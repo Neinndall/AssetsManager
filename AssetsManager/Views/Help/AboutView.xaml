@@ -104,7 +104,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="0,0,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CloudDownload" Foreground="{StaticResource AccentBlue}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Auto Downloads" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
@@ -117,7 +117,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="8,0,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
@@ -130,7 +130,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="FolderSearch" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="File Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
@@ -143,7 +143,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,8" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="3D Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
@@ -156,7 +156,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="0,8,8,0" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Live Monitoring" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>
@@ -169,7 +169,7 @@
             <Border Style="{StaticResource SettingsCard}" Margin="8,8,0,0" Padding="20">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="8">
+                        <Border Background="{StaticResource HoverColor}" Width="36" Height="36" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="MusicNote" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <TextBlock Text="Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="12,0,0,0"/>

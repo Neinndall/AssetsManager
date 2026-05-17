@@ -237,7 +237,7 @@ namespace AssetsManager.Services.Viewer
 
                 var modelPart = new ModelPart
                 {
-                    Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
+                    Name = PathUtils.SimplifyMeshName(data.MaterialName),
                     Visual = new ModelVisual3D(),
                     AllTextures = loadedTextures,
                     AvailableTextureNames = availableTextureNames,

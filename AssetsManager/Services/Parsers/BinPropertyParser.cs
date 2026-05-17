@@ -7,16 +7,23 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using AssetsManager.Services.Hashes;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Parsers
 {
-    public static class BinUtils
+    public class BinPropertyParser
     {
-        public static Task WriteBinTreeAsJsonAsync(Stream outputStream, BinTree binTree, HashResolverService hashResolver)
+        private readonly HashResolverService _hashResolver;
+
+        public BinPropertyParser(HashResolverService hashResolver)
         {
-            return Task.Run(() => WriteBinTreeAsJson(outputStream, binTree, hashResolver));
+            _hashResolver = hashResolver;
         }
 
-        private static void WriteBinTreeAsJson(Stream outputStream, BinTree binTree, HashResolverService hashResolver)
+        public Task WriteBinTreeAsJsonAsync(Stream outputStream, BinTree binTree)
+        {
+            return Task.Run(() => WriteBinTreeAsJson(outputStream, binTree));
+        }
+
+        private void WriteBinTreeAsJson(Stream outputStream, BinTree binTree)
         {
             var options = new JsonWriterOptions { Indented = true };
             using var writer = new Utf8JsonWriter(outputStream, options);
@@ -24,13 +31,13 @@ namespace AssetsManager.Utils
             writer.WriteStartObject();
             foreach (var kvp in binTree.Objects)
             {
-                writer.WritePropertyName(hashResolver.ResolveBinHashGeneral(kvp.Key));
+                writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(kvp.Key));
                 writer.WriteStartObject();
-                writer.WriteString("type", hashResolver.ResolveBinHashGeneral(kvp.Value.ClassHash));
+                writer.WriteString("type", _hashResolver.ResolveBinHashGeneral(kvp.Value.ClassHash));
                 foreach (var propKvp in kvp.Value.Properties)
                 {
-                    writer.WritePropertyName(hashResolver.ResolveBinHashGeneral(propKvp.Key));
-                    WritePropertyValue(writer, propKvp.Value, hashResolver);
+                    writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(propKvp.Key));
+                    WritePropertyValue(writer, propKvp.Value);
                 }
                 writer.WriteEndObject();
             }
@@ -38,7 +45,7 @@ namespace AssetsManager.Utils
             writer.Flush();
         }
 
-        private static void WritePropertyValue(Utf8JsonWriter writer, BinTreeProperty prop, HashResolverService hashResolver)
+        private void WritePropertyValue(Utf8JsonWriter writer, BinTreeProperty prop)
         {
             if (prop == null)
             {
@@ -49,7 +56,7 @@ namespace AssetsManager.Utils
             switch (prop.Type)
             {
                 case BinPropertyType.String: writer.WriteStringValue(((BinTreeString)prop).Value); break;
-                case BinPropertyType.Hash: writer.WriteStringValue(hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value)); break;
+                case BinPropertyType.Hash: writer.WriteStringValue(_hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value)); break;
                 case BinPropertyType.I8: writer.WriteNumberValue(((BinTreeI8)prop).Value); break;
                 case BinPropertyType.U8: writer.WriteNumberValue(((BinTreeU8)prop).Value); break;
                 case BinPropertyType.I16: writer.WriteNumberValue(((BinTreeI16)prop).Value); break;
@@ -114,8 +121,8 @@ namespace AssetsManager.Utils
                     writer.WriteEndObject();
                     break;
 
-                case BinPropertyType.ObjectLink: writer.WriteStringValue(hashResolver.ResolveBinHashGeneral(((BinTreeObjectLink)prop).Value)); break;
-                case BinPropertyType.WadChunkLink: writer.WriteStringValue(hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
+                case BinPropertyType.ObjectLink: writer.WriteStringValue(_hashResolver.ResolveBinHashGeneral(((BinTreeObjectLink)prop).Value)); break;
+                case BinPropertyType.WadChunkLink: writer.WriteStringValue(_hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
 
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
@@ -123,7 +130,7 @@ namespace AssetsManager.Utils
                     var container = (BinTreeContainer)prop;
                     foreach (var p in container.Elements)
                     {
-                        WritePropertyValue(writer, p, hashResolver);
+                        WritePropertyValue(writer, p);
                     }
                     writer.WriteEndArray();
                     break;
@@ -132,17 +139,17 @@ namespace AssetsManager.Utils
                 case BinPropertyType.Embedded:
                     var structProp = (BinTreeStruct)prop;
                     writer.WriteStartObject();
-                    writer.WriteString("type", hashResolver.ResolveBinHashGeneral(structProp.ClassHash));
+                    writer.WriteString("type", _hashResolver.ResolveBinHashGeneral(structProp.ClassHash));
                     foreach (var kvp in structProp.Properties)
                     {
-                        writer.WritePropertyName(hashResolver.ResolveBinHashGeneral(kvp.Key));
-                        WritePropertyValue(writer, kvp.Value, hashResolver);
+                        writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(kvp.Key));
+                        WritePropertyValue(writer, kvp.Value);
                     }
                     writer.WriteEndObject();
                     break;
 
                 case BinPropertyType.Optional:
-                    WritePropertyValue(writer, ((BinTreeOptional)prop).Value, hashResolver);
+                    WritePropertyValue(writer, ((BinTreeOptional)prop).Value);
                     break;
 
                 case BinPropertyType.Map:
@@ -150,9 +157,9 @@ namespace AssetsManager.Utils
                     foreach (var kvp in (BinTreeMap)prop)
                     {
                         // JSON keys must be strings.
-                        var keyString = ConvertPropertyToString(kvp.Key, hashResolver);
+                        var keyString = ConvertPropertyToString(kvp.Key);
                         writer.WritePropertyName(keyString);
-                        WritePropertyValue(writer, kvp.Value, hashResolver);
+                        WritePropertyValue(writer, kvp.Value);
                     }
                     writer.WriteEndObject();
                     break;
@@ -160,19 +167,19 @@ namespace AssetsManager.Utils
                 default:
                     writer.WriteStartObject();
                     writer.WriteString("Type", prop.Type.ToString());
-                    writer.WriteString("NameHash", hashResolver.ResolveBinHashGeneral(prop.NameHash));
+                    writer.WriteString("NameHash", _hashResolver.ResolveBinHashGeneral(prop.NameHash));
                     writer.WriteEndObject();
                     break;
             }
         }
 
-        private static string ConvertPropertyToString(BinTreeProperty prop, HashResolverService hashResolver)
+        private string ConvertPropertyToString(BinTreeProperty prop)
         {
             if (prop == null) return "null";
             switch (prop.Type)
             {
                 case BinPropertyType.String: return ((BinTreeString)prop).Value;
-                case BinPropertyType.Hash: return hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value);
+                case BinPropertyType.Hash: return _hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value);
                 case BinPropertyType.I8: return ((BinTreeI8)prop).Value.ToString();
                 case BinPropertyType.U8: return ((BinTreeU8)prop).Value.ToString();
                 case BinPropertyType.I16: return ((BinTreeI16)prop).Value.ToString();
@@ -181,7 +188,7 @@ namespace AssetsManager.Utils
                 case BinPropertyType.U32: return ((BinTreeU32)prop).Value.ToString();
                 case BinPropertyType.I64: return ((BinTreeI64)prop).Value.ToString();
                 case BinPropertyType.U64: return ((BinTreeU64)prop).Value.ToString();
-                default: return hashResolver.ResolveBinHashGeneral(prop.NameHash);
+                default: return _hashResolver.ResolveBinHashGeneral(prop.NameHash);
             }
         }
     }

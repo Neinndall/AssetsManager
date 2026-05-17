@@ -74,10 +74,12 @@ namespace AssetsManager.Views
 
             // Setup and inject dependencies for BackupsControl
             BackupsControl.BackupManager = backupManager;
+            BackupsControl.VersionService = versionService;
             BackupsControl.LogService = logService;
             BackupsControl.AppSettings = appSettings;
             BackupsControl.CustomMessageBoxService = customMessageBoxService;
             BackupsControl.TaskCancellationManager = taskCancellationManager;
+            BackupsControl.ServiceProvider = serviceProvider;
 
             // Setup and inject dependencies for ApiControl
             ApiControl.LogService = logService;

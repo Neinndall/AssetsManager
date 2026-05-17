@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Windows.Media;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
@@ -15,9 +16,32 @@ namespace AssetsManager.Views.Models.Explorer
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
     {
+        private static readonly Dictionary<string, string> _wadPathPool = new(StringComparer.OrdinalIgnoreCase);
+
         public string Name { get; set; }
         public NodeType Type { get; set; }
-        public string FullPath { get; set; } // Real path for RealDirectory/WadFile/RealFile, Virtual path for Virtual items
+
+        private string _fullPath;
+        public string FullPath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_fullPath))
+                {
+                    if (Type == NodeType.VirtualFile || Type == NodeType.VirtualDirectory || Type == NodeType.WemFile || Type == NodeType.AudioEvent || Type == NodeType.SoundBank)
+                    {
+                        if (Parent == null || Parent.Type == NodeType.WadFile || Parent.Type == NodeType.RealDirectory)
+                            return Name;
+
+                        var parentPath = Parent.FullPath;
+                        return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                    }
+                }
+                return _fullPath;
+            }
+            set => _fullPath = value;
+        }
+
         public DiffStatus Status { get; set; } = DiffStatus.Unchanged;
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
@@ -27,10 +51,52 @@ namespace AssetsManager.Views.Models.Explorer
         public bool IsEnabled { get; set; } = true;
         public AudioSourceType AudioSource { get; set; } // Only for WemFile
 
-        public ObservableRangeCollection<FileSystemNodeModel> Children { get; set; }
+        private ObservableRangeCollection<FileSystemNodeModel> _children;
+        public ObservableRangeCollection<FileSystemNodeModel> Children
+        {
+            get
+            {
+                if (_children == null && CanHaveChildren(Type))
+                {
+                    _children = new ObservableRangeCollection<FileSystemNodeModel>();
+                }
+                return _children;
+            }
+            set => _children = value;
+        }
 
-        // --- Data for WADs and Chunks ---
-        public string SourceWadPath { get; set; } // Only for VirtualFile/VirtualDirectory
+        public static bool CanHaveChildren(NodeType type)
+        {
+            return type == NodeType.RealDirectory || 
+                   type == NodeType.WadFile || 
+                   type == NodeType.VirtualDirectory || 
+                   type == NodeType.SoundBank || 
+                   type == NodeType.AudioEvent;
+        }
+
+        public FileSystemNodeModel Parent { get; set; }
+
+        private string _sourceWadPath;
+        public string SourceWadPath
+        {
+            get => _sourceWadPath;
+            set
+            {
+                if (value == null) _sourceWadPath = null;
+                else
+                {
+                    lock (_wadPathPool)
+                    {
+                        if (!_wadPathPool.TryGetValue(value, out _sourceWadPath))
+                        {
+                            _sourceWadPath = value;
+                            _wadPathPool[value] = value;
+                        }
+                    }
+                }
+            }
+        }
+
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
@@ -44,7 +110,10 @@ namespace AssetsManager.Views.Models.Explorer
                     if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
                         _extension = "";
                     else
-                        _extension = Path.GetExtension(FullPath ?? "").ToLowerInvariant();
+                    {
+                        string path = FullPath;
+                        _extension = string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
+                    }
                 }
                 return _extension;
             }
@@ -205,14 +274,13 @@ namespace AssetsManager.Views.Models.Explorer
         // Constructor for real files/directories
         public FileSystemNodeModel(string path)
         {
-            FullPath = path;
+            _fullPath = path;
             Name = Path.GetFileName(path);
-            Children = new ObservableRangeCollection<FileSystemNodeModel>();
 
             if (Directory.Exists(path))
             {
                 Type = NodeType.RealDirectory;
-                Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
+                Children.Add(new FileSystemNodeModel()); // Add dummy child
             }
             else
             {
@@ -220,16 +288,16 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
                 {
                     Type = NodeType.WadFile;
-                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
+                    Children.Add(new FileSystemNodeModel()); // Add dummy child
                 }
                 else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
+                    Children.Add(new FileSystemNodeModel()); // Add dummy child
                 }
                 else
                 {
-                    Type = NodeType.RealFile; // It's a real file on the filesystem
+                    Type = NodeType.RealFile;
                 }
             }
         }
@@ -238,9 +306,8 @@ namespace AssetsManager.Views.Models.Explorer
         public FileSystemNodeModel(string name, bool isDirectory, string virtualPath, string sourceWad)
         {
             Name = name;
-            FullPath = virtualPath;
+            _fullPath = virtualPath;
             SourceWadPath = sourceWad;
-            Children = new ObservableRangeCollection<FileSystemNodeModel>();
 
             if (isDirectory)
             {
@@ -252,7 +319,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerName.EndsWith(".wpk") || lowerName.EndsWith(".bnk"))
                 {
                     Type = NodeType.SoundBank;
-                    Children.AddRange(new[] { new FileSystemNodeModel() }); // Add dummy child via Range
+                    Children.Add(new FileSystemNodeModel()); // Add dummy child
                 }
                 else
                 {
@@ -265,7 +332,6 @@ namespace AssetsManager.Views.Models.Explorer
         internal FileSystemNodeModel()
         {
             Name = "Loading...";
-            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         // Constructor for custom UI nodes like Audio Events
@@ -273,8 +339,6 @@ namespace AssetsManager.Views.Models.Explorer
         {
             Name = name;
             Type = type;
-            FullPath = name; // Path is not relevant for these nodes
-            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         // Constructor for WemFile nodes
@@ -285,8 +349,6 @@ namespace AssetsManager.Views.Models.Explorer
             WemId = wemId;
             WemOffset = wemOffset;
             WemSize = wemSize;
-            FullPath = name; // Path is not relevant for these nodes
-            Children = new ObservableRangeCollection<FileSystemNodeModel>();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -298,20 +360,20 @@ namespace AssetsManager.Views.Models.Explorer
         public void Dispose()
         {
             // Limpiar hijos recursivamente
-            if (Children != null)
+            if (_children != null)
             {
-                foreach (var child in Children)
+                foreach (var child in _children)
                 {
                     child.Dispose();
                 }
-                Children.Clear();
+                _children.Clear();
             }
 
             // Limpiar referencias
             ChunkDiff = null;
-            SourceWadPath = null;
+            _sourceWadPath = null;
             BackupChunkPath = null;
-            FullPath = null;
+            _fullPath = null;
             OldPath = null;
             Name = null;
 

@@ -6,12 +6,12 @@ using System.Reflection;
 using AssetsManager.Services.Hashes;
 using System.Linq;
 using Serilog;
-using System.Threading; // Added for CancellationToken and OperationCanceledException
+using System.Threading;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
-using AssetsManager.Utils; // Added for TaskCancellationManager
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Comparator
 {
@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Comparator
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("Single WAD comparison was cancelled.");
+                _logService.LogWarning("WADs comparison process was cancelled.");
                 allDiffs = null;
             }
             catch (Exception ex)
@@ -128,10 +128,8 @@ namespace AssetsManager.Services.Comparator
 
                 _logService.Log("Starting WADs comparison...");
                 
-                // Notify UI immediately to show activity (Indeterminate spinner)
                 NotifyComparisonStarted(0);
 
-                // Run heavy scanning in a background task to keep UI responsive
                 var scanResult = await Task.Run(() =>
                 {
                     var searchPatterns = new[] { "*.wad.client", "*.wad" };
@@ -167,10 +165,8 @@ namespace AssetsManager.Services.Comparator
                 _totalChunksGlobal = scanResult.TotalChunks;
                 _completedChunksGlobal = 0;
                 
-                // Update UI with the real total discovered
                 NotifyComparisonStarted(_totalChunksGlobal);
 
-                // Phase 2: Compare
                 int fileIndex = 0;
                 foreach (var file in scanResult.ValidFiles)
                 {
@@ -185,7 +181,7 @@ namespace AssetsManager.Services.Comparator
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("WADs comparison was cancelled.");
+                _logService.LogWarning("WADs comparison process was cancelled.");
                 allDiffs = null;
             }
             catch (Exception ex)
@@ -227,11 +223,9 @@ namespace AssetsManager.Services.Comparator
                 newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
             }
 
-            // Fast Mode: We use the pre-calculated hashes from the WAD header
             var oldChunkChecksums = await GetChunkChecksumsAsync(oldChunks.Values, cancellationToken, statusMsg);
             var newChunkChecksums = await GetChunkChecksumsAsync(newChunks.Values, cancellationToken, statusMsg);
 
-            // Comparison logic (fast)
             foreach (var oldChunk in oldChunks.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -245,10 +239,25 @@ namespace AssetsManager.Services.Comparator
                     var newChunk = newChunks[oldChunk.PathHash];
                     if (oldChunkChecksums[oldChunk.PathHash] != newChunkChecksums[newChunk.PathHash])
                     {
-                        var newPath = _hashResolverService.ResolveHash(newChunk.PathHash);
+                        var newPath = _hashResolverService.ResolveHash(oldChunk.PathHash);
                         diffs.Add(new ChunkDiff { Type = ChunkDiffType.Modified, OldChunk = oldChunk, NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
                     }
                 }
+            }
+
+            var oldChecksumMap = new Dictionary<ulong, ulong>();
+            // First pass: chunks that are NOT in new WAD (likely renames)
+            foreach (var kvp in oldChunkChecksums)
+            {
+                if (!newChunks.ContainsKey(kvp.Key))
+                {
+                    oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
+                }
+            }
+            // Second pass: chunks that ARE in new WAD (likely duplicates)
+            foreach (var kvp in oldChunkChecksums)
+            {
+                oldChecksumMap.TryAdd(kvp.Value, kvp.Key);
             }
 
             foreach (var newChunk in newChunks.Values)
@@ -257,11 +266,12 @@ namespace AssetsManager.Services.Comparator
                 if (!oldChunks.ContainsKey(newChunk.PathHash))
                 {
                     var newPath = _hashResolverService.ResolveHash(newChunk.PathHash);
-                    var oldChecksum = oldChunkChecksums.FirstOrDefault(c => c.Value == newChunkChecksums[newChunk.PathHash]);
-                    if (oldChecksum.Key != 0)
+                    ulong newChecksum = newChunkChecksums[newChunk.PathHash];
+
+                    if (oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
                     {
-                        var oldPath = _hashResolverService.ResolveHash(oldChecksum.Key);
-                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunks[oldChecksum.Key], NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
+                        var oldPath = _hashResolverService.ResolveHash(oldHash);
+                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunks[oldHash], NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
                     }
                     else
                     {
@@ -285,8 +295,6 @@ namespace AssetsManager.Services.Comparator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Fast Mode: Use Reflection to access the private '_checksum' field in the WAD header
-                    // This is nearly instant and avoids decompressing the data.
                     ulong checksum = 0;
                     if (_checksumField != null)
                     {

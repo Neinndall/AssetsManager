@@ -136,16 +136,16 @@ namespace AssetsManager.Services.Monitor
 
         public async Task DownloadPluginsAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
-            await ExecuteNativeDownloadTaskAsync("League Client", manifestUrl, lolPbeDirectory, locales);
+            await ExecuteNativeDownloadTaskAsync("League Client", manifestUrl, lolPbeDirectory, locales, cancellationToken);
         }
 
         public async Task DownloadGameClientAsync(string manifestUrl, string lolPbeDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             string gameDirectory = Path.Combine(lolPbeDirectory, "Game");
-            await ExecuteNativeDownloadTaskAsync("Game Client", manifestUrl, gameDirectory, locales);
+            await ExecuteNativeDownloadTaskAsync("Game Client", manifestUrl, gameDirectory, locales, cancellationToken);
         }
 
-        private async Task ExecuteNativeDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales)
+        private async Task ExecuteNativeDownloadTaskAsync(string taskName, string manifestUrl, string targetDirectory, List<string> locales, CancellationToken cancellationToken)
         {
             try
             {
@@ -154,10 +154,10 @@ namespace AssetsManager.Services.Monitor
                 
                 _logService.Log($"Verifying/Updating {taskName}...");
 
-                var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl);
+                var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl, cancellationToken);
                 var manifest = _rmanService.Parse(manifestBytes);
 
-                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales);
+                int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales, cancellationToken);
 
                 if (updatedCount > 0)
                 {
@@ -168,6 +168,11 @@ namespace AssetsManager.Services.Monitor
                     _logService.Log("No updates required for this manifest.");
                 }
                 VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
+            }
+            catch (OperationCanceledException)
+            {
+                // Note: Granular logging is handled inside ManifestDownloader for both Verification and Updating phases.
+                VersionDownloadCompleted?.Invoke(this, (taskName, false, "Cancelled"));
             }
             catch (Exception ex)
             {
@@ -217,6 +222,44 @@ namespace AssetsManager.Services.Monitor
                 catch { }
             }
             return successCount > 0;
+        }
+
+        public async Task<string> GetGameVersionAsync(string rootDirectory)
+        {
+            if (string.IsNullOrEmpty(rootDirectory) || !Directory.Exists(rootDirectory)) return null;
+
+            try
+            {
+                string metadataPath = Path.Combine(rootDirectory, "Game", "content-metadata.json");
+                if (!File.Exists(metadataPath))
+                {
+                    metadataPath = Path.Combine(rootDirectory, "content-metadata.json");
+                }
+
+                if (File.Exists(metadataPath))
+                {
+                    string json = await File.ReadAllTextAsync(metadataPath);
+                    using var document = JsonDocument.Parse(json);
+                    if (document.RootElement.TryGetProperty("version", out var versionElement))
+                    {
+                        string fullVersion = versionElement.GetString();
+                        if (string.IsNullOrEmpty(fullVersion)) return null;
+
+                        int plusIndex = fullVersion.IndexOf('+');
+                        if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
+
+                        int spaceIndex = fullVersion.IndexOf(' ');
+                        if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
+
+                        return fullVersion;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Error reading version from {rootDirectory}");
+            }
+            return null;
         }
     }
 }

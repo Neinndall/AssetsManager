@@ -24,8 +24,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <materialIcons:MaterialIcon Kind="FilterList" Width="16" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
-                    <TextBlock Text="Historical Log Entries" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                    <materialIcons:MaterialIcon Kind="FilterList" Width="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0"/>
+                    <TextBlock Text="Historical Log Entries" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Pagination Controls -->
@@ -37,7 +37,7 @@
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="20" Foreground="{StaticResource TextSecondary}"/>
                     </Button>
 
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="12,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding Paginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
 
@@ -59,7 +59,7 @@
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                     <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Margin" Value="0,0,0,4"/>
+                    <Setter Property="Margin" Value="0,0,0,6"/>
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ListViewItem">
@@ -73,31 +73,56 @@
                 <DataTemplate>
                     <Grid>
                         <!-- 1. Background -->
-                        <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                        <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.1"/>
+                            </Border.Effect>
+                        </Border>
                         
-                        <!-- 2. Accent Strip (Pixel-Perfect Layer) -->
-                        <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" BorderBrush="{StaticResource AccentOrange}" CornerRadius="8"/>
+                        <!-- 2. Accent Strip -->
+                        <Border x:Name="AccentStrip" BorderThickness="2,0,0,0" CornerRadius="10,0,0,10">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentOrange}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBlue}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
 
                         <!-- 3. Content -->
-                        <Grid Margin="12,8,12,8">
+                        <Grid Margin="16,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/> <!-- Icon -->
                                 <ColumnDefinition Width="*"/>    <!-- Info -->
                                 <ColumnDefinition Width="Auto"/> <!-- Actions -->
                             </Grid.ColumnDefinitions>
 
-                            <!-- File Icon Box -->
-                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                <materialIcons:MaterialIcon Width="18" Height="18" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <!-- Professional Icon Box -->
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,16,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <materialIcons:MaterialIcon Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon.Style>
                                         <Style TargetType="materialIcons:MaterialIcon">
-                                            <Setter Property="Kind" Value="FileQuestionOutline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                            <Setter Property="Kind" Value="DatabaseOutline"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Type}" Value="FileDiff">
-                                                    <Setter Property="Kind" Value="FileDocumentOutline"/>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="Kind" Value="FileCompare"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding Type}" Value="WadComparison">
-                                                    <Setter Property="Kind" Value="FolderZipOutline"/>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadArchive">
+                                                    <Setter Property="Kind" Value="PackageVariantClosed"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="Kind" Value="Radar"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -105,31 +130,111 @@
                                 </materialIcons:MaterialIcon>
                             </Border>
 
-                            <!-- Info -->
+                            <!-- Info Section -->
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm:ss}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                <!-- Main Title with Type-based Prefix -->
+                                <TextBlock FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Comparison | {0}'}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Watcher | {0}'}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Difference | {0}'}"/>
+                                                </DataTrigger>
+                                                <!-- Fallbacks -->
+                                                <DataTrigger Binding="{Binding DisplayName}" Value="{x:Null}">
+                                                    <Setter Property="Text" Value="{Binding FileName}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding DisplayName}" Value="">
+                                                    <Setter Property="Text" Value="{Binding FileName}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- Version/Type Badge -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Version}" Value="{x:Null}">
+                                                                <Setter Property="Text" Value="v1.0"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Version}" Value="">
+                                                                <Setter Property="Text" Value="v1.0"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Timestamp Badge -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Storage ID / Category Badge -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="FolderOutline" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding ReferenceId}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </StackPanel>
 
-                            <!-- Actions -->
+                            <!-- Actions Section -->
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Click="btnEditName_Click" ToolTip="Edit Name"
-                                        Style="{StaticResource TransparentIconButton}"
-                                        Width="28" Height="28" Margin="0,0,4,0">
-                                    <materialIcons:MaterialIcon Kind="PencilOutline" Width="16" Height="16" Foreground="{StaticResource TextSecondary}"/>
+                                <Button Click="btnEditName_Click" 
+                                        Width="30" Height="30" Margin="0,0,6,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="ToolTip" Value="Rename Comparison"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="ToolTip" Value="Rename Watcher"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                    <Setter Property="ToolTip" Value="Rename Difference"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18" Foreground="{StaticResource TextSecondary}"/>
                                 </Button>
 
-                                <Button Click="btnViewDiff_Click" ToolTip="View Historical Differences" 
-                                        Style="{StaticResource TransparentIconButton}" 
-                                        Width="28" Height="28" Margin="0,0,4,0">
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16" Foreground="{StaticResource AccentBrush}"/>
+                                <Button Click="btnViewDiff_Click" 
+                                        Width="34" Height="34" Margin="0,0,6,0" Background="{StaticResource SidebarBackground}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="ToolTip" Value="View Historical Data"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
+                                                    <Setter Property="ToolTip" Value="View Differences"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
                                 </Button>
-                                
-                                <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Delete Entry">
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Foreground="{StaticResource AccentRed}"/>
+
+                                <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
+
+                                <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove from History">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
                         </Grid>

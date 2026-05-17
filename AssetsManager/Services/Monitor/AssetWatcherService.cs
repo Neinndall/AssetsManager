@@ -22,17 +22,19 @@ namespace AssetsManager.Services.Monitor
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadContentProvider _wadContentProvider;
+        private readonly VersionService _versionService;
 
         private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public event Action<MonitoredAsset> AssetUpdated;
 
-        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider)
+        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider, VersionService versionService)
         {
             _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadContentProvider = wadContentProvider;
+            _versionService = versionService;
         }
 
         public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
@@ -125,12 +127,12 @@ namespace AssetsManager.Services.Monitor
                     if (asset.LastKnownHash == 0)
                     {
                         // First time adding, just save current state and extract initial version
-                        await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, true);
+                        await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, true, fullWadPath);
                     }
                     else if (asset.LastKnownHash != currentChecksum)
                     {
                         // Change detected!
-                        await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, false);
+                        await ProcessAssetUpdate(asset, wadFile, chunk, currentChecksum, false, fullWadPath);
                         anyUpdated = true;
                         updatedAssetNames.Add(asset.Alias);
                     }
@@ -182,7 +184,7 @@ namespace AssetsManager.Services.Monitor
             return (anyUpdated, updatedAssetNames);
         }
 
-        private async Task ProcessAssetUpdate(MonitoredAsset asset, WadFile wadFile, WadChunk chunk, ulong checksum, bool isInitial)
+        private async Task ProcessAssetUpdate(MonitoredAsset asset, WadFile wadFile, WadChunk chunk, ulong checksum, bool isInitial, string fullWadPath)
         {
             string cleanAlias = asset.Alias.Replace("/", "_").Replace("\\", "_");
             string oldPath = Path.Combine(_directoriesCreator.WatcherCacheOldPath, cleanAlias);
@@ -190,6 +192,16 @@ namespace AssetsManager.Services.Monitor
 
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(oldPath));
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(newPath));
+
+            // Update version if we can (e.g. after a game update)
+            // We do this BEFORE archiving to history so the history entry has the CORRECT current version
+            string currentVersion = asset.Version;
+            try
+            {
+                string wadBaseDir = Path.GetDirectoryName(fullWadPath);
+                currentVersion = await _versionService.GetGameVersionAsync(wadBaseDir) ?? currentVersion;
+            }
+            catch { }
 
             if (!isInitial)
             {
@@ -231,10 +243,13 @@ namespace AssetsManager.Services.Monitor
                     var entry = new HistoryEntry
                     {
                         FileName = asset.Alias,
+                        DisplayName = asset.Alias,
+                        Version = currentVersion,
                         OldFilePath = archiveOld,
                         NewFilePath = archiveNew,
                         Timestamp = DateTime.Now,
-                        Type = HistoryEntryType.FileDiff
+                        Type = HistoryEntryType.WatcherUpdate,
+                        ReferenceId = "Watcher Update"
                     };
 
                     _appSettings.DiffHistory.Insert(0, entry);
@@ -248,6 +263,7 @@ namespace AssetsManager.Services.Monitor
 
             Application.Current.Dispatcher.Invoke(() =>
             {
+                asset.Version = currentVersion;
                 asset.LastKnownHash = checksum;
                 asset.LastUpdated = DateTime.Now;
                 asset.Status = isInitial ? AssetStatus.UpToDate : AssetStatus.Updated;

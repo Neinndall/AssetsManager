@@ -26,10 +26,10 @@
         </DoubleAnimation>
     </Storyboard>
     
-        <!-- Animación para el icono giratorio de progreso -->
+    <!-- Animación para el icono giratorio de progreso (Cadencia optimizada) -->
     <Storyboard x:Key="SpinningIconAnimation">
         <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                         From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever"/>
+                         From="0" To="360" Duration="0:0:0.85" RepeatBehavior="Forever"/>
     </Storyboard>
 
     <!-- Estilo para aplicar la animación de giro automáticamente -->
@@ -127,6 +127,118 @@
                 <BeginStoryboard Storyboard="{StaticResource PbeLedPulseAnimation}"/>
             </EventTrigger>
         </Style.Triggers>
+    </Style>
+
+    <!-- Smooth Progress Animation: Interpolates the Value property for a professional feel -->
+    <Storyboard x:Key="SmoothProgressAnimation">
+        <DoubleAnimation Storyboard.TargetProperty="Value" 
+                         Duration="0:0:0.5" 
+                         DecelerationRatio="0.5">
+            <DoubleAnimation.EasingFunction>
+                <CubicEase EasingMode="EaseOut"/>
+            </DoubleAnimation.EasingFunction>
+        </DoubleAnimation>
+    </Storyboard>
+
+    <!-- Global style for the animated status line sweep (v4 Premium) -->
+    <Style x:Key="TechnicalScanStyle" TargetType="ContentControl">
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="Height" Value="1.5"/>
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/> <!-- Use project brand color -->
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContentControl">
+                    <Grid x:Name="Root">
+                        <Border x:Name="GlowPart" Height="{TemplateBinding Height}" HorizontalAlignment="Stretch">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <LinearGradientBrush.RelativeTransform>
+                                        <TranslateTransform x:Name="GlowTransform" X="-1"/>
+                                    </LinearGradientBrush.RelativeTransform>
+                                    <GradientStop Color="Transparent" Offset="0"/>
+                                    <!-- Binding to the TemplatedParent's BorderBrush -->
+                                    <GradientStop Color="{Binding BorderBrush.Color, RelativeSource={RelativeSource TemplatedParent}}" Offset="0.5"/>
+                                    <GradientStop Color="Transparent" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="Visibility" Value="Visible">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="StartScan">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="GlowTransform" 
+                                                         Storyboard.TargetProperty="X" 
+                                                         From="-1" To="1" Duration="0:0:2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="StartScan"/>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- MODERN GLINDER (GridSplitter) STYLE & ANIMATIONS -->
+    <Style x:Key="ModernGlinderStyle" TargetType="GridSplitter">
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="SizeNS"/>
+        <Setter Property="ResizeDirection" Value="Rows"/>
+        <Setter Property="ResizeBehavior" Value="PreviousAndNext"/>
+        <Setter Property="ShowsPreview" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="Transparent" x:Name="RootBorder">
+                        <Border x:Name="Handle" 
+                                Width="42" Height="4" 
+                                Background="{StaticResource BorderColor}" 
+                                CornerRadius="2" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"
+                                Opacity="0.4">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="HandleGlow" Color="{Binding Color, Source={StaticResource AccentBrush}}" BlurRadius="0" ShadowDepth="0" Opacity="0"/>
+                            </Border.Effect>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Handle" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Handle" Property="Opacity" Value="1"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="Width" To="64" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).BlurRadius" To="12" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).Opacity" To="0.6" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="Width" To="42" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).BlurRadius" To="0" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Handle" Storyboard.TargetProperty="(Effect).Opacity" To="0" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
         
 </ResourceDictionary>

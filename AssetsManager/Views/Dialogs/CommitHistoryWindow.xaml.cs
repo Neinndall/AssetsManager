@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using AssetsManager.Views.Models.Dialogs;
@@ -49,12 +50,25 @@ namespace AssetsManager.Views.Dialogs
             _viewModel.IsLoading = true;
             try
             {
-                // Call the enriched service layer
-                var enrichedCommits = await _gitHubApi.GetEnrichedCommitsAsync("qa", "qa-testing", 20);
+                // Call the enriched service layer with maximum history depth (100 commits)
+                var enrichedCommits = await _gitHubApi.GetEnrichedCommitsAsync("qa", "qa-testing", 100);
                 
                 // Update UI state
                 _viewModel.Commits.ReplaceRange(enrichedCommits);
-                _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Revisions synchronized" : "No revisions found";
+
+                // Group commits by date for the new GitHub-style timeline
+                var groups = enrichedCommits
+                    .GroupBy(c => c.Commit.Author.Date.Date)
+                    .OrderByDescending(g => g.Key)
+                    .Select(g => new CommitGroup
+                    {
+                        DateHeader = $"Commits on {g.Key:MMM dd, yyyy}",
+                        Commits = g.ToList()
+                    })
+                    .ToList();
+
+                _viewModel.GroupedCommits.ReplaceRange(groups);
+                _viewModel.StatusMessage = _viewModel.Commits.Count > 0 ? "Commits synchronized" : "No commits found";
             }
             catch (Exception ex)
             {

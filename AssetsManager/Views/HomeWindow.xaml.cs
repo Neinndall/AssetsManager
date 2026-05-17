@@ -13,11 +13,11 @@ namespace AssetsManager.Views
         public MainWindow ParentWindow { get; set; }
         private readonly HomeModel _model;
 
-        public HomeWindow(AppSettings appSettings)
+        public HomeWindow(AppSettings appSettings, DirectoriesCreator directoriesCreator)
         {
             InitializeComponent();
             
-            _model = new HomeModel(appSettings);
+            _model = new HomeModel(appSettings, directoriesCreator);
             DataContext = _model;
             
             Unloaded += HomeWindow_Unloaded;
@@ -34,7 +34,10 @@ namespace AssetsManager.Views
             {
                 if (ParentWindow != null)
                 {
-                    ParentWindow.Sidebar.SelectNavigationItem(destination);
+                    string sidebarTag = destination;
+                    if (destination.StartsWith("Explorer_")) sidebarTag = "Explorer";
+
+                    ParentWindow.Sidebar.SelectNavigationItem(sidebarTag);
                     ParentWindow.OnSidebarNavigationRequested(destination);
                 }
             }

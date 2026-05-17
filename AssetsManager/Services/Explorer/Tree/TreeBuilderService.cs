@@ -12,6 +12,7 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Settings;
 using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Services.Explorer.Tree
@@ -41,26 +42,32 @@ namespace AssetsManager.Services.Explorer.Tree
             _audioBankService = audioBankService;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All)
         {
             var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
 
-            string gamePath = Path.Combine(rootPath, "Game");
-            if (Directory.Exists(gamePath))
+            if (preferredDirectory == PreferredDirectory.All || preferredDirectory == PreferredDirectory.Game)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var gameNode = new FileSystemNodeModel(gamePath);
-                rootNodes.Add(gameNode);
-                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
+                string gamePath = Path.Combine(rootPath, "Game");
+                if (Directory.Exists(gamePath))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var gameNode = new FileSystemNodeModel(gamePath);
+                    rootNodes.Add(gameNode);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
+                }
             }
 
-            string pluginsPath = Path.Combine(rootPath, "Plugins");
-            if (Directory.Exists(pluginsPath))
+            if (preferredDirectory == PreferredDirectory.All || preferredDirectory == PreferredDirectory.Plugins)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var pluginsNode = new FileSystemNodeModel(pluginsPath);
-                rootNodes.Add(pluginsNode);
-                await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
+                string pluginsPath = Path.Combine(rootPath, "Plugins");
+                if (Directory.Exists(pluginsPath))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var pluginsNode = new FileSystemNodeModel(pluginsPath);
+                    rootNodes.Add(pluginsNode);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -136,7 +143,11 @@ namespace AssetsManager.Services.Explorer.Tree
                 var eventNodesToAdd = new List<FileSystemNodeModel>();
                 foreach (var eventNode in audioTree)
                 {
-                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent);
+                    var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent)
+                    {
+                        Parent = clickedNode
+                    };
+
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
@@ -170,7 +181,8 @@ namespace AssetsManager.Services.Explorer.Tree
                             SourceChunkPathHash = sourceHash,
                             BackupChunkPath = backupChunkPath,
                             ChunkDiff = soundDiff,
-                            AudioSource = soundNode.Source
+                            AudioSource = soundNode.Source,
+                            Parent = newEventNode
                         };
                         soundNodesToAdd.Add(newSoundNode);
                     }
@@ -193,6 +205,8 @@ namespace AssetsManager.Services.Explorer.Tree
             {
                 return true; // Keep files
             }
+
+            if (node.Children == null) return false;
 
             for (int i = node.Children.Count - 1; i >= 0; i--)
             {

@@ -62,7 +62,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0: Professional Toolbar Area -->
             <RowDefinition Height="*"/>    <!-- 1: Main Content Area -->

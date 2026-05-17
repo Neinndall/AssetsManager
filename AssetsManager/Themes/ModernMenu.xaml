@@ -14,6 +14,7 @@
         <Setter Property="HasDropShadow" Value="True"/>
         <Setter Property="MinWidth" Value="150"/>
         <Setter Property="Padding" Value="0,2"/>
+        <Setter Property="Popup.PopupAnimation" Value="None"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
@@ -65,7 +66,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="4"
-                                Margin="3,0.5"
+                                Margin="3,1"
                                 SnapsToDevicePixels="True">
                             <Grid MinHeight="{TemplateBinding MinHeight}">
                                 <Grid.ColumnDefinitions>
@@ -118,8 +119,8 @@
                                Focusable="False"
                                IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
                                Placement="Right"
-                               PopupAnimation="Fade"
-                               VerticalOffset="-4"
+                               PopupAnimation="None"
+                               VerticalOffset="-5"
                                HorizontalOffset="-2">
                             <Grid x:Name="SubmenuGrid">
                                 <!-- Shadow Layer -->
@@ -147,7 +148,8 @@
                                                           KeyboardNavigation.DirectionalNavigation="Cycle" 
                                                           Grid.IsSharedSizeScope="True" 
                                                           SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" 
-                                                          KeyboardNavigation.TabNavigation="Cycle"/>
+                                                          KeyboardNavigation.TabNavigation="Cycle"
+                                                          Margin="1,3,1,3"/>
                                         </Grid>
                                     </ScrollViewer>
                                 </Border>

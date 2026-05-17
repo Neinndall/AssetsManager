@@ -104,18 +104,18 @@ namespace AssetsManager.Views.Helpers
             source?.AddHook(WndProc);
 
             // 1. Apply native rounding (Fixes the square spikes)
-            WindowNativeHelper.ApplyDwmRoundedCorners(hwnd);
+            WindowNative.ApplyDwmRoundedCorners(hwnd);
 
             // 2. Set native border color to match our HUD theme (Fixes the grey glow)
             if (this.TryFindResource("BorderColor") is SolidColorBrush borderBrush)
             {
-                WindowNativeHelper.SetDwmBorderColor(hwnd, borderBrush.Color);
+                WindowNative.SetDwmBorderColor(hwnd, borderBrush.Color);
             }
         }
 
         protected virtual IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            return WindowNativeHelper.HandleWindowMessage(msg, wParam, ref handled);
+            return WindowNative.HandleWindowMessage(msg, wParam, lParam, ref handled);
         }
     }
 }

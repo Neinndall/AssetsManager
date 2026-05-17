@@ -29,14 +29,9 @@ namespace AssetsManager.Views.Controls.Explorer
             ViewModel?.ParentExplorer?.HandleCollapseToContainer();
         }
 
-        private void LoadComparisonButton_Click(object sender, RoutedEventArgs e)
+        private void LoadResultsButton_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.ParentExplorer?.HandleLoadBackup();
-        }
-
-        private void OpenStandaloneWad_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel?.ParentExplorer?.HandleOpenStandaloneWad();
+            ViewModel?.ParentExplorer?.HandleLoadResults();
         }
 
         private void SwitchModeButton_Click(object sender, RoutedEventArgs e)

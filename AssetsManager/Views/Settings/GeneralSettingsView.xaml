@@ -10,10 +10,11 @@
 
     <UserControl.Resources>
         <x:Array x:Key="UpdateFrequencies" Type="{x:Type System:Int32}">
-            <System:Int32>1</System:Int32>
+            <System:Int32>3</System:Int32>
+            <System:Int32>5</System:Int32>
             <System:Int32>10</System:Int32>
+            <System:Int32>20</System:Int32>
             <System:Int32>30</System:Int32>
-            <System:Int32>60</System:Int32>
         </x:Array>
     </UserControl.Resources>
 
@@ -77,11 +78,11 @@
                         <CheckBox x:Name="swBackgroundUpdates" Grid.Column="1" IsChecked="{Binding Settings.BackgroundUpdates, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                     </Grid>
                     
-                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="6" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swBackgroundUpdates, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock Text="POLLING INTERVAL (MINUTES)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black"/>
+                            <TextBlock Text="POLLING INTERVAL (MINUTES)" VerticalAlignment="Center" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black"/>
                             <ComboBox Grid.Column="1" SelectedItem="{Binding Settings.UpdateCheckFrequency, Mode=TwoWay}" Width="80" Height="26" Style="{StaticResource ModernComboBox}" ItemsSource="{StaticResource UpdateFrequencies}"/>
                         </Grid>
                     </Border>
@@ -122,13 +123,13 @@
                                   Style="{StaticResource ModernToggleSwitch}"/>
                     </Grid>
                     
-                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="6" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swAutoExtract, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="ORGANIZE EXTRACTED ASSETS" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black"/>
-                                <TextBlock Text="Keep original directory structure during extraction" Foreground="{StaticResource TextMuted}" FontSize="9"/>
+                                <TextBlock Text="ORGANIZE EXTRACTED ASSETS" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black"/>
+                                <TextBlock Text="Keep original directory structure during extraction" Foreground="{StaticResource TextMuted}" FontSize="10"/>
                             </StackPanel>
                             <CheckBox Grid.Column="1" IsChecked="{Binding Settings.OrganizeExtractedAssets, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                         </Grid>
@@ -149,15 +150,15 @@
                                   Style="{StaticResource ModernToggleSwitch}"/>
                     </Grid>
 
-                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="4" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    <Border Margin="0,12,0,0" Background="{StaticResource CardBackground}" CornerRadius="6" Padding="16,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding IsChecked, ElementName=swGenerateReport, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="REPORT FILTERS" Foreground="{StaticResource TextSecondary}" FontSize="10" FontWeight="Black" Margin="0,0,0,12"/>
-                            <WrapPanel Orientation="Horizontal">
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="NEW" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="MODIFIED" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="RENAMED" Style="{StaticResource ModernCheckBox}" Margin="0,0,16,0" FontSize="10"/>
-                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="REMOVED" Style="{StaticResource ModernCheckBox}" FontSize="10"/>
+                            <TextBlock Text="REPORT FILTERS" Foreground="{StaticResource TextSecondary}" FontSize="11" FontWeight="Black" Margin="0,0,0,4"/>
+                            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterNew, Mode=TwoWay}" Content="NEW" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterModified, Mode=TwoWay}" Content="MODIFIED" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRenamed, Mode=TwoWay}" Content="RENAMED" Style="{StaticResource ModernCheckBox}" Margin="0,0,18,0" FontSize="10" VerticalAlignment="Center"/>
+                                <CheckBox IsChecked="{Binding Settings.ReportGeneration.FilterRemoved, Mode=TwoWay}" Content="REMOVED" Style="{StaticResource ModernCheckBox}" Margin="0,0,0,0" FontSize="10" VerticalAlignment="Center"/>
                             </WrapPanel>
                         </StackPanel>
                     </Border>
@@ -165,12 +166,12 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- SECTION: EXPORT PROTOCOLS -->
+        <!-- SECTION: PREFERRED PROTOCOLS -->
         <StackPanel Margin="0,0,0,40">
             <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
                 <StackPanel Orientation="Horizontal">
                     <materialIcons:MaterialIcon Kind="FileExportOutline" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="EXPORT PROTOCOLS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="PREFERRED PROTOCOLS" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -186,15 +187,60 @@
                               SelectedValue="{Binding Settings.AudioExportFormat, Mode=TwoWay}"/>
                 </Grid>
 
-                <Grid>
+                <Grid Margin="0,0,0,24">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Image rendering target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Preferred format for texture and asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Texture export target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Preferred format for textures in asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding ImageFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
                               SelectedValue="{Binding Settings.ImageExportFormat, Mode=TwoWay}"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Data export target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Preferred format for data in asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
+                              ItemsSource="{Binding DataFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
+                              SelectedValue="{Binding Settings.DataExportFormat, Mode=TwoWay}"/>
+                </Grid>
+
+                <!-- Preferred Game Client -->
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Preferred game client" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Primary game client for initial exploration and automated backups" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="120" Height="28" 
+                              Style="{StaticResource ModernComboBox}"
+                              ItemsSource="{Binding PreferredClientOptions}"
+                              DisplayMemberPath="Name" SelectedValuePath="Value"
+                              SelectedValue="{Binding Settings.PreferredClient, Mode=TwoWay}"/>
+                </Grid>
+
+                <!-- Preferred Directory Folder -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Preferred directory folder" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Select the target folder to explore when entering directory mode" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="120" Height="28" 
+                              Style="{StaticResource ModernComboBox}"
+                              ItemsSource="{Binding PreferredDirectoryOptions}"
+                              DisplayMemberPath="Name" SelectedValuePath="Value"
+                              SelectedValue="{Binding Settings.PreferredDirectory, Mode=TwoWay}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>

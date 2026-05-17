@@ -174,11 +174,11 @@
         <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource ModernTreeViewItem}"/>
 
-        <!-- Core Virtualization Settings -->
+        <!-- Core Virtualization Settings (STABILIZED) -->
         <Setter Property="VirtualizingStackPanel.IsVirtualizing" Value="True"/>
         <Setter Property="VirtualizingStackPanel.VirtualizationMode" Value="Standard"/>
-        <Setter Property="VirtualizingStackPanel.CacheLength" Value="4,4"/>
-        <Setter Property="VirtualizingStackPanel.CacheLengthUnit" Value="Page"/>
+        <Setter Property="VirtualizingStackPanel.CacheLength" Value="20,20"/>
+        <Setter Property="VirtualizingStackPanel.CacheLengthUnit" Value="Item"/>
         <Setter Property="VirtualizingStackPanel.ScrollUnit" Value="Pixel"/>
         <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
         

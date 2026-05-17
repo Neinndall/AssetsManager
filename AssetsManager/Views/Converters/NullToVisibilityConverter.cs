@@ -10,7 +10,12 @@ namespace AssetsManager.Views.Converters
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             bool invert = parameter is string str && str.Equals("Invert", StringComparison.OrdinalIgnoreCase);
+            
             bool isNull = value == null;
+            if (value is string s && string.IsNullOrWhiteSpace(s))
+            {
+                isNull = true;
+            }
 
             if (invert)
             {

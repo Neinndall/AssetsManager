@@ -24,7 +24,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                     <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
@@ -35,8 +35,8 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Download Configuration" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select available game languages to download." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,1,0,0"/>
+                            <TextBlock Text="Choose your locales" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Select available game languages to download" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                         </StackPanel>
                         
                         <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -62,21 +62,21 @@
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                     <TextBlock Text="Fetch Versions" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Refresh manifests" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Refresh manifests" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="GetLeagueClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="DesktopClassic" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Get Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Install Client" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Download specific ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="GetLoLGameClient_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
                 <StackPanel VerticalAlignment="Center">
                     <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="Get Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    <TextBlock Text="Install Game" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Download game ver." FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Click="DeleteSelectedVersions_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
@@ -85,7 +85,7 @@
                     <StackPanel VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                         <TextBlock Text="Delete Selected" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource AccentRed}"/>
-                        <TextBlock Text="Remove from disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        <TextBlock Text="Remove from disk" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Button>
@@ -124,7 +124,7 @@
                     <Button Style="{StaticResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
                     </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LeagueClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
                     <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28">
@@ -150,7 +150,7 @@
                     <Button Style="{StaticResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
                     </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LoLGameClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
                     <Button Style="{StaticResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="28" Height="28">
@@ -195,7 +195,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                                <materialIcons:MaterialIcon Kind="DesktopClassic" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="DesktopClassic" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
@@ -204,7 +204,7 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>
@@ -257,7 +257,7 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{StaticResource HoverColor}" Margin="0,0,12,0">
-                                                <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="20" Height="20" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}"/>
@@ -266,7 +266,7 @@
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </Grid>
                                     </Grid>
                                     <ControlTemplate.Triggers>

@@ -21,6 +21,31 @@ namespace AssetsManager.Utils
             return sanitized;
         }
 
+        public static string GetLogName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+
+            string cleanName = name;
+            // Clean count suffix if present (e.g., "file.wad (11)" -> "file.wad")
+            int parenthesisIndex = cleanName.LastIndexOf(" (");
+            if (parenthesisIndex > 0)
+            {
+                string potentialNumber = cleanName.Substring(parenthesisIndex + 2);
+                if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
+                {
+                    cleanName = cleanName.Substring(0, parenthesisIndex).Trim();
+                }
+            }
+
+            // If it's a path (backup grouped mode), take only the filename
+            if (cleanName.Contains("\\") || cleanName.Contains("/"))
+            {
+                cleanName = Path.GetFileName(cleanName);
+            }
+
+            return cleanName;
+        }
+
         public static string GetUniqueFilePath(string destinationDirectory, string fileName)
         {
             string sanitizedFileName = SanitizeName(fileName); // This now calls the local static method
@@ -112,6 +137,23 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Robust check to see if a path is the same or a sub-path of another.
+        /// </summary>
+        public static bool IsSameOrSubPath(string root, string sub)
+        {
+            if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(sub)) return false;
+
+            try
+            {
+                string r = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                string s = Path.GetFullPath(sub).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+                return s.StartsWith(r, StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
         /// Truncates the given name at the first occurrence of a dot ('.').
         /// e.g. "character_skin01.skins_character" -> "character_skin01"
         /// </summary>
@@ -120,6 +162,36 @@ namespace AssetsManager.Utils
             if (string.IsNullOrEmpty(name)) return name;
             int dotIndex = name.IndexOf('.');
             return dotIndex == -1 ? name : name.Substring(0, dotIndex);
+        }
+
+        /// <summary>
+        /// Simplifies a full mesh/material identifier by taking only the last segment of the path.
+        /// e.g. "Maps/KitPieces/TFT/Materials/Base/VertexAnimation/Bush_Wind_A" -> "Bush_Wind_A"
+        /// </summary>
+        public static string SimplifyMeshName(string fullName)
+        {
+            if (string.IsNullOrEmpty(fullName)) return "Default";
+
+            // Split by both types of slashes and take the last non-empty part
+            string[] parts = fullName.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length > 0 ? parts.Last() : fullName;
+        }
+
+        /// <summary>
+        /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
+        /// </summary>
+        public static string NormalizePath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            return path.Replace('\\', '/').ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Converts a physical or mixed path into a clean virtual path for WAD lookups.
+        /// </summary>
+        public static string ToVirtualPath(string path)
+        {
+            return NormalizePath(path).TrimStart('/');
         }
     }
 }

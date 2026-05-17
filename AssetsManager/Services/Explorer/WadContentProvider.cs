@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -25,47 +26,88 @@ namespace AssetsManager.Services.Explorer
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly DirectoriesCreator _directoriesCreator;
 
-        public WadContentProvider(LogService logService, WadNodeLoaderService wadNodeLoaderService, DirectoriesCreator directoriesCreator)
+        public WadContentProvider(
+            LogService logService, 
+            WadNodeLoaderService wadNodeLoaderService, 
+            DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _wadNodeLoaderService = wadNodeLoaderService;
             _directoriesCreator = directoriesCreator;
         }
 
-        // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
-        public Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
+        /// <summary>
+        /// Searches for a specific virtual path within all WAD files in a directory using direct hash comparison.
+        /// No dependency on HashResolverService.
+        /// </summary>
+        public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
         {
-            return Task.Run(() =>
+            return await Task.Run(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                // WAD paths are hashed in lowercase
+                string normalizedPath = virtualPath.Replace('\\', '/').ToLowerInvariant();
+                ulong targetHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(normalizedPath);
 
-                try
+                var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
+                                              .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
+                                              .ToList();
+
+                foreach (var wadPath in wadFiles)
                 {
-                    if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
+                    try
                     {
+                        using (var wadFile = new WadFile(wadPath))
+                        {
+                            if (wadFile.Chunks.TryGetValue(targetHash, out var chunk))
+                            {
+                                return new FileSystemNodeModel(Path.GetFileName(normalizedPath), false, normalizedPath, wadPath)
+                                {
+                                    SourceChunkPathHash = chunk.PathHash,
+                                    SourceWadPath = wadPath,
+                                    Type = NodeType.VirtualFile
+                                };
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"Error processing WAD file {wadPath}: {ex.Message}");
+                    }
+                }
+
+                return null;
+            });
+        }
+
+        // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
+        public async Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
+                {
+                    _logService.LogDebug($"[DATA DIRECTION] Loading from BACKUP directory: 'wad_chunks/{ (fileNode.BackupChunkPath.Contains("old") ? "old" : "new") }'");
+                    return await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         // MODO BACKUP: Carga directa y exclusiva de chunks guardados.
                         byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
                         bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
                         var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
                         return WadChunkUtils.DecompressChunk(compressedData, compressionType);
-                    }
-
-                    // MODO LIVE: Solo si no hay backup (Comparator o Explorer local).
-                    using var wadFile = new WadFile(fileNode.SourceWadPath);
-                    if (wadFile.Chunks.TryGetValue(fileNode.SourceChunkPathHash, out var chunk))
-                    {
-                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
-                        return decompressedDataOwner.Span.ToArray();
-                    }
-
-                    return null;
+                    }, cancellationToken);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
-                    return null;
-                }
-            }, cancellationToken);
+
+                _logService.LogDebug($"[DATA DIRECTION] Loading from LOCAL installation: '{Path.GetDirectoryName(fileNode.SourceWadPath)}'");
+                // MODO LIVE: Delegamos en el método unificado
+                return await DecompressChunkByHashAsync(fileNode.SourceWadPath, fileNode.SourceChunkPathHash, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
+                return null;
+            }
         }
 
         // Obtiene los bytes de un lado específico (Old o New) de un diff, gestionando tanto WADs como Backups.
@@ -113,8 +155,13 @@ namespace AssetsManager.Services.Explorer
         private string GetBackupRoot(string chunkPath)
         {
             if (string.IsNullOrEmpty(chunkPath)) return string.Empty;
+
             int index = chunkPath.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
-            return index != -1 ? chunkPath.Substring(0, index) : Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
+            if (index != -1) return chunkPath.Substring(0, index);
+
+            string fallback = Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
+            _logService.LogWarning($"'wad_chunks' not found in path. Using fallback root: {fallback}");
+            return fallback;
         }
 
         // Obtiene los bytes descomprimidos de un diff (lado predominante para previsualización)
@@ -156,6 +203,7 @@ namespace AssetsManager.Services.Explorer
 
                 if (!string.IsNullOrEmpty(node.BackupChunkPath))
                 {
+                    _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from BACKUP storage: 'wad_chunks/{ (node.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     // MODO BACKUP: Carga del contenedor desde el chunk.
                     byte[] compressedData = File.ReadAllBytes(node.BackupChunkPath);
                     var compressionType = node.ChunkDiff?.NewCompressionType ?? WadChunkCompression.None;
@@ -163,6 +211,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else
                 {
+                    _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from LOCAL installation: '{Path.GetDirectoryName(node.SourceWadPath)}'");
                     // MODO LIVE
                     containerData = await DecompressChunkByHashAsync(node.SourceWadPath, node.SourceChunkPathHash, cancellationToken);
                 }
@@ -172,9 +221,8 @@ namespace AssetsManager.Services.Explorer
                 if (node.AudioSource == AudioSourceType.Bnk)
                 {
                     if (node.WemSize == 0) return null;
-                    byte[] wemData = new byte[node.WemSize];
-                    Array.Copy(containerData, (int)node.WemOffset, wemData, 0, (int)node.WemSize);
-                    return wemData;
+                    // Retornamos el segmento directamente usando Span para evitar copias intermedias (siendo ToArray la copia final necesaria)
+                    return containerData.AsSpan((int)node.WemOffset, (int)node.WemSize).ToArray();
                 }
                 else // Wpk
                 {
@@ -209,8 +257,10 @@ namespace AssetsManager.Services.Explorer
                         _logService.LogWarning($"Chunk with hash {chunkHash:x16} not found in {wadPath}");
                         return null;
                     }
-                    using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
-                    return decompressedDataOwner.Span.ToArray();
+
+                    // Usamos LoadChunk del WadFile que ya gestiona el stream interno, evitando aperturas dobles.
+                    using var compressedDataOwner = wadFile.LoadChunk(chunk);
+                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Span, chunk.Compression);
                 }
                 catch (OperationCanceledException)
                 {

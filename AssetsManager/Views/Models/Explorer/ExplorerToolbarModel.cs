@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 using AssetsManager.Views.Controls.Explorer;
 using Material.Icons;
 
@@ -13,12 +14,33 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isWadMode = true;
         private bool _isGridMode = false;
         private bool _isBreadcrumbVisible = true;
-        private bool _isFavoritesEnabled = false;
+        private bool _isFavoritesEnabled = true;
         private string _searchText = string.Empty;
         private bool _isGroupingEnabled;
         private bool _isBackupMode;
         private bool _isSearchVisible;
         private bool _isToolsExpanded;
+        private string _currentClientName;
+        private Brush _currentClientBrush;
+        private MaterialIconKind _currentClientIcon;
+
+        public string CurrentClientName
+        {
+            get => _currentClientName;
+            set { if (_currentClientName != value) { _currentClientName = value; OnPropertyChanged(); } }
+        }
+
+        public Brush CurrentClientBrush
+        {
+            get => _currentClientBrush;
+            set { if (_currentClientBrush != value) { _currentClientBrush = value; OnPropertyChanged(); } }
+        }
+
+        public MaterialIconKind CurrentClientIcon
+        {
+            get => _currentClientIcon;
+            set { if (_currentClientIcon != value) { _currentClientIcon = value; OnPropertyChanged(); } }
+        }
 
         public bool IsBackupMode
         {

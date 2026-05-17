@@ -108,11 +108,11 @@
                     <Border Grid.Row="1" Margin="0,10,0,8" Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                             Visibility="{Binding LoadedModels.Count, Converter={StaticResource CountToVisibilityConverter}}">
                         <UniformGrid Columns="3">
-                            <RadioButton x:Name="TabTransform" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="34" Padding="0" ToolTip="Transform">
-                                <materialIcons:MaterialIcon Kind="AxisArrow" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </RadioButton>
-                            <RadioButton x:Name="TabMeshes" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="34" Padding="0" ToolTip="Meshes &amp; Textures">
+                            <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="34" Padding="0" ToolTip="Textures &amp; Meshes">
                                 <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </RadioButton>
+                            <RadioButton x:Name="TabTransform" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="34" Padding="0" ToolTip="Transform">
+                                <materialIcons:MaterialIcon Kind="AxisArrow" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </RadioButton>
                             <RadioButton x:Name="TabAnimations" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" Height="34" Padding="0" ToolTip="Animations">
                                 <materialIcons:MaterialIcon Kind="AnimationPlay" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -123,6 +123,91 @@
                     <!-- INSPECTOR CONTENT -->
                     <Grid Grid.Row="2" Margin="0,0,0,6"
                           Visibility="{Binding LoadedModels.Count, Converter={StaticResource CountToVisibilityConverter}}">
+                        <!-- MESHES -->
+                        <Grid x:Name="MeshesPanel"
+                              Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Sync Meshes Header -->
+                            <Border Grid.Row="0" Margin="0,0,0,10" Padding="12,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                    Visibility="{Binding SelectedModel.SourceType, Converter={StaticResource EqualityConverter}, ConverterParameter='Chroma'}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialIcons:MaterialIcon Kind="AutoFix" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Sync Meshes" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="Sync visibility with chromas" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding IsMeshSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                        <CheckBox.LayoutTransform>
+                                            <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                        </CheckBox.LayoutTransform>
+                                    </CheckBox>
+                                </Grid>
+                            </Border>
+
+                            <ListBox x:Name="MeshesListBox" 
+                                     Grid.Row="1"
+                                     ItemsSource="{Binding SelectedModelParts}"
+                                     Background="Transparent" 
+                                     BorderThickness="0"
+                                     VirtualizingStackPanel.IsVirtualizing="True"
+                                     VirtualizingStackPanel.VirtualizationMode="Recycling"
+                                     VirtualizingStackPanel.CacheLengthUnit="Item"
+                                     VirtualizingStackPanel.CacheLength="10,10"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <ContentPresenter />
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                </Grid>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                         <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}" Height="28" FontSize="11" ItemsSource="{Binding AvailableTextureNames}" SelectedItem="{Binding SelectedTextureName}" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+
                         <!-- TRANSFORM -->
                         <ScrollViewer x:Name="TransformPanel" VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding IsChecked, ElementName=TabTransform, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -269,62 +354,6 @@
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
-
-                        <!-- MESHES -->
-                        <Grid x:Name="MeshesPanel"
-                              Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <ListBox x:Name="MeshesListBox" 
-                                     ItemsSource="{Binding SelectedModelParts}"
-                                     Background="Transparent" 
-                                     BorderThickness="0"
-                                     VirtualizingStackPanel.IsVirtualizing="True"
-                                     VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                     VirtualizingStackPanel.CacheLengthUnit="Item"
-                                     VirtualizingStackPanel.CacheLength="10,10"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="Padding" Value="0"/>
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="Template">
-                                            <Setter.Value>
-                                                <ControlTemplate TargetType="ListBoxItem">
-                                                    <ContentPresenter />
-                                                </ControlTemplate>
-                                            </Setter.Value>
-                                        </Setter>
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,6" Padding="10,8">
-                                            <StackPanel>
-                                                <Grid Margin="0,0,0,8">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                </Grid>
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="4" Width="28" Height="28" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                         <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}" Height="28" FontSize="11" ItemsSource="{Binding AvailableTextureNames}" SelectedItem="{Binding SelectedTextureName}" VerticalAlignment="Center"/>
-                                                </Grid>
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Grid>
 
                         <!-- ANIMATIONS -->
                         <Grid x:Name="AnimationsPanel"
@@ -544,26 +573,46 @@
 
             <!-- BOTTOM ACTIONS (Compact Studio Toolbar v3.2.3.2) -->
             <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="12,8">
-                <UniformGrid Columns="3">
-                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="0,0,3,0" Padding="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="LoadModelButton" Click="LoadModelButton_Click" Height="36" Padding="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                <Setter Property="Grid.Column" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,3,0"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMapMode}" Value="True">
+                                        <Setter Property="Grid.Column" Value="1"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadModelIcon" Kind="{Binding LoadButtonIcon}" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock x:Name="LoadModelText" Text="{Binding LoadButtonText}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadChromaModelButton" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
+                    
+                    <Button x:Name="LoadChromaModelButton" Grid.Column="1" Click="LoadChromaModelButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,3,0" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon x:Name="LoadChromaModelIcon" Kind="Palette" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Chroma" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding Kind, ElementName=LoadModelIcon, Converter={StaticResource EqualityConverter}, ConverterParameter=!Map}">
+                    
+                    <Button x:Name="LoadAnimationButton" Grid.Column="2" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="36" Margin="3,0,0,0" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Anims" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                </UniformGrid>
+                </Grid>
             </Border>
             
             <!-- Hidden controls needed for logic -->

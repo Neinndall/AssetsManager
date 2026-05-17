@@ -1,21 +1,14 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Interop;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
-using AssetsManager.Utils;
-using AssetsManager.Views.Models.Wad;
-using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -23,12 +16,15 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Win;
 using AssetsManager.Views.Controls;
-using AssetsManager.Views.Dialogs.Controls;
-using AssetsManager.Views.Controls.Comparator;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Utils.Win;
+using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.Wad;
+using LeagueToolkit.Core.Wad;
 
 namespace AssetsManager.Views
 {
@@ -268,12 +264,12 @@ namespace AssetsManager.Views
                 OldPath = d.OldPath,
                 NewPath = d.NewPath,
                 SourceWadFile = d.SourceWadFile,
-                OldPathHash = d.OldChunk.PathHash,
-                NewPathHash = d.NewChunk.PathHash,
+                OldPathHash = (d.Type == ChunkDiffType.New) ? 0 : d.OldChunk.PathHash,
+                NewPathHash = (d.Type == ChunkDiffType.Removed) ? 0 : d.NewChunk.PathHash,
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
             }).ToList();
 
             if (!serializableDiffs.Any()) return;
@@ -301,6 +297,8 @@ namespace AssetsManager.Views
                     if (string.IsNullOrEmpty(displayName)) displayName = "Root";
                 }
 
+                string version = await _versionService.GetGameVersionAsync(newLolPath);
+
                 try
                 {
                     // Unified Flow:
@@ -313,7 +311,7 @@ namespace AssetsManager.Views
                     {
                         await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
                         // 2. Metadata Registration (ComparisonHistoryService)
-                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, $"Comparison from {displayName}", oldLolPath, newLolPath);
+                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
                     });
                 }
                 catch (Exception ex)
@@ -439,7 +437,7 @@ namespace AssetsManager.Views
             }
         }
 
-        public void OnSidebarNavigationRequested(string viewTag)
+        public async void OnSidebarNavigationRequested(string viewTag)
         {
             // Only clean up the current view if we are navigating to a *main content view*
             // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
@@ -459,12 +457,22 @@ namespace AssetsManager.Views
             {
                 case "Home": LoadHomeWindow(); break;
                 case "Explorer": LoadExplorerWindow(); break;
+                case "Explorer_Live": await LoadExplorerWithModeAsync("Live"); break;
+                case "Explorer_Pbe": await LoadExplorerWithModeAsync("Pbe"); break;
+                case "Explorer_Local": await LoadExplorerWithModeAsync("Local"); break;
                 case "Comparator": LoadComparatorWindow(); break;
                 case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
+        }
+
+        private async Task LoadExplorerWithModeAsync(string mode)
+        {
+            var explorerWindow = _serviceProvider.GetRequiredService<ExplorerWindow>();
+            MainContentArea.Content = explorerWindow;
+            await explorerWindow.InitializeWithMode(mode);
         }
 
         private void LoadHomeWindow()

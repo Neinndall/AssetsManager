@@ -13,7 +13,7 @@
             <Setter.Value>
                 <WindowChrome CaptionHeight="36" 
                               ResizeBorderThickness="3" 
-                              GlassFrameThickness="0" 
+                              GlassFrameThickness="1" 
                               CornerRadius="0" />
             </Setter.Value>
         </Setter>
@@ -44,7 +44,7 @@
                             </Grid.RowDefinitions>
 
                             <!-- 1. Custom Title Bar -->
-                            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="100" Margin="-1.5,-1.5,-1.5,0">
+                            <Border Grid.Row="0" Background="{StaticResource CardBackground}" Height="36" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Panel.ZIndex="100" Margin="-1,-1,-1,0">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="CornerRadius" Value="10,10,0,0"/>

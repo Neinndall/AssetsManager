@@ -29,6 +29,20 @@
                 </Border.Style>
                 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Professional Mode Indicator (Refined) -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,12,0"
+                                ToolTip="Environment Identity"
+                                Visibility="{Binding CurrentClientName, Converter={StaticResource NullToVisibilityConverter}}">
+                        <materialIcons:MaterialIcon Kind="{Binding CurrentClientIcon}" Foreground="{Binding CurrentClientBrush}" Width="16" Height="16" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding CurrentClientName}" 
+                                   FontSize="11" FontWeight="Black" Foreground="{StaticResource TextPrimary}" 
+                                   VerticalAlignment="Center" Margin="0,1,0,0"/>
+                    </StackPanel>
+
+                    <!-- Separator -->
+                    <Rectangle Width="1" Height="16" Fill="{StaticResource BorderColor}" Margin="0,0,8,0" 
+                               Visibility="{Binding CurrentClientName, Converter={StaticResource NullToVisibilityConverter}}"/>
+
                     <!-- Toggle Tools Button (Hamburger) -->
                     <ToggleButton x:Name="ToolsToggleButton" 
                                   Style="{StaticResource TransparentIconToggleButton}" 
@@ -44,7 +58,6 @@
                                   Click="SearchToggleButton_Click"
                                   Margin="2,0,4,0"/>
 
-                    <!-- Search Box (Visibility handled by Width animation in Style) -->
                     <Grid x:Name="SearchGroup">
                         <TextBox x:Name="SearchTextBox" 
                                  Style="{StaticResource AnimatedSearchBoxStyle}" 
@@ -75,21 +88,13 @@
                             Margin="0,0,1,0"
                             Click="CollapseToContainerButton_Click"/>
 
-                    <!-- 2. Load Backup -->
-                    <Button x:Name="LoadComparisonButton" 
+                    <!-- 2. Load Results -->
+                    <Button x:Name="LoadResultsButton" 
                             Style="{StaticResource HUDToolItemStyle}" 
-                            Tag="Backup"
-                            Content="FileUpload"
+                            Tag="Results"
+                            Content="History"
                             Margin="0,0,1,0"
-                            Click="LoadComparisonButton_Click"/>
-
-                    <!-- 2.5 Open Standalone WAD -->
-                    <Button x:Name="OpenStandaloneWadButton" 
-                            Style="{StaticResource HUDToolItemStyle}" 
-                            Tag="Open WAD"
-                            Content="FolderOpen"
-                            Margin="0,0,1,0"
-                            Click="OpenStandaloneWad_Click"/>
+                            Click="LoadResultsButton_Click"/>
 
                     <!-- 3. Switch Tree (Mode: WAD/Directory) -->
                     <Button x:Name="SwitchModeButton" 

@@ -93,7 +93,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (selectedEntry != null)
             {
-                if (selectedEntry.Type == HistoryEntryType.WadComparison)
+                if (selectedEntry.Type == HistoryEntryType.WadArchive)
                 {
                     var (data, path) = await ComparisonHistoryService.LoadComparisonAsync(selectedEntry.ReferenceId);
                     if (data != null)
@@ -138,7 +138,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     {
                         foreach (var selectedEntry in itemsToRemove)
                         {
-                            if (selectedEntry.Type == HistoryEntryType.WadComparison)
+                            if (selectedEntry.Type == HistoryEntryType.WadArchive)
                             {
                                 ComparisonHistoryService.DeleteComparison(selectedEntry);
                             }

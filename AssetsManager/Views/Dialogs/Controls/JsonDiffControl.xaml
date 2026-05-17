@@ -51,21 +51,21 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
                                 <TextBlock Text="INSIGHTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,12,0"/>
                                 
-                                <Border Background="#1A00E676" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" Cursor="Hand">
+                                <Border Background="#1A00E676" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" MouseRightButtonDown="FilterInsertion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Plus" Width="12" Height="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding InsertionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1AFF5252" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" Cursor="Hand">
+                                <Border Background="#1AFF5252" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" MouseRightButtonDown="FilterDeletion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Minus" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding DeletionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A5C85FF" CornerRadius="4" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" Cursor="Hand">
+                                <Border Background="#1A5C85FF" CornerRadius="6" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" MouseRightButtonDown="FilterModification_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="EditOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding ModificationsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
@@ -111,6 +111,66 @@
                                          Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode" Width="30" Height="30">
                                 <icons:MaterialIcon Kind="ViewStream" Width="16" Height="16"/>
                             </RadioButton>
+
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
+                            <!-- FILTERS SECTION -->
+                            <TextBlock Text="FILTERS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <ToggleButton IsChecked="{Binding ShowInsertions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Insertions">
+                                <icons:MaterialIcon Kind="Plus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowInsertions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowDeletions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Deletions">
+                                <icons:MaterialIcon Kind="Minus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowDeletions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowModifications}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Modifications">
+                                <icons:MaterialIcon Kind="EditOutline" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowModifications}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
 
                             <!-- SEPARATOR -->
                             <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
@@ -215,7 +275,20 @@
                         </Border>
 
                         <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
-                            <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+                            <Grid>
+                                <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+
+                                <!-- Initial Comparison Overlay -->
+                                <Border Background="{StaticResource DarkBackground}" 
+                                        Visibility="{Binding IsInitialComparison, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        CornerRadius="0,0,12,12">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.5">
+                                        <icons:MaterialIcon Kind="InformationOutline" Width="48" Height="48" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="NO PREVIOUS INFORMATION" FontSize="14" FontWeight="Black" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="This is the first time this asset is being tracked." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Border>
                     </Grid>
                 </Border>
@@ -327,48 +400,16 @@
             </Border>
         </Grid>
 
-        <!-- Bottom Info Bar (Breadcrumbs / JSON Path) -->
+        <!-- Bottom Info Bar (Line Info) -->
         <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,6">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- Icons and Line Info -->
-                    <ColumnDefinition Width="*"/>    <!-- Flexible Line Content -->
-                    <ColumnDefinition Width="Auto"/> <!-- Actions -->
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal">
                     <!-- LINE INDICATOR -->
                     <icons:MaterialIcon Kind="LineScan" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
                     <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0">
                         <Run Text="Line "/><Run Text="{Binding CurrentLine, FallbackValue='1'}"/>
                     </TextBlock>
-
-                    <!-- SEPARATOR -->
-                    <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="0,0,12,0" VerticalAlignment="Center" Opacity="0.5"/>
-
-                    <!-- PATH INDICATOR ICON -->
-                    <icons:MaterialIcon Kind="CodeBraces" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" Opacity="0.8"/>
                 </StackPanel>
-
-                <!-- PATH INDICATOR CONTENT (Now in a star column with Trimming) -->
-                <TextBlock Grid.Column="1" 
-                           Text="{Binding CurrentLineText, FallbackValue='root'}" 
-                           FontSize="10" 
-                           FontWeight="SemiBold" 
-                           Foreground="{StaticResource TextPrimary}" 
-                           VerticalAlignment="Center" 
-                           Opacity="0.9"
-                           TextTrimming="CharacterEllipsis"
-                           Margin="0,0,12,0"/>
-
-                <Button Grid.Column="2"
-                        HorizontalAlignment="Right"
-                        Click="BtnCopyPath_Click"
-                        Style="{StaticResource TransparentIconButton}"
-                        Width="26" Height="26"
-                        ToolTip="Copy JSON Path">
-                    <icons:MaterialIcon Kind="ContentCopy" Width="12" Height="12"/>
-                </Button>
             </Grid>
         </Border>
     </Grid>

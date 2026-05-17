@@ -60,7 +60,8 @@ namespace AssetsManager.Views.Controls.Explorer
             _currentSearchFilter = searchText;
             if (ViewModel.IsGridMode && _currentFolderNode != null)
             {
-                UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                // Force a refresh even if the folder is the same because the search filter changed
+                RefreshGridItems(_currentFolderNode);
             }
         }
 
@@ -75,12 +76,12 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 if (_currentFolderNode != null)
                 {
-                    UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                    RefreshGridItems(_currentFolderNode);
                 }
             }
             else // Preview Mode
             {
-                if (_currentNode != null && _currentNode != _currentFolderNode && !ViewModel.IsSelectedNodeContainer)
+                if (_currentNode != null && !ViewModel.IsSelectedNodeContainer)
                 {
                     _ = ShowPreviewAsync(_currentNode);
                 }
@@ -289,14 +290,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async Task ResetToDefaultState()
         {
-            ViewModel.IsGridMode = false;
-            
+            _currentFolderNode = null;
             UpdateSelectedNode(null, null);
             await ExplorerPreviewService.ResetPreviewAsync();
         }
 
         public void UpdateSelectedNode(FileSystemNodeModel node, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
+            var previousFolder = _currentFolderNode;
             _currentNode = node;
             _rootNodes = rootNodes;
             ViewModel.HasSelectedNode = node != null;
@@ -305,32 +306,45 @@ namespace AssetsManager.Views.Controls.Explorer
 
             UpdateBreadcrumbs(node);
 
-            bool isContainer = node != null && (node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent);
+            bool isContainer = node != null && FileSystemNodeModel.CanHaveChildren(node.Type);
             ViewModel.IsSelectedNodeContainer = isContainer;
 
+            // 1. Identify current folder context
+            FileSystemNodeModel folderToLoad = null;
             if (isContainer)
             {
-                _currentFolderNode = node;
+                folderToLoad = node;
+            }
+            else if (node != null && rootNodes != null)
+            {
+                // If it's a file, the folder context is its parent
+                var path = TreeUIManager.FindNodePath(rootNodes, node);
+                if (path != null && path.Count > 1)
+                {
+                    folderToLoad = path[path.Count - 2];
+                }
+            }
 
-                var gridItems = new ObservableRangeCollection<FileGridViewModel>(
-                    (!string.IsNullOrEmpty(_currentSearchFilter)
-                        ? node.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
-                        : node.Children)
-                    .Select(n => new FileGridViewModel(n)));
+            // 2. Refresh grid items if the folder context has changed
+            if (folderToLoad != null)
+            {
+                if (folderToLoad != previousFolder)
+                {
+                    _currentFolderNode = folderToLoad;
+                    RefreshGridItems(_currentFolderNode);
+                }
 
-                FileGridControl.ItemsSource = gridItems;
-                
-                if (!ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
+                if (!isContainer && !ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {
                     _ = ExplorerPreviewService.ResetPreviewAsync();
                 }
-
-                // Sequential Loading Queue with Cancellation
-                _thumbnailCts?.Cancel();
-                _thumbnailCts = new CancellationTokenSource();
-                _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
             }
-            else if (node != null)
+            else
+            {
+                _currentFolderNode = null;
+            }
+            
+            if (!isContainer && node != null)
             {
                 // If it's a file, hide status messages immediately to avoid flickers during load
                 ViewModel.IsWelcomeVisible = false;
@@ -345,6 +359,28 @@ namespace AssetsManager.Views.Controls.Explorer
                     ViewModel.IsUnsupportedVisible = false;
                 }
             }
+        }
+
+        private void RefreshGridItems(FileSystemNodeModel folderNode)
+        {
+            if (folderNode == null) return;
+
+            // Defer execution to avoid issues with current mouse events in the ListBox
+            _ = Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var gridItems = new ObservableRangeCollection<FileGridViewModel>(
+                    (!string.IsNullOrEmpty(_currentSearchFilter)
+                        ? folderNode.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        : folderNode.Children)
+                    .Select(n => new FileGridViewModel(n)));
+
+                FileGridControl.ItemsSource = gridItems;
+
+                // Sequential Loading Queue with Cancellation
+                _thumbnailCts?.Cancel();
+                _thumbnailCts = new CancellationTokenSource();
+                _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)
@@ -391,7 +427,8 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (nodes == null || nodes.Count == 0 || FileExplorer == null) return;
 
-            var diffs = nodes.Where(n => n.ChunkDiff != null).Select(n => n.ChunkDiff).ToList();
+            // Filter only those that actually HAVE a real difference (exclude dependencies)
+            var diffs = nodes.Where(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency).Select(n => n.ChunkDiff).ToList();
             if (diffs.Count == 0) return;
 
             // Get PBE paths from FileExplorer

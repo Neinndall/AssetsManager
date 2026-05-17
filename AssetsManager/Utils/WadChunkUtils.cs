@@ -3,41 +3,46 @@ using System.IO;
 using System.IO.Compression;
 using LeagueToolkit.Core.Wad;
 using ZstdSharp;
+using System.Threading;
 
 namespace AssetsManager.Utils
 {
     public static class WadChunkUtils
     {
-        public static byte[] DecompressChunk(byte[] compressedData, WadChunkCompression? compressionType)
+        // Reutilizamos el descompresor para evitar instanciaciones masivas en el GC (Thread-safe)
+        private static readonly ThreadLocal<Decompressor> _zstdDecompressor = new(() => new Decompressor());
+
+        public static byte[] DecompressChunk(ReadOnlySpan<byte> compressedData, WadChunkCompression? compressionType)
         {
             if (compressionType == null || compressionType == WadChunkCompression.None)
             {
-                return compressedData;
+                return compressedData.ToArray();
             }
-
-            using var compressedStream = new MemoryStream(compressedData);
-            using var decompressedStream = new MemoryStream();
 
             switch (compressionType)
             {
-                case WadChunkCompression.GZip:
-                    using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
-                    {
-                        gzipStream.CopyTo(decompressedStream);
-                    }
-                    break;
                 case WadChunkCompression.ZstdChunked:
                 case WadChunkCompression.Zstd:
-                    using (var zstdStream = new DecompressionStream(compressedStream))
+                    // Fix: Unwrap may return a Span<byte>, so we convert it to ToArray() if needed to match the byte[] return type.
+                    return _zstdDecompressor.Value.Unwrap(compressedData).ToArray();
+
+                case WadChunkCompression.GZip:
+                    // Para GZip, convertimos el Span a array (necesario para MemoryStream)
+                    using (var compressedStream = new MemoryStream(compressedData.ToArray()))
+                    using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+                    using (var decompressedStream = new MemoryStream())
                     {
-                        zstdStream.CopyTo(decompressedStream);
+                        gzipStream.CopyTo(decompressedStream);
+                        return decompressedStream.ToArray();
                     }
-                    break;
+
                 default:
                     throw new NotSupportedException($"Compression type {compressionType} is not supported for decompression.");
             }
-
-            return decompressedStream.ToArray();
         }
+
+        // Sobrecarga para mantener compatibilidad con byte[]
+        public static byte[] DecompressChunk(byte[] compressedData, WadChunkCompression? compressionType)
+            => DecompressChunk(compressedData.AsSpan(), compressionType);
     }
 }

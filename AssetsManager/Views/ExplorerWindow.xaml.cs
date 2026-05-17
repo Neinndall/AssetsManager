@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services.Hashes;
@@ -32,10 +33,12 @@ namespace AssetsManager.Views
             WadExportService wadExportService,
             WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
+            VersionService versionService,
             TaskCancellationManager taskCancellationManager,
             FavoritesManager favoritesManager,
             ImageMergerService imageMergerService,
             MonitorService monitorService,
+            BackupManager backupManager,
             AssetWatcherService assetWatcherService,
             ProgressUIManager progressUIManager)
         {
@@ -54,10 +57,12 @@ namespace AssetsManager.Views
             FileExplorer.AudioBankService = audioBankService;
             FileExplorer.AudioBankLinkerService = audioBankLinkerService;
             FileExplorer.HashResolverService = hashResolverService;
+            FileExplorer.VersionService = versionService;
             FileExplorer.TaskCancellationManager = taskCancellationManager;
             FileExplorer.FavoritesManager = favoritesManager;
             FileExplorer.ImageMergerService = imageMergerService;
             FileExplorer.MonitorService = monitorService;
+            FileExplorer.BackupManager = backupManager;
             FileExplorer.AssetWatcherService = assetWatcherService;
             FileExplorer.ProgressUIManager = progressUIManager;
 
@@ -69,6 +74,14 @@ namespace AssetsManager.Views
 
             FileExplorer.FilePreviewer = FilePreviewer;
             FilePreviewer.FileExplorer = FileExplorer;
+        }
+
+        public async Task InitializeWithMode(string mode)
+        {
+            if (FileExplorer != null)
+            {
+                await FileExplorer.InitializeWithMode(mode);
+            }
         }
 
         public void CleanupResources()

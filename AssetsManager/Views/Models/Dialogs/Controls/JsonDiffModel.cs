@@ -14,6 +14,9 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private bool _isWordLevelDiff;
         private bool _hideUnchangedLines;
         private bool _isWordWrapEnabled;
+        private bool _showInsertions = true;
+        private bool _showDeletions = true;
+        private bool _showModifications = true;
 
         // Metrics Properties
         private int _insertionsCount;
@@ -23,14 +26,19 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         // Metadata Properties
         private string _oldSize;
         private string _newSize;
-        private string _currentPath;
-        private string _currentLineText;
         private int _currentLine = 1;
 
         // Batch Mode Properties
         private bool _isBatchMode;
+        private bool _isInitialComparison;
         private int _currentFileIndex = 1;
         private int _totalFilesCount = 1;
+
+        public bool IsInitialComparison
+        {
+            get => _isInitialComparison;
+            set { _isInitialComparison = value; OnPropertyChanged(); }
+        }
 
         public bool IsInlineMode
         {
@@ -54,6 +62,24 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         {
             get => _isWordWrapEnabled;
             set { _isWordWrapEnabled = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowInsertions
+        {
+            get => _showInsertions;
+            set { _showInsertions = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowDeletions
+        {
+            get => _showDeletions;
+            set { _showDeletions = value; OnPropertyChanged(); }
+        }
+
+        public bool ShowModifications
+        {
+            get => _showModifications;
+            set { _showModifications = value; OnPropertyChanged(); }
         }
 
         public int InsertionsCount
@@ -86,22 +112,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _newSize = value; OnPropertyChanged(); }
         }
 
-        public string CurrentPath
-        {
-            get => _currentPath;
-            set { _currentPath = value; OnPropertyChanged(); }
-        }
-
         public int CurrentLine
         {
             get => _currentLine;
             set { _currentLine = value; OnPropertyChanged(); }
-        }
-
-        public string CurrentLineText
-        {
-            get => _currentLineText;
-            set { _currentLineText = value; OnPropertyChanged(); }
         }
 
         public bool IsBatchMode
@@ -136,8 +150,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             // after the DiffPlex model is built.
             
             // Metadata Updates
-            OldSize = FormatUtils.FormatSize((ulong)(oldText?.Length ?? 0));
-            NewSize = FormatUtils.FormatSize((ulong)(newText?.Length ?? 0));
+            OldSize = FormatUtils.FormatSize((long)(oldText?.Length ?? 0));
+            NewSize = FormatUtils.FormatSize((long)(newText?.Length ?? 0));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

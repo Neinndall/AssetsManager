@@ -28,6 +28,7 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -61,7 +62,9 @@ namespace AssetsManager.Views.Controls.Explorer
         public AudioBankLinkerService AudioBankLinkerService { get; set; }
         public HashResolverService HashResolverService { get; set; }
         public AssetWatcherService AssetWatcherService { get; set; }
+        public VersionService VersionService { get; set; }
         public MonitorService MonitorService { get; set; }
+        public BackupManager BackupManager { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
         public ProgressUIManager ProgressUIManager { get; set; }
@@ -79,6 +82,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly DispatcherTimer _searchTimer;
         private string _currentRootPath;
         private string _backupJsonPath;
+        private bool _isExternalInitRequested = false;
 
         public FileExplorerControl()
         {
@@ -88,15 +92,37 @@ namespace AssetsManager.Views.Controls.Explorer
             DataContext = _viewModel;
             
             this.Loaded += FileExplorerControl_Loaded;
+            this.Unloaded += FileExplorerControl_Unloaded;
 
             _searchTimer = new DispatcherTimer();
             _searchTimer.Interval = TimeSpan.FromMilliseconds(300);
             _searchTimer.Tick += SearchTimer_Tick;
         }
 
+        private void FileExplorerControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                await ReloadTreeAsync();
+            });
+        }
+
         public void CleanupResources()
         {
-            TaskCancellationManager.CancelCurrentOperation(true, "Cancelling tree building...");
+            TaskCancellationManager.CancelCurrentOperation();
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
 
             // 1. Detener el timer PRIMERO
             if (_searchTimer != null)
@@ -143,12 +169,40 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // 8. Limpiar paths
             _currentRootPath = null;
+            _isExternalInitRequested = false;
         }
 
         private async void FileExplorerControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
+            // Setup toolbar peer connection - ALWAYS do this
+            _viewModel.Toolbar.ParentExplorer = this;
+            _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
+
+            if (_isExternalInitRequested) return;
+
+            // Smart discovery based on preference
+            string pbe = AppSettings.LolPbeDirectory;
+            string live = AppSettings.LolLiveDirectory;
+            bool pbeValid = !string.IsNullOrEmpty(pbe) && Directory.Exists(pbe);
+            bool liveValid = !string.IsNullOrEmpty(live) && Directory.Exists(live);
+            
+            string wadPath = null;
+            if (AppSettings.PreferredClient == PreferredClient.PBE)
+            {
+                wadPath = pbeValid ? pbe : (liveValid ? live : null);
+            }
+            else
+            {
+                wadPath = liveValid ? live : (pbeValid ? pbe : null);
+            }
+
             // First, do the synchronous checks to decide the initial UI state.
-            bool shouldLoadWadTree = _viewModel.IsWadMode && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory);
+            bool shouldLoadWadTree = _viewModel.IsWadMode && wadPath != null;
             bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
 
             if (shouldLoadWadTree || shouldLoadDirTree)
@@ -175,14 +229,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
 
-            // Setup toolbar peer connection
-            _viewModel.Toolbar.ParentExplorer = this;
-            _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
-
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
             {
-                await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                await BuildWadTreeAsync(wadPath);
             }
             else if (shouldLoadDirTree)
             {
@@ -200,28 +250,17 @@ namespace AssetsManager.Views.Controls.Explorer
             switch (e.PropertyName)
             {
                 case nameof(ExplorerToolbarModel.IsGridMode):
-                    HandleViewModeChanged(_viewModel.Toolbar.IsGridMode);
+                    FilePreviewer?.SetViewMode(_viewModel.Toolbar.IsGridMode);
                     break;
                 case nameof(ExplorerToolbarModel.IsBreadcrumbVisible):
-                    HandleBreadcrumbVisibilityChanged(_viewModel.Toolbar.IsBreadcrumbVisible);
-                    break;
-                case nameof(ExplorerToolbarModel.IsFavoritesEnabled):
-                    HandleFavoritesVisibilityChanged(_viewModel.Toolbar.IsFavoritesEnabled);
+                    FilePreviewer?.SetBreadcrumbToggleState(_viewModel.Toolbar.IsBreadcrumbVisible);
                     break;
                 case nameof(ExplorerToolbarModel.IsGroupingEnabled):
-                    HandleSortStateChanged(_viewModel.Toolbar.IsGroupingEnabled);
+                    HandleSortStateChanged();
                     break;
                 case nameof(ExplorerToolbarModel.SearchText):
                     HandleSearchTextChanged();
                     break;
-            }
-        }
-
-        public void HandleViewModeChanged(bool isGridMode)
-        {
-            if (FilePreviewer != null)
-            {
-                FilePreviewer.SetViewMode(isGridMode);
             }
         }
 
@@ -232,8 +271,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleSwitchMode()
         {
-            _viewModel.IsWadMode = !_viewModel.IsWadMode;
-            // Mode switched, we keep the current view mode (Grid/Preview) preference.
+            // Update the toolbar state to switch modes
+            _viewModel.Toolbar.IsWadMode = !_viewModel.Toolbar.IsWadMode;
+            _viewModel.Toolbar.IsBackupMode = false;
+
+            // Reset paths so ReloadTree can re-discover the correct root
+            _currentRootPath = null;
+            _backupJsonPath = null;
             
             if (FilePreviewer != null)
             {
@@ -242,21 +286,8 @@ namespace AssetsManager.Views.Controls.Explorer
             await ReloadTreeAsync();
         }
 
-        public void HandleBreadcrumbVisibilityChanged(bool isVisible)
+        public async void HandleSortStateChanged()
         {
-            FilePreviewer?.SetBreadcrumbToggleState(isVisible);
-        }
-
-        public void HandleFavoritesVisibilityChanged(bool isVisible)
-        {
-            _viewModel.IsFavoritesEnabled = isVisible;
-        }
-
-        public async void HandleSortStateChanged(bool isEnabled)
-        {
-            // Toolbar 'IsEnabled' means Categories mode (IsSortingEnabled = false)
-            // Default (Unchecked) is Path Mode (IsSortingEnabled = true)
-            _viewModel.IsSortingEnabled = !isEnabled;
             if (_viewModel.IsBackupMode)
             {
                 await BuildTreeFromBackupAsync(_backupJsonPath);
@@ -268,13 +299,63 @@ namespace AssetsManager.Views.Controls.Explorer
             ImageMergerService.ShowWindow();
         }
 
+        public async Task InitializeWithMode(string mode)
+        {
+            _isExternalInitRequested = true;
+
+            switch (mode)
+            {
+                case "Live":
+                    _viewModel.IsWadMode = true;
+                    if (!string.IsNullOrEmpty(AppSettings.LolLiveDirectory) && Directory.Exists(AppSettings.LolLiveDirectory))
+                        await BuildWadTreeAsync(AppSettings.LolLiveDirectory);
+                    else
+                        _viewModel.UpdateEmptyState(true);
+                    break;
+                case "Pbe":
+                    _viewModel.IsWadMode = true;
+                    if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
+                        await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                    else
+                        _viewModel.UpdateEmptyState(true);
+                    break;
+                case "Local":
+                    _viewModel.IsWadMode = false;
+                    if (!string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath))
+                        await BuildDirectoryTreeAsync(DirectoriesCreator.AssetsDownloadedPath);
+                    else
+                        _viewModel.UpdateEmptyState(false);
+                    break;
+            }
+        }
+
         public async Task ReloadTreeAsync()
         {
             if (_viewModel.IsWadMode)
             {
-                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && Directory.Exists(AppSettings.LolPbeDirectory))
+                string path = _currentRootPath;
+                
+                if (string.IsNullOrEmpty(path))
                 {
-                    await BuildWadTreeAsync(AppSettings.LolPbeDirectory);
+                    // Discovery logic based on preference
+                    string pbe = AppSettings.LolPbeDirectory;
+                    string live = AppSettings.LolLiveDirectory;
+                    bool pbeValid = !string.IsNullOrEmpty(pbe) && Directory.Exists(pbe);
+                    bool liveValid = !string.IsNullOrEmpty(live) && Directory.Exists(live);
+
+                    if (AppSettings.PreferredClient == PreferredClient.PBE)
+                    {
+                        path = pbeValid ? pbe : (liveValid ? live : null);
+                    }
+                    else
+                    {
+                        path = liveValid ? live : (pbeValid ? pbe : null);
+                    }
+                }
+
+                if (path != null)
+                {
+                    await BuildWadTreeAsync(path);
                 }
                 else
                 {
@@ -294,66 +375,25 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        public async void HandleLoadBackup()
+        public async void HandleLoadResults()
         {
             var openFileDialog = new CommonOpenFileDialog
             {
-                Title = "Select a backup file",
+                Title = "Select a comparison result file",
                 Filters = { new CommonFileDialogFilter("WAD Comparison JSON", "wadcomparison.json"), new CommonFileDialogFilter("All files", "*.*") },
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
 
             if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
+                _currentRootPath = null; // Important: Clear root when loading result
+
                 if (FilePreviewer != null)
                 {
                     await FilePreviewer.ResetToDefaultState();
                 }
                 await BuildTreeFromBackupAsync(openFileDialog.FileName);
             }
-        }
-
-        public async void HandleOpenStandaloneWad()
-        {
-            var openFileDialog = new CommonOpenFileDialog
-            {
-                Title = "Select a WAD file",
-                Filters = { 
-                    new CommonFileDialogFilter("WAD Files (*.wad.client, *.wad)", "*.wad.client;*.wad"), 
-                    new CommonFileDialogFilter("All files", "*.*") 
-                }
-            };
-
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                await LoadStandaloneWadAsync(openFileDialog.FileName);
-            }
-        }
-
-        public async Task LoadStandaloneWadAsync(string wadPath)
-        {
-            if (FilePreviewer != null)
-            {
-                await FilePreviewer.ResetToDefaultState();
-            }
-            await BuildStandaloneWadTreeAsync(wadPath);
-        }
-
-        private async Task BuildStandaloneWadTreeAsync(string wadPath)
-        {
-            _currentRootPath = wadPath;
-            NewLolPath = null;
-            OldLolPath = null;
-
-            await ExecuteTreeBuildInternalAsync(
-                async ct => await this.WadNodeLoaderService.LoadWadContentAsync(wadPath),
-                ExplorerLoadingState.LoadingWads,
-                "Failed to load standalone WAD file.",
-                false,
-                onSuccess: (nodes) => 
-                {
-                    _viewModel.IsStandaloneMode = true;
-                });
         }
 
         private async Task ExecuteTreeBuildInternalAsync(
@@ -379,7 +419,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 if (_viewModel.RootNodes.Count == 0 && !isBackupMode)
                 {
-                    CustomMessageBoxService.ShowError("Error", "No items found in the selected location.", Window.GetWindow(this));
+                    LogService.LogWarning("No items found in the selected location.");
                     _viewModel.IsEmptyState = true;
                 }
 
@@ -413,8 +453,17 @@ namespace AssetsManager.Views.Controls.Explorer
             NewLolPath = null;
             OldLolPath = null;
 
+            // Identity Badge Logic
+            if (BackupManager != null)
+            {
+                var (isPbe, _) = BackupManager.GetPathIdentification(rootPath);
+                _viewModel.Toolbar.CurrentClientName = isPbe ? "PBE" : "LIVE";
+                _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource(isPbe ? "AccentBlue" : "AccentBrush");
+                _viewModel.Toolbar.CurrentClientIcon = isPbe ? Material.Icons.MaterialIconKind.FlaskOutline : Material.Icons.MaterialIconKind.SealVariant;
+            }
+
             await ExecuteTreeBuildInternalAsync(
-                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct),
+                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
@@ -425,6 +474,9 @@ namespace AssetsManager.Views.Controls.Explorer
             _currentRootPath = rootPath;
             NewLolPath = null;
             OldLolPath = null;
+
+            _viewModel.Toolbar.CurrentClientName = "LOCAL";
+            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("TextMuted");
 
             await ExecuteTreeBuildInternalAsync(
                 async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
@@ -437,6 +489,9 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             _backupJsonPath = jsonPath;
 
+            _viewModel.Toolbar.CurrentClientName = "RESULT";
+            _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("AccentTeal");
+
             await ExecuteTreeBuildInternalAsync(
                 async ct => 
                 {
@@ -445,7 +500,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     OldLolPath = oldPath;
                     return nodes;
                 },
-                ExplorerLoadingState.LoadingBackup,
+                ExplorerLoadingState.LoadingResults,
                 "Failed to build tree from backup.",
                 true);
         }
@@ -529,18 +584,23 @@ namespace AssetsManager.Views.Controls.Explorer
                         {
                             processedCount++;
                             ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, Path.GetFileName(fileName));
-                        });
+                        }, false); // forceSmart: false
                     }
 
                     if (selectedNodes.Count == 1)
                     {
                         var node = selectedNodes[0];
+                        string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
+                        
+                        // Use the cleaned name (without suffixes) so the log link matches the folder on disk
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
-                            logPath = Path.Combine(destinationPath, node.Name);
+                            string cleanName = PathUtils.GetLogName(node.Name);
+                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
                         }
-                        LogService.LogInteractiveSuccess($"Successfully extracted {node.Name}", logPath, node.Name);
+
+                        LogService.LogInteractiveSuccess($"Successfully extracted {logName}", logPath, logName);
                     }
                     else
                     {
@@ -551,7 +611,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (OperationCanceledException)
                 {
-                    LogService.LogWarning("Extraction was cancelled by the user.");
+                    LogService.LogWarning("Extraction process was cancelled.");
                 }
                 catch (Exception ex)
                 {
@@ -633,7 +693,7 @@ namespace AssetsManager.Views.Controls.Explorer
                             processedCount++;
                             ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
                             savedFiles.Add(path);
-                        });
+                        }, true); // forceSmart: true -> always converts (ignores Original setting)
 
                         if (selectedNodes.Count == 1 && savedFiles.Count > 0)
                         {
@@ -642,11 +702,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
                             if (node.Type == NodeType.SoundBank)
                             {
-                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(node.Name));
+                                string cleanName = PathUtils.GetLogName(node.Name);
+                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
                             }
                             else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                             {
-                                singleSavedPath = Path.Combine(destinationPath, node.Name);
+                                string cleanName = PathUtils.GetLogName(node.Name);
+                                singleSavedPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
                             }
 
                             if (savedFiles.Count == 1)
@@ -673,7 +735,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (OperationCanceledException)
                 {
-                    LogService.LogWarning("Save operation was cancelled by the user.");
+                    LogService.LogWarning("Save process was cancelled.");
                 }
                 catch (Exception ex)
                 {
@@ -694,8 +756,8 @@ namespace AssetsManager.Views.Controls.Explorer
             // Use the TreeUIManager to get ALL multi-selected nodes, or the current one if none
             var selectedNodes = TreeUIManager.GetSelectedNodes(_viewModel.RootNodes, FileTreeView.SelectedItem as FileSystemNodeModel);
             
-            // Filter only those that actually HAVE a difference to show
-            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null).ToList();
+            // Filter only those that actually HAVE a real difference (exclude dependencies)
+            var nodesWithDiff = selectedNodes.Where(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency).ToList();
 
             if (nodesWithDiff.Count > 1 && FilePreviewer != null)
             {
@@ -768,7 +830,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void WatchAsset_Click(object sender, RoutedEventArgs e)
+        private async void WatchAsset_Click(object sender, RoutedEventArgs e)
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel selectedNode && selectedNode.Type == NodeType.VirtualFile)
             {
@@ -809,15 +871,29 @@ namespace AssetsManager.Views.Controls.Explorer
                     wadRelativePath = wadPhysicalPath.Substring(AppSettings.LolPbeDirectory.Length).TrimStart('/', '\\');
                 }
 
+                string currentVersion = null;
+                try
+                {
+                    // 1. Try primary path
+                    currentVersion = await VersionService.GetGameVersionAsync(NewPbePath);
+
+                    // 2. Fallback: Try the directory of the WAD itself if primary failed
+                    if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
+                    {
+                        string wadDir = Path.GetDirectoryName(wadPhysicalPath);
+                        currentVersion = await VersionService.GetGameVersionAsync(wadDir);
+                    }
+                }
+                catch { }
+
                 var newAsset = new MonitoredAsset
                 {
                     Alias = selectedNode.Name,
                     AssetPath = logicalPath,
-                    WadName = wadRelativePath, // Full relative path: Plugins/folder/file.wad
+                    WadName = wadRelativePath,
                     InternalPath = internalPath,
                     SourceType = sourceType,
-                    Status = AssetStatus.Pending,
-                    StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted"),
+                    Version = currentVersion,
                     LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : 0
                 };
 

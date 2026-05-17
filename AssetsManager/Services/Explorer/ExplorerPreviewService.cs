@@ -8,26 +8,19 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Collections.Generic;
 using System.Windows.Media;
-using LeagueToolkit.Core.Wad;
 using Microsoft.Web.WebView2.Wpf;
-using LeagueToolkit.Core.Renderer;
-using BCnEncoder.Shared;
-using System.Runtime.InteropServices;
 using AssetsManager.Services.Parsers;
-using System.Windows;
-using System.Text.Json;
 using System.Reflection;
 using ICSharpCode.AvalonEdit;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
+using ICSharpCode.AvalonEdit.Document;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Comparator;
-using SharpVectors.Converters;
-using SharpVectors.Renderers.Wpf;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -35,7 +28,8 @@ namespace AssetsManager.Services.Explorer
     {
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activePreviewer = Previewer.None;
-        private FileSystemNodeModel _currentlyDisplayedNode;
+        private FileSystemNodeModel _currentContentNode;
+        private FileSystemNodeModel _currentImageNode;
         private Image _imagePreview;
         private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
@@ -48,8 +42,18 @@ namespace AssetsManager.Services.Explorer
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
+        private readonly SvgParser _svgParser;
+        private readonly NarrativeMetadataService _narrativeMetadataService;
 
-        public ExplorerPreviewService(LogService logService, DirectoriesCreator directoriesCreator, WadDiffProvider wadDiffProvider, ContentFormatterService contentFormatterService, AudioConversionService audioConversionService, WadContentProvider wadContentProvider)
+        public ExplorerPreviewService(
+            LogService logService, 
+            DirectoriesCreator directoriesCreator, 
+            WadDiffProvider wadDiffProvider, 
+            ContentFormatterService contentFormatterService, 
+            AudioConversionService audioConversionService, 
+            WadContentProvider wadContentProvider,
+            SvgParser svgParser,
+            NarrativeMetadataService narrativeMetadataService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
@@ -57,6 +61,8 @@ namespace AssetsManager.Services.Explorer
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
+            _svgParser = svgParser;
+            _narrativeMetadataService = narrativeMetadataService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -82,31 +88,47 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            // Avoid redundant reloads of the same file
-            if (_currentlyDisplayedNode == node) return;
-
-            // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
-            _viewModel.PrepareSlotForFile(node);
-
-            // Step 2: SELECTIVE clearing to maintain Dual View
-            // Only clear the slot that is being updated to avoid flickering
-            // without affecting the other active panel.
             bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
                            SupportedFileTypes.Textures.Contains(node.Extension) || 
                            SupportedFileTypes.VectorImages.Contains(node.Extension);
 
+            // Per-Slot Early Exit:
+            // Check if the node is already loaded in its corresponding slot.
+            // This prevents reloads when alternating focus in Dual View.
+            if (isImage)
+            {
+                if (_currentImageNode == node && _viewModel.IsImageVisible) return;
+            }
+            else
+            {
+                if (_currentContentNode == node && (_viewModel.IsTextVisible || _viewModel.IsWebVisible || _viewModel.IsUnsupportedVisible)) return;
+            }
+
+            // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
+            _viewModel.PrepareSlotForFile(node);
+
+            // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
+            // We only update/clear metadata if the current node is an image. 
+            // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
+            var metadata = await _narrativeMetadataService.GetMetadataAsync(node);
+            if (isImage || metadata != null)
+            {
+                _viewModel.NarrativeMetadata = metadata;
+            }
+
+            // Step 3: SELECTIVE clearing to maintain Dual View
             if (isImage)
             {
                 _imagePreview.Source = null;
+                _currentImageNode = node;
             }
             else
             {
                 _textEditorPreview.Clear();
                 // Note: WebView cleanup is handled inside SetPreviewerAsync 
                 // when the new media is ready to be injected.
+                _currentContentNode = node;
             }
-
-            _currentlyDisplayedNode = node;
 
             try
             {
@@ -127,7 +149,19 @@ namespace AssetsManager.Services.Explorer
 
         public async Task ResetPreviewAsync()
         {
-            _currentlyDisplayedNode = null;
+            _currentContentNode = null;
+            _currentImageNode = null;
+
+            // Step 1: Clean UI controls to release RAM
+            if (_textEditorPreview != null)
+            {
+                // Assigning a new document is the most efficient way to release old large buffers
+                _textEditorPreview.Document = new TextDocument();
+            }
+            _imagePreview.Source = null;
+            _viewModel.NarrativeMetadata = null;
+
+            // Step 2: Restore the UI state
             await SetPreviewerAsync(Previewer.StatusPanel);
         }
 
@@ -183,7 +217,7 @@ namespace AssetsManager.Services.Explorer
                     await ShowAudioVideoPreviewAsync(data, extension, node.Name);
                 }
             }
-            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension) || SupportedFileTypes.Lua.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
         }
 
@@ -196,6 +230,10 @@ namespace AssetsManager.Services.Explorer
 
                 IHighlightingDefinition syntaxHighlighting = null;
                 if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "js" || dataType == "preload")
+                {
+                    syntaxHighlighting = GetJsonHighlighting();
+                }
+                else if (dataType == "luabin64")
                 {
                     syntaxHighlighting = GetJsonHighlighting();
                 }
@@ -279,7 +317,6 @@ namespace AssetsManager.Services.Explorer
                         // Global Reset
                         _viewModel.ResetAllVisibility();
                         _imagePreview.Source = null;
-                        _textEditorPreview.Clear();
                     }
                     break;
             }
@@ -382,7 +419,7 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                var drawingImage = await Task.Run(() => SvgUtils.LoadSvg(data));
+                var drawingImage = await Task.Run(() => _svgParser.LoadSvg(data));
                 if (drawingImage != null)
                 {
                     await SetPreviewerAsync(Previewer.Image, drawingImage);
@@ -554,7 +591,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {
-                    return await Task.Run(() => SvgUtils.LoadSvg(data));
+                    return await Task.Run(() => _svgParser.LoadSvg(data));
                 }
             }
             catch (Exception ex)

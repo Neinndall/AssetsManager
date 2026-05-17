@@ -54,14 +54,100 @@ namespace AssetsManager.Services.Explorer
         {
             await Task.Run(() =>
             {
+                // 1. Flatten the tree for O(1) traversal
+                var allNodes = new List<FileSystemNodeModel>();
+                Flatten(nodes, allNodes);
+
                 if (string.IsNullOrWhiteSpace(searchText))
                 {
-                    SetVisibility(nodes, true);
+                    // Fast reset: Only update if necessary to avoid UI churn
+                    foreach (var node in allNodes)
+                    {
+                        if (!node.IsVisible) node.IsVisible = true;
+                        if (node.HasMatch) node.HasMatch = false;
+                        node.PreMatch = null;
+                        node.Match = null;
+                        node.PostMatch = null;
+                    }
                     return;
                 }
 
-                FilterNodes(nodes, searchText);
+                // 2. High Performance & Anti-Flicker Filtering
+                // Pass 1: Identification (who should be visible?)
+                var toShow = new HashSet<FileSystemNodeModel>();
+                var matchIndices = new Dictionary<FileSystemNodeModel, int>();
+
+                foreach (var node in allNodes)
+                {
+                    if (node.Name == "Loading...") continue;
+
+                    int index = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
+                    if (index >= 0)
+                    {
+                        matchIndices[node] = index;
+                        toShow.Add(node);
+
+                        // Propagate visibility upwards instantly in the set
+                        var parent = node.Parent;
+                        while (parent != null && toShow.Add(parent))
+                        {
+                            parent = parent.Parent;
+                        }
+                    }
+                }
+
+                // Pass 2: Surgical Application (Only notify UI if state changes)
+                foreach (var node in allNodes)
+                {
+                    bool shouldBeVisible = toShow.Contains(node);
+                    bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
+
+                    // Update match highlighting data
+                    if (node.HasMatch != hasMatch) node.HasMatch = hasMatch;
+                    
+                    if (hasMatch)
+                    {
+                        int length = searchText.Length;
+                        node.PreMatch = node.Name.Substring(0, matchIndex);
+                        node.Match = node.Name.Substring(matchIndex, length);
+                        node.PostMatch = node.Name.Substring(matchIndex + length);
+                    }
+                    else
+                    {
+                        node.PreMatch = null;
+                        node.Match = null;
+                        node.PostMatch = null;
+                    }
+
+                    // CRITICAL: Only update IsVisible if it's different.
+                    // This prevents the flickering of parent containers.
+                    if (node.IsVisible != shouldBeVisible)
+                    {
+                        node.IsVisible = shouldBeVisible;
+                    }
+                }
             });
+        }
+
+        private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result)
+        {
+            if (roots == null) return;
+
+            var stack = new Stack<FileSystemNodeModel>();
+            foreach (var root in roots.Reverse()) stack.Push(root);
+
+            while (stack.Count > 0)
+            {
+                var node = stack.Pop();
+                result.Add(node);
+                if (node.Children != null)
+                {
+                    for (int i = node.Children.Count - 1; i >= 0; i--)
+                    {
+                        stack.Push(node.Children[i]);
+                    }
+                }
+            }
         }
 
         private async Task<FileSystemNodeModel> ExpandToPathAsync(
@@ -146,80 +232,5 @@ namespace AssetsManager.Services.Explorer
             }
             return null;
         }
-
-        private bool FilterNodes(IEnumerable<FileSystemNodeModel> nodes, string searchText)
-        {
-            bool somethingVisibleInThisLevel = false;
-            if (nodes == null) return false;
-
-            foreach (var node in nodes)
-            {
-                if (node.Name == "Loading...")
-                {
-                    node.IsVisible = false;
-                    continue;
-                }
-
-                bool selfMatches = false;
-                if (searchText.StartsWith(".") && searchText.Length > 1)
-                {
-                    // Search by extension
-                    selfMatches = node.Extension.Equals(searchText, StringComparison.OrdinalIgnoreCase);
-                }
-                else
-                {
-                    // Search by name
-                    selfMatches = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-
-                bool childMatches = FilterNodes(node.Children, searchText);
-
-                node.IsVisible = selfMatches || childMatches;
-
-                if (selfMatches)
-                {
-                    var index = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
-                    var length = searchText.Length;
-
-                    node.PreMatch = node.Name.Substring(0, index);
-                    node.Match = node.Name.Substring(index, length);
-                    node.PostMatch = node.Name.Substring(index + length);
-                    node.HasMatch = true;
-                }
-                else
-                {
-                    node.HasMatch = false;
-                    node.PreMatch = null;
-                    node.Match = null;
-                    node.PostMatch = null;
-                }
-
-                if (node.IsVisible)
-                {
-                    somethingVisibleInThisLevel = true;
-                }
-            }
-            return somethingVisibleInThisLevel;
-        }
-
-        private void SetVisibility(IEnumerable<FileSystemNodeModel> nodes, bool isVisible)
-        {
-            if (nodes == null) return;
-            foreach (var node in nodes)
-            {
-                node.IsVisible = isVisible;
-                node.HasMatch = false;
-                node.PreMatch = null;
-                node.Match = null;
-                node.PostMatch = null;
-
-                if (!isVisible)
-                {
-                    node.IsExpanded = false;
-                }
-                SetVisibility(node.Children, isVisible);
-            }
-        }
     }
 }
-

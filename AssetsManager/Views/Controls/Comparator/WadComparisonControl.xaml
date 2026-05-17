@@ -4,280 +4,488 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Comparator"
+             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              mc:Ignorable="d">
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Configuration Card -->
-            <RowDefinition Height="Auto"/> <!-- Versions Card -->
-            <RowDefinition Height="Auto"/> <!-- Footer Action Card -->
+            <RowDefinition Height="Auto"/> <!-- 1. Header & Mode -->
+            <RowDefinition Height="Auto"/> <!-- 2. Dual Comparison Cards -->
+            <RowDefinition Height="Auto"/> <!-- 3. Action Footer -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Configuration Card -->
-        <Border Grid.Row="0" Margin="0,0,0,20"
-                Background="{StaticResource CardBackground}" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1" 
-                CornerRadius="8" 
-                Padding="12">
+        <!-- 1. HEADER: CONFIGURATION (Restored Section Metrics: 42x42 / 22x22 | 13px Bold) -->
+        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="0,0,0,24" Padding="24,16">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Icon & Text -->
+                <!-- Title & Context (Standardized 42x42 / 22x22) -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Width="38" Height="38" Margin="0,0,12,0">
-                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,20,0">
+                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.3"/>
+                            </materialIcons:MaterialIcon.Effect>
+                        </materialIcons:MaterialIcon>
                     </Border>
+
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Configuration" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select a comparison mode to proceed." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                        <TextBlock Text="ANALYSIS CONTEXT" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure the scanning strategy: bulk directory processing or atomic WAD analysis" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Right: Mode Switcher -->
-                <Border Grid.Column="1" 
-                        Background="{StaticResource SidebarBackground}" 
-                        CornerRadius="8" 
-                        Padding="4" 
-                        BorderBrush="{StaticResource BorderColor}" 
-                        BorderThickness="1"
-                        VerticalAlignment="Center">
+                <!-- Mode Selector -->
+                <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="ModeDirectory" 
-                                     Content="Directory" 
-                                     GroupName="ComparisonMode"
-                                     IsChecked="{Binding IsDirectoryMode}" 
-                                     Style="{StaticResource SegmentedRadioButtonStyle}"/>
-                        <RadioButton x:Name="ModeFile" 
-                                     Content="Wad File" 
-                                     GroupName="ComparisonMode"
-                                     IsChecked="{Binding IsFileMode, Mode=OneWay}"
-                                     Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="ModeDirectory" Content="DIRECTORY" IsChecked="{Binding IsDirectoryMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        <RadioButton x:Name="ModeFile" Content="WAD FILE" IsChecked="{Binding IsFileMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
                     </StackPanel>
                 </Border>
             </Grid>
         </Border>
 
-        <!-- 2. VERSIONS CARD -->
-        <Border Grid.Row="1" 
-                Background="{StaticResource CardBackground}" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1" 
-                CornerRadius="12"
-                Padding="24"
-                Margin="0,0,0,20">
-            <StackPanel>
-                
-                <!-- === SECTION: TARGET VERSION (NEW) === -->
-                <StackPanel Margin="0,0,0,18">
-                    <!-- Label Header -->
-                    <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
-                        <Border Background="#1A00E676" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
-                            <materialIcons:MaterialIcon Kind="StarThreePointsOutline" Foreground="{StaticResource AccentGreen}" Width="18" Height="18" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="TARGET VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentGreen}" Opacity="0.9"/>
-                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="New Directory"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsFileMode}" Value="True">
-                                                <Setter Property="Text" Value="New Wad File"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </StackPanel>
+        <!-- 2. DUAL CARDS -->
+        <Grid Grid.Row="1" Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="32"/> 
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-                    <!-- Inputs: Directory Mode -->
-                    <StackPanel Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="newLolPbeDirectoryTextBox" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Height="38"
-                                     IsReadOnly="True" 
-                                     Text="{Binding NewDirectoryPath}"
-                                     Padding="10,0" 
-                                     VerticalContentAlignment="Center"
-                                     Grid.Column="0"
-                                     Margin="0,0,8,0"/>
-                            <Button Grid.Column="1" 
-                                    Click="btnSelectNewLolPbeDirectory_Click" 
-                                    Style="{StaticResource BrowseButtonStyle}" 
-                                    ToolTip="Browse Directory">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpen" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
-
-                    <!-- Inputs: File Mode -->
-                    <StackPanel Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="newWadFileTextBox" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Height="38"
-                                     IsReadOnly="True" 
-                                     Text="{Binding NewWadFilePath}"
-                                     Padding="10,0" 
-                                     VerticalContentAlignment="Center"
-                                     Grid.Column="0"
-                                     Margin="0,0,8,0"/>
-                            <Button Grid.Column="1" 
-                                    Click="btnSelectNewWadFile_Click" 
-                                    Style="{StaticResource BrowseButtonStyle}" 
-                                    ToolTip="Browse File">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FileFind" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- === SECTION: BASE VERSION (OLD) === -->
+            <!-- LEFT CARD: TARGET VERSION (NEW) -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,26,24,26" VerticalAlignment="Top">
                 <StackPanel>
-                    <!-- Label Header -->
-                    <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
-                        <Border Background="#1AFF9100" CornerRadius="6" Width="32" Height="32" Margin="0,0,12,0">
-                            <materialIcons:MaterialIcon Kind="ClockTimeFourOutline" Foreground="{StaticResource AccentOrange}" Width="18" Height="18" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="BASE VERSION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource AccentOrange}" Opacity="0.9"/>
-                            <TextBlock FontSize="13" Foreground="{StaticResource TextPrimary}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="Old Directory"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsFileMode}" Value="True">
-                                                <Setter Property="Text" Value="Old Wad File"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                    <!-- Header with integrated Quick Select -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <StackPanel Orientation="Horizontal" Grid.Column="0">
+                            <!-- Standardized 42x42 Container -->
+                            <Border Background="#1A00E676" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                                <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentGreen}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="TARGET VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}"/>
+                                <TextBlock Text="New source to compare with" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
 
-                    <!-- Inputs: Directory Mode -->
-                    <StackPanel Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <!-- Discreet Quick Select (Arrow) -->
+                        <ComboBox Grid.Column="1" x:Name="TargetQuickSelect" 
+                                  Style="{StaticResource ModernComboBox}" Tag="Icon" 
+							      Width="42" Height="42"
+                                  ItemsSource="{Binding AvailableBackups}"
+                                  SelectedItem="{Binding SelectedTargetBackup}"
+                                  SelectionChanged="TargetQuickSelect_SelectionChanged"
+                                  VerticalAlignment="Center"
+                                  Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,1"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                
+                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="7" FontWeight="Bold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="BACKUP"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                        <Setter Property="Text" Value="MAIN"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,4,0">
+                                            <TextBlock Text="{Binding CreationDate, StringFormat={}{0:dd/MM/yyyy}}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                            <TextBlock Text="{Binding CreationDate, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="{StaticResource TextMuted}" Opacity="0.6" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- Path Row (Primary Input) -->
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="DIRECTORY PATH"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                        <Setter Property="Text" Value="WAD FILE PATH"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Height="42" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                                    <Setter Property="Text" Value="{Binding NewDirectoryPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                            <Setter Property="Text" Value="{Binding NewWadFilePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
+                                Click="btnSelectNewLolPbeDirectory_Click" 
+                                Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <materialIcons:MaterialIcon Kind="FolderOpen" Width="18"/>
+                        </Button>
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
+                                Click="btnSelectNewWadFile_Click" 
+                                Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <materialIcons:MaterialIcon Kind="FileFind" Width="18"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Metadata Section Header -->
+                    <TextBlock Text="METADATA INFORMATION" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                    
+                    <!-- Metadata HUD -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="oldLolPbeDirectoryTextBox" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Height="38"
-                                     IsReadOnly="True" 
-                                     Text="{Binding OldDirectoryPath}"
-                                     Padding="10,0" 
-                                     VerticalContentAlignment="Center"
-                                     Grid.Column="0"
-                                     Margin="0,0,8,0"/>
-                            <Button Grid.Column="1" 
-                                    Click="btnSelectOldLolPbeDirectory_Click" 
-                                    Style="{StaticResource BrowseButtonStyle}" 
-                                    ToolTip="Browse Directory">
+                            <StackPanel>
+                                <TextBlock Text="VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding TargetVersion}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FolderOpen" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse"/>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
+                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="LIVE"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding TargetVersion}" Value="---">
+                                                            <Setter Property="Text" Value="---"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsTargetPbe}" Value="True">
+                                                            <Setter Property="Text" Value="PBE"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetMain, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0">
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsTargetMain}" Value="False"/>
+                                                            <Condition Binding="{Binding TargetVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                    </Border>
                                 </StackPanel>
-                            </Button>
+                            </StackPanel>
                         </Grid>
-                    </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
 
-                    <!-- Inputs: File Mode -->
-                    <StackPanel Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
+            <!-- CENTER GAP -->
+            <Grid Grid.Column="1" VerticalAlignment="Top" Margin="0,15,0,0"/>
+
+            <!-- RIGHT CARD: BASE VERSION (OLD) -->
+            <Border Grid.Column="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="16" Padding="24,26,24,26" VerticalAlignment="Top">
+                <StackPanel>
+                    <!-- Header with integrated Quick Select -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <StackPanel Orientation="Horizontal" Grid.Column="0">
+                            <!-- Standardized 42x42 Container -->
+                            <Border Background="#1AFF9100" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                                <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="BASE VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentOrange}"/>
+                                <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Discreet Quick Select (Arrow) -->
+                        <ComboBox Grid.Column="1" x:Name="BaseQuickSelect" 
+                                  Style="{StaticResource ModernComboBox}" Tag="Icon" 
+                                  Width="42" Height="42"
+                                  ItemsSource="{Binding AvailableBackups}"
+                                  SelectedItem="{Binding SelectedBaseBackup}"
+                                  SelectionChanged="BaseQuickSelect_SelectionChanged"
+                                  VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,1"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                
+                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                                            <Setter Property="BorderThickness" Value="1"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="BorderThickness" Value="0"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="7" FontWeight="Bold" VerticalAlignment="Center">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="BACKUP"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsMainClient}" Value="True">
+                                                                        <Setter Property="Text" Value="MAIN"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,4,0">
+                                            <TextBlock Text="{Binding CreationDate, StringFormat={}{0:dd/MM/yyyy}}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                            <TextBlock Text="{Binding CreationDate, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="{StaticResource TextMuted}" Opacity="0.6" HorizontalAlignment="Right"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- Path Row (Primary Input) -->
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="DIRECTORY PATH"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                        <Setter Property="Text" Value="WAD FILE PATH"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Height="42" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+                                    <Setter Property="Text" Value="{Binding OldDirectoryPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                            <Setter Property="Text" Value="{Binding OldWadFilePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
+                                Click="btnSelectOldLolPbeDirectory_Click" 
+                                Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <materialIcons:MaterialIcon Kind="FolderOpen" Width="18"/>
+                        </Button>
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
+                                Click="btnSelectOldWadFile_Click" 
+                                Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <materialIcons:MaterialIcon Kind="FileFind" Width="18"/>
+                        </Button>
+                    </Grid>
+
+                    <!-- Metadata Section Header -->
+                    <TextBlock Text="METADATA INFORMATION" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                    
+                    <!-- Metadata HUD -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="16,12">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="oldWadFileTextBox" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Height="38"
-                                     IsReadOnly="True" 
-                                     Text="{Binding OldWadFilePath}"
-                                     Padding="10,0" 
-                                     VerticalContentAlignment="Center"
-                                     Grid.Column="0"
-                                     Margin="0,0,8,0"/>
-                            <Button Grid.Column="1" 
-                                    Click="btnSelectOldWadFile_Click" 
-                                    Style="{StaticResource BrowseButtonStyle}" 
-                                    ToolTip="Browse File">
+                            <StackPanel>
+                                <TextBlock Text="VERSION" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding BaseVersion}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                                <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <materialIcons:MaterialIcon Kind="FileFind" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Browse"/>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
+                                        <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="LIVE"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding BaseVersion}" Value="---">
+                                                            <Setter Property="Text" Value="---"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsBasePbe}" Value="True">
+                                                            <Setter Property="Text" Value="PBE"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseMain, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0">
+                                        <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsBaseMain}" Value="False"/>
+                                                            <Condition Binding="{Binding BaseVersion, Converter={StaticResource EqualityConverter}, ConverterParameter='!---'}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="BACKUP" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                    </Border>
                                 </StackPanel>
-                            </Button>
+                            </StackPanel>
                         </Grid>
-                    </StackPanel>
+                    </Border>
                 </StackPanel>
+            </Border>
+        </Grid>
 
-            </StackPanel>
-        </Border>
+        <!-- 3. FOOTER: Start Comparison -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-        <!-- 3. ACTION CARD (Ready for Compare?) -->
-        <Border Grid.Row="2"
-                Background="{StaticResource CardBackground}" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1" 
-                CornerRadius="12" 
-                Padding="12"
-                Margin="0,0,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <!-- Status Card -->
+            <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Padding="24,0" Height="86" Margin="0,0,12,0">
+                <Grid VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <!-- Icon/Decoration -->
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="38" Height="38" Margin="0,0,12,0">
-                    <materialIcons:MaterialIcon Kind="CheckAll" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                    <!-- Standardized 42x42 Container with centered 'i' icon -->
+                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
 
-                <!-- Texts -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Ready for Compare?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                    <TextBlock Text="Review your paths above and start the analysis." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
-                </StackPanel>
-
-                <!-- Button -->
-                <Button Grid.Column="2" 
-                        x:Name="compareWadButton" 
-                        Click="compareWadButton_Click"
-                        IsEnabled="{Binding IsComparing, Converter={StaticResource InverseBooleanConverter}}"
-                        Style="{StaticResource PrimaryButton}"
-                        HorizontalContentAlignment="Left"
-                        Padding="10,0,14,0"
-                        Margin="0,0,8,0">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Flash" Margin="0,0,8,0" Width="14" Height="14" VerticalAlignment="Center"/>
-                        <TextBlock Text="START COMPARISON" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14" Margin="0,2,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="The comparison will identify new, modified, renamed and deleted assets."/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFileMode}" Value="True">
+                                            <Setter Property="Text" Value="Selecting a WAD will automatically locate and load its corresponding twin on the base side for a synchronized comparison."/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
-                </Button>
-            </Grid>
-        </Border>
+                </Grid>
+            </Border>
+
+            <!-- Action Button -->
+            <Button Grid.Column="1" x:Name="compareWadButton" Click="compareWadButton_Click" 
+                    IsEnabled="{Binding IsComparing, Converter={StaticResource InverseBooleanConverter}}" 
+                    Style="{StaticResource SelectionCardButtonStyle}" Width="220" Height="86" Margin="0" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Flash" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Start comparison" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Execute analysis process" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+        </Grid>
     </Grid>
 </UserControl>

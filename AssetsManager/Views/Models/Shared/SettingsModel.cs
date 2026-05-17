@@ -25,18 +25,37 @@ namespace AssetsManager.Views.Models.Shared
             }
         }
 
-        public List<AudioFormatOption> AudioFormatOptions { get; } = new List<AudioFormatOption>
+        public List<FormatOption<AudioExportFormat>> AudioFormatOptions { get; } = new List<FormatOption<AudioExportFormat>>
         {
-            new AudioFormatOption { Name = "OGG", Value = AudioExportFormat.Ogg },
-            new AudioFormatOption { Name = "WAV", Value = AudioExportFormat.Wav },
-            new AudioFormatOption { Name = "MP3", Value = AudioExportFormat.Mp3 }
+            new FormatOption<AudioExportFormat> { Name = "OGG", Value = AudioExportFormat.Ogg },
+            new FormatOption<AudioExportFormat> { Name = "WAV", Value = AudioExportFormat.Wav },
+            new FormatOption<AudioExportFormat> { Name = "MP3", Value = AudioExportFormat.Mp3 }
         };
 
-        public List<ImageFormatOption> ImageFormatOptions { get; } = new List<ImageFormatOption>
+        public List<FormatOption<ImageExportFormat>> ImageFormatOptions { get; } = new List<FormatOption<ImageExportFormat>>
         {
-            new ImageFormatOption { Name = "Original", Value = ImageExportFormat.Original },
-            new ImageFormatOption { Name = "PNG", Value = ImageExportFormat.Png },
-            new ImageFormatOption { Name = "JPEG", Value = ImageExportFormat.Jpeg }
+            new FormatOption<ImageExportFormat> { Name = "Original", Value = ImageExportFormat.Original },
+            new FormatOption<ImageExportFormat> { Name = "PNG", Value = ImageExportFormat.Png },
+            new FormatOption<ImageExportFormat> { Name = "JPEG", Value = ImageExportFormat.Jpeg }
+        };
+
+        public List<FormatOption<DataExportFormat>> DataFormatOptions { get; } = new List<FormatOption<DataExportFormat>>
+        {
+            new FormatOption<DataExportFormat> { Name = "Original", Value = DataExportFormat.Original },
+            new FormatOption<DataExportFormat> { Name = "JSON", Value = DataExportFormat.Json }
+        };
+
+        public List<FormatOption<PreferredClient>> PreferredClientOptions { get; } = new List<FormatOption<PreferredClient>>
+        {
+            new FormatOption<PreferredClient> { Name = "PBE", Value = PreferredClient.PBE },
+            new FormatOption<PreferredClient> { Name = "LIVE", Value = PreferredClient.LIVE }
+        };
+
+        public List<FormatOption<PreferredDirectory>> PreferredDirectoryOptions { get; } = new List<FormatOption<PreferredDirectory>>
+        {
+            new FormatOption<PreferredDirectory> { Name = "All", Value = PreferredDirectory.All },
+            new FormatOption<PreferredDirectory> { Name = "Game", Value = PreferredDirectory.Game },
+            new FormatOption<PreferredDirectory> { Name = "Plugins", Value = PreferredDirectory.Plugins }
         };
 
         public void NotifySettingsChanged()

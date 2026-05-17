@@ -5,11 +5,11 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Parsers
 {
-    public static class PreloadUtils
+    public class PreloadParser
     {
-        public static async Task WritePreloadAsJsonAsync(Stream outputStream, byte[] preloadContent)
+        public async Task WritePreloadAsJsonAsync(Stream outputStream, byte[] preloadContent)
         {
             var content = Encoding.UTF8.GetString(preloadContent);
             var parsedObject = ParsePreload(content);
@@ -18,7 +18,7 @@ namespace AssetsManager.Utils
             await JsonSerializer.SerializeAsync(outputStream, parsedObject, options);
         }
 
-        private static object ParsePreload(string content)
+        private object ParsePreload(string content)
         {
             content = content.Replace("\r\n", "\n").Trim();
 
@@ -61,7 +61,7 @@ namespace AssetsManager.Utils
             return result;
         }
 
-        private static object ParseEntry(string entry)
+        private object ParseEntry(string entry)
         {
             entry = entry.Trim();
             if (entry.StartsWith("{") && entry.EndsWith("}"))
@@ -90,7 +90,7 @@ namespace AssetsManager.Utils
             return entry;
         }
 
-        private static void AddKeyValuePair(Dictionary<string, object> dict, string pair)
+        private void AddKeyValuePair(Dictionary<string, object> dict, string pair)
         {
             var parts = pair.Split(new[] { '=' }, 2);
             if (parts.Length == 2)

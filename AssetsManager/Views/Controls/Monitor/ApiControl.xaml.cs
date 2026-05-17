@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -63,6 +64,39 @@ namespace AssetsManager.Views.Controls.Monitor
 
             await LoadSalesFromCacheAsync();
             await LoadMythicShopFromCacheAsync();
+            await LoadPassRewardsFromCacheAsync();
+        }
+
+        private async Task LoadPassRewardsFromCacheAsync()
+        {
+            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
+            {
+                return;
+            }
+
+            try
+            {
+                var progressionPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_progression.json");
+                var rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+
+                if (File.Exists(progressionPath) && File.Exists(rewardsPath))
+                {
+                    var progContent = await File.ReadAllTextAsync(progressionPath);
+                    var rewardsContent = await File.ReadAllTextAsync(rewardsPath);
+
+                    var progression = JsonSerializer.Deserialize<ProgressionResponse>(progContent);
+                    var rewardsResponse = JsonSerializer.Deserialize<RewardsResponse>(rewardsContent);
+
+                    if (progression != null && rewardsResponse != null)
+                    {
+                        await ProcessPassRewardsDataAsync(progression, rewardsResponse);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to load pass rewards data from cache.");
+            }
         }
 
         private async Task LoadMythicShopFromCacheAsync()
@@ -200,6 +234,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
         {
+            if (LogService != null) LogService.Log("Starting Sales Fetch Process");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -236,81 +271,131 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (ViewModel?.SalesCatalog.Count == 0)
             {
-                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowInfo("Information", "No sales data to save.", Window.GetWindow(this));
                 return;
             }
 
+            await HandleExportRequestAsync("sales", ViewModel.SalesCatalog, (DataTemplate)this.FindResource("StoreItemTemplate"), 8);
+        }
+
+        private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel?.MythicShopCategories.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Information", "No Mythic Shop data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            await HandleExportRequestAsync("mythic_shop", ViewModel.MythicShopCategories, (DataTemplate)this.FindResource("MythicItemTemplate"), 8);
+        }
+
+        private async void SavePassRewardsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel?.PassRewards.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Information", "No pass rewards data to save.", Window.GetWindow(this));
+                return;
+            }
+
+            await HandleExportRequestAsync("pass_rewards", ViewModel.PassRewards, (DataTemplate)this.FindResource("PassRewardTemplate"), 8);
+        }
+
+        private async Task HandleExportRequestAsync(string defaultFileName, System.Collections.IEnumerable items, DataTemplate template, int columns)
+        {
             var dialog = new CommonSaveFileDialog
             {
-                Title = "Save sales data",
-                DefaultFileName = "sales",
+                Title = $"Save {defaultFileName.Replace("_", " ")} data",
+                DefaultFileName = defaultFileName,
                 InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png" // Default to PNG
+                DefaultExtension = ".png"
             };
             dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                string filePath = dialog.FileName;
-                string extension = Path.GetExtension(filePath).ToLowerInvariant();
-
                 try
                 {
-                    if (extension == ".png")
-                    {
-                        await SaveSalesAsPngAsync(filePath);
-                    }
-                    else
-                    {
-                        CustomMessageBoxService.ShowError("Error", "Unsupported file format selected. Only PNG is supported.", Window.GetWindow(this));
-                    }
+                    await ExportGridToPngAsync(items, template, columns, dialog.FileName);
                 }
                 catch (Exception ex)
                 {
-                    LogService.LogError(ex, $"Failed to save sales data to {filePath}.");
+                    LogService.LogError(ex, $"Failed to export {defaultFileName} to PNG.");
                     CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
                 }
             }
         }
 
-        private async Task SaveSalesAsPngAsync(string filePath)
+        private async Task ExportGridToPngAsync(System.Collections.IEnumerable items, DataTemplate template, int columns, string filePath)
         {
-            var items = ViewModel?.SalesCatalog; // Use the currently displayed page
-            if (items == null || !items.Any())
+            // 1. Container
+            var rootPanel = new StackPanel
             {
-                CustomMessageBoxService.ShowInfo("Info", "No sales data to save.", Window.GetWindow(this));
-                return;
+                Background = (Brush)Application.Current.FindResource("SidebarBackground"), // Professional Dark Background
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+                Orientation = Orientation.Vertical,
+                Width = 1200 // Fixed width for consistent high-quality output
+            };
+
+            // 2. Logic for both flat lists and categorized lists (Mythic)
+            bool isCategorized = items is IEnumerable<MythicShopCategory>;
+
+            if (isCategorized)
+            {
+                foreach (var category in (IEnumerable<MythicShopCategory>)items)
+                {
+                    var header = new Border
+                    {
+                        Background = (Brush)Application.Current.FindResource("CardBackground"),
+                        CornerRadius = new CornerRadius(8),
+                        Padding = new Thickness(16, 8, 16, 8),
+                        Margin = new Thickness(20, 20, 20, 12),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        BorderBrush = (Brush)Application.Current.FindResource("BorderColor"),
+                        BorderThickness = new Thickness(1)
+                    };
+                    header.Child = new TextBlock
+                    {
+                        Text = category.CategoryName,
+                        FontSize = 14,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = (Brush)Application.Current.FindResource("TextPrimary")
+                    };
+                    rootPanel.Children.Add(header);
+
+                    rootPanel.Children.Add(CreateUniformGrid(category.Items, template, columns));
+                }
+            }
+            else
+            {
+                // Add a small padding at the top for flat lists
+                rootPanel.Children.Add(new Border { Height = 20 });
+                rootPanel.Children.Add(CreateUniformGrid(items, template, columns));
             }
 
-            // 1. Create the container
-            var grid = new Grid
-            {
-                Background = this.Background, // Use the control's own background
-                SnapsToDevicePixels = true,
-                UseLayoutRounding = true
-            };
+            // Add bottom padding
+            rootPanel.Children.Add(new Border { Height = 20 });
 
+            // 3. Measure & Arrange for off-screen rendering
+            rootPanel.Measure(new Size(rootPanel.Width, double.PositiveInfinity));
+            rootPanel.Arrange(new Rect(0, 0, rootPanel.DesiredSize.Width, rootPanel.DesiredSize.Height));
+
+            // 4. Save using utility
+            await ImageExportUtils.SaveAsPngAsync(rootPanel, filePath, LogService);
+        }
+
+        private ItemsControl CreateUniformGrid(System.Collections.IEnumerable items, DataTemplate template, int columns)
+        {
             var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
-            uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 3);
-            var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
-
-            // 2. Create the ItemsControl
-            var itemsControl = new ItemsControl
+            uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, columns);
+            
+            return new ItemsControl
             {
                 ItemsSource = items,
-                ItemTemplate = SalesItemsControl.ItemTemplate,
-                ItemsPanel = itemsPanelTemplate
+                ItemTemplate = template,
+                ItemsPanel = new ItemsPanelTemplate(uniformGridFactory),
+                Margin = new Thickness(10, 0, 10, 0)
             };
-
-            grid.Children.Add(itemsControl);
-
-            // 3. Set width and measure
-            grid.Width = SalesItemsControl.ActualWidth;
-            grid.Measure(new Size(grid.Width, double.PositiveInfinity));
-            grid.Arrange(new Rect(0, 0, grid.DesiredSize.Width, grid.DesiredSize.Height));
-
-            // 4. Call the utility to save the element
-            await ImageExportUtils.SaveAsPngAsync(grid, filePath, LogService);
         }
 
         private void PreviousPage_Click(object sender, RoutedEventArgs e)
@@ -325,15 +410,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
+            if (LogService != null) LogService.Log("Starting Mythic Shop Fetch Process");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
                 return;
             }
 
-            ViewModel?.IsBusy = true;
+            ViewModel.IsBusy = true;
             var mythicShopResponse = await RiotApiService.GetMythicShopResponseAsync();
-            ViewModel?.IsBusy = false;
+            ViewModel.IsBusy = false;
 
             if (mythicShopResponse == null)
             {
@@ -410,90 +496,6 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
-        private async void SaveMythicShopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (ViewModel?.MythicShopCategories.Count == 0)
-            {
-                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
-                return;
-            }
-
-            var dialog = new CommonSaveFileDialog
-            {
-                Title = "Save Mythic Shop data",
-                DefaultFileName = "mythic_shop",
-                InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png"
-            };
-            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
-
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                string filePath = dialog.FileName;
-                try
-                {
-                    await SaveMythicShopAsPngAsync(filePath);
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, $"Failed to save Mythic Shop data to {filePath}.");
-                    CustomMessageBoxService.ShowError("Error", $"An error occurred while saving: {ex.Message}", Window.GetWindow(this));
-                }
-            }
-        }
-
-        private async Task SaveMythicShopAsPngAsync(string filePath)
-        {
-            var categories = ViewModel?.MythicShopCategories;
-            if (categories == null || !categories.Any())
-            {
-                CustomMessageBoxService.ShowInfo("Info", "No Mythic Shop data to save.", Window.GetWindow(this));
-                return;
-            }
-
-            var rootPanel = new StackPanel
-            {
-                Background = this.Background,
-                SnapsToDevicePixels = true,
-                UseLayoutRounding = true,
-                Orientation = Orientation.Vertical
-            };
-
-            var itemTemplate = this.FindResource("MythicItemTemplate") as DataTemplate;
-
-            foreach (var category in categories)
-            {
-                var categoryTitle = new TextBlock
-                {
-                    Text = category.CategoryName,
-                    FontSize = 16,
-                    FontWeight = FontWeights.SemiBold,
-                    Margin = new Thickness(10, 10, 0, 10),
-                    Foreground = (SolidColorBrush)Application.Current.FindResource("TextPrimary")
-                };
-                rootPanel.Children.Add(categoryTitle);
-
-                var uniformGridFactory = new FrameworkElementFactory(typeof(UniformGrid));
-                uniformGridFactory.SetValue(UniformGrid.ColumnsProperty, 4);
-                var itemsPanelTemplate = new ItemsPanelTemplate(uniformGridFactory);
-
-                var itemsControl = new ItemsControl
-                {
-                    ItemsSource = category.Items,
-                    ItemTemplate = itemTemplate,
-                    ItemsPanel = itemsPanelTemplate
-                };
-
-                rootPanel.Children.Add(itemsControl);
-            }
-
-            rootPanel.Width = MythicShopCategoriesItemsControl.ActualWidth;
-            rootPanel.Measure(new Size(rootPanel.Width, double.PositiveInfinity));
-            rootPanel.Arrange(new Rect(0, 0, rootPanel.DesiredSize.Width, rootPanel.DesiredSize.Height));
-
-            await ImageExportUtils.SaveAsPngAsync(rootPanel, filePath, LogService);
-        }
-
         private async void LcuConnectionTimer_Tick(object sender, EventArgs e)
         {
             if (RiotApiService == null) return;
@@ -522,6 +524,183 @@ namespace AssetsManager.Views.Controls.Monitor
         private void TabMythic_Click(object sender, RoutedEventArgs e)
         {
             MainTabControl.SelectedIndex = 1;
+        }
+
+        private void TabPass_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabControl.SelectedIndex = 2;
+        }
+
+        private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
+        {
+            if (LogService != null) LogService.Log("Starting Pass Rewards Fetch Process");
+            if (RiotApiService == null)
+            {
+                CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
+                return;
+            }
+
+            string eventId = ViewModel.ManualPassId?.Trim();
+
+            if (string.IsNullOrEmpty(eventId))
+            {
+                ViewModel.IsBusy = true;
+                ViewModel.StatusText = "Status: Finding active pass...";
+
+                eventId = await RiotApiService.GetActivePassGroupIdAsync();
+                if (string.IsNullOrEmpty(eventId))
+                {
+                    ViewModel.IsBusy = false;
+                    CustomMessageBoxService.ShowError("Error", "Could not find an active pass event ID.", Window.GetWindow(this));
+                    return;
+                }
+            }
+
+            ViewModel.IsBusy = true;
+            ViewModel.StatusText = "Status: Fetching pass data...";
+            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId);
+            string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
+
+            if (string.IsNullOrEmpty(progressionJson) || string.IsNullOrEmpty(rewardsJson))
+            {
+                ViewModel.IsBusy = false;
+                CustomMessageBoxService.ShowError("Error", "Could not retrieve pass progression or rewards data.", Window.GetWindow(this));
+                return;
+            }
+
+            try
+            {
+                var progression = JsonSerializer.Deserialize<ProgressionResponse>(progressionJson);
+                var rewardsResponse = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+
+                if (progression != null && rewardsResponse != null)
+                {
+                    await ProcessPassRewardsDataAsync(progression, rewardsResponse);
+                    LogService.LogSuccess("Pass rewards data retrieved and processed successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to process Pass Rewards data.");
+                CustomMessageBoxService.ShowError("Error", $"An error occurred: {ex.Message}", Window.GetWindow(this));
+            }
+
+            ViewModel.IsBusy = false;
+            ViewModel.StatusText = "Status: LCU Connected";
+            UpdateAuthenticationStatus();
+        }
+
+        private async Task ProcessPassRewardsDataAsync(ProgressionResponse progression, RewardsResponse rewardsResponse)
+        {
+            var rewardGroupsMap = rewardsResponse.Data.ToDictionary(g => g.Id, g => g);
+            var passRewards = new List<PassRewardModel>();
+            var processedKeys = new HashSet<string>();
+
+            foreach (var milestone in progression.Milestones)
+            {
+                if (milestone.Properties == null || !milestone.Properties.TryGetValue("REWARD_GROUP_ID", out var rewardGroupIdObj))
+                    continue;
+
+                string rewardGroupId = rewardGroupIdObj.ToString();
+                string translatedLevel = TranslateMilestoneName(milestone.Name);
+                string key = $"{translatedLevel}-{rewardGroupId}";
+
+                if (processedKeys.Contains(key)) continue;
+
+                if (rewardGroupsMap.TryGetValue(rewardGroupId, out var rewardGroup))
+                {
+                    foreach (var reward in rewardGroup.Rewards)
+                    {
+                        if (reward.Media == null || string.IsNullOrEmpty(reward.Media.IconUrl))
+                            continue;
+
+                        string title = string.Empty;
+                        string details = string.Empty;
+
+                        if (reward.Localizations != null)
+                        {
+                            title = reward.Localizations.Title;
+                            details = reward.Localizations.Details;
+                        }
+
+                        passRewards.Add(new PassRewardModel
+                        {
+                            Level = translatedLevel,
+                            Title = TransformTitle(title, reward.Quantity),
+                            Details = details,
+                            IconUrl = reward.Media.IconUrl,
+                            Quantity = reward.Quantity,
+                            IsFree = milestone.Name.Contains("Free", StringComparison.OrdinalIgnoreCase)
+                        });
+
+                        processedKeys.Add(key);
+                        break; // Following GeneratorRewards logic: process only the first reward
+                    }
+                }
+            }
+
+            ViewModel.PassRewards.ReplaceRange(passRewards);
+
+            // Batch extract icons efficiently
+            var urlsToExtract = passRewards.Select(r => r.IconUrl).ToList();
+            
+            _ = Task.Run(async () => 
+            {
+                await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, (originalUrl, localPath) => 
+                {
+                    // Find all models using this URL (there might be duplicates across levels)
+                    var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
+                    
+                    Dispatcher.Invoke(() => 
+                    {
+                        foreach (var target in targets)
+                        {
+                            target.IconUrl = localPath;
+                        }
+                    });
+                });
+            });
+        }
+
+        private string TranslateMilestoneName(string name)
+        {
+            if (name.Contains("Milestone", StringComparison.OrdinalIgnoreCase))
+            {
+                int index = name.IndexOf("Milestone", StringComparison.OrdinalIgnoreCase);
+                if (index >= 0)
+                {
+                    // Get everything after "Milestone"
+                    string levelPart = name.Substring(index + "Milestone".Length);
+                    
+                    // Use Regex to extract only the leading numbers
+                    var match = Regex.Match(levelPart, @"^(\d+)");
+                    if (match.Success)
+                    {
+                        string levelNumber = match.Groups[1].Value.TrimStart('0');
+                        if (string.IsNullOrEmpty(levelNumber)) levelNumber = "0";
+                        return $"Level {levelNumber}";
+                    }
+                }
+            }
+            return name;
+        }
+
+        private string TransformTitle(string title, long quantity)
+        {
+            if (string.IsNullOrEmpty(title)) return title;
+
+            var match = Regex.Match(title, @"rewards_title_Reward_(\w+)_(\d+)");
+            if (match.Success)
+            {
+                var type = match.Groups[1].Value;
+                var amount = match.Groups[2].Value;
+
+                if (type.Equals("BE", StringComparison.OrdinalIgnoreCase))
+                {
+                    return $"{amount} esencias azules";
+                }
+            }
+            return title;
         }
     }
 }

@@ -33,7 +33,7 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
-        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath)
+        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version = null)
         {
             try
             {
@@ -43,11 +43,13 @@ namespace AssetsManager.Services.Monitor
                 {
                     var entry = new HistoryEntry
                     {
-                        FileName = comparisonDisplayName,
+                        FileName = comparisonDisplayName, // Preserved for legacy if needed
+                        DisplayName = comparisonDisplayName,
+                        Version = version,
                         OldFilePath = oldPbePath,
                         NewFilePath = newPbePath,
                         Timestamp = DateTime.Now,
-                        Type = HistoryEntryType.WadComparison,
+                        Type = HistoryEntryType.WadArchive,
                         ReferenceId = folderName
                     };
 
@@ -96,7 +98,7 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                if (entry.Type == HistoryEntryType.WadComparison && !string.IsNullOrEmpty(entry.ReferenceId))
+                if (entry.Type == HistoryEntryType.WadArchive && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
                     // 1. Delete physical directory
                     string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);

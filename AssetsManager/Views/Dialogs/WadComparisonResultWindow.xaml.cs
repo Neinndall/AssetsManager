@@ -1,25 +1,25 @@
 using System;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Views.Helpers;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Comparator;
-using AssetsManager.Services.Explorer;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Dialogs.Controls;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Wad;
-using AssetsManager.Services.Downloads;
-using AssetsManager.Services.Core;
-using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 using LeagueToolkit.Core.Wad;
-using System.Threading;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -38,6 +38,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
         private readonly WadContentProvider _wadContentProvider;
+        private readonly VersionService _versionService;
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -58,7 +59,8 @@ namespace AssetsManager.Views.Dialogs
             DiffViewService diffViewService, 
             HashResolverService hashResolverService, 
             AppSettings appSettings,
-            WadContentProvider wadContentProvider)
+            WadContentProvider wadContentProvider,
+            VersionService versionService)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -76,6 +78,7 @@ namespace AssetsManager.Views.Dialogs
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
             _wadContentProvider = wadContentProvider;
+            _versionService = versionService;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
@@ -162,12 +165,12 @@ namespace AssetsManager.Views.Dialogs
                 OldPath = d.OldPath,
                 NewPath = d.NewPath,
                 SourceWadFile = d.SourceWadFile,
-                OldPathHash = d.OldChunk.PathHash,
-                NewPathHash = d.NewChunk.PathHash,
+                OldPathHash = (d.Type == ChunkDiffType.New) ? 0 : d.OldChunk.PathHash,
+                NewPathHash = (d.Type == ChunkDiffType.Removed) ? 0 : d.NewChunk.PathHash,
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
-                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : d.NewChunk.Compression
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
             }).ToList();
         }
 
@@ -245,7 +248,7 @@ namespace AssetsManager.Views.Dialogs
             
             if (validDiffs.Count > 1)
             {
-                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this);
+                await _diffViewService.ShowBatchWadDiffAsync(validDiffs, 0, _oldPbePath, _newPbePath, this, _sourceJsonPath);
             }
             else if (validDiffs.Count == 1)
             {
@@ -368,15 +371,20 @@ namespace AssetsManager.Views.Dialogs
                 }
 
                 _logService.Log("Starting comparison backup and asset packaging...");
-                string displayName = "Manual Backup";
+                string displayName = "Unknown";
                 var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
 
                 if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
-                else if (!string.IsNullOrEmpty(_newPbePath)) displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+                else if (!string.IsNullOrEmpty(_newPbePath)) 
+                {
+                    displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+                }
+
+                string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
                 await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.FullPath);
-                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, $"Comparison from {displayName}", _oldPbePath, _newPbePath);
+                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
                 _assignedFolderName = folderInfo.FolderName;
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
             }

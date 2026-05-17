@@ -23,13 +23,17 @@ namespace AssetsManager.Utils
             return $"Expires in {remaining.Minutes}m";
         }
 
-        public static string FormatSize(ulong sizeInBytes)
+        public static string FormatSize(long sizeInBytes)
         {
-            if (sizeInBytes < 1024) return $"{sizeInBytes} B";
-            double sizeInKB = (double)sizeInBytes / 1024.0;
-            if (sizeInKB < 1024) return $"{sizeInKB:F1} KB";
-            double sizeInMB = sizeInKB / 1024.0;
-            return $"{sizeInMB:F1} MB";
+            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+            int counter = 0;
+            decimal number = (decimal)sizeInBytes;
+            while (Math.Round(number / 1024) >= 1 && counter < suffixes.Length - 1)
+            {
+                number = number / 1024;
+                counter++;
+            }
+            return string.Format("{0:n1} {1}", number, suffixes[counter]);
         }
     }
 }

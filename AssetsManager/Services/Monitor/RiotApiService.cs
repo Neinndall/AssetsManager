@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using LeagueToolkit.Core.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Monitor;
@@ -18,9 +21,17 @@ namespace AssetsManager.Services.Monitor
         private readonly HttpClient _httpClient;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
+        private readonly SemaphoreSlim _extractionSemaphore = new(1, 1);
+        private readonly string[] _passWadNames = { "default-assets2.wad", "default-assets.wad" };
 
         private readonly Dictionary<string, string> _localEndpoints;
         private readonly Dictionary<string, string> _remoteEndpoints;
+
+        private string GetIconWadPath(string iconUrl)
+        {
+            string basePath = Regex.Replace(iconUrl.ToLowerInvariant(), @"^.*assets/", "");
+            return $"plugins/rcp-be-lol-game-data/global/default/assets/{basePath}";
+        }
 
         public RiotApiService(AppSettings appSettings, HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
         {
@@ -74,7 +85,6 @@ namespace AssetsManager.Services.Monitor
                 {
                     _appSettings.ApiSettings.Connection.Port = int.Parse(parts[2]);
                     _appSettings.ApiSettings.Connection.Password = parts[3];
-                    _appSettings.ApiSettings.Connection.Lockfile = lockfileContent;
                     _appSettings.ApiSettings.Connection.LocalApiUrl = $"https://127.0.0.1:{_appSettings.ApiSettings.Connection.Port}";
 
                     AppSettings.SaveSettings(_appSettings);
@@ -101,7 +111,6 @@ namespace AssetsManager.Services.Monitor
         {
             if (string.IsNullOrEmpty(_appSettings.ApiSettings.Connection.Password))
             {
-                _logService.LogError("Lockfile password not available to generate authentication header.");
                 return string.Empty;
             }
 
@@ -132,54 +141,53 @@ namespace AssetsManager.Services.Monitor
         {
             if (!_localEndpoints.TryGetValue(endpointKey, out var tokenEndpointPath))
             {
-                _logService.LogError($"Internal Error: The '{endpointKey}' endpoint is not defined in the service.");
                 return null;
             }
 
             try
             {
                 var response = await MakeLocalRequestAsync(tokenEndpointPath);
-                response.EnsureSuccessStatusCode();
-                var rawResponse = await response.Content.ReadAsStringAsync();
-                string token = null;
-
-                try
+                if (response != null && response.IsSuccessStatusCode)
                 {
-                    using (var jsonDoc = JsonDocument.Parse(rawResponse))
+                    var rawResponse = await response.Content.ReadAsStringAsync();
+                    
+                    if (rawResponse.StartsWith("\"") && rawResponse.EndsWith("\""))
                     {
-                        if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object &&
-                            jsonDoc.RootElement.TryGetProperty("accessToken", out var accessTokenElement))
+                        return rawResponse.Trim('"');
+                    }
+
+                    try 
+                    {
+                        using (var jsonDoc = JsonDocument.Parse(rawResponse))
                         {
-                            token = accessTokenElement.GetString();
-                        }
-                        else if (jsonDoc.RootElement.ValueKind == JsonValueKind.String)
-                        {
-                            token = jsonDoc.RootElement.GetString();
-                        }
-                        else
-                        {
-                            token = rawResponse.Trim('"');
+                            if (jsonDoc.RootElement.ValueKind == JsonValueKind.String)
+                            {
+                                return jsonDoc.RootElement.GetString();
+                            }
+                            
+                            if (jsonDoc.RootElement.ValueKind == JsonValueKind.Object)
+                            {
+                                if (endpointKey == "entitlementsToken" && jsonDoc.RootElement.TryGetProperty("entitlements_token", out var entToken))
+                                {
+                                    return entToken.GetString();
+                                }
+                                if (endpointKey == "leagueSessionToken")
+                                {
+                                    if (jsonDoc.RootElement.TryGetProperty("token", out var sToken)) return sToken.GetString();
+                                    if (jsonDoc.RootElement.TryGetProperty("accessToken", out var aToken)) return aToken.GetString();
+                                }
+                            }
                         }
                     }
+                    catch (JsonException)
+                    {
+                        return rawResponse.Trim('"');
+                    }
                 }
-                catch (JsonException)
-                {
-                    token = rawResponse.Trim('"');
-                }
-
-                if (!string.IsNullOrEmpty(token))
-                {
-                    return token;
-                }
-                _logService.LogWarning($"Token was null or empty after processing response from {endpointKey}.");
-            }
-            catch (HttpRequestException httpEx)
-            {
-                _logService.LogWarning($"HTTP error while acquiring token from {endpointKey}: {httpEx.Message}");
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Unexpected error while acquiring token from {endpointKey}.");
+                _logService.LogWarning($"HTTP error while acquiring token from {endpointKey}: {ex.Message}");
             }
 
             return null;
@@ -203,7 +211,6 @@ namespace AssetsManager.Services.Monitor
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Error parsing JWT payload. Default values will be used.");
-                // Fallback to default values if parsing fails
                 _appSettings.ApiSettings.Token.Expiration = DateTime.UtcNow.AddHours(1);
                 _appSettings.ApiSettings.Token.Region = "Unknown";
                 _appSettings.ApiSettings.Token.Puuid = "Unknown";
@@ -213,51 +220,15 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<string> GetSalesAsync()
+        public async Task<SalesCatalog> GetSalesCatalogAsync()
         {
             var response = await MakeRemoteRequestAsync("sales");
             if (response != null && response.IsSuccessStatusCode)
             {
-                var salesJson = await response.Content.ReadAsStringAsync();
-
-                // Save to API cache
+                var json = await response.Content.ReadAsStringAsync();
                 _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
-                var fileName = "sales.json";
-                var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
-                await File.WriteAllTextAsync(filePath, salesJson);
-                return salesJson;
-            }
-            return null;
-        }
-
-        public async Task<SalesCatalog> GetSalesCatalogAsync()
-        {
-            var salesJson = await GetSalesAsync();
-            if (!string.IsNullOrEmpty(salesJson))
-            {
-                return JsonSerializer.Deserialize<SalesCatalog>(salesJson);
-            }
-            return null;
-        }
-
-        public async Task<string> GetMythicShopAsync()
-        {
-            var response = await MakeRemoteRequestAsync("mythic_shop");
-            if (response != null && response.IsSuccessStatusCode)
-            {
-                var mythicShopJson = await response.Content.ReadAsStringAsync();
-
-                // Save to API cache
-                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
-                var fileName = "mythic_shop.json";
-                var filePath = Path.Combine(_directoriesCreator.ApiCachePath, fileName);
-                await File.WriteAllTextAsync(filePath, mythicShopJson);
-                return mythicShopJson;
-            }
-            else if (response != null)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logService.LogWarning($"Mythic Shop request failed with status code: {response.StatusCode}. Content: {errorContent}");
+                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "sales.json"), json);
+                return JsonSerializer.Deserialize<SalesCatalog>(json);
             }
             return null;
         }
@@ -272,75 +243,247 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
+        public async Task<string> GetPassRewardsProgressionAsync(string eventId)
+        {
+            var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
+                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "pass_progression.json"), json);
+                return json;
+            }
+            return null;
+        }
+
+        public async Task<string> GetPassRewardsRewardsAsync()
+        {
+            var response = await MakeRemoteRequestAsync("rewards");
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
+                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "pass_rewards.json"), json);
+                return json;
+            }
+            return null;
+        }
+
+        public async Task<string> GetActivePassGroupIdAsync()
+        {
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            if (string.IsNullOrEmpty(lolDirectory)) return null;
+
+            string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+
+            foreach (var wadName in _passWadNames)
+            {
+                string wadPath = Path.Combine(pluginPath, wadName);
+                if (!File.Exists(wadPath)) continue;
+
+                try
+                {
+                    using var wadFile = new WadFile(wadPath);
+                    string[] possiblePaths = { 
+                        "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
+                        "global/default/v1/event-hub.json",
+                        "v1/event-hub.json"
+                    };
+                    
+                    foreach (var path in possiblePaths)
+                    {
+                        ulong hash = LeagueToolkit.Hashing.XxHash64Ext.Hash(path.ToLowerInvariant());
+                        if (wadFile.Chunks.TryGetValue(hash, out var chunk))
+                        {
+                            using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                            using (var doc = JsonDocument.Parse(decompressedDataOwner.Span.ToArray()))
+                            {
+                                string bestId = null;
+                                string bestName = "Unknown Event";
+                                DateTime latestStart = DateTime.MinValue;
+                                DateTime now = DateTime.UtcNow;
+
+                                foreach (var element in doc.RootElement.EnumerateArray())
+                                {
+                                    if (element.TryGetProperty("event", out var eventObj))
+                                    {
+                                        if (eventObj.TryGetProperty("eventHubType", out var type) && type.GetString() == "kSeasonPass")
+                                        {
+                                            if (eventObj.TryGetProperty("rewardTrack", out var rewardTrack) &&
+                                                rewardTrack.TryGetProperty("trackConfig", out var trackConfig) &&
+                                                trackConfig.TryGetProperty("id", out var id))
+                                            {
+                                                string currentId = id.GetString();
+                                                string currentName = eventObj.TryGetProperty("localizedName", out var nameProp) ? nameProp.GetString() : "Unknown Event";
+                                                DateTime startDate = DateTime.MinValue;
+                                                DateTime endDate = DateTime.MaxValue;
+
+                                                if (eventObj.TryGetProperty("startDate", out var startProp))
+                                                    DateTime.TryParse(startProp.GetString(), out startDate);
+
+                                                if (eventObj.TryGetProperty("endDate", out var endProp))
+                                                    DateTime.TryParse(endProp.GetString(), out endDate);
+
+                                                bool hasNotEnded = now <= endDate;
+
+                                                if (hasNotEnded)
+                                                {
+                                                    if (bestId == null || startDate > latestStart)
+                                                    {
+                                                        bestId = currentId;
+                                                        bestName = currentName;
+                                                        latestStart = startDate;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (bestId != null)
+                                {
+                                    _logService.LogSuccess($"Active Pass ID found called: {bestName}");
+                                    return bestId;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Error extracting active pass ID from {wadName}");
+                }
+            }
+            return null;
+        }
+
+        public async Task ExtractRewardIconsBatchAsync(IEnumerable<string> iconUrls, Action<string, string> onIconExtracted)
+        {
+            if (iconUrls == null || !iconUrls.Any()) return;
+
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            if (string.IsNullOrEmpty(lolDirectory)) return;
+
+            string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+            string rewardsDir = Path.Combine(_directoriesCreator.ApiCachePath, "rewards");
+            _directoriesCreator.CreateDirectory(rewardsDir);
+
+            var uniqueUrls = iconUrls.Distinct().ToList();
+            var remainingUrls = new List<string>();
+
+            foreach (var url in uniqueUrls)
+            {
+                string destinationPath = Path.Combine(rewardsDir, Path.GetFileName(url));
+                if (File.Exists(destinationPath)) onIconExtracted?.Invoke(url, destinationPath);
+                else remainingUrls.Add(url);
+            }
+
+            if (!remainingUrls.Any()) return;
+
+            await _extractionSemaphore.WaitAsync();
+            try
+            {
+                foreach (var wadName in _passWadNames)
+                {
+                    string wadPath = Path.Combine(pluginPath, wadName);
+                    if (!File.Exists(wadPath)) continue;
+
+                    using var wadFile = new WadFile(wadPath);
+                    for (int i = remainingUrls.Count - 1; i >= 0; i--)
+                    {
+                        var iconUrl = remainingUrls[i];
+                        ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(GetIconWadPath(iconUrl));
+
+                        if (wadFile.Chunks.TryGetValue(pathHash, out var chunk))
+                        {
+                            using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                            string destinationPath = Path.Combine(rewardsDir, Path.GetFileName(iconUrl));
+                            await File.WriteAllBytesAsync(destinationPath, decompressedDataOwner.Span.ToArray());
+                            
+                            onIconExtracted?.Invoke(iconUrl, destinationPath);
+                            remainingUrls.RemoveAt(i);
+                        }
+                    }
+                    if (!remainingUrls.Any()) break;
+                }
+            }
+            finally { _extractionSemaphore.Release(); }
+        }
+
+        public async Task<string> ExtractRewardIconAsync(string iconUrl)
+        {
+            if (string.IsNullOrEmpty(iconUrl)) return null;
+            string fileName = Path.GetFileName(iconUrl);
+            string destinationPath = Path.Combine(_directoriesCreator.ApiCachePath, "rewards", fileName);
+            if (File.Exists(destinationPath)) return destinationPath;
+
+            await _extractionSemaphore.WaitAsync();
+            try
+            {
+                if (File.Exists(destinationPath)) return destinationPath;
+                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+                
+                ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(GetIconWadPath(iconUrl));
+
+                foreach (var wadName in _passWadNames)
+                {
+                    string wadPath = Path.Combine(pluginPath, wadName);
+                    if (!File.Exists(wadPath)) continue;
+
+                    using var wadFile = new WadFile(wadPath);
+                    if (wadFile.Chunks.TryGetValue(pathHash, out var chunk))
+                    {
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        _directoriesCreator.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                        await File.WriteAllBytesAsync(destinationPath, decompressedDataOwner.Span.ToArray());
+                        return destinationPath;
+                    }
+                }
+            }
+            catch { }
+            finally { _extractionSemaphore.Release(); }
+            return null;
+        }
+
         private async Task<HttpResponseMessage> MakeLocalRequestAsync(string endpointPath)
         {
-            if (string.IsNullOrEmpty(_appSettings.ApiSettings.Connection.LocalApiUrl))
-            {
-                _logService.LogError("LocalApiUrl not configured. Cannot make local request.");
-                return null;
-            }
-
+            if (string.IsNullOrEmpty(_appSettings.ApiSettings.Connection.LocalApiUrl)) return null;
             var requestUri = $"{_appSettings.ApiSettings.Connection.LocalApiUrl}{endpointPath}";
             var authHeader = GetLocalAuthHeader();
-
-            if (string.IsNullOrEmpty(authHeader))
-            {
-                _logService.LogError("Local authentication header is empty. Could not make local request.");
-                return null;
-            }
+            if (string.IsNullOrEmpty(authHeader)) return null;
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
             request.Headers.Add("Authorization", authHeader);
-
+            if (Uri.TryCreate(requestUri, UriKind.Absolute, out var uri)) request.Headers.Host = uri.Authority;
             return await _httpClient.SendAsync(request);
         }
 
-        private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1)
+        private async Task<HttpResponseMessage> MakeRemoteRequestAsync(string endpointKey, int retryCount = 1, string eventId = null)
         {
-            string tokenEndpointKey;
-            if (endpointKey == "sales")
-            {
-                tokenEndpointKey = "entitlementsToken";
-            }
-            else if (endpointKey == "mythic_shop")
-            {
-                tokenEndpointKey = "leagueSessionToken";
-            }
-            else
-            {
-                _logService.LogError($"No token acquisition strategy defined for endpoint key: {endpointKey}");
-                return null;
-            }
+            if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath)) return null;
+            var tempPath = endpointPath;
+            if (tempPath.Contains("{events_id}") && !string.IsNullOrEmpty(eventId)) tempPath = tempPath.Replace("{events_id}", eventId);
+            if (tempPath.Contains("{locales}")) tempPath = tempPath.Replace("{locales}", "en_US");
 
-            string jwt = await GetTokenFromEndpoint(tokenEndpointKey);
+            string tokenKey = (endpointKey == "sales") ? "entitlementsToken" : "leagueSessionToken";
+            string jwt = await GetTokenFromEndpoint(tokenKey);
+            if (string.IsNullOrEmpty(jwt)) return null;
 
-            if (string.IsNullOrEmpty(jwt))
-            {
-                _logService.LogError($"Failed to acquire necessary token ('{tokenEndpointKey}') for remote request.");
-                return null;
-            }
-
-            // We need to parse the token to get region info for the URL and for the UI.
             _appSettings.ApiSettings.Token.Jwt = jwt;
             ParseJwtPayload(jwt);
-            var region = _appSettings.ApiSettings.Token.Region?.ToLower();
-
-            if (string.IsNullOrEmpty(region) || region == "unknown")
+            
+            var currentRegion = _appSettings.ApiSettings.Token.Region?.ToLower() ?? "unknown";
+            if (currentRegion == "unknown")
             {
-                _logService.LogError("Could not determine region from JWT. Cannot make remote request.");
+                _logService.LogError("Could not determine region. Remote request cancelled.");
                 return null;
             }
 
-            region = Regex.Replace(region, @"\d+$", "");
-            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", region);
+            var regionKey = Regex.Replace(currentRegion, @"\d+$", "");
+            var baseUrl = Endpoints.BaseUrlLive.Replace("{region}", regionKey);
+            var requestUri = $"{baseUrl}{tempPath}";
 
-            if (!_remoteEndpoints.TryGetValue(endpointKey, out var endpointPath))
-            {
-                _logService.LogError($"The remote endpoint '{endpointKey}' is not defined in the service.");
-                return null;
-            }
-
-            var requestUri = $"{baseUrl}{endpointPath}";
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
             request.Headers.Add("Authorization", $"Bearer {jwt}");
             request.Headers.Add("User-Agent", "LeagueOfLegendsClient/15.1.645.4557 (rcp-be-lol-ranked)");
@@ -349,20 +492,15 @@ namespace AssetsManager.Services.Monitor
             try
             {
                 var response = await _httpClient.SendAsync(request);
-
                 if ((response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.Forbidden) && retryCount > 0)
                 {
-                    _logService.Log($"Token for {endpointKey} was rejected. Attempting to refresh and retry...");
-                    // Re-acquire the specific token needed
-                    string refreshedJwt = await GetTokenFromEndpoint(tokenEndpointKey);
+                    string refreshedJwt = await GetTokenFromEndpoint(tokenKey);
                     if (!string.IsNullOrEmpty(refreshedJwt))
                     {
-                        // Update the header with the new token for the retry
                         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", refreshedJwt);
-                        return await _httpClient.SendAsync(request); // Use the same request object with the updated header
+                        return await _httpClient.SendAsync(request);
                     }
                 }
-
                 return response;
             }
             catch (Exception ex)
@@ -370,6 +508,19 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError(ex, $"Error in remote request to {requestUri}.");
                 return null;
             }
+        }
+
+        private async Task<string> GetMythicShopAsync()
+        {
+            var response = await MakeRemoteRequestAsync("mythic_shop");
+            if (response != null && response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
+                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "mythic_shop.json"), json);
+                return json;
+            }
+            return null;
         }
     }
 }

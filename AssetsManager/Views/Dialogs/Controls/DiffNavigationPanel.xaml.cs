@@ -152,6 +152,9 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (host == null || host.ActualWidth <= 0 || host.ActualHeight <= 0) return;
             host.ClearVisuals();
+
+            // Initial comparison: Don't draw markers as there are no semantic changes
+            if (ParentControl?.ViewModel?.IsInitialComparison == true) return;
             
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
@@ -159,12 +162,27 @@ namespace AssetsManager.Views.Dialogs.Controls
                 if (pane.Lines.Count > 0)
                 {
                     double ratio = host.ActualHeight / pane.Lines.Count;
-                    for (int i = 0; i < pane.Lines.Count; i++)
+                    int i = 0;
+                    while (i < pane.Lines.Count)
                     {
                         var line = pane.Lines[i];
-                        if (line.Type == ChangeType.Unchanged) continue;
+                        if (line.Type == ChangeType.Unchanged)
+                        {
+                            i++;
+                            continue;
+                        }
 
-                        Brush brush = line.Type switch
+                        // Start of a change block
+                        var currentType = line.Type;
+                        int start = i;
+                        
+                        // Group contiguous lines of the same type
+                        while (i < pane.Lines.Count && pane.Lines[i].Type == currentType)
+                        {
+                            i++;
+                        }
+
+                        Brush brush = currentType switch
                         {
                             ChangeType.Inserted => _addedBrush,
                             ChangeType.Deleted => _removedBrush,
@@ -175,7 +193,8 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                         if (brush != null)
                         {
-                            dc.DrawRectangle(brush, null, new Rect(0, i * ratio, host.ActualWidth, Math.Max(1, ratio)));
+                            int count = i - start;
+                            dc.DrawRectangle(brush, null, new Rect(0, start * ratio, host.ActualWidth, Math.Max(1, count * ratio)));
                         }
                     }
                 }
@@ -216,6 +235,10 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void FindDiffLines()
         {
             _diffLines.Clear();
+
+            // Initial comparison: No real differences to navigate to
+            if (ParentControl?.ViewModel?.IsInitialComparison == true) return;
+
             var lines = _diffModel?.NewText.Lines ?? _unifiedLines;
             if (lines == null) return;
 

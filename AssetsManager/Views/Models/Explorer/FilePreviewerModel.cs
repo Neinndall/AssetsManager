@@ -30,6 +30,15 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        private NarrativeMetadata _narrativeMetadata;
+        public NarrativeMetadata NarrativeMetadata
+        {
+            get => _narrativeMetadata;
+            set { _narrativeMetadata = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsNarrativeMetadataVisible)); }
+        }
+
+        public bool IsNarrativeMetadataVisible => NarrativeMetadata != null;
+
         public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
@@ -83,7 +92,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public bool IsGridVisible => IsGridMode && HasSelectedNode && IsSelectedNodeContainer;
+        public bool IsGridVisible => IsGridMode && IsSelectedNodeContainer;
         public bool IsPreviewVisible => !IsGridVisible;
 
         public bool HasSelectedNode

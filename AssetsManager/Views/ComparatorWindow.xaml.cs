@@ -1,5 +1,6 @@
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using System.Windows.Controls;
 using AssetsManager.Views.Models.Comparator;
@@ -15,7 +16,9 @@ namespace AssetsManager.Views
             WadComparatorService wadComparatorService,
             LogService logService,
             AppSettings appSettings,
-            TaskCancellationManager taskCancellationManager
+            TaskCancellationManager taskCancellationManager,
+            BackupManager backupManager,
+            VersionService versionService
             )
         {
             InitializeComponent();
@@ -29,6 +32,8 @@ namespace AssetsManager.Views
             WadComparisonControl.LogService = logService;
             WadComparisonControl.AppSettings = appSettings;
             WadComparisonControl.TaskCancellationManager = taskCancellationManager;
+            WadComparisonControl.BackupManager = backupManager;
+            WadComparisonControl.VersionService = versionService;
         }
     }
 }

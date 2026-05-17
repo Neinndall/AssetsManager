@@ -10,7 +10,6 @@
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d" 
              PreviewKeyDown="FilePreviewerControl_PreviewKeyDown">
-    
     <DockPanel>
         <!-- Pinned Tabs Area -->
         <Grid DockPanel.Dock="Top" 
@@ -304,7 +303,44 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <Image x:Name="ImagePreview" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Image x:Name="ImagePreview" Grid.Row="0" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                            <!-- Summoner Icon Metadata (Minimalist) -->
+                            <StackPanel Grid.Row="1" 
+                                        Margin="32,0,32,40"
+                                        Visibility="{Binding IsNarrativeMetadataVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                
+                                <TextBlock Text="{Binding NarrativeMetadata.Title}" 
+                                           FontSize="16" 
+                                           FontWeight="Black" 
+                                           Foreground="White"
+                                           TextAlignment="Center"
+                                           Opacity="0.95"
+                                           Margin="0,0,0,8"/>
+
+                                <Border Height="1.5" 
+                                        Width="40" 
+                                        Background="{StaticResource AccentBrush}" 
+                                        HorizontalAlignment="Center" 
+                                        Margin="0,0,0,16"/>
+
+                                <TextBlock Text="{Binding NarrativeMetadata.Description}" 
+                                           FontSize="13" 
+                                           Foreground="{StaticResource TextSecondary}" 
+                                           TextWrapping="Wrap" 
+                                           LineHeight="20"
+                                           TextAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           MaxWidth="380"
+                                           Opacity="0.85"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
             </Grid>

@@ -120,6 +120,7 @@ namespace AssetsManager.Services.Core
         private async void FinishOperation()
         {
             if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
             {
@@ -142,6 +143,15 @@ namespace AssetsManager.Services.Core
             _owner.Dispatcher.Invoke(() =>
             {
                 if (_statusBarViewModel == null) return;
+
+                // PROTECT CANCELLATION STATE: If we are cancelling, don't let other progress messages 
+                // overwrite the "Cancelling Task..." message, except for the "Ready" reset.
+                if (_taskCancellationManager.IsCancelling && 
+                    message != _taskCancellationManager.CancellationMessage && 
+                    message != "Ready")
+                {
+                    return;
+                }
 
                 _statusBarViewModel.StatusText = message;
                 
@@ -307,14 +317,21 @@ namespace AssetsManager.Services.Core
 
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
-            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            bool wasCancelled = _taskCancellationManager.IsCancelling;
+
+            if (wasCancelled) 
+            {
+                await Task.Delay(1500);
+            }
+
+            _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
             
             _owner.Dispatcher.Invoke(() =>
             {
                 CloseProgressWindow();
 
-                if (!data.Success && !_taskCancellationManager.IsCancelling) 
+                if (!data.Success && !wasCancelled) 
                 {
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
                 }

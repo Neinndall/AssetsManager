@@ -1,14 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Meta;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
-using AssetsManager.Utils;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Audio;
@@ -24,8 +22,25 @@ namespace AssetsManager.Services.Formatting
         private readonly AudioBankService _audioBankService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
+        private readonly BinPropertyParser _binPropertyParser;
+        private readonly TroybinParser _troybinParser;
+        private readonly PreloadParser _preloadParser;
+        private readonly StringTableParser _stringTableParser;
+        private readonly LuaParser _luaParser;
 
-        public ContentFormatterService(LogService logService, JsBeautifierService jsBeautifierService, CSSParserService cssParserService, HashResolverService hashResolverService, AudioBankService audioBankService, WadContentProvider wadContentProvider, JsonFormatterService jsonFormatterService)
+        public ContentFormatterService(
+            LogService logService, 
+            JsBeautifierService jsBeautifierService, 
+            CSSParserService cssParserService, 
+            HashResolverService hashResolverService, 
+            AudioBankService audioBankService, 
+            WadContentProvider wadContentProvider, 
+            JsonFormatterService jsonFormatterService,
+            BinPropertyParser binPropertyParser,
+            TroybinParser troybinParser,
+            PreloadParser preloadParser,
+            StringTableParser stringTableParser,
+            LuaParser luaParser)
         {
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
@@ -34,11 +49,16 @@ namespace AssetsManager.Services.Formatting
             _audioBankService = audioBankService;
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
+            _binPropertyParser = binPropertyParser;
+            _troybinParser = troybinParser;
+            _preloadParser = preloadParser;
+            _stringTableParser = stringTableParser;
+            _luaParser = luaParser;
         }
 
         public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
         {
-            if (linkedBank == null) return "{}";
+            if (linkedBank == null) return string.Empty;
 
             try
             {
@@ -55,6 +75,8 @@ namespace AssetsManager.Services.Formatting
                 {
                     result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
                 }
+
+                if (result == null || result.Count == 0) return string.Empty;
 
                 var options = new System.Text.Json.JsonSerializerOptions
                 {
@@ -110,6 +132,9 @@ namespace AssetsManager.Services.Formatting
                 case "bnk":
                     formattedContent = await GetBnkJsonStringAsync(data);
                     break;
+                case "luabin64":
+                    formattedContent = await _luaParser.DecompileAsync(data);
+                    break;
                 case "text":
                 default:
                     formattedContent = Encoding.UTF8.GetString(data);
@@ -122,7 +147,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -142,7 +167,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -150,7 +175,7 @@ namespace AssetsManager.Services.Formatting
                 using var binStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
                 var binTree = new BinTree(binStream);
-                await BinUtils.WriteBinTreeAsJsonAsync(jsonStream, binTree, _hashResolverService);
+                await _binPropertyParser.WriteBinTreeAsJsonAsync(jsonStream, binTree);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
                 return await reader.ReadToEndAsync();
@@ -166,14 +191,14 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
             {
                 using var inputStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
-                await StringTableUtils.WriteStringTableAsJsonAsync(jsonStream, inputStream, _hashResolverService);
+                await _stringTableParser.WriteStringTableAsJsonAsync(jsonStream, inputStream);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream, Encoding.UTF8);
                 return await reader.ReadToEndAsync();
@@ -189,7 +214,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -214,7 +239,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
@@ -222,7 +247,7 @@ namespace AssetsManager.Services.Formatting
                 using var troybinStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
                 var inibinFile = new LeagueToolkit.IO.Inibin.InibinFile(troybinStream);
-                await TroybinUtils.WriteInibinAsJsonAsync(jsonStream, inibinFile, _hashResolverService);
+                await _troybinParser.WriteInibinAsJsonAsync(jsonStream, inibinFile);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
                 return await reader.ReadToEndAsync();
@@ -238,13 +263,13 @@ namespace AssetsManager.Services.Formatting
         {
             if (data == null || data.Length == 0)
             {
-                return "{}";
+                return string.Empty;
             }
 
             try
             {
                 using var jsonStream = new MemoryStream();
-                await PreloadUtils.WritePreloadAsJsonAsync(jsonStream, data);
+                await _preloadParser.WritePreloadAsJsonAsync(jsonStream, data);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
                 return await reader.ReadToEndAsync();

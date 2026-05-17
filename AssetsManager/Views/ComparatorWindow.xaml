@@ -34,10 +34,10 @@
                         <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="12" Width="56" Height="56" Margin="0,0,0,0">
-                        <materialIcons:MaterialIcon Kind="Compare" Width="30" Height="30" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
+                        <materialIcons:MaterialIcon Kind="Compare" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <materialIcons:MaterialIcon.Effect>
-                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="15" ShadowDepth="0" Opacity="0.4"/>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.3"/>
                             </materialIcons:MaterialIcon.Effect>
                         </materialIcons:MaterialIcon>
                     </Border>

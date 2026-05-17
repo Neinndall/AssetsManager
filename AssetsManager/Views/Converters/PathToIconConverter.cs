@@ -20,7 +20,7 @@ namespace AssetsManager.Views.Converters
             { ".css", MaterialIconKind.LanguageCss3 },
             { ".html", MaterialIconKind.LanguageHtml5 },
             { ".xml", MaterialIconKind.FileXmlBox },
-            { ".lua", MaterialIconKind.LanguageLua },
+            { ".luabin64", MaterialIconKind.LanguageLua },
             { ".txt", MaterialIconKind.FileDocumentOutline },
             { ".log", MaterialIconKind.FileDocumentOutline },
             { ".info", MaterialIconKind.FileDocumentOutline },

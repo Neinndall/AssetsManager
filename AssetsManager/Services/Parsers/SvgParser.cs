@@ -4,14 +4,14 @@ using System.Windows.Media;
 using SharpVectors.Converters;
 using SharpVectors.Renderers.Wpf;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Services.Parsers
 {
-    public static class SvgUtils
+    public class SvgParser
     {
         /// <summary>
         /// Convierte un array de bytes SVG en un ImageSource nativo de WPF (DrawingImage).
         /// </summary>
-        public static ImageSource LoadSvg(byte[] data)
+        public ImageSource LoadSvg(byte[] data)
         {
             if (data == null || data.Length == 0) return null;
 

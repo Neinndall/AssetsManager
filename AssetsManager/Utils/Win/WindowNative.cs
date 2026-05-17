@@ -6,7 +6,7 @@ using System.Windows.Media;
 
 namespace AssetsManager.Utils.Win
 {
-    public static class WindowNativeHelper
+    public static class WindowNative
     {
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWA_BORDER_COLOR = 34;
@@ -39,7 +39,7 @@ namespace AssetsManager.Utils.Win
             catch { }
         }
 
-        public static IntPtr HandleWindowMessage(int msg, IntPtr wParam, ref bool handled)
+        public static IntPtr HandleWindowMessage(int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             switch (msg)
             {

@@ -43,11 +43,16 @@ namespace AssetsManager.Views.Models.Monitor
         private string _authButtonContent;
         public string AuthButtonContent { get => _authButtonContent; set => SetProperty(ref _authButtonContent, value); }
 
+        private string _manualPassId;
+        public string ManualPassId { get => _manualPassId; set => SetProperty(ref _manualPassId, value); }
+
         public PaginationModel<CatalogItem> Paginator { get; }
 
         public ObservableRangeCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;
 
         public ObservableRangeCollection<MythicShopCategory> MythicShopCategories { get; }
+
+        public ObservableRangeCollection<PassRewardModel> PassRewards { get; }
 
         // Computed properties for display
         public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
@@ -74,6 +79,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             Paginator = new PaginationModel<CatalogItem> { PageSize = 12 };
             MythicShopCategories = new ObservableRangeCollection<MythicShopCategory>();
+            PassRewards = new ObservableRangeCollection<PassRewardModel>();
         }
 
         public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)

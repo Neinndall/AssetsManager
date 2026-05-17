@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Settings;
+using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Utils
 {
@@ -33,10 +34,13 @@ namespace AssetsManager.Utils
         public string DefaultExtractedSelectDirectory { get; set; }
         public string LastPbeStatusMessage { get; set; }
         public string LastPbeCheckTime { get; set; }
+        public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
+        public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
         public string CustomFloorTexturePath { get; set; } = string.Empty;
         public Dictionary<string, long> HashesSizes { get; set; }
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
+        public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
 
         // New structure for monitored assets (Local WADs/Plugins)
         public List<MonitoredAsset> MonitoredAssets { get; set; }
@@ -48,6 +52,7 @@ namespace AssetsManager.Utils
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
         public List<string> FavoritePaths { get; set; }
+        public List<AudioPlaylistPack> AudioPlaylists { get; set; }
 
         public ApiSettings ApiSettings { get; set; }
 
@@ -89,6 +94,7 @@ namespace AssetsManager.Utils
             settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
             settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
             settings.FavoritePaths ??= new List<string>();
+            settings.AudioPlaylists ??= new List<AudioPlaylistPack>();
 
             // Robustly initialize and heal ApiSettings
             if (settings.ApiSettings == null)
@@ -141,8 +147,11 @@ namespace AssetsManager.Utils
                 CustomFloorTexturePath = null,
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
+                DataExportFormat = DataExportFormat.Original,
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
+                PreferredClient = PreferredClient.PBE,
+                PreferredDirectory = PreferredDirectory.All,
                 HashesSizes = new Dictionary<string, long>(),
                 MonitoredAssets = new List<MonitoredAsset>(),
                 DiffHistory = new List<HistoryEntry>(),
@@ -152,6 +161,7 @@ namespace AssetsManager.Utils
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
                 FavoritePaths = new List<string>(),
+                AudioPlaylists = new List<AudioPlaylistPack>(),
                 ApiSettings = new ApiSettings
                 {
                     Connection = new ConnectionInfo(),
@@ -187,6 +197,8 @@ namespace AssetsManager.Utils
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
+            PreferredClient = defaultSettings.PreferredClient;
+            PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
             MonitoredAssets = defaultSettings.MonitoredAssets;
@@ -199,6 +211,7 @@ namespace AssetsManager.Utils
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
+            AudioPlaylists = defaultSettings.AudioPlaylists;
             ApiSettings = defaultSettings.ApiSettings;
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
             // HashesSizes is intentionally not reset to preserve local cache state.
