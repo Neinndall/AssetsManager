@@ -113,11 +113,11 @@
                                         <!-- Tier Badge INSIDE Image Area (Top-Right) -->
                                         <StackPanel VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4">
                                             <!-- FREE Badge -->
-                                            <Border Background="{StaticResource AccentGreen}" CornerRadius="4" Padding="5,2" Visibility="{Binding IsFree, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Border Background="{StaticResource AccentGreen}" CornerRadius="6" Padding="5,2" Visibility="{Binding IsFree, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                 <TextBlock Text="FREE" FontSize="9" FontWeight="Black" Foreground="White"/>
                                             </Border>
                                             <!-- PREMIUM Badge (Optional, only if not free) -->
-                                            <Border Background="{StaticResource AccentBlue}" CornerRadius="4" Padding="5,2" Visibility="{Binding IsFree, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                            <Border Background="{StaticResource AccentBlue}" CornerRadius="6" Padding="5,2" Visibility="{Binding IsFree, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                                                 <TextBlock Text="PASS" FontSize="9" FontWeight="Black" Foreground="White"/>
                                             </Border>
                                         </StackPanel>

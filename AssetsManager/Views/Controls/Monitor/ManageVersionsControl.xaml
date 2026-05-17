@@ -24,7 +24,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                     <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
@@ -35,8 +35,8 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="Download Configuration" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select available game languages to download." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            <TextBlock Text="Choose your locales" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Select available game languages to download" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                         </StackPanel>
                         
                         <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -124,7 +124,7 @@
                     <Button Style="{StaticResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
                     </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LeagueClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
                     <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28">
@@ -150,7 +150,7 @@
                     <Button Style="{StaticResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
                         <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
                     </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="4" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <TextBlock Text="{Binding LoLGameClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </Border>
                     <Button Style="{StaticResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="28" Height="28">

@@ -27,7 +27,7 @@
 
     <!-- 1. Diagnostic Badge Styles (Stats Bar & Status) -->
     <Style x:Key="DiagnosticBadgeStyle" TargetType="Border">
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="Padding" Value="8,2"/>
         <Setter Property="Margin" Value="0,0,8,0"/>
         <Setter Property="BorderThickness" Value="1"/>

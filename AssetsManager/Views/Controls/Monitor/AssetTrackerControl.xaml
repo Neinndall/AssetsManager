@@ -30,7 +30,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Icon -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                         <materialIcons:MaterialIcon Kind="ShapeOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
@@ -44,7 +44,7 @@
                         <!-- Texts -->
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Tracked Category" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select the asset category you want to monitor." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            <TextBlock Text="Select the asset category you want to monitor" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                         </StackPanel>
 
                         <!-- Combo -->
@@ -92,7 +92,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Icon -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                         <materialIcons:MaterialIcon Kind="Numeric" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
@@ -106,7 +106,7 @@
                         <!-- Texts -->
                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                             <TextBlock Text="Start Sequence ID" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Force scanning to start from a specific ID (Optional)." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            <TextBlock Text="Force scanning to start from a specific ID" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                         </StackPanel>
 
                         <!-- TextBox -->

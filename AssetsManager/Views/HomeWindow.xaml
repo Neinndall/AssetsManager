@@ -145,7 +145,7 @@
                                 <!-- Top Info: Title + Status Badge -->
                                 <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
                                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <Border Width="44" Height="44" CornerRadius="12" Background="#1A4FC1FF" Margin="0,0,16,0">
+                                        <Border Width="44" Height="44" CornerRadius="10" Background="#1A4FC1FF" Margin="0,0,16,0">
                                             <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}"/>
                                         </Border>
                                         <StackPanel VerticalAlignment="Center">
@@ -203,7 +203,7 @@
                                 <!-- Top Info: Title + Status Badge -->
                                 <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
                                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <Border Width="44" Height="44" CornerRadius="12" Background="#1AFF9100" Margin="0,0,16,0">
+                                        <Border Width="44" Height="44" CornerRadius="10" Background="#1AFF9100" Margin="0,0,16,0">
                                             <materialIcons:MaterialIcon Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}"/>
                                         </Border>
                                         <StackPanel VerticalAlignment="Center">
@@ -261,7 +261,7 @@
                                 <!-- Top Info: Title + Status Badge -->
                                 <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
                                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <Border Width="44" Height="44" CornerRadius="12" Background="#1AFFFFFF" Margin="0,0,16,0">
+                                        <Border Width="44" Height="44" CornerRadius="10" Background="#1AFFFFFF" Margin="0,0,16,0">
                                             <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource TextSecondary}"/>
                                         </Border>
                                         <StackPanel VerticalAlignment="Center">
@@ -317,7 +317,7 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
-                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A5577CC" Margin="0,0,16,0">
+                                    <Border Width="44" Height="44" CornerRadius="10" Background="#1A5577CC" Margin="0,0,16,0">
                                         <materialIcons:MaterialIcon Kind="Compare" Width="24" Height="24" Foreground="{StaticResource AccentBrush}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
@@ -341,7 +341,7 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
-                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A4CAF50" Margin="0,0,16,0">
+                                    <Border Width="44" Height="44" CornerRadius="10" Background="#1A4CAF50" Margin="0,0,16,0">
                                         <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentGreen}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
@@ -365,7 +365,7 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
-                                    <Border Width="44" Height="44" CornerRadius="12" Background="#1A9C27B0" Margin="0,0,16,0">
+                                    <Border Width="44" Height="44" CornerRadius="10" Background="#1A9C27B0" Margin="0,0,16,0">
                                         <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}"/>
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">

@@ -32,15 +32,16 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Module Icon Spanning both lines -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="MonitorDashboard" Width="22" Height="22" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <!-- Titles Stacked to the right of the icon -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="DASHBOARD" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,2"/>
-                        <TextBlock Text="OPERATIONS CENTER" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Operations Center" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                        <TextBlock Text="Manage status from severals places" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                     </StackPanel>
+					
                 </Grid>
 
                 <!-- HUD Indicators -->
@@ -87,12 +88,12 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                        <Border Width="36" Height="36" CornerRadius="10" Background="#1A3498DB">
-                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="18" Height="18" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="42" Height="42" CornerRadius="10" Background="#1A3498DB">
+                            <materialIcons:MaterialIcon Kind="ServerNetwork" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
-                            <TextBlock Text="Environment" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="Environment" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
                     
@@ -103,8 +104,8 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="36" Height="36" CornerRadius="8" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="{Binding PbeStatusIconKind}" Width="18" Height="18" Foreground="{Binding PbeStatusColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="8" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
+                                <materialIcons:MaterialIcon Kind="{Binding PbeStatusIconKind}" Width="22" Height="22" Foreground="{Binding PbeStatusColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Server Status" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
@@ -145,8 +146,8 @@
                             <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="18" Height="18" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
-                            <TextBlock Text="Software Identity" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="CORE BUILD" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="Software Identity" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="CORE BUILD" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -212,8 +213,8 @@
                             <materialIcons:MaterialIcon Kind="Pulse" Width="18" Height="18" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
-                            <TextBlock Text="Diagnostics" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="Diagnostics" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="SYSTEM HEALTH" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -271,7 +272,7 @@
                             </Border>
                             <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
                                 <TextBlock Text="Live Surveillance" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                <TextBlock Text="ASSET WATCHER" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Text="ASSET WATCHER" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -329,7 +330,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <materialIcons:MaterialIcon Grid.Column="0" Kind="History" Width="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
-                            <TextBlock Grid.Column="1" Text="Integrity surveillance active and synced with local client." FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="Integrity surveillance active and synced with local client" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="2" Text="{Binding WatcherLastUpdate}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
@@ -351,7 +352,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
                             <TextBlock Text="CDN Discovery" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                            <TextBlock Text="ASSET TRACKER" FontWeight="Black" FontSize="14" Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Text="ASSET TRACKER" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
                     </StackPanel>
 

@@ -87,7 +87,7 @@
                                         </TextBlock>
 
                                         <!-- Update Type Tag -->
-                                        <Border Margin="10,0,0,0" CornerRadius="4" Padding="6,1" BorderThickness="1" VerticalAlignment="Center" Height="20" 
+                                        <Border Margin="10,0,0,0" CornerRadius="6" Padding="6,1" BorderThickness="1" VerticalAlignment="Center" Height="20" 
                                                 BorderBrush="{Binding UpdateTypeColor}" Background="Transparent">
                                             <TextBlock Text="{Binding UpdateType}" FontSize="9" FontWeight="Bold" Foreground="{Binding UpdateTypeColor}" VerticalAlignment="Center"/>
                                         </Border>

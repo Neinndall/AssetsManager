@@ -87,7 +87,7 @@
                                 <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,8,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextSecondary}"/>
-                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="4" Margin="10,0,0,0" Padding="6,2">
+                                        <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Margin="10,0,0,0" Padding="6,2">
                                             <TextBlock Text="{Binding Count}" FontSize="10" Foreground="{StaticResource AccentBrush}" FontWeight="Black"/>
                                         </Border>
                                     </StackPanel>

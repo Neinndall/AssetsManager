@@ -31,14 +31,14 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Icon Box -->
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,16,0">
                         <materialIcons:MaterialIcon Kind="Magnify" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <!-- Text -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Search Assets" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                        <TextBlock Text="Filter by name or WAD." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        <TextBlock Text="Watcher Engine" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                        <TextBlock Text="Track live modifications and filter detected game assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                     </StackPanel>
 
                     <!-- Input (Search Hub Integration - Aligned with 44px Icon Box) -->
@@ -48,7 +48,7 @@
                             BorderThickness="1" 
                             CornerRadius="10" 
                             Padding="0"
-                            Width="300" Height="44"
+                            Width="260" Height="44"
                             VerticalAlignment="Center">
                         <Grid>
                             <TextBox x:Name="txtSearch" 
@@ -156,7 +156,7 @@
                                 
                                 <StackPanel Orientation="Horizontal">
                                     <!-- 1. STATUS BADGE -->
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="Circle" Width="8" Height="8" Foreground="{Binding StatusColor}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
@@ -164,7 +164,7 @@
                                     </Border>
 
                                     <!-- 2. VERSION BADGE -->
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center"
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center"
                                             Visibility="{Binding Version, Converter={StaticResource NullToVisibilityConverter}}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
@@ -173,7 +173,7 @@
                                     </Border>
 
                                     <!-- 3. TIMESTAMP BADGE (HORA) -->
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding LastUpdated, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
@@ -181,7 +181,7 @@
                                     </Border>
 
                                     <!-- 4. WAD SOURCE BADGE (DIRECCION) -->
-                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <materialIcons:MaterialIcon Kind="PackageVariant" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{Binding WadName}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>

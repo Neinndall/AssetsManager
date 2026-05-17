@@ -15,33 +15,32 @@
             <RowDefinition Height="Auto"/> <!-- 3. Action Footer -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: Mode Switcher -->
-        <Border Grid.Row="0" Margin="0,0,0,24"
-                Background="{StaticResource CardBackground}" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1" 
-                CornerRadius="12" 
-                Padding="24,12">
+        <!-- 1. HEADER: CONFIGURATION (Restored Section Metrics: 42x42 / 22x22 | 13px Bold) -->
+        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="0,0,0,24" Padding="24,16">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Title & Context -->
+                <!-- Title & Context (Standardized 42x42 / 22x22) -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Standardized 44x44 Container -->
-                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
-                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,20,0">
+                        <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon.Effect>
+                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.3"/>
+                            </materialIcons:MaterialIcon.Effect>
+                        </materialIcons:MaterialIcon>
                     </Border>
+
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Configuration" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Select a mode and set up your comparison by selecting base and target sources." FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                        <TextBlock Text="Select your mode" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Set up your comparison by selecting base and target sources" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- Mode Selector -->
-                <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="12" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton x:Name="ModeDirectory" Content="DIRECTORY" IsChecked="{Binding IsDirectoryMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
                         <RadioButton x:Name="ModeFile" Content="WAD FILE" IsChecked="{Binding IsFileMode, Mode=TwoWay}" Style="{StaticResource SegmentedRadioButtonStyle}"/>
@@ -69,20 +68,20 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <!-- Standardized 44x44 Container -->
-                            <Border Background="#1A00E676" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                            <!-- Standardized 42x42 Container -->
+                            <Border Background="#1A00E676" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                                 <materialIcons:MaterialIcon Kind="AutoFix" Foreground="{StaticResource AccentGreen}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="TARGET VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}"/>
-                                <TextBlock Text="New source to compare with" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                                <TextBlock Text="New source to compare with" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="TargetQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-							      Width="38" Height="38"
+							      Width="42" Height="42"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedTargetBackup}"
                                   SelectionChanged="TargetQuickSelect_SelectionChanged"
@@ -103,7 +102,7 @@
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
                                                 <!-- Client Type Badge (Restored & Refined) -->
-                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,1" VerticalAlignment="Center">
+                                                <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
@@ -162,7 +161,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Height="38" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
+                        <TextBox Height="42" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
                             <TextBox.Style>
                                 <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
                                     <Setter Property="Text" Value="{Binding NewDirectoryPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
@@ -174,12 +173,12 @@
                                 </Style>
                             </TextBox.Style>
                         </TextBox>
-                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="38" Height="38" Padding="0" 
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
                                 Click="btnSelectNewLolPbeDirectory_Click" 
                                 Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <materialIcons:MaterialIcon Kind="FolderOpen" Width="18"/>
                         </Button>
-                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="38" Height="38" Padding="0" 
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
                                 Click="btnSelectNewWadFile_Click" 
                                 Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <materialIcons:MaterialIcon Kind="FileFind" Width="18"/>
@@ -203,7 +202,7 @@
                             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
                                         <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
@@ -220,10 +219,10 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetMain, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsTargetMain, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0">
                                         <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -261,20 +260,20 @@
                         </Grid.ColumnDefinitions>
                         
                         <StackPanel Orientation="Horizontal" Grid.Column="0">
-                            <!-- Standardized 44x44 Container -->
-                            <Border Background="#1AFF9100" CornerRadius="10" Width="44" Height="44" Margin="0,0,16,0">
+                            <!-- Standardized 42x42 Container -->
+                            <Border Background="#1AFF9100" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
                                 <materialIcons:MaterialIcon Kind="History" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="BASE VERSION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentOrange}"/>
-                                <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,1,0,0"/>
+                                <TextBlock Text="Old source to compare against" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
                         <!-- Discreet Quick Select (Arrow) -->
                         <ComboBox Grid.Column="1" x:Name="BaseQuickSelect" 
                                   Style="{StaticResource ModernComboBox}" Tag="Icon" 
-                                  Width="38" Height="38"
+                                  Width="42" Height="42"
                                   ItemsSource="{Binding AvailableBackups}"
                                   SelectedItem="{Binding SelectedBaseBackup}"
                                   SelectionChanged="BaseQuickSelect_SelectionChanged"
@@ -294,7 +293,7 @@
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
                                                 <!-- Client Type Badge (Restored & Refined) -->
-                                                <Border Margin="6,0,0,0" CornerRadius="2.5" Padding="4,1" VerticalAlignment="Center">
+                                                <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{StaticResource HoverColor}"/>
@@ -353,7 +352,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Height="38" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
+                        <TextBox Height="42" IsReadOnly="True" Padding="12,0" VerticalContentAlignment="Center" Margin="0,0,8,0">
                             <TextBox.Style>
                                 <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
                                     <Setter Property="Text" Value="{Binding OldDirectoryPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
@@ -365,12 +364,12 @@
                                 </Style>
                             </TextBox.Style>
                         </TextBox>
-                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="38" Height="38" Padding="0" 
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
                                 Click="btnSelectOldLolPbeDirectory_Click" 
                                 Visibility="{Binding IsDirectoryMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <materialIcons:MaterialIcon Kind="FolderOpen" Width="18"/>
                         </Button>
-                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="38" Height="38" Padding="0" 
+                        <Button Grid.Column="1" Style="{StaticResource BrowseButtonStyle}" Width="42" Height="42" Padding="0" 
                                 Click="btnSelectOldWadFile_Click" 
                                 Visibility="{Binding IsFileMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <materialIcons:MaterialIcon Kind="FileFind" Width="18"/>
@@ -394,7 +393,7 @@
                             <StackPanel Grid.Column="1" HorizontalAlignment="Right">
                                 <TextBlock Text="CLIENT TYPE" FontSize="9" FontWeight="Black" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" HorizontalAlignment="Right"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,8,0">
                                         <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
@@ -411,10 +410,10 @@
                                             </TextBlock.Style>
                                         </TextBlock>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseMain, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource AccentBrush}" Visibility="{Binding IsBaseMain, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,0,8,0">
                                         <TextBlock Text="MAIN" FontSize="10" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                     </Border>
-                                    <Border CornerRadius="4" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <Border CornerRadius="6" Padding="6,2" Background="{StaticResource HoverColor}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -448,20 +447,20 @@
 
             <!-- Status Card -->
             <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Padding="24,0" Height="86" Margin="0,0,12,0">
-                <Grid>
+                <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Standardized 44x44 Container with centered 'i' icon -->
-                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="44" Height="44" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <!-- Standardized 42x42 Container with centered 'i' icon -->
+                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,16,0">
                         <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14">
+                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14" Margin="0,2,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Text" Value="The comparison will identify new, modified, renamed and deleted assets."/>

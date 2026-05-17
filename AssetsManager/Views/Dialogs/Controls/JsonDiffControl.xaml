@@ -51,21 +51,21 @@
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
                                 <TextBlock Text="INSIGHTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,12,0"/>
                                 
-                                <Border Background="#1A00E676" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" MouseRightButtonDown="FilterInsertion_Click" Cursor="Hand">
+                                <Border Background="#1A00E676" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" MouseRightButtonDown="FilterInsertion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Plus" Width="12" Height="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding InsertionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1AFF5252" CornerRadius="4" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" MouseRightButtonDown="FilterDeletion_Click" Cursor="Hand">
+                                <Border Background="#1AFF5252" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" MouseRightButtonDown="FilterDeletion_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="Minus" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding DeletionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
                                     </StackPanel>
                                 </Border>
 
-                                <Border Background="#1A5C85FF" CornerRadius="4" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" MouseRightButtonDown="FilterModification_Click" Cursor="Hand">
+                                <Border Background="#1A5C85FF" CornerRadius="6" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" MouseRightButtonDown="FilterModification_Click" Cursor="Hand">
                                     <StackPanel Orientation="Horizontal">
                                         <icons:MaterialIcon Kind="EditOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
                                         <TextBlock Text="{Binding ModificationsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
