@@ -1,8 +1,16 @@
 AssetsManager - League of Legends | v4.0.0.0
 
 MAJOR UPDATE
+This version marks the largest milestone in AssetsManager history, representing a total transformation into a high-fidelity engineering tool. v4.0.0.0 is the result of a massive convergence between a mathematical HUD revolution and a deep architectural overhaul. Every pixel has been realigned to strict new visual standards—from the modular "Bento UI" Monitor Dashboard and the specialized "Analysis Context" engine in the Comparator, to the refined "Radar" identification systems. Under the hood, the system has been re-engineered for professional-grade performance, introducing a "Zero-RAM" binary hash search engine, a ultra-low memory file tree architecture, and a high-speed filtering motor capable of processing hundreds of thousands of files with near-zero latency. This update doesn't just improve the application; it redefines the entire asset analysis workflow with unmatched precision, stability, and technical depth.
 
 New Features
+  - Monitor / Modular Bento UI Refinement
+    * Redesigned the Monitor modules (Dashboard, Watcher, Tracker, API) with a modular "Bento" layout.
+    * Integrated custom high-fidelity views for each sub-module, ensuring they follow the project's unique HUD design language while maintaining their own technical identity.
+    * Standardized Hero Iconography: unified all module header icons to the 42x42 / 22x22 standard with the "Hero Glow" effect, achieving perfect visual symmetry.
+    * Restored Primary Identity: upgraded the main module header to the 48x48 / 26x26 standard, ensuring it stands out as the core identity of the workspace.
+    * Enhanced Header Dynamism: refined the main Monitor header to dynamically update its icon and technical description based on the active tab, providing immediate functional context.
+    * Differentiated Dashboard Identity: assigned a dedicated "Radar" icon to the Command Center header to distinguish it from the global identity, emphasizing its scanning and oversight role.
   - Explorer / Narrative Metadata (Icons & Emotes)
     * Integrated brand new narrative metadata for summoner icons and emotes: the system now automatically parses internal game data to display titles and descriptions in the explorer previewer.
     * Implemented Ultra-Fast Discovery Engine: developed a direct-hash lookup system that locates metadata files instantly without requiring the full hash database to be loaded, significantly improving performance.

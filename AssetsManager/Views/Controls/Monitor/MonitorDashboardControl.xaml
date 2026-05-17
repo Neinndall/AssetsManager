@@ -83,7 +83,7 @@
             </Grid.RowDefinitions>
             
             <!-- CARD 1: PBE SERVER -->
-            <Border Grid.Column="0" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="0,0,8,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
+            <Border Grid.Column="0" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Margin="0,0,8,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -145,7 +145,7 @@
             </Border>
 
             <!-- CARD 2: CORE BUILD (NEW) -->
-            <Border Grid.Column="1" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,8,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
+            <Border Grid.Column="1" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Margin="8,0,8,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -216,7 +216,7 @@
             </Border>
 
             <!-- CARD 3: SYSTEM HEALTH -->
-            <Border Grid.Column="2" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
+            <Border Grid.Column="2" Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Margin="8,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="20,14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -275,7 +275,7 @@
             </Border>
 
             <!-- CARD 4: ASSET WATCHER -->
-            <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="0,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24,18">
+            <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="12" Margin="0,0,8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24,18">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -366,7 +366,7 @@
             </Border>
 
             <!-- CARD 5: ASSET TRACKER -->
-            <Border Grid.Column="2" Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24,18">
+            <Border Grid.Column="2" Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="12" Margin="8,0,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="24,18">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
