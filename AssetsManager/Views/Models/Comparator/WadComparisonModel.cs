@@ -53,8 +53,6 @@ namespace AssetsManager.Views.Models.Comparator
                     _isDirectoryMode = value;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsFileMode));
-                    
-                    // Trigger refresh for all mode-dependent properties
                     NotifyAllPropertiesChanged();
                 }
             }
@@ -86,20 +84,30 @@ namespace AssetsManager.Views.Models.Comparator
             set => IsDirectoryMode = !value;
         }
 
-        // --- DYNAMIC SOURCE PATHS (What the Comparison Service uses) ---
         public string TargetSourcePath => IsDirectoryMode ? TargetSourceRoot : _newWadFilePath;
         public string BaseSourcePath => IsDirectoryMode ? BaseSourceRoot : _oldWadFilePath;
 
-        // --- SOURCE ROOTS (What Metadata and Sync use) ---
         public string TargetSourceRoot => IsDirectoryMode 
             ? (_selectedTargetDirectoryBackup != null ? _selectedTargetDirectoryBackup.Path : _newDirectoryPath)
-            : (_selectedTargetWadBackup != null ? _selectedTargetWadBackup.Path : (_newWadFilePath != null ? System.IO.Path.GetDirectoryName(_newWadFilePath) : null));
+            : (_selectedTargetWadBackup != null ? _selectedTargetWadBackup.Path : (_newWadFilePath != null ? GetRootFromWadPath(_newWadFilePath) : null));
 
         public string BaseSourceRoot => IsDirectoryMode 
             ? (_selectedBaseDirectoryBackup != null ? _selectedBaseDirectoryBackup.Path : _oldDirectoryPath)
-            : (_selectedBaseWadBackup != null ? _selectedBaseWadBackup.Path : (_oldWadFilePath != null ? System.IO.Path.GetDirectoryName(_oldWadFilePath) : null));
+            : (_selectedBaseWadBackup != null ? _selectedBaseWadBackup.Path : (_oldWadFilePath != null ? GetRootFromWadPath(_oldWadFilePath) : null));
 
-        // --- BACKUP SELECTION ---
+        private string GetRootFromWadPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            string dir = System.IO.Path.GetDirectoryName(path);
+            while (!string.IsNullOrEmpty(dir))
+            {
+                if (System.IO.Directory.Exists(System.IO.Path.Combine(dir, "Game")) || System.IO.Directory.Exists(System.IO.Path.Combine(dir, "Plugins")))
+                    return dir;
+                dir = System.IO.Path.GetDirectoryName(dir);
+            }
+            return System.IO.Path.GetDirectoryName(path);
+        }
+
         public BackupModel SelectedTargetBackup
         {
             get => IsDirectoryMode ? _selectedTargetDirectoryBackup : _selectedTargetWadBackup;
@@ -112,10 +120,8 @@ namespace AssetsManager.Views.Models.Comparator
                         _selectedTargetDirectoryBackup = value;
                         if (value != null) _newDirectoryPath = value.Path;
                         OnPropertyChanged();
-                        OnPropertyChanged(nameof(TargetSourcePath));
-                        OnPropertyChanged(nameof(TargetSourceRoot));
                         OnPropertyChanged(nameof(NewDirectoryPath));
-                        if (value == null && string.IsNullOrEmpty(_newDirectoryPath)) ClearMetadata(false);
+                        NotifySourceChanges();
                     }
                 }
                 else
@@ -124,10 +130,8 @@ namespace AssetsManager.Views.Models.Comparator
                     {
                         _selectedTargetWadBackup = value;
                         OnPropertyChanged();
-                        OnPropertyChanged(nameof(TargetSourcePath));
-                        OnPropertyChanged(nameof(TargetSourceRoot));
                         OnPropertyChanged(nameof(NewWadFilePath));
-                        if (value == null && string.IsNullOrEmpty(_newWadFilePath)) ClearMetadata(false);
+                        NotifySourceChanges();
                     }
                 }
             }
@@ -145,10 +149,8 @@ namespace AssetsManager.Views.Models.Comparator
                         _selectedBaseDirectoryBackup = value;
                         if (value != null) _oldDirectoryPath = value.Path;
                         OnPropertyChanged();
-                        OnPropertyChanged(nameof(BaseSourcePath));
-                        OnPropertyChanged(nameof(BaseSourceRoot));
                         OnPropertyChanged(nameof(OldDirectoryPath));
-                        if (value == null && string.IsNullOrEmpty(_oldDirectoryPath)) ClearMetadata(true);
+                        NotifySourceChanges();
                     }
                 }
                 else
@@ -157,16 +159,21 @@ namespace AssetsManager.Views.Models.Comparator
                     {
                         _selectedBaseWadBackup = value;
                         OnPropertyChanged();
-                        OnPropertyChanged(nameof(BaseSourcePath));
-                        OnPropertyChanged(nameof(BaseSourceRoot));
                         OnPropertyChanged(nameof(OldWadFilePath));
-                        if (value == null && string.IsNullOrEmpty(_oldWadFilePath)) ClearMetadata(true);
+                        NotifySourceChanges();
                     }
                 }
             }
         }
 
-        // --- PATH PROPERTIES ---
+        private void NotifySourceChanges()
+        {
+            OnPropertyChanged(nameof(TargetSourcePath));
+            OnPropertyChanged(nameof(BaseSourcePath));
+            OnPropertyChanged(nameof(TargetSourceRoot));
+            OnPropertyChanged(nameof(BaseSourceRoot));
+        }
+
         public string NewDirectoryPath
         {
             get => _newDirectoryPath;
@@ -175,12 +182,11 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newDirectoryPath != value) 
                 { 
                     _newDirectoryPath = value;
-                    _selectedTargetDirectoryBackup = null;
+                    if (value == null || (_selectedTargetDirectoryBackup != null && _selectedTargetDirectoryBackup.Path != value))
+                        _selectedTargetDirectoryBackup = null;
                     if (string.IsNullOrEmpty(value)) ClearMetadata(false);
-                    
                     OnPropertyChanged();
-                    OnPropertyChanged(nameof(TargetSourcePath));
-                    OnPropertyChanged(nameof(TargetSourceRoot));
+                    NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedTargetBackup));
                 } 
             }
@@ -194,12 +200,11 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldDirectoryPath != value) 
                 { 
                     _oldDirectoryPath = value; 
-                    _selectedBaseDirectoryBackup = null;
+                    if (value == null || (_selectedBaseDirectoryBackup != null && _selectedBaseDirectoryBackup.Path != value))
+                        _selectedBaseDirectoryBackup = null;
                     if (string.IsNullOrEmpty(value)) ClearMetadata(true);
-
                     OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(BaseSourcePath));
-                    OnPropertyChanged(nameof(BaseSourceRoot));
+                    NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedBaseBackup));
                 } 
             }
@@ -213,12 +218,15 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_newWadFilePath != value) 
                 { 
                     _newWadFilePath = value; 
-                    _selectedTargetWadBackup = null;
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
+                    // INTELLIGENT CLEAR: Only clear if the path doesn't start with the backup path
+                    if (value != null && _selectedTargetWadBackup != null && value.StartsWith(_selectedTargetWadBackup.Path, StringComparison.OrdinalIgnoreCase))
+                    { /* Keep selection */ }
+                    else if (value != null)
+                    { _selectedTargetWadBackup = null; }
 
+                    if (string.IsNullOrEmpty(value)) ClearMetadata(false);
                     OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(TargetSourcePath));
-                    OnPropertyChanged(nameof(TargetSourceRoot));
+                    NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedTargetBackup));
                 } 
             }
@@ -232,12 +240,15 @@ namespace AssetsManager.Views.Models.Comparator
                 if (_oldWadFilePath != value) 
                 { 
                     _oldWadFilePath = value; 
-                    _selectedBaseWadBackup = null;
-                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
+                    // INTELLIGENT CLEAR: Only clear if the path doesn't start with the backup path
+                    if (value != null && _selectedBaseWadBackup != null && value.StartsWith(_selectedBaseWadBackup.Path, StringComparison.OrdinalIgnoreCase))
+                    { /* Keep selection */ }
+                    else if (value != null)
+                    { _selectedBaseWadBackup = null; }
 
+                    if (string.IsNullOrEmpty(value)) ClearMetadata(true);
                     OnPropertyChanged(); 
-                    OnPropertyChanged(nameof(BaseSourcePath));
-                    OnPropertyChanged(nameof(BaseSourceRoot));
+                    NotifySourceChanges();
                     OnPropertyChanged(nameof(SelectedBaseBackup));
                 } 
             }
@@ -249,65 +260,40 @@ namespace AssetsManager.Views.Models.Comparator
             set { if (_isComparing != value) { _isComparing = value; OnPropertyChanged(); } }
         }
 
-        // --- COMPUTED METADATA PROPERTIES ---
         public string BaseVersion
         {
             get => IsDirectoryMode ? _baseDirectoryVersion : _baseWadVersion;
-            set 
-            { 
-                if (IsDirectoryMode) _baseDirectoryVersion = value; else _baseWadVersion = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _baseDirectoryVersion = value; else _baseWadVersion = value; OnPropertyChanged(); }
         }
 
         public string TargetVersion
         {
             get => IsDirectoryMode ? _targetDirectoryVersion : _targetWadVersion;
-            set 
-            { 
-                if (IsDirectoryMode) _targetDirectoryVersion = value; else _targetWadVersion = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _targetDirectoryVersion = value; else _targetWadVersion = value; OnPropertyChanged(); }
         }
 
         public bool IsBasePbe
         {
             get => IsDirectoryMode ? _isBaseDirectoryPbe : _isBaseWadPbe;
-            set 
-            { 
-                if (IsDirectoryMode) _isBaseDirectoryPbe = value; else _isBaseWadPbe = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _isBaseDirectoryPbe = value; else _isBaseWadPbe = value; OnPropertyChanged(); }
         }
 
         public bool IsTargetPbe
         {
             get => IsDirectoryMode ? _isTargetDirectoryPbe : _isTargetWadPbe;
-            set 
-            { 
-                if (IsDirectoryMode) _isTargetDirectoryPbe = value; else _isTargetWadPbe = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _isTargetDirectoryPbe = value; else _isTargetWadPbe = value; OnPropertyChanged(); }
         }
 
         public bool IsBaseMain
         {
             get => IsDirectoryMode ? _isBaseDirectoryMain : _isBaseWadMain;
-            set 
-            { 
-                if (IsDirectoryMode) _isBaseDirectoryMain = value; else _isBaseWadMain = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _isBaseDirectoryMain = value; else _isBaseWadMain = value; OnPropertyChanged(); }
         }
 
         public bool IsTargetMain
         {
             get => IsDirectoryMode ? _isTargetDirectoryMain : _isTargetWadMain;
-            set 
-            { 
-                if (IsDirectoryMode) _isTargetDirectoryMain = value; else _isTargetWadMain = value; 
-                OnPropertyChanged(); 
-            }
+            set { if (IsDirectoryMode) _isTargetDirectoryMain = value; else _isTargetWadMain = value; OnPropertyChanged(); }
         }
 
         public void ClearMetadata(bool isBase)
@@ -334,7 +320,6 @@ namespace AssetsManager.Views.Models.Comparator
                 return;
             }
 
-            // Get game root directly to avoid recursive climbing in VersionService
             string root = backupManager.GetGameRoot(path);
             var version = await versionService.GetGameVersionAsync(root ?? path);
             var (isPbe, isMain) = backupManager.GetPathIdentification(path);
