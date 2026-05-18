@@ -1,4 +1,36 @@
+AssetsManager - League of Legends | v4.0.0.2
+
+HOTFIX UPDATE
+This update refines the Monitor Dashboard with professional HUD standards, improving the visual hierarchy of maintenance states and introducing dynamic integrity surveillance. It unifies the telemetry display across all monitor cards and enhances the real-time responsiveness of the Asset Watcher for a more reliable oversight experience.
+
+New Features
+  - Monitor / Dynamic Asset Watcher Surveillance
+    * Implemented a brand new reactive messaging system for the Watcher footer.
+    * Integrated "Integrity Alerts": the system now dynamically switches its status message from "Surveillance active" to "Integrity alert · {N} changes detected" when file variations are found.
+    * Added Reactive Security Iconography: the surveillance shield now automatically turns from Green to Orange upon detecting changes, providing immediate visual feedback of potential integrity issues.
+
+Improvements
+  - Monitor / Professional Split-Footer HUD
+    * Redesigned the PBE Server and Asset Watcher footers with a professional 3-column "Split" layout for superior data organization.
+    * Unified Telemetry Display: implemented a standardized right-aligned section featuring a neutral white clock icon and time, ensuring technical data remains readable even during alerts.
+    * Simplified HUD Aesthetics: removed redundant "CHECK:" and "SYNC:" prefixes from footers to achieve a cleaner, more direct HUD feel.
+    * Refined Asset Watcher Narrative: updated the surveillance message to a concise, technical "Surveillance active · Local client synced" for a more professional tone.
+  - Monitor / PBE Maintenance Hierarchy
+    * Improved the PBE Server card by moving the "LAST CHECK" timestamp to a dedicated badge in the header, separating technical telemetry from operational status.
+    * Enhanced Maintenance Visibility: refined the footer to exclusively display the maintenance message (e.g., "Started at HH:mm") with its dedicated icon, resulting in a cleaner and more focused layout.
+  - Monitor / Asset Tracker Data Clarity
+    * Removed text trimming (ellipsis) from the "Last Discovered" asset display, ensuring the full identity of the latest found assets is always visible without truncation.
+
+Bug Fixes
+  - Resolved an inconsistency in the Asset Watcher where the surveillance message remained static regardless of the actual monitoring state.
+  - Corrected the visual hierarchy of the PBE footer during maintenance periods to prevent information overlap and clutter.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.0.1
+
+HOTFIX UPDATE
+This hotfix update focuses on improving overall stability, synchronization reliability, and interface responsiveness across the application. It introduces an enhanced auto-sync system for Comparator Directory Mode, refines Monitor status visibility for clearer server tracking, improves asset loading efficiency, and resolves several UI issues including dashboard flickering and tab alignment inconsistencies.
 
 New Features
   - Comparator / Directory Mode Auto-Sync

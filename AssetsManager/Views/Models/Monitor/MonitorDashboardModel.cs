@@ -83,6 +83,13 @@ namespace AssetsManager.Views.Models.Monitor
             set { _watcherLastUpdate = value; OnPropertyChanged(); }
         }
 
+        private string _watcherStatusSubtitle = "Surveillance active · Local client synced";
+        public string WatcherStatusSubtitle
+        {
+            get => _watcherStatusSubtitle;
+            set { _watcherStatusSubtitle = value; OnPropertyChanged(); }
+        }
+
         private string _lastChangedFileName = "None";
         public string LastChangedFileName
         {
@@ -514,6 +521,16 @@ namespace AssetsManager.Views.Models.Monitor
             WatcherLastUpdate = lastItem != null && lastItem.LastUpdated != DateTime.MinValue
                 ? (lastItem.LastUpdated.Date == DateTime.Today ? lastItem.LastUpdated.ToString("HH:mm") : lastItem.LastUpdated.ToString("dd/MM HH:mm"))
                 : "Never";
+
+            // Dynamic Subtitle
+            if (MonitoredFilesChangedCount > 0)
+            {
+                WatcherStatusSubtitle = $"Integrity alert · {MonitoredFilesChangedCount} changes detected";
+            }
+            else
+            {
+                WatcherStatusSubtitle = "Surveillance active · Local client synced";
+            }
 
             UpdateGlobalStatus();
             UpdateDataStatus();
