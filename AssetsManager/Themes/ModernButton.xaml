@@ -657,7 +657,7 @@
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                                <ColumnDefinition Width="Auto"/> <!-- Text + Indicator -->
+                                <ColumnDefinition Width="Auto"/> <!-- Text -->
                             </Grid.ColumnDefinitions>
 
                             <!-- Content: Icon (Column 0) -->
@@ -666,19 +666,18 @@
                                                         VerticalAlignment="Center" x:Name="TabIcon" Opacity="0.6"
                                                         Grid.Column="0"/>
 
-                            <!-- Content: Text + Indicator (Column 1) -->
-                            <Grid Grid.Column="1" Margin="0,10,14,10">
-                                <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" x:Name="TabText"/>
+                            <!-- Content: Text (Column 1) -->
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" Margin="0,10,14,10" 
+                                       VerticalAlignment="Center" x:Name="TabText"/>
 
-                                <!-- Selection Indicator: Now mathematically centered ONLY under the text block -->
-                                <Border x:Name="Indicator" Height="2.5" Width="36" Background="{StaticResource AccentBrush}" 
-                                        VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                                        CornerRadius="2,2,0,0" Opacity="0" Margin="0,0,0,-10">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#FF5C85FF" BlurRadius="10" ShadowDepth="0" Opacity="0.5"/>
-                                    </Border.Effect>
-                                </Border>
-                            </Grid>
+                            <!-- Selection Indicator: Now spanning across BOTH Icon and Text -->
+                            <Border x:Name="Indicator" Height="2.5" Grid.ColumnSpan="2" Background="{StaticResource AccentBrush}" 
+                                    VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                                    CornerRadius="2,2,0,0" Opacity="0" Margin="14,0,14,-2">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#FF5C85FF" BlurRadius="10" ShadowDepth="0" Opacity="0.5"/>
+                                </Border.Effect>
+                            </Border>
                         </Grid>
                     </Grid>
 
