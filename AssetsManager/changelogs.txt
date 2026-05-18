@@ -1,9 +1,21 @@
 AssetsManager - League of Legends | v4.0.0.1
 
+New Features
+  - Comparator / Directory Mode Auto-Sync
+    * Implemented a robust auto-synchronization engine for Directory Mode that automatically identifies and selects the most recent backup matching the Target environment.
+
 Improvements
   - Monitor / PBE Status Display Refinement
     * Improved the PBE server status card with clearer "Online" and "Maintenance" titles.
     * Refined the technical footer to display "Connection Verified" for active states and "Started at HH:mm" for maintenance periods, eliminating redundant information.
+  - Monitor / Asset Tracker Load More Efficiency
+    * Increased the "Load More" batch size from 5 to 10 assets to improve discovery speed and maintain consistency with initial checkups.
+
+Bug Fixes
+  - Eliminated visual flickering during Monitor Dashboard initial load for immediate data display.
+  - Corrected selection indicator alignment in Monitor tabs to ensure perfect centering under the text.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 AssetsManager - League of Legends | v4.0.0.0
 
