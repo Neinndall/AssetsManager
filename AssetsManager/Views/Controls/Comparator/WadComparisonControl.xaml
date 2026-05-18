@@ -34,7 +34,7 @@
                     </Border>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="ANALYSIS CONTEXT" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Analysis context" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                         <TextBlock Text="Configure the scanning strategy: bulk directory processing or atomic WAD analysis" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
