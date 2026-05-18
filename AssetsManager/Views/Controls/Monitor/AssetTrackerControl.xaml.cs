@@ -174,7 +174,7 @@ namespace AssetsManager.Views.Controls.Monitor
             ViewModel.IsBusy = true;
             try
             {
-                var newAssets = MonitorService.GenerateMoreAssets(ViewModel.Assets, ViewModel.SelectedCategory, 5);
+                var newAssets = MonitorService.GenerateMoreAssets(ViewModel.Assets, ViewModel.SelectedCategory, 10);
                 ViewModel.Assets.AddRange(newAssets);
             }
             catch (Exception ex)
