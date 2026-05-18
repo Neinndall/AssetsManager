@@ -10,12 +10,12 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 1. Header & Mode -->
-            <RowDefinition Height="Auto"/> <!-- 2. Dual Comparison Cards -->
-            <RowDefinition Height="Auto"/> <!-- 3. Action Footer -->
+            <RowDefinition Height="Auto"/> <!-- 0. Header & Mode -->
+            <RowDefinition Height="Auto"/> <!-- 1. Dual Comparison Cards -->
+            <RowDefinition Height="Auto"/> <!-- 2. Action Footer -->
         </Grid.RowDefinitions>
 
-        <!-- 1. HEADER: CONFIGURATION (Restored Section Metrics: 42x42 / 22x22 | 13px Bold) -->
+        <!-- 0. HEADER: CONFIGURATION -->
         <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="0,0,0,24" Padding="24,16">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -23,7 +23,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Title & Context (Standardized 42x42 / 22x22) -->
+                <!-- Title & Context -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,20,0">
                         <materialIcons:MaterialIcon Kind="Wrench" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -34,8 +34,8 @@
                     </Border>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="ANALYSIS CONTEXT" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock Text="Configure the scanning strategy: bulk directory processing or atomic WAD analysis" FontSize="11" Foreground="{StaticResource TextSecondary}" Opacity="0.7" Margin="0,2,0,0"/>
+                        <TextBlock Text="Analysis Context" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Configure the scanning strategy: bulk directory processing or atomic WAD analysis" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                     </StackPanel>
                 </StackPanel>
 
@@ -49,7 +49,7 @@
             </Grid>
         </Border>
 
-        <!-- 2. DUAL CARDS -->
+        <!-- 1. DUAL CARDS -->
         <Grid Grid.Row="1" Margin="0,0,0,24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -101,7 +101,7 @@
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
-                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <!-- Client Type Badge -->
                                                 <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
@@ -144,10 +144,9 @@
                     </Grid>
 
                     <!-- Path Row (Primary Input) -->
-                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                    <TextBlock Text="DIRECTORY PATH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="DIRECTORY PATH"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFileMode}" Value="True">
                                         <Setter Property="Text" Value="WAD FILE PATH"/>
@@ -292,7 +291,7 @@
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                 
-                                                <!-- Client Type Badge (Restored & Refined) -->
+                                                <!-- Client Type Badge -->
                                                 <Border Margin="6,0,0,0" CornerRadius="6" Padding="4,1" VerticalAlignment="Center">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
@@ -335,10 +334,9 @@
                     </Grid>
 
                     <!-- Path Row (Primary Input) -->
-                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
+                    <TextBlock Text="DIRECTORY PATH" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Text" Value="DIRECTORY PATH"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFileMode}" Value="True">
                                         <Setter Property="Text" Value="WAD FILE PATH"/>
@@ -438,7 +436,7 @@
             </Border>
         </Grid>
 
-        <!-- 3. FOOTER: Start Comparison -->
+        <!-- 2. FOOTER: Start Comparison (Unified & Clean) -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -446,32 +444,30 @@
             </Grid.ColumnDefinitions>
 
             <!-- Status Card -->
-            <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="12" Padding="24,0" Height="86" Margin="0,0,12,0">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                    CornerRadius="12" Padding="24,0" Height="86" Margin="0,0,12,0">
                 <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Standardized 42x42 Container with centered 'i' icon -->
-                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <!-- Standardized Container with Info icon (Matches Header Hero Style) -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,18,0">
                         <materialIcons:MaterialIcon Kind="InformationVariant" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Ready to analyze?" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}"/>
-                        <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14" Margin="0,2,0,0">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Text" Value="The comparison will identify new, modified, renamed and deleted assets."/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsFileMode}" Value="True">
-                                            <Setter Property="Text" Value="Selecting a WAD will automatically locate and load its corresponding twin on the base side for a synchronized comparison."/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                            <TextBlock Text="Analysis Strategy" FontWeight="Bold" FontSize="14" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <!-- Integrated AutoSync Badge -->
+                            <Border Background="#1A00E676" BorderBrush="{StaticResource AccentGreen}" BorderThickness="1" CornerRadius="4" Padding="6,1" VerticalAlignment="Center">
+                                <TextBlock Text="SMART SYNC" FontSize="8" FontWeight="Black" Foreground="{StaticResource AccentGreen}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="Identifies new, modified, renamed, and removed assets. The engine automatically aligns version twins to ensure absolute analytical precision." 
+                                   FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="14"/>
                     </StackPanel>
                 </Grid>
             </Border>

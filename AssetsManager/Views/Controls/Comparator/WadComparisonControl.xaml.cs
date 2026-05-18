@@ -67,7 +67,23 @@ namespace AssetsManager.Views.Controls.Comparator
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 ViewModel.NewDirectoryPath = defaultPath;
-                await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.TargetSourceRoot, VersionService, BackupManager);
+                await ViewModel.UpdateMetadataFromPathAsync(false, defaultPath, VersionService, BackupManager);
+
+                // --- DIRECTORY AUTO-SYNC ---
+                if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                {
+                    var (isPbe, _) = BackupManager.GetPathIdentification(defaultPath);
+                    var suggestedBackup = ViewModel.AvailableBackups
+                        .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
+                        .OrderByDescending(b => b.CreationDate)
+                        .FirstOrDefault();
+
+                    if (suggestedBackup != null)
+                    {
+                        ViewModel.SelectedBaseBackup = suggestedBackup;
+                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
+                    }
+                }
             }
         }
 
@@ -110,6 +126,21 @@ namespace AssetsManager.Views.Controls.Comparator
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
                 await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
+
+                // --- DIRECTORY AUTO-SYNC ---
+                if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                {
+                    var suggestedBackup = ViewModel.AvailableBackups
+                        .Where(b => !b.IsMainClient && b.IsPbe == backup.IsPbe)
+                        .OrderByDescending(b => b.CreationDate)
+                        .FirstOrDefault();
+
+                    if (suggestedBackup != null)
+                    {
+                        ViewModel.SelectedBaseBackup = suggestedBackup;
+                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
+                    }
+                }
             }
         }
 
@@ -133,8 +164,25 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.NewDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(false, ViewModel.NewDirectoryPath, VersionService, BackupManager);
+                    string newPath = folderBrowserDialog.FileName;
+                    ViewModel.NewDirectoryPath = newPath;
+                    await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+
+                    // --- DIRECTORY AUTO-SYNC ---
+                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                    {
+                        var (isPbe, _) = BackupManager.GetPathIdentification(newPath);
+                        var suggestedBackup = ViewModel.AvailableBackups
+                            .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
+                            .OrderByDescending(b => b.CreationDate)
+                            .FirstOrDefault();
+
+                        if (suggestedBackup != null)
+                        {
+                            ViewModel.SelectedBaseBackup = suggestedBackup;
+                            await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
+                        }
+                    }
                 }
             }
         }

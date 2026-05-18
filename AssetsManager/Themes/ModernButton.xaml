@@ -653,20 +653,27 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Grid Background="Transparent">
-                        <!-- Centered Group: Ensures the indicator follows the name exactly -->
+                        <!-- Main Container: Centered but aware of internal columns -->
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Stretch">
-                            <!-- Content: Icon + Text -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{TemplateBinding Padding}">
-                                <materialIcons:MaterialIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
-                                                            Width="16" Height="16" Margin="0,0,8,0" 
-                                                            VerticalAlignment="Center" x:Name="TabIcon" Opacity="0.6"/>
-                                <TextBlock Text="{TemplateBinding Content}" VerticalAlignment="Center" x:Name="TabText"/>
-                            </StackPanel>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                <ColumnDefinition Width="Auto"/> <!-- Text -->
+                            </Grid.ColumnDefinitions>
 
-                            <!-- Selection Indicator: Now mathematically centered under the text block -->
-                            <Border x:Name="Indicator" Height="2.5" Width="36" Background="{StaticResource AccentBrush}" 
-                                    VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                                    CornerRadius="2,2,0,0" Opacity="0">
+                            <!-- Content: Icon (Column 0) -->
+                            <materialIcons:MaterialIcon Kind="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" 
+                                                        Width="16" Height="16" Margin="14,10,8,10" 
+                                                        VerticalAlignment="Center" x:Name="TabIcon" Opacity="0.6"
+                                                        Grid.Column="0"/>
+
+                            <!-- Content: Text (Column 1) -->
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding Content}" Margin="0,10,14,10" 
+                                       VerticalAlignment="Center" x:Name="TabText"/>
+
+                            <!-- Selection Indicator: Now spanning across BOTH Icon and Text -->
+                            <Border x:Name="Indicator" Height="2.5" Grid.ColumnSpan="2" Background="{StaticResource AccentBrush}" 
+                                    VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                                    CornerRadius="2,2,0,0" Opacity="0" Margin="14,0,14,-2">
                                 <Border.Effect>
                                     <DropShadowEffect Color="#FF5C85FF" BlurRadius="10" ShadowDepth="0" Opacity="0.5"/>
                                 </Border.Effect>

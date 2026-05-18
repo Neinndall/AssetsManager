@@ -1,7 +1,26 @@
+AssetsManager - League of Legends | v4.0.0.1
+
+New Features
+  - Comparator / Directory Mode Auto-Sync
+    * Implemented a robust auto-synchronization engine for Directory Mode that automatically identifies and selects the most recent backup matching the Target environment.
+
+Improvements
+  - Monitor / PBE Status Display Refinement
+    * Improved the PBE server status card with clearer "Online" and "Maintenance" titles.
+    * Refined the technical footer to display "Connection Verified" for active states and "Started at HH:mm" for maintenance periods, eliminating redundant information.
+  - Monitor / Asset Tracker Load More Efficiency
+    * Increased the "Load More" batch size from 5 to 10 assets to improve discovery speed and maintain consistency with initial checkups.
+
+Bug Fixes
+  - Eliminated visual flickering during Monitor Dashboard initial load for immediate data display.
+  - Corrected selection indicator alignment in Monitor tabs to ensure perfect centering under the text.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.0.0
 
 MAJOR UPDATE
-This version marks the largest milestone in AssetsManager history, representing a total transformation into a high-fidelity engineering tool. v4.0.0.0 is the result of a massive convergence between a mathematical HUD revolution and a deep architectural overhaul. Every pixel has been realigned to strict new visual standards—from the modular "Bento UI" Monitor Dashboard and the specialized "Analysis Context" engine in the Comparator, to the refined "Radar" identification systems. Under the hood, the system has been re-engineered for professional-grade performance, introducing a "Zero-RAM" binary hash search engine, a ultra-low memory file tree architecture, and a high-speed filtering motor capable of processing hundreds of thousands of files with near-zero latency. This update doesn't just improve the application; it redefines the entire asset analysis workflow with unmatched precision, stability, and technical depth.
+This version marks a total transformation of AssetsManager into a high-fidelity engineering tool. This massive update introduces a completely redesigned User Interface based on strict mathematical HUD standards, alongside a robust architectural refactoring for peak performance. From the new "Bento UI" Monitor Dashboard to the specialized "Analysis Context" engine in the Comparator, every pixel and every line of code has been re-engineered to provide a professional, seamless, and lightning-fast asset analysis experience.
 
 New Features
   - Monitor / Modular Bento UI Refinement
@@ -190,7 +209,6 @@ Improvements
     * Separated Core Information: introduced a dedicated "CORE BUILD" card that highlights the software identity, build channel (QA/Experimental vs Stable), and GitHub SHA for development tracking.
     * Enhanced System Health: separated the integrity diagnostics into a "SYSTEM HEALTH" card focused exclusively on hash database synchronization and self-check status.
     * High-Fidelity HUD Headers: upgraded the Operations Center header with four distinct technical indicators: PBE, SYSTEM, CORE, and ASSETS.
-
     * Advanced Asset Watcher Metrics: significantly improved the Watcher card with real-time health badges and a "Last Change" tracker that displays the name of the most recently updated file.
     * Intelligent Asset Tracker Insights: enhanced the Tracker card with "Last Discovered" metadata, providing immediate visibility into the latest assets found on the Riot CDN.
   - Explorer & Comparator / Extraction Logic Redefinition
