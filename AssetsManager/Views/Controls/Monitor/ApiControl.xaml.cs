@@ -145,29 +145,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
                     if (salesCatalog != null)
                     {
-                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
+                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
                         ViewModel?.SetFullSalesCatalog(salesItems);
-                        
-                        // Start background image extraction for Sales items
-                        _ = Task.Run(async () => 
-                        {
-                            foreach (var item in salesItems)
-                            {
-                                try
-                                {
-                                    var splashPath = await RiotApiService.GetSkinSplashPathAsync(item.Name);
-                                    if (!string.IsNullOrEmpty(splashPath))
-                                    {
-                                        var localPath = await RiotApiService.ExtractSkinSplashAsync(splashPath);
-                                        if (!string.IsNullOrEmpty(localPath))
-                                        {
-                                            Dispatcher.Invoke(() => item.ImagePath = localPath);
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
-                        });
                     }
                 }
             }
@@ -269,33 +248,12 @@ namespace AssetsManager.Views.Controls.Monitor
             if (salesCatalog != null)
             {
                 UpdateAuthenticationStatus();
-                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
+                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
 
                 if (salesItems.Any())
                 {
                     ViewModel?.SetFullSalesCatalog(salesItems);
                     LogService.LogSuccess("Sales data retrieved and displayed successfully!");
-
-                    // Start background image extraction for Sales items
-                    _ = Task.Run(async () => 
-                    {
-                        foreach (var item in salesItems)
-                        {
-                            try
-                            {
-                                var splashPath = await RiotApiService.GetSkinSplashPathAsync(item.Name);
-                                if (!string.IsNullOrEmpty(splashPath))
-                                {
-                                    var localPath = await RiotApiService.ExtractSkinSplashAsync(splashPath);
-                                    if (!string.IsNullOrEmpty(localPath))
-                                    {
-                                        Dispatcher.Invoke(() => item.ImagePath = localPath);
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
-                    });
                 }
                 else
                 {
@@ -530,28 +488,6 @@ namespace AssetsManager.Views.Controls.Monitor
                     .ToList();
 
                 ViewModel?.MythicShopCategories.ReplaceRange(finalCategories);
-
-                // Start background image extraction for Mythic Shop items
-                var allMythicItems = finalCategories.SelectMany(c => c.Items).ToList();
-                _ = Task.Run(async () => 
-                {
-                    foreach (var item in allMythicItems)
-                    {
-                        try
-                        {
-                            var splashPath = await RiotApiService.GetSkinSplashPathAsync(item.Name);
-                            if (!string.IsNullOrEmpty(splashPath))
-                            {
-                                var localPath = await RiotApiService.ExtractSkinSplashAsync(splashPath);
-                                if (!string.IsNullOrEmpty(localPath))
-                                {
-                                    Dispatcher.Invoke(() => item.ImagePath = localPath);
-                                }
-                            }
-                        }
-                        catch { /* Silent skip for individual image failures */ }
-                    }
-                });
             }
             catch (Exception ex)
             {

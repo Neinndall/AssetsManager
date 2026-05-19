@@ -14,15 +14,8 @@
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.2" Color="Black"/>
                                 </Border.Effect>
-                                <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <Grid>
-                                        <materialIcons:MaterialIcon Kind="HexagonOutline" Width="32" Height="32" Foreground="{StaticResource AccentPurple}" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <Border CornerRadius="10">
-                                            <Border.Background>
-                                                <ImageBrush ImageSource="{Binding ImagePath}" Stretch="UniformToFill"/>
-                                            </Border.Background>
-                                        </Border>
-                                    </Grid>
+                                <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
+                                    <materialIcons:MaterialIcon Kind="TagOutline" Width="32" Height="32" Foreground="{StaticResource TextMuted}" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </Border>
                         </Grid>
@@ -67,15 +60,8 @@
                                 <Border.Effect>
                                     <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.2" Color="Black"/>
                                 </Border.Effect>
-                                <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                    <Grid>
-                                        <materialIcons:MaterialIcon Kind="HexagonOutline" Width="32" Height="32" Foreground="{StaticResource AccentPurple}" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <Border CornerRadius="10">
-                                            <Border.Background>
-                                                <ImageBrush ImageSource="{Binding ImagePath}" Stretch="UniformToFill"/>
-                                            </Border.Background>
-                                        </Border>
-                                    </Grid>
+                                <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True">
+                                    <materialIcons:MaterialIcon Kind="HexagonOutline" Width="32" Height="32" Foreground="{StaticResource AccentPurple}" Opacity="0.3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                             </Border>
                         </Grid>
