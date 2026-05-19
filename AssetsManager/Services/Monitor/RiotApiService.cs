@@ -24,13 +24,131 @@ namespace AssetsManager.Services.Monitor
         private readonly SemaphoreSlim _extractionSemaphore = new(1, 1);
         private readonly string[] _passWadNames = { "default-assets2.wad", "default-assets.wad" };
 
+        private Dictionary<string, string> _skinNamePathMap;
         private readonly Dictionary<string, string> _localEndpoints;
         private readonly Dictionary<string, string> _remoteEndpoints;
 
         private string GetIconWadPath(string iconUrl)
         {
-            string basePath = Regex.Replace(iconUrl.ToLowerInvariant(), @"^.*assets/", "");
+            // Normalizamos a minúsculas para evitar problemas de case
+            string url = iconUrl.ToLowerInvariant();
+
+            // 1. Eliminamos todo hasta el primer "assets/" (que suele ser /lol-game-data/assets/)
+            string basePath = Regex.Replace(url, @"^.*?assets/", "");
+
+            // 2. Si el resultado empieza por "assets/", lo eliminamos también.
+            // Esto es crítico para los splashPath de skins.json que vienen como "/lol-game-data/assets/ASSETS/..."
+            if (basePath.StartsWith("assets/"))
+            {
+                basePath = basePath.Substring(7); // "assets/".Length == 7
+            }
+
             return $"plugins/rcp-be-lol-game-data/global/default/assets/{basePath}";
+        }
+
+        private async Task LoadSkinsJsonAsync()
+        {
+            if (_skinNamePathMap != null) return;
+
+            _skinNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            if (string.IsNullOrEmpty(lolDirectory)) return;
+
+            string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+            string skinsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/skins.json";
+            ulong hash = LeagueToolkit.Hashing.XxHash64Ext.Hash(skinsJsonPath);
+
+            foreach (var wadName in _passWadNames)
+            {
+                string wadPath = Path.Combine(pluginPath, wadName);
+                if (!File.Exists(wadPath)) continue;
+
+                try
+                {
+                    using var wadFile = new WadFile(wadPath);
+                    if (wadFile.Chunks.TryGetValue(hash, out var chunk))
+                    {
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        using (var doc = JsonDocument.Parse(decompressedDataOwner.Span.ToArray()))
+                        {
+                            foreach (var property in doc.RootElement.EnumerateObject())
+                            {
+                                if (property.Value.TryGetProperty("name", out var nameProp) && 
+                                    property.Value.TryGetProperty("splashPath", out var splashProp))
+                                {
+                                    string name = nameProp.GetString();
+                                    string splash = splashProp.GetString();
+                                    if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(splash))
+                                    {
+                                        _skinNamePathMap[name] = splash;
+                                    }
+                                }
+                            }
+                        }
+                        break; // Found and loaded
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Error loading skins.json from {wadName}");
+                }
+            }
+        }
+
+        public async Task<string> GetSkinSplashPathAsync(string skinName)
+        {
+            await LoadSkinsJsonAsync();
+            if (_skinNamePathMap != null && _skinNamePathMap.TryGetValue(skinName, out var splashPath))
+            {
+                return splashPath;
+            }
+            return null;
+        }
+
+        public async Task<string> ExtractSkinSplashAsync(string splashPath)
+        {
+            if (string.IsNullOrEmpty(splashPath)) return null;
+
+            string fileName = Path.GetFileName(splashPath);
+            string destinationPath = Path.Combine(_directoriesCreator.ApiCachePath, "mythic", fileName);
+            if (File.Exists(destinationPath)) return destinationPath;
+
+            await _extractionSemaphore.WaitAsync();
+            try
+            {
+                if (File.Exists(destinationPath)) return destinationPath;
+
+                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+
+                // Convert splashPath to WAD path
+                // /lol-game-data/assets/ASSETS/Characters/Lux/Skins/Skin40/Images/lux_splash_centered_40.jpg
+                // -> plugins/rcp-be-lol-game-data/global/default/assets/assets/characters/lux/skins/skin40/images/lux_splash_centered_40.jpg
+                string wadPathInWad = GetIconWadPath(splashPath);
+                ulong pathHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(wadPathInWad);
+
+                foreach (var wadName in _passWadNames)
+                {
+                    string wadPath = Path.Combine(pluginPath, wadName);
+                    if (!File.Exists(wadPath)) continue;
+
+                    using var wadFile = new WadFile(wadPath);
+                    if (wadFile.Chunks.TryGetValue(pathHash, out var chunk))
+                    {
+                        using var decompressedDataOwner = wadFile.LoadChunkDecompressed(chunk);
+                        _directoriesCreator.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                        await File.WriteAllBytesAsync(destinationPath, decompressedDataOwner.Span.ToArray());
+                        return destinationPath;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Error extracting skin splash: {splashPath}");
+            }
+            finally { _extractionSemaphore.Release(); }
+            return null;
         }
 
         public RiotApiService(AppSettings appSettings, HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 using AssetsManager.Utils;
 
@@ -11,7 +12,7 @@ namespace AssetsManager.Views.Models.Monitor
         public List<CatalogItem> Catalog { get; set; }
     }
 
-    public class CatalogItem
+    public class CatalogItem : INotifyPropertyChanged
     {
         [JsonPropertyName("inventoryType")]
         public string InventoryType { get; set; }
@@ -32,6 +33,27 @@ namespace AssetsManager.Views.Models.Monitor
 
         [JsonPropertyName("sale")]
         public SaleInfo Sale { get; set; }
+
+        private string _imagePath;
+        [JsonIgnore]
+        public string ImagePath
+        {
+            get => _imagePath;
+            set
+            {
+                if (_imagePath != value)
+                {
+                    _imagePath = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public class SaleInfo
