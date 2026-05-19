@@ -8,20 +8,31 @@ New Features
     * Implemented a brand new reactive messaging system for the Watcher footer.
     * Integrated "Integrity Alerts": the system now dynamically switches its status message from "Surveillance active" to "Integrity alert · {N} changes detected" when file variations are found.
     * Added Reactive Security Iconography: the surveillance shield now automatically turns from Green to Orange upon detecting changes, providing immediate visual feedback of potential integrity issues.
+  - Explorer / Narrative Metadata Expansion
+    * Added support for Ward names and descriptions: the explorer now automatically resolves and displays narrative context for ward skin assets.
+  - Monitor / API Center Image Support
+    * Integrated automated image extraction for Sales and Mythic Shop items: the system now automatically retrieves and displays official skin, emote, and ward icons directly in the API Center interface.
+    * Implemented a Background Extraction Engine: images are processed in a separate thread to maintain UI responsiveness while populating the cache.
 
 Improvements
   - Monitor / Professional Split-Footer HUD
     * Redesigned the PBE Server and Asset Watcher footers with a professional 3-column "Split" layout for superior data organization.
     * Unified Telemetry Display: implemented a standardized right-aligned section featuring a neutral white clock icon and time, ensuring technical data remains readable even during alerts.
-    * Simplified HUD Aesthetics: removed redundant "CHECK:" and "SYNC:" prefixes from footers to achieve a cleaner, more direct HUD feel.
     * Refined Asset Watcher Narrative: updated the surveillance message to a concise, technical "Surveillance active · Local client synced" for a more professional tone.
   - Monitor / PBE Maintenance Hierarchy
     * Improved the PBE Server card by moving the "LAST CHECK" timestamp to a dedicated badge in the header, separating technical telemetry from operational status.
     * Enhanced Maintenance Visibility: refined the footer to exclusively display the maintenance message (e.g., "Started at HH:mm") with its dedicated icon, resulting in a cleaner and more focused layout.
   - Monitor / Asset Tracker Data Clarity
     * Removed text trimming (ellipsis) from the "Last Discovered" asset display, ensuring the full identity of the latest found assets is always visible without truncation.
+  - Explorer / Hierarchical Path Precision
+    * Enhanced "Copy Full Path" functionality: the system now reconstructs the absolute logical path from the tree root, including the source WAD container and all parent directories.
+    * Renamed technical identifiers to "VirtualPath" and "CopyFullPath" to clearly distinguish between internal identity and UI navigation.
+    * Integrated Path Sanitization: automated the removal of technical suffixes (like WAD file counts) during path copying to provide clean, usable strings.
+    * Optimized Memory Footprint: implemented an aggressive "Thin Path" strategy that releases path strings from RAM for all virtual nodes, significantly reducing memory usage during large WAD explorations.
 
 Bug Fixes
+  - A bug has been fixed that prevented favorites from appearing in the UI when accessing the Explorer from the home screen (live or pbe).
+  - Fixed a critical authentication issue where the Sales Catalog and Mythic Shop failed to load due to inconsistent token formats (Plain Text vs. JSON) between LCU endpoints.
   - Resolved an inconsistency in the Asset Watcher where the surveillance message remained static regardless of the actual monitoring state.
   - Corrected the visual hierarchy of the PBE footer during maintenance periods to prevent information overlap and clutter.
 

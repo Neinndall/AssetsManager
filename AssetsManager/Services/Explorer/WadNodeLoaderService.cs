@@ -202,7 +202,7 @@ namespace AssetsManager.Services.Explorer
                                 file.BackupChunkPath = chunkPath;
                                 var status = GetDiffStatus(file.Type);
 
-                                // The FullPath is the game path (for audio linker), the Name is just the file name
+                                // The VirtualPath is the game path (for audio linker), the Name is just the file name
                                 string fileName = Path.GetFileName(file.Path);
                                 var node = new FileSystemNodeModel(fileName, false, file.Path, wadGroup.Key)
                                 {
@@ -372,7 +372,7 @@ namespace AssetsManager.Services.Explorer
             {
                 try
                 {
-                    var directories = Directory.GetDirectories(node.FullPath);
+                    var directories = Directory.GetDirectories(node.VirtualPath);
                     var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir) { Parent = node }).ToList();
                     node.Children.AddRange(childDirs);
                     
@@ -381,7 +381,7 @@ namespace AssetsManager.Services.Explorer
                         await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
                     }
 
-                    var files = Directory.GetFiles(node.FullPath);
+                    var files = Directory.GetFiles(node.VirtualPath);
                     var childFiles = new List<FileSystemNodeModel>();
                     foreach (var file in files.OrderBy(f => f))
                     {
@@ -391,12 +391,12 @@ namespace AssetsManager.Services.Explorer
                         bool keepFile = false;
                         if (lowerFile.EndsWith(".wad.client"))
                         {
-                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Game")))
+                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Game")))
                                 keepFile = true;
                         }
                         else if (lowerFile.EndsWith(".wad"))
                         {
-                            if (node.FullPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
+                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
                                 keepFile = true;
                         }
 
@@ -415,7 +415,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    _logService.LogWarning($"Access denied to: {node.FullPath}");
+                    _logService.LogWarning($"Access denied to: {node.VirtualPath}");
                 }
             }
         }
@@ -428,8 +428,8 @@ namespace AssetsManager.Services.Explorer
             var childrenToAdd = await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.FullPath : wadNode.SourceWadPath;
-                var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.FullPath, pathToWad);
+                string pathToWad = wadNode.Type == NodeType.WadFile ? wadNode.VirtualPath : wadNode.SourceWadPath;
+                var rootVirtualNode = new FileSystemNodeModel(wadNode.Name, true, wadNode.VirtualPath, pathToWad);
                 
                 try
                 {
@@ -608,10 +608,11 @@ namespace AssetsManager.Services.Explorer
             };
 
             // OPTIMIZATION: If the node has a real hierarchical parent, we can discard the stored string
-            // as the dynamic FullPath getter will reconstruct it on demand.
-            if (parentNode != null && !parentNode.IsGroupingFolder && parentNode.Type != NodeType.WadFile)
+            // as the dynamic VirtualPath getter will reconstruct it on demand.
+            // Safety check: && parentNode.Type != NodeType.WadFile (Removed for RAM optimization, the getter handles it)
+            if (parentNode != null && !parentNode.IsGroupingFolder)
             {
-                fileNode.FullPath = null;
+                fileNode.VirtualPath = null;
             }
 
             parentNode.Children.Add(fileNode);
