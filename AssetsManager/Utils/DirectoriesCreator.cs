@@ -19,6 +19,9 @@ namespace AssetsManager.Utils
         public string WebView2DataPath { get; }
         public string TempPreviewPath { get; }
         public string ApiCachePath { get; }
+        public string ApiCacheSalesPath { get; }
+        public string ApiCacheMythicPath { get; }
+        public string ApiCacheRewardsPath { get; }
 
         public DirectoriesCreator()
         {
@@ -40,7 +43,11 @@ namespace AssetsManager.Utils
 
             WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
             TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
+            
             ApiCachePath = Path.Combine(appFolderPath, "api_cache");
+            ApiCacheSalesPath = Path.Combine(ApiCachePath, "sales");
+            ApiCacheMythicPath = Path.Combine(ApiCachePath, "mythic");
+            ApiCacheRewardsPath = Path.Combine(ApiCachePath, "rewards");
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");

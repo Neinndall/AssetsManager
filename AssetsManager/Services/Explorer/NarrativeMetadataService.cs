@@ -22,12 +22,6 @@ namespace AssetsManager.Services.Explorer
         private string _cachedIconsSourceWad;
         private string _cachedEmotesSourceWad;
 
-        private const string IconsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-icons.json";
-        private const string EmotesJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-emotes.json";
-        
-        private const string ProfileIconsPath = "v1/profile-icons/";
-        private const string EmotesPath = "assets/loadouts/summoneremotes/";
-
         public NarrativeMetadataService(LogService logService, WadContentProvider wadContentProvider, AppSettings appSettings)
         {
             _logService = logService;
@@ -42,13 +36,13 @@ namespace AssetsManager.Services.Explorer
             string path = PathUtils.NormalizePath(node.FullPath);
             
             // 1. Check for Summoner Icons
-            if (path.Contains(ProfileIconsPath))
+            if (path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
             {
                 return await GetIconMetadataAsync(node);
             }
             
             // 2. Check for Emotes
-            if (path.Contains(EmotesPath))
+            if (path.Contains(RiotCatalogDefinitions.EmotesVirtualPath))
             {
                 return await GetEmoteMetadataAsync(node);
             }
@@ -145,7 +139,7 @@ namespace AssetsManager.Services.Explorer
         {
             if (_cachedIcons != null && _cachedIconsSourceWad == node.SourceWadPath) return _cachedIcons;
 
-            byte[] jsonData = await LoadJsonFromContextAsync(node, IconsJsonPath);
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.IconsJsonPath);
             if (jsonData == null) return null;
 
             try
@@ -166,7 +160,7 @@ namespace AssetsManager.Services.Explorer
         {
             if (_cachedEmotes != null && _cachedEmotesSourceWad == node.SourceWadPath) return _cachedEmotes;
 
-            byte[] jsonData = await LoadJsonFromContextAsync(node, EmotesJsonPath);
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.EmotesJsonPath);
             if (jsonData == null) return null;
 
             try

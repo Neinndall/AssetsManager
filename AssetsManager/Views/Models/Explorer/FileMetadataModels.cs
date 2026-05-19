@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Models.Explorer
         public string Title { get; set; }
         public int YearReleased { get; set; }
         public bool IsLegacy { get; set; }
+        public string ImagePath { get; set; }
         public List<DescriptionEntry> Descriptions { get; set; }
     }
 

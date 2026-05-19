@@ -55,105 +55,73 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             UpdateAuthenticationStatus();
 
-            bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false); // Silenciosa
+            bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false);
             UpdateConnectionStatus(isCurrentlyConnected);
             if (isCurrentlyConnected)
             {
                 _lcuConnectionTimer.Start();
             }
 
-            await LoadSalesFromCacheAsync();
-            await LoadMythicShopFromCacheAsync();
-            await LoadPassRewardsFromCacheAsync();
+            // Explicit calls for each module's cache
+            await LoadSalesCacheAsync();
+            await LoadMythicShopCacheAsync();
+            await LoadPassRewardsCacheAsync();
         }
 
-        private async Task LoadPassRewardsFromCacheAsync()
+        private async Task LoadSalesCacheAsync()
         {
-            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
-            {
-                return;
-            }
+            string filePath = Path.Combine(DirectoriesCreator.ApiCachePath, "sales.json");
+            if (!File.Exists(filePath)) return;
 
             try
             {
-                var progressionPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_progression.json");
-                var rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
-
-                if (File.Exists(progressionPath) && File.Exists(rewardsPath))
+                string json = await File.ReadAllTextAsync(filePath);
+                var catalog = JsonSerializer.Deserialize<SalesCatalog>(json);
+                if (catalog?.Catalog != null)
                 {
-                    var progContent = await File.ReadAllTextAsync(progressionPath);
-                    var rewardsContent = await File.ReadAllTextAsync(rewardsPath);
-
-                    var progression = JsonSerializer.Deserialize<ProgressionResponse>(progContent);
-                    var rewardsResponse = JsonSerializer.Deserialize<RewardsResponse>(rewardsContent);
-
-                    if (progression != null && rewardsResponse != null)
-                    {
-                        await ProcessPassRewardsDataAsync(progression, rewardsResponse);
-                    }
+                    var salesItems = catalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
+                    ViewModel?.SetFullSalesCatalog(salesItems);
+                    _ = ExtractSkinImagesInBackgroundAsync(salesItems, "sales");
                 }
             }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to load pass rewards data from cache.");
-            }
+            catch (Exception ex) { LogService.LogError(ex, "Failed to load sales cache."); }
         }
 
-        private async Task LoadMythicShopFromCacheAsync()
+        private async Task LoadMythicShopCacheAsync()
         {
-            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
-            {
-                return;
-            }
+            string filePath = Path.Combine(DirectoriesCreator.ApiCachePath, "mythic_shop.json");
+            if (!File.Exists(filePath)) return;
 
             try
             {
-                var mythicShopFilePath = Path.Combine(DirectoriesCreator.ApiCachePath, "mythic_shop.json");
-
-                if (File.Exists(mythicShopFilePath))
-                {
-                    var jsonContent = await File.ReadAllTextAsync(mythicShopFilePath);
-                    var mythicShopResponse = JsonSerializer.Deserialize<MythicShopResponse>(jsonContent);
-
-                    if (mythicShopResponse != null)
-                    {
-                        ProcessMythicShopData(mythicShopResponse);
-                    }
-                }
+                string json = await File.ReadAllTextAsync(filePath);
+                var response = JsonSerializer.Deserialize<MythicShopResponse>(json);
+                if (response != null) ProcessMythicShopData(response);
             }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to load mythic shop data from cache.");
-            }
+            catch (Exception ex) { LogService.LogError(ex, "Failed to load mythic shop cache."); }
         }
 
-        private async Task LoadSalesFromCacheAsync()
+        private async Task LoadPassRewardsCacheAsync()
         {
-            if (DirectoriesCreator == null || !Directory.Exists(DirectoriesCreator.ApiCachePath))
-            {
-                return;
-            }
+            string progPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_progression.json");
+            string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+
+            if (!File.Exists(progPath) || !File.Exists(rewardsPath)) return;
 
             try
             {
-                var salesFilePath = Path.Combine(DirectoriesCreator.ApiCachePath, "sales.json");
+                var progJson = await File.ReadAllTextAsync(progPath);
+                var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
 
-                if (File.Exists(salesFilePath))
+                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
+                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+
+                if (prog != null && rewards != null)
                 {
-                    var jsonContent = await File.ReadAllTextAsync(salesFilePath);
-                    var salesCatalog = JsonSerializer.Deserialize<SalesCatalog>(jsonContent);
-
-                    if (salesCatalog != null)
-                    {
-                        var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
-                        ViewModel?.SetFullSalesCatalog(salesItems);
-                    }
+                    await ProcessPassRewardsDataAsync(prog, rewards);
                 }
             }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, "Failed to load sales data from cache.");
-            }
+            catch (Exception ex) { LogService.LogError(ex, "Failed to load pass rewards cache."); }
         }
 
         private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -234,7 +202,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsSales_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.Log("Starting Sales Fetch Process");
+            if (LogService != null) LogService.Log("Starting sales fetch process...");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -248,12 +216,14 @@ namespace AssetsManager.Views.Controls.Monitor
             if (salesCatalog != null)
             {
                 UpdateAuthenticationStatus();
-                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR");
+                var salesItems = salesCatalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
 
                 if (salesItems.Any())
                 {
                     ViewModel?.SetFullSalesCatalog(salesItems);
-                    LogService.LogSuccess("Sales data retrieved and displayed successfully!");
+
+                    // Start background image extraction for Sales items
+                    _ = ExtractSkinImagesInBackgroundAsync(salesItems, "sales");
                 }
                 else
                 {
@@ -410,7 +380,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.Log("Starting Mythic Shop Fetch Process");
+            if (LogService != null) LogService.Log("Starting mythic shop fetch process...");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -429,7 +399,6 @@ namespace AssetsManager.Views.Controls.Monitor
 
             UpdateAuthenticationStatus();
             ProcessMythicShopData(mythicShopResponse);
-            LogService.LogSuccess("Mythic Shop data retrieved and displayed successfully.");
         }
 
         private void ProcessMythicShopData(MythicShopResponse mythicShopResponse)
@@ -488,12 +457,51 @@ namespace AssetsManager.Views.Controls.Monitor
                     .ToList();
 
                 ViewModel?.MythicShopCategories.ReplaceRange(finalCategories);
+
+                // Start background image extraction for Mythic Shop items
+                var allMythicItems = finalCategories.SelectMany(c => c.Items).ToList();
+                _ = ExtractSkinImagesInBackgroundAsync(allMythicItems, "mythic");
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Failed to process Mythic Shop data.");
                 CustomMessageBoxService.ShowError("Error", $"An error occurred while processing Mythic Shop data: {ex.Message}", Window.GetWindow(this));
             }
+        }
+
+        private async Task ExtractSkinImagesInBackgroundAsync<T>(IEnumerable<T> items, string subDir = "mythic")
+        {
+            await Task.Run(async () => 
+            {
+                foreach (var item in items)
+                {
+                    try
+                    {
+                        var nameProperty = item.GetType().GetProperty("Name");
+                        if (nameProperty == null) continue;
+
+                        string name = (string)nameProperty.GetValue(item);
+                        if (string.IsNullOrEmpty(name)) continue;
+
+                        // Unified lookup for skins, emotes, wards, and icons
+                        var assetPath = await RiotApiService.GetMythicAssetPathAsync(name);
+                        
+                        if (!string.IsNullOrEmpty(assetPath))
+                        {
+                            var localPath = await RiotApiService.ExtractMythicIconAsync(assetPath, subDir);
+                            if (!string.IsNullOrEmpty(localPath))
+                            {
+                                var imagePathProperty = item.GetType().GetProperty("ImagePath");
+                                if (imagePathProperty != null)
+                                {
+                                    Dispatcher.Invoke(() => imagePathProperty.SetValue(item, localPath));
+                                }
+                            }
+                        }
+                    }
+                    catch { /* Silent skip for individual items */ }
+                }
+            });
         }
 
         private async void LcuConnectionTimer_Tick(object sender, EventArgs e)
@@ -533,7 +541,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
         {
-            if (LogService != null) LogService.Log("Starting Pass Rewards Fetch Process");
+            if (LogService != null) LogService.Log("Starting pass rewards fetch process...");
             if (RiotApiService == null)
             {
                 CustomMessageBoxService.ShowError("Error", "RiotApiService is not available.", Window.GetWindow(this));
@@ -576,7 +584,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (progression != null && rewardsResponse != null)
                 {
                     await ProcessPassRewardsDataAsync(progression, rewardsResponse);
-                    LogService.LogSuccess("Pass rewards data retrieved and processed successfully!");
                 }
             }
             catch (Exception ex)
