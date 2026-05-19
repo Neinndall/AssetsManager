@@ -21,25 +21,25 @@ namespace AssetsManager.Views.Models.Explorer
         public string Name { get; set; }
         public NodeType Type { get; set; }
 
-        private string _fullPath;
-        public string FullPath
+        private string _virtualPath;
+        public string VirtualPath
         {
             get
             {
-                if (string.IsNullOrEmpty(_fullPath))
+                if (string.IsNullOrEmpty(_virtualPath))
                 {
                     if (Type == NodeType.VirtualFile || Type == NodeType.VirtualDirectory || Type == NodeType.WemFile || Type == NodeType.AudioEvent || Type == NodeType.SoundBank)
                     {
                         if (Parent == null || Parent.Type == NodeType.WadFile || Parent.Type == NodeType.RealDirectory)
                             return Name;
 
-                        var parentPath = Parent.FullPath;
+                        var parentPath = Parent.VirtualPath;
                         return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
                     }
                 }
-                return _fullPath;
+                return _virtualPath;
             }
-            set => _fullPath = value;
+            set => _virtualPath = value;
         }
 
         public string CopyFullPath
@@ -124,7 +124,7 @@ namespace AssetsManager.Views.Models.Explorer
                         _extension = "";
                     else
                     {
-                        string path = FullPath;
+                        string path = VirtualPath;
                         _extension = string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
                     }
                 }
@@ -287,7 +287,7 @@ namespace AssetsManager.Views.Models.Explorer
         // Constructor for real files/directories
         public FileSystemNodeModel(string path)
         {
-            _fullPath = path;
+            _virtualPath = path;
             Name = Path.GetFileName(path);
 
             if (Directory.Exists(path))
@@ -319,7 +319,7 @@ namespace AssetsManager.Views.Models.Explorer
         public FileSystemNodeModel(string name, bool isDirectory, string virtualPath, string sourceWad)
         {
             Name = name;
-            _fullPath = virtualPath;
+            _virtualPath = virtualPath;
             SourceWadPath = sourceWad;
 
             if (isDirectory)
@@ -386,7 +386,7 @@ namespace AssetsManager.Views.Models.Explorer
             ChunkDiff = null;
             _sourceWadPath = null;
             BackupChunkPath = null;
-            _fullPath = null;
+            _virtualPath = null;
             OldPath = null;
             Name = null;
 

@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Explorer
             {
                 byte[] data = null;
                 if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node); }
-                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.FullPath)) data = await File.ReadAllBytesAsync(node.FullPath); }
+                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath); }
                 else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node); }
 
                 if (data != null) { await DispatchPreview(data, node.Extension, node); }
@@ -142,7 +142,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to preview file '{node.FullPath}'.");
+                _logService.LogError(ex, $"Failed to preview file '{node.VirtualPath}'.");
                 await ShowUnsupportedPreviewAsync(node.Extension);
             }
         }
@@ -167,13 +167,13 @@ namespace AssetsManager.Services.Explorer
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
         {
-            if (!File.Exists(node.FullPath))
+            if (!File.Exists(node.VirtualPath))
             {
                 await ShowUnsupportedPreviewAsync("File not found");
                 return;
             }
 
-            byte[] fileData = await File.ReadAllBytesAsync(node.FullPath);
+            byte[] fileData = await File.ReadAllBytesAsync(node.VirtualPath);
             await DispatchPreview(fileData, node.Extension, node);
         }
 
@@ -562,7 +562,7 @@ namespace AssetsManager.Services.Explorer
                 byte[] data = node.Type switch
                 {
                     NodeType.VirtualFile => await _wadContentProvider.GetVirtualFileBytesAsync(node),
-                    NodeType.RealFile => await File.ReadAllBytesAsync(node.FullPath),
+                    NodeType.RealFile => await File.ReadAllBytesAsync(node.VirtualPath),
                     _ => null
                 };
 
@@ -596,7 +596,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to get image preview for '{node.FullPath}'.");
+                _logService.LogError(ex, $"Failed to get image preview for '{node.VirtualPath}'.");
                 return null;
             }
 

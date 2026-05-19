@@ -309,7 +309,7 @@ namespace AssetsManager.Views
                     // We run this without awaiting to not block UI thread, but we log errors inside the services
                     _ = Task.Run(async () => 
                     {
-                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
+                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.PhysicalPath);
                         // 2. Metadata Registration (ComparisonHistoryService)
                         _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
                     });

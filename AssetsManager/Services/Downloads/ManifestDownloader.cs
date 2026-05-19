@@ -50,13 +50,13 @@ public class ManifestDownloader
         public RmanChunk Chunk { get; set; }
         public ulong FileOffset { get; set; }
         public RmanFile FileInfo { get; set; }
-        public string FullPath { get; set; }
+        public string PhysicalPath { get; set; }
     }
 
     private class FilePatchTask
     {
         public RmanFile FileInfo { get; set; }
-        public string FullPath { get; set; }
+        public string PhysicalPath { get; set; }
         public Dictionary<ulong, List<ChunkDownloadTask>> ChunksByBundle { get; set; }
     }
 
@@ -68,7 +68,7 @@ public class ManifestDownloader
 
     private class TargetInfo
     {
-        public string FullPath { get; set; }
+        public string PhysicalPath { get; set; }
         public ulong FileOffset { get; set; }
         public RmanFile FileInfo { get; set; }
     }
@@ -131,8 +131,8 @@ public class ManifestDownloader
                     try 
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var fullPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
-                        var fileInfo = new FileInfo(fullPath);
+                        var physicalPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
+                        var fileInfo = new FileInfo(physicalPath);
                         bool fileExists = fileInfo.Exists;
                         var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
                         ulong currentFileOffset = 0;
@@ -146,14 +146,14 @@ public class ManifestDownloader
                                 if (chunk != null)
                                 {
                                     if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
-                                    chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                                    chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, PhysicalPath = physicalPath });
                                     currentFileOffset += chunk.UncompressedSize;
                                 }
                             }
                         }
                         else
                         {
-                            using (var fs = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
+                            using (var fs = new FileStream(physicalPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 256 * 1024, FileOptions.SequentialScan | FileOptions.Asynchronous))
                             {
                                 foreach (var chunkId in file.ChunkIds)
                                 {
@@ -181,7 +181,7 @@ public class ManifestDownloader
                                     if (needsUpdate)
                                     {
                                         if (!chunksByBundle.ContainsKey(chunk.BundleId)) chunksByBundle[chunk.BundleId] = new List<ChunkDownloadTask>();
-                                        chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, FullPath = fullPath });
+                                        chunksByBundle[chunk.BundleId].Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset, FileInfo = file, PhysicalPath = physicalPath });
                                     }
                                     currentFileOffset += chunk.UncompressedSize;
                                 }
@@ -190,7 +190,7 @@ public class ManifestDownloader
 
                         if (chunksByBundle.Any()) 
                         {
-                            filesToPatch.Add(new FilePatchTask { FileInfo = file, FullPath = fullPath, ChunksByBundle = chunksByBundle });
+                            filesToPatch.Add(new FilePatchTask { FileInfo = file, PhysicalPath = physicalPath, ChunksByBundle = chunksByBundle });
                             Interlocked.Add(ref totalChunksToDownloadCount, chunksByBundle.Values.Sum(l => l.Count));
                             Interlocked.Add(ref totalMBToDownload, chunksByBundle.Values.SelectMany(l => l).Sum(c => (long)c.Chunk.CompressedSize));
                         }
@@ -229,8 +229,8 @@ public class ManifestDownloader
 
         // Sequential UI Reporting: Sort files alphabetically to follow manifest/folder order
         var filesToPatchList = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
-        var initialChunksPerFile = filesToPatchList.ToDictionary(f => f.FullPath, f => f.ChunksByBundle.Values.Sum(l => l.Count));
-        var pathToIndex = filesToPatchList.Select((f, i) => new { f.FullPath, i }).ToDictionary(x => x.FullPath, x => x.i);
+        var initialChunksPerFile = filesToPatchList.ToDictionary(f => f.PhysicalPath, f => f.ChunksByBundle.Values.Sum(l => l.Count));
+        var pathToIndex = filesToPatchList.Select((f, i) => new { f.PhysicalPath, i }).ToDictionary(x => x.PhysicalPath, x => x.i);
 
         // ===========================================================================
         // PHASE 2: GLOBAL UPDATE (STREAMING & DEDUPLICATED)
@@ -239,7 +239,7 @@ public class ManifestDownloader
         var uniqueChunks = allTasks.GroupBy(t => t.Chunk.ChunkId)
                                    .Select(g => new UniqueChunkTask { 
                                        Chunk = g.First().Chunk, 
-                                       Targets = g.Select(t => new TargetInfo { FullPath = t.FullPath, FileOffset = t.FileOffset, FileInfo = t.FileInfo }).ToList() 
+                                       Targets = g.Select(t => new TargetInfo { PhysicalPath = t.PhysicalPath, FileOffset = t.FileOffset, FileInfo = t.FileInfo }).ToList() 
                                    }).ToList();
 
         // Priority Download: Order bundles by the first file they complete in our sorted list
@@ -248,7 +248,7 @@ public class ManifestDownloader
             .Select(g => new { 
                 Id = g.Key, 
                 Chunks = g.ToList(), 
-                Priority = g.Min(c => c.Targets.Min(t => pathToIndex[t.FullPath])) 
+                Priority = g.Min(c => c.Targets.Min(t => pathToIndex[t.PhysicalPath])) 
             })
             .OrderBy(x => x.Priority)
             .ToDictionary(x => x.Id, x => x.Chunks);
@@ -353,7 +353,7 @@ public class ManifestDownloader
 
                                     foreach (var target in t.Targets)
                                     {
-                                        var handle = openHandles.GetOrAdd(target.FullPath, (path) => {
+                                        var handle = openHandles.GetOrAdd(target.PhysicalPath, (path) => {
                                             var dir = Path.GetDirectoryName(path);
                                             if (!string.IsNullOrEmpty(dir)) _directoriesCreator.CreateDirectory(dir);
                                             var h = File.OpenHandle(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite, FileOptions.Asynchronous);
@@ -363,17 +363,17 @@ public class ManifestDownloader
 
                                         RandomAccess.Write(handle, uncomp, (long)target.FileOffset);
                                         int currentDoneChunks = Interlocked.Increment(ref completedChunks);
-                                        int rem = pendingPerFile.AddOrUpdate(target.FullPath, 0, (k, v) => v - 1);
+                                        int rem = pendingPerFile.AddOrUpdate(target.PhysicalPath, 0, (k, v) => v - 1);
 
                                         if (rem == 0) {
-                                            if (openHandles.TryRemove(target.FullPath, out var hnd)) hnd.Dispose();
+                                            if (openHandles.TryRemove(target.PhysicalPath, out var hnd)) hnd.Dispose();
                                         }
 
                                         // UI Coordination: Thread-safe sequential focus with detailed progress
                                         lock (uiLock)
                                         {
                                             while (visualFileIndex < filesToPatchList.Count && 
-                                                   pendingPerFile.TryGetValue(filesToPatchList[visualFileIndex].FullPath, out int p) && p == 0)
+                                                   pendingPerFile.TryGetValue(filesToPatchList[visualFileIndex].PhysicalPath, out int p) && p == 0)
                                             {
                                                 visualFileIndex++;
                                             }
@@ -384,8 +384,8 @@ public class ManifestDownloader
                                                 int reportIndex = Math.Min(visualFileIndex, totalFilesToPatch - 1);
                                                 var reportFile = filesToPatchList[reportIndex];
 
-                                                pendingPerFile.TryGetValue(reportFile.FullPath, out int pending);
-                                                int totalForFile = initialChunksPerFile[reportFile.FullPath];
+                                                pendingPerFile.TryGetValue(reportFile.PhysicalPath, out int pending);
+                                                int totalForFile = initialChunksPerFile[reportFile.PhysicalPath];
                                                 int doneForFile = totalForFile - pending;
 
                                                 string message = $"{visualFileIndex + 1} of {totalFilesToPatch} files: {reportFile.FileInfo.Name}|{doneForFile}/{totalForFile}";

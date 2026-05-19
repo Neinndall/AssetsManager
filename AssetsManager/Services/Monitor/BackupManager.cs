@@ -298,9 +298,9 @@ namespace AssetsManager.Services.Monitor
             return PathUtils.IsSameOrSubPath(root, sub);
         }
 
-        private string GetBackupDisplayName(string folderName, string fullPath)
+        private string GetBackupDisplayName(string folderName, string virtualPath)
         {
-            var (isPbe, _) = GetPathIdentification(fullPath);
+            var (isPbe, _) = GetPathIdentification(virtualPath);
             return isPbe ? "League of Legends PBE" : "League of Legends LIVE";
         }
         

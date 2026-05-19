@@ -52,9 +52,9 @@ namespace AssetsManager.Services.Explorer
         {
             if (item == null) return;
 
-            if (_appSettings.FavoritePaths.Contains(item.FullPath))
+            if (_appSettings.FavoritePaths.Contains(item.VirtualPath))
             {
-                _appSettings.FavoritePaths.Remove(item.FullPath);
+                _appSettings.FavoritePaths.Remove(item.VirtualPath);
                 Favorites.Remove(item);
                 AppSettings.SaveSettings(_appSettings);
             }
@@ -68,7 +68,7 @@ namespace AssetsManager.Services.Explorer
             
             return new FavoriteItemModel
             {
-                FullPath = path,
+                VirtualPath = path,
                 DisplayName = name
             };
         }

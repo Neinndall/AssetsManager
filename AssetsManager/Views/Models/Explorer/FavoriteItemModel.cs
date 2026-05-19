@@ -5,7 +5,7 @@ namespace AssetsManager.Views.Models.Explorer
 {
     public class FavoriteItemModel : INotifyPropertyChanged
     {
-        public string FullPath { get; set; }
+        public string VirtualPath { get; set; }
         public string DisplayName { get; set; }
 
         public event PropertyChangedEventHandler PropertyChanged;

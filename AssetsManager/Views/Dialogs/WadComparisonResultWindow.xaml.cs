@@ -383,7 +383,7 @@ namespace AssetsManager.Views.Dialogs
                 string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.FullPath);
+                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.PhysicalPath);
                 _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
                 _assignedFolderName = folderInfo.FolderName;
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);

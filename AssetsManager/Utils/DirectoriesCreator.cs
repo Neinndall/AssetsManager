@@ -61,11 +61,11 @@ namespace AssetsManager.Utils
             return path;
         }
 
-        public (string FolderName, string FullPath) GetNewWadComparisonFolderInfo()
+        public (string FolderName, string PhysicalPath) GetNewWadComparisonFolderInfo()
         {
             string folderName = $"comparison_{DateTime.Now:ddMMyyyy_HHmmss}";
-            string fullPath = Path.Combine(WadComparisonSavePath, folderName);
-            return (folderName, fullPath);
+            string physicalPath = Path.Combine(WadComparisonSavePath, folderName);
+            return (folderName, physicalPath);
         }
 
         public string GetNewJsonHistoryPath(string fileName)
@@ -90,11 +90,11 @@ namespace AssetsManager.Utils
         }
 
         // Action methods
-        public void PrepareComparisonDirectory(string fullPath)
+        public void PrepareComparisonDirectory(string physicalPath)
         {
-            CreateDirectory(fullPath);
-            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "old"));
-            CreateDirectory(Path.Combine(fullPath, "wad_chunks", "new"));
+            CreateDirectory(physicalPath);
+            CreateDirectory(Path.Combine(physicalPath, "wad_chunks", "old"));
+            CreateDirectory(Path.Combine(physicalPath, "wad_chunks", "new"));
         }
         
         public void CreateHashesDirectories()

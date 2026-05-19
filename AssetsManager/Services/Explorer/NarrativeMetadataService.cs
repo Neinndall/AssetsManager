@@ -33,9 +33,9 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<NarrativeMetadata> GetMetadataAsync(FileSystemNodeModel node)
         {
-            if (node == null || string.IsNullOrEmpty(node.FullPath)) return null;
+            if (node == null || string.IsNullOrEmpty(node.VirtualPath)) return null;
 
-            string path = PathUtils.NormalizePath(node.FullPath);
+            string path = PathUtils.NormalizePath(node.VirtualPath);
             
             // 1. Check for Summoner Icons
             if (path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
@@ -93,7 +93,7 @@ namespace AssetsManager.Services.Explorer
                 var emotesList = await LoadEmotesMetadataAsync(node);
                 if (emotesList == null) return null;
 
-                string normalizedNodePath = PathUtils.NormalizePath(node.FullPath);
+                string normalizedNodePath = PathUtils.NormalizePath(node.VirtualPath);
                 
                 // Strategy 1: Match by ID in filename (e.g. "123_EM.png")
                 string fileName = Path.GetFileNameWithoutExtension(node.Name);

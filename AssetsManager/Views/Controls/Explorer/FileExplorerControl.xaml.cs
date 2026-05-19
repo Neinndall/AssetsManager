@@ -823,9 +823,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Filter out any "Loading..." nodes that might be in the path
                     // And join by '/'
                     var validNodes = path.Where(n => n.Name != "Loading...");
-                    string fullPath = string.Join("/", validNodes.Select(n => n.Name));
-                    
-                    FavoritesManager.AddFavorite(fullPath);
+                    string virtualPath = string.Join("/", validNodes.Select(n => n.Name));
+                    FavoritesManager.AddFavorite(virtualPath);
                 }
             }
         }
@@ -934,7 +933,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     if (node.Type == NodeType.VirtualFile)
                         data = await WadContentProvider.GetVirtualFileBytesAsync(node);
                     else if (node.Type == NodeType.RealFile)
-                        data = await File.ReadAllBytesAsync(node.FullPath);
+                        data = await File.ReadAllBytesAsync(node.VirtualPath);
 
                     if (data == null) continue;
 
@@ -965,7 +964,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         ImageMergerService.AddItem(new ImageMergerItem
                         {
                             Name = node.Name,
-                            Path = node.FullPath ?? node.Name,
+                            Path = node.VirtualPath ?? node.Name,
                             Image = bitmap
                         });
                         addedCount++;
@@ -994,7 +993,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Deselect immediately so it can be clicked again
                 FavoritesListView.SelectedItem = null;
 
-                var node = await WadSearchBoxService.NavigateToPathAsync(item.FullPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
 
                 if (node != null)
                 {
@@ -1002,7 +1001,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    LogService.LogWarning($"Favorite node not found: {item.FullPath}");
+                    LogService.LogWarning($"Favorite node not found: {item.VirtualPath}");
                     CustomMessageBoxService.ShowInfo("Not Found", $"Could not find '{item.DisplayName}' in the current tree.", Window.GetWindow(this));
                 }
             }
