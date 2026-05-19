@@ -42,13 +42,13 @@ namespace AssetsManager.Views.Models.Explorer
             set => _fullPath = value;
         }
 
-        public string LogicalFullPath
+        public string CopyFullPath
         {
             get
             {
                 if (Parent != null)
                 {
-                    var parentPath = Parent.LogicalFullPath;
+                    var parentPath = Parent.CopyFullPath;
                     return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
                 }
                 return Name;
