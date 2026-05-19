@@ -18,6 +18,7 @@ namespace AssetsManager.Utils
         // --- Virtual Folder Paths (for Explorer/WAD resolution) ---
         public const string ProfileIconsVirtualPath = "v1/profile-icons/";
         public const string EmotesVirtualPath = "assets/loadouts/summoneremotes/";
+        public const string WardsVirtualPath = "content/src/leagueclient/wardskinimages/";
 
         // --- Catalog Metadata Structure ---
         public class CatalogInfo

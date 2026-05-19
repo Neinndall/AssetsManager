@@ -26,6 +26,20 @@ namespace AssetsManager.Views.Models.Explorer
         public string InventoryIcon { get; set; }
     }
 
+    public class WardJsonEntry
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public List<WardRegionalDescription> RegionalDescriptions { get; set; }
+    }
+
+    public class WardRegionalDescription
+    {
+        public string Region { get; set; }
+        public string Description { get; set; }
+    }
+
     public class DescriptionEntry
     {
         public string Region { get; set; }
