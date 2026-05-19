@@ -183,6 +183,17 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.Toolbar.ParentExplorer = this;
             _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
 
+            // Bind Favorites - ALWAYS do this
+            if (FavoritesManager != null)
+            {
+                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
+                
+                // Track changes to update visibility (Clean up first to avoid duplicates)
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
+                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
+            }
+
             if (_isExternalInitRequested) return;
 
             // Smart discovery based on preference
@@ -218,16 +229,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // Now, perform the async hash loading.
             await HashResolverService.LoadAllHashesAsync();
-
-            // Bind Favorites
-            if (FavoritesManager != null)
-            {
-                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
-                
-                // Track changes to update visibility
-                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
-                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
-            }
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
