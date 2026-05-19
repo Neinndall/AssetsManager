@@ -188,8 +188,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 FavoritesListView.ItemsSource = FavoritesManager.Favorites;
                 
-                // Track changes to update visibility (Clean up first to avoid duplicates)
-                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+                // Track changes to update visibility
                 FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
                 _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
