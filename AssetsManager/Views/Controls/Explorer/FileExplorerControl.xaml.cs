@@ -809,7 +809,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel node)
             {
-                Clipboard.SetText(node.FullPath);
+                Clipboard.SetText(node.LogicalFullPath);
             }
         }
 

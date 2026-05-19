@@ -42,6 +42,19 @@ namespace AssetsManager.Views.Models.Explorer
             set => _fullPath = value;
         }
 
+        public string LogicalFullPath
+        {
+            get
+            {
+                if (Parent != null)
+                {
+                    var parentPath = Parent.LogicalFullPath;
+                    return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                }
+                return Name;
+            }
+        }
+
         public DiffStatus Status { get; set; } = DiffStatus.Unchanged;
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
