@@ -9,7 +9,7 @@ using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Models.Controls
 {
-    public class LogViewModel : INotifyPropertyChanged
+    public class LogViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly NotificationService _notificationService;
         private int _notificationCount;
@@ -94,6 +94,15 @@ namespace AssetsManager.Views.Models.Controls
             {
                 OnPropertyChanged(nameof(LogVisibility));
             }
+        }
+
+        public void Dispose()
+        {
+            if (_notificationService != null)
+            {
+                _notificationService.CountsChanged -= UpdateCounts;
+            }
+            PropertyChanged = null;
         }
     }
 }

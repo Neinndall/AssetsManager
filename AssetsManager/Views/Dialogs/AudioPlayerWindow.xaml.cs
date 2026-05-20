@@ -50,8 +50,6 @@ namespace AssetsManager.Views.Dialogs
             
             // Initial load
             LoadPacks();
-            
-            this.Unloaded += (s, e) => _settings.ConfigurationSaved -= OnConfigurationSaved;
         }
 
         protected override void OnClosing(CancelEventArgs e)
@@ -62,6 +60,9 @@ namespace AssetsManager.Views.Dialogs
             _timer.Stop();
             _mediaPlayer.Stop();
             _mediaPlayer.Close();
+
+            // Unsubscribe from configuration changes to prevent memory leaks
+            _settings.ConfigurationSaved -= OnConfigurationSaved;
         }
 
         private void OnConfigurationSaved(object sender, EventArgs e)

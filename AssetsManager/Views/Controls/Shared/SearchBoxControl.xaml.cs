@@ -30,9 +30,18 @@ namespace AssetsManager.Views.Controls.Shared
 
             searchTimer = new DispatcherTimer();
             searchTimer.Interval = TimeSpan.FromMilliseconds(300);
-            searchTimer.Tick += SearchTimer_Tick;
 
+            Loaded += SearchBoxControl_Loaded;
             Unloaded += SearchBoxControl_Unloaded;
+        }
+
+        private void SearchBoxControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (searchTimer != null)
+            {
+                searchTimer.Tick -= SearchTimer_Tick;
+                searchTimer.Tick += SearchTimer_Tick;
+            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)

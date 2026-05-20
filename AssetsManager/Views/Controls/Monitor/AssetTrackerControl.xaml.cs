@@ -46,10 +46,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (AppSettings != null)
             {
+                // Defensive pattern to avoid duplicates
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
+            // Sync with MonitorService events using defensive pattern
+            MonitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
             MonitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            
+            MonitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
             MonitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
 
             LoadTrackerData();
@@ -57,7 +63,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void OnConfigurationSaved(object sender, EventArgs e)
         {
-            Dispatcher.InvokeAsync(() => LoadTrackerData());
+            _ = Dispatcher.InvokeAsync(() => LoadTrackerData());
         }
 
         private void LoadTrackerData()
@@ -67,7 +73,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             CategoryComboBox.ItemsSource = ViewModel.Categories;
 
-            if (ViewModel.Categories.Any())
+            if (ViewModel.Categories.Any() && CategoryComboBox.SelectedItem == null)
             {
                 CategoryComboBox.SelectedItem = ViewModel.Categories.First();
             }
@@ -87,6 +93,7 @@ namespace AssetsManager.Views.Controls.Monitor
             // Subscribe to new category property changes
             if (ViewModel.SelectedCategory != null)
             {
+                ViewModel.SelectedCategory.PropertyChanged -= OnCategoryPropertyChanged;
                 ViewModel.SelectedCategory.PropertyChanged += OnCategoryPropertyChanged;
             }
 
@@ -97,7 +104,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (e.PropertyName == nameof(AssetCategory.Start))
             {
-                RefreshAssetList();
+                _ = Dispatcher.InvokeAsync(() => RefreshAssetList());
             }
         }
 
@@ -237,13 +244,19 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
+
+            // Cleanup current category subscription to prevent memory leaks
+            if (ViewModel?.SelectedCategory != null)
+            {
+                ViewModel.SelectedCategory.PropertyChanged -= OnCategoryPropertyChanged;
+            }
         }
 
         private void OnCategoryCheckStarted(AssetCategory category)
         {
             if (category == ViewModel.SelectedCategory)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                _ = Dispatcher.InvokeAsync(() =>
                 {
                     foreach (var asset in ViewModel.Assets.Where(a => a.Status == "Pending"))
                     {
@@ -257,7 +270,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (category == ViewModel.SelectedCategory)
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                _ = Dispatcher.InvokeAsync(() =>
                 {
                     RefreshAssetList();
                 });

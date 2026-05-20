@@ -45,100 +45,107 @@ public class RmanService
     private RmanManifest ParseBody(byte[] body, ulong manifestId)
     {
         _data = body;
-        int rootOffset = BitConverter.ToInt32(_data, 0);
-        var root = GetObject(rootOffset);
-        var manifest = new RmanManifest { ManifestId = manifestId };
-
-        // 1. Bundles & Chunks
-        var bundleOffsets = GetVector(GetFieldOffset(root, 0));
-        foreach (var bundleOffset in bundleOffsets)
+        try
         {
-            var bundleObj = GetObject(bundleOffset);
-            var bundle = new RmanBundle
-            {
-                BundleId = GetUInt64(GetFieldOffset(bundleObj, 0))
-            };
+            int rootOffset = BitConverter.ToInt32(_data, 0);
+            var root = GetObject(rootOffset);
+            var manifest = new RmanManifest { ManifestId = manifestId };
 
-            var chunkOffsets = GetVector(GetFieldOffset(bundleObj, 1));
-            uint currentBundleOffset = 0;
-            foreach (var chunkOffset in chunkOffsets)
+            // 1. Bundles & Chunks
+            var bundleOffsets = GetVector(GetFieldOffset(root, 0));
+            foreach (var bundleOffset in bundleOffsets)
             {
-                var chunkObj = GetObject(chunkOffset);
-                var chunk = new RmanChunk
+                var bundleObj = GetObject(bundleOffset);
+                var bundle = new RmanBundle
                 {
-                    ChunkId = GetUInt64(GetFieldOffset(chunkObj, 0)),
-                    CompressedSize = GetUInt32(GetFieldOffset(chunkObj, 1)),
-                    UncompressedSize = GetUInt32(GetFieldOffset(chunkObj, 2)),
-                    BundleId = bundle.BundleId,
-                    BundleOffset = currentBundleOffset
+                    BundleId = GetUInt64(GetFieldOffset(bundleObj, 0))
                 };
-                bundle.Chunks.Add(chunk);
-                currentBundleOffset += chunk.CompressedSize;
-            }
-            manifest.Bundles.Add(bundle);
-        }
 
-        // 2. Languages
-        var langOffsets = GetVector(GetFieldOffset(root, 1));
-        foreach (var langOffset in langOffsets)
-        {
-            var langObj = GetObject(langOffset);
-            manifest.Languages.Add(new RmanLanguage
-            {
-                LanguageId = GetByte(GetFieldOffset(langObj, 0)),
-                Name = GetString(GetFieldOffset(langObj, 1))
-            });
-        }
-
-        // 3. Directories
-        var dirOffsets = GetVector(GetFieldOffset(root, 3));
-        foreach (var dirOffset in dirOffsets)
-        {
-            var dirObj = GetObject(dirOffset);
-            manifest.Directories.Add(new RmanDirectory
-            {
-                DirectoryId = GetUInt64(GetFieldOffset(dirObj, 0)),
-                ParentId = GetUInt64(GetFieldOffset(dirObj, 1)),
-                Name = GetString(GetFieldOffset(dirObj, 2))
-            });
-        }
-
-        // 4. Files
-        var fileOffsets = GetVector(GetFieldOffset(root, 2));
-        var paramOffsets = GetVector(GetFieldOffset(root, 5));
-        var hashTypes = paramOffsets.Select(p => (HashType)GetByte(GetFieldOffset(GetObject(p), 1))).ToList();
-
-        foreach (var fileOffset in fileOffsets)
-        {
-            var fileObj = GetObject(fileOffset);
-            var file = new RmanFile
-            {
-                FileId = GetUInt64(GetFieldOffset(fileObj, 0)),
-                DirectoryId = GetUInt64(GetFieldOffset(fileObj, 1)),
-                FileSize = GetUInt64(GetFieldOffset(fileObj, 2)),
-                Name = GetString(GetFieldOffset(fileObj, 3)),
-            };
-
-            ulong langMask = GetUInt64(GetFieldOffset(fileObj, 4));
-            if (langMask > 0)
-            {
-                for (int i = 0; i < 64; i++)
+                var chunkOffsets = GetVector(GetFieldOffset(bundleObj, 1));
+                uint currentBundleOffset = 0;
+                foreach (var chunkOffset in chunkOffsets)
                 {
-                    if ((langMask & (1UL << i)) != 0) file.LanguageIds.Add((byte)(i + 1));
+                    var chunkObj = GetObject(chunkOffset);
+                    var chunk = new RmanChunk
+                    {
+                        ChunkId = GetUInt64(GetFieldOffset(chunkObj, 0)),
+                        CompressedSize = GetUInt32(GetFieldOffset(chunkObj, 1)),
+                        UncompressedSize = GetUInt32(GetFieldOffset(chunkObj, 2)),
+                        BundleId = bundle.BundleId,
+                        BundleOffset = currentBundleOffset
+                    };
+                    bundle.Chunks.Add(chunk);
+                    currentBundleOffset += chunk.CompressedSize;
                 }
+                manifest.Bundles.Add(bundle);
             }
 
-            byte paramIndex = GetByte(GetFieldOffset(fileObj, 11));
-            file.HashType = paramIndex < hashTypes.Count ? hashTypes[paramIndex] : HashType.Sha256;
+            // 2. Languages
+            var langOffsets = GetVector(GetFieldOffset(root, 1));
+            foreach (var langOffset in langOffsets)
+            {
+                var langObj = GetObject(langOffset);
+                manifest.Languages.Add(new RmanLanguage
+                {
+                    LanguageId = GetByte(GetFieldOffset(langObj, 0)),
+                    Name = GetString(GetFieldOffset(langObj, 1))
+                });
+            }
 
-            var chunkIdVectorOffset = GetFieldOffset(fileObj, 7);
-            if (chunkIdVectorOffset != 0) file.ChunkIds.AddRange(GetVectorULong(chunkIdVectorOffset));
+            // 3. Directories
+            var dirOffsets = GetVector(GetFieldOffset(root, 3));
+            foreach (var dirOffset in dirOffsets)
+            {
+                var dirObj = GetObject(dirOffset);
+                manifest.Directories.Add(new RmanDirectory
+                {
+                    DirectoryId = GetUInt64(GetFieldOffset(dirObj, 0)),
+                    ParentId = GetUInt64(GetFieldOffset(dirObj, 1)),
+                    Name = GetString(GetFieldOffset(dirObj, 2))
+                });
+            }
 
-            manifest.Files.Add(file);
+            // 4. Files
+            var fileOffsets = GetVector(GetFieldOffset(root, 2));
+            var paramOffsets = GetVector(GetFieldOffset(root, 5));
+            var hashTypes = paramOffsets.Select(p => (HashType)GetByte(GetFieldOffset(GetObject(p), 1))).ToList();
+
+            foreach (var fileOffset in fileOffsets)
+            {
+                var fileObj = GetObject(fileOffset);
+                var file = new RmanFile
+                {
+                    FileId = GetUInt64(GetFieldOffset(fileObj, 0)),
+                    DirectoryId = GetUInt64(GetFieldOffset(fileObj, 1)),
+                    FileSize = GetUInt64(GetFieldOffset(fileObj, 2)),
+                    Name = GetString(GetFieldOffset(fileObj, 3)),
+                };
+
+                ulong langMask = GetUInt64(GetFieldOffset(fileObj, 4));
+                if (langMask > 0)
+                {
+                    for (int i = 0; i < 64; i++)
+                    {
+                        if ((langMask & (1UL << i)) != 0) file.LanguageIds.Add((byte)(i + 1));
+                    }
+                }
+
+                byte paramIndex = GetByte(GetFieldOffset(fileObj, 11));
+                file.HashType = paramIndex < hashTypes.Count ? hashTypes[paramIndex] : HashType.Sha256;
+
+                var chunkIdVectorOffset = GetFieldOffset(fileObj, 7);
+                if (chunkIdVectorOffset != 0) file.ChunkIds.AddRange(GetVectorULong(chunkIdVectorOffset));
+
+                manifest.Files.Add(file);
+            }
+
+            ResolveFullPaths(manifest);
+            return manifest;
         }
-
-        ResolveFullPaths(manifest);
-        return manifest;
+        finally
+        {
+            _data = Array.Empty<byte>();
+        }
     }
 
     private void ResolveFullPaths(RmanManifest manifest)

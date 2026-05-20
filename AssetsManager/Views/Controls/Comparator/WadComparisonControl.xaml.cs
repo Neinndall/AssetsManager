@@ -37,6 +37,8 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (AppSettings != null)
             {
+                // Defensive pattern to avoid duplicate subscriptions on reload
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
             await LoadBackupsAsync();
@@ -48,6 +50,12 @@ namespace AssetsManager.Views.Controls.Comparator
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            // Clear heavy data from memory when not in use
+            if (ViewModel != null)
+            {
+                ViewModel.AvailableBackups.Clear();
             }
         }
 

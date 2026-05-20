@@ -16,7 +16,7 @@ using Material.Icons;
 
 namespace AssetsManager.Views.Models.Monitor
 {
-    public class MonitorDashboardModel : INotifyPropertyChanged
+    public class MonitorDashboardModel : INotifyPropertyChanged, IDisposable
     {
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
@@ -24,6 +24,7 @@ namespace AssetsManager.Views.Models.Monitor
         private readonly VersionService _versionService;
         private readonly Status _statusService;
         private readonly UpdateCheckService _updateCheckService;
+        private bool _isDisposed;
 
         // --- PBE Status ---
         private string _pbeStatusText = "Unknown";
@@ -266,23 +267,8 @@ namespace AssetsManager.Views.Models.Monitor
                 AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
 
-            // Subscribe to UpdateCheckService for future updates
-            _updateCheckService.UpdatesFound += (message, latestVersion) =>
-            {
-                // Verify if it's an app update notification
-                if (!string.IsNullOrEmpty(latestVersion))
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        AppVersionText = $"v{latestVersion} available!";
-                        AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
-                        AppVersionIconKind = MaterialIconKind.CloudDownload;
-                        UpdateAppVersionFooter();
-                        UpdateGlobalStatus();
-                        UpdateSystemHealthFooter();
-                    });
-                }
-            };
+            // Subscribe to services using named methods to avoid leaks
+            _updateCheckService.UpdatesFound += OnUpdatesFound;
 
             // Initial PBE Load
             RefreshPbeData();
@@ -310,57 +296,11 @@ namespace AssetsManager.Views.Models.Monitor
                 item.PropertyChanged += MonitoredItem_PropertyChanged;
             }
 
-            _monitorService.CategoryCheckCompleted += (category) =>
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    // Race condition fix: When this event fires, 'category.Status' might still be 'Checking'.
-                    // We check if ANY OTHER category is checking. If not, we are effectively Idle.
-                    bool anyOtherChecking = _monitorService.AssetCategories
-                        .Where(c => c != category)
-                        .Any(c => c.Status == CategoryStatus.Checking);
-
-                    if (!anyOtherChecking)
-                    {
-                        AssetTrackerStatus = "Service Idle - Waiting...";
-                    }
-
-                    RefreshAssetTrackerData();
-                });
-            };
-            _monitorService.CategoryCheckStarted += (category) =>
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    AssetTrackerStatus = $"Category: {category.Name} - Checking...";
-                });
-            };
-
-            _pbeStatusService.StatusChecked += () =>
-            {
-                Application.Current.Dispatcher.Invoke(() => {
-                    RefreshPbeData();
-                    PbeLastCheck = DateTime.Now.ToString("HH:mm");
-                });
-            };
-
-            _statusService.HashSyncStarted += () =>
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    HashesStatus = "Updating...";
-                    UpdateSystemHealthFooter();
-                });
-            };
-
-            _statusService.HashSyncCompleted += () =>
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    HashesStatus = "Synced";
-                    UpdateSystemHealthFooter();
-                });
-            };
+            _monitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
+            _monitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            _pbeStatusService.StatusChecked += OnPbeStatusChecked;
+            _statusService.HashSyncStarted += OnHashSyncStarted;
+            _statusService.HashSyncCompleted += OnHashSyncCompleted;
 
             // Initial Indicator Color
             UpdateHashesIndicatorColor();
@@ -579,6 +519,108 @@ namespace AssetsManager.Views.Models.Monitor
         protected void OnPropertyChanged([CallerMemberName] string name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        private void OnUpdatesFound(string message, string latestVersion)
+        {
+            if (!string.IsNullOrEmpty(latestVersion))
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    AppVersionText = $"v{latestVersion} available!";
+                    AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
+                    AppVersionIconKind = MaterialIconKind.CloudDownload;
+                    UpdateAppVersionFooter();
+                    UpdateGlobalStatus();
+                    UpdateSystemHealthFooter();
+                });
+            }
+        }
+
+        private void OnCategoryCheckCompleted(AssetCategory category)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                bool anyOtherChecking = _monitorService.AssetCategories
+                    .Where(c => c != category)
+                    .Any(c => c.Status == CategoryStatus.Checking);
+
+                if (!anyOtherChecking)
+                {
+                    AssetTrackerStatus = "Service Idle - Waiting...";
+                }
+
+                RefreshAssetTrackerData();
+            });
+        }
+
+        private void OnCategoryCheckStarted(AssetCategory category)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                AssetTrackerStatus = $"Category: {category.Name} - Checking...";
+            });
+        }
+
+        private void OnPbeStatusChecked()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                RefreshPbeData();
+                PbeLastCheck = DateTime.Now.ToString("HH:mm");
+            });
+        }
+
+        private void OnHashSyncStarted()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                HashesStatus = "Updating...";
+                UpdateSystemHealthFooter();
+            });
+        }
+
+        private void OnHashSyncCompleted()
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                HashesStatus = "Synced";
+                UpdateSystemHealthFooter();
+            });
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed) return;
+
+            if (_updateCheckService != null)
+            {
+                _updateCheckService.UpdatesFound -= OnUpdatesFound;
+            }
+
+            if (_monitorService != null)
+            {
+                _monitorService.MonitoredAssets.CollectionChanged -= MonitoredItems_CollectionChanged;
+                foreach (var item in _monitorService.MonitoredAssets)
+                {
+                    item.PropertyChanged -= MonitoredItem_PropertyChanged;
+                }
+                _monitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
+                _monitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
+            }
+
+            if (_pbeStatusService != null)
+            {
+                _pbeStatusService.StatusChecked -= OnPbeStatusChecked;
+            }
+
+            if (_statusService != null)
+            {
+                _statusService.HashSyncStarted -= OnHashSyncStarted;
+                _statusService.HashSyncCompleted -= OnHashSyncCompleted;
+            }
+
+            _isDisposed = true;
         }
     }
 }

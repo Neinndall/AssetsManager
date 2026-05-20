@@ -54,6 +54,7 @@ namespace AssetsManager.Services.Monitor
                     };
 
                     _appSettings.DiffHistory.Insert(0, entry);
+                    // Necesita la otra llamada para evitar reload tree?
                     _appSettings.Save();
                     _logService.LogSuccess("Comparison history saved successfully.");
                 }
@@ -109,6 +110,7 @@ namespace AssetsManager.Services.Monitor
 
                     // 2. Remove from internal list
                     _appSettings.DiffHistory.Remove(entry);
+                    // Necesita la otra llamada para evitar reload tree?
                     _appSettings.Save();
 
                     _logService.LogSuccess("Comparison results and related files deleted successfully.");

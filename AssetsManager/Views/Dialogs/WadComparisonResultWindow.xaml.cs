@@ -185,9 +185,15 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
-            if (_viewModel?.TreeModel != null)
+            Loaded -= WadComparisonResultWindow_Loaded;
+            Closed -= OnWindowClosed;
+            if (_viewModel != null)
             {
-                _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                if (_viewModel.TreeModel != null)
+                {
+                    _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
+                }
             }
             _serializableDiffs?.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
@@ -196,6 +202,7 @@ namespace AssetsManager.Views.Dialogs
 
         private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            Loaded -= WadComparisonResultWindow_Loaded;
             _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
             
             var wadGroups = await Task.Run(() =>

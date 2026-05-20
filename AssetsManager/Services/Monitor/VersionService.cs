@@ -233,10 +233,13 @@ namespace AssetsManager.Services.Monitor
                 // Focus on code-metadata.json as requested
                 string metadataName = "code-metadata.json";
                 
-                // Check standard locations ONLY in the provided root
+                // 1. Check standard location (provided root is the client root containing Game subdirectory)
                 string metadataPath = Path.Combine(rootDirectory, "Game", metadataName);
                 if (File.Exists(metadataPath)) return await ExtractVersionFromFile(metadataPath);
 
+                // 2. Check direct location (provided root is already the Game folder itself)
+                string directMetadataPath = Path.Combine(rootDirectory, metadataName);
+                if (File.Exists(directMetadataPath)) return await ExtractVersionFromFile(directMetadataPath);
             }
             catch (Exception ex)
             {

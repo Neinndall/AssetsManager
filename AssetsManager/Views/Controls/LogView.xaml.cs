@@ -39,6 +39,14 @@ namespace AssetsManager.Views.Controls
             _viewModel = new LogViewModel();
             DataContext = _viewModel;
             this.SizeChanged += LogView_SizeChanged;
+            this.Unloaded += LogView_Unloaded;
+        }
+
+        private void LogView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            this.SizeChanged -= LogView_SizeChanged;
+            this.Unloaded -= LogView_Unloaded;
+            _viewModel?.Dispose();
         }
 
         private void LogView_SizeChanged(object sender, SizeChangedEventArgs e)

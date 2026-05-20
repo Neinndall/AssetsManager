@@ -58,7 +58,6 @@ namespace AssetsManager.Views
         private readonly WadPackagingService _wadPackagingService;
 
         private string _latestAppVersionAvailable;
-        private NotificationHubWindow _notificationHubWindow;
         
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
@@ -422,13 +421,9 @@ namespace AssetsManager.Views
 
         public async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            if (_notificationHubWindow == null)
-            {
-                _notificationHubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
-                _notificationHubWindow.Owner = this;
-            }
-
-            _notificationHubWindow.ShowHub(this);
+            var hubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
+            hubWindow.Owner = this;
+            hubWindow.ShowDialog();
 
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {

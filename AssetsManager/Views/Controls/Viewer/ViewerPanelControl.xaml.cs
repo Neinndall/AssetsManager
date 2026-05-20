@@ -190,8 +190,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public void Cleanup()
         {
             ResetScene();
-            Viewport = null;
-            ChromaGallery = null;
         }
 
         public void ResetScene()

@@ -29,12 +29,16 @@ Improvements
     * Renamed technical identifiers to "VirtualPath" and "CopyFullPath" to clearly distinguish between internal identity and UI navigation.
     * Integrated Path Sanitization: automated the removal of technical suffixes (like WAD file counts) during path copying to provide clean, usable strings.
     * Optimized Memory Footprint: implemented an aggressive "Thin Path" strategy that releases path strings from RAM for all virtual nodes, significantly reducing memory usage during large WAD explorations.
+  - Explorer / Advanced Texture Support
+    * Integrated custom LeagueToolkit patch: added full support for modern BC5 and BC7 texture formats (0x0D/0x0E), enabling high-fidelity preview and extraction of the latest game assets.
 
 Bug Fixes
   - A bug has been fixed that prevented favorites from appearing in the UI when accessing the Explorer from the home screen (live or pbe).
   - Fixed a critical authentication issue where the Sales Catalog and Mythic Shop failed to load due to inconsistent token formats (Plain Text vs. JSON) between LCU endpoints.
   - Resolved an inconsistency in the Asset Watcher where the surveillance message remained static regardless of the actual monitoring state.
   - Corrected the visual hierarchy of the PBE footer during maintenance periods to prevent information overlap and clutter.
+  - Fixed update version label in asset watcher information.
+  - Fixed a version resolution bug in the Comparator where manual Target Version inputs caused the corresponding old backup base version to display as "Unknown" due to path climbing inconsistencies.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

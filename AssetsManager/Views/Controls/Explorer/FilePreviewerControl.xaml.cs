@@ -32,7 +32,6 @@ namespace AssetsManager.Views.Controls.Explorer
         public FileExplorerControl FileExplorer { get; set; } // Peer Injection
 
         public FilePreviewerModel ViewModel { get; set; }
-        private bool _isLoaded = false;
 
         private FileSystemNodeModel _currentNode;
         private FileSystemNodeModel _currentFolderNode;
@@ -44,10 +43,6 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             InitializeComponent();
             ViewModel = new FilePreviewerModel();
-            
-            // Subscriptions
-            ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged += PinnedFiles_CollectionChanged;
-            ViewModel.PinnedFilesManager.PropertyChanged += PinnedFilesManager_PropertyChanged;
             
             this.DataContext = ViewModel;
             
@@ -206,8 +201,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            if (_isLoaded) return;
-
             try
             {
                 ExplorerPreviewService.Initialize(
@@ -217,13 +210,21 @@ namespace AssetsManager.Views.Controls.Explorer
                     ViewModel
                 );
 
+                // Setup subscriptions - Self-healing pattern to avoid duplicates
+                if (ViewModel.PinnedFilesManager != null)
+                {
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged += PinnedFiles_CollectionChanged;
+                    
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PropertyChanged += PinnedFilesManager_PropertyChanged;
+                }
+
                 // Setup sub-controls peer connection
                 Breadcrumbs.ParentPreviewer = this;
                 FileGridControl.ParentPreviewer = this;
                 
                 UpdateScrollButtonsVisibility();
-
-                _isLoaded = true;
             }
             catch (Exception ex)
             {
@@ -241,8 +242,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 await ExplorerPreviewService.ResetPreviewAsync();
                 
-                ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
-                ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                if (ViewModel.PinnedFilesManager != null)
+                {
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                }
 
                 // Clear sub-controls peer connection
                 if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
@@ -250,7 +254,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, "Error cleaning WebView2 on unload");
+                LogService.LogError(ex, "Error cleaning FilePreviewerControl on unload");
             }
         }
 

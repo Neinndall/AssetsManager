@@ -40,7 +40,10 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
+                // Defensive pattern to avoid duplicate subscriptions
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
+
                 _viewModel.LoadHistory(AppSettings.DiffHistory);
             }
         }
@@ -51,11 +54,17 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
+
+            // Clear history from memory when not in use
+            if (ViewModel != null)
+            {
+                ViewModel.Paginator.SetFullList(null);
+            }
         }
 
         private void OnConfigurationSaved(object sender, EventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            _ = Dispatcher.InvokeAsync(() =>
             {
                 if (AppSettings != null)
                 {

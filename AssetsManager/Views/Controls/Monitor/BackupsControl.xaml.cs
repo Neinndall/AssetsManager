@@ -46,6 +46,8 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (AppSettings != null)
             {
+                // Defensive pattern to avoid duplicate subscriptions on reload
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
             try
@@ -63,6 +65,12 @@ namespace AssetsManager.Views.Controls.Monitor
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            // Clear heavy data from memory when not in use
+            if (ViewModel != null)
+            {
+                ViewModel.AllBackups.Clear();
             }
         }
 

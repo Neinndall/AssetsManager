@@ -267,6 +267,17 @@ namespace AssetsManager.Services.Explorer
         {
             _activePreviewer = newPreviewer;
 
+            // Dispose old WebView when switching previewers to avoid process/memory leaks
+            if (newPreviewer != Previewer.WebView && _webViewContainer != null)
+            {
+                var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                if (oldWebView != null)
+                {
+                    oldWebView.Dispose();
+                    _webViewContainer.Children.Remove(oldWebView);
+                }
+            }
+
             switch (newPreviewer)
             {
                 case Previewer.Image:
@@ -292,9 +303,6 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
-                        var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                        if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
-
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
                         _viewModel.IsWebVisible = false;

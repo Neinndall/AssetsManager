@@ -18,6 +18,7 @@ namespace AssetsManager.Views
             SetupNavigation();
             // Load initial view
             NavigateToView(_serviceProvider.GetRequiredService<AboutView>());
+            Closed += HelpWindow_Closed;
         }
 
         private void SetupNavigation()
@@ -42,6 +43,7 @@ namespace AssetsManager.Views
 
         private void HelpWindow_Closed(object sender, EventArgs e)
         {
+            Closed -= HelpWindow_Closed;
             NavAbout.Checked -= NavAbout_Checked;
             NavDocumentation.Checked -= NavDocumentation_Checked;
             NavChangelogs.Checked -= NavChangelogs_Checked;

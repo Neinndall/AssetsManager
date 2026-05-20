@@ -202,7 +202,6 @@ namespace AssetsManager.Services.Monitor
             {
                 if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory))
                 {
-                    _logService.Log($"[AssetWatcher] Requesting version update from PBE root: {_appSettings.LolPbeDirectory}");
                     currentVersion = await _versionService.GetGameVersionAsync(_appSettings.LolPbeDirectory) ?? currentVersion;
                 }
             }

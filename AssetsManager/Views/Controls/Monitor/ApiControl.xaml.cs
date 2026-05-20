@@ -45,14 +45,25 @@ namespace AssetsManager.Views.Controls.Monitor
             this.Loaded += ApiControl_Loaded;
             this.Unloaded += ApiControl_Unloaded;
 
-            // Initialize the timer
+            // Initialize the timer (without subscribing here to maintain symmetry)
             _lcuConnectionTimer = new DispatcherTimer();
             _lcuConnectionTimer.Interval = TimeSpan.FromSeconds(2);
-            _lcuConnectionTimer.Tick += LcuConnectionTimer_Tick;
         }
 
         private async void ApiControl_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_lcuConnectionTimer != null)
+            {
+                _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
+                _lcuConnectionTimer.Tick += LcuConnectionTimer_Tick;
+            }
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
             UpdateAuthenticationStatus();
 
             bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false);
@@ -66,6 +77,18 @@ namespace AssetsManager.Views.Controls.Monitor
             await LoadSalesCacheAsync();
             await LoadMythicShopCacheAsync();
             await LoadPassRewardsCacheAsync();
+        }
+
+        private async void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                UpdateAuthenticationStatus();
+                // Refresh caches if the paths might have changed
+                await LoadSalesCacheAsync();
+                await LoadMythicShopCacheAsync();
+                await LoadPassRewardsCacheAsync();
+            });
         }
 
         private async Task LoadSalesCacheAsync()
@@ -452,7 +475,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 // Add to observable collection in the correct order using ReplaceRange
                 var finalCategories = categoryOrder
-                    .Where(catName => categories.ContainsKey(catName) && categories[catName].Items.Any())
+                    .Where(categories.ContainsKey)
+                    .Where(catName => categories[catName].Items.Any())
                     .Select(catName => categories[catName])
                     .ToList();
 
@@ -519,9 +543,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void ApiControl_Unloaded(object sender, RoutedEventArgs e)
         {
-            _lcuConnectionTimer.Stop();
-            // Unsubscribe to prevent potential memory leaks if the control is frequently loaded/unloaded
-            _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
+            if (_lcuConnectionTimer != null)
+            {
+                _lcuConnectionTimer.Stop();
+                _lcuConnectionTimer.Tick -= LcuConnectionTimer_Tick;
+            }
+
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
         }
 
         private void TabSales_Click(object sender, RoutedEventArgs e)
