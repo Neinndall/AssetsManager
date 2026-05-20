@@ -733,6 +733,8 @@ namespace AssetsManager.Services.Audio
             var strategy = GetBinFileSearchStrategy(clickedNode);
             if (strategy == null) return (null, baseName, BinType.Unknown);
 
+            if (rootNodes == null) return (null, baseName, strategy.Type);
+
             if (currentRootPath == null)
             {
                 var binNode = FindNodeByPath(rootNodes, strategy.BinPath);

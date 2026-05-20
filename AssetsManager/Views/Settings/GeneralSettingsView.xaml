@@ -180,7 +180,7 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Audio encoding target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Target conversion format for Wwise .wem containers" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Preferred audio format for SMART method in the Explorer" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding AudioFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
