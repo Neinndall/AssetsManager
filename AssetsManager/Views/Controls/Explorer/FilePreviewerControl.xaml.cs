@@ -335,6 +335,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (folderToLoad != previousFolder)
                 {
                     _currentFolderNode = folderToLoad;
+                    FileGridControl.ItemsSource = null; // Clear immediately to prevent visual ghosting/flashing of previous folder items
                     RefreshGridItems(_currentFolderNode);
                 }
 
@@ -346,6 +347,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 _currentFolderNode = null;
+                FileGridControl.ItemsSource = null; // Clear immediately when resetting or when folder context is null
             }
             
             if (!isContainer && node != null)
