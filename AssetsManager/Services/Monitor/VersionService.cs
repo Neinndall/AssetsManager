@@ -230,34 +230,46 @@ namespace AssetsManager.Services.Monitor
 
             try
             {
-                string metadataPath = Path.Combine(rootDirectory, "Game", "content-metadata.json");
-                if (!File.Exists(metadataPath))
-                {
-                    metadataPath = Path.Combine(rootDirectory, "content-metadata.json");
-                }
+                // Focus on code-metadata.json as requested
+                string metadataName = "code-metadata.json";
+                
+                // Check standard locations ONLY in the provided root
+                string metadataPath = Path.Combine(rootDirectory, "Game", metadataName);
+                if (File.Exists(metadataPath)) return await ExtractVersionFromFile(metadataPath);
 
-                if (File.Exists(metadataPath))
-                {
-                    string json = await File.ReadAllTextAsync(metadataPath);
-                    using var document = JsonDocument.Parse(json);
-                    if (document.RootElement.TryGetProperty("version", out var versionElement))
-                    {
-                        string fullVersion = versionElement.GetString();
-                        if (string.IsNullOrEmpty(fullVersion)) return null;
-
-                        int plusIndex = fullVersion.IndexOf('+');
-                        if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
-
-                        int spaceIndex = fullVersion.IndexOf(' ');
-                        if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
-
-                        return fullVersion;
-                    }
-                }
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Error reading version from {rootDirectory}");
+            }
+            return null;
+        }
+
+        private async Task<string> ExtractVersionFromFile(string filePath)
+        {
+            try
+            {
+                string json = await File.ReadAllTextAsync(filePath);
+                using var document = JsonDocument.Parse(json);
+                if (document.RootElement.TryGetProperty("version", out var versionElement))
+                {
+                    string fullVersion = versionElement.GetString();
+                    if (string.IsNullOrEmpty(fullVersion)) return null;
+
+                    _logService.LogDebug($"[VersionService] Version {fullVersion} detected in: {Path.GetFileName(filePath)}");
+
+                    int plusIndex = fullVersion.IndexOf('+');
+                    if (plusIndex > 0) return fullVersion.Substring(0, plusIndex);
+
+                    int spaceIndex = fullVersion.IndexOf(' ');
+                    if (spaceIndex > 0) return fullVersion.Substring(0, spaceIndex);
+
+                    return fullVersion;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Error parsing metadata file: {filePath}");
             }
             return null;
         }

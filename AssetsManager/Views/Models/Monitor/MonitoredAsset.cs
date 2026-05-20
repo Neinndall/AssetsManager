@@ -40,6 +40,7 @@ namespace AssetsManager.Views.Models.Monitor
             get => _version;
             set { if (_version != value) { _version = value; OnPropertyChanged(); } }
         }
+
         private DateTime _lastUpdated;
         private AssetStatus _status;
         private Brush _statusColor;
