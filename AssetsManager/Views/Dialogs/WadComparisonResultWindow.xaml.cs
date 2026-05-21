@@ -185,9 +185,15 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
-            if (_viewModel?.TreeModel != null)
+            Loaded -= WadComparisonResultWindow_Loaded;
+            Closed -= OnWindowClosed;
+            if (_viewModel != null)
             {
-                _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+                if (_viewModel.TreeModel != null)
+                {
+                    _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
+                }
             }
             _serializableDiffs?.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
@@ -196,6 +202,7 @@ namespace AssetsManager.Views.Dialogs
 
         private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            Loaded -= WadComparisonResultWindow_Loaded;
             _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
             
             var wadGroups = await Task.Run(() =>
@@ -383,7 +390,7 @@ namespace AssetsManager.Views.Dialogs
                 string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.FullPath);
+                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.PhysicalPath);
                 _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
                 _assignedFolderName = folderInfo.FolderName;
                 _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);

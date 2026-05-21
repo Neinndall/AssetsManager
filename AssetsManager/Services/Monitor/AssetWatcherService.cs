@@ -13,6 +13,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Services.Monitor
 {
@@ -170,7 +171,9 @@ namespace AssetsManager.Services.Monitor
 
             if (anyUpdated)
             {
-                _appSettings.Save();
+				// Necesita la otra llamada para evitar reload tree?
+				_appSettings.Save();
+				
                 if (!silent)
                 {
                     _logService.LogSuccess("Assets Watcher files are updated.");
@@ -193,13 +196,14 @@ namespace AssetsManager.Services.Monitor
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(oldPath));
             _directoriesCreator.CreateDirectory(Path.GetDirectoryName(newPath));
 
-            // Update version if we can (e.g. after a game update)
-            // We do this BEFORE archiving to history so the history entry has the CORRECT current version
+            // Update version if we can (ALWAYS from PBE for the Watcher)
             string currentVersion = asset.Version;
             try
             {
-                string wadBaseDir = Path.GetDirectoryName(fullWadPath);
-                currentVersion = await _versionService.GetGameVersionAsync(wadBaseDir) ?? currentVersion;
+                if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory))
+                {
+                    currentVersion = await _versionService.GetGameVersionAsync(_appSettings.LolPbeDirectory) ?? currentVersion;
+                }
             }
             catch { }
 
@@ -305,18 +309,16 @@ namespace AssetsManager.Services.Monitor
             string pluginsPath = Path.Combine(baseDir, "Plugins", fileName);
             if (File.Exists(pluginsPath)) return pluginsPath;
 
-            // Search
+            // Deep search if not in common locations
             try
             {
-                if (Directory.Exists(baseDir))
+                string searchPattern = fileName;
+                var foundFiles = Directory.GetFiles(baseDir, searchPattern, SearchOption.AllDirectories);
+                if (foundFiles.Length > 0)
                 {
-                    var foundFiles = Directory.GetFiles(baseDir, fileName, SearchOption.AllDirectories);
-                    if (foundFiles.Length > 0)
-                    {
-                        // Update the asset WadName for future checks to avoid searching again
-                        asset.WadName = foundFiles[0].Substring(baseDir.Length).TrimStart('/', '\\');
-                        return foundFiles[0];
-                    }
+                    // Update the asset WadName for future checks to avoid searching again
+                    asset.WadName = foundFiles[0].Substring(baseDir.Length).TrimStart('/', '\\');
+                    return foundFiles[0];
                 }
             }
             catch { }

@@ -36,6 +36,21 @@ namespace AssetsManager.Views.Dialogs
             this.Hide();
         }
 
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            
+            if (ViewModel != null)
+            {
+                ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            }
+            if (_imageMergerService != null)
+            {
+                _imageMergerService.Items.CollectionChanged -= OnItemsCollectionChanged;
+            }
+            this.Closing -= OnWindowClosing;
+        }
+
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(ImageMergerModel.Columns) || e.PropertyName == nameof(ImageMergerModel.Margin))

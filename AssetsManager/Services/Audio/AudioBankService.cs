@@ -23,10 +23,12 @@ namespace AssetsManager.Services.Audio
         }
 
         private readonly LogService _logService;
+        private readonly BinParser _binParser;
 
-        public AudioBankService(LogService logService)
+        public AudioBankService(LogService logService, BinParser binParser)
         {
             _logService = logService;
+            _binParser = binParser;
         }
 
         public int GetSoundCount(byte[] wpkData, byte[] audioBnkData)
@@ -57,7 +59,7 @@ namespace AssetsManager.Services.Audio
 
         public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
         {
-            var eventNameMap = BinParser.GetEventsFromBin(binData, baseName, binType, _logService);
+            var eventNameMap = _binParser.GetEventsFromBin(binData, baseName, binType, _logService);
             
             // Now we include eventsData in WEM extraction in case Riot embedded audios there too
             var allWems = ExtractWems(wpkData, audioBnkData, eventsData);

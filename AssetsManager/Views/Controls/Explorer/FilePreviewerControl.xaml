@@ -309,7 +309,35 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <Image x:Name="ImagePreview" Grid.Row="0" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image x:Name="ImagePreview" Grid.Row="0" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Image.Style>
+                                    <Style TargetType="Image">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsImageUnsupportedVisible}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Image.Style>
+                            </Image>
+
+                            <!-- Error Message inside Image area (Dual View) -->
+                            <Border x:Name="UnsupportedImagePanel" 
+                                    Grid.Row="0"
+                                    HorizontalAlignment="Center" 
+                                    VerticalAlignment="Center" 
+                                    Visibility="{Binding IsImageUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                    MaxWidth="400">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
+                                    <TextBlock Text="{Binding UnsupportedTitle}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding ImageUnsupportedMessage}"
+                                               FontSize="14" Foreground="{StaticResource TextSecondary}" 
+                                               HorizontalAlignment="Center" Margin="0,8,0,0" 
+                                               TextAlignment="Center" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
 
                             <!-- Summoner Icon Metadata (Minimalist) -->
                             <StackPanel Grid.Row="1" 

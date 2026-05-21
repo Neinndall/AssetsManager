@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Formatting
         private readonly AudioBankService _audioBankService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
-        private readonly BinPropertyParser _binPropertyParser;
+        private readonly BinParser _binParser;
         private readonly TroybinParser _troybinParser;
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Formatting
             AudioBankService audioBankService, 
             WadContentProvider wadContentProvider, 
             JsonFormatterService jsonFormatterService,
-            BinPropertyParser binPropertyParser,
+            BinParser binParser,
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Formatting
             _audioBankService = audioBankService;
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
-            _binPropertyParser = binPropertyParser;
+            _binParser = binParser;
             _troybinParser = troybinParser;
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
@@ -175,7 +175,7 @@ namespace AssetsManager.Services.Formatting
                 using var binStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
                 var binTree = new BinTree(binStream);
-                await _binPropertyParser.WriteBinTreeAsJsonAsync(jsonStream, binTree);
+                await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binTree);
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
                 return await reader.ReadToEndAsync();

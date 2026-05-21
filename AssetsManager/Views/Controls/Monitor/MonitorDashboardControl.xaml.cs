@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using AssetsManager.Services;
@@ -35,6 +36,17 @@ namespace AssetsManager.Views.Controls.Monitor
         public MonitorDashboardControl()
         {
             InitializeComponent();
+            Unloaded += MonitorDashboardControl_Unloaded;
+        }
+
+        private void MonitorDashboardControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            Unloaded -= MonitorDashboardControl_Unloaded;
+            if (DataContext is IDisposable disposableModel)
+            {
+                disposableModel.Dispose();
+            }
+            DataContext = null;
         }
 
         private void TryInitModel()

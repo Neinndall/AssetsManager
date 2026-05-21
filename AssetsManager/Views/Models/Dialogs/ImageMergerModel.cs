@@ -48,7 +48,7 @@ namespace AssetsManager.Views.Models.Dialogs
     {
         private int _columns = 4;
         private int _margin = 5;
-        private double _zoom = 1.0;
+        private double _zoom = 0.8;
         private BitmapSource _previewImage;
         private bool _isProcessing;
 

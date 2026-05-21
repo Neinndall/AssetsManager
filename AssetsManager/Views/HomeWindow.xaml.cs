@@ -25,7 +25,8 @@ namespace AssetsManager.Views
 
         private void HomeWindow_Unloaded(object sender, RoutedEventArgs e)
         {
-            _model.Cleanup();
+            Unloaded -= HomeWindow_Unloaded;
+            _model.Dispose();
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)

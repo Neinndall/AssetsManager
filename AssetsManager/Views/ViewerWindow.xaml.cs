@@ -102,10 +102,16 @@ namespace AssetsManager.Views
         public void CleanupResources()
         {
             _cameraController?.Dispose();
-            ViewportControl?.Cleanup();
 
-            if (_groundVisual != null) ViewportControl.Viewport.Children.Remove(_groundVisual);
-            if (_skyVisual != null) ViewportControl.Viewport.Children.Remove(_skyVisual);
+            if (ViewportControl != null)
+            {
+                ViewportControl.SceneSetupRequested -= SetupScene;
+                ViewportControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
+                ViewportControl.Cleanup();
+            }
+
+            if (_groundVisual != null && ViewportControl != null) ViewportControl.Viewport.Children.Remove(_groundVisual);
+            if (_skyVisual != null && ViewportControl != null) ViewportControl.Viewport.Children.Remove(_skyVisual);
 
             PanelControl?.Cleanup();
         }

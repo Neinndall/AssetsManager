@@ -7,7 +7,7 @@ using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Models.Notifications
 {
-    public class NotificationHubModel : INotifyPropertyChanged
+    public class NotificationHubModel : INotifyPropertyChanged, IDisposable
     {
         private readonly NotificationService _notificationService;
         private bool _isOpen;
@@ -76,6 +76,16 @@ namespace AssetsManager.Views.Models.Notifications
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Dispose()
+        {
+            if (_notificationService != null)
+            {
+                _notificationService.NotificationAdded -= OnNotificationAdded;
+                _notificationService.CountsChanged -= UpdateCounts;
+            }
+            PropertyChanged = null;
         }
     }
 }

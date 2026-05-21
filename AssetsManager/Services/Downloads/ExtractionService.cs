@@ -89,8 +89,11 @@ namespace AssetsManager.Services.Downloads
 
                     _directoriesCreator.CreateDirectory(fileDestinationDirectory);
 
-                    // EXTRACT Action: Always use Original (Crude/RAW) for consistency across the system
-                    var mode = WadExportMode.Original;
+                    // EXTRACT Action: Use Smart mode to honor user-configured export preferences (like PNG, JSON, etc.),
+                    // but fall back to Original mode for container audio banks (.bnk, .wpk) to keep them intact as files
+                    // instead of unpacking them into subdirectories of raw sound IDs.
+                    string ext = Path.GetExtension(diff.FileName).ToLower();
+                    var mode = (ext == ".bnk" || ext == ".wpk") ? WadExportMode.Original : WadExportMode.Smart;
 
                     await _wadExportService.ExportAsync(node, fileDestinationDirectory, mode, null, newLolPath, cancellationToken);
                 }

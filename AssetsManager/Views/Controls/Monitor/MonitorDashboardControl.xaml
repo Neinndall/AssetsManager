@@ -91,19 +91,25 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
-                        <Border Width="42" Height="42" CornerRadius="10" Background="#1A3498DB">
+                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="#1A3498DB">
                             <materialIcons:MaterialIcon Kind="ServerNetwork" Width="22" Height="22" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <materialIcons:MaterialIcon.Effect>
                                     <DropShadowEffect Color="#FF3498DB" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
                                 </materialIcons:MaterialIcon.Effect>
                             </materialIcons:MaterialIcon>
                         </Border>
-                        <StackPanel VerticalAlignment="Center" Margin="10,0,0,0">
+                        
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
                             <TextBlock Text="Environment" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
                             <TextBlock Text="PBE SERVER" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
                     
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <!-- Status with Icon -->
@@ -127,19 +133,26 @@
                     </StackPanel>
                     
                     <Border Grid.Row="2" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}" 
-                            BorderBrush="{Binding PbeStatusColor}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <!-- Technical Time (Prominent / TextPrimary) -->
-                            <materialIcons:MaterialIcon Kind="ClockOutline" Width="11" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PbeLastCheck}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            
-                            <!-- Vertical Separator -->
-                            <Rectangle Width="1" Height="10" Fill="{Binding PbeStatusColor}" Opacity="0.3" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                            BorderBrush="{Binding PbeStatusColor}" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="0,16,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                            <!-- Icon + Status (Dynamic Color) -->
-                            <materialIcons:MaterialIcon Kind="CheckAll" Foreground="{Binding PbeStatusColor}" Width="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PbeStatusSubtitle}" FontSize="9" FontWeight="Bold" Foreground="{Binding PbeStatusColor}" VerticalAlignment="Center"/>
-                        </StackPanel>
+                            <!-- 1. Status Icon -->
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="CheckAll" Foreground="{Binding PbeStatusColor}" Width="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+
+                            <!-- 2. Status Message (Truncated if long) -->
+                            <TextBlock Grid.Column="1" Text="{Binding PbeStatusSubtitle}" FontSize="9" FontWeight="Bold" Foreground="{Binding PbeStatusColor}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                            <!-- 3. Last Check (Right Aligned) -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextPrimary}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding PbeLastCheck}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>
@@ -357,9 +370,18 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <materialIcons:MaterialIcon Grid.Column="0" Kind="History" Width="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,10,0"/>
-                            <TextBlock Grid.Column="1" Text="Integrity surveillance active and synced with local client" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="2" Text="{Binding WatcherLastUpdate}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+
+                            <!-- 1. Security Icon -->
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="ShieldCheckOutline" Width="14" Foreground="{Binding DataStatusColor}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+
+                            <!-- 2. Technical Message -->
+                            <TextBlock Grid.Column="1" Text="{Binding WatcherStatusSubtitle}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Opacity="0.9"/>
+
+                            <!-- 3. Sync Telemetry (Right Aligned) -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="ClockOutline" Width="10" Height="10" Foreground="{StaticResource TextPrimary}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding WatcherLastUpdate}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
                 </Grid>
@@ -406,7 +428,7 @@
                         
                         <StackPanel>
                             <TextBlock Text="LAST DISCOVERED" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                            <TextBlock Text="{Binding LastDiscoveredAssetName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" MaxWidth="220" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding LastDiscoveredAssetName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" MaxWidth="220"/>
                         </StackPanel>
                     </StackPanel>
 

@@ -29,8 +29,23 @@ namespace AssetsManager.Views.Help
             _viewModel.CurrentVersion = ApplicationInfos.Version;
             UpdateModelState();
 
-            // Subscribe to background update checks
-            _updateCheckService.UpdatesFound += (s, e) => UpdateModelState();
+            Loaded += UpdatesView_Loaded;
+            Unloaded += UpdatesView_Unloaded;
+        }
+
+        private void UpdatesView_Loaded(object sender, RoutedEventArgs e)
+        {
+            _updateCheckService.UpdatesFound += OnUpdatesFound;
+        }
+
+        private void UpdatesView_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _updateCheckService.UpdatesFound -= OnUpdatesFound;
+        }
+
+        private void OnUpdatesFound(string message, string latestVersion)
+        {
+            UpdateModelState();
         }
 
         private void UpdateModelState()

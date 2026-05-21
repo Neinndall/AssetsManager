@@ -50,6 +50,7 @@ namespace AssetsManager.Views
 
             SetupNavigation();
             NavigateToView(_generalSettingsView);
+            Closed += SettingsWindow_Closed;
         }
 
         private void SetupNavigation()
@@ -70,6 +71,7 @@ namespace AssetsManager.Views
 
         private void SettingsWindow_Closed(object sender, EventArgs e)
         {
+            Closed -= SettingsWindow_Closed;
             NavGeneral.Checked -= NavGeneral_Checked;
             NavDefaultPaths.Checked -= NavDefaultPaths_Checked;
             NavAdvanced.Checked -= NavAdvanced_Checked;

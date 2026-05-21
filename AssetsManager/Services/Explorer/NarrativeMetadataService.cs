@@ -19,14 +19,10 @@ namespace AssetsManager.Services.Explorer
         
         private List<SummonerIconJsonEntry> _cachedIcons;
         private List<EmoteJsonEntry> _cachedEmotes;
+        private List<WardJsonEntry> _cachedWards;
         private string _cachedIconsSourceWad;
         private string _cachedEmotesSourceWad;
-
-        private const string IconsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-icons.json";
-        private const string EmotesJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-emotes.json";
-        
-        private const string ProfileIconsPath = "v1/profile-icons/";
-        private const string EmotesPath = "assets/loadouts/summoneremotes/";
+        private string _cachedWardsSourceWad;
 
         public NarrativeMetadataService(LogService logService, WadContentProvider wadContentProvider, AppSettings appSettings)
         {
@@ -37,20 +33,26 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<NarrativeMetadata> GetMetadataAsync(FileSystemNodeModel node)
         {
-            if (node == null || string.IsNullOrEmpty(node.FullPath)) return null;
+            if (node == null || string.IsNullOrEmpty(node.VirtualPath)) return null;
 
-            string path = PathUtils.NormalizePath(node.FullPath);
+            string path = PathUtils.NormalizePath(node.VirtualPath);
             
             // 1. Check for Summoner Icons
-            if (path.Contains(ProfileIconsPath))
+            if (path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
             {
                 return await GetIconMetadataAsync(node);
             }
             
             // 2. Check for Emotes
-            if (path.Contains(EmotesPath))
+            if (path.Contains(RiotCatalogDefinitions.EmotesVirtualPath))
             {
                 return await GetEmoteMetadataAsync(node);
+            }
+
+            // 3. Check for Wards
+            if (path.Contains(RiotCatalogDefinitions.WardsVirtualPath))
+            {
+                return await GetWardMetadataAsync(node);
             }
 
             return null;
@@ -91,7 +93,7 @@ namespace AssetsManager.Services.Explorer
                 var emotesList = await LoadEmotesMetadataAsync(node);
                 if (emotesList == null) return null;
 
-                string normalizedNodePath = PathUtils.NormalizePath(node.FullPath);
+                string normalizedNodePath = PathUtils.NormalizePath(node.VirtualPath);
                 
                 // Strategy 1: Match by ID in filename (e.g. "123_EM.png")
                 string fileName = Path.GetFileNameWithoutExtension(node.Name);
@@ -132,6 +134,31 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        private async Task<NarrativeMetadata> GetWardMetadataAsync(FileSystemNodeModel node)
+        {
+            try
+            {
+                var wardsList = await LoadWardsMetadataAsync(node);
+                if (wardsList == null) return null;
+
+                // Match by ID in filename (e.g. "wardhero_101.png")
+                string fileName = Path.GetFileNameWithoutExtension(node.Name);
+                var match = System.Text.RegularExpressions.Regex.Match(fileName, @"\d+");
+                if (match.Success && int.TryParse(match.Value, out int wardId))
+                {
+                    var entry = wardsList.FirstOrDefault(e => e.Id == wardId);
+                    if (entry != null) return MapWardToMetadata(entry);
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to get ward metadata for node {node.Name}");
+                return null;
+            }
+        }
+
         private NarrativeMetadata MapEmoteToMetadata(EmoteJsonEntry entry)
         {
             return new NarrativeMetadata
@@ -141,11 +168,21 @@ namespace AssetsManager.Services.Explorer
             };
         }
 
+        private NarrativeMetadata MapWardToMetadata(WardJsonEntry entry)
+        {
+            return new NarrativeMetadata
+            {
+                Title = string.IsNullOrWhiteSpace(entry.Name) ? "N/A" : entry.Name,
+                Description = entry.RegionalDescriptions?.FirstOrDefault(d => d.Region == "riot")?.Description
+                              ?? (!string.IsNullOrWhiteSpace(entry.Description) ? entry.Description : "N/A")
+            };
+        }
+
         private async Task<List<SummonerIconJsonEntry>> LoadIconsMetadataAsync(FileSystemNodeModel node)
         {
             if (_cachedIcons != null && _cachedIconsSourceWad == node.SourceWadPath) return _cachedIcons;
 
-            byte[] jsonData = await LoadJsonFromContextAsync(node, IconsJsonPath);
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.IconsJsonPath);
             if (jsonData == null) return null;
 
             try
@@ -166,7 +203,7 @@ namespace AssetsManager.Services.Explorer
         {
             if (_cachedEmotes != null && _cachedEmotesSourceWad == node.SourceWadPath) return _cachedEmotes;
 
-            byte[] jsonData = await LoadJsonFromContextAsync(node, EmotesJsonPath);
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.EmotesJsonPath);
             if (jsonData == null) return null;
 
             try
@@ -179,6 +216,27 @@ namespace AssetsManager.Services.Explorer
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to parse summoner-emotes.json");
+                return null;
+            }
+        }
+
+        private async Task<List<WardJsonEntry>> LoadWardsMetadataAsync(FileSystemNodeModel node)
+        {
+            if (_cachedWards != null && _cachedWardsSourceWad == node.SourceWadPath) return _cachedWards;
+
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.WardsJsonPath);
+            if (jsonData == null) return null;
+
+            try
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                _cachedWards = JsonSerializer.Deserialize<List<WardJsonEntry>>(jsonData, options);
+                _cachedWardsSourceWad = node.SourceWadPath;
+                return _cachedWards;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse ward-skins.json");
                 return null;
             }
         }

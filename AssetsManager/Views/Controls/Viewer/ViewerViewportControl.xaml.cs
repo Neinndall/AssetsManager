@@ -88,15 +88,20 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _animationPlayer = new AnimationPlayer(LogService);
                 _cameraController = new CustomCameraController(Viewport3D);
+
+                // Re-add skeleton visual guides to viewport if they were cleared
+                if (!Viewport.Children.Contains(_skeletonVisual))
+                    Viewport.Children.Add(_skeletonVisual);
+                if (!Viewport.Children.Contains(_jointsVisual))
+                    Viewport.Children.Add(_jointsVisual);
+
+                // Self-healing subscription to rendering loop
+                CompositionTarget.Rendering -= CompositionTarget_Rendering;
+                CompositionTarget.Rendering += CompositionTarget_Rendering;
+                _lastFrameTime = DateTime.Now;
             };
 
             Unloaded += (s, e) => Cleanup();
-
-            Viewport.Children.Add(_skeletonVisual);
-            Viewport.Children.Add(_jointsVisual);
-
-            CompositionTarget.Rendering += CompositionTarget_Rendering;
-            _lastFrameTime = DateTime.Now;
         }
 
         public void RegisterEnvironment(ModelVisual3D sky, ModelVisual3D ground)

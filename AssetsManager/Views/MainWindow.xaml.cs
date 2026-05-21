@@ -58,7 +58,6 @@ namespace AssetsManager.Views
         private readonly WadPackagingService _wadPackagingService;
 
         private string _latestAppVersionAvailable;
-        private NotificationHubWindow _notificationHubWindow;
         
         // New fields to manage the state of the extraction after comparison
         private bool _isExtractingAfterComparison = false;
@@ -309,7 +308,7 @@ namespace AssetsManager.Views
                     // We run this without awaiting to not block UI thread, but we log errors inside the services
                     _ = Task.Run(async () => 
                     {
-                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.FullPath);
+                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.PhysicalPath);
                         // 2. Metadata Registration (ComparisonHistoryService)
                         _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
                     });
@@ -422,13 +421,9 @@ namespace AssetsManager.Views
 
         public async void OnNotificationHubRequested(object sender, EventArgs e)
         {
-            if (_notificationHubWindow == null)
-            {
-                _notificationHubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
-                _notificationHubWindow.Owner = this;
-            }
-
-            _notificationHubWindow.ShowHub(this);
+            var hubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
+            hubWindow.Owner = this;
+            hubWindow.ShowDialog();
 
             if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
             {

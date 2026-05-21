@@ -96,14 +96,30 @@ namespace AssetsManager.Views.Controls.Explorer
 
             _searchTimer = new DispatcherTimer();
             _searchTimer.Interval = TimeSpan.FromMilliseconds(300);
-            _searchTimer.Tick += SearchTimer_Tick;
         }
 
         private void FileExplorerControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            if (_searchTimer != null)
+            {
+                _searchTimer.Stop();
+                _searchTimer.Tick -= SearchTimer_Tick;
+            }
+
             if (AppSettings != null)
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (_viewModel.Toolbar != null)
+            {
+                _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
+                _viewModel.Toolbar.ParentExplorer = null;
+            }
+
+            if (FavoritesManager != null)
+            {
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
             }
         }
 
@@ -117,57 +133,36 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
+            // 1. CRITICAL: Cancel any active tree build or extraction
             TaskCancellationManager.CancelCurrentOperation();
 
-            if (AppSettings != null)
-            {
-                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
-            }
-
-            // 1. Detener el timer PRIMERO
+            // 2. Stop search timer (Unloaded also does this, but we ensure it here too)
             if (_searchTimer != null)
             {
                 _searchTimer.Stop();
-                _searchTimer.Tick -= SearchTimer_Tick;
             }
 
-            // 2. Limpiar referencia en Toolbar
-            if (_viewModel.Toolbar != null)
-            {
-                _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
-                _viewModel.Toolbar.ParentExplorer = null;
-            }
-
-            // 3. Desuscribir eventos propios
-            this.Loaded -= FileExplorerControl_Loaded;
-
-            // 4. Limpiar el TreeView
+            // 3. Clear the TreeView binding and events
             if (FileTreeView != null)
             {
                 FileTreeView.SelectedItemChanged -= FileTreeView_SelectedItemChanged;
-                FileTreeView.ItemsSource = null; // ← IMPORTANTE: Desvincular binding
+                FileTreeView.ItemsSource = null; 
             }
 
-            // 5. CRÍTICO: Limpiar recursivamente todos los nodos
+            // 4. DEEP CLEANUP: Dispose all nodes recursively to release megabytes of RAM
             if (_viewModel.RootNodes != null)
             {
                 foreach (var rootNode in _viewModel.RootNodes.ToList())
                 {
-                    rootNode.Dispose(); // ← Usa el nuevo método Dispose
+                    rootNode.Dispose(); 
                 }
                 _viewModel.RootNodes.Clear();
             }
 
-            // 6. Desuscribir de favoritos
-            if (FavoritesManager != null)
-            {
-                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
-            }
+            // 5. Break peer connections
+            FilePreviewer = null; 
 
-            // 7. Romper referencias cruzadas
-            FilePreviewer = null; // Remove reference
-
-            // 8. Limpiar paths
+            // 6. Reset internal state
             _currentRootPath = null;
             _isExternalInitRequested = false;
         }
@@ -176,12 +171,29 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (AppSettings != null)
             {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
             // Setup toolbar peer connection - ALWAYS do this
             _viewModel.Toolbar.ParentExplorer = this;
+            _viewModel.Toolbar.PropertyChanged -= Toolbar_PropertyChanged;
             _viewModel.Toolbar.PropertyChanged += Toolbar_PropertyChanged;
+
+            // Setup search timer tick - ALWAYS do this
+            _searchTimer.Tick -= SearchTimer_Tick;
+            _searchTimer.Tick += SearchTimer_Tick;
+
+            // Bind Favorites - ALWAYS do this
+            if (FavoritesManager != null)
+            {
+                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
+                
+                // Track changes to update visibility (using self-healing pattern to avoid duplicates)
+                FavoritesManager.Favorites.CollectionChanged -= Favorites_CollectionChanged;
+                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
+                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
+            }
 
             if (_isExternalInitRequested) return;
 
@@ -218,16 +230,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
             // Now, perform the async hash loading.
             await HashResolverService.LoadAllHashesAsync();
-
-            // Bind Favorites
-            if (FavoritesManager != null)
-            {
-                FavoritesListView.ItemsSource = FavoritesManager.Favorites;
-                
-                // Track changes to update visibility
-                FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
-                _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
-            }
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)
@@ -809,7 +811,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (FileTreeView.SelectedItem is FileSystemNodeModel node)
             {
-                Clipboard.SetText(node.FullPath);
+                Clipboard.SetText(node.CopyFullPath);
             }
         }
 
@@ -823,9 +825,8 @@ namespace AssetsManager.Views.Controls.Explorer
                     // Filter out any "Loading..." nodes that might be in the path
                     // And join by '/'
                     var validNodes = path.Where(n => n.Name != "Loading...");
-                    string fullPath = string.Join("/", validNodes.Select(n => n.Name));
-                    
-                    FavoritesManager.AddFavorite(fullPath);
+                    string virtualPath = string.Join("/", validNodes.Select(n => n.Name));
+                    FavoritesManager.AddFavorite(virtualPath);
                 }
             }
         }
@@ -899,7 +900,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 // If we don't have the hash, we'll get it during the first check
                 AppSettings.MonitoredAssets.Add(newAsset);
-                AppSettings.Save();
+                
+                // Silent save: Persist data but DON'T fire ConfigurationSaved event to avoid tree reload
+                AppSettings.SaveSettings(AppSettings);
                 
                 // Notify MonitorService to update the UI list in the other tab
                 MonitorService?.LoadMonitoredAssets();
@@ -934,7 +937,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     if (node.Type == NodeType.VirtualFile)
                         data = await WadContentProvider.GetVirtualFileBytesAsync(node);
                     else if (node.Type == NodeType.RealFile)
-                        data = await File.ReadAllBytesAsync(node.FullPath);
+                        data = await File.ReadAllBytesAsync(node.VirtualPath);
 
                     if (data == null) continue;
 
@@ -965,7 +968,7 @@ namespace AssetsManager.Views.Controls.Explorer
                         ImageMergerService.AddItem(new ImageMergerItem
                         {
                             Name = node.Name,
-                            Path = node.FullPath ?? node.Name,
+                            Path = node.VirtualPath ?? node.Name,
                             Image = bitmap
                         });
                         addedCount++;
@@ -994,7 +997,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Deselect immediately so it can be clicked again
                 FavoritesListView.SelectedItem = null;
 
-                var node = await WadSearchBoxService.NavigateToPathAsync(item.FullPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
 
                 if (node != null)
                 {
@@ -1002,7 +1005,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 else
                 {
-                    LogService.LogWarning($"Favorite node not found: {item.FullPath}");
+                    LogService.LogWarning($"Favorite node not found: {item.VirtualPath}");
                     CustomMessageBoxService.ShowInfo("Not Found", $"Could not find '{item.DisplayName}' in the current tree.", Window.GetWindow(this));
                 }
             }

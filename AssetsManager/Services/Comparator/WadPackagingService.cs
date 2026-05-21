@@ -28,16 +28,16 @@ namespace AssetsManager.Services.Comparator
 
         private record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
 
-        private BinFileStrategy GetBinFileSearchStrategy(string fullPath, string sourceWadPath)
+        private BinFileStrategy GetBinFileSearchStrategy(string virtualPath, string sourceWadPath)
         {
-            _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. FullPath: '{fullPath}', SourceWad: '{sourceWadPath}'");
+            _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. VirtualPath: '{virtualPath}', SourceWad: '{sourceWadPath}'");
             string sourceWadName = Path.GetFileName(sourceWadPath);
 
             // Strategy 0: Infer from companion path structure
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
-            if (fullPath.Contains("/companions/pets/"))
+            if (virtualPath.Contains("/companions/pets/"))
             {
-                var pathParts = fullPath.Split('/');
+                var pathParts = virtualPath.Split('/');
                 int petsIndex = Array.IndexOf(pathParts, "pets");
 
                 if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
@@ -59,9 +59,9 @@ namespace AssetsManager.Services.Comparator
 
             // Strategy 1: Infer from full path structure
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
-            if (fullPath.Contains("/characters/") && fullPath.Contains("/skins/"))
+            if (virtualPath.Contains("/characters/") && virtualPath.Contains("/skins/"))
             {
-                var pathParts = fullPath.Split('/');
+                var pathParts = virtualPath.Split('/');
                 int charactersIndex = Array.IndexOf(pathParts, "characters");
                 int skinsIndex = Array.IndexOf(pathParts, "skins");
 
@@ -105,7 +105,7 @@ namespace AssetsManager.Services.Comparator
 
             // Strategy 3: Infer for locale VO files
             _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 3: Infer for locale VO files.");
-            if (fullPath.Contains("_vo_", StringComparison.OrdinalIgnoreCase) &&
+            if (virtualPath.Contains("_vo_", StringComparison.OrdinalIgnoreCase) &&
                 sourceWadName.StartsWith("Common.", StringComparison.OrdinalIgnoreCase) &&
                 sourceWadName.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) &&
                 !sourceWadName.Equals("Common.wad.client", StringComparison.OrdinalIgnoreCase))
@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Comparator
             }
             _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 4 failed or was not applicable.");
 
-            _logService.LogWarning($"[GetBinFileSearchStrategy] No BIN file strategy found for '{fullPath}'.");
+            _logService.LogWarning($"[GetBinFileSearchStrategy] No BIN file strategy found for '{virtualPath}'.");
             return null;
         }
 
@@ -233,18 +233,18 @@ namespace AssetsManager.Services.Comparator
 
                 foreach (var siblingFileName in potentialSiblingsList)
                 {
-                    string siblingFullPath = Path.Combine(Path.GetDirectoryName(pathForStrategy), siblingFileName).Replace('\\', '/');
-                    _logService.LogDebug($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingFullPath}'");
-                    var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingFullPath, StringComparison.OrdinalIgnoreCase));
-                    var siblingDependency = await CreateDependencyAsync(siblingFullPath, XxHash64Ext.Hash(siblingFullPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
+                    string siblingVirtualPath = Path.Combine(Path.GetDirectoryName(pathForStrategy), siblingFileName).Replace('\\', '/');
+                    _logService.LogDebug($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingVirtualPath}'");
+                    var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingVirtualPath, StringComparison.OrdinalIgnoreCase));
+                    var siblingDependency = await CreateDependencyAsync(siblingVirtualPath, XxHash64Ext.Hash(siblingVirtualPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
                     if (siblingDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(siblingDependency);
-                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingFullPath}'.");
+                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingVirtualPath}'.");
                     }
                     else
                     {
-                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Sibling dependency not found for '{siblingFullPath}'. This is normal if the bank doesn't use this specific container type.");
+                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Sibling dependency not found for '{siblingVirtualPath}'. This is normal if the bank doesn't use this specific container type.");
                     }
                 }
             }
@@ -337,17 +337,17 @@ namespace AssetsManager.Services.Comparator
             _logService.LogDebug($"[CreateDependencyAsync] Attempting to create dependency for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadRelativePath}'.");
             return await Task.Run(() =>
             {
-                string wadFullPath = Path.Combine(newPbePath, wadRelativePath);
-                if (!File.Exists(wadFullPath))
+                string wadVirtualPath = Path.Combine(newPbePath, wadRelativePath);
+                if (!File.Exists(wadVirtualPath))
                 {
-                    _logService.LogDebug($"[CreateDependencyAsync] WAD not found at new path, trying old path: '{wadFullPath}'");
-                    wadFullPath = Path.Combine(oldPbePath, wadRelativePath);
+                    _logService.LogDebug($"[CreateDependencyAsync] WAD not found at new path, trying old path: '{wadVirtualPath}'");
+                    wadVirtualPath = Path.Combine(oldPbePath, wadRelativePath);
                 }
 
-                if (File.Exists(wadFullPath))
+                if (File.Exists(wadVirtualPath))
                 {
-                    _logService.LogDebug($"[CreateDependencyAsync] WAD found at '{wadFullPath}'. Reading...");
-                    using var wad = new WadFile(wadFullPath);
+                    _logService.LogDebug($"[CreateDependencyAsync] WAD found at '{wadVirtualPath}'. Reading...");
+                    using var wad = new WadFile(wadVirtualPath);
                     if (wad.Chunks.TryGetValue(fileHash, out var chunk))
                     {
                         _logService.LogDebug($"[CreateDependencyAsync] Chunk found for hash {fileHash:X16}. Creating dependency object.");
@@ -364,7 +364,7 @@ namespace AssetsManager.Services.Comparator
                     }
                     else
                     {
-                        _logService.LogDebug($"[CreateDependencyAsync] Chunk NOT found for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadFullPath}'. This is normal for optional siblings.");
+                        _logService.LogDebug($"[CreateDependencyAsync] Chunk NOT found for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadVirtualPath}'. This is normal for optional siblings.");
                     }
                 }
                 else

@@ -59,7 +59,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel.ParentControl = this;
 
             LoadJsonSyntaxHighlighting();
-            SetupScrollSync();
+            
+            this.Loaded += JsonDiffControl_Loaded;
+            this.Unloaded += JsonDiffControl_Unloaded;
         }
 
         private void LoadJsonSyntaxHighlighting()
@@ -88,26 +90,60 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void SetupScrollSync()
+        private void JsonDiffControl_Loaded(object sender, RoutedEventArgs e)
         {
-            OldJsonContent.Loaded += (s, e) =>
+            // Defensive detach to ensure no duplicate event handlers are registered
+            DetachScrollSyncEvents();
+
+            if (OldJsonContent?.TextArea?.TextView != null)
             {
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += OldEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
-                
-                // Ambos editores actualizan la guía (v3.2.1.0 style) para máxima robustez ante asincronismo
                 OldJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
-
-                // Breadcrumb events
                 OldJsonContent.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+            }
+            if (NewJsonContent?.TextArea?.TextView != null)
+            {
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += NewEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged += Editor_GuideScrollChanged;
                 NewJsonContent.TextArea.Caret.PositionChanged += Caret_PositionChanged;
-            };
-
-            UnifiedDiffEditor.Loaded += (s, e) =>
+            }
+            if (UnifiedDiffEditor?.TextArea != null)
             {
                 UnifiedDiffEditor.TextArea.Caret.PositionChanged += Caret_PositionChanged;
-            };
+            }
+        }
+
+        private void JsonDiffControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            DetachScrollSyncEvents();
+        }
+
+        private void DetachScrollSyncEvents()
+        {
+            if (OldJsonContent?.TextArea?.TextView != null)
+            {
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
+                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
+            }
+            if (OldJsonContent?.TextArea?.Caret != null)
+            {
+                OldJsonContent.TextArea.Caret.PositionChanged -= Caret_PositionChanged;
+            }
+
+            if (NewJsonContent?.TextArea?.TextView != null)
+            {
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
+                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
+            }
+            if (NewJsonContent?.TextArea?.Caret != null)
+            {
+                NewJsonContent.TextArea.Caret.PositionChanged -= Caret_PositionChanged;
+            }
+
+            if (UnifiedDiffEditor?.TextArea?.Caret != null)
+            {
+                UnifiedDiffEditor.TextArea.Caret.PositionChanged -= Caret_PositionChanged;
+            }
         }
 
         private void Caret_PositionChanged(object sender, EventArgs e)
@@ -133,23 +169,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         #region Public Methods
         public void Dispose()
         {
+            this.Loaded -= JsonDiffControl_Loaded;
+            this.Unloaded -= JsonDiffControl_Unloaded;
+
+            DetachScrollSyncEvents();
+
             ParentWindow = null;
             if (DiffNavigationPanel != null)
             {
                 DiffNavigationPanel.ParentControl = null;
                 DiffNavigationPanel.Cleanup();
-            }
-            
-            // Unsubscribe events safely
-            if (OldJsonContent?.TextArea?.TextView != null)
-            {
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= OldEditor_ScrollChanged;
-                OldJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
-            }
-            if (NewJsonContent?.TextArea?.TextView != null)
-            {
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= NewEditor_ScrollChanged;
-                NewJsonContent.TextArea.TextView.ScrollOffsetChanged -= Editor_GuideScrollChanged;
             }
 
             // Clear heavy resources

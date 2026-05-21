@@ -105,7 +105,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.FullPath}");
+                _logService.LogError(ex, $"Failed to get bytes for virtual file: {fileNode.VirtualPath}");
                 return null;
             }
         }
@@ -237,7 +237,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logService.LogError(ex, $"Failed to extract WEM file '{node.FullPath}'.");
+                _logService.LogError(ex, $"Failed to extract WEM file '{node.VirtualPath}'.");
                 return null;
             }
         }

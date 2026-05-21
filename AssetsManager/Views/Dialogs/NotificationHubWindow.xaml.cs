@@ -17,31 +17,6 @@ namespace AssetsManager.Views.Dialogs
             this.DataContext = new NotificationHubModel(notificationService);
         }
 
-        public void ShowHub(Window owner)
-        {
-            if (this.IsVisible)
-            {
-                // If minimized, restore and focus
-                if (this.WindowState == WindowState.Minimized)
-                {
-                    this.WindowState = WindowState.Normal;
-                    this.Activate();
-                    return;
-                }
-
-                // If visible but NOT minimized, toggle (Hide)
-                if (owner != null) owner.Activate();
-                this.Hide();
-                if (ViewModel != null) ViewModel.IsOpen = false;
-                return;
-            }
-
-            this.Owner = owner;
-            this.Show();
-            this.Activate();
-            if (ViewModel != null) ViewModel.IsOpen = true;
-        }
-
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkAllRead();
@@ -60,16 +35,10 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        // Override the close behavior to Hide instead of Close
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
-            e.Cancel = true;
-            if (this.Owner != null)
-            {
-                this.Owner.Activate();
-            }
-            this.Hide();
-            if (ViewModel != null) ViewModel.IsOpen = false;
+            base.OnClosed(e);
+            ViewModel?.Dispose();
         }
     }
 }

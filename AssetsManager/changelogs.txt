@@ -1,4 +1,68 @@
+AssetsManager - League of Legends | v4.0.0.2
+
+HOTFIX UPDATE
+This hotfix update focuses on application-wide stability and HUD precision. It introduces a brand new "Surgical Filtering" engine to the Explorer searcher to prevent crashes during rapid analysis, refines the Monitor Dashboard with dynamic surveillance telemetry, and upgrades the Image Merger with stabilized, minimalist numerical controls. Additionally, it improves the previewer's feedback for nameless data and incompatible formats, delivering a more reliable and high-fidelity asset analysis environment.
+
+New Features
+  - Monitor / Dynamic Asset Watcher Surveillance
+    * Implemented a brand new reactive messaging system for the Watcher footer.
+    * Integrated "Integrity Alerts": the system now dynamically switches its status message from "Surveillance active" to "Integrity alert · {N} changes detected" when file variations are found.
+    * Added Reactive Security Iconography: the surveillance shield now automatically turns from Green to Orange upon detecting changes, providing immediate visual feedback of potential integrity issues.
+  - Explorer / Narrative Metadata Expansion
+    * Added support for Ward names and descriptions: the explorer now automatically resolves and displays narrative context for ward skin assets.
+  - Monitor / API Center Image Support
+    * Integrated automated image extraction for Sales and Mythic Shop items: the system now automatically retrieves and displays official skin, emote, and ward icons directly in the API Center interface.
+    * Implemented a Background Extraction Engine: images are processed in a separate thread to maintain UI responsiveness while populating the cache.
+
+Improvements
+  - Monitor / Professional Split-Footer HUD
+    * Redesigned the PBE Server and Asset Watcher footers with a professional 3-column "Split" layout for superior data organization.
+    * Unified Telemetry Display: implemented a standardized right-aligned section featuring a neutral white clock icon and time, ensuring technical data remains readable even during alerts.
+    * Refined Asset Watcher Narrative: updated the surveillance message to a concise, technical "Surveillance active · Local client synced" for a more professional tone.
+  - Monitor / PBE Maintenance Hierarchy
+    * Improved the PBE Server card by moving the "LAST CHECK" timestamp to a dedicated badge in the header, separating technical telemetry from operational status.
+    * Enhanced Maintenance Visibility: refined the footer to exclusively display the maintenance message (e.g., "Started at HH:mm") with its dedicated icon, resulting in a cleaner and more focused layout.
+  - Monitor / Asset Tracker Data Clarity
+    * Removed text trimming (ellipsis) from the "Last Discovered" asset display, ensuring the full identity of the latest found assets is always visible without truncation.
+  - Explorer / Searcher Stability & Performance: implemented a brand new "Surgical Filtering" engine that prevents application crashes during rapid typing by using thread-safe collection traversal.
+  - Explorer / Refined Previewer Feedback: added specific titles and messages for nameless data and incompatible formats.
+  - Image Merger / UI Precision & Stability
+    * Implemented dynamic numerical badges for "Columns" and "Margin" settings for immediate visual feedback.
+    * Stabilized the Preview header by implementing a fixed-width container for the Zoom value, preventing layout shifts during adjustments.
+    * Refined Zoom display with clean integer formatting for a more professional and focused HUD aesthetic.
+  - Explorer / Hierarchical Path Precision
+    * Enhanced "Copy Full Path" functionality: the system now reconstructs the absolute logical path from the tree root, including the source WAD container and all parent directories.
+    * Renamed technical identifiers to "VirtualPath" and "CopyFullPath" to clearly distinguish between internal identity and UI navigation.
+    * Integrated Path Sanitization: automated the removal of technical suffixes (like WAD file counts) during path copying to provide clean, usable strings.
+    * Optimized Memory Footprint: implemented an aggressive "Thin Path" strategy that releases path strings from RAM for all virtual nodes, significantly reducing memory usage during large WAD explorations.
+  - Explorer / Advanced Texture Support
+    * Integrated custom LeagueToolkit patch: added full support for modern BC5 and BC7 texture formats (0x0D/0x0E), enabling high-fidelity preview and extraction of the latest game assets.
+  - Settings / Audio Encoding Target Clarity
+    * Refined the "Audio encoding target" description in Settings to explicitly clarify its use: "Preferred audio format for SMART method in the Explorer".
+  - Comparator / Hybrid Comparison Extraction
+    * Optimized comparison extraction to use a hybrid approach: individual files (textures, data, single audios) now respect the user's preferred format options (Smart Mode), while container audio banks (.bnk and .wpk) are kept intact as original files to avoid unpacking them into directories of unnamed ID numbers.
+
+Bug Fixes
+  - A bug has been fixed that prevented favorites from appearing in the UI when accessing the Explorer from the home screen (live or pbe).
+  - Fixed a critical authentication issue where the Sales Catalog and Mythic Shop failed to load due to inconsistent token formats (Plain Text vs. JSON) between LCU endpoints.
+  - Resolved an inconsistency in the Asset Watcher where the surveillance message remained static regardless of the actual monitoring state.
+  - Corrected the visual hierarchy of the PBE footer during maintenance periods to prevent information overlap and clutter.
+  - Fixed update version label in asset watcher information.
+  - Fixed a bug in "Extract New Assets" where preferred format settings (such as converting textures to PNG or data to JSON) were ignored because the process hardcoded RAW/Original extraction.
+  - Added a safety check to AudioBankLinkerService to prevent NullReferenceException crashes when looking up associated binary mappings without an active explorer tree context.
+  - Fixed a visual ghosting and flashing glitch in the Grid View where items from a previously browsed folder or different explorer mode (e.g. WAD vs Local Dir) were briefly visible before updating.
+  - Fixed a playback disruption bug in Dual View where opening or failing to load a texture in the right panel would incorrectly dispose of and close the active audio (.wem) player on the left panel.
+  - Fixed a critical application crash (InvalidOperationException) in the Explorer searcher caused by thread collisions when typing rapidly in large file trees.
+  - Resolved a UI collapse issue in Dual View where selecting an unsupported file (such as an extensionless hash file) on the left panel while displaying a right-aligned texture error would collapse the right side and force the left error into full screen.
+  - Implemented independent left and right error message states to prevent texture errors from overwriting active content error messages when navigating tabs.
+  - Enhanced the error description for nameless and extensionless files by displaying "This file format is not supported to preview it" instead of a double-spaced generic template.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.0.1
+
+HOTFIX UPDATE
+This hotfix update focuses on improving overall stability, synchronization reliability, and interface responsiveness across the application. It introduces an enhanced auto-sync system for Comparator Directory Mode, refines Monitor status visibility for clearer server tracking, improves asset loading efficiency, and resolves several UI issues including dashboard flickering and tab alignment inconsistencies.
 
 New Features
   - Comparator / Directory Mode Auto-Sync

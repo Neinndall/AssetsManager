@@ -27,7 +27,8 @@ namespace AssetsManager.Services.Explorer
     public class ExplorerPreviewService
     {
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
-        private Previewer _activePreviewer = Previewer.None;
+        private Previewer _activeContentPreviewer = Previewer.None;
+        private Previewer _activeImagePreviewer = Previewer.None;
         private FileSystemNodeModel _currentContentNode;
         private FileSystemNodeModel _currentImageNode;
         private Image _imagePreview;
@@ -88,20 +89,19 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+            Previewer requiredPreviewer = GetRequiredPreviewer(node);
+            bool isImage = requiredPreviewer == Previewer.Image;
 
             // Per-Slot Early Exit:
-            // Check if the node is already loaded in its corresponding slot.
-            // This prevents reloads when alternating focus in Dual View.
+            // Check if the node is already loaded in its corresponding slot with the correct previewer.
+            // This prevents reloads when alternating focus in Dual View, while correctly restoring tabs.
             if (isImage)
             {
-                if (_currentImageNode == node && _viewModel.IsImageVisible) return;
+                if (_currentImageNode == node && _viewModel.IsImageVisible && _activeImagePreviewer == requiredPreviewer) return;
             }
             else
             {
-                if (_currentContentNode == node && (_viewModel.IsTextVisible || _viewModel.IsWebVisible || _viewModel.IsUnsupportedVisible)) return;
+                if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer) return;
             }
 
             // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Explorer
             {
                 byte[] data = null;
                 if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node); }
-                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.FullPath)) data = await File.ReadAllBytesAsync(node.FullPath); }
+                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath); }
                 else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node); }
 
                 if (data != null) { await DispatchPreview(data, node.Extension, node); }
@@ -142,7 +142,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to preview file '{node.FullPath}'.");
+                _logService.LogError(ex, $"Failed to preview file '{node.VirtualPath}'.");
                 await ShowUnsupportedPreviewAsync(node.Extension);
             }
         }
@@ -167,13 +167,13 @@ namespace AssetsManager.Services.Explorer
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
         {
-            if (!File.Exists(node.FullPath))
+            if (!File.Exists(node.VirtualPath))
             {
                 await ShowUnsupportedPreviewAsync("File not found");
                 return;
             }
 
-            byte[] fileData = await File.ReadAllBytesAsync(node.FullPath);
+            byte[] fileData = await File.ReadAllBytesAsync(node.VirtualPath);
             await DispatchPreview(fileData, node.Extension, node);
         }
 
@@ -265,7 +265,16 @@ namespace AssetsManager.Services.Explorer
 
         private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
         {
-            _activePreviewer = newPreviewer;
+            // Dispose of WebView only when we are explicitly replacing it in the left Content slot
+            if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
+            {
+                var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                if (oldWebView != null)
+                {
+                    oldWebView.Dispose();
+                    _webViewContainer.Children.Remove(oldWebView);
+                }
+            }
 
             switch (newPreviewer)
             {
@@ -274,6 +283,15 @@ namespace AssetsManager.Services.Explorer
                     {
                         _imagePreview.Source = imageSource;
                         _viewModel.IsImageVisible = true;
+                        _activeImagePreviewer = Previewer.Image;
+
+                        // Clear "Unsupported" error status if active, so the valid image is shown full screen
+                        if (_viewModel.IsUnsupportedVisible)
+                        {
+                            _viewModel.IsUnsupportedVisible = false;
+                            _viewModel.IsContentVisible = false;
+                            _activeContentPreviewer = Previewer.None;
+                        }
                     }
                     break;
 
@@ -286,37 +304,81 @@ namespace AssetsManager.Services.Explorer
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
                         _viewModel.IsTextVisible = false;
                         _viewModel.IsWebVisible = true;
+                        _activeContentPreviewer = Previewer.WebView;
                     }
                     break;
 
                 case Previewer.AvalonEdit:
                     if (content is ValueTuple<string, IHighlightingDefinition> textData)
                     {
-                        var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                        if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
-
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
                         _viewModel.IsWebVisible = false;
                         _viewModel.IsTextVisible = true;
                         _textEditorPreview.Focus();
+                        _activeContentPreviewer = Previewer.AvalonEdit;
                     }
                     break;
 
                 case Previewer.StatusPanel:
                     if (content is string extension)
                     {
-                        _viewModel.IsUnsupportedVisible = true;
-                        _viewModel.IsContentVisible = true;
-                        _viewModel.IsTextVisible = false;
-                        _viewModel.IsWebVisible = false;
-                        _viewModel.UnsupportedMessage = $"The {extension} format is not supported to preview it";
+                        bool isImageExt = extension.Contains("tex") || extension.Contains("dds") || extension.Contains("svg") ||
+                                          SupportedFileTypes.Images.Contains(extension) ||
+                                          SupportedFileTypes.Textures.Contains(extension) ||
+                                          SupportedFileTypes.VectorImages.Contains(extension);
+
+                        // Check if there is currently a file (valid or showing error) in the left panel
+                        // (which means Dual View should be maintained and we show the image error on the right)
+                        bool isLeftPanelOccupied = _viewModel.IsContentVisible;
+
+                        if (isImageExt && isLeftPanelOccupied)
+                        {
+                            // Dual View Scenario: Keep left panel active, show error on the right
+                            _viewModel.IsImageVisible = true;
+                            _viewModel.IsImageUnsupportedVisible = true;
+                            _viewModel.SetUnsupportedStatus(extension, true);
+                            _activeImagePreviewer = Previewer.StatusPanel;
+                        }
+                        else
+                        {
+                            // Full Screen or Left-only Scenario: Show error on the left
+                            // Dispose of left WebView as it is being replaced by the StatusPanel error
+                            if (_webViewContainer != null)
+                            {
+                                var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                                if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+                            }
+
+                            _viewModel.IsUnsupportedVisible = true;
+                            _viewModel.IsContentVisible = true;
+                            _viewModel.IsTextVisible = false;
+                            _viewModel.IsWebVisible = false;
+                            _viewModel.SetUnsupportedStatus(extension, false);
+                            _activeContentPreviewer = Previewer.StatusPanel;
+
+                            if (isImageExt)
+                            {
+                                _viewModel.IsImageVisible = false;
+                                _viewModel.IsImageUnsupportedVisible = false;
+                                _activeImagePreviewer = Previewer.None;
+                            }
+                        }
                     }
                     else
                     {
                         // Global Reset
+                        // Dispose of WebView as we are doing a full clean
+                        if (_webViewContainer != null)
+                        {
+                            var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
+                            if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+                        }
+
                         _viewModel.ResetAllVisibility();
                         _imagePreview.Source = null;
+                        _activeContentPreviewer = Previewer.None;
+                        _activeImagePreviewer = Previewer.None;
                     }
                     break;
             }
@@ -550,6 +612,41 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.StatusPanel, extension);
         }
 
+        private Previewer GetRequiredPreviewer(FileSystemNodeModel node)
+        {
+            if (node == null) return Previewer.None;
+            string extension = node.Extension.ToLowerInvariant();
+            
+            bool isImage = SupportedFileTypes.Images.Contains(extension) || 
+                           SupportedFileTypes.Textures.Contains(extension) || 
+                           SupportedFileTypes.VectorImages.Contains(extension);
+                           
+            if (isImage)
+            {
+                return Previewer.Image;
+            }
+            
+            if (SupportedFileTypes.Media.Contains(extension))
+            {
+                return Previewer.WebView;
+            }
+            
+            if (SupportedFileTypes.Json.Contains(extension) || 
+                SupportedFileTypes.JavaScript.Contains(extension) || 
+                SupportedFileTypes.Css.Contains(extension) || 
+                SupportedFileTypes.Bin.Contains(extension) || 
+                SupportedFileTypes.Troybin.Contains(extension) || 
+                SupportedFileTypes.StringTable.Contains(extension) || 
+                SupportedFileTypes.Preload.Contains(extension) || 
+                SupportedFileTypes.PlainText.Contains(extension) || 
+                SupportedFileTypes.Lua.Contains(extension))
+            {
+                return Previewer.AvalonEdit;
+            }
+            
+            return Previewer.StatusPanel;
+        }
+
         public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0)
         {
             if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension) && !SupportedFileTypes.VectorImages.Contains(node.Extension)))
@@ -562,7 +659,7 @@ namespace AssetsManager.Services.Explorer
                 byte[] data = node.Type switch
                 {
                     NodeType.VirtualFile => await _wadContentProvider.GetVirtualFileBytesAsync(node),
-                    NodeType.RealFile => await File.ReadAllBytesAsync(node.FullPath),
+                    NodeType.RealFile => await File.ReadAllBytesAsync(node.VirtualPath),
                     _ => null
                 };
 
@@ -596,7 +693,7 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to get image preview for '{node.FullPath}'.");
+                _logService.LogError(ex, $"Failed to get image preview for '{node.VirtualPath}'.");
                 return null;
             }
 

@@ -70,7 +70,7 @@ namespace AssetsManager.Views.Converters
 
             if (node.Name == "Loading...") return MaterialIconKind.Loading;
 
-            if (string.IsNullOrEmpty(node.FullPath))
+            if (string.IsNullOrEmpty(node.VirtualPath))
             {
                 return MaterialIconKind.FileQuestionOutline;
             }
@@ -89,7 +89,7 @@ namespace AssetsManager.Views.Converters
             {
                 case NodeType.RealDirectory:
                 case NodeType.VirtualDirectory:
-                    if (node.FullPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || node.FullPath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                    if (node.VirtualPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || node.VirtualPath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                     {
                         return MaterialIconKind.ArchiveOutline;
                     }
@@ -101,7 +101,7 @@ namespace AssetsManager.Views.Converters
                 case NodeType.WemFile:
                     return MaterialIconKind.MusicNoteOutline;
                 default:
-                    return GetFileIcon(node.Extension, node.FullPath);
+                    return GetFileIcon(node.Extension, node.VirtualPath);
             }
         }
 
@@ -132,9 +132,9 @@ namespace AssetsManager.Views.Converters
             return icon;
         }
 
-        private static MaterialIconKind GetIcon(string extension, string fullPath)
+        private static MaterialIconKind GetIcon(string extension, string virtualPath)
         {
-            if (string.IsNullOrEmpty(fullPath))
+            if (string.IsNullOrEmpty(virtualPath))
             {
                 return MaterialIconKind.FileQuestionOutline;
             }
@@ -144,7 +144,7 @@ namespace AssetsManager.Views.Converters
                 return knownIcon;
             }
 
-            var lowerPath = fullPath.ToLowerInvariant();
+            var lowerPath = virtualPath.ToLowerInvariant();
             if (lowerPath.Contains("javascript") || lowerPath.Contains("/js/")) return MaterialIconKind.LanguageJavascript;
             if (lowerPath.Contains("/css/")) return MaterialIconKind.LanguageCss3;
 

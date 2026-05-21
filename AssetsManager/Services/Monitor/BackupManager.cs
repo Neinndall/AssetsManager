@@ -280,11 +280,21 @@ namespace AssetsManager.Services.Monitor
             {
                 if (string.IsNullOrEmpty(current)) break;
 
-                if (File.Exists(Path.Combine(current, "content-metadata.json")) || 
-                    File.Exists(Path.Combine(current, "Game", "content-metadata.json")))
+                if (File.Exists(Path.Combine(current, "Game", "content-metadata.json")))
                 {
                     return current;
                 }
+
+                if (File.Exists(Path.Combine(current, "content-metadata.json")))
+                {
+                    if (Path.GetFileName(current).Equals("Game", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parentDir = Directory.GetParent(current);
+                        if (parentDir != null) return parentDir.FullName;
+                    }
+                    return current;
+                }
+
                 var parent = Directory.GetParent(current);
                 if (parent == null) break;
                 current = parent.FullName;
@@ -298,9 +308,9 @@ namespace AssetsManager.Services.Monitor
             return PathUtils.IsSameOrSubPath(root, sub);
         }
 
-        private string GetBackupDisplayName(string folderName, string fullPath)
+        private string GetBackupDisplayName(string folderName, string virtualPath)
         {
-            var (isPbe, _) = GetPathIdentification(fullPath);
+            var (isPbe, _) = GetPathIdentification(virtualPath);
             return isPbe ? "League of Legends PBE" : "League of Legends LIVE";
         }
         

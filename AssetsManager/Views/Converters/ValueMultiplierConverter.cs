@@ -12,7 +12,15 @@ namespace AssetsManager.Views.Converters
             {
                 if (double.TryParse(parameter.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double factor))
                 {
-                    return val * factor;
+                    double result = val * factor;
+                    
+                    // If target is string, format it cleanly
+                    if (targetType == typeof(string))
+                    {
+                        return Math.Round(result).ToString("F0");
+                    }
+                    
+                    return result;
                 }
             }
             return value;

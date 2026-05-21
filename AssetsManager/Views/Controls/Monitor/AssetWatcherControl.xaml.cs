@@ -40,12 +40,32 @@ namespace AssetsManager.Views.Controls.Monitor
             DataContext = _viewModel;
 
             this.Loaded += AssetWatcherControl_Loaded;
+            this.Unloaded += AssetWatcherControl_Unloaded;
         }
 
         private void AssetWatcherControl_Loaded(object sender, RoutedEventArgs e)
         {
-            if (MonitorService == null) return;
+            if (AppSettings != null)
+            {
+                // Defensive pattern to avoid duplicate subscriptions on reload
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
+            }
+
             RefreshList();
+        }
+
+        private void AssetWatcherControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            _ = Dispatcher.InvokeAsync(() => RefreshList());
         }
 
         private void RefreshList()

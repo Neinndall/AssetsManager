@@ -47,7 +47,7 @@ namespace AssetsManager.Services.Audio
 
         public async Task<LinkedAudioBank> LinkAudioBankForDiffAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
         {
-            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}', PreferOld: {preferOld}, BackupRootDir: '{backupRootDir}'");
+            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', Path: '{clickedNode.VirtualPath}', PreferOld: {preferOld}, BackupRootDir: '{backupRootDir}'");
 
             if (string.IsNullOrEmpty(basePath) && clickedNode.ChunkDiff == null && string.IsNullOrEmpty(backupRootDir))
             {
@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Audio
                         }
 
                         // Resolve SIBLINGS (same directory)
-                        string directoryPath = Path.GetDirectoryName(clickedNode.FullPath).Replace('\\', '/');
+                        string directoryPath = Path.GetDirectoryName(clickedNode.VirtualPath).Replace('\\', '/');
                         var siblings = comparisonData?.Diffs.Where(d =>
                             (d.NewPath != null && Path.GetDirectoryName(d.NewPath).Replace('\\', '/') == directoryPath) ||
                             (d.OldPath != null && Path.GetDirectoryName(d.OldPath).Replace('\\', '/') == directoryPath))
@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Audio
                             _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Regional WAD detected: '{sourceWad}'. Searching for Master Events Bank in en_US counterpart using direct path...");
                             
                             // Use the EXACT same path (Riot usually shares en_us paths across all locales)
-                            string targetPath = clickedNode.FullPath;
+                            string targetPath = clickedNode.VirtualPath;
                             
                             var masterDiff = comparisonData?.Diffs.FirstOrDefault(d => 
                                 (string.Equals(d.NewPath, targetPath, StringComparison.OrdinalIgnoreCase) || 
@@ -277,11 +277,11 @@ namespace AssetsManager.Services.Audio
                 if (strategy != null)
                 {
                     binType = strategy.Type;
-                    string targetWadFullPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
+                    string targetWadVirtualPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
                     
-                    if (File.Exists(targetWadFullPath))
+                    if (File.Exists(targetWadVirtualPath))
                     {
-                        var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadFullPath);
+                        var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadVirtualPath);
                         binNode = FindNodeByPath(wadContent, strategy.BinPath);
                         if (binNode != null)
                         {
@@ -290,8 +290,8 @@ namespace AssetsManager.Services.Audio
                         }
 
                         // Siblings
-                        string sourceWadFullPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
-                        if (string.Equals(targetWadFullPath, sourceWadFullPath, StringComparison.OrdinalIgnoreCase))
+                        string sourceWadVirtualPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
+                        if (string.Equals(targetWadVirtualPath, sourceWadVirtualPath, StringComparison.OrdinalIgnoreCase))
                         {
                             wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
                             audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
@@ -344,7 +344,7 @@ namespace AssetsManager.Services.Audio
             bool isBackupMode = clickedNode.ChunkDiff != null;
             string modeLabel = isBackupMode ? "BACKUP" : "LIVE";
             
-            _logService.LogDebug($"[LinkAudioBankAsync] [{modeLabel} MODE] Linking audio bank. Node: '{clickedNode.Name}', Path: '{clickedNode.FullPath}'");
+            _logService.LogDebug($"[LinkAudioBankAsync] [{modeLabel} MODE] Linking audio bank. Node: '{clickedNode.Name}', Path: '{clickedNode.VirtualPath}'");
 
             if (isBackupMode)
             {
@@ -415,7 +415,7 @@ namespace AssetsManager.Services.Audio
                             string jsonContent = await File.ReadAllTextAsync(backupJsonPath);
                             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
-                            string directoryPath = Path.GetDirectoryName(clickedNode.FullPath).Replace('\\', '/');
+                            string directoryPath = Path.GetDirectoryName(clickedNode.VirtualPath).Replace('\\', '/');
                             var siblings = comparisonData?.Diffs.Where(d =>
                                 (d.NewPath != null && Path.GetDirectoryName(d.NewPath).Replace('\\', '/') == directoryPath) ||
                                 (d.OldPath != null && Path.GetDirectoryName(d.OldPath).Replace('\\', '/') == directoryPath))
@@ -521,14 +521,14 @@ namespace AssetsManager.Services.Audio
 
             // 3. DETECCIÓN POR CONTENEDOR (Campeones Regionales / Skins)
             // Aquí aplicamos la lógica de prioridad: Nombre de archivo > Carpeta > Skin0
-            if (wadParts.Length >= 4 || clickedNode.FullPath.Contains("/characters/"))
+            if (wadParts.Length >= 4 || clickedNode.VirtualPath.Contains("/characters/"))
             {
                 string champName = wadPrefix.ToLower();
                 
                 // Si la ruta no coincide con el prefijo, lo sacamos de la ruta (caso de archivos sueltos en WADs globales)
-                if (clickedNode.FullPath.Contains("/characters/"))
+                if (clickedNode.VirtualPath.Contains("/characters/"))
                 {
-                    var pathParts = clickedNode.FullPath.Split('/');
+                    var pathParts = clickedNode.VirtualPath.Split('/');
                     int charIndex = Array.IndexOf(pathParts, "characters");
                     if (pathParts.Length > charIndex + 1) champName = pathParts[charIndex + 1].ToLower();
                 }
@@ -554,9 +554,9 @@ namespace AssetsManager.Services.Audio
                     }
                 }
                 // PRIORIDAD 2: Buscar en la ruta de carpetas
-                else if (clickedNode.FullPath.Contains("/skins/"))
+                else if (clickedNode.VirtualPath.Contains("/skins/"))
                 {
-                    var pathParts = clickedNode.FullPath.Split('/');
+                    var pathParts = clickedNode.VirtualPath.Split('/');
                     int skinsIndex = Array.IndexOf(pathParts, "skins");
                     if (pathParts.Length > skinsIndex + 1)
                     {
@@ -581,9 +581,9 @@ namespace AssetsManager.Services.Audio
             }
 
             // 4. ESTRATEGIAS POR RUTA (Companions)
-            if (clickedNode.FullPath.Contains("/companions/pets/"))
+            if (clickedNode.VirtualPath.Contains("/companions/pets/"))
             {
-                var pathParts = clickedNode.FullPath.Split('/');
+                var pathParts = clickedNode.VirtualPath.Split('/');
                 int petsIndex = Array.IndexOf(pathParts, "pets");
                 if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
                 {
@@ -687,10 +687,10 @@ namespace AssetsManager.Services.Audio
             }
             else
             {
-                string targetWadFullPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
-                if (File.Exists(targetWadFullPath))
+                string targetWadVirtualPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
+                if (File.Exists(targetWadVirtualPath))
                 {
-                    var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadFullPath);
+                    var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadVirtualPath);
                     var binNode = FindNodeByPath(wadContent, strategy.BinPath);
                     if (binNode != null) return (binNode, baseName, strategy.Type);
                 }
@@ -732,6 +732,8 @@ namespace AssetsManager.Services.Audio
             string baseName = GetBaseName(clickedNode.Name);
             var strategy = GetBinFileSearchStrategy(clickedNode);
             if (strategy == null) return (null, baseName, BinType.Unknown);
+
+            if (rootNodes == null) return (null, baseName, strategy.Type);
 
             if (currentRootPath == null)
             {
@@ -822,14 +824,14 @@ namespace AssetsManager.Services.Audio
             return null;
         }
 
-        private FileSystemNodeModel FindNodeByPath(IEnumerable<FileSystemNodeModel> nodes, string fullPath)
+        private FileSystemNodeModel FindNodeByPath(IEnumerable<FileSystemNodeModel> nodes, string virtualPath)
         {
             foreach (var node in nodes)
             {
-                if (node.FullPath != null && node.FullPath.Equals(fullPath, StringComparison.OrdinalIgnoreCase)) return node;
+                if (node.VirtualPath != null && node.VirtualPath.Equals(virtualPath, StringComparison.OrdinalIgnoreCase)) return node;
                 if (node.Children != null && node.Children.Any())
                 {
-                    var found = FindNodeByPath(node.Children, fullPath);
+                    var found = FindNodeByPath(node.Children, virtualPath);
                     if (found != null) return found;
                 }
             }

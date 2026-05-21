@@ -90,6 +90,9 @@ namespace AssetsManager.Views.Models.Monitor
         private string _endTime;
         public string EndTime { get => _endTime; set => SetProperty(ref _endTime, value); }
 
+        private string _imagePath;
+        public string ImagePath { get => _imagePath; set => SetProperty(ref _imagePath, value); }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
         {

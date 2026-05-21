@@ -1,11 +1,48 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace AssetsManager.Utils
 {
     public static class PathUtils
     {
+        /// <summary>
+        /// Normalizes a Riot asset URL to a relative WAD path.
+        /// e.g. "/lol-game-data/assets/ASSETS/Images/icon.png" -> "plugins/rcp-be-lol-game-data/global/default/assets/ASSETS/Images/icon.png"
+        /// </summary>
+        public static string NormalizeRiotIconPath(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return string.Empty;
+
+            string normalizedUrl = url.ToLowerInvariant();
+
+            // 1. Eliminamos todo hasta el primer "assets/" (que suele ser /lol-game-data/assets/)
+            // Esto nos deja con la ruta relativa dentro de la raíz de datos del cliente.
+            string basePath = Regex.Replace(normalizedUrl, @"^.*?assets/", "");
+
+            // La raíz virtual /lol-game-data/assets/ mapea directamente a plugins/rcp-be-lol-game-data/global/default/
+            // No debemos forzar un segmento "assets/" adicional ya que muchas rutas (como v1/...) están en la raíz.
+            return $"plugins/rcp-be-lol-game-data/global/default/{basePath}";
+        }
+
+        /// <summary>
+        /// Cleans a Riot skin or item name by removing parenthetical suffixes.
+        /// e.g. "Crime City Nightmare Shaco (Underground)" -> "Crime City Nightmare Shaco"
+        /// </summary>
+        public static string CleanRiotName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+
+            int bracketIndex = name.IndexOf('(');
+            if (bracketIndex > 0)
+            {
+                return name.Substring(0, bracketIndex).Trim();
+            }
+
+            return name;
+        }
+
         public static string SanitizeName(string name)
         {
             var invalidChars = Path.GetInvalidFileNameChars();

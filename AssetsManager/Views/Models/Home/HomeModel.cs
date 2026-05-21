@@ -6,7 +6,7 @@ using AssetsManager.Utils;
 
 namespace AssetsManager.Views.Models.Home
 {
-    public class HomeModel : INotifyPropertyChanged
+    public class HomeModel : INotifyPropertyChanged, IDisposable
     {
         private readonly AppSettings _appSettings;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -114,9 +114,12 @@ namespace AssetsManager.Views.Models.Home
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
         
-        public void Cleanup()
+        public void Dispose()
         {
-            _appSettings.ConfigurationSaved -= AppSettings_ConfigurationSaved;
+            if (_appSettings != null)
+            {
+                _appSettings.ConfigurationSaved -= AppSettings_ConfigurationSaved;
+            }
         }
     }
 }
