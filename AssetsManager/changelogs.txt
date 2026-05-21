@@ -26,6 +26,10 @@ Improvements
     * Removed text trimming (ellipsis) from the "Last Discovered" asset display, ensuring the full identity of the latest found assets is always visible without truncation.
   - Explorer / Searcher Stability & Performance: implemented a brand new "Surgical Filtering" engine that prevents application crashes during rapid typing by using thread-safe collection traversal.
   - Explorer / Refined Previewer Feedback: added specific titles and messages for nameless data and incompatible formats.
+  - Image Merger / UI Precision & Stability
+    * Implemented dynamic numerical badges for "Columns" and "Margin" settings for immediate visual feedback.
+    * Stabilized the Preview header by implementing a fixed-width container for the Zoom value, preventing layout shifts during adjustments.
+    * Refined Zoom display with clean integer formatting for a more professional and focused HUD aesthetic.
   - Explorer / Hierarchical Path Precision
     * Enhanced "Copy Full Path" functionality: the system now reconstructs the absolute logical path from the tree root, including the source WAD container and all parent directories.
     * Renamed technical identifiers to "VirtualPath" and "CopyFullPath" to clearly distinguish between internal identity and UI navigation.
@@ -48,6 +52,7 @@ Bug Fixes
   - Added a safety check to AudioBankLinkerService to prevent NullReferenceException crashes when looking up associated binary mappings without an active explorer tree context.
   - Fixed a visual ghosting and flashing glitch in the Grid View where items from a previously browsed folder or different explorer mode (e.g. WAD vs Local Dir) were briefly visible before updating.
   - Fixed a playback disruption bug in Dual View where opening or failing to load a texture in the right panel would incorrectly dispose of and close the active audio (.wem) player on the left panel.
+  - Fixed a critical application crash (InvalidOperationException) in the Explorer searcher caused by thread collisions when typing rapidly in large file trees.
   - Resolved a UI collapse issue in Dual View where selecting an unsupported file (such as an extensionless hash file) on the left panel while displaying a right-aligned texture error would collapse the right side and force the left error into full screen.
   - Implemented independent left and right error message states to prevent texture errors from overwriting active content error messages when navigating tabs.
   - Enhanced the error description for nameless and extensionless files by displaying "This file format is not supported to preview it" instead of a double-spaced generic template.
