@@ -154,13 +154,15 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
 
-                        if (ViewModel.IsGridMode && _currentFolderNode != null)
+                        if (_currentFolderNode != null)
                         {
                             UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                            FileExplorer?.SelectNode(_currentFolderNode);
                         }
                         else
                         {
                             _currentNode = null;
+                            UpdateBreadcrumbs(null);
                         }
                     }
                     return;
@@ -173,6 +175,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.RenamedDiffDetails = selectedPin.Node?.ChunkDiff;
 
                 UpdateBreadcrumbs(selectedPin.Node);
+                FileExplorer?.SelectNode(selectedPin.Node);
 
                 // Important: Always call the service with the LATEST node from the pin
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
