@@ -24,7 +24,8 @@ Improvements
     * Enhanced Maintenance Visibility: refined the footer to exclusively display the maintenance message (e.g., "Started at HH:mm") with its dedicated icon, resulting in a cleaner and more focused layout.
   - Monitor / Asset Tracker Data Clarity
     * Removed text trimming (ellipsis) from the "Last Discovered" asset display, ensuring the full identity of the latest found assets is always visible without truncation.
-  - Explorer / Improved unsupported format feedback: implemented specific messages and titles to distinguish between data files without extensions and unsupported file formats.
+  - Explorer / Searcher Stability & Performance: implemented a brand new "Surgical Filtering" engine that prevents application crashes during rapid typing by using thread-safe collection traversal.
+  - Explorer / Refined Previewer Feedback: added specific titles and messages for nameless data and incompatible formats.
   - Explorer / Hierarchical Path Precision
     * Enhanced "Copy Full Path" functionality: the system now reconstructs the absolute logical path from the tree root, including the source WAD container and all parent directories.
     * Renamed technical identifiers to "VirtualPath" and "CopyFullPath" to clearly distinguish between internal identity and UI navigation.

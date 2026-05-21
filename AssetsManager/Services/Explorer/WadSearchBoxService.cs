@@ -76,9 +76,9 @@ namespace AssetsManager.Services.Explorer
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // 1. Flatten the tree for O(1) traversal
+                    // 1. Flatten the tree for O(1) traversal with cancellation support
                     var allNodes = new List<FileSystemNodeModel>();
-                    Flatten(nodes, allNodes);
+                    Flatten(nodes, allNodes, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -117,8 +117,9 @@ namespace AssetsManager.Services.Explorer
 
                             // Propagate visibility upwards instantly in the set
                             var parent = node.Parent;
-                            while (parent != null && toShow.Add(parent))
+                            while (parent != null && !toShow.Contains(parent))
                             {
+                                toShow.Add(parent);
                                 parent = parent.Parent;
                             }
                         }
@@ -160,13 +161,13 @@ namespace AssetsManager.Services.Explorer
                     }
                 }, cancellationToken);
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
             {
-                // Silently swallow cancellation
+                // Silently swallow cancellation or collection modification (we will retry on next keystroke)
             }
         }
 
-        private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result)
+        private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
         {
             if (roots == null) return;
 
@@ -175,13 +176,17 @@ namespace AssetsManager.Services.Explorer
 
             while (stack.Count > 0)
             {
+                ct.ThrowIfCancellationRequested();
+
                 var node = stack.Pop();
                 result.Add(node);
-                if (node.Children != null)
+                
+                var children = node.Children;
+                if (children != null)
                 {
-                    for (int i = node.Children.Count - 1; i >= 0; i--)
+                    for (int i = children.Count - 1; i >= 0; i--)
                     {
-                        stack.Push(node.Children[i]);
+                        stack.Push(children[i]);
                     }
                 }
             }
