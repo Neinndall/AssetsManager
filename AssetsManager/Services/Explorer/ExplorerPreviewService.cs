@@ -332,16 +332,12 @@ namespace AssetsManager.Services.Explorer
                         // (which means Dual View should be maintained and we show the image error on the right)
                         bool isLeftPanelOccupied = _viewModel.IsContentVisible;
 
-                        string unsupportedMsg = (string.IsNullOrWhiteSpace(extension) || extension == ".")
-                            ? "This file format is not supported to preview it"
-                            : $"The {extension} format is not supported to preview it";
-
                         if (isImageExt && isLeftPanelOccupied)
                         {
                             // Dual View Scenario: Keep left panel active, show error on the right
                             _viewModel.IsImageVisible = true;
                             _viewModel.IsImageUnsupportedVisible = true;
-                            _viewModel.ImageUnsupportedMessage = unsupportedMsg;
+                            _viewModel.SetUnsupportedStatus(extension, true);
                             _activeImagePreviewer = Previewer.StatusPanel;
                         }
                         else
@@ -358,7 +354,7 @@ namespace AssetsManager.Services.Explorer
                             _viewModel.IsContentVisible = true;
                             _viewModel.IsTextVisible = false;
                             _viewModel.IsWebVisible = false;
-                            _viewModel.UnsupportedMessage = unsupportedMsg;
+                            _viewModel.SetUnsupportedStatus(extension, false);
                             _activeContentPreviewer = Previewer.StatusPanel;
 
                             if (isImageExt)

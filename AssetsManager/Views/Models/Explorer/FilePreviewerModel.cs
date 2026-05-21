@@ -317,6 +317,26 @@ namespace AssetsManager.Views.Models.Explorer
             HasEverPreviewedAFile = false;
         }
 
+        public void SetUnsupportedStatus(string extension, bool isImageMode)
+        {
+            bool isNoExtension = string.IsNullOrWhiteSpace(extension) || extension == ".";
+
+            UnsupportedTitle = isNoExtension ? "Preview not available" : "Format not supported";
+
+            string message = isNoExtension
+                ? "This file format is not supported to preview it"
+                : $"The {extension} format is not supported to preview it";
+
+            if (isImageMode)
+            {
+                ImageUnsupportedMessage = message;
+            }
+            else
+            {
+                UnsupportedMessage = message;
+            }
+        }
+
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
