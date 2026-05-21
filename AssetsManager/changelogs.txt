@@ -1,7 +1,7 @@
 AssetsManager - League of Legends | v4.0.0.2
 
 HOTFIX UPDATE
-This update refines the Monitor Dashboard with professional HUD standards, improving the visual hierarchy of maintenance states and introducing dynamic integrity surveillance. It unifies the telemetry display across all monitor cards and enhances the real-time responsiveness of the Asset Watcher for a more reliable oversight experience.
+This hotfix update focuses on application-wide stability and HUD precision. It introduces a brand new "Surgical Filtering" engine to the Explorer searcher to prevent crashes during rapid analysis, refines the Monitor Dashboard with dynamic surveillance telemetry, and upgrades the Image Merger with stabilized, minimalist numerical controls. Additionally, it improves the previewer's feedback for nameless data and incompatible formats, delivering a more reliable and high-fidelity asset analysis environment.
 
 New Features
   - Monitor / Dynamic Asset Watcher Surveillance
