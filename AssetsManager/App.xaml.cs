@@ -107,7 +107,7 @@ namespace AssetsManager
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<AudioConversionService>();
-      services.AddSingleton<BinPropertyParser>();
+      services.AddSingleton<BinParser>();
       services.AddSingleton<TroybinParser>();
       services.AddSingleton<PreloadParser>();
       services.AddSingleton<StringTableParser>();

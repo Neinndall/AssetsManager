@@ -1,15 +1,28 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Services.Parsers
 {
-    public static class BinParser
+    public class BinParser
     {
-        public static Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
+        private readonly HashResolverService _hashResolver;
+
+        public BinParser(HashResolverService hashResolver)
+        {
+            _hashResolver = hashResolver;
+        }
+
+        #region Get Events (Audio)
+
+        public Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
         {
             var mapEventNames = new Dictionary<uint, string>();
             if (binData == null || binData.Length == 0) 
@@ -22,181 +35,59 @@ namespace AssetsManager.Services.Parsers
 
             try
             {
-                // Search for 'events' containers
-                var eventsMagicBytes = new byte[] { 0x84, 0xE3, 0xD8, 0x12, 0x80, 0x10 };
-                SearchAndExtract(binData, eventsMagicBytes, mapEventNames, logService, "Standard Events");
+                using var stream = new MemoryStream(binData);
+                var binTree = new BinTree(stream);
 
-                // Search for 'music' embedded objects
-                var musicMagicBytes = new byte[] { 0xD4, 0x4F, 0x9C, 0x9F, 0x83 };
-                SearchAndExtractMusic(binData, musicMagicBytes, mapEventNames, logService);
+                foreach (var kvp in binTree.Objects)
+                {
+                    foreach (var propKvp in kvp.Value.Properties)
+                    {
+                        ExtractStrings(propKvp.Value, mapEventNames);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                logService.LogError(ex, "[AUDIO] Crash during raw byte-based BIN processing in BinParser.");
+                logService.LogError(ex, "[AUDIO] Crash during BinTree processing in BinParser.");
             }
 
-            logService.LogDebug($"[BinParser] Finished processing bank: {bankName}. Found {mapEventNames.Count} event names.");
-            if (mapEventNames.Any())
-            {
-                var eventsToShow = mapEventNames.Take(5).Select(kvp => string.Format("({0}: {1})", kvp.Key, kvp.Value));
-                string eventList = string.Join(", ", eventsToShow);
-                logService.LogDebug($"[BinParser] Sample names from {bankName}: {eventList}");
-            }
+            logService.LogDebug($"[BinParser] Finished processing bank: {bankName}. Found {mapEventNames.Count} unique strings/events.");
             return mapEventNames;
         }
-        
-        private static void SearchAndExtract(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService, string debugContext = "")
+
+        private void ExtractStrings(BinTreeProperty prop, Dictionary<uint, string> map)
         {
-            int currentPosition = 0;
-            int findCount = 0;
-            while (currentPosition < haystack.Length)
+            if (prop == null) return;
+            switch (prop.Type)
             {
-                int foundIndex = FindBytes(haystack, needle, currentPosition);
-                if (foundIndex == -1) break;
-
-                findCount++;
-                currentPosition = foundIndex + needle.Length;
-                
-                // Read amount
-                if (currentPosition + 8 > haystack.Length)
-                {
-                    logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for amount after magic sequence.");
+                case BinPropertyType.String:
+                    var str = ((BinTreeString)prop).Value;
+                    if (!string.IsNullOrEmpty(str))
+                    {
+                        map[Fnv1Hash(str)] = str;
+                    }
                     break;
-                }
-                // Skipping 4 bytes of object size
-                uint amount = BitConverter.ToUInt32(haystack, currentPosition + 4);
-                logService.LogDebug($"[BinParser] [{debugContext}] Found magic at index {foundIndex}. Strings to read: {amount}");
-                currentPosition += 8;
-
-                for (int i = 0; i < amount; i++)
-                {
-                    if (currentPosition + 2 > haystack.Length)
-                    {
-                        logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for string length.");
-                        break;
-                    }
-                    
-                    // Read length-prefixed string
-                    ushort stringLength = BitConverter.ToUInt16(haystack, currentPosition);
-                    currentPosition += 2;
-
-                    if (currentPosition + stringLength > haystack.Length)
-                    {
-                        logService.LogWarning($"[BinParser] [{debugContext}] Malformed/truncated BIN file: Not enough bytes for string data.");
-                        break;
-                    }
-                    
-                    string eventName = System.Text.Encoding.ASCII.GetString(haystack, currentPosition, stringLength);
-                    currentPosition += stringLength;
-
-                    uint eventHash = Fnv1Hash(eventName);
-                    if (!map.ContainsKey(eventHash))
-                    {
-                        map[eventHash] = eventName;
-                    }
-                }
-            }
-            if (findCount == 0)
-            {
-                logService.LogDebug($"[BinParser] [{debugContext}] No magic bytes match found in this BIN.");
-            }
-        }
-
-        private static void SearchAndExtractMusic(byte[] haystack, byte[] needle, Dictionary<uint, string> map, LogService logService)
-        {
-            int currentPosition = 0;
-            while (currentPosition < haystack.Length)
-            {
-                int foundIndex = FindBytes(haystack, needle, currentPosition);
-                if (foundIndex == -1) break;
-
-                currentPosition = foundIndex + needle.Length;
-
-                // Read type_hash
-                if (currentPosition + 4 > haystack.Length)
-                {
-                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for type_hash (music).");
+                case BinPropertyType.Container:
+                case BinPropertyType.UnorderedContainer:
+                    foreach (var p in ((BinTreeContainer)prop).Elements)
+                        ExtractStrings(p, map);
                     break;
-                }
-                uint typeHash = BitConverter.ToUInt32(haystack, currentPosition);
-                currentPosition += 4;
-                if (typeHash == 0) continue; // Skip if type_hash is 0
-
-                // Skip object size and read amount
-                if (currentPosition + 6 > haystack.Length)
-                {
-                    logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for object size/amount (music).");
+                case BinPropertyType.Struct:
+                case BinPropertyType.Embedded:
+                    foreach (var p in ((BinTreeStruct)prop).Properties.Values)
+                        ExtractStrings(p, map);
                     break;
-                }
-                currentPosition += 4; // skip object size (uint32)
-                ushort amount = BitConverter.ToUInt16(haystack, currentPosition); // amount is uint16
-                currentPosition += 2;
-
-                for (int i = 0; i < amount; i++)
-                {
-                    if (currentPosition + 5 > haystack.Length) // 4 bytes for name (hash) + 1 byte for bin_type
+                case BinPropertyType.Optional:
+                    ExtractStrings(((BinTreeOptional)prop).Value, map);
+                    break;
+                case BinPropertyType.Map:
+                    foreach (var kvp in ((BinTreeMap)prop))
                     {
-                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for name/bin_type (music).");
-                        break;
+                        ExtractStrings(kvp.Key, map);
+                        ExtractStrings(kvp.Value, map);
                     }
-                    currentPosition += 4; // skip name (hash) (uint32)
-                    byte binTypeByte = haystack[currentPosition]; // read bin_type (uint8)
-                    currentPosition++;
-
-                    if (binTypeByte != 0x10 /* string */)
-                    {
-                        logService.LogWarning($"Malformed BIN file: Expected string type (0x10) for music event, but got 0x{binTypeByte:X2}. Skipping.");
-                        // C code used goto error, we break this loop. If we continue, we risk reading garbage.
-                        break; 
-                    }
-
-                    if (currentPosition + 2 > haystack.Length)
-                    {
-                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string length (music).");
-                        break;
-                    }
-                    
-                    ushort stringLength = BitConverter.ToUInt16(haystack, currentPosition);
-                    currentPosition += 2;
-
-                    if (currentPosition + stringLength > haystack.Length)
-                    {
-                        logService.LogWarning("Malformed/truncated BIN file: Not enough bytes for string data (music).");
-                        break;
-                    }
-                    
-                    string eventName = System.Text.Encoding.ASCII.GetString(haystack, currentPosition, stringLength);
-                    currentPosition += stringLength;
-
-                    uint eventHash = Fnv1Hash(eventName);
-                    if (!map.ContainsKey(eventHash))
-                    {
-                        map[eventHash] = eventName;
-                    }
-                }
+                    break;
             }
-        }
-
-
-        private static int FindBytes(byte[] src, byte[] find, int startIndex)
-        {
-            for (int i = startIndex; i <= src.Length - find.Length; i++)
-            {
-                bool match = true;
-                for (int j = 0; j < find.Length; j++)
-                {
-                    if (src[i + j] != find[j])
-                    {
-                        match = false;
-                        break;
-                    }
-                }
-                if (match)
-                {
-                    return i; // Found a match, return the starting index
-                }
-            }
-            return -1; // No match found after checking all positions
         }
 
         private static uint Fnv1Hash(string input)
@@ -207,7 +98,6 @@ namespace AssetsManager.Services.Parsers
             uint hash = offsetBasis;
             foreach (char c in input)
             {
-                // Custom tolower logic from the C code
                 byte b = (byte)c;
                 byte lower_b = (b > 64 && b < 91) ? (byte)(b + 32) : b;
                 
@@ -216,6 +106,185 @@ namespace AssetsManager.Services.Parsers
             }
             return hash;
         }
+
+        #endregion
+
+        #region JSON Serialization
+
+        public Task WriteBinTreeAsJsonAsync(Stream outputStream, BinTree binTree)
+        {
+            return Task.Run(() => WriteBinTreeAsJson(outputStream, binTree));
+        }
+
+        private void WriteBinTreeAsJson(Stream outputStream, BinTree binTree)
+        {
+            var options = new JsonWriterOptions { Indented = true };
+            using var writer = new Utf8JsonWriter(outputStream, options);
+
+            writer.WriteStartObject();
+            foreach (var kvp in binTree.Objects)
+            {
+                writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(kvp.Key));
+                writer.WriteStartObject();
+                writer.WriteString("type", _hashResolver.ResolveBinHashGeneral(kvp.Value.ClassHash));
+                foreach (var propKvp in kvp.Value.Properties)
+                {
+                    writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(propKvp.Key));
+                    WritePropertyValue(writer, propKvp.Value);
+                }
+                writer.WriteEndObject();
+            }
+            writer.WriteEndObject();
+            writer.Flush();
+        }
+
+        private void WritePropertyValue(Utf8JsonWriter writer, BinTreeProperty prop)
+        {
+            if (prop == null)
+            {
+                writer.WriteNullValue();
+                return;
+            }
+
+            switch (prop.Type)
+            {
+                case BinPropertyType.String: writer.WriteStringValue(((BinTreeString)prop).Value); break;
+                case BinPropertyType.Hash: writer.WriteStringValue(_hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value)); break;
+                case BinPropertyType.I8: writer.WriteNumberValue(((BinTreeI8)prop).Value); break;
+                case BinPropertyType.U8: writer.WriteNumberValue(((BinTreeU8)prop).Value); break;
+                case BinPropertyType.I16: writer.WriteNumberValue(((BinTreeI16)prop).Value); break;
+                case BinPropertyType.U16: writer.WriteNumberValue(((BinTreeU16)prop).Value); break;
+                case BinPropertyType.I32: writer.WriteNumberValue(((BinTreeI32)prop).Value); break;
+                case BinPropertyType.U32: writer.WriteNumberValue(((BinTreeU32)prop).Value); break;
+                case BinPropertyType.I64: writer.WriteNumberValue(((BinTreeI64)prop).Value); break;
+                case BinPropertyType.U64: writer.WriteNumberValue(((BinTreeU64)prop).Value); break;
+                case BinPropertyType.F32: writer.WriteNumberValue(((BinTreeF32)prop).Value); break;
+                case BinPropertyType.Bool: writer.WriteBooleanValue(((BinTreeBool)prop).Value); break;
+                case BinPropertyType.BitBool: writer.WriteBooleanValue(((BinTreeBitBool)prop).Value); break;
+
+                case BinPropertyType.Vector2:
+                    var v2 = ((BinTreeVector2)prop).Value;
+                    writer.WriteStartObject();
+                    writer.WriteNumber("x", v2.X);
+                    writer.WriteNumber("y", v2.Y);
+                    writer.WriteEndObject();
+                    break;
+
+                case BinPropertyType.Vector3:
+                    var v3 = ((BinTreeVector3)prop).Value;
+                    writer.WriteStartObject();
+                    writer.WriteNumber("x", v3.X);
+                    writer.WriteNumber("y", v3.Y);
+                    writer.WriteNumber("z", v3.Z);
+                    writer.WriteEndObject();
+                    break;
+
+                case BinPropertyType.Vector4:
+                    var v4 = ((BinTreeVector4)prop).Value;
+                    writer.WriteStartObject();
+                    writer.WriteNumber("x", v4.X);
+                    writer.WriteNumber("y", v4.Y);
+                    writer.WriteNumber("z", v4.Z);
+                    writer.WriteNumber("w", v4.W);
+                    writer.WriteEndObject();
+                    break;
+
+                case BinPropertyType.Matrix44:
+                    var m44 = ((BinTreeMatrix44)prop).Value;
+                    writer.WriteStartArray();
+                    for (int i = 0; i < 4; i++)
+                    {
+                        writer.WriteStartArray();
+                        writer.WriteNumberValue(m44[i, 0]);
+                        writer.WriteNumberValue(m44[i, 1]);
+                        writer.WriteNumberValue(m44[i, 2]);
+                        writer.WriteNumberValue(m44[i, 3]);
+                        writer.WriteEndArray();
+                    }
+                    writer.WriteEndArray();
+                    break;
+
+                case BinPropertyType.Color:
+                    var c = ((BinTreeColor)prop).Value;
+                    writer.WriteStartObject();
+                    writer.WriteNumber("r", c.R);
+                    writer.WriteNumber("g", c.G);
+                    writer.WriteNumber("b", c.B);
+                    writer.WriteNumber("a", c.A);
+                    writer.WriteEndObject();
+                    break;
+
+                case BinPropertyType.ObjectLink: writer.WriteStringValue(_hashResolver.ResolveBinHashGeneral(((BinTreeObjectLink)prop).Value)); break;
+                case BinPropertyType.WadChunkLink: writer.WriteStringValue(_hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
+
+                case BinPropertyType.Container:
+                case BinPropertyType.UnorderedContainer:
+                    writer.WriteStartArray();
+                    var container = (BinTreeContainer)prop;
+                    foreach (var p in container.Elements)
+                    {
+                        WritePropertyValue(writer, p);
+                    }
+                    writer.WriteEndArray();
+                    break;
+
+                case BinPropertyType.Struct:
+                case BinPropertyType.Embedded:
+                    var structProp = (BinTreeStruct)prop;
+                    writer.WriteStartObject();
+                    writer.WriteString("type", _hashResolver.ResolveBinHashGeneral(structProp.ClassHash));
+                    foreach (var kvp in structProp.Properties)
+                    {
+                        writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(kvp.Key));
+                        WritePropertyValue(writer, kvp.Value);
+                    }
+                    writer.WriteEndObject();
+                    break;
+
+                case BinPropertyType.Optional:
+                    WritePropertyValue(writer, ((BinTreeOptional)prop).Value);
+                    break;
+
+                case BinPropertyType.Map:
+                    writer.WriteStartObject();
+                    foreach (var kvp in (BinTreeMap)prop)
+                    {
+                        var keyString = ConvertPropertyToString(kvp.Key);
+                        writer.WritePropertyName(keyString);
+                        WritePropertyValue(writer, kvp.Value);
+                    }
+                    writer.WriteEndObject();
+                    break;
+
+                default:
+                    writer.WriteStartObject();
+                    writer.WriteString("Type", prop.Type.ToString());
+                    writer.WriteString("NameHash", _hashResolver.ResolveBinHashGeneral(prop.NameHash));
+                    writer.WriteEndObject();
+                    break;
+            }
+        }
+
+        private string ConvertPropertyToString(BinTreeProperty prop)
+        {
+            if (prop == null) return "null";
+            switch (prop.Type)
+            {
+                case BinPropertyType.String: return ((BinTreeString)prop).Value;
+                case BinPropertyType.Hash: return _hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value);
+                case BinPropertyType.I8: return ((BinTreeI8)prop).Value.ToString();
+                case BinPropertyType.U8: return ((BinTreeU8)prop).Value.ToString();
+                case BinPropertyType.I16: return ((BinTreeI16)prop).Value.ToString();
+                case BinPropertyType.U16: return ((BinTreeU16)prop).Value.ToString();
+                case BinPropertyType.I32: return ((BinTreeI32)prop).Value.ToString();
+                case BinPropertyType.U32: return ((BinTreeU32)prop).Value.ToString();
+                case BinPropertyType.I64: return ((BinTreeI64)prop).Value.ToString();
+                case BinPropertyType.U64: return ((BinTreeU64)prop).Value.ToString();
+                default: return _hashResolver.ResolveBinHashGeneral(prop.NameHash);
+            }
+        }
+
+        #endregion
     }
 }
 

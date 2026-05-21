@@ -33,6 +33,8 @@ Improvements
     * Integrated custom LeagueToolkit patch: added full support for modern BC5 and BC7 texture formats (0x0D/0x0E), enabling high-fidelity preview and extraction of the latest game assets.
   - Settings / Audio Encoding Target Clarity
     * Refined the "Audio encoding target" description in Settings to explicitly clarify its use: "Preferred audio format for SMART method in the Explorer".
+  - Comparator / Hybrid Comparison Extraction
+    * Optimized comparison extraction to use a hybrid approach: individual files (textures, data, single audios) now respect the user's preferred format options (Smart Mode), while container audio banks (.bnk and .wpk) are kept intact as original files to avoid unpacking them into directories of unnamed ID numbers.
 
 Bug Fixes
   - A bug has been fixed that prevented favorites from appearing in the UI when accessing the Explorer from the home screen (live or pbe).
@@ -41,7 +43,6 @@ Bug Fixes
   - Corrected the visual hierarchy of the PBE footer during maintenance periods to prevent information overlap and clutter.
   - Fixed update version label in asset watcher information.
   - Fixed a bug in "Extract New Assets" where preferred format settings (such as converting textures to PNG or data to JSON) were ignored because the process hardcoded RAW/Original extraction.
-  - Optimized comparison extraction to use a hybrid approach: individual files (textures, data, single audios) now respect the user's preferred format options (Smart Mode), while container audio banks (.bnk and .wpk) are kept intact as original files to avoid unpacking them into directories of unnamed ID numbers.
   - Added a safety check to AudioBankLinkerService to prevent NullReferenceException crashes when looking up associated binary mappings without an active explorer tree context.
   - Fixed a visual ghosting and flashing glitch in the Grid View where items from a previously browsed folder or different explorer mode (e.g. WAD vs Local Dir) were briefly visible before updating.
 
