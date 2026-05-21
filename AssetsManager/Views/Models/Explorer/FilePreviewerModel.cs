@@ -155,6 +155,13 @@ namespace AssetsManager.Views.Models.Explorer
             set { _unsupportedMessage = value; OnPropertyChanged(); }
         }
 
+        private string _imageUnsupportedMessage = "The file format is not supported to preview it";
+        public string ImageUnsupportedMessage
+        {
+            get => _imageUnsupportedMessage;
+            set { _imageUnsupportedMessage = value; OnPropertyChanged(); }
+        }
+
         private bool _isWelcomeVisible = true;
         public bool IsWelcomeVisible
         {
@@ -174,6 +181,13 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _isImageVisible;
             set { _isImageVisible = value; OnPropertyChanged(); }
+        }
+
+        private bool _isImageUnsupportedVisible;
+        public bool IsImageUnsupportedVisible
+        {
+            get => _isImageUnsupportedVisible;
+            set { _isImageUnsupportedVisible = value; OnPropertyChanged(); }
         }
 
         private bool _isContentVisible;
@@ -240,7 +254,7 @@ namespace AssetsManager.Views.Models.Explorer
 
             if (isImage)
             {
-                IsImageVisible = true;
+                IsImageUnsupportedVisible = false; // Start clean for images
             }
             else
             {
@@ -271,6 +285,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (isImage)
                 {
                     IsImageVisible = false;
+                    IsImageUnsupportedVisible = false;
                 }
                 else
                 {
@@ -294,6 +309,7 @@ namespace AssetsManager.Views.Models.Explorer
             IsWelcomeVisible = true;
             IsUnsupportedVisible = false;
             IsImageVisible = false;
+            IsImageUnsupportedVisible = false;
             IsContentVisible = false;
             IsTextVisible = false;
             IsWebVisible = false;
