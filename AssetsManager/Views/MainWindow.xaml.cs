@@ -305,12 +305,19 @@ namespace AssetsManager.Views
                     var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
                     _lastAssignedFolder = folderInfo.FolderName; // Store for follow-up actions
                     
-                    // We run this without awaiting to not block UI thread, but we log errors inside the services
+                    // We run this without awaiting to not block UI thread, but we wrap it in try-catch to log errors
                     _ = Task.Run(async () => 
                     {
-                        await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.PhysicalPath);
-                        // 2. Metadata Registration (ComparisonHistoryService)
-                        _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
+                        try
+                        {
+                            await _wadPackagingService.SaveBackupAsync(serializableDiffs, oldLolPath, newLolPath, folderInfo.PhysicalPath);
+                            // 2. Metadata Registration (ComparisonHistoryService)
+                            _comparisonHistoryService.RegisterComparisonInHistory(_lastAssignedFolder, displayName, oldLolPath, newLolPath, version);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logService.LogError(ex, "Failed to auto-save comparison history in background task.");
+                        }
                     });
                 }
                 catch (Exception ex)
