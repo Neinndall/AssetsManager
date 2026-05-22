@@ -117,7 +117,7 @@ namespace AssetsManager.Services.Core
         /// <summary>
         /// Centralizes logic to finish an operation.
         /// </summary>
-        private async void FinishOperation()
+        private async Task FinishOperation()
         {
             if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
             _taskCancellationManager.CompleteCurrentOperation();
@@ -215,7 +215,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Downloading {completedFiles} of {totalFiles} files: {currentFileName}", completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
         }
 
-        public void OnDownloadCompleted() => FinishOperation();
+        public async void OnDownloadCompleted() => await FinishOperation();
 
         // --- Comparator ---
 
@@ -242,7 +242,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
         }
 
-        public void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath) => FinishOperation();
+        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath) => await FinishOperation();
 
         // --- Extraction ---
 
@@ -267,7 +267,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Extracting {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
         }
 
-        public void OnExtractionCompleted() => FinishOperation();
+        public async void OnExtractionCompleted() => await FinishOperation();
 
         // --- Saving ---
 
@@ -292,7 +292,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
         }
 
-        public void OnSavingCompleted() => FinishOperation();
+        public async void OnSavingCompleted() => await FinishOperation();
 
         // --- Versions (Update) ---
 
@@ -319,18 +319,10 @@ namespace AssetsManager.Services.Core
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
-            if (wasCancelled) 
-            {
-                await Task.Delay(1500);
-            }
-
-            _taskCancellationManager.CompleteCurrentOperation();
-            UpdateStatusBar("Ready");
+            await FinishOperation();
             
             _owner.Dispatcher.Invoke(() =>
             {
-                CloseProgressWindow();
-
                 if (!data.Success && !wasCancelled) 
                 {
                     _customMessageBoxService.ShowError("Error", data.Message, _owner);
@@ -362,10 +354,10 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Backing up {data.Processed} of {data.Total} files: {data.CurrentFile}", data.Processed, data.Total, data.CurrentFile);
         }
 
-        public void OnBackupCompleted(object sender, bool success)
+        public async void OnBackupCompleted(object sender, bool success)
         {
             // BackupsControl handles the success message/logic. We just close the progress UI.
-            FinishOperation();
+            await FinishOperation();
         }
 
         #endregion

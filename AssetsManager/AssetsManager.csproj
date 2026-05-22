@@ -44,7 +44,7 @@
       <HintPath>..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\BCnEncoder.dll</HintPath>
     </Reference>
   </ItemGroup>
-
+  
   <ItemGroup>
     <EmbeddedResource Include="changelogs.txt" />
     <EmbeddedResource Include="Resources\AudioPlayer.html" />
