@@ -73,15 +73,14 @@ namespace AssetsManager.Services.Core
                 _cachedData[cacheKey] = result;
                 return result;
             }
+            catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logService.LogError(httpEx, $"Could not load commits from branch '{branch}'. The branch may have been renamed or removed.");
+                return new List<GitHubCommit>();
+            }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to fetch GitHub commits for {RepoName} on branch {branch}");
-                
-                if (_cachedData.TryGetValue(cacheKey, out var cached))
-                {
-                    return (List<GitHubCommit>)cached;
-                }
-                
+                _logService.LogError(ex, $"Could not load commits from branch '{branch}'.");
                 return new List<GitHubCommit>();
             }
         }
@@ -120,15 +119,13 @@ namespace AssetsManager.Services.Core
                 _cachedData[cacheKey] = release;
                 return release;
             }
+            catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
             catch (Exception ex)
             {
-                _logService.LogWarning($"Release with tag {tag} not found or error: {ex.Message}");
-
-                if (_cachedData.TryGetValue(cacheKey, out var cached))
-                {
-                    return (GitHubRelease)cached;
-                }
-
+                _logService.LogWarning($"Failed to fetch release '{tag}': {ex.Message}");
                 return null;
             }
         }
@@ -169,15 +166,14 @@ namespace AssetsManager.Services.Core
                 _cachedData[cacheKey] = allAssets;
                 return allAssets;
             }
+            catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logService.LogWarning("Releases not found on GitHub. The repository may be private or unavailable.");
+                return new List<GitHubAsset>();
+            }
             catch (Exception ex)
             {
                 _logService.LogWarning($"Failed to fetch all releases: {ex.Message}");
-                
-                if (_cachedData.TryGetValue(cacheKey, out var cached))
-                {
-                    return (List<GitHubAsset>)cached;
-                }
-
                 return new List<GitHubAsset>();
             }
         }
@@ -251,7 +247,7 @@ namespace AssetsManager.Services.Core
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to fetch enriched GitHub commits");
+                _logService.LogError(ex, "Could not load full commit history.");
                 return new List<GitHubCommit>();
             }
         }

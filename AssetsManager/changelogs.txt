@@ -1,3 +1,22 @@
+AssetsManager - League of Legends | v4.0.0.3
+
+HOTFIX UPDATE
+
+New Features
+
+Improvements
+  - Commit History / Improved log messages when release tags are missing.
+  - Explorer / Synchronized Breadcrumb Navigation
+    * Implemented a brand new context-aware breadcrumb system: closing all file tabs now automatically resets the path to the parent directory, providing a logical and seamless return to the folder context.
+    * Integrated Real-time Tree Synchronization: closing or switching between tabs now automatically updates the File Explorer selection and scrolls the tree to the active file, ensuring absolute visual coherence between the previewer and the navigation hierarchy.
+
+Changes
+
+Bug Fixes
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.0.2
 
 HOTFIX UPDATE
