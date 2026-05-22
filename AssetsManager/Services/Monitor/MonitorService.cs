@@ -349,11 +349,11 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.CompletedSuccess);
+                _ = Task.Run(async () =>
                 {
-                    category.Status = CategoryStatus.CompletedSuccess;
                     await Task.Delay(3000);
-                    category.Status = CategoryStatus.Idle;
+                    Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.Idle);
                 });
             }
         }
@@ -416,11 +416,11 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.CompletedSuccess);
+                _ = Task.Run(async () =>
                 {
-                    category.Status = CategoryStatus.CompletedSuccess;
                     await Task.Delay(3000);
-                    category.Status = CategoryStatus.Idle;
+                    Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.Idle);
                 });
             }
         }
