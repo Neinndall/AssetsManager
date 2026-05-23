@@ -518,7 +518,7 @@ namespace AssetsManager.Views.Controls.Monitor
                                 var imagePathProperty = item.GetType().GetProperty("ImagePath");
                                 if (imagePathProperty != null)
                                 {
-                                    Dispatcher.InvokeAsync(() => imagePathProperty.SetValue(item, localPath));
+                                    await Dispatcher.InvokeAsync(() => imagePathProperty.SetValue(item, localPath));
                                 }
                             }
                         }
@@ -691,7 +691,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         // Find all models using this URL (there might be duplicates across levels)
                         var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
                         
-                        Dispatcher.InvokeAsync(() => 
+                        _ = Dispatcher.InvokeAsync(() => 
                         {
                             foreach (var target in targets)
                             {

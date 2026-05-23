@@ -57,7 +57,7 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     // Don't overwrite pending check or updated status if we are already in that state in UI
-                    Application.Current.Dispatcher.InvokeAsync(() =>
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         if (asset.Status != AssetStatus.Updated)
                         {
@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's an absolute path that really doesn't exist
                             _logService.LogWarning($"WAD file not found at path: {asset.WadName}");
-                            Application.Current.Dispatcher.InvokeAsync(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -88,7 +88,7 @@ namespace AssetsManager.Services.Monitor
                                 _logService.LogWarning("Some monitored assets have relative paths but PBE Client Directory is not configured in Settings.");
                                 baseDirWarningLogged = true;
                             }
-                            Application.Current.Dispatcher.InvokeAsync(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Pending;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
@@ -98,7 +98,7 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's a relative path, we have a base dir, but still couldn't find the file
                             _logService.LogWarning($"Asset WAD not found in game directory: {asset.WadName}");
-                            Application.Current.Dispatcher.InvokeAsync(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -114,7 +114,7 @@ namespace AssetsManager.Services.Monitor
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {
                         _logService.LogWarning($"Asset '{asset.InternalPath}' not found inside WAD '{asset.WadName}'");
-                        Application.Current.Dispatcher.InvokeAsync(() =>
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             asset.Status = AssetStatus.Error;
                             asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -142,7 +142,7 @@ namespace AssetsManager.Services.Monitor
                         // No changes found in this check. 
                         // CRITICAL: Only set to UpToDate if it wasn't already marked as Updated 
                         // (prevents auto-resetting before user sees it)
-                        Application.Current.Dispatcher.InvokeAsync(() =>
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             if (!asset.HasChanges)
                             {
@@ -161,7 +161,7 @@ namespace AssetsManager.Services.Monitor
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error checking asset: {asset.AssetPath}");
-                    Application.Current.Dispatcher.InvokeAsync(() =>
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         asset.Status = AssetStatus.Error;
                         asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -268,7 +268,7 @@ namespace AssetsManager.Services.Monitor
                 }
             }
 
-            Application.Current.Dispatcher.InvokeAsync(() =>
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 asset.Version = currentVersion;
                 asset.LastKnownHash = checksum;

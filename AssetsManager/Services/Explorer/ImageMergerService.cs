@@ -18,13 +18,15 @@ namespace AssetsManager.Services.Explorer
     public class ImageMergerService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly LogService _logService;
         private ImageMergerWindow _activeWindow;
 
         public ObservableRangeCollection<ImageMergerItem> Items { get; } = new ObservableRangeCollection<ImageMergerItem>();
 
-        public ImageMergerService(IServiceProvider serviceProvider)
+        public ImageMergerService(IServiceProvider serviceProvider, LogService logService)
         {
             _serviceProvider = serviceProvider;
+            _logService = logService;
         }
 
         public void AddItem(ImageMergerItem item)

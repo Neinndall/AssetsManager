@@ -321,7 +321,7 @@ namespace AssetsManager.Services.Core
 
             await FinishOperation();
             
-            _owner.Dispatcher.InvokeAsync(() =>
+            await _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (!data.Success && !wasCancelled) 
                 {

@@ -3,13 +3,20 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Formatting
 {
     public sealed class JsBeautifierService
     {
+        private readonly LogService _logService;
         private const string INDENT = "    ";
         private const int MAX_SIZE_FOR_FORMATTING = 3 * 1024 * 1024; // 3MB
+
+        public JsBeautifierService(LogService logService)
+        {
+            _logService = logService;
+        }
 
         public async Task<string> BeautifyAsync(string jsContent)
         {

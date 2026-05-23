@@ -341,11 +341,11 @@ namespace AssetsManager.Views
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
 
-                Dispatcher.InvokeAsync(StartExtractionAsync);
+                await Dispatcher.InvokeAsync(StartExtractionAsync);
             }
             else
             {
-                Dispatcher.InvokeAsync(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
                 });

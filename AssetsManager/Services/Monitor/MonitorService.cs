@@ -314,7 +314,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task CheckAssetsAsync(List<TrackedAsset> assetsToCheck, AssetCategory category, CancellationToken cancellationToken)
         {
-            Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
+            await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             CategoryCheckStarted?.Invoke(category);
             try
             {
@@ -349,13 +349,13 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
+                await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         await Task.Delay(3000);
-                        Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
+                        await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
                     }
                     catch (Exception ex)
                     {
@@ -378,7 +378,7 @@ namespace AssetsManager.Services.Monitor
 
         private async Task<bool> _CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
         {
-            Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
+            await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             try
             {
                 CategoryCheckStarted?.Invoke(category);
@@ -423,13 +423,13 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
+                await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         await Task.Delay(3000);
-                        Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
+                        await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
                     }
                     catch (Exception ex)
                     {

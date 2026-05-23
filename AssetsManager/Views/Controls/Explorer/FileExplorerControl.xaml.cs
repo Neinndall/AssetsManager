@@ -887,7 +887,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"Watcher: Could not detect game version for asset: {selectedNode.Name}");
+                    LogService.LogError(ex, $"Watcher: Could not detect game version for asset: {selectedNode.Name}");
                 }
 
                 var newAsset = new MonitoredAsset
@@ -1083,7 +1083,7 @@ namespace AssetsManager.Views.Controls.Explorer
             _searchTimer.Start();
         }
 
-        public void HandleCollapseToContainer()
+        public async void HandleCollapseToContainer()
         {
             if (FileTreeView.SelectedItem is not FileSystemNodeModel selectedNode) return;
 
@@ -1119,7 +1119,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 containerNode.IsExpanded = false;
 
-                Dispatcher.InvokeAsync(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, containerNode, false);
                 }, DispatcherPriority.ContextIdle);
@@ -1162,7 +1162,7 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (nodeToSelect != null)
             {
-                Dispatcher.InvokeAsync(() =>
+                await Dispatcher.InvokeAsync(() =>
                 {
                     TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
                 }, DispatcherPriority.ContextIdle);
@@ -1172,7 +1172,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
                 if (selectedNode != null && string.IsNullOrEmpty(searchText))
                 {
-                    Dispatcher.InvokeAsync(() =>
+                    await Dispatcher.InvokeAsync(() =>
                     {
                         TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
                     }, DispatcherPriority.ContextIdle);

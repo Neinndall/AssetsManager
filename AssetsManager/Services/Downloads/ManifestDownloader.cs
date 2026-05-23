@@ -399,7 +399,7 @@ public class ManifestDownloader
                     }
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { _logService.LogWarning($"Bundle {bundleEntry.Key:X16} error: {ex.Message}"); }
+                catch (Exception ex) { _logService.LogError(ex, $"Bundle {bundleEntry.Key:X16} processing error"); }
                 finally { netSem.Release(); }
             });
             await Task.WhenAll(tasks);
