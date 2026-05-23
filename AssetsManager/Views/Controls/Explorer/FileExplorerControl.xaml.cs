@@ -84,6 +84,12 @@ namespace AssetsManager.Views.Controls.Explorer
         private string _backupJsonPath;
         private bool _isExternalInitRequested = false;
 
+        // State tracking for smart reloading
+        private string _lastPbePath;
+        private string _lastLivePath;
+        private PreferredClient _lastPreferredClient;
+        private PreferredDirectory _lastPreferredDirectory;
+
         public FileExplorerControl()
         {
             InitializeComponent();
@@ -125,10 +131,24 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(async () =>
+            // SMART FILTER: Only reload if settings that actually affect the Explorer have changed.
+            // This prevents the tree from resetting when history, notifications, or background checks occur.
+            bool pathChanged = _lastPbePath != AppSettings.LolPbeDirectory || _lastLivePath != AppSettings.LolLiveDirectory;
+            bool prefChanged = _lastPreferredClient != AppSettings.PreferredClient || _lastPreferredDirectory != AppSettings.PreferredDirectory;
+
+            if (pathChanged || prefChanged)
             {
-                await ReloadTreeAsync();
-            });
+                // Update tracked state
+                _lastPbePath = AppSettings.LolPbeDirectory;
+                _lastLivePath = AppSettings.LolLiveDirectory;
+                _lastPreferredClient = AppSettings.PreferredClient;
+                _lastPreferredDirectory = AppSettings.PreferredDirectory;
+
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    await ReloadTreeAsync();
+                });
+            }
         }
 
         public void CleanupResources()
@@ -194,6 +214,12 @@ namespace AssetsManager.Views.Controls.Explorer
                 FavoritesManager.Favorites.CollectionChanged += Favorites_CollectionChanged;
                 _viewModel.HasFavorites = FavoritesManager.Favorites.Count > 0;
             }
+
+            // Initialize tracking state to prevent false-positive reloads
+            _lastPbePath = AppSettings.LolPbeDirectory;
+            _lastLivePath = AppSettings.LolLiveDirectory;
+            _lastPreferredClient = AppSettings.PreferredClient;
+            _lastPreferredDirectory = AppSettings.PreferredDirectory;
 
             if (_isExternalInitRequested) return;
 
