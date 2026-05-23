@@ -391,6 +391,7 @@ namespace AssetsManager.Views.Models.Explorer
             Name = null;
 
             // Desuscribir todos los eventos
+            Parent = null;
             PropertyChanged = null;
         }
     }
