@@ -59,6 +59,7 @@ namespace AssetsManager.Utils
         public event EventHandler ConfigurationSaved;
 
         private const string ConfigFilePath = "config.json";
+        private static readonly object _saveLock = new object();
 
         public void Save()
         {
@@ -68,52 +69,55 @@ namespace AssetsManager.Utils
 
         public static AppSettings LoadSettings()
         {
-            if (!File.Exists(ConfigFilePath))
+            lock (_saveLock)
             {
-                var defaultSettings = GetDefaultSettings();
-                SaveSettings(defaultSettings);
-                return defaultSettings;
+                if (!File.Exists(ConfigFilePath))
+                {
+                    var defaultSettings = GetDefaultSettings();
+                    SaveSettings(defaultSettings);
+                    return defaultSettings;
+                }
+
+                var json = File.ReadAllText(ConfigFilePath);
+                var settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? GetDefaultSettings();
+
+                var jObject = JObject.Parse(json);
+                bool needsResave = false;
+
+                if (needsResave)
+                {
+                    SaveSettings(settings);
+                }
+
+                settings.MonitoredAssets ??= new List<MonitoredAsset>();
+                settings.DiffHistory ??= new List<HistoryEntry>();
+                settings.AssetTrackerProgress ??= new Dictionary<string, long>();
+                settings.AssetTrackerFailedIds ??= new Dictionary<string, List<long>>();
+                settings.AssetTrackerFoundIds ??= new Dictionary<string, List<long>>();
+                settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
+                settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
+                settings.FavoritePaths ??= new List<string>();
+                settings.AudioPlaylists ??= new List<AudioPlaylistPack>();
+
+                // Robustly initialize and heal ApiSettings
+                if (settings.ApiSettings == null)
+                {
+                    settings.ApiSettings = GetDefaultSettings().ApiSettings;
+                    needsResave = true;
+                }
+                else
+                {
+                    settings.ApiSettings.Connection ??= new ConnectionInfo();
+                    settings.ApiSettings.Token ??= new TokenInfo();
+                }
+
+                if (needsResave)
+                {
+                    SaveSettings(settings);
+                }
+
+                return settings;
             }
-
-            var json = File.ReadAllText(ConfigFilePath);
-            var settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? GetDefaultSettings();
-
-            var jObject = JObject.Parse(json);
-            bool needsResave = false;
-
-            if (needsResave)
-            {
-                SaveSettings(settings);
-            }
-
-            settings.MonitoredAssets ??= new List<MonitoredAsset>();
-            settings.DiffHistory ??= new List<HistoryEntry>();
-            settings.AssetTrackerProgress ??= new Dictionary<string, long>();
-            settings.AssetTrackerFailedIds ??= new Dictionary<string, List<long>>();
-            settings.AssetTrackerFoundIds ??= new Dictionary<string, List<long>>();
-            settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
-            settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
-            settings.FavoritePaths ??= new List<string>();
-            settings.AudioPlaylists ??= new List<AudioPlaylistPack>();
-
-            // Robustly initialize and heal ApiSettings
-            if (settings.ApiSettings == null)
-            {
-                settings.ApiSettings = GetDefaultSettings().ApiSettings;
-                needsResave = true;
-            }
-            else
-            {
-                settings.ApiSettings.Connection ??= new ConnectionInfo();
-                settings.ApiSettings.Token ??= new TokenInfo();
-            }
-
-            if (needsResave)
-            {
-                SaveSettings(settings);
-            }
-
-            return settings;
         }
 
         public static AppSettings GetDefaultSettings()
@@ -173,8 +177,11 @@ namespace AssetsManager.Utils
 
         public static void SaveSettings(AppSettings settings)
         {
-            var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-            File.WriteAllText(ConfigFilePath, json);
+            lock (_saveLock)
+            {
+                var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+                File.WriteAllText(ConfigFilePath, json);
+            }
         }
 
         public void ResetToDefaults()
