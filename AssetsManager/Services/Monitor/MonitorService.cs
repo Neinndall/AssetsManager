@@ -42,7 +42,10 @@ namespace AssetsManager.Services.Monitor
 
         public void Dispose()
         {
-            _assetWatcherService.AssetUpdated -= OnAssetUpdated;
+            if (_assetWatcherService != null)
+            {
+                _assetWatcherService.AssetUpdated -= OnAssetUpdated;
+            }
         }
 
         public void LoadMonitoredAssets()
