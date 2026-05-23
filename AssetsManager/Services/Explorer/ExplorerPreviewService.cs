@@ -411,7 +411,7 @@ namespace AssetsManager.Services.Explorer
                     webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
                     if (shouldAutoplay)
                     {
-                        webView.Dispatcher.Invoke(async () =>
+                        _ = webView.Dispatcher.InvokeAsync(async () =>
                         {
                             try
                             {

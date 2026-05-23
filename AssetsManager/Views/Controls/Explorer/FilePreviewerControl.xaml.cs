@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
@@ -375,7 +376,7 @@ namespace AssetsManager.Views.Controls.Explorer
             if (folderNode == null) return;
 
             // Defer execution to avoid issues with current mouse events in the ListBox
-            _ = Dispatcher.BeginInvoke(new Action(() =>
+            Dispatcher.InvokeAsync(() =>
             {
                 var gridItems = new ObservableRangeCollection<FileGridViewModel>(
                     (!string.IsNullOrEmpty(_currentSearchFilter)
@@ -389,7 +390,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 _thumbnailCts?.Cancel();
                 _thumbnailCts = new CancellationTokenSource();
                 _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
-            }), System.Windows.Threading.DispatcherPriority.Background);
+            }, DispatcherPriority.Background);
         }
 
         private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)

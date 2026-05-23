@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input;
+using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Views.Helpers;
@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Dialogs
             JsonDiffControl.FocusFirstDifference();
 
             // 2. IMPORTANT: Wait for the UI to process the initial rendering of the heavy text
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
             // 3. Now make the window visible and bring to front
             this.Visibility = Visibility.Visible;
@@ -63,7 +63,7 @@ namespace AssetsManager.Views.Dialogs
             await Dispatcher.InvokeAsync(() =>
             {
                 JsonDiffControl.RefreshGuidePosition();
-            }, System.Windows.Threading.DispatcherPriority.Input);
+            }, DispatcherPriority.Input);
         }
 
         // Used by DiffViewService when the file content is already processed and available in memory.

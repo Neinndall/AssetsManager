@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private void StartOperation(string headerText, string verb, string iconKind, int totalItems, string initialStatusMsg)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 _totalFiles = totalItems;
                 UpdateStatusBar(initialStatusMsg, 0, totalItems);
@@ -108,7 +108,7 @@ namespace AssetsManager.Services.Core
             }
 
             UpdateStatusBar(cleanStatus, current, total);
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
             });
@@ -122,7 +122,7 @@ namespace AssetsManager.Services.Core
             if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
             _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
-            _owner.Dispatcher.Invoke(() =>
+            await _owner.Dispatcher.InvokeAsync(() =>
             {
                 CloseProgressWindow();
             });
@@ -140,7 +140,7 @@ namespace AssetsManager.Services.Core
 
         private void UpdateStatusBar(string message, int completed = -1, int total = -1)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_statusBarViewModel == null) return;
 
@@ -179,7 +179,7 @@ namespace AssetsManager.Services.Core
             }
             else
             {
-                _owner.Dispatcher.Invoke(() =>
+                _owner.Dispatcher.InvokeAsync(() =>
                 {
                     if (_statusBarViewModel != null && _statusBarViewModel.StatusText == _taskCancellationManager.CancellationMessage)
                     {
@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Core
 
         public void OnComparisonStarted(int totalFiles)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 // If the operation is already active (indeterminate start), just update the total
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
@@ -248,7 +248,7 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_progressDetailsWindow != null && _totalFiles == 0 && data.totalFiles > 0)
                 {
@@ -273,7 +273,7 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingStarted(int totalFiles)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
                 {
@@ -304,7 +304,7 @@ namespace AssetsManager.Services.Core
 
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_progressDetailsWindow != null)
                 {
@@ -321,7 +321,7 @@ namespace AssetsManager.Services.Core
 
             await FinishOperation();
             
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (!data.Success && !wasCancelled) 
                 {
@@ -334,7 +334,7 @@ namespace AssetsManager.Services.Core
 
         public void OnBackupStarted(object sender, int totalFiles)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _owner.Dispatcher.InvokeAsync(() =>
             {
                 // If already active (indeterminate start), update the total
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)

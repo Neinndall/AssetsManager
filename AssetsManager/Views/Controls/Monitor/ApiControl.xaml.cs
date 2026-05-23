@@ -518,7 +518,7 @@ namespace AssetsManager.Views.Controls.Monitor
                                 var imagePathProperty = item.GetType().GetProperty("ImagePath");
                                 if (imagePathProperty != null)
                                 {
-                                    Dispatcher.Invoke(() => imagePathProperty.SetValue(item, localPath));
+                                    Dispatcher.InvokeAsync(() => imagePathProperty.SetValue(item, localPath));
                                 }
                             }
                         }
@@ -684,19 +684,26 @@ namespace AssetsManager.Views.Controls.Monitor
             
             _ = Task.Run(async () => 
             {
-                await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, (originalUrl, localPath) => 
+                try
                 {
-                    // Find all models using this URL (there might be duplicates across levels)
-                    var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
-                    
-                    Dispatcher.Invoke(() => 
+                    await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, (originalUrl, localPath) => 
                     {
-                        foreach (var target in targets)
+                        // Find all models using this URL (there might be duplicates across levels)
+                        var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
+                        
+                        Dispatcher.InvokeAsync(() => 
                         {
-                            target.IconUrl = localPath;
-                        }
+                            foreach (var target in targets)
+                            {
+                                target.IconUrl = localPath;
+                            }
+                        });
                     });
-                });
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, "Failed to background extract rewards icons.");
+                }
             });
         }
 

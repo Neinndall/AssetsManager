@@ -1,5 +1,7 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace AssetsManager.Views.Helpers
 {
@@ -67,7 +69,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (sender is TextBox textBox && textBox.IsVisible)
             {
-                textBox.Dispatcher.BeginInvoke(new System.Action(() =>
+                textBox.Dispatcher.InvokeAsync(() =>
                 {
                     UpdateClearButtonVisibility(textBox);
                     if (GetClearButton(textBox) is Button clearButton)
@@ -76,11 +78,9 @@ namespace AssetsManager.Views.Helpers
                         clearButton.Click -= ClearButton_Click;
                         clearButton.Click += ClearButton_Click;
                     }
-                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+                }, DispatcherPriority.ContextIdle);
             }
         }
-
-
 
         private static void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {

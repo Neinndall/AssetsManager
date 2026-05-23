@@ -1116,10 +1116,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 containerNode.IsExpanded = false;
 
-                _ = Dispatcher.BeginInvoke(new Action(() =>
+                Dispatcher.InvokeAsync(() =>
                 {
                     TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, containerNode, false);
-                }), DispatcherPriority.ContextIdle);
+                }, DispatcherPriority.ContextIdle);
             }
         }
 
@@ -1159,20 +1159,20 @@ namespace AssetsManager.Views.Controls.Explorer
 
             if (nodeToSelect != null)
             {
-                _ = Dispatcher.BeginInvoke(new Action(() =>
+                Dispatcher.InvokeAsync(() =>
                 {
                     TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
-                }), DispatcherPriority.ContextIdle);
+                }, DispatcherPriority.ContextIdle);
             }
             else
             {
                 var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
                 if (selectedNode != null && string.IsNullOrEmpty(searchText))
                 {
-                    _ = Dispatcher.BeginInvoke(new Action(() =>
+                    Dispatcher.InvokeAsync(() =>
                     {
                         TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
-                    }), DispatcherPriority.ContextIdle);
+                    }, DispatcherPriority.ContextIdle);
                 }
             }
         }

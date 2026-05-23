@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 
 namespace AssetsManager.Views.Models.Monitor
@@ -32,7 +33,7 @@ namespace AssetsManager.Views.Models.Monitor
         public MonitoredAsset()
         {
             Status = AssetStatus.Pending;
-            StatusColor = (SolidColorBrush)System.Windows.Application.Current.FindResource("TextMuted");
+            StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
         }
 
         public string Version

@@ -194,7 +194,7 @@ namespace AssetsManager.Views
 
         private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
         {
-            System.Windows.Application.Current.Shutdown();
+            Application.Current.Shutdown();
         }
 
         private void ShowAppFromTray()
@@ -227,7 +227,10 @@ namespace AssetsManager.Views
             // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
-                TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
+                Dispatcher.InvokeAsync(() =>
+                {
+                    TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
+                });
             }
 
             // Always update internal notification system
@@ -236,7 +239,7 @@ namespace AssetsManager.Views
         
         private void OnExtractionCompleted(object sender, EventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.InvokeAsync(() =>
             {
                 _progressUIManager.OnExtractionCompleted();
                 if (_isExtractingAfterComparison)
@@ -338,11 +341,11 @@ namespace AssetsManager.Views
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
 
-                Dispatcher.Invoke(StartExtractionAsync);
+                Dispatcher.InvokeAsync(StartExtractionAsync);
             }
             else
             {
-                Dispatcher.Invoke(() =>
+                Dispatcher.InvokeAsync(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
                 });

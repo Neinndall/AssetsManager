@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Views.Controls.Explorer
@@ -17,10 +18,10 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (SearchToggleButton.IsChecked == true)
             {
-                Dispatcher.BeginInvoke(new System.Action(() =>
+                Dispatcher.InvokeAsync(() =>
                 {
                     SearchTextBox.Focus();
-                }), System.Windows.Threading.DispatcherPriority.Input);
+                }, DispatcherPriority.Input);
             }
         }
 

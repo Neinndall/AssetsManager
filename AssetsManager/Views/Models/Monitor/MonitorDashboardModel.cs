@@ -402,7 +402,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (e.PropertyName == nameof(MonitoredAsset.HasChanges) || e.PropertyName == nameof(MonitoredAsset.LastUpdated))
             {
-                Application.Current.Dispatcher.Invoke(RefreshFileWatcherData);
+                Application.Current.Dispatcher.InvokeAsync(RefreshFileWatcherData);
             }
         }
 
@@ -525,7 +525,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     AppVersionText = $"v{latestVersion} available!";
                     AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
@@ -539,7 +539,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnCategoryCheckCompleted(AssetCategory category)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 bool anyOtherChecking = _monitorService.AssetCategories
                     .Where(c => c != category)
@@ -556,7 +556,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnCategoryCheckStarted(AssetCategory category)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 AssetTrackerStatus = $"Category: {category.Name} - Checking...";
             });
@@ -564,7 +564,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnPbeStatusChecked()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 RefreshPbeData();
                 PbeLastCheck = DateTime.Now.ToString("HH:mm");
@@ -573,7 +573,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnHashSyncStarted()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 HashesStatus = "Updating...";
                 UpdateSystemHealthFooter();
@@ -582,7 +582,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnHashSyncCompleted()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 HashesStatus = "Synced";
                 UpdateSystemHealthFooter();

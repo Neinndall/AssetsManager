@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Windows;
 using AssetsManager.Views.Models.Notifications;
 
 namespace AssetsManager.Services.Core
@@ -8,7 +9,7 @@ namespace AssetsManager.Services.Core
     {
         // Evento para avisar al ViewModel que hay una nueva notificación (para Toasts o actualizar lista)
         public event Action<NotificationModel> NotificationAdded;
-        
+
         // Evento para actualizar el contador de no leídos
         public event Action CountsChanged;
 
@@ -27,7 +28,7 @@ namespace AssetsManager.Services.Core
             };
 
             // Insertamos al principio para que salga la más reciente arriba
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Insert(0, notification);
             });
@@ -52,7 +53,7 @@ namespace AssetsManager.Services.Core
 
         public void ClearAll()
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Clear();
             });
@@ -61,7 +62,7 @@ namespace AssetsManager.Services.Core
 
         public void RemoveNotification(NotificationModel notification)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Remove(notification);
             });

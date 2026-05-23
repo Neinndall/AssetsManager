@@ -29,7 +29,7 @@ namespace AssetsManager.Services.Explorer
 
         public void AddItem(ImageMergerItem item)
         {
-            Application.Current.Dispatcher.Invoke(() => {
+            Application.Current.Dispatcher.InvokeAsync(() => {
                 if (!Items.Any(i => i.Path == item.Path))
                 {
                     Items.Add(item);
@@ -180,7 +180,7 @@ namespace AssetsManager.Services.Explorer
 
         public void ShowWindow()
         {
-            Application.Current.Dispatcher.Invoke(() => {
+            Application.Current.Dispatcher.InvokeAsync(() => {
                 if (_activeWindow != null && _activeWindow.IsLoaded)
                 {
                     // Ensure the window is visible and focused

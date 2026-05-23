@@ -123,7 +123,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
         {
-            Dispatcher.Invoke(() => ApplyFilters());
+            Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
         public void ApplyFilters()

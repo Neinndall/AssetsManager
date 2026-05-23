@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
@@ -100,7 +101,7 @@ namespace AssetsManager.Views.Dialogs
 
             // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
             // Using Render priority for images as they are faster to draw than heavy text
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
             // 2. Now make the window visible and bring to front
             this.Visibility = Visibility.Visible;
@@ -351,7 +352,7 @@ namespace AssetsManager.Views.Dialogs
             else if (SliderBtn.IsChecked == true)
             {
                 // Force layout update and then update the effect
-                this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
+                this.Dispatcher.InvokeAsync(() => UpdateSliderEffect(), DispatcherPriority.Loaded);
             }
         }
 
