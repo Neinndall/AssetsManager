@@ -205,7 +205,10 @@ namespace AssetsManager.Services.Monitor
                     currentVersion = await _versionService.GetGameVersionAsync(_appSettings.LolPbeDirectory) ?? currentVersion;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Could not update asset version from PBE for {asset.Alias}");
+            }
 
             if (!isInitial)
             {
@@ -321,7 +324,10 @@ namespace AssetsManager.Services.Monitor
                     return foundFiles[0];
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Deep search for WAD '{fileName}' failed in '{baseDir}'");
+            }
 
             return null;
         }

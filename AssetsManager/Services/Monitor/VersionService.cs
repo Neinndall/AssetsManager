@@ -219,7 +219,10 @@ namespace AssetsManager.Services.Monitor
                     var paths = Directory.GetFiles(_directoriesCreator.VersionsPath, file.FileName, SearchOption.AllDirectories);
                     if (paths.Length > 0) { File.Delete(paths[0]); successCount++; }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to delete version file '{file.FileName}'");
+                }
             }
             return successCount > 0;
         }

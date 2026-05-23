@@ -102,11 +102,11 @@ namespace AssetsManager.Services.Viewer
                                     if (bitmap != null)
                                     {
                                         bitmap.Freeze();
-                                            skinModel.PreviewImage = bitmap;
-                                            skinModel.SwatchColor = ExtractDominantColor(bitmap);
-                                            skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
-                                        }
-                                        }
+                                        skinModel.PreviewImage = bitmap;
+                                        skinModel.SwatchColor = ExtractDominantColor(bitmap);
+                                        skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
+                                    }
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -119,7 +119,7 @@ namespace AssetsManager.Services.Viewer
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, "Error scanning for chromas");
+                    _logService.LogError(ex, $"Error scanning for chromas in path: {rootPath}");
                 }
 
                 return skins;
@@ -187,7 +187,10 @@ namespace AssetsManager.Services.Viewer
                     if (sknFiles.Length > 0) return sknFiles[0];
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Could not find associated model for skins path: {skinsPath}");
+            }
             return null;
         }
     }

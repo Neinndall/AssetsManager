@@ -885,7 +885,10 @@ namespace AssetsManager.Views.Controls.Explorer
                         currentVersion = await VersionService.GetGameVersionAsync(wadDir);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Watcher: Could not detect game version for asset: {selectedNode.Name}");
+                }
 
                 var newAsset = new MonitoredAsset
                 {

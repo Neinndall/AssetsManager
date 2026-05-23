@@ -80,7 +80,10 @@ namespace AssetsManager.Services.Explorer
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"Failed to add image to merger from file: {filePath}");
+                    }
                 }
             }
         }

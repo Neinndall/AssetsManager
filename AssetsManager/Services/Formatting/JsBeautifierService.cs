@@ -65,7 +65,10 @@ namespace AssetsManager.Services.Formatting
                     return true;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Beautifier: TryFormatAsData failed, falling back to QuickFormat.");
+            }
             return false;
         }
 
