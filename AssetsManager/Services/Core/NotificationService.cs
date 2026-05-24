@@ -27,14 +27,13 @@ namespace AssetsManager.Services.Core
                 OnClickAction = onClick
             };
 
-            // Insertamos al principio para que salga la más reciente arriba
+            // We must update the collection AND fire events on the UI thread to avoid race conditions
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Insert(0, notification);
+                NotificationAdded?.Invoke(notification);
+                CountsChanged?.Invoke();
             });
-
-            NotificationAdded?.Invoke(notification);
-            CountsChanged?.Invoke();
         }
 
         public ObservableCollection<NotificationModel> GetNotifications()
@@ -56,8 +55,8 @@ namespace AssetsManager.Services.Core
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Clear();
+                CountsChanged?.Invoke();
             });
-            CountsChanged?.Invoke();
         }
 
         public void RemoveNotification(NotificationModel notification)
@@ -65,8 +64,8 @@ namespace AssetsManager.Services.Core
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 _notifications.Remove(notification);
+                CountsChanged?.Invoke();
             });
-            CountsChanged?.Invoke();
         }
     }
 }

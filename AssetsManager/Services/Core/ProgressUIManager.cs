@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private void StartOperation(string headerText, string verb, string iconKind, int totalItems, string initialStatusMsg)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 _totalFiles = totalItems;
                 UpdateStatusBar(initialStatusMsg, 0, totalItems);
@@ -108,7 +108,7 @@ namespace AssetsManager.Services.Core
             }
 
             UpdateStatusBar(cleanStatus, current, total);
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
             });
@@ -122,7 +122,7 @@ namespace AssetsManager.Services.Core
             if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
             _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
-            await _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 CloseProgressWindow();
             });
@@ -140,7 +140,7 @@ namespace AssetsManager.Services.Core
 
         private void UpdateStatusBar(string message, int completed = -1, int total = -1)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 if (_statusBarViewModel == null) return;
 
@@ -208,31 +208,22 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        // --- Downloads ---
-
-        public void OnDownloadProgressChanged(int completedFiles, int totalFiles, string currentFileName, bool isSuccess, string errorMessage)
-        {
-            UpdateOperation($"Downloading {completedFiles} of {totalFiles} files: {currentFileName}", completedFiles, totalFiles, currentFileName, isSuccess, errorMessage);
-        }
-
-        public async void OnDownloadCompleted() => await FinishOperation();
-
         // --- Comparator ---
 
         public void OnComparisonStarted(int totalFiles)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 // If the operation is already active (indeterminate start), just update the total
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
                 {
                     _totalFiles = totalFiles;
-                    UpdateStatusBar("Comparing WADs...", 0, totalFiles);
+                    UpdateStatusBar("Preparing WADs...", 0, totalFiles);
                     _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
                     return;
                 }
                 
-                StartOperation("Comparing WADs", "Comparing", "Compare", totalFiles, "Comparing WADs...");
+                StartOperation("Comparing WADs", "Comparing", "Compare", totalFiles, "Preparing WADs...");
             });
         }
 
@@ -248,17 +239,17 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 if (_progressDetailsWindow != null && _totalFiles == 0 && data.totalFiles > 0)
                 {
                     _totalFiles = data.totalFiles;
-                    UpdateStatusBar("Extracting Assets...", 0, data.totalFiles);
+                    UpdateStatusBar("Preparing Files...", 0, data.totalFiles);
                     _progressDetailsWindow.UpdateProgress(0, data.totalFiles, "Initializing...", true, null);
                     return;
                 }
 
-                StartOperation("Extracting Assets", "Extracting", "PackageDown", data.totalFiles, "Extracting Assets...");
+                StartOperation("Extracting Assets", "Extracting", "PackageDown", data.totalFiles, "Preparing Files...");
             });
         }
 
@@ -273,17 +264,17 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingStarted(int totalFiles)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
                 {
                     _totalFiles = totalFiles;
-                    UpdateStatusBar("Saving Assets...", 0, totalFiles);
+                    UpdateStatusBar("Preparing Files...", 0, totalFiles);
                     _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
                     return;
                 }
 
-                StartOperation("Saving Assets", "Saving", "ContentSave", totalFiles, "Saving Assets...");
+                StartOperation("Saving Assets", "Saving", "ContentSave", totalFiles, "Preparing Files...");
             });
         }
 
@@ -299,12 +290,12 @@ namespace AssetsManager.Services.Core
         public void OnVersionDownloadStarted(object sender, string taskName)
         {
             // Version download always starts with verification
-            StartOperation("Versions Update", "Verifying", "Download", 0, "Verifying Files...");
+            StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 if (_progressDetailsWindow != null)
                 {
@@ -334,18 +325,18 @@ namespace AssetsManager.Services.Core
 
         public void OnBackupStarted(object sender, int totalFiles)
         {
-            _owner.Dispatcher.InvokeAsync(() =>
+            _owner.Dispatcher.Invoke(() =>
             {
                 // If already active (indeterminate start), update the total
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
                 {
                     _totalFiles = totalFiles;
-                    UpdateStatusBar("Creating backup...", 0, totalFiles);
+                    UpdateStatusBar("Preparing Backup...", 0, totalFiles);
                     _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
                     return;
                 }
 
-                StartOperation("Creating Backup", "Backing up", "ContentSave", totalFiles, "Creating backup...");
+                StartOperation("Creating Backup", "Backing up", "ContentSave", totalFiles, "Preparing Backup...");
             });
         }
 

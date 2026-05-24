@@ -239,7 +239,7 @@ namespace AssetsManager.Views
         
         private void OnExtractionCompleted(object sender, EventArgs e)
         {
-            Dispatcher.InvokeAsync(() =>
+            Dispatcher.Invoke(() =>
             {
                 _progressUIManager.OnExtractionCompleted();
                 if (_isExtractingAfterComparison)
@@ -341,11 +341,11 @@ namespace AssetsManager.Views
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
 
-                await Dispatcher.InvokeAsync(StartExtractionAsync);
+                Dispatcher.Invoke(StartExtractionAsync);
             }
             else
             {
-                await Dispatcher.InvokeAsync(() =>
+                Dispatcher.Invoke(() =>
                 {
                     ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
                 });
