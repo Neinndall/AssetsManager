@@ -527,7 +527,7 @@ namespace AssetsManager.Views.Models.Monitor
             {
                 Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    AppVersionText = $"v{latestVersion} available!";
+                    AppVersionText = $"{latestVersion} available!";
                     AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                     AppVersionIconKind = MaterialIconKind.CloudDownload;
                     UpdateAppVersionFooter();
