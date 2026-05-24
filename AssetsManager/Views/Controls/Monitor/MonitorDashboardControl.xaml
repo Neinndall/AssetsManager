@@ -427,8 +427,22 @@
                         </Grid>
                         
                         <StackPanel>
-                            <TextBlock Text="LAST DISCOVERED" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                            <TextBlock Text="{Binding LastDiscoveredAssetName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" MaxWidth="220"/>
+                            <Grid HorizontalAlignment="Center" Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="LAST CATEGORY:" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LastDiscoveredCategory}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" MaxWidth="150" TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                            <Grid HorizontalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="LAST ASSET:" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock Grid.Column="1" Text="{Binding LastDiscoveredAssetId}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" FontFamily="Consolas"/>
+                            </Grid>
                         </StackPanel>
                     </StackPanel>
 

@@ -120,11 +120,18 @@ namespace AssetsManager.Views.Models.Monitor
             set { _assetTrackerCategoriesCount = value; OnPropertyChanged(); }
         }
 
-        private string _lastDiscoveredAssetName = "None";
-        public string LastDiscoveredAssetName
+        private string _lastDiscoveredCategory = "None";
+        public string LastDiscoveredCategory
         {
-            get => _lastDiscoveredAssetName;
-            set { _lastDiscoveredAssetName = value; OnPropertyChanged(); }
+            get => _lastDiscoveredCategory;
+            set { _lastDiscoveredCategory = value; OnPropertyChanged(); }
+        }
+
+        private string _lastDiscoveredAssetId = "N/A";
+        public string LastDiscoveredAssetId
+        {
+            get => _lastDiscoveredAssetId;
+            set { _lastDiscoveredAssetId = value; OnPropertyChanged(); }
         }
 
         // --- System / Hashes ---
@@ -490,11 +497,13 @@ namespace AssetsManager.Views.Models.Monitor
 
             if (lastActiveCategory != null)
             {
-                LastDiscoveredAssetName = $"{lastActiveCategory.Name} #{lastActiveCategory.FoundUrls.Max()}";
+                LastDiscoveredCategory = lastActiveCategory.Name;
+                LastDiscoveredAssetId = lastActiveCategory.FoundUrls.Max().ToString();
             }
             else
             {
-                LastDiscoveredAssetName = "None";
+                LastDiscoveredCategory = "None";
+                LastDiscoveredAssetId = "N/A";
             }
 
             if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
