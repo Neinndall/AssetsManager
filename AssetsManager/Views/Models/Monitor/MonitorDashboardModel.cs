@@ -269,7 +269,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"v{_updateCheckService.AvailableVersion} available!";
+                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Unified Orange
                 AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
