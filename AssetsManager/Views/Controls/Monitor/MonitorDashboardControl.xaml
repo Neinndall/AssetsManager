@@ -112,19 +112,13 @@
                     </Grid>
                     
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <!-- Status with Icon -->
+                        <!-- Status with Icon (Simplified, No Hero) -->
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="{Binding PbeStatusIconKind}" Width="22" Height="22" Foreground="{Binding PbeStatusColor}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon.Effect>
-                                        <DropShadowEffect Color="{Binding PbeStatusColor.Color}" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
-                                    </materialIcons:MaterialIcon.Effect>
-                                </materialIcons:MaterialIcon>
-                            </Border>
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding PbeStatusIconKind}" Width="26" Height="26" Foreground="{Binding PbeStatusColor}" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Server Status" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
                                 <TextBlock Text="{Binding PbeStatusText}" FontSize="15" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
@@ -132,8 +126,8 @@
                         </Grid>
                     </StackPanel>
                     
-                    <Border Grid.Row="2" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}" 
-                            BorderBrush="{Binding PbeStatusColor}" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="0,16,0,0">
+                    <Border Grid.Row="2" Background="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.08}" 
+                            BorderBrush="{Binding PbeStatusColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.2}" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="0,16,0,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -168,7 +162,7 @@
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
                         <Border Width="42" Height="42" CornerRadius="10" Background="#1A00E676">
-                            <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="ShieldCheck" Width="22" Height="22" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <materialIcons:MaterialIcon.Effect>
                                     <DropShadowEffect Color="#FF00E676" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
                                 </materialIcons:MaterialIcon.Effect>
@@ -181,15 +175,13 @@
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <!-- Version with Icon (Simplified, No Hero Glow) -->
+                        <!-- Version with Icon (Simplified, No Hero) -->
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="{Binding AppVersionIconKind}" Width="22" Height="22" Foreground="{Binding AppVersionColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding AppVersionIconKind}" Width="26" Height="26" Foreground="{Binding AppVersionColor}" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Core Version" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
                                 <TextBlock Text="{Binding AppVersionText}" FontSize="15" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
@@ -214,8 +206,8 @@
                         </Border>
                     </StackPanel>
 
-                    <Border Grid.Row="2" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}" 
-                            BorderBrush="{Binding AppVersionColor}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                    <Border Grid.Row="2" Background="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.08}" 
+                            BorderBrush="{Binding AppVersionColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.2}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -252,20 +244,13 @@
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <!-- DB Item -->
+                        <!-- DB Item (Simplified, No Hero) -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <!-- Icon Box -->
-                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="10" Background="{Binding HashesIndicatorColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}">
-                                <materialIcons:MaterialIcon Kind="DatabaseCheckOutline" Width="22" Height="22" Foreground="{Binding HashesIndicatorColor}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <materialIcons:MaterialIcon.Effect>
-                                        <DropShadowEffect Color="{Binding HashesIndicatorColor.Color}" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
-                                    </materialIcons:MaterialIcon.Effect>
-                                </materialIcons:MaterialIcon>
-                            </Border>
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="DatabaseCheckOutline" Width="26" Height="26" Foreground="{Binding HashesIndicatorColor}" VerticalAlignment="Center"/>
                             <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Hash Database" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
                                 <TextBlock Text="{Binding HashesStatus}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
@@ -273,8 +258,8 @@
                         </Grid>
                     </StackPanel>
 
-                    <Border Grid.Row="2" Background="{Binding SystemHealthFooterColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.1}" 
-                            BorderBrush="{Binding SystemHealthFooterColor}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+                    <Border Grid.Row="2" Background="{Binding SystemHealthFooterColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.08}" 
+                            BorderBrush="{Binding SystemHealthFooterColor, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=0.2}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
                         <Grid HorizontalAlignment="Center">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>

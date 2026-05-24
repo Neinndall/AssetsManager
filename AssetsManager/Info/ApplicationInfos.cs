@@ -44,7 +44,7 @@ namespace AssetsManager.Info
         public static bool IsQA => Version.Contains("-");
         public static bool IsStable => !IsQA;
 
-        public static string BuildType => IsQA ? "EXPERIMENTAL BUILD" : "STABLE BUILD";
+        public static string BuildType => IsQA ? "Experimental Build" : "Stable Build";
         public static MaterialIconKind BuildIcon => IsQA ? MaterialIconKind.Flask : MaterialIconKind.CheckDecagram;
         public static string BuildColorKey => IsQA ? "AccentOrange" : "AccentGreen";
     }
