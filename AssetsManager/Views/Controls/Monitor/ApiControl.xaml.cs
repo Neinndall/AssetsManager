@@ -686,12 +686,12 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 try
                 {
-                    await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, (originalUrl, localPath) => 
+                    await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, async (originalUrl, localPath) => 
                     {
                         // Find all models using this URL (there might be duplicates across levels)
                         var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
                         
-                        _ = Dispatcher.InvokeAsync(() => 
+                        await Dispatcher.InvokeAsync(() => 
                         {
                             foreach (var target in targets)
                             {
