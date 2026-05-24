@@ -1,19 +1,47 @@
 AssetsManager - League of Legends | v4.0.0.3
 
-HOTFIX UPDATE
-
-New Features
+STABILITY & FORENSICS UPDATE
+This update focuses on reinforcing the application's core engine, ensuring absolute data integrity, and providing professional-grade diagnostic tools. It introduces a brand new thread-safe configuration system, a smart navigation engine for the explorer, and a project-wide "Zero Technical Silence" policy for background operations. Additionally, it modernizes the asynchronous interaction model to deliver a perfectly fluid and reliable user experience.
 
 Improvements
-  - Commit History / Improved log messages when release tags are missing.
-  - Explorer / Synchronized Breadcrumb Navigation
-    * Implemented a brand new context-aware breadcrumb system: closing all file tabs now automatically resets the path to the parent directory, providing a logical and seamless return to the folder context.
-    * Integrated Real-time Tree Synchronization: closing or switching between tabs now automatically updates the File Explorer selection and scrolls the tree to the active file, ensuring absolute visual coherence between the previewer and the navigation hierarchy.
-
-Changes
+  - Monitor / Dashboard HUD Refinement
+    * Redesigned the middle status icons in the PBE Server, Core Build, and System Health cards: removed the "hero" border containers and shadow effects to achieve a much cleaner and more minimal aesthetic.
+    * Standardized Glyph Metrics: updated the standalone status icons to a consistent 26px size for optimal visibility and HUD alignment.
+    * Refined Core Build Identity: assigned a static "ShieldCheck" icon to the Software Identity header to provide a more stable and professional visual anchor.
+    * Optimized Status Label Aesthetics: updated the PBE, Core, and System status footers with a solid 1.0 BorderThickness and refined background/border opacities (0.08 / 0.2) for a more sophisticated and subtle HUD integration.
+    * Consistent Casing: updated the Core Build status labels to "Stable Build" and "Experimental Build" for a more refined typographic look.
+  - Explorer / Smart Navigation Engine
+    * Implemented a brand new "Smart Reload" filter: the file tree now intelligently ignores setting changes that don't affect file visibility (such as history updates or encoding preferences), eliminating frustrating tree resets during background tasks.
+    * Optimized Initialization: critical paths and user preferences are now tracked from startup, preventing the "first-time reload" flicker when accessing settings.
+  - Core / Robust Thread-Safe Configuration
+    * Implemented a specialized static lock mechanism in the settings engine: this ensures that concurrent writes to `config.json` (e.g., from the Watcher and API Center simultaneously) are synchronized, making file corruption technically impossible.
+    * Added Guarded Load/Save cycles to prevent IO exceptions during rapid configuration updates.
+  - Architecture / Professional Async Modernization
+    * Standardized the application's asynchronous engine on `await InvokeAsync` for all UI interactions, eliminating micro-stutters and ensuring perfectly ordered interface updates.
+    * Implemented a **Synchronous State Transition Architecture** for the Progress UI: used blocking `Invoke` for "Start" and "ProgressChanged" events across all modules (Comparator, Extraction, Backups, Versions) to eliminate race conditions and ensure the progress window never skips initial preparation messages.
+    * Refined the Dispatcher model: used synchronous `Invoke` for critical log message ordering and notification badge synchronization.
+  - UI / Standardized Progress Messaging
+    * Implemented a brand new **Preparation Messaging Strategy** across all modules: processes now show standardized "Preparing..." messages during technical initialization for immediate user feedback.
+  - Monitor / API Center & Dashboard Refinement
+    * Fixed a visual bug in the Monitor Dashboard where the app version displayed a double 'v' prefix (e.g., 'vv4.0.0.3') when an update was available.
+    * Optimized API Center icon extraction: switched to a serial, awaited synchronization model for batch icon loading to ensure a perfectly smooth "waterfall" effect and zero UI lag.
+    * Refined Asset Tracker Telemetry: split the "Last Discovered" information into dedicated "LAST CATEGORY" and "LAST ASSET" fields with professional HUD alignment and monospaced ID formatting.
+  - Diagnostics / Advanced Stability Laboratory
+    * Integrated a brand new technical verification suite in the Benchmark module: features automated concurrency stress tests (50 parallel writes), double-disposal safety checks, and background error visibility tests.
+    * Refined Resource Management: optimized the `Dispose` logic across all core services to ensure precise event unsubscription and zero memory leaks while maintaining code simplicity.
 
 Bug Fixes
-
+  - Core / "Zero Technical Silence" Implementation
+    * Fixed a critical issue where background tasks (extractions, backups, and icon processing) could fail silently; all background operations now feature full try-catch protection with forensic stack traces in the error logs.
+  - Core / Notification Badge Synchronization
+    * Resolved a race condition in the Notification Service where the unread count badge failed to update in real-time; the system now guarantees collection integrity before notifying the UI.
+  - Monitor / Service Flow Optimization
+    * Resolved UI stalls in the Monitor Dashboard by decoupling status reset timers from the main execution thread.
+    * Fixed an inconsistency in the Asset Watcher where status colors and badges could flicker or desync during rapid file scanning.
+  - Core / Build & Syntax Integrity
+    * Corrected syntax artifacts and missing namespaces in the Differences and Image windows caused by concurrent file edits.
+    * Eliminated all unawaited task warnings (CS4014) and async-void patterns to achieve a 100% clean and professional build.
+  - Commit History / Refined messaging for edge cases when release tags are missing.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -430,10 +458,10 @@ Bug Fixes
     * Resolved a NullReferenceException in the backup interface by correctly synchronizing the version service injection.
   - Audio / Playback & YouTube
     * Fixed a regression in the Audio Player that prevented the playback of YouTube URLs and local media files, restoring full functionality to the hybrid player.
-    * Resolved "Zombie Audio" issue: implemented explicit resource cleanup on window close to ensure media playback and timers stop correctly.
+    * Resolved "Zombie Audio" issue: implemented explicitly resource cleanup on window close to ensure media playback and timers stop correctly.
     * Fixed Playlist State persistence: moved active pack tracking to a singleton service to prevent state loss when closing and reopening the player.
     * Implemented YouTube URL Auto-Resolution: fixed a critical issue where saved YouTube tracks would expire after a few hours. The system now stores the permanent video link and automatically generates a fresh stream URI upon playback, ensuring playlists remain functional indefinitely.
-    * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. The header now instantly reflects the current session state.
+    * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. El encabezado ahora refleja instantáneamente el estado de la sesión actual.
   - Explorer / Extraction & Tree Integrity
     * Fixed a bug where the "EXTRACT" action incorrectly converted audio containers (.bnk/.wpk) to .ogg instead of preserving their RAW state.
     * Fixed bug in extraction folder naming and interactive log links.
@@ -456,6 +484,6 @@ Bug Fixes
     * Fixed a bug where version information and client metadata leaked between Directory and WAD File modes when switching.
     * Resolved an issue where auto-filled paths in Directory mode were lost after using the WAD File mode; the state is now correctly preserved for each mode independently.
   - Monitor / Dashboard Logic & Symmetry
-    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it now dynamically reflects the actual version status and update availability.
+    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.

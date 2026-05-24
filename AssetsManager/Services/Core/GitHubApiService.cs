@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Core
             }
             catch (HttpRequestException httpEx) when (httpEx.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                _logService.LogError(httpEx, $"Could not load commits from branch '{branch}'. The branch may have been renamed or removed.");
+                _logService.LogWarning($"Could not load commits from branch '{branch}'. The branch may have been renamed or removed.");
                 return new List<GitHubCommit>();
             }
             catch (Exception ex)
