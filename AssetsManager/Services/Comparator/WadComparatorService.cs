@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Reflection;
 using AssetsManager.Services.Hashes;
 using System.Linq;
 using Serilog;
@@ -283,8 +282,6 @@ namespace AssetsManager.Services.Comparator
             return diffs;
         }
 
-        private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
-
         private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
         {
             var checksums = new Dictionary<ulong, ulong>();
@@ -295,13 +292,7 @@ namespace AssetsManager.Services.Comparator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    ulong checksum = 0;
-                    if (_checksumField != null)
-                    {
-                        checksum = (ulong)_checksumField.GetValue(chunk);
-                    }
-                    
-                    checksums[chunk.PathHash] = checksum;
+                    checksums[chunk.PathHash] = chunk.Checksum;
 
                     int completed = Interlocked.Increment(ref _completedChunksGlobal);
                     if (completed % 100 == 0 || completed == _totalChunksGlobal)
