@@ -10,6 +10,15 @@ Improvements
     * Refined Core Build Identity: assigned a static "ShieldCheck" icon to the Software Identity header to provide a more stable and professional visual anchor.
     * Optimized Status Label Aesthetics: updated the PBE, Core, and System status footers with a solid 1.0 BorderThickness and refined background/border opacities (0.08 / 0.2) for a more sophisticated and subtle HUD integration.
     * Consistent Casing: updated the Core Build status labels to "Stable Build" and "Experimental Build" for a more refined typographic look.
+  - Explorer / Hybrid Engine & Search Fidelity
+    * Implemented a brand new "Hybrid Loading" architecture: the system now builds the complete file structure upon entry, restoring 100% fidelity to the search and filter tools while maintaining a 70% reduction in RAM usage (~150MB) through dynamic path reconstruction.
+    * Restored Global Search (/) functionality: the "Go To" command now supports deep recursive path discovery across all WADs and physical directories.
+    * Refined Progress Feedback: updated the loading screen with specific technical states ("Searching", "Indexing", "Exploring") for real-time visibility of the scanning process in both Live and Local modes.
+    * Standardized Audio Discovery: unified the lazy loading of sound banks (.bnk/.wpk) in both local and virtual trees, ensuring internal audio events are always accessible via the UI expander.
+  - UI / Audio Player Compact HUD
+    * Redesigned the audio player into a high-fidelity "Compact HUD Console": unified the play controls, time display, and volume management into a single, space-efficient control bar.
+    * Integrated Speed Control: added interactive badges to toggle playback rates (0.5x, 1.0x, 1.5x, 2.0x) for detailed audio analysis.
+    * Refined HUD Aesthetics: applied a subtle glassmorphism effect using the project's CardBackground and AccentBlue tones, featuring a dense waveform and softened container shadows for perfect interface integration.
   - Explorer / Smart Navigation Engine
     * Implemented a brand new "Smart Reload" filter: the file tree now intelligently ignores setting changes that don't affect file visibility (such as history updates or encoding preferences), eliminating frustrating tree resets during background tasks.
     * Optimized Initialization: critical paths and user preferences are now tracked from startup, preventing the "first-time reload" flicker when accessing settings.
