@@ -352,19 +352,28 @@ namespace AssetsManager.Services.Explorer
         /// <summary>
         /// Ensures all children of a node are loaded, primarily used for lazy loading WAD files.
         /// </summary>
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            var dispatcher = System.Windows.Application.Current.Dispatcher;
+
+            // If the node is already loaded (has real children and not just the dummy), we skip it.
+            if (node.Children.Count > 0 && node.Children[0].Name != "Loading...")
+            {
+                return;
+            }
+
+            // Clear the "Loading..." dummy node if it exists
             if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
             {
-                node.Children.Clear();
+                await dispatcher.InvokeAsync(() => node.Children.Clear());
             }
 
             if (node.Type == NodeType.WadFile)
             {
                 var children = await LoadChildrenAsync(node, cancellationToken);
-                node.Children.AddRange(children);
+                await dispatcher.InvokeAsync(() => node.Children.AddRange(children));
                 return;
             }
 
@@ -372,45 +381,48 @@ namespace AssetsManager.Services.Explorer
             {
                 try
                 {
-                    var directories = Directory.GetDirectories(node.VirtualPath);
-                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir) { Parent = node }).ToList();
-                    node.Children.AddRange(childDirs);
-                    
-                    foreach(var childNode in childDirs)
-                    {
-                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
-                    }
+                    var childNodesToAdd = new List<FileSystemNodeModel>();
 
-                    var files = Directory.GetFiles(node.VirtualPath);
-                    var childFiles = new List<FileSystemNodeModel>();
-                    foreach (var file in files.OrderBy(f => f))
+                    // 1. Scan Directories
+                    var directories = Directory.GetDirectories(node.VirtualPath);
+                    foreach (var dir in directories.OrderBy(d => d))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        string lowerFile = file.ToLowerInvariant();
-
-                        bool keepFile = false;
-                        if (lowerFile.EndsWith(".wad.client"))
-                        {
-                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Game")))
-                                keepFile = true;
-                        }
-                        else if (lowerFile.EndsWith(".wad"))
-                        {
-                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
-                                keepFile = true;
-                        }
-
-                        if (keepFile)
-                        {
-                            var childNode = new FileSystemNodeModel(file) { Parent = node };
-                            childFiles.Add(childNode);
-                        }
+                        var dirNode = new FileSystemNodeModel(dir) { Parent = node };
+                        childNodesToAdd.Add(dirNode);
                     }
-                    
-                    node.Children.AddRange(childFiles);
-                    foreach(var childNode in childFiles)
+
+                    // 2. Scan WAD Files
+                    var files = Directory.GetFiles(node.VirtualPath);
+                    var wadFiles = files.Where(f => f.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || 
+                                                   f.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                                        .OrderBy(f => f);
+
+                    foreach (var file in wadFiles)
                     {
-                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var wadNode = new FileSystemNodeModel(file) { Parent = node };
+                        childNodesToAdd.Add(wadNode);
+                    }
+
+                    // 3. Batch add to UI to prevent layout collisions
+                    if (childNodesToAdd.Any())
+                    {
+                        await dispatcher.InvokeAsync(() => node.Children.AddRange(childNodesToAdd));
+                    }
+
+                    // 4. Recurse into directories (Initial scan only)
+                    foreach (var child in childNodesToAdd)
+                    {
+                        if (child.Type == NodeType.RealDirectory)
+                        {
+                            onMountingProgress?.Invoke(child.Name);
+                            await EnsureAllChildrenLoadedAsync(child, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
+                        }
+                        else if (child.Type == NodeType.WadFile)
+                        {
+                            onScanningProgress?.Invoke(child.Name);
+                        }
                     }
                 }
                 catch (UnauthorizedAccessException)
@@ -622,7 +634,7 @@ namespace AssetsManager.Services.Explorer
         /// <summary>
         /// Loads a physical directory into the tree structure.
         /// </summary>
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath))
             {
@@ -637,7 +649,7 @@ namespace AssetsManager.Services.Explorer
                 if (rootNode.Children != null)
                 {
                     rootNode.Children.Clear();
-                    AddNodeToRealTree(rootNode, rootPath, cancellationToken);
+                    AddNodeToRealTree(rootNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     return rootNode.Children;
                 }
 
@@ -645,23 +657,25 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
-        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken)
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                onMountingProgress?.Invoke(Path.GetFileName(directory));
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear();
                 dirNode.Parent = parentNode;
                 parentNode.Children.Add(dirNode);
-                AddNodeToRealTree(dirNode, directory, cancellationToken);
+                AddNodeToRealTree(dirNode, directory, cancellationToken, onScanningProgress, onMountingProgress);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                onScanningProgress?.Invoke(Path.GetFileName(file));
                 var fileNode = new FileSystemNodeModel(file);
                 fileNode.Parent = parentNode;
                 parentNode.Children.Add(fileNode);

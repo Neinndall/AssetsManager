@@ -42,7 +42,7 @@ namespace AssetsManager.Services.Explorer.Tree
             _audioBankService = audioBankService;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
 
@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Explorer.Tree
                     cancellationToken.ThrowIfCancellationRequested();
                     var gameNode = new FileSystemNodeModel(gamePath);
                     rootNodes.Add(gameNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                 }
             }
 
@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Explorer.Tree
                     cancellationToken.ThrowIfCancellationRequested();
                     var pluginsNode = new FileSystemNodeModel(pluginsPath);
                     rootNodes.Add(pluginsNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                 }
             }
 
@@ -82,10 +82,9 @@ namespace AssetsManager.Services.Explorer.Tree
             return rootNodes;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
-            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken);
-            return new ObservableRangeCollection<FileSystemNodeModel>(nodes);
+            return await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken, onScanningProgress, onMountingProgress);
         }
 
         public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)

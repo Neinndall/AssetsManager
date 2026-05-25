@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Windows.Media;
+using System.Threading.Tasks;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
 
@@ -182,6 +183,26 @@ namespace AssetsManager.Views.Models.Explorer
                 {
                     _isExpanded = value;
                     OnPropertyChanged(nameof(IsExpanded));
+
+                    if (_isExpanded && Type == NodeType.WadFile && Children.Count == 1 && Children[0].Name == "Loading...")
+                    {
+                        // Use the Dispatcher to ensure we can update the collection later, 
+                        // but do the heavy lifting in a background task.
+                        var dispatcher = System.Windows.Application.Current.Dispatcher;
+                        Task.Run(async () => 
+                        {
+                            try
+                            {
+                                var loader = App.ServiceProvider.GetService(typeof(AssetsManager.Services.Explorer.WadNodeLoaderService)) as AssetsManager.Services.Explorer.WadNodeLoaderService;
+                                if (loader != null)
+                                {
+                                    // Use the node's own path as root context for simplicity
+                                    await loader.EnsureAllChildrenLoadedAsync(this, VirtualPath);
+                                }
+                            }
+                            catch { /* Silent fail for lazy loading */ }
+                        });
+                    }
                 }
             }
         }

@@ -491,7 +491,9 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             await ExecuteTreeBuildInternalAsync(
-                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory),
+                async ct => await TreeBuilderService.BuildWadTreeAsync(rootPath, ct, AppSettings.PreferredDirectory, 
+                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
+                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
                 ExplorerLoadingState.LoadingWads,
                 "Failed to build WAD tree.",
                 false);
@@ -507,7 +509,9 @@ namespace AssetsManager.Views.Controls.Explorer
             _viewModel.Toolbar.CurrentClientBrush = (System.Windows.Media.Brush)Application.Current.FindResource("TextMuted");
 
             await ExecuteTreeBuildInternalAsync(
-                async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct),
+                async ct => await TreeBuilderService.BuildDirectoryTreeAsync(rootPath, ct, 
+                    (file) => Dispatcher.Invoke(() => _viewModel.UpdateScanningProgress(file)),
+                    (dir) => Dispatcher.Invoke(() => _viewModel.UpdateMountingProgress(dir))),
                 ExplorerLoadingState.ExploringDirectory,
                 "Failed to build directory tree.",
                 false);

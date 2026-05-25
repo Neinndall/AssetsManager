@@ -27,6 +27,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isEmptyState;
         private bool _isNoResultsFound;
         private bool _hasFavorites;
+        private ExplorerLoadingState _currentState;
         private string _loadingStatus = "Loading assets...";
         private string _loadingOperation = "LOADING";
         private string _loadingDetail = "Preparing the file explorer";
@@ -210,8 +211,10 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_isSelectDirectoryActionVisible != value) { _isSelectDirectoryActionVisible = value; OnPropertyChanged(); } }
         }
 
-        public void SetLoadingState(ExplorerLoadingState state)
+        public void SetLoadingState(ExplorerLoadingState state, string fileName = null, bool isDirectory = false)
         {
+            _currentState = state; // Track current state
+
             if (state == ExplorerLoadingState.None)
             {
                 IsBusy = false;
@@ -227,6 +230,8 @@ namespace AssetsManager.Views.Models.Explorer
             IsTreeReady = false;
             IsEmptyState = false;
 
+            string context = Toolbar.CurrentClientName?.ToLowerInvariant() ?? "assets";
+
             switch (state)
             {
                 case ExplorerLoadingState.LoadingHashes:
@@ -236,13 +241,27 @@ namespace AssetsManager.Views.Models.Explorer
                     break;
                 case ExplorerLoadingState.LoadingWads:
                     LoadingStatus = "Loading WAD Files";
-                    LoadingOperation = "WAD EXPLORER";
-                    LoadingDetail = "Scanning files from the directory...";
+                    LoadingOperation = "EXPLORER";
+                    if (fileName != null)
+                    {
+                        LoadingDetail = isDirectory ? $"Mounting {fileName} from the {context} directory..." : $"Scanning {fileName} from the {context} directory...";
+                    }
+                    else
+                    {
+                        LoadingDetail = $"Scanning {fileName} from the {context} directory...";
+                    }
                     break;
                 case ExplorerLoadingState.ExploringDirectory:
-                    LoadingStatus = "Exploring Directory";
-                    LoadingOperation = "DIRECTORY";
-                    LoadingDetail = "Scanning files from the directory...";
+                    LoadingStatus = "Exploring Local Assets";
+                    LoadingOperation = "LOCAL";
+                    if (fileName != null)
+                    {
+                        LoadingDetail = isDirectory ? $"Mounting {fileName} from the local directory..." : $"Scanning {fileName} from the {context} directory...";
+                    }
+                    else
+                    {
+                        LoadingDetail = "Scanning {fileName} from the {context} directory...";
+                    }
                     break;
                 case ExplorerLoadingState.LoadingResults:
                     LoadingStatus = "Loading Results";
@@ -255,6 +274,16 @@ namespace AssetsManager.Views.Models.Explorer
                     LoadingDetail = "Initializing components...";
                     break;
             }
+        }
+
+        public void UpdateScanningProgress(string fileName)
+        {
+            SetLoadingState(_currentState, fileName, false);
+        }
+
+        public void UpdateMountingProgress(string dirName)
+        {
+            SetLoadingState(_currentState, dirName, true);
         }
 
         public string LoadingOperation
