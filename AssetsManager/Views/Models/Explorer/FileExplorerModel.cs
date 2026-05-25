@@ -244,23 +244,23 @@ namespace AssetsManager.Views.Models.Explorer
                     LoadingOperation = "EXPLORER";
                     if (fileName != null)
                     {
-                        LoadingDetail = isDirectory ? $"Mounting {fileName} from the {context} directory..." : $"Scanning {fileName} from the {context} directory...";
+                        LoadingDetail = isDirectory ? $"Indexing {fileName}..." : $"Scanning {context} directories...";
                     }
                     else
                     {
-                        LoadingDetail = $"Scanning {fileName} from the {context} directory...";
+                        LoadingDetail = $"Locating WAD files in {context}...";
                     }
                     break;
                 case ExplorerLoadingState.ExploringDirectory:
                     LoadingStatus = "Exploring Local Assets";
-                    LoadingOperation = "LOCAL";
+                    LoadingOperation = "EXPLORER";
                     if (fileName != null)
                     {
-                        LoadingDetail = isDirectory ? $"Mounting {fileName} from the local directory..." : $"Scanning {fileName} from the {context} directory...";
+                        LoadingDetail = isDirectory ? $"Entering {fileName}..." : $"Scanning {context} assets...";
                     }
                     else
                     {
-                        LoadingDetail = "Scanning {fileName} from the {context} directory...";
+                        LoadingDetail = $"Exploring local assets in {context}...";
                     }
                     break;
                 case ExplorerLoadingState.LoadingResults:

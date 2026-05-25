@@ -350,30 +350,17 @@ namespace AssetsManager.Services.Explorer
         }
 
         /// <summary>
-        /// Ensures all children of a node are loaded, primarily used for lazy loading WAD files.
+        /// Ensures all children of a node are loaded.
         /// </summary>
         public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var dispatcher = System.Windows.Application.Current.Dispatcher;
-
-            // If the node is already loaded (has real children and not just the dummy), we skip it.
-            if (node.Children.Count > 0 && node.Children[0].Name != "Loading...")
-            {
-                return;
-            }
-
-            // Clear the "Loading..." dummy node if it exists
-            if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
-            {
-                await dispatcher.InvokeAsync(() => node.Children.Clear());
-            }
-
             if (node.Type == NodeType.WadFile)
             {
+                onMountingProgress?.Invoke(node.Name);
                 var children = await LoadChildrenAsync(node, cancellationToken);
-                await dispatcher.InvokeAsync(() => node.Children.AddRange(children));
+                node.Children.AddRange(children);
                 return;
             }
 
@@ -381,48 +368,52 @@ namespace AssetsManager.Services.Explorer
             {
                 try
                 {
-                    var childNodesToAdd = new List<FileSystemNodeModel>();
-
-                    // 1. Scan Directories
                     var directories = Directory.GetDirectories(node.VirtualPath);
+                    var childDirs = new List<FileSystemNodeModel>();
                     foreach (var dir in directories.OrderBy(d => d))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         var dirNode = new FileSystemNodeModel(dir) { Parent = node };
-                        childNodesToAdd.Add(dirNode);
+                        childDirs.Add(dirNode);
+                    }
+                    node.Children.AddRange(childDirs);
+                    
+                    foreach(var childNode in childDirs)
+                    {
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     }
 
-                    // 2. Scan WAD Files
                     var files = Directory.GetFiles(node.VirtualPath);
-                    var wadFiles = files.Where(f => f.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || 
-                                                   f.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
-                                        .OrderBy(f => f);
-
-                    foreach (var file in wadFiles)
+                    var childFiles = new List<FileSystemNodeModel>();
+                    foreach (var file in files.OrderBy(f => f))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var wadNode = new FileSystemNodeModel(file) { Parent = node };
-                        childNodesToAdd.Add(wadNode);
-                    }
+                        string lowerFile = file.ToLowerInvariant();
 
-                    // 3. Batch add to UI to prevent layout collisions
-                    if (childNodesToAdd.Any())
-                    {
-                        await dispatcher.InvokeAsync(() => node.Children.AddRange(childNodesToAdd));
-                    }
+                        bool keepFile = false;
+                        if (lowerFile.EndsWith(".wad.client"))
+                        {
+                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Game")))
+                                keepFile = true;
+                        }
+                        else if (lowerFile.EndsWith(".wad"))
+                        {
+                            if (node.VirtualPath.StartsWith(Path.Combine(currentRootPath, "Plugins")))
+                                keepFile = true;
+                        }
 
-                    // 4. Recurse into directories (Initial scan only)
-                    foreach (var child in childNodesToAdd)
+                        if (keepFile)
+                        {
+                            onScanningProgress?.Invoke(Path.GetFileName(file));
+                            var childNode = new FileSystemNodeModel(file) { Parent = node };
+                            childFiles.Add(childNode);
+                        }
+                    }
+                    
+                    node.Children.AddRange(childFiles);
+                    foreach(var childNode in childFiles)
                     {
-                        if (child.Type == NodeType.RealDirectory)
-                        {
-                            onMountingProgress?.Invoke(child.Name);
-                            await EnsureAllChildrenLoadedAsync(child, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
-                        }
-                        else if (child.Type == NodeType.WadFile)
-                        {
-                            onScanningProgress?.Invoke(child.Name);
-                        }
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     }
                 }
                 catch (UnauthorizedAccessException)
@@ -619,9 +610,7 @@ namespace AssetsManager.Services.Explorer
                 Parent = parentNode
             };
 
-            // OPTIMIZATION: If the node has a real hierarchical parent, we can discard the stored string
-            // as the dynamic VirtualPath getter will reconstruct it on demand.
-            // Safety check: && parentNode.Type != NodeType.WadFile (Removed for RAM optimization, the getter handles it)
+            // OPTIMIZATION: Discard full path to save RAM, dynamic getter will reconstruct it
             if (parentNode != null && !parentNode.IsGroupingFolder)
             {
                 fileNode.VirtualPath = null;

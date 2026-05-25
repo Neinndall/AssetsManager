@@ -84,7 +84,8 @@ namespace AssetsManager.Services.Explorer.Tree
 
         public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
-            return await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken, onScanningProgress, onMountingProgress);
+            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken, onScanningProgress, onMountingProgress);
+            return new ObservableRangeCollection<FileSystemNodeModel>(nodes);
         }
 
         public async Task<(ObservableRangeCollection<FileSystemNodeModel> Nodes, string NewLolPath, string OldLolPath)> BuildTreeFromBackupAsync(string jsonPath, bool isSortingEnabled, CancellationToken cancellationToken)
@@ -193,9 +194,9 @@ namespace AssetsManager.Services.Explorer.Tree
             });
         }
 
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
-            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken);
+            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
         }
 
         private bool PruneEmptyDirectories(FileSystemNodeModel node)

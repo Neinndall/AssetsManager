@@ -31,6 +31,11 @@ Improvements
     * Refined Resource Management: optimized the `Dispose` logic across all core services to ensure precise event unsubscription and zero memory leaks while maintaining code simplicity.
 
 Bug Fixes
+  - Explorer / Stability & Navigation Integrity
+    * Resolved a critical "InvalidOperationException" (StartAt) in the tree navigation engine by isolating layout updates from the WPF content generation cycle.
+    * Fixed a collection modification crash in the search engine during rapid typing by implementing thread-safe snapshot traversal.
+    * Resolved a null-reference exception in the path resolver when searching deep within file-only branches.
+    * Corrected string interpolation in progress messages to ensure accurate file names are displayed during loading.
   - Core / "Zero Technical Silence" Implementation
     * Fixed a critical issue where background tasks (extractions, backups, and icon processing) could fail silently; all background operations now feature full try-catch protection with forensic stack traces in the error logs.
   - Core / Notification Badge Synchronization

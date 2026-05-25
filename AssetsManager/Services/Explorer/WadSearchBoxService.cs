@@ -34,21 +34,28 @@ namespace AssetsManager.Services.Explorer
         {
             var token = PrepareCancellationToken();
 
-            if (string.IsNullOrEmpty(searchText))
+            try
             {
-                await FilterTreeAsync(rootNodes, string.Empty, token);
-                return null;
-            }
+                if (string.IsNullOrEmpty(searchText))
+                {
+                    await FilterTreeAsync(rootNodes, string.Empty, token);
+                    return null;
+                }
 
-            if (searchText.Contains("/"))
-            {
-                await FilterTreeAsync(rootNodes, string.Empty, token);
-                var targetNode = await ExpandToPathAsync(searchText, rootNodes, loadChildrenFunc);
-                return targetNode;
+                if (searchText.Contains("/"))
+                {
+                    await FilterTreeAsync(rootNodes, string.Empty, token);
+                    var targetNode = await ExpandToPathAsync(searchText, rootNodes);
+                    return targetNode;
+                }
+                else
+                {
+                    await FilterTreeAsync(rootNodes, searchText, token);
+                    return null;
+                }
             }
-            else
+            catch (OperationCanceledException)
             {
-                await FilterTreeAsync(rootNodes, searchText, token);
                 return null;
             }
         }
@@ -65,7 +72,7 @@ namespace AssetsManager.Services.Explorer
             // Reset any previous search filtering before navigating
             await FilterTreeAsync(rootNodes, string.Empty, token);
 
-            return await ExpandToPathAsync(path, rootNodes, loadChildrenFunc);
+            return await ExpandToPathAsync(path, rootNodes);
         }
 
         public async Task FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken)
@@ -194,82 +201,47 @@ namespace AssetsManager.Services.Explorer
 
         private async Task<FileSystemNodeModel> ExpandToPathAsync(
             string path,
-            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
-            Func<FileSystemNodeModel, Task> loadChildrenFunc)
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             path = path.Replace("\\", "/").Trim('/');
             if (string.IsNullOrEmpty(path)) return null;
 
             string[] pathComponents = path.Split('/');
-            var targetNode = await FindNodeByPathSuffixAsync(rootNodes, pathComponents, loadChildrenFunc);
+            var targetNode = await FindNodeByPathSuffixAsync(rootNodes, pathComponents);
 
             return targetNode;
         }
 
         private async Task<FileSystemNodeModel> FindNodeByPathSuffixAsync(
             IEnumerable<FileSystemNodeModel> nodes,
-            string[] pathSuffix,
-            Func<FileSystemNodeModel, Task> loadChildrenFunc)
+            string[] pathSuffix)
         {
+            if (nodes == null) return null;
+
             foreach (var node in nodes)
             {
-                bool isFirstComponentLast = pathSuffix.Length == 1;
-                bool isMatch = isFirstComponentLast
-                    ? node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase)
-                    : node.Name.Equals(pathSuffix[0], StringComparison.OrdinalIgnoreCase);
-
-                if (isMatch)
+                bool isMatch = node.Name.Equals(pathSuffix[0], StringComparison.OrdinalIgnoreCase);
+                
+                // If it's a single component search, we can be more lenient (StartsWith)
+                if (pathSuffix.Length == 1 && node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase))
                 {
-                    FileSystemNodeModel potentialMatch = node;
-                    bool match = true;
-
-                    for (int i = 1; i < pathSuffix.Length; i++)
-                    {
-                        if (potentialMatch.Type == NodeType.WadFile || potentialMatch.Type == NodeType.RealDirectory || potentialMatch.Type == NodeType.VirtualDirectory)
-                        {
-                            if (potentialMatch.Children.Count == 0 || (potentialMatch.Children.Count == 1 && potentialMatch.Children[0].Name == "Loading..."))
-                            {
-                                await loadChildrenFunc(potentialMatch);
-                            }
-                        }
-
-                        bool isLastComponentInLoop = (i == pathSuffix.Length - 1);
-                        var currentComponent = pathSuffix[i];
-
-                        var nextNode = isLastComponentInLoop
-                            ? potentialMatch.Children.FirstOrDefault(c => c.Name.StartsWith(currentComponent, StringComparison.OrdinalIgnoreCase))
-                            : potentialMatch.Children.FirstOrDefault(c => c.Name.Equals(currentComponent, StringComparison.OrdinalIgnoreCase));
-
-                        if (nextNode != null)
-                        {
-                            potentialMatch = nextNode;
-                        }
-                        else
-                        {
-                            match = false;
-                            break;
-                        }
-                    }
-
-                    if (match)
-                    {
-                        return potentialMatch;
-                    }
+                    return node;
                 }
-                else
+
+                if (isMatch && pathSuffix.Length > 1 && node.Children != null)
                 {
-                    if (node.Type == NodeType.WadFile || node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory)
-                    {
-                        if (node.Children.Count == 0 || (node.Children.Count == 1 && node.Children[0].Name == "Loading..."))
-                        {
-                            await loadChildrenFunc(node);
-                        }
-                        var foundInChild = await FindNodeByPathSuffixAsync(node.Children, pathSuffix, loadChildrenFunc);
-                        if (foundInChild != null)
-                        {
-                            return foundInChild;
-                        }
-                    }
+                    // Match found for this segment, try to match the rest of the suffix in children
+                    string[] remainingSuffix = pathSuffix.Skip(1).ToArray();
+                    var foundInDescendant = await FindNodeByPathSuffixAsync(node.Children, remainingSuffix);
+                    if (foundInDescendant != null) return foundInDescendant;
+                }
+
+                // Even if this node didn't match the start of the suffix, the suffix might exist deeper in this branch
+                // (e.g., searching for /skins.json starting from the root)
+                if (node.Children != null && node.Children.Any())
+                {
+                    var foundDeeper = await FindNodeByPathSuffixAsync(node.Children, pathSuffix);
+                    if (foundDeeper != null) return foundDeeper;
                 }
             }
             return null;

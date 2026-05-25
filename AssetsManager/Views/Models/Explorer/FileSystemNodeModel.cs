@@ -183,26 +183,6 @@ namespace AssetsManager.Views.Models.Explorer
                 {
                     _isExpanded = value;
                     OnPropertyChanged(nameof(IsExpanded));
-
-                    if (_isExpanded && Type == NodeType.WadFile && Children.Count == 1 && Children[0].Name == "Loading...")
-                    {
-                        // Use the Dispatcher to ensure we can update the collection later, 
-                        // but do the heavy lifting in a background task.
-                        var dispatcher = System.Windows.Application.Current.Dispatcher;
-                        Task.Run(async () => 
-                        {
-                            try
-                            {
-                                var loader = App.ServiceProvider.GetService(typeof(AssetsManager.Services.Explorer.WadNodeLoaderService)) as AssetsManager.Services.Explorer.WadNodeLoaderService;
-                                if (loader != null)
-                                {
-                                    // Use the node's own path as root context for simplicity
-                                    await loader.EnsureAllChildrenLoadedAsync(this, VirtualPath);
-                                }
-                            }
-                            catch { /* Silent fail for lazy loading */ }
-                        });
-                    }
                 }
             }
         }
@@ -314,7 +294,6 @@ namespace AssetsManager.Views.Models.Explorer
             if (Directory.Exists(path))
             {
                 Type = NodeType.RealDirectory;
-                Children.Add(new FileSystemNodeModel()); // Add dummy child
             }
             else
             {
@@ -322,7 +301,6 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
                 {
                     Type = NodeType.WadFile;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child
                 }
                 else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
                 {
@@ -362,7 +340,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        // Internal constructor for the dummy node
+        // Internal constructor for the dummy node (Keep for SoundBanks if they still use it)
         internal FileSystemNodeModel()
         {
             Name = "Loading...";

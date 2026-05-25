@@ -1158,7 +1158,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
         {
-            await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
+            if (node.Type == NodeType.SoundBank)
+            {
+                await TreeBuilderService.ExpandAudioBankAsync(node, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+            }
+            else
+            {
+                await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
+            }
         }
 
         private async void SearchTimer_Tick(object sender, EventArgs e)
@@ -1177,7 +1184,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 FilePreviewer.SetSearchFilter(searchText);
             }
 
-            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, LoadAllChildrenForSearch);
+            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null);
 
             // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))
