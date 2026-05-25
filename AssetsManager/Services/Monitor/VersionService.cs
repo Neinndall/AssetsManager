@@ -55,7 +55,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task FetchAllVersionsAsync()
         {
-            _logService.Log("Starting get versions from League Client and Game Client...");
+            _logService.Log("Starting get versions from league client and game client...");
 
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
 
