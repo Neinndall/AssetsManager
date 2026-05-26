@@ -70,7 +70,8 @@ namespace AssetsManager.Views.Controls.Explorer
         }
 
         /// <summary>
-        /// Checks whether <paramref name="target"/> is the same as or a visual ancestor of <paramref name="source"/>.
+        /// Checks whether <paramref name="target"/> is the same as or a visual/logical ancestor of <paramref name="source"/>.
+        /// Implements the "Hybrid Tree Protocol" to handle FlowDocument and other non-Visual elements.
         /// </summary>
         private static bool IsDescendant(DependencyObject target, DependencyObject source)
         {
@@ -79,11 +80,28 @@ namespace AssetsManager.Views.Controls.Explorer
             while (current != null)
             {
                 if (current == target) return true;
-                // Popup content lives in a separate visual tree, so we handle both Popup and visual parent
+
+                // Handle Popup/Separate Visual Tree
                 if (current is Popup popup)
+                {
                     current = popup.PlacementTarget;
+                }
                 else
-                    current = VisualTreeHelper.GetParent(current);
+                {
+                    // Use LogicalTreeHelper as fallback for non-Visual elements (like FlowDocument, Run, Span)
+                    DependencyObject parent = null;
+                    try
+                    {
+                        if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+                        {
+                            parent = VisualTreeHelper.GetParent(current);
+                        }
+                    }
+                    catch { /* Fallback to Logical tree */ }
+
+                    // If visual parent is null (or it wasn't a visual), try logical parent
+                    current = parent ?? LogicalTreeHelper.GetParent(current);
+                }
             }
             return false;
         }
