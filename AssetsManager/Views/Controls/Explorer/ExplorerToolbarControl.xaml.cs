@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Explorer
             if (window != null)
             {
                 window.PreviewMouseDown += Window_PreviewMouseDown;
+                window.LocationChanged += Window_LocationChanged;
             }
 
             LoadHistory();
@@ -45,6 +46,21 @@ namespace AssetsManager.Views.Controls.Explorer
             if (window != null)
             {
                 window.PreviewMouseDown -= Window_PreviewMouseDown;
+                window.LocationChanged -= Window_LocationChanged;
+            }
+        }
+
+        /// <summary>
+        /// Ensures the popup moves with the window.
+        /// </summary>
+        private void Window_LocationChanged(object sender, EventArgs e)
+        {
+            if (SearchHistoryPopup.IsOpen)
+            {
+                // Force a position refresh by toggling a small offset
+                var offset = SearchHistoryPopup.HorizontalOffset;
+                SearchHistoryPopup.HorizontalOffset = offset + 0.1;
+                SearchHistoryPopup.HorizontalOffset = offset;
             }
         }
 
