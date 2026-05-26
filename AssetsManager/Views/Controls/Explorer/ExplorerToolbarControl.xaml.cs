@@ -35,6 +35,8 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 window.PreviewMouseDown += Window_PreviewMouseDown;
             }
+
+            LoadHistory();
         }
 
         private void ExplorerToolbarControl_Unloaded(object sender, RoutedEventArgs e)
@@ -95,12 +97,10 @@ namespace AssetsManager.Views.Controls.Explorer
                 Dispatcher.InvokeAsync(() =>
                 {
                     SearchTextBox.Focus();
-                    // Focus triggers GotFocus → ShowHistoryPopup automatically
                 }, DispatcherPriority.Input);
             }
             else
             {
-                // Search bar collapsed — ensure popup is closed
                 SearchHistoryPopup.IsOpen = false;
             }
         }
@@ -134,7 +134,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void SearchTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Always show popup when clicking the search box, even if it was closed
             if (!SearchHistoryPopup.IsOpen)
             {
                 ShowHistoryPopup();
@@ -143,8 +142,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void SearchTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            // With StaysOpen="True" the popup closing is handled by Window_PreviewMouseDown.
-            // We only close here if focus truly left both the TextBox and the Popup.
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (!SearchHistoryPopup.IsKeyboardFocusWithin && !SearchTextBox.IsFocused)
@@ -206,7 +203,6 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void SearchHistoryListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            // Only apply if the change came from a user click (not keyboard navigation)
             if (_suppressSelectionClose) return;
             if (SearchHistoryListBox.SelectedItem is string selectedText)
             {
@@ -214,9 +210,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        /// <summary>
-        /// Applies a history item to the search box, closes the popup, and restores focus.
-        /// </summary>
         private void ApplyHistoryItem(string text)
         {
             _suppressSelectionClose = true;
@@ -231,72 +224,54 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void ClearHistoryButton_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
-                settings.SearchHistory.Clear();
-                settings.Save();
-                
-                SearchHistoryPopup.IsOpen = false;
-            }
-            catch { /* Silent Fail */ }
+            ClearHistory();
+            SearchHistoryPopup.IsOpen = false;
         }
 
         private void DeleteHistoryItem_Click(object sender, RoutedEventArgs e)
         {
-            try
+            if (sender is Button btn && btn.Tag is string item)
             {
-                if (sender is Button btn && btn.Tag is string item)
+                RemoveHistoryItem(item);
+
+                if (ViewModel?.SearchHistory.Count == 0)
                 {
-                    var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
-                    settings.SearchHistory.Remove(item);
-                    settings.Save();
-
-                    // Refresh history display without closing if there are still items
-                    _suppressSelectionClose = true;
-                    if (settings.SearchHistory.Count > 0)
-                    {
-                        SearchHistoryListBox.ItemsSource = null;
-                        SearchHistoryListBox.ItemsSource = settings.SearchHistory;
-                    }
-                    else
-                    {
-                        SearchHistoryPopup.IsOpen = false;
-                    }
-                    _suppressSelectionClose = false;
-
-                    // Keep focus on the search box so the popup stays open
-                    SearchTextBox.Focus();
+                    SearchHistoryPopup.IsOpen = false;
                 }
+
+                SearchTextBox.Focus();
             }
-            catch { /* Silent Fail */ }
-            e.Handled = true; // Prevent bubble up
+            e.Handled = true;
         }
 
         private void ShowHistoryPopup()
         {
-            try
+            if (ViewModel?.SearchHistory != null && ViewModel.SearchHistory.Count > 0)
             {
-                var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
-                if (settings.SearchHistory != null && settings.SearchHistory.Count > 0)
-                {
-                    _suppressSelectionClose = true;
-                    SearchHistoryListBox.ItemsSource = null;
-                    SearchHistoryListBox.ItemsSource = settings.SearchHistory;
-                    SearchHistoryListBox.SelectedIndex = -1;
-                    _suppressSelectionClose = false;
-
-                    SearchHistoryPopup.IsOpen = true;
-                }
-                else
-                {
-                    SearchHistoryPopup.IsOpen = false;
-                }
+                _suppressSelectionClose = true;
+                SearchHistoryListBox.SelectedIndex = -1;
+                _suppressSelectionClose = false;
+                SearchHistoryPopup.IsOpen = true;
             }
-            catch
+            else
             {
                 SearchHistoryPopup.IsOpen = false;
             }
+        }
+
+        // ── History Logic (Managed by the Control) ──
+
+        public void LoadHistory()
+        {
+            try
+            {
+                var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
+                if (settings.SearchHistory != null && ViewModel != null)
+                {
+                    ViewModel.SearchHistory.ReplaceRange(settings.SearchHistory);
+                }
+            }
+            catch { /* Silent Fail */ }
         }
 
         public void AddSearchToHistory(string query)
@@ -307,7 +282,7 @@ namespace AssetsManager.Views.Controls.Explorer
             try
             {
                 var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
-                
+
                 // Deduplicate and keep most recent at the top
                 settings.SearchHistory.Remove(query);
                 settings.SearchHistory.Insert(0, query);
@@ -319,9 +294,35 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 settings.Save();
+                ViewModel?.SearchHistory.ReplaceRange(settings.SearchHistory);
+            }
+            catch { /* Silent Fail */ }
+        }
+
+        public void RemoveHistoryItem(string item)
+        {
+            try
+            {
+                var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
+                if (settings.SearchHistory.Remove(item))
+                {
+                    settings.Save();
+                    ViewModel?.SearchHistory.ReplaceRange(settings.SearchHistory);
+                }
+            }
+            catch { /* Silent Fail */ }
+        }
+
+        public void ClearHistory()
+        {
+            try
+            {
+                var settings = App.ServiceProvider.GetRequiredService<AppSettings>();
+                settings.SearchHistory.Clear();
+                settings.Save();
+                ViewModel?.SearchHistory.Clear();
             }
             catch { /* Silent Fail */ }
         }
     }
 }
-

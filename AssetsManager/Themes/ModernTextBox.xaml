@@ -34,13 +34,11 @@
                                           Margin="5,2,25,2"
                                           VerticalAlignment="Center"/>
                             <Button x:Name="ClearTextButton" 
-                                    Style="{StaticResource TransparentIconButton}"
+                                    Style="{StaticResource SmallCloseButtonStyle}"
                                     HorizontalAlignment="Right"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
-                                    Focusable="False">
-                                <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextSecondary}"/>
-                            </Button>
+                                    Focusable="False"/>
                         </Grid>
 
                         <!-- 3. Border Overlay (Changes thickness without shifting layout) -->
@@ -112,13 +110,11 @@
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                             <Button x:Name="ClearTextButton" 
-                                    Style="{StaticResource TransparentIconButton}"
+                                    Style="{StaticResource SmallCloseButtonStyle}"
                                     HorizontalAlignment="Right"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
-                                    Focusable="False">
-                                <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{StaticResource TextSecondary}"/>
-                            </Button>
+                                    Focusable="False"/>
                         </Grid>
 
                         <!-- 3. Border Overlay -->
@@ -221,14 +217,12 @@
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                             <Button x:Name="ClearTextButton" 
-                                    Style="{StaticResource TransparentIconButton}"
+                                    Style="{StaticResource SmallCloseButtonStyle}"
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
                                     Margin="0,0,8,0"
                                     Visibility="Collapsed"
-                                    Focusable="False">
-                                <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource TextSecondary}"/>
-                            </Button>
+                                    Focusable="False"/>
                         </Grid>
 
                         <!-- 3. Border Overlay (Handles Highlight without layout shift) -->
@@ -257,4 +251,5 @@
             </Setter.Value>
         </Setter>
     </Style>
+
 </ResourceDictionary>

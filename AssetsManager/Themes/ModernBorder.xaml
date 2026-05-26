@@ -71,4 +71,20 @@
         </Setter>
     </Style>
 
+    <!-- [ExplorerToolbarControl.xaml] Border style for search history popup -->
+    <Style x:Key="SearchHistoryPopupBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="4"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Black" Opacity="0.3"/>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
