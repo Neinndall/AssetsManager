@@ -1,7 +1,12 @@
-AssetsManager - League of Legends | v4.0.0.3
+AssetsManager - League of Legends | v4.0.1.0
 
-STABILITY & FORENSICS UPDATE
-This update focuses on reinforcing the application's core engine, ensuring absolute data integrity, and providing professional-grade diagnostic tools. It introduces a brand new thread-safe configuration system, a smart navigation engine for the explorer, and a project-wide "Zero Technical Silence" policy for background operations. Additionally, it modernizes the asynchronous interaction model to deliver a perfectly fluid and reliable user experience.
+MEDIUM UPDATE
+
+New Features
+  - Explorer / Persistent Search History
+    * Implemented a brand new "Search History" system that automatically saves and manages the last 5 unique queries, persisting them across sessions in the application configuration.
+    * Added a dedicated HUD-styled Popup with a clean vertical list of recent searches, complete with hover-based delete buttons and a global "Clear" option.
+    * Integrated full Keyboard Navigation to let users cycle through recent queries using Arrow Keys and press Enter to select or Escape to close the list.
 
 Improvements
   - Monitor / Dashboard HUD Refinement

@@ -52,6 +52,7 @@ namespace AssetsManager.Utils
 
         public Dictionary<string, List<long>> AssetTrackerUserRemovedIds { get; set; }
         public List<string> FavoritePaths { get; set; }
+        public List<string> SearchHistory { get; set; }
         public List<AudioPlaylistPack> AudioPlaylists { get; set; }
 
         public ApiSettings ApiSettings { get; set; }
@@ -97,6 +98,7 @@ namespace AssetsManager.Utils
                 settings.AssetTrackerUrlOverrides ??= new Dictionary<string, Dictionary<long, string>>();
                 settings.AssetTrackerUserRemovedIds ??= new Dictionary<string, List<long>>();
                 settings.FavoritePaths ??= new List<string>();
+                settings.SearchHistory ??= new List<string>();
                 settings.AudioPlaylists ??= new List<AudioPlaylistPack>();
 
                 // Robustly initialize and heal ApiSettings
@@ -165,6 +167,7 @@ namespace AssetsManager.Utils
                 AssetTrackerUrlOverrides = new Dictionary<string, Dictionary<long, string>>(),
                 AssetTrackerUserRemovedIds = new Dictionary<string, List<long>>(),
                 FavoritePaths = new List<string>(),
+                SearchHistory = new List<string>(),
                 AudioPlaylists = new List<AudioPlaylistPack>(),
                 ApiSettings = new ApiSettings
                 {
@@ -218,6 +221,7 @@ namespace AssetsManager.Utils
             AssetTrackerUrlOverrides = defaultSettings.AssetTrackerUrlOverrides;
             AssetTrackerUserRemovedIds = defaultSettings.AssetTrackerUserRemovedIds;
             FavoritePaths = defaultSettings.FavoritePaths;
+            SearchHistory = defaultSettings.SearchHistory;
             AudioPlaylists = defaultSettings.AudioPlaylists;
             ApiSettings = defaultSettings.ApiSettings;
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;

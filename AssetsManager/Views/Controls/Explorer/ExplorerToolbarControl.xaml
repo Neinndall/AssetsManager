@@ -63,7 +63,165 @@
                                  Style="{StaticResource AnimatedSearchBoxStyle}" 
                                  Tag="{Binding IsSearchVisible}"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Margin="0,0,4,0"/>
+                                 Margin="0,0,4,0"
+                                 GotFocus="SearchTextBox_GotFocus"
+                                 LostFocus="SearchTextBox_LostFocus"
+                                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                                 PreviewMouseLeftButtonDown="SearchTextBox_PreviewMouseLeftButtonDown"/>
+                        <Popup x:Name="SearchHistoryPopup"
+                               PlacementTarget="{Binding ElementName=SearchTextBox}"
+                               Placement="Bottom"
+                               StaysOpen="True"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade"
+                               MinWidth="220">
+                            <Border Background="{StaticResource CardBackground}"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="4"
+                                    Margin="0,4,0,0"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Color="Black" Opacity="0.3"/>
+                                </Border.Effect>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- Header -->
+                                    <Grid Grid.Row="0" Margin="6,4,6,6">
+                                        <TextBlock Text="RECENT SEARCHES"
+                                                   FontSize="9"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource TextSecondary}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button x:Name="ClearHistoryButton"
+                                                Content="Clear"
+                                                FontSize="9"
+                                                HorizontalAlignment="Right"
+                                                Cursor="Hand"
+                                                Click="ClearHistoryButton_Click"
+                                                Focusable="False">
+                                            <Button.Style>
+                                                <Style TargetType="Button">
+                                                    <Setter Property="Background" Value="Transparent"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border Background="Transparent" Padding="4,2">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                </Border>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+                                    
+                                    <!-- List -->
+                                    <ListBox Grid.Row="1"
+                                             x:Name="SearchHistoryListBox"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             MaxHeight="200"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             SelectionChanged="SearchHistoryListBox_SelectionChanged">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Padding="6,4">
+                                                                <ContentPresenter/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                                                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Height="24">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <materialIcons:MaterialIcon Kind="History" 
+                                                                                Width="12" Height="12" 
+                                                                                Foreground="{StaticResource TextSecondary}" 
+                                                                                VerticalAlignment="Center" 
+                                                                                Margin="2,0,6,0"/>
+                                                    <TextBlock Grid.Column="1" 
+                                                               Text="{Binding}" 
+                                                               Foreground="{StaticResource TextPrimary}" 
+                                                               FontSize="11" 
+                                                               VerticalAlignment="Center" 
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <!-- Delete item button -->
+                                                    <Button Grid.Column="2"
+                                                            Click="DeleteHistoryItem_Click"
+                                                            Tag="{Binding}"
+                                                            Visibility="Collapsed"
+                                                            x:Name="DelBtn"
+                                                            Focusable="False"
+                                                            Cursor="Hand">
+                                                        <Button.Style>
+                                                            <Style TargetType="Button">
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="Button">
+                                                                            <Border Background="Transparent" Padding="4">
+                                                                                <materialIcons:MaterialIcon x:Name="DelIcon" Kind="Close" Width="10" Height="10" Foreground="{StaticResource TextSecondary}"/>
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                                    <Setter TargetName="DelIcon" Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </Button.Style>
+                                                    </Button>
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <!-- Show delete button on hover -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="DelBtn" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+                        </Popup>
                     </Grid>
                 </StackPanel>
             </Border>

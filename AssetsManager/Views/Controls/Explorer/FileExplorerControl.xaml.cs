@@ -1184,6 +1184,11 @@ namespace AssetsManager.Views.Controls.Explorer
                 FilePreviewer.SetSearchFilter(searchText);
             }
 
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                Toolbar?.AddSearchToHistory(searchText);
+            }
+
             var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null);
 
             // Update No Results found UI after search completes
