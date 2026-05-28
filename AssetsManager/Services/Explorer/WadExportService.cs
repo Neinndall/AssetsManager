@@ -267,13 +267,9 @@ namespace AssetsManager.Services.Explorer
 
             if (fileBytes == null) return;
 
+            // NOTE: Extension guessing is now handled exclusively by WadNodeLoaderService
+            // during the tree population phase, so node.Name is already correct.
             string fileName = node.Name;
-            if (string.IsNullOrEmpty(Path.GetExtension(fileName)))
-            {
-                string guessedExtension = FileTypeDetector.GuessExtension(fileBytes);
-                if (!string.IsNullOrEmpty(guessedExtension)) fileName = $"{fileName}.{guessedExtension}";
-            }
-
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
             await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken);
             onFileSavedCallback?.Invoke(filePath);

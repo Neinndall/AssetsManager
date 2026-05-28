@@ -280,64 +280,26 @@ namespace AssetsManager.Views.Dialogs
         private void TryResolveHashes()
         {
             string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
-            var wadFileCache = new Dictionary<string, WadFile>();
-            try
+            
+            // NOTE: WAD opening and Smart Guessing are now handled in-situ by WadComparatorService.
+            // We only handle backup path assignment and basic fallback here for UI integrity.
+            foreach (var diff in _serializableDiffs)
             {
-                foreach (var diff in _serializableDiffs)
+                if (backupRoot != null)
                 {
-                    if (backupRoot != null)
-                    {
-                        diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
-                    }
-
-                    if (diff.OldPathHash != 0)
-                    {
-                        string resolvedPath = _hashResolverService.ResolveHash(diff.OldPathHash);
-                        bool isUnresolved = resolvedPath == diff.OldPathHash.ToString("x16");
-                        if ((isUnresolved || !Path.HasExtension(resolvedPath)) && diff.Type != ChunkDiffType.New)
-                        {
-                            string wadPath = Path.Combine(_oldPbePath, diff.SourceWadFile);
-                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile) && File.Exists(wadPath))
-                                wadFileCache[wadPath] = wadFile = new WadFile(wadPath);
-
-                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.OldPathHash, out var chunk))
-                            {
-                                using var stream = wadFile.OpenChunk(chunk);
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                string extension = FileTypeDetector.GuessExtension(new Span<byte>(buffer, 0, bytesRead));
-                                if (!string.IsNullOrEmpty(extension)) resolvedPath += "." + extension;
-                            }
-                        }
-                        diff.OldPath = resolvedPath;
-                    }
-
-                    if (diff.NewPathHash != 0)
-                    {
-                        string resolvedPath = _hashResolverService.ResolveHash(diff.NewPathHash);
-                        bool isUnresolved = resolvedPath == diff.NewPathHash.ToString("x16");
-                        if ((isUnresolved || !Path.HasExtension(resolvedPath)) && diff.Type != ChunkDiffType.Removed)
-                        {
-                            string wadPath = Path.Combine(_newPbePath, diff.SourceWadFile);
-                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile) && File.Exists(wadPath))
-                                wadFileCache[wadPath] = wadFile = new WadFile(wadPath);
-
-                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.NewPathHash, out var chunk))
-                            {
-                                using var stream = wadFile.OpenChunk(chunk);
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                string extension = FileTypeDetector.GuessExtension(new Span<byte>(buffer, 0, bytesRead));
-                                if (!string.IsNullOrEmpty(extension)) resolvedPath += "." + extension;
-                            }
-                        }
-                        diff.NewPath = resolvedPath;
-                    }
+                    diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
                 }
-            }
-            finally
-            {
-                foreach (var wadFile in wadFileCache.Values) wadFile.Dispose();
+
+                // Ensure paths are assigned if they weren't already (e.g. from history loading)
+                if (diff.OldPathHash != 0 && string.IsNullOrEmpty(diff.OldPath))
+                {
+                    diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                }
+
+                if (diff.NewPathHash != 0 && string.IsNullOrEmpty(diff.NewPath))
+                {
+                    diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                }
             }
         }
 

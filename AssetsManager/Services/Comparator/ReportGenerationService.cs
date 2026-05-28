@@ -55,63 +55,22 @@ namespace AssetsManager.Services.Comparator
             reportContent.AppendLine("========================================");
             reportContent.AppendLine();
 
-            string GetPathWithExtension(string path, ulong hash, string sourceWadFile, string baseDirectory)
-            {
-                if (Path.HasExtension(path) || string.IsNullOrEmpty(baseDirectory) || hash == 0)
-                {
-                    return path;
-                }
-
-                string wadPath = Path.Combine(baseDirectory, sourceWadFile);
-                if (!File.Exists(wadPath))
-                {
-                    return path;
-                }
-
-                try
-                {
-                    using var wadFile = new WadFile(wadPath);
-                    if (wadFile.Chunks.TryGetValue(hash, out WadChunk chunk))
-                    {
-                        using (var stream = wadFile.OpenChunk(chunk))
-                        {
-                            var buffer = new byte[256]; // Read only a small portion
-                            var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                            var data = new Span<byte>(buffer, 0, bytesRead);
-                            string extension = FileTypeDetector.GuessExtension(data);
-                            if (!string.IsNullOrEmpty(extension))
-                            {
-                                return $"{path}.{extension}";
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogWarning($"Could not process chunk {hash:x16} from {wadPath} for extension guessing: {ex.Message}");
-                }
-
-                return path;
-            }
-
             foreach (var diff in filteredDiffs)
             {
                 string line = $"[{diff.Type}] ";
                 switch (diff.Type)
                 {
                     case ChunkDiffType.New:
-                        line += GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
+                        line += diff.NewPath;
                         break;
                     case ChunkDiffType.Removed:
-                        line += GetPathWithExtension(diff.OldPath, diff.OldPathHash, diff.SourceWadFile, oldDirectory);
+                        line += diff.OldPath;
                         break;
                     case ChunkDiffType.Renamed:
-                        var oldPathWithExt = GetPathWithExtension(diff.OldPath, diff.OldPathHash, diff.SourceWadFile, oldDirectory);
-                        var newPathWithExt = GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
-                        line += $"{oldPathWithExt} -> {newPathWithExt}";
+                        line += $"{diff.OldPath} -> {diff.NewPath}";
                         break;
                     case ChunkDiffType.Modified:
-                        line += GetPathWithExtension(diff.NewPath, diff.NewPathHash, diff.SourceWadFile, newDirectory);
+                        line += diff.NewPath;
                         break;
                 }
                 reportContent.AppendLine(line);
