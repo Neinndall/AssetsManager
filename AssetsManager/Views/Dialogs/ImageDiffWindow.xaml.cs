@@ -65,6 +65,9 @@ namespace AssetsManager.Views.Dialogs
         {
             InitializeComponent();
             
+            // [PLAN B] Start invisible to prevent visual jump. Uncomment this and Visibility.Visible in Loaded if needed.
+            // Visibility = Visibility.Hidden;
+
             // Smooth Handover: Handled via Loaded event if LoadingWindow is set
             Loaded += ImageDiffWindow_Loaded;
 
@@ -103,10 +106,12 @@ namespace AssetsManager.Views.Dialogs
             // Using Render priority for images as they are faster to draw than heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-            // 2. Now make the window visible and bring to front
-            this.Visibility = Visibility.Visible;
+            // 2. Ensure activation and focus (Plan B: Uncomment Visibility.Visible if Hidden was used)
+            // this.Visibility = Visibility.Visible;
+            this.Activate();
+            this.Focus();
 
-            // 3. Smooth Handover: Close loading window now that we are visible
+            // 3. Smooth Handover: Close loading window now that we are ready
             if (LoadingWindow != null)
             {
                 LoadingWindow.Close();

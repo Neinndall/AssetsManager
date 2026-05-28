@@ -495,6 +495,7 @@ namespace AssetsManager.Views
         private void btnHelp_Click(object sender, RoutedEventArgs e)
         {
             var helpWindow = _serviceProvider.GetRequiredService<HelpWindow>();
+            helpWindow.Owner = this;
             helpWindow.ShowDialog();
         }
 

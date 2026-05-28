@@ -11,9 +11,10 @@
                 HeaderIcon="BellOutline"
                 Height="500" Width="400"
                 WindowStartupLocation="CenterOwner"
-                Style="{StaticResource HudWindowStyle}"
+                ResizeMode="NoResize"
+                ShowMinimizeButton="False"
                 ShowMaximizeButton="False"
-                ResizeMode="NoResize">
+                Style="{StaticResource HudWindowStyle}">
 
     <Window.Resources>
         <!-- DataTemplate for Notifications -->

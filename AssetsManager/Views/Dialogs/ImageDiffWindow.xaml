@@ -12,7 +12,7 @@
                 HeaderIcon="ImageMultipleOutline"
                 Height="850" Width="1200"
                 MinWidth="600" MinHeight="500"
-                WindowStartupLocation="CenterScreen"
+                WindowStartupLocation="CenterOwner"
                 Style="{StaticResource HudWindowStyle}">
 
     <Window.InputBindings>

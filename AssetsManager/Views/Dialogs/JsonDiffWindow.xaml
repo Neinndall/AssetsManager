@@ -12,7 +12,7 @@
                 HeaderTitle="Text Comparison" 
                 HeaderIcon="FileDocumentEditOutline"
                 Height="900" Width="1400" MinHeight="900" MinWidth="1400"
-                WindowStartupLocation="CenterScreen"
+                WindowStartupLocation="CenterOwner"
                 Style="{StaticResource HudWindowStyle}">
 
     <Window.InputBindings>

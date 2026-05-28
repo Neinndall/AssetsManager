@@ -229,6 +229,8 @@ namespace AssetsManager
 
       var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
       mainWindow.Show();
+      mainWindow.Activate();
+      mainWindow.Focus();
     }
 
     private void SetupGlobalExceptionHandling(LogService logService, CustomMessageBoxService customMessageBoxService)

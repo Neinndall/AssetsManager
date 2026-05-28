@@ -10,8 +10,8 @@
         MinHeight="650" MinWidth="850"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource SidebarBackground}"
-        HeaderTitle="Commit History" 
-        HeaderIcon="Update"
+        HeaderTitle="Commit History"
+        HeaderIcon="Github"
         Style="{StaticResource HudWindowStyle}"
         FontFamily="{StaticResource AppFontFamily}">
 

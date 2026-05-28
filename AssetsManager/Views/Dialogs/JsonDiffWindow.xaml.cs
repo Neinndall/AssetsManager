@@ -22,8 +22,10 @@ namespace AssetsManager.Views.Dialogs
             JsonDiffControl.JsonFormatterService = jsonFormatterService;
             JsonDiffControl.ParentWindow = this;
 
-            // Start invisible to prevent visual jump and transparency gaps
-            Visibility = Visibility.Hidden;
+            // [PLAN B] Start invisible to prevent visual jump and transparency gaps on massive files.
+            // If you uncomment this, also uncomment the Visibility.Visible line in JsonDiffWindow_Loaded.
+            // Visibility = Visibility.Hidden;
+
             Loaded += JsonDiffWindow_Loaded;
             Closed += OnWindowClosed;
         }
@@ -43,16 +45,18 @@ namespace AssetsManager.Views.Dialogs
                 LoadingWindow.SetState(DiffLoadingState.Ready);
             }
 
-            // 1. Scroll to the first difference while still invisible
+            // 1. Scroll to the first difference
             JsonDiffControl.FocusFirstDifference();
 
             // 2. IMPORTANT: Wait for the UI to process the initial rendering of the heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
-            // 3. Now make the window visible and bring to front
-            this.Visibility = Visibility.Visible;
+            // 3. Ensure activation and focus (Plan B: Uncomment Visibility.Visible if Hidden was used)
+            // this.Visibility = Visibility.Visible;
+            this.Activate();
+            this.Focus();
 
-            // 4. Smooth Handover: Close loading window now that we are visible
+            // 4. Smooth Handover: Close loading window now that we are ready
             if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
