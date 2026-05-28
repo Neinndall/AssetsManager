@@ -44,6 +44,8 @@ namespace AssetsManager.Services.Explorer
 
                 if (searchText.Contains("/"))
                 {
+                    // No need to filter if we are navigating to a specific path
+                    // But we might want to clear any existing search highlights/filters
                     await FilterTreeAsync(rootNodes, string.Empty, token);
                     var targetNode = await ExpandToPathAsync(searchText, rootNodes);
                     return targetNode;
@@ -89,7 +91,9 @@ namespace AssetsManager.Services.Explorer
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (string.IsNullOrWhiteSpace(searchText))
+                    bool isSearchEmpty = string.IsNullOrWhiteSpace(searchText);
+
+                    if (isSearchEmpty)
                     {
                         // Fast reset: Only update if necessary to avoid UI churn
                         foreach (var node in allNodes)
@@ -97,10 +101,13 @@ namespace AssetsManager.Services.Explorer
                             cancellationToken.ThrowIfCancellationRequested();
 
                             if (!node.IsVisible) node.IsVisible = true;
-                            if (node.HasMatch) node.HasMatch = false;
-                            node.PreMatch = null;
-                            node.Match = null;
-                            node.PostMatch = null;
+                            if (node.HasMatch)
+                            {
+                                node.HasMatch = false;
+                                node.PreMatch = null;
+                                node.Match = null;
+                                node.PostMatch = null;
+                            }
                         }
                         return;
                     }
@@ -143,16 +150,23 @@ namespace AssetsManager.Services.Explorer
                         bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
 
                         // Update match highlighting data
-                        if (node.HasMatch != hasMatch) node.HasMatch = hasMatch;
+                        if (node.HasMatch != hasMatch)
+                        {
+                            node.HasMatch = hasMatch;
+                        }
                         
                         if (hasMatch)
                         {
                             int length = searchText.Length;
-                            node.PreMatch = node.Name.Substring(0, matchIndex);
-                            node.Match = node.Name.Substring(matchIndex, length);
-                            node.PostMatch = node.Name.Substring(matchIndex + length);
+                            string pre = node.Name.Substring(0, matchIndex);
+                            string match = node.Name.Substring(matchIndex, length);
+                            string post = node.Name.Substring(matchIndex + length);
+
+                            if (node.PreMatch != pre) node.PreMatch = pre;
+                            if (node.Match != match) node.Match = match;
+                            if (node.PostMatch != post) node.PostMatch = post;
                         }
-                        else
+                        else if (node.PreMatch != null)
                         {
                             node.PreMatch = null;
                             node.Match = null;
@@ -160,7 +174,6 @@ namespace AssetsManager.Services.Explorer
                         }
 
                         // CRITICAL: Only update IsVisible if it's different.
-                        // This prevents the flickering of parent containers.
                         if (node.IsVisible != shouldBeVisible)
                         {
                             node.IsVisible = shouldBeVisible;
@@ -170,9 +183,10 @@ namespace AssetsManager.Services.Explorer
             }
             catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
             {
-                // Silently swallow cancellation or collection modification (we will retry on next keystroke)
+                // Silently swallow cancellation or collection modification
             }
         }
+
 
         private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
         {
