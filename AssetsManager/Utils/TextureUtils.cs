@@ -186,6 +186,15 @@ namespace AssetsManager.Utils
             }
         }
 
+        public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
+        {
+            if (data == null || data.Length == 0) return null;
+            using (var ms = new MemoryStream(data))
+            {
+                return LoadTexture(ms, extension, maxWidth, maxHeight);
+            }
+        }
+
         public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             try

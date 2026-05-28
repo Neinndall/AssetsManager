@@ -107,36 +107,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (asset != null && asset.HasChanges)
             {
-                string ext = Path.GetExtension(asset.Alias).ToLowerInvariant();
-                
-                if (SupportedFileTypes.IsImage(ext))
-                {
-                    try 
-                    {
-                        BitmapSource oldImg = null;
-                        if (File.Exists(asset.OldFilePath) && new FileInfo(asset.OldFilePath).Length > 0)
-                        {
-                            using var fs = File.OpenRead(asset.OldFilePath);
-                            oldImg = TextureUtils.LoadTexture(fs, ext);
-                        }
-
-                        using var fsNew = File.OpenRead(asset.NewFilePath);
-                        BitmapSource newImg = TextureUtils.LoadTexture(fsNew, ext);
-
-                        var imgDiffWin = new ImageDiffWindow(oldImg, newImg, "Previous Version", "Current Version");
-                        imgDiffWin.Owner = Window.GetWindow(this);
-                        imgDiffWin.ShowDialog();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogService.LogError(ex, "Error loading images for comparison");
-                        CustomMessageBoxService.ShowError("Error", "Could not load images for comparison.", Window.GetWindow(this));
-                    }
-                }
-                else
-                {
-                    await DiffViewService.ShowFileDiffAsync(asset.OldFilePath, asset.NewFilePath, Window.GetWindow(this));
-                }
+                await DiffViewService.ShowFileDiffAsync(asset.OldFilePath, asset.NewFilePath, Window.GetWindow(this));
 
                 asset.HasChanges = false;
                 asset.Status = AssetStatus.UpToDate;
