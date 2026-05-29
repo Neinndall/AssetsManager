@@ -77,6 +77,58 @@ namespace AssetsManager.Views.Controls.Monitor
             await LoadSalesCacheAsync();
             await LoadMythicShopCacheAsync();
             await LoadPassRewardsCacheAsync();
+            await LoadAvailablePassesAsync();
+        }
+
+        private async Task LoadAvailablePassesAsync()
+        {
+            if (DirectoriesCreator == null) return;
+
+            await Task.Run(() =>
+            {
+                var files = Directory.GetFiles(DirectoriesCreator.ApiCachePath, "*_progression.json");
+                var passNames = files.Select(f => {
+                    string name = Path.GetFileName(f).Replace("_progression.json", "");
+                    // Use centralized utility for UI display
+                    return PathUtils.CleanPassName(name, forUI: true);
+                }).Distinct().ToList();
+
+                Dispatcher.Invoke(() =>
+                {
+                    ViewModel.AvailablePasses.Clear();
+                    foreach (var name in passNames) ViewModel.AvailablePasses.Add(name);
+                });
+            });
+        }
+
+        private async void PassBrowser_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel.SelectedPass == null) return;
+
+            // Use centralized utility to reconstruct the filename from the UI name
+            string cleanName = PathUtils.CleanPassName(ViewModel.SelectedPass.Replace(" ", "_"));
+            string fileName = $"{cleanName}_progression.json";
+            
+            string progPath = Path.Combine(DirectoriesCreator.ApiCachePath, fileName);
+            string rewardsPath = Path.Combine(DirectoriesCreator.ApiCachePath, "pass_rewards.json");
+
+            if (!File.Exists(progPath) || !File.Exists(rewardsPath)) return;
+
+            try
+            {
+                var progJson = await File.ReadAllTextAsync(progPath);
+                var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
+
+                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
+                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+
+                if (prog != null && rewards != null)
+                {
+                    await ProcessPassRewardsDataAsync(prog, rewards);
+                    LogService.LogSuccess($"Loaded cached pass: {ViewModel.SelectedPass}");
+                }
+            }
+            catch (Exception ex) { LogService.LogError(ex, "Failed to load pass from browser selection."); }
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -580,13 +632,17 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             string eventId = ViewModel.ManualPassId?.Trim();
+            string eventName = null;
 
             if (string.IsNullOrEmpty(eventId))
             {
                 ViewModel.IsBusy = true;
                 ViewModel.StatusText = "Status: Finding active pass...";
 
-                eventId = await RiotApiService.GetActivePassGroupIdAsync();
+                var activePass = await RiotApiService.GetActivePassGroupIdAsync();
+                eventId = activePass.Id;
+                eventName = activePass.Name;
+
                 if (string.IsNullOrEmpty(eventId))
                 {
                     ViewModel.IsBusy = false;
@@ -594,10 +650,15 @@ namespace AssetsManager.Views.Controls.Monitor
                     return;
                 }
             }
+            else 
+            {
+                // Manual ID: Try to find its beautiful name in the Hub anyway
+                eventName = await RiotApiService.GetPassNameFromHubAsync(eventId);
+            }
 
             ViewModel.IsBusy = true;
             ViewModel.StatusText = "Status: Fetching pass data...";
-            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId);
+            string progressionJson = await RiotApiService.GetPassRewardsProgressionAsync(eventId, eventName);
             string rewardsJson = await RiotApiService.GetPassRewardsRewardsAsync();
 
             if (string.IsNullOrEmpty(progressionJson) || string.IsNullOrEmpty(rewardsJson))
@@ -615,6 +676,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 if (progression != null && rewardsResponse != null)
                 {
                     await ProcessPassRewardsDataAsync(progression, rewardsResponse);
+                    // Refresh the browser list since we just saved a new (or updated) pass
+                    await LoadAvailablePassesAsync();
                 }
             }
             catch (Exception ex)
@@ -668,7 +731,8 @@ namespace AssetsManager.Views.Controls.Monitor
                             Details = details,
                             IconUrl = reward.Media.IconUrl,
                             Quantity = reward.Quantity,
-                            IsFree = milestone.Name.Contains("Free", StringComparison.OrdinalIgnoreCase)
+                            // A reward is FREE if it contains "_Free" OR if it doesn't contain "_Pass" (for mini-events)
+                            IsFree = !milestone.Name.Contains("_Pass", StringComparison.OrdinalIgnoreCase)
                         });
 
                         processedKeys.Add(key);
@@ -709,13 +773,27 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private string TranslateMilestoneName(string name)
         {
+            // 1. Try specialized "Mini-Event" format: "2026 Season 2 Kiwi Milestone 1"
+            // Regex for: Year(4) Season X [EventName] Milestone Y
+            var miniEventMatch = Regex.Match(name, @"^(\d{4})\s+Season\s+(\d+)\s+(.+)\s+Milestone\s+(\d+)", RegexOptions.IgnoreCase);
+            if (miniEventMatch.Success)
+            {
+                string year = miniEventMatch.Groups[1].Value.Substring(2); // "26"
+                string season = miniEventMatch.Groups[2].Value; // "2"
+                string eventName = miniEventMatch.Groups[3].Value.Trim(); // "Kiwi"
+                string milestone = miniEventMatch.Groups[4].Value; // "1"
+                
+                return $"{eventName} Milestone {milestone} - S{year}-S{season}";
+            }
+
+            // 2. Fallback to standard "Level X" for conventional pases
             if (name.Contains("Milestone", StringComparison.OrdinalIgnoreCase))
             {
                 int index = name.IndexOf("Milestone", StringComparison.OrdinalIgnoreCase);
                 if (index >= 0)
                 {
-                    // Get everything after "Milestone"
-                    string levelPart = name.Substring(index + "Milestone".Length);
+                    // Get everything after "Milestone" and trim to handle potential spaces
+                    string levelPart = name.Substring(index + "Milestone".Length).Trim();
                     
                     // Use Regex to extract only the leading numbers
                     var match = Regex.Match(levelPart, @"^(\d+)");

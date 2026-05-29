@@ -46,6 +46,12 @@ namespace AssetsManager.Views.Models.Monitor
         private string _manualPassId;
         public string ManualPassId { get => _manualPassId; set => SetProperty(ref _manualPassId, value); }
 
+        private ObservableCollection<string> _availablePasses;
+        public ObservableCollection<string> AvailablePasses { get => _availablePasses; set => SetProperty(ref _availablePasses, value); }
+
+        private string _selectedPass;
+        public string SelectedPass { get => _selectedPass; set => SetProperty(ref _selectedPass, value); }
+
         public PaginationModel<CatalogItem> Paginator { get; }
 
         public ObservableRangeCollection<CatalogItem> SalesCatalog => Paginator.PagedItems;
@@ -80,6 +86,7 @@ namespace AssetsManager.Views.Models.Monitor
             Paginator = new PaginationModel<CatalogItem> { PageSize = 12 };
             MythicShopCategories = new ObservableRangeCollection<MythicShopCategory>();
             PassRewards = new ObservableRangeCollection<PassRewardModel>();
+            AvailablePasses = new ObservableCollection<string>();
         }
 
         public void SetFullSalesCatalog(IEnumerable<CatalogItem> items)

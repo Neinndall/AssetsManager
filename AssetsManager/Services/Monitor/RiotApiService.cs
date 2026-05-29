@@ -421,16 +421,39 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        public async Task<string> GetPassRewardsProgressionAsync(string eventId)
+        public async Task<string> GetPassRewardsProgressionAsync(string eventId, string overrideName = null)
         {
             var response = await MakeRemoteRequestAsync("progression", eventId: eventId);
             if (response != null && response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
-                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, "pass_progression.json"), json);
+                
+                // Determine a unique name for this pass to avoid overwriting
+                string fileName = "pass_progression.json";
+                string eventName = overrideName;
 
-                _logService.LogSuccess("Pass rewards progression retrieved and cached successfully.");
+                if (string.IsNullOrEmpty(eventName))
+                {
+                    try 
+                    {
+                        using var doc = JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("name", out var nameProp))
+                        {
+                            eventName = nameProp.GetString();
+                        }
+                    } catch { /* Fallback */ }
+                }
+
+                if (!string.IsNullOrEmpty(eventName))
+                {
+                    string cleanName = PathUtils.CleanPassName(eventName);
+                    fileName = $"{PathUtils.SanitizeName(cleanName).Replace(" ", "_")}_progression.json";
+                }
+
+                _directoriesCreator.CreateDirectory(_directoriesCreator.ApiCachePath);
+                await File.WriteAllTextAsync(Path.Combine(_directoriesCreator.ApiCachePath, fileName), json);
+
+                _logService.LogSuccess($"Pass rewards progression for {fileName} retrieved and cached successfully.");
                 return json;
             }
 
@@ -443,6 +466,15 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError("Failed to retrieve Pass progression. The server response was empty or null.");
             }
             return null;
+        }
+
+        private string SanitizeFileName(string fileName)
+        {
+            foreach (char c in Path.GetInvalidFileNameChars())
+            {
+                fileName = fileName.Replace(c, '_');
+            }
+            return fileName.Replace(' ', '_');
         }
 
         public async Task<string> GetPassRewardsRewardsAsync()
@@ -458,10 +490,10 @@ namespace AssetsManager.Services.Monitor
             return null;
         }
 
-        public async Task<string> GetActivePassGroupIdAsync()
+        public async Task<(string Id, string Name)> GetActivePassGroupIdAsync()
         {
             string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
-            if (string.IsNullOrEmpty(lolDirectory)) return null;
+            if (string.IsNullOrEmpty(lolDirectory)) return (null, null);
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
             string[] possiblePaths = { 
@@ -496,12 +528,62 @@ namespace AssetsManager.Services.Monitor
 
                     if (bestEvent != null)
                     {
-                        _logService.LogSuccess($"Active Pass ID found: {bestEvent.Name}");
-                        return bestEvent.Id;
+                        _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
+                        return (bestEvent.Id, bestEvent.Name);
                     }
                 }
                 catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             }
+            return (null, null);
+        }
+
+        public async Task<string> GetPassNameFromHubAsync(string trackConfigId)
+        {
+            if (string.IsNullOrEmpty(trackConfigId)) return null;
+
+            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            if (string.IsNullOrEmpty(lolDirectory)) return null;
+
+            string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
+            string[] possiblePaths = { 
+                "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
+                "global/default/v1/event-hub.json",
+                "v1/event-hub.json" 
+            };
+
+            foreach (var path in possiblePaths)
+            {
+                var node = await _wadContentProvider.FindNodeByVirtualPathAsync(path, pluginPath);
+                if (node == null) continue;
+
+                try 
+                {
+                    byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                    if (data == null) continue;
+
+                    using var doc = JsonDocument.Parse(data);
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("event", out var ev))
+                        {
+                            if (ev.TryGetProperty("rewardTrack", out var rt) && 
+                                rt.TryGetProperty("trackConfig", out var tc) &&
+                                tc.TryGetProperty("id", out var idProp) &&
+                                idProp.GetString().Equals(trackConfigId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
+                                if (!string.IsNullOrEmpty(name))
+                                {
+                                    _logService.Log($"Found name for event ID: {name}");
+                                    return name;
+                                }
+                            }
+                        }
+                    }
+                } catch { }
+            }
+            
+            _logService.LogWarning($"[EventHub] Could not find a localized name for ID {trackConfigId} in the Hub.");
             return null;
         }
 

@@ -43,6 +43,26 @@ namespace AssetsManager.Utils
             return name;
         }
 
+        /// <summary>
+        /// Cleans technical Riot suffixes from a Pass Event name.
+        /// e.g. "2026_Season2_Act2_Pass_reward_track" -> "2026 Season 2 Act 2"
+        /// </summary>
+        public static string CleanPassName(string name, bool forUI = false)
+        {
+            if (string.IsNullOrEmpty(name)) return "Unknown_Pass";
+
+            string clean = name.Replace("_Pass_reward_track", "")
+                               .Replace("_reward_track", "")
+                               .Replace("_Pass", "");
+
+            if (forUI)
+            {
+                return clean.Replace("_", " ").Trim();
+            }
+
+            return clean;
+        }
+
         public static string SanitizeName(string name)
         {
             var invalidChars = Path.GetInvalidFileNameChars();

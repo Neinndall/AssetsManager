@@ -3,12 +3,17 @@ AssetsManager - League of Legends | v4.0.1.0
 MEDIUM UPDATE
 
 New Features
+  - Monitor / Pass Rewards Browser: implemented a multi-event caching system with dynamic event-named files and a dedicated UI selector.
+  - Monitor / Image Comparison: added support for viewing image differences in Asset Watcher and History (previously unavailable).
   - Explorer / Persistent Search History
     * Implemented a brand new "Search History" system that automatically saves and manages the last 5 unique queries, persisting them across sessions in the application configuration.
     * Added a dedicated HUD-styled Popup with a clean vertical list of recent searches, complete with hover-based delete buttons and a global "Clear" option.
     * Integrated full Keyboard Navigation to let users cycle through recent queries using Arrow Keys and press Enter to select or Escape to close the list.
 
 Improvements
+  - Monitor / Smart Pass Naming: integrated Event Hub localized name resolution to prioritize accurate event titles for caching and display.
+  - Monitor / Smart Milestone Translation: implemented automatic name shortening for mini-events (e.g. "Kiwi Milestone 1 - S26-S2") to prevent UI overflow.
+  - Monitor / Pass Rewards UI: redesigned the configuration section to perfectly match the Asset Tracker visual language.
   - Monitor / Dashboard HUD Refinement
     * Redesigned the middle status icons in the PBE Server, Core Build, and System Health cards: removed the "hero" border containers and shadow effects to achieve a much cleaner and more minimal aesthetic.
     * Standardized Glyph Metrics: updated the standalone status icons to a consistent 26px size for optimal visibility and HUD alignment.
@@ -43,8 +48,19 @@ Improvements
   - Diagnostics / Advanced Stability Laboratory
     * Integrated a brand new technical verification suite in the Benchmark module: features automated concurrency stress tests (50 parallel writes), double-disposal safety checks, and background error visibility tests.
     * Refined Resource Management: optimized the `Dispose` logic across all core services to ensure precise event unsubscription and zero memory leaks while maintaining code simplicity.
+  - Comparator / High-Performance Engine & SSoT
+    * Optimized WAD comparison architecture: implemented a single-pass comparison engine with session-wide resolution caching, achieving a 26% reduction in memory allocation and consistent 2-3s execution times for massive datasets.
+    * Integrated Smart Asset Identification: added "in-situ" extension guessing for unknown hashes (0x...) by reading file headers directly during the comparison phase, ensuring professional-grade results without additional disk I/O.
+  - UI / High-Fidelity Progress Feedback
+    * Refined progress reporting frequency: updated the unified notification system to report every 100 chunks, ensuring a perfectly smooth and progressive visual experience regardless of file volume.
+  - Architecture / System-Wide Redundancy Cleanup
+    * Streamlined Results & Reporting: eliminated redundant WAD re-scanning and duplicate extension guessing logic in the Comparison Results Window and Report Generation Service, resulting in near-instant window openings.
+    * Refined Export Efficiency: optimized the Export Service to rely on the tree's pre-processed identity (SSoT), removing unnecessary format detections during file saving.
 
 Bug Fixes
+  - Fixed focus loss and unexpected minimization when closing comparison or settings windows.
+  - Implemented image support for the difference viewer in Asset Watcher and History modules.
+  - Ensured the application correctly activates and gains focus on startup.
   - Explorer / Stability & Navigation Integrity
     * Resolved a critical "InvalidOperationException" (StartAt) in the tree navigation engine by isolating layout updates from the WPF content generation cycle.
     * Fixed a collection modification crash in the search engine during rapid typing by implementing thread-safe snapshot traversal.
