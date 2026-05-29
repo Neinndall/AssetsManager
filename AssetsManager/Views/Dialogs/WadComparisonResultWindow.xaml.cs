@@ -281,8 +281,6 @@ namespace AssetsManager.Views.Dialogs
         {
             string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
             
-            // NOTE: WAD opening and Smart Guessing are now handled in-situ by WadComparatorService.
-            // We only handle backup path assignment and basic fallback here for UI integrity.
             foreach (var diff in _serializableDiffs)
             {
                 if (backupRoot != null)
@@ -290,7 +288,7 @@ namespace AssetsManager.Views.Dialogs
                     diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
                 }
 
-                // Ensure paths are assigned if they weren't already or if they look like unresolved hex hashes
+                // Optimization: Skip if already has a readable name. Only attempt if empty or a raw hex hash.
                 if (diff.OldPathHash != 0 && (string.IsNullOrEmpty(diff.OldPath) || IsHexHash(diff.OldPath)))
                 {
                     string resolved = _hashResolverService.ResolveHash(diff.OldPathHash);
