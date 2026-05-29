@@ -290,17 +290,25 @@ namespace AssetsManager.Views.Dialogs
                     diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
                 }
 
-                // Ensure paths are assigned if they weren't already (e.g. from history loading)
-                if (diff.OldPathHash != 0 && string.IsNullOrEmpty(diff.OldPath))
+                // Ensure paths are assigned if they weren't already or if they look like unresolved hex hashes
+                if (diff.OldPathHash != 0 && (string.IsNullOrEmpty(diff.OldPath) || IsHexHash(diff.OldPath)))
                 {
-                    diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
+                    string resolved = _hashResolverService.ResolveHash(diff.OldPathHash);
+                    if (resolved != null) diff.OldPath = resolved;
                 }
 
-                if (diff.NewPathHash != 0 && string.IsNullOrEmpty(diff.NewPath))
+                if (diff.NewPathHash != 0 && (string.IsNullOrEmpty(diff.NewPath) || IsHexHash(diff.NewPath)))
                 {
-                    diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                    string resolved = _hashResolverService.ResolveHash(diff.NewPathHash);
+                    if (resolved != null) diff.NewPath = resolved;
                 }
             }
+        }
+
+        private bool IsHexHash(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return path.Length == 16 && System.Text.RegularExpressions.Regex.IsMatch(path, @"^[0-9a-fA-F]+$");
         }
 
         private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
