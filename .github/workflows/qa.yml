@@ -12,28 +12,36 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout Code
+    - name: Checkout AssetsManager
       uses: actions/checkout@v6
       with:
+        path: app_root
         fetch-depth: 0
+
+    - name: Checkout LeagueToolkit Fork
+      uses: actions/checkout@v6
+      with:
+        repository: Neinndall/LeagueToolkit
+        ref: optimize-wad-checksum-and-toc
+        path: LeagueToolkit-4.1.0-beta.53
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '10.0.x'
         cache: true
-        cache-dependency-path: 'AssetsManager/AssetsManager.csproj'
+        cache-dependency-path: 'app_root/AssetsManager/AssetsManager.csproj'
 
     - name: Extract Version from CSProj
       id: get_version
       shell: pwsh
       run: |
-        [xml]$xml = Get-Content "./AssetsManager/AssetsManager.csproj"
+        [xml]$xml = Get-Content "app_root/AssetsManager/AssetsManager.csproj"
         $ver = $xml.Project.PropertyGroup.Version
         echo "PROJECT_VERSION=$ver" >> $env:GITHUB_ENV
 
     - name: .NET Publish
-      run: dotnet publish "./AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -o "./publish/" /p:AnalysisLevel=None -p:DebugType=None -p:GenerateDocumentationFile=false /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
+      run: dotnet publish "app_root/AssetsManager/AssetsManager.csproj" -c Release -r win-x64 -o "./publish/" /p:AnalysisLevel=None -p:DebugType=None -p:GenerateDocumentationFile=false /p:InformationalVersion="${{ env.PROJECT_VERSION }}-${{ github.sha }}"
 
     - name: Zip File
       shell: pwsh
