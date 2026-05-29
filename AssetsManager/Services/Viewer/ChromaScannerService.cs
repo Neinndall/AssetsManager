@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
@@ -128,29 +129,38 @@ namespace AssetsManager.Services.Viewer
 
         /// <summary>
         /// Simple algorithm to extract the dominant color of a bitmap for the UI Swatch.
+        /// Optimized to only sample a small region without copying the whole bitmap.
         /// </summary>
         private Color ExtractDominantColor(BitmapSource bitmap)
         {
             try
             {
-                // We take a sample of pixels from the center of the texture
-                int width = bitmap.PixelWidth;
-                int height = bitmap.PixelHeight;
+                // Sampling a 64x64 area from the center is more than enough for a swatch
+                int sampleSize = 64;
+                int startX = Math.Max(0, (bitmap.PixelWidth - sampleSize) / 2);
+                int startY = Math.Max(0, (bitmap.PixelHeight - sampleSize) / 2);
+                int width = Math.Min(sampleSize, bitmap.PixelWidth);
+                int height = Math.Min(sampleSize, bitmap.PixelHeight);
+
+                Int32Rect sourceRect = new Int32Rect(startX, startY, width, height);
                 int stride = (width * bitmap.Format.BitsPerPixel + 7) / 8;
-                byte[] pixels = new byte[stride * height];
-                bitmap.CopyPixels(pixels, stride, 0);
+                
+                // Use a small buffer (stackalloc if possible, but 64x64*4 = 16KB is safe for heap too)
+                byte[] samplePixels = new byte[stride * height];
+                bitmap.CopyPixels(sourceRect, samplePixels, stride, 0);
 
                 long r = 0, g = 0, b = 0;
                 int samples = 0;
+                int bytesPerPixel = bitmap.Format.BitsPerPixel / 8;
 
-                // Sample every 32 pixels for performance
-                for (int i = 0; i < pixels.Length; i += 32 * (bitmap.Format.BitsPerPixel / 8))
+                for (int i = 0; i < samplePixels.Length; i += bytesPerPixel)
                 {
-                    if (i + 2 < pixels.Length)
+                    if (i + 2 < samplePixels.Length)
                     {
-                        b += pixels[i];
-                        g += pixels[i + 1];
-                        r += pixels[i + 2];
+                        // Assuming Bgra32 or Bgr32
+                        b += samplePixels[i];
+                        g += samplePixels[i + 1];
+                        r += samplePixels[i + 2];
                         samples++;
                     }
                 }

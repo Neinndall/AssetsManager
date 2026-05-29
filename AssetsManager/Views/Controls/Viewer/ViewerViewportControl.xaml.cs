@@ -431,7 +431,8 @@ namespace AssetsManager.Views.Controls.Viewer
                             model.SkinnedMesh,
                             model.Parts.ToList(),
                             model == _activeSceneModel ? _skeletonVisual : null,
-                            model == _activeSceneModel ? _jointsVisual : null
+                            model == _activeSceneModel ? _jointsVisual : null,
+                            model.Name
                         );
                     }
                 }

@@ -95,12 +95,16 @@ namespace AssetsManager.Views.Models.Viewer
             if (Geometry != null)
             {
                 Geometry.Material = null;
+                Geometry.BackMaterial = null;
                 Geometry.Geometry = null;
                 Geometry = null;
             }
 
-            AllTextures?.Clear();
-            AllTextures = null;
+            if (AllTextures != null)
+            {
+                AllTextures.Clear();
+                AllTextures = null;
+            }
             AvailableTextureNames?.Clear();
 
             // Desuscribir todos los eventos

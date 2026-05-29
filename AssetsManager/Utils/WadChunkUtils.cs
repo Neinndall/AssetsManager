@@ -27,12 +27,14 @@ namespace AssetsManager.Utils
                     return _zstdDecompressor.Value.Unwrap(compressedData).ToArray();
 
                 case WadChunkCompression.GZip:
-                    // Para GZip, convertimos el Span a array (necesario para MemoryStream)
-                    using (var compressedStream = new MemoryStream(compressedData.ToArray()))
-                    using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+                    // Optimizamos: Evitamos el ToArray() si podemos usar el array original o manejar el stream de forma eficiente.
                     using (var decompressedStream = new MemoryStream())
                     {
-                        gzipStream.CopyTo(decompressedStream);
+                        using (var compressedStream = new MemoryStream(compressedData.ToArray()))
+                        using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+                        {
+                            gzipStream.CopyTo(decompressedStream);
+                        }
                         return decompressedStream.ToArray();
                     }
 

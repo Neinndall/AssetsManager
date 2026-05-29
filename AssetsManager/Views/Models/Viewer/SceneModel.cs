@@ -182,14 +182,18 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void Dispose()
         {
-            // 1. Limpiar transformaciones y visuales
+            // 1. Liberar recursos pesados y cerrar buffers (Toolkit)
+            CurrentAnimation?.Dispose();
+            SkinnedMesh?.Dispose();
+
+            // 2. Limpiar visuales y desconectar de la GPU (WPF)
             if (RootVisual != null)
             {
                 RootVisual.Transform = null;
                 RootVisual.Children.Clear();
             }
 
-            // 2. Limpiar Parts (geometrías y texturas críticas)
+            // 3. Destruir partes individuales y limpiar colecciones
             if (_parts != null)
             {
                 _parts.CollectionChanged -= Parts_CollectionChanged;
@@ -200,17 +204,19 @@ namespace AssetsManager.Views.Models.Viewer
                 }
                 _parts.Clear();
             }
-
-            // 3. Limpiar estado de animaciones
             Animations?.Clear();
+
+            // 4. Cortar todas las referencias finales
             CurrentAnimation = null;
+            SkinnedMesh = null;
+            Skeleton = null;
+            RootVisual = null;
+            
+            // 5. Limpiar eventos y estados
             IsAnimationPaused = false;
             AnimationTime = 0;
-
-            // 4. Liberar referencias finales
-            Skeleton = null;
-            SkinnedMesh = null;
-            RootVisual = null;
+            PropertyChanged = null;
+            MeshVisibilityChanged = null;
         }
     }
 }
