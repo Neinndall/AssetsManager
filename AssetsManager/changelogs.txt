@@ -92,6 +92,8 @@ Bug Fixes
     * Corrected syntax artifacts and missing namespaces in the Differences and Image windows caused by concurrent file edits.
     * Eliminated all unawaited task warnings (CS4014) and async-void patterns to achieve a 100% clean and professional build.
   - Commit History / Refined messaging for edge cases when release tags are missing.
+  - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
+  - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -731,8 +731,10 @@ namespace AssetsManager.Views.Controls.Monitor
                             Details = details,
                             IconUrl = reward.Media.IconUrl,
                             Quantity = reward.Quantity,
-                            // A reward is FREE if it contains "_Free" OR if it doesn't contain "_Pass" (for mini-events)
-                            IsFree = !milestone.Name.Contains("_Pass", StringComparison.OrdinalIgnoreCase)
+                            // Priority logic: _Free takes precedence over _Pass. 
+                            // If neither is present (Mini-Events), it defaults to FREE.
+                            IsFree = milestone.Name.Contains("_Free", StringComparison.OrdinalIgnoreCase) || 
+                                     !milestone.Name.Contains("_Pass", StringComparison.OrdinalIgnoreCase)
                         });
 
                         processedKeys.Add(key);
