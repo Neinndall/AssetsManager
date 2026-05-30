@@ -1225,6 +1225,11 @@ namespace AssetsManager.Views.Controls.Explorer
         public void SelectNode(FileSystemNodeModel node)
         {
             if (node == null) return;
+            
+            // SECURITY GUARD: Only skip if the TreeView already has THIS EXACT node selected.
+            // This prevents infinite loops but allows refreshing if the underlying pin content changes.
+            if (FileTreeView.SelectedItem is FileSystemNodeModel current && current == node) return;
+
             TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, node, false);
         }
     }

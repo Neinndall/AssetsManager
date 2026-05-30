@@ -75,6 +75,8 @@ Bug Fixes
   - Fixed multiple compilation errors related to missing namespaces in the new optimized services.
   - Comparator / Quick Select Synchronization: fixed a UI issue where the Target Version selector failed to mark the selected item when the path matched an existing backup; consolidated path selection logic to ensure consistent behavior across all selection methods.
   - Explorer / Stability & Navigation Integrity
+    * Fixed an infinite selection loop and tab flickering when navigating between folders containing files with identical names; implemented a guard against redundant selection cycles and optimized the tab recycling logic to ensure a perfectly smooth and accurate UI refresh.
+    * Resolved a Dual View focus regression where the tree selection would incorrectly jump back to the previous category slot (e.g., Video) when clicking a new file of a different type (e.g., Texture).
     * Resolved a critical "InvalidOperationException" (StartAt) in the tree navigation engine by isolating layout updates from the WPF content generation cycle.
     * Fixed a collection modification crash in the search engine during rapid typing by implementing thread-safe snapshot traversal.
     * Resolved a null-reference exception in the path resolver when searching deep within file-only branches.

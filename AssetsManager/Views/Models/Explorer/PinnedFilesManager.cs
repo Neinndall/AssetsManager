@@ -75,10 +75,14 @@ namespace AssetsManager.Views.Models.Explorer
                 // Recycle the temporary slot
                 recyclablePin.Node = node;
                 
-                // Force notification by resetting SelectedFile to trigger property change
-                var current = SelectedFile;
-                _selectedFile = null; 
-                SelectedFile = current;
+                // CRITICAL FIX: The recycled pin must become the SelectedFile.
+                // If it was already selected, we force a notification to refresh the content.
+                if (SelectedFile == recyclablePin)
+                {
+                    _selectedFile = null; 
+                }
+                
+                SelectedFile = recyclablePin;
             }
             else
             {
