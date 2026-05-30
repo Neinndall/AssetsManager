@@ -240,14 +240,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void UpdateAppVersionFooter()
         {
-            if (AppVersionText != null && AppVersionText.Contains("available!"))
-            {
-                AppVersionFooterText = "Channel: Update Available";
-            }
-            else
-            {
-                AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}";
-            }
+            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}";
         }
 
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
