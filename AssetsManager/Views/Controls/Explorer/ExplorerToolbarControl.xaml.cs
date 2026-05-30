@@ -16,8 +16,9 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public ExplorerToolbarModel ViewModel => DataContext as ExplorerToolbarModel;
 
-        // Flag to prevent SelectionChanged from closing the popup during programmatic updates
+        // Flags to prevent SelectionChanged and Focus from closing/reopening the popup during programmatic updates
         private bool _suppressSelectionClose;
+        private bool _isApplyingHistoryItem;
 
         public ExplorerToolbarControl()
         {
@@ -163,7 +164,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void SearchTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
-            ShowHistoryPopup();
+            if (!_isApplyingHistoryItem)
+            {
+                ShowHistoryPopup();
+            }
         }
 
         private void SearchTextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -183,6 +187,14 @@ namespace AssetsManager.Views.Controls.Explorer
                     SearchHistoryPopup.IsOpen = false;
                 }
             }), DispatcherPriority.Background);
+        }
+
+        private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_isApplyingHistoryItem && SearchHistoryPopup.IsOpen)
+            {
+                SearchHistoryPopup.IsOpen = false;
+            }
         }
 
         private void SearchTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -246,14 +258,22 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void ApplyHistoryItem(string text)
         {
-            _suppressSelectionClose = true;
-            SearchTextBox.Text = text;
-            SearchHistoryPopup.IsOpen = false;
-            SearchHistoryListBox.SelectedIndex = -1;
-            _suppressSelectionClose = false;
+            _isApplyingHistoryItem = true;
+            try
+            {
+                _suppressSelectionClose = true;
+                SearchTextBox.Text = text;
+                SearchHistoryPopup.IsOpen = false;
+                SearchHistoryListBox.SelectedIndex = -1;
+                _suppressSelectionClose = false;
 
-            SearchTextBox.Focus();
-            SearchTextBox.CaretIndex = SearchTextBox.Text.Length;
+                SearchTextBox.Focus();
+                SearchTextBox.CaretIndex = SearchTextBox.Text.Length;
+            }
+            finally
+            {
+                _isApplyingHistoryItem = false;
+            }
         }
 
         private void ClearHistoryButton_Click(object sender, RoutedEventArgs e)

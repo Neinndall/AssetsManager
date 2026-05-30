@@ -66,6 +66,7 @@
                                  Margin="0,0,4,0"
                                  GotFocus="SearchTextBox_GotFocus"
                                  LostFocus="SearchTextBox_LostFocus"
+                                 TextChanged="SearchTextBox_TextChanged"
                                  PreviewKeyDown="SearchTextBox_PreviewKeyDown"
                                  PreviewMouseLeftButtonDown="SearchTextBox_PreviewMouseLeftButtonDown"/>
                         <Popup x:Name="SearchHistoryPopup"

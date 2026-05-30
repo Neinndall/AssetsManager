@@ -41,6 +41,7 @@ Improvements
   - Explorer / Smart Navigation Engine
     * Implemented a brand new "Smart Reload" filter: the file tree now intelligently ignores setting changes that don't affect file visibility (such as history updates or encoding preferences), eliminating frustrating tree resets during background tasks.
     * Optimized Initialization: critical paths and user preferences are now tracked from startup, preventing the "first-time reload" flicker when accessing settings.
+  - Explorer / Search History Polish: refined the selection behavior to automatically hide the popup after choosing a recent search and integrated auto-hide logic while typing to ensure an unobstructed view of live results.
   - Core / Robust Thread-Safe Configuration
     * Implemented a specialized static lock mechanism in the settings engine: this ensures that concurrent writes to `config.json` (e.g., from the Watcher and API Center simultaneously) are synchronized, making file corruption technically impossible.
     * Added Guarded Load/Save cycles to prevent IO exceptions during rapid configuration updates.
