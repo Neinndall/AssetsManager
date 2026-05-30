@@ -1,7 +1,7 @@
 AssetsManager - League of Legends | v4.0.1.0
 
-PERFORMANCE & MEMORY OVERHAUL
-This update introduces a massive technical refactoring of the geometry and animation engines. By implementing high-performance Binary I/O based on Span/stackalloc and a fully asynchronous loading architecture, we've achieved a ~70-80% reduction in memory pressure and eliminated UI freezing during heavy asset processing. Character animations are now smoother than ever thanks to persistent buffer recycling, while map geometry loading has been accelerated through O(1) material resolution.
+MEDIUM UPDATE
+
 
 New Features
   - Monitor / Pass Rewards Browser: implemented a multi-event caching system with dynamic event-named files and a dedicated UI selector.
