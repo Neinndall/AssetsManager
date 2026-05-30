@@ -240,7 +240,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void UpdateAppVersionFooter()
         {
-            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}";
+            string shaPart = BuildSha != null && BuildSha != "N/A" ? $" · {BuildSha}" : string.Empty;
+            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}{shaPart}";
         }
 
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
