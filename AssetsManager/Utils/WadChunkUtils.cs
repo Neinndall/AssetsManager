@@ -23,11 +23,9 @@ namespace AssetsManager.Utils
             {
                 case WadChunkCompression.ZstdChunked:
                 case WadChunkCompression.Zstd:
-                    // Fix: Unwrap may return a Span<byte>, so we convert it to ToArray() if needed to match the byte[] return type.
                     return _zstdDecompressor.Value.Unwrap(compressedData).ToArray();
 
                 case WadChunkCompression.GZip:
-                    // Optimizamos: Evitamos el ToArray() si podemos usar el array original o manejar el stream de forma eficiente.
                     using (var decompressedStream = new MemoryStream())
                     {
                         using (var compressedStream = new MemoryStream(compressedData.ToArray()))
@@ -43,8 +41,13 @@ namespace AssetsManager.Utils
             }
         }
 
-        // Sobrecarga para mantener compatibilidad con byte[]
         public static byte[] DecompressChunk(byte[] compressedData, WadChunkCompression? compressionType)
             => DecompressChunk(compressedData.AsSpan(), compressionType);
+
+        // Reads the WAD file header to extract the chunk count without instantiating WadFile.
+        // Delegates to LeagueToolkit's WadFile.GetChunkCount - single source of truth for the
+        // WAD format. Kept as a wrapper to preserve call sites and to allow future fallback logic
+        // if the library API ever changes.
+        public static int ReadWadChunkCount(string wadFilePath) => WadFile.GetChunkCount(wadFilePath);
     }
 }
