@@ -9,6 +9,7 @@ New Features
   - Explorer / Narrative Metadata Expansion
     * Added support for Loot items: the explorer now automatically resolves and displays narrative context (names and descriptions) for loot assets by parsing the `loot.json` catalog.
     * Implemented Hybrid Parsing: the system now supports both Array and Object-based root structures in `loot.json`, ensuring compatibility across different game versions.
+    * New Metadata Search Prefix (*): users can now search by real name or description by prefixing queries with `*`. Supports multi-keyword logic (e.g., `*aram mayhem`) for advanced asset discovery.
   - Explorer / Persistent Search History
     * Implemented a brand new "Search History" system that automatically saves and manages the last 5 unique queries, persisting them across sessions in the application configuration.
     * Added a dedicated HUD-styled Popup with a clean vertical list of recent searches, complete with hover-based delete buttons and a global "Clear" option.

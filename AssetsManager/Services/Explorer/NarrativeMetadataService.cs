@@ -17,10 +17,10 @@ namespace AssetsManager.Services.Explorer
         private readonly WadContentProvider _wadContentProvider;
         private readonly AppSettings _appSettings;
         
-        private List<SummonerIconJsonEntry> _cachedIcons;
-        private List<EmoteJsonEntry> _cachedEmotes;
-        private List<WardJsonEntry> _cachedWards;
-        private List<LootJsonEntry> _cachedLoot;
+        private Dictionary<int, SummonerIconJsonEntry> _cachedIcons;
+        private Dictionary<string, EmoteJsonEntry> _cachedEmotes; // Key: Path suffix
+        private Dictionary<int, WardJsonEntry> _cachedWards;
+        private Dictionary<string, LootJsonEntry> _cachedLoot; // Key: Path suffix
         private string _cachedIconsSourceWad;
         private string _cachedEmotesSourceWad;
         private string _cachedWardsSourceWad;
@@ -33,38 +33,120 @@ namespace AssetsManager.Services.Explorer
             _appSettings = appSettings;
         }
 
-        public async Task<NarrativeMetadata> GetMetadataAsync(FileSystemNodeModel node)
+        public bool IsMetadataSupported(FileSystemNodeModel node)
+        {
+            if (node == null || FileSystemNodeModel.CanHaveChildren(node.Type)) return false;
+            
+            // Fast check before normalization
+            string name = node.Name.ToLowerInvariant();
+            if (!name.EndsWith(".png") && !name.EndsWith(".jpg") && !name.EndsWith(".dds")) return false;
+
+            string path = PathUtils.NormalizePath(node.VirtualPath);
+            return path.Contains("profile-icons") ||
+                   path.Contains("summoneremotes") ||
+                   path.Contains("wardskinimages") ||
+                   path.Contains("loot");
+        }
+
+        /// <summary>
+        /// Preloads all relevant metadata catalogs for a given WAD or client context.
+        /// Essential for high-performance search loops.
+        /// </summary>
+        public async Task PreloadMetadataAsync(FileSystemNodeModel contextNode)
+        {
+            if (contextNode == null) return;
+            
+            // We fire these in parallel for maximum speed
+            await Task.WhenAll(
+                LoadIconsMetadataAsync(contextNode),
+                LoadEmotesMetadataAsync(contextNode),
+                LoadWardsMetadataAsync(contextNode),
+                LoadLootMetadataAsync(contextNode)
+            );
+        }
+
+        /// <summary>
+        /// Synchronous lookup. Requires PreloadMetadataAsync to have been called first.
+        /// Used for high-speed search loops.
+        /// </summary>
+        public NarrativeMetadata GetMetadataSync(FileSystemNodeModel node)
         {
             if (node == null || string.IsNullOrEmpty(node.VirtualPath)) return null;
 
             string path = PathUtils.NormalizePath(node.VirtualPath);
-            
-            // 1. Check for Summoner Icons
-            if (path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
+
+            // 1. Icons
+            if (_cachedIcons != null && path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
             {
-                return await GetIconMetadataAsync(node);
-            }
-            
-            // 2. Check for Emotes
-            if (path.Contains(RiotCatalogDefinitions.EmotesVirtualPath))
-            {
-                return await GetEmoteMetadataAsync(node);
+                string fileName = Path.GetFileNameWithoutExtension(node.Name);
+                if (int.TryParse(fileName, out int iconId) && _cachedIcons.TryGetValue(iconId, out var entry))
+                {
+                    return new NarrativeMetadata
+                    {
+                        Title = string.IsNullOrWhiteSpace(entry.Title) ? "N/A" : entry.Title,
+                        Description = entry.Descriptions?.FirstOrDefault(d => d.Region == "riot")?.Description 
+                                      ?? entry.Descriptions?.FirstOrDefault()?.Description ?? "N/A"
+                    };
+                }
             }
 
-            // 3. Check for Wards
-            if (path.Contains(RiotCatalogDefinitions.WardsVirtualPath))
+            // 2. Emotes
+            if (_cachedEmotes != null && path.Contains(RiotCatalogDefinitions.EmotesVirtualPath))
             {
-                return await GetWardMetadataAsync(node);
+                return GetMappedMetadataFromDict(path, "summoneremotes/", _cachedEmotes);
             }
 
-            // 4. Check for Loot
-            if (path.Contains(RiotCatalogDefinitions.LootVirtualPath))
+            // 3. Wards
+            if (_cachedWards != null && path.Contains(RiotCatalogDefinitions.WardsVirtualPath))
             {
-                return await GetLootMetadataAsync(node);
+                string fileName = Path.GetFileNameWithoutExtension(node.Name);
+                var match = System.Text.RegularExpressions.Regex.Match(fileName, @"\d+");
+                if (match.Success && int.TryParse(match.Value, out int wardId) && _cachedWards.TryGetValue(wardId, out var entry))
+                {
+                    return MapToMetadata(entry.Name, entry.RegionalDescriptions?.FirstOrDefault(d => d.Region == "riot")?.Description ?? entry.Description);
+                }
+            }
+
+            // 4. Loot
+            if (_cachedLoot != null && path.Contains(RiotCatalogDefinitions.LootVirtualPath))
+            {
+                return GetMappedMetadataFromDict(path, "assets/loot/", _cachedLoot);
             }
 
             return null;
         }
+
+        private NarrativeMetadata GetMappedMetadataFromDict<T>(string path, string token, Dictionary<string, T> dict)
+        {
+            int tokenIndex = path.IndexOf(token);
+            if (tokenIndex == -1) return null;
+
+            string suffix = Path.ChangeExtension(path.Substring(tokenIndex), null);
+            if (dict.TryGetValue(suffix, out var entry))
+            {
+                if (entry is EmoteJsonEntry e) return MapToMetadata(e.Name, e.Description);
+                if (entry is LootJsonEntry l) return MapToMetadata(l.Name, l.Description);
+            }
+            return null;
+        }
+
+        private NarrativeMetadata MapToMetadata(string title, string description)
+        {
+            return new NarrativeMetadata
+            {
+                Title = string.IsNullOrWhiteSpace(title) ? "N/A" : title,
+                Description = string.IsNullOrWhiteSpace(description) ? "N/A" : description
+            };
+        }
+
+        public async Task<NarrativeMetadata> GetMetadataAsync(FileSystemNodeModel node)
+        {
+            if (node == null || string.IsNullOrEmpty(node.VirtualPath)) return null;
+            return GetMetadataSync(node); // Reuse sync logic since caches are pre-warmed or handled
+        }
+
+        // --- Catalog Loading Logic ---
+        // (Loading methods stay mostly the same as they are context-specific and async)
 
         private async Task<NarrativeMetadata> GetIconMetadataAsync(FileSystemNodeModel node)
         {
@@ -73,11 +155,10 @@ namespace AssetsManager.Services.Explorer
 
             try
             {
-                var iconsList = await LoadIconsMetadataAsync(node);
-                if (iconsList == null) return null;
+                var iconsDict = await LoadIconsMetadataAsync(node);
+                if (iconsDict == null) return null;
 
-                var entry = iconsList.FirstOrDefault(e => e.Id == iconId);
-                if (entry == null) return null;
+                if (!iconsDict.TryGetValue(iconId, out var entry)) return null;
 
                 return new NarrativeMetadata
                 {
@@ -98,39 +179,28 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                var emotesList = await LoadEmotesMetadataAsync(node);
-                if (emotesList == null) return null;
+                var emotesDict = await LoadEmotesMetadataAsync(node);
+                if (emotesDict == null) return null;
 
                 string normalizedNodePath = PathUtils.NormalizePath(node.VirtualPath);
-                
-                // Strategy 1: Match by ID in filename (e.g. "123_EM.png")
+                string token = "summoneremotes/";
+                int tokenIndex = normalizedNodePath.IndexOf(token);
+                if (tokenIndex == -1) return null;
+
+                string nodeSuffix = Path.ChangeExtension(normalizedNodePath.Substring(tokenIndex), null);
+
+                if (emotesDict.TryGetValue(nodeSuffix, out var entry))
+                {
+                    return MapEmoteToMetadata(entry);
+                }
+
+                // Strategy 2: Match by ID in filename as fallback
                 string fileName = Path.GetFileNameWithoutExtension(node.Name);
                 string idPart = fileName.Split('_')[0];
                 if (int.TryParse(idPart, out int emoteId))
                 {
-                    var entry = emotesList.FirstOrDefault(e => e.Id == emoteId);
-                    if (entry != null) return MapEmoteToMetadata(entry);
-                }
-
-                // Strategy 2: Match by Path (for named emotes in subfolders)
-                // Use "summoneremotes/" as an anchor to avoid issues with duplicated "assets/" folders
-                string token = "summoneremotes/";
-                int tokenIndex = normalizedNodePath.IndexOf(token);
-                if (tokenIndex != -1)
-                {
-                    string nodeSuffix = Path.ChangeExtension(normalizedNodePath.Substring(tokenIndex), null);
-                    
-                    var entry = emotesList.FirstOrDefault(e => {
-                        if (string.IsNullOrEmpty(e.InventoryIcon)) return false;
-                        string jsonPath = PathUtils.NormalizePath(e.InventoryIcon);
-                        int jsonTokenIndex = jsonPath.IndexOf(token);
-                        if (jsonTokenIndex == -1) return false;
-
-                        return nodeSuffix == Path.ChangeExtension(jsonPath.Substring(jsonTokenIndex), null);
-                    });
-
-
-                    if (entry != null) return MapEmoteToMetadata(entry);
+                    var fallbackEntry = emotesDict.Values.FirstOrDefault(e => e.Id == emoteId);
+                    if (fallbackEntry != null) return MapEmoteToMetadata(fallbackEntry);
                 }
 
                 return null;
@@ -146,16 +216,18 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                var wardsList = await LoadWardsMetadataAsync(node);
-                if (wardsList == null) return null;
+                var wardsDict = await LoadWardsMetadataAsync(node);
+                if (wardsDict == null) return null;
 
                 // Match by ID in filename (e.g. "wardhero_101.png")
                 string fileName = Path.GetFileNameWithoutExtension(node.Name);
                 var match = System.Text.RegularExpressions.Regex.Match(fileName, @"\d+");
                 if (match.Success && int.TryParse(match.Value, out int wardId))
                 {
-                    var entry = wardsList.FirstOrDefault(e => e.Id == wardId);
-                    if (entry != null) return MapWardToMetadata(entry);
+                    if (wardsDict.TryGetValue(wardId, out var entry))
+                    {
+                        return MapWardToMetadata(entry);
+                    }
                 }
 
                 return null;
@@ -171,8 +243,8 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                var lootList = await LoadLootMetadataAsync(node);
-                if (lootList == null) return null;
+                var lootDict = await LoadLootMetadataAsync(node);
+                if (lootDict == null) return null;
 
                 string normalizedNodePath = PathUtils.NormalizePath(node.VirtualPath);
                 string token = "assets/loot/";
@@ -181,16 +253,10 @@ namespace AssetsManager.Services.Explorer
 
                 string nodeSuffix = Path.ChangeExtension(normalizedNodePath.Substring(tokenIndex), null);
 
-                var entry = lootList.FirstOrDefault(e => {
-                    if (string.IsNullOrEmpty(e.Image)) return false;
-                    string jsonPath = PathUtils.NormalizePath(e.Image);
-                    int jsonTokenIndex = jsonPath.IndexOf(token);
-                    if (jsonTokenIndex == -1) return false;
-
-                    return nodeSuffix == Path.ChangeExtension(jsonPath.Substring(jsonTokenIndex), null);
-                });
-
-                if (entry != null) return MapLootToMetadata(entry);
+                if (lootDict.TryGetValue(nodeSuffix, out var entry))
+                {
+                    return MapLootToMetadata(entry);
+                }
 
                 return null;
             }
@@ -229,7 +295,7 @@ namespace AssetsManager.Services.Explorer
             };
         }
 
-        private async Task<List<SummonerIconJsonEntry>> LoadIconsMetadataAsync(FileSystemNodeModel node)
+        private async Task<Dictionary<int, SummonerIconJsonEntry>> LoadIconsMetadataAsync(FileSystemNodeModel node)
         {
             if (_cachedIcons != null && _cachedIconsSourceWad == node.SourceWadPath) return _cachedIcons;
 
@@ -239,7 +305,8 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                _cachedIcons = JsonSerializer.Deserialize<List<SummonerIconJsonEntry>>(jsonData, options);
+                var list = JsonSerializer.Deserialize<List<SummonerIconJsonEntry>>(jsonData, options);
+                _cachedIcons = list?.ToDictionary(e => e.Id, e => e);
                 _cachedIconsSourceWad = node.SourceWadPath;
                 return _cachedIcons;
             }
@@ -250,7 +317,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task<List<EmoteJsonEntry>> LoadEmotesMetadataAsync(FileSystemNodeModel node)
+        private async Task<Dictionary<string, EmoteJsonEntry>> LoadEmotesMetadataAsync(FileSystemNodeModel node)
         {
             if (_cachedEmotes != null && _cachedEmotesSourceWad == node.SourceWadPath) return _cachedEmotes;
 
@@ -260,7 +327,25 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                _cachedEmotes = JsonSerializer.Deserialize<List<EmoteJsonEntry>>(jsonData, options);
+                var list = JsonSerializer.Deserialize<List<EmoteJsonEntry>>(jsonData, options);
+                
+                _cachedEmotes = new Dictionary<string, EmoteJsonEntry>(StringComparer.OrdinalIgnoreCase);
+                string token = "summoneremotes/";
+
+                if (list != null)
+                {
+                    foreach (var entry in list)
+                    {
+                        if (string.IsNullOrEmpty(entry.InventoryIcon)) continue;
+                        string jsonPath = PathUtils.NormalizePath(entry.InventoryIcon);
+                        int jsonTokenIndex = jsonPath.IndexOf(token);
+                        if (jsonTokenIndex == -1) continue;
+
+                        string suffix = Path.ChangeExtension(jsonPath.Substring(jsonTokenIndex), null);
+                        _cachedEmotes[suffix] = entry;
+                    }
+                }
+
                 _cachedEmotesSourceWad = node.SourceWadPath;
                 return _cachedEmotes;
             }
@@ -271,7 +356,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task<List<WardJsonEntry>> LoadWardsMetadataAsync(FileSystemNodeModel node)
+        private async Task<Dictionary<int, WardJsonEntry>> LoadWardsMetadataAsync(FileSystemNodeModel node)
         {
             if (_cachedWards != null && _cachedWardsSourceWad == node.SourceWadPath) return _cachedWards;
 
@@ -281,7 +366,8 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                _cachedWards = JsonSerializer.Deserialize<List<WardJsonEntry>>(jsonData, options);
+                var list = JsonSerializer.Deserialize<List<WardJsonEntry>>(jsonData, options);
+                _cachedWards = list?.ToDictionary(e => e.Id, e => e);
                 _cachedWardsSourceWad = node.SourceWadPath;
                 return _cachedWards;
             }
@@ -292,7 +378,7 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task<List<LootJsonEntry>> LoadLootMetadataAsync(FileSystemNodeModel node)
+        private async Task<Dictionary<string, LootJsonEntry>> LoadLootMetadataAsync(FileSystemNodeModel node)
         {
             if (_cachedLoot != null && _cachedLootSourceWad == node.SourceWadPath) return _cachedLoot;
 
@@ -302,12 +388,12 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                
+                List<LootJsonEntry> list = null;
+
                 using (var doc = JsonDocument.Parse(jsonData))
                 {
                     JsonElement root = doc.RootElement;
 
-                    // If it's a wrapper object (e.g., { "LootItems": [...] }), go deeper
                     if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("LootItems", out var lootItemsProp))
                     {
                         root = lootItemsProp;
@@ -315,12 +401,29 @@ namespace AssetsManager.Services.Explorer
 
                     if (root.ValueKind == JsonValueKind.Array)
                     {
-                        _cachedLoot = JsonSerializer.Deserialize<List<LootJsonEntry>>(root.GetRawText(), options);
+                        list = JsonSerializer.Deserialize<List<LootJsonEntry>>(root.GetRawText(), options);
                     }
                     else if (root.ValueKind == JsonValueKind.Object)
                     {
                         var dict = JsonSerializer.Deserialize<Dictionary<string, LootJsonEntry>>(root.GetRawText(), options);
-                        _cachedLoot = dict?.Values.ToList();
+                        list = dict?.Values.ToList();
+                    }
+                }
+
+                _cachedLoot = new Dictionary<string, LootJsonEntry>(StringComparer.OrdinalIgnoreCase);
+                string token = "assets/loot/";
+
+                if (list != null)
+                {
+                    foreach (var entry in list)
+                    {
+                        if (string.IsNullOrEmpty(entry.Image)) continue;
+                        string jsonPath = PathUtils.NormalizePath(entry.Image);
+                        int jsonTokenIndex = jsonPath.IndexOf(token);
+                        if (jsonTokenIndex == -1) continue;
+
+                        string suffix = Path.ChangeExtension(jsonPath.Substring(jsonTokenIndex), null);
+                        _cachedLoot[suffix] = entry;
                     }
                 }
 
@@ -337,24 +440,40 @@ namespace AssetsManager.Services.Explorer
         private async Task<byte[]> LoadJsonFromContextAsync(FileSystemNodeModel node, string jsonVirtualPath)
         {
             string gameDataPath = null;
-            if (File.Exists(node.SourceWadPath))
+            
+            // Try to resolve path from the node's WAD
+            if (!string.IsNullOrEmpty(node.SourceWadPath) && File.Exists(node.SourceWadPath))
             {
                 gameDataPath = Path.GetDirectoryName(node.SourceWadPath);
             }
-            else
+            
+            // Fallback to global settings if WAD context is missing or JSON not found there
+            if (string.IsNullOrEmpty(gameDataPath))
             {
                 gameDataPath = _appSettings.PreferredClient == PreferredClient.PBE ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
             }
 
-            if (!string.IsNullOrEmpty(gameDataPath) && Directory.Exists(gameDataPath))
+            if (!string.IsNullOrEmpty(gameDataPath))
             {
+                // _logService.Log($"[Metadata] Searching for catalog '{Path.GetFileName(jsonVirtualPath)}' in: {gameDataPath}");
                 var jsonNode = await _wadContentProvider.FindNodeByVirtualPathAsync(jsonVirtualPath, gameDataPath);
                 if (jsonNode != null)
                 {
                     return await _wadContentProvider.GetVirtualFileBytesAsync(jsonNode);
                 }
+                else
+                {
+                    // Secondary fallback: Try searching in the opposite client directory just in case
+                    string alternatePath = _appSettings.PreferredClient == PreferredClient.PBE ? _appSettings.LolLiveDirectory : _appSettings.LolPbeDirectory;
+                    if (!string.IsNullOrEmpty(alternatePath) && alternatePath != gameDataPath)
+                    {
+                        jsonNode = await _wadContentProvider.FindNodeByVirtualPathAsync(jsonVirtualPath, alternatePath);
+                        if (jsonNode != null) return await _wadContentProvider.GetVirtualFileBytesAsync(jsonNode);
+                    }
+                }
             }
 
+            _logService.LogWarning($"[Metadata] Could not locate catalog file: {jsonVirtualPath}");
             return null;
         }
     }

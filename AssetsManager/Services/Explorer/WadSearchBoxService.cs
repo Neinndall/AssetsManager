@@ -11,22 +11,28 @@ using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Explorer
 {
+    /// <summary>
+    /// Service responsible for tree filtering, metadata-based searching, and path navigation (GO TO).
+    /// Optimized for handling millions of nodes with time-slicing and surgical UI updates.
+    /// </summary>
     public class WadSearchBoxService
     {
+        private readonly NarrativeMetadataService _metadataService;
+        private readonly LogService _logService;
         private CancellationTokenSource _searchCts;
         private readonly object _searchLock = new object();
 
-        private CancellationToken PrepareCancellationToken()
+        public WadSearchBoxService(NarrativeMetadataService metadataService, LogService logService)
         {
-            lock (_searchLock)
-            {
-                _searchCts?.Cancel();
-                _searchCts?.Dispose();
-                _searchCts = new CancellationTokenSource();
-                return _searchCts.Token;
-            }
+            _metadataService = metadataService;
+            _logService = logService;
         }
 
+        #region --- Public API ---
+
+        /// <summary>
+        /// Main entry point for performing a search. Routes to either Path Navigation (/) or Filtered Search.
+        /// </summary>
         public async Task<FileSystemNodeModel> PerformSearchAsync(
             string searchText,
             ObservableRangeCollection<FileSystemNodeModel> rootNodes,
@@ -39,25 +45,20 @@ namespace AssetsManager.Services.Explorer
             {
                 if (string.IsNullOrEmpty(searchText))
                 {
-                    await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
-                    return null;
+                    return await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
                 }
 
+                // MODE: Path Navigation (GO TO)
                 if (searchText.Contains("/"))
                 {
-                    // No need to filter if we are navigating to a specific path
-                    // But we might want to clear any existing search highlights/filters
                     await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
-                    var targetNode = await ExpandToPathAsync(searchText, rootNodes);
-                    return targetNode;
+                    return await ExpandToPathAsync(searchText, rootNodes);
                 }
-                else
-                {
-                    // Normal search: Filter the tree but DO NOT return a match for auto-navigation.
-                    // The user prefers to navigate the filtered tree manually.
-                    await FilterTreeAsync(rootNodes, searchText, token, activeNode);
-                    return null;
-                }
+
+                // MODE: Normal/Metadata Filtered Search (Manual Navigation)
+                // We filter the tree but return null to prevent automatic scrolling/selection.
+                await FilterTreeAsync(rootNodes, searchText, token, activeNode);
+                return null;
             }
             catch (OperationCanceledException)
             {
@@ -65,6 +66,9 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        /// <summary>
+        /// Resets search state and navigates directly to a path.
+        /// </summary>
         public async Task<FileSystemNodeModel> NavigateToPathAsync(
             string path,
             ObservableRangeCollection<FileSystemNodeModel> rootNodes,
@@ -73,223 +77,279 @@ namespace AssetsManager.Services.Explorer
             if (string.IsNullOrEmpty(path)) return null;
 
             var token = PrepareCancellationToken();
-
-            // Reset any previous search filtering before navigating
             await FilterTreeAsync(rootNodes, string.Empty, token);
 
             return await ExpandToPathAsync(path, rootNodes);
         }
 
-        public async Task<FileSystemNodeModel> FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken, FileSystemNodeModel activeNode = null)
+        /// <summary>
+        /// Orchestrates the tree filtering process: Flatten -> Prepare -> Identify -> Apply.
+        /// Returns the activeNode if resetting, or null otherwise to maintain manual navigation.
+        /// </summary>
+        public async Task<FileSystemNodeModel> FilterTreeAsync(
+            ObservableRangeCollection<FileSystemNodeModel> nodes, 
+            string searchText, 
+            CancellationToken cancellationToken, 
+            FileSystemNodeModel activeNode = null)
         {
             try
             {
-                // Identification and Flattening (Always fast)
+                // 1. Identification and Flattening (Fast, no UI updates)
                 var allNodes = new List<FileSystemNodeModel>();
                 await Task.Run(() => Flatten(nodes, allNodes, cancellationToken), cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                bool isSearchEmpty = string.IsNullOrWhiteSpace(searchText);
-
-                if (isSearchEmpty)
+                if (string.IsNullOrWhiteSpace(searchText))
                 {
-                    // 1. Identify prioritized nodes (Roots, Active Path, and Expanded Branches)
-                    var prioritizedNodes = new HashSet<FileSystemNodeModel>();
-                    
-                    // Priority A: Root nodes
-                    foreach (var root in nodes) prioritizedNodes.Add(root);
-
-                    // Priority B: Active path and its siblings
-                    if (activeNode != null)
-                    {
-                        var current = activeNode;
-                        while (current != null)
-                        {
-                            prioritizedNodes.Add(current);
-                            if (current.Parent != null)
-                            {
-                                foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
-                            }
-                            current = current.Parent;
-                        }
-                    }
-
-                    // Priority C: Expanded branches (What the user is actually looking at)
-                    foreach (var node in allNodes)
-                    {
-                        if (node.IsExpanded)
-                        {
-                            prioritizedNodes.Add(node);
-                            if (node.Children != null)
-                            {
-                                foreach (var child in node.Children) prioritizedNodes.Add(child);
-                            }
-                        }
-                    }
-
-                    // Apply priority updates immediately (Time-sliced for fluidity)
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    foreach (var node in prioritizedNodes)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        ResetNodeState(node);
-                        
-                        // If we've worked for more than 16ms (one frame), yield to keep UI responsive
-                        if (sw.ElapsedMilliseconds > 16)
-                        {
-                            await Task.Yield();
-                            sw.Restart();
-                        }
-                    }
-
-                    // 2. START BACKGROUND RESET for the rest and RETURN immediately
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            // Small delay to let the prioritized branch render first
-                            await Task.Delay(50, cancellationToken);
-
-                            var bgSw = System.Diagnostics.Stopwatch.StartNew();
-                            foreach (var node in allNodes)
-                            {
-                                if (cancellationToken.IsCancellationRequested) break;
-                                if (prioritizedNodes.Contains(node)) continue;
-
-                                if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.Children)
-                                {
-                                    ResetNodeState(node);
-
-                                    // Yield every 16ms to keep background processing efficient but non-blocking
-                                    if (bgSw.ElapsedMilliseconds > 16)
-                                    {
-                                        await Task.Yield();
-                                        bgSw.Restart();
-                                    }
-                                }
-                            }
-                        }
-                        catch (OperationCanceledException) { }
-                        catch (Exception) { }
-                    }, cancellationToken);
-
-                    return null;
+                    await PerformResetAsync(nodes, allNodes, activeNode, cancellationToken);
+                    return activeNode; // Return activeNode so the UI takes the user to it after clearing
                 }
 
-                // Normal Search Logic
-                FileSystemNodeModel firstMatch = null;
+                // 2. Search Preparation
+                bool isMetadataSearch = searchText.StartsWith("*");
+                string query = (isMetadataSearch ? searchText.Substring(1) : searchText).Trim();
+                string[] keywords = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                if (keywords.Length == 0)
+                {
+                    await PerformResetAsync(nodes, allNodes, activeNode, cancellationToken);
+                    return activeNode;
+                }
+
+                if (isMetadataSearch)
+                {
+                    var contextNode = allNodes.FirstOrDefault(n => !string.IsNullOrEmpty(n.SourceWadPath));
+                    if (contextNode != null) await _metadataService.PreloadMetadataAsync(contextNode);
+                }
 
                 await Task.Run(async () =>
                 {
-                    // 2. High Performance & Anti-Flicker Filtering
-                    // Pass 1: Identification (who should be visible?)
                     var toShow = new HashSet<FileSystemNodeModel>();
                     var matchIndices = new Dictionary<FileSystemNodeModel, int>();
-
-                    foreach (var node in allNodes)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        if (node.Name == "Loading...") continue;
-
-                        int index = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
-                        if (index >= 0)
-                        {
-                            if (firstMatch == null) firstMatch = node;
-
-                            matchIndices[node] = index;
-                            toShow.Add(node);
-
-                            // Propagate visibility upwards instantly in the set
-                            var parent = node.Parent;
-                            while (parent != null && !toShow.Contains(parent))
-                            {
-                                toShow.Add(parent);
-                                parent = parent.Parent;
-                            }
-                        }
-                    }
+                    FileSystemNodeModel dummyMatch = null;
+                    
+                    // PHASE 1: Identification (Find matching nodes)
+                    IdentifyMatchingNodes(allNodes, keywords, query, isMetadataSearch, toShow, matchIndices, ref dummyMatch, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Pass 2: Surgical Application (Only notify UI if state changes)
-                    int uiUpdateCount = 0;
-                    foreach (var node in allNodes)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        bool shouldBeVisible = toShow.Contains(node);
-                        bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
-
-                        bool changed = false;
-
-                        // Update match highlighting data
-                        if (node.HasMatch != hasMatch)
-                        {
-                            node.HasMatch = hasMatch;
-                            changed = true;
-                        }
-                        
-                        if (hasMatch)
-                        {
-                            int length = searchText.Length;
-                            string pre = node.Name.Substring(0, matchIndex);
-                            string match = node.Name.Substring(matchIndex, length);
-                            string post = node.Name.Substring(matchIndex + length);
-
-                            if (node.PreMatch != pre) { node.PreMatch = pre; changed = true; }
-                            if (node.Match != match) { node.Match = match; changed = true; }
-                            if (node.PostMatch != post) { node.PostMatch = post; changed = true; }
-                        }
-                        else if (node.PreMatch != null)
-                        {
-                            node.PreMatch = null;
-                            node.Match = null;
-                            node.PostMatch = null;
-                            changed = true;
-                        }
-
-                        // CRITICAL: Only update IsVisible if it's different.
-                        if (node.IsVisible != shouldBeVisible)
-                        {
-                            node.IsVisible = shouldBeVisible;
-                            changed = true;
-                        }
-
-                        // ULTRA-PERFORMANCE: If node has children, only show matching children to make expansion INSTANT
-                        if (FileSystemNodeModel.CanHaveChildren(node.Type) && node.Children != null)
-                        {
-                            var visibleItems = node.Children.Where(c => toShow.Contains(c)).ToList();
-                            if (visibleItems.Count != node.Children.Count)
-                            {
-                                if (node.VisibleChildren == node.Children || node.VisibleChildren.Count != visibleItems.Count)
-                                {
-                                    node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
-                                    changed = true;
-                                }
-                            }
-                            else if (node.VisibleChildren != node.Children)
-                            {
-                                node.VisibleChildren = null;
-                                changed = true;
-                            }
-                        }
-
-                        if (changed)
-                        {
-                            uiUpdateCount++;
-                            if (uiUpdateCount % 500 == 0) await Task.Yield();
-                        }
-                    }
+                    // PHASE 2: Application (Surgical UI updates with time-slicing)
+                    await ApplySearchVisibilityAsync(allNodes, toShow, matchIndices, query, isMetadataSearch, cancellationToken);
                 }, cancellationToken);
 
-                return firstMatch;
+                return null; // Always return null during search to enforce manual navigation
             }
-            catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
+            catch (Exception ex)
             {
+                _logService.LogError(ex, "An error occurred during search filtering.");
                 return null;
             }
+        }
+
+        #endregion
+
+        #region --- Core Logic (Private) ---
+
+        /// <summary>
+        /// Evaluates each node to see if it matches the search criteria.
+        /// </summary>
+        private int IdentifyMatchingNodes(
+            List<FileSystemNodeModel> allNodes, 
+            string[] keywords, 
+            string query,
+            bool isMetadataSearch,
+            HashSet<FileSystemNodeModel> toShow,
+            Dictionary<FileSystemNodeModel, int> matchIndices,
+            ref FileSystemNodeModel firstMatch,
+            CancellationToken ct)
+        {
+            int matchesFound = 0;
+            foreach (var node in allNodes)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (node.Name == "Loading...") continue;
+
+                bool found = false;
+                int matchIndex = -1;
+
+                if (isMetadataSearch)
+                {
+                    if (_metadataService.IsMetadataSupported(node))
+                    {
+                        var metadata = _metadataService.GetMetadataSync(node);
+                        if (metadata != null && AllKeywordsMatch(metadata, keywords))
+                        {
+                            found = true;
+                            matchIndex = 0;
+                        }
+                    }
+                }
+                else
+                {
+                    matchIndex = node.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+                    if (matchIndex >= 0) found = true;
+                }
+
+                if (found)
+                {
+                    matchesFound++;
+                    if (firstMatch == null) firstMatch = node;
+
+                    matchIndices[node] = matchIndex;
+                    toShow.Add(node);
+
+                    // Propagate visibility upwards
+                    var parent = node.Parent;
+                    while (parent != null && !toShow.Contains(parent))
+                    {
+                        toShow.Add(parent);
+                        parent = parent.Parent;
+                    }
+                }
+            }
+            return matchesFound;
+        }
+
+        /// <summary>
+        /// Efficiently applies visibility and highlighting changes to the UI.
+        /// </summary>
+        private async Task ApplySearchVisibilityAsync(
+            List<FileSystemNodeModel> allNodes,
+            HashSet<FileSystemNodeModel> toShow,
+            Dictionary<FileSystemNodeModel, int> matchIndices,
+            string query,
+            bool isMetadataSearch,
+            CancellationToken ct)
+        {
+            var appSw = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var node in allNodes)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                bool shouldBeVisible = toShow.Contains(node);
+                bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
+                bool changed = false;
+
+                // 1. Highlighting (Standard mode only)
+                bool finalHasMatch = hasMatch && !isMetadataSearch;
+                if (node.HasMatch != finalHasMatch) { node.HasMatch = finalHasMatch; changed = true; }
+                
+                if (finalHasMatch)
+                {
+                    string pre = node.Name.Substring(0, matchIndex);
+                    string match = node.Name.Substring(matchIndex, query.Length);
+                    string post = node.Name.Substring(matchIndex + query.Length);
+
+                    if (node.PreMatch != pre) { node.PreMatch = pre; changed = true; }
+                    if (node.Match != match) { node.Match = match; changed = true; }
+                    if (node.PostMatch != post) { node.PostMatch = post; changed = true; }
+                }
+                else if (node.PreMatch != null)
+                {
+                    node.PreMatch = null; node.Match = null; node.PostMatch = null; changed = true;
+                }
+
+                // 2. Visibility
+                if (node.IsVisible != shouldBeVisible) { node.IsVisible = shouldBeVisible; changed = true; }
+
+                // 3. Insta-Expansion (Filtered children)
+                if (FileSystemNodeModel.CanHaveChildren(node.Type) && node.Children != null)
+                {
+                    var visibleItems = node.Children.Where(c => toShow.Contains(c)).ToList();
+                    if (visibleItems.Count != node.Children.Count)
+                    {
+                        if (node.VisibleChildren == node.Children || node.VisibleChildren.Count != visibleItems.Count)
+                        {
+                            node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
+                            changed = true;
+                        }
+                    }
+                    else if (node.VisibleChildren != node.Children)
+                    {
+                        node.VisibleChildren = null; changed = true;
+                    }
+                }
+
+                // Time-slice UI updates
+                if (changed && appSw.ElapsedMilliseconds > 16)
+                {
+                    await Task.Yield();
+                    appSw.Restart();
+                }
+            }
+        }
+
+        private bool AllKeywordsMatch(NarrativeMetadata metadata, string[] keywords)
+        {
+            foreach (var kw in keywords)
+            {
+                bool inTitle = metadata.Title?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false;
+                bool inDesc = metadata.Description?.Contains(kw, StringComparison.OrdinalIgnoreCase) ?? false;
+                if (!inTitle && !inDesc) return false;
+            }
+            return true;
+        }
+
+        #endregion
+
+        #region --- Reset Logic ---
+
+        private async Task PerformResetAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, List<FileSystemNodeModel> allNodes, FileSystemNodeModel activeNode, CancellationToken cancellationToken)
+        {
+            var prioritizedNodes = new HashSet<FileSystemNodeModel>();
+            foreach (var root in nodes) prioritizedNodes.Add(root);
+
+            if (activeNode != null)
+            {
+                var current = activeNode;
+                while (current != null)
+                {
+                    prioritizedNodes.Add(current);
+                    if (current.Parent != null)
+                        foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
+                    current = current.Parent;
+                }
+            }
+
+            foreach (var node in allNodes)
+            {
+                if (node.IsExpanded)
+                {
+                    prioritizedNodes.Add(node);
+                    if (node.Children != null)
+                        foreach (var child in node.Children) prioritizedNodes.Add(child);
+                }
+            }
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var node in prioritizedNodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ResetNodeState(node);
+                if (sw.ElapsedMilliseconds > 16) { await Task.Yield(); sw.Restart(); }
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(50, cancellationToken);
+                    var bgSw = System.Diagnostics.Stopwatch.StartNew();
+                    foreach (var node in allNodes)
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+                        if (prioritizedNodes.Contains(node)) continue;
+
+                        if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.Children)
+                        {
+                            ResetNodeState(node);
+                            if (bgSw.ElapsedMilliseconds > 16) { await Task.Yield(); bgSw.Restart(); }
+                        }
+                    }
+                }
+                catch (Exception) { }
+            }, cancellationToken);
         }
 
         private void ResetNodeState(FileSystemNodeModel node)
@@ -305,70 +365,51 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        #endregion
+
+        #region --- Helpers & Navigation ---
+
         private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
         {
             if (roots == null) return;
-
             var stack = new Stack<FileSystemNodeModel>();
             foreach (var root in roots.Reverse()) stack.Push(root);
 
             while (stack.Count > 0)
             {
                 ct.ThrowIfCancellationRequested();
-
                 var node = stack.Pop();
                 result.Add(node);
-                
                 var children = node.Children;
                 if (children != null)
                 {
-                    for (int i = children.Count - 1; i >= 0; i--)
-                    {
-                        stack.Push(children[i]);
-                    }
+                    for (int i = children.Count - 1; i >= 0; i--) stack.Push(children[i]);
                 }
             }
         }
 
-        private async Task<FileSystemNodeModel> ExpandToPathAsync(
-            string path,
-            ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        private async Task<FileSystemNodeModel> ExpandToPathAsync(string path, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             path = path.Replace("\\", "/").Trim('/');
             if (string.IsNullOrEmpty(path)) return null;
-
             string[] pathComponents = path.Split('/');
-            var targetNode = await FindNodeByPathSuffixAsync(rootNodes, pathComponents);
-
-            return targetNode;
+            return await FindNodeByPathSuffixAsync(rootNodes, pathComponents);
         }
 
-        private async Task<FileSystemNodeModel> FindNodeByPathSuffixAsync(
-            IEnumerable<FileSystemNodeModel> nodes,
-            string[] pathSuffix)
+        private async Task<FileSystemNodeModel> FindNodeByPathSuffixAsync(IEnumerable<FileSystemNodeModel> nodes, string[] pathSuffix)
         {
             if (nodes == null) return null;
-
             foreach (var node in nodes)
             {
                 bool isMatch = node.Name.Equals(pathSuffix[0], StringComparison.OrdinalIgnoreCase);
-                
-                // If it's a single component search, we can be more lenient (StartsWith)
-                if (pathSuffix.Length == 1 && node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase))
-                {
-                    return node;
-                }
+                if (pathSuffix.Length == 1 && node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase)) return node;
 
                 if (isMatch && pathSuffix.Length > 1 && node.Children != null)
                 {
-                    // Match found for this segment, try to match the rest of the suffix in children
-                    string[] remainingSuffix = pathSuffix.Skip(1).ToArray();
-                    var foundInDescendant = await FindNodeByPathSuffixAsync(node.Children, remainingSuffix);
+                    var foundInDescendant = await FindNodeByPathSuffixAsync(node.Children, pathSuffix.Skip(1).ToArray());
                     if (foundInDescendant != null) return foundInDescendant;
                 }
 
-                // Even if this node didn't match the start of the suffix, the suffix might exist deeper in this branch
-                // (e.g., searching for /skins.json starting from the root)
                 if (node.Children != null && node.Children.Any())
                 {
                     var foundDeeper = await FindNodeByPathSuffixAsync(node.Children, pathSuffix);
@@ -377,5 +418,18 @@ namespace AssetsManager.Services.Explorer
             }
             return null;
         }
+
+        private CancellationToken PrepareCancellationToken()
+        {
+            lock (_searchLock)
+            {
+                _searchCts?.Cancel();
+                _searchCts?.Dispose();
+                _searchCts = new CancellationTokenSource();
+                return _searchCts.Token;
+            }
+        }
+
+        #endregion
     }
 }

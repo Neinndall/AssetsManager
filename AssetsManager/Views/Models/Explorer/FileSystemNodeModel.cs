@@ -32,10 +32,14 @@ namespace AssetsManager.Views.Models.Explorer
                     if (Type == NodeType.VirtualFile || Type == NodeType.VirtualDirectory || Type == NodeType.WemFile || Type == NodeType.AudioEvent || Type == NodeType.SoundBank)
                     {
                         if (Parent == null || Parent.Type == NodeType.WadFile || Parent.Type == NodeType.RealDirectory)
-                            return Name;
-
-                        var parentPath = Parent.VirtualPath;
-                        return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                        {
+                            _virtualPath = Name;
+                        }
+                        else
+                        {
+                            var parentPath = Parent.VirtualPath;
+                            _virtualPath = string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                        }
                     }
                 }
                 return _virtualPath;
