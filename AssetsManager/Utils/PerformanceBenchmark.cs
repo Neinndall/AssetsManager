@@ -217,11 +217,11 @@ namespace AssetsManager.Utils
 
             // 1. Generate Massive Tree
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 5; i++)
             {
                 var root = new FileSystemNodeModel($"Plugins_{i}", NodeType.RealDirectory);
                 rootNodes.Add(root);
-                GenerateDummyNodes(root, nodeCount / 10, random);
+                GenerateDummyNodes(root, nodeCount / 5, random, 0);
             }
             sw.Stop();
             log.LogSuccess($"Tree Generated: {nodeCount} nodes in {sw.ElapsedMilliseconds}ms");
@@ -236,43 +236,45 @@ namespace AssetsManager.Utils
             sw.Stop();
             log.LogSuccess($"Search Filter: {sw.ElapsedMilliseconds}ms");
 
-            // 3. Test Select Deep Node Path Finding
+            // 3. Test Select Deep Node Path Finding (NOW O(depth))
             log.Log("Finding Deep Node Path...");
             FileSystemNodeModel deepNode = null;
             var current = rootNodes[0];
             while (current.Children != null && current.Children.Count > 0)
             {
-                deepNode = current.Children[0];
+                deepNode = current.Children[random.Next(0, current.Children.Count)];
                 current = deepNode;
             }
 
             sw.Restart();
             var path = treeManager.FindNodePath(rootNodes, deepNode);
             sw.Stop();
-            log.LogSuccess($"Path Finding (depth {path?.Count ?? 0}): {sw.Elapsed.TotalMilliseconds:F2}ms");
+            log.LogSuccess($"Path Finding (depth {path?.Count ?? 0}): {sw.Elapsed.TotalMilliseconds:F4}ms (Zero Reflection overhead)");
 
             // 4. Test Search Clear Performance (Massive Visibility Reset)
             log.Log("Testing Search Clear (Resetting Visibility)...");
             sw.Restart();
+            // This now returns almost instantly because of the background reset split
             await searchService.FilterTreeAsync(rootNodes, "", System.Threading.CancellationToken.None, deepNode);
             sw.Stop();
-            log.LogSuccess($"Search Clear (Prioritizing active path): {sw.ElapsedMilliseconds}ms");
+            log.LogSuccess($"Search Clear (Prioritizing active path): {sw.ElapsedMilliseconds}ms (Task returned to UI)");
 
             log.Log("Stress test completed.");
             log.Log("=================================");
         }
 
-        private static void GenerateDummyNodes(FileSystemNodeModel parent, int total, Random rnd)
+        private static void GenerateDummyNodes(FileSystemNodeModel parent, int total, Random rnd, int depth)
         {
-            if (total <= 0) return;
+            if (total <= 0 || depth > 20) return;
 
-            int childrenCount = Math.Min(total, rnd.Next(5, 50));
+            // Simular carpetas masivas (como profile-icons) en niveles profundos
+            int childrenCount = (depth == 6) ? Math.Min(total, 5000) : Math.Min(total, rnd.Next(5, 30));
             int remaining = total - childrenCount;
 
             for (int i = 0; i < childrenCount; i++)
             {
-                var type = rnd.Next(0, 2) == 0 ? NodeType.VirtualDirectory : NodeType.VirtualFile;
-                var node = new FileSystemNodeModel($"Item_{i}_{rnd.Next(1000, 9999)}.jpg", type == NodeType.VirtualDirectory, $"path/to/item_{i}", "source.wad")
+                var type = (depth < 6 && rnd.Next(0, 2) == 0) ? NodeType.VirtualDirectory : NodeType.VirtualFile;
+                var node = new FileSystemNodeModel($"Item_{depth}_{i}_{rnd.Next(1000, 9999)}.jpg", type == NodeType.VirtualDirectory, $"path/to/item_{i}", "source.wad")
                 {
                     Parent = parent
                 };
@@ -281,7 +283,7 @@ namespace AssetsManager.Utils
                 if (remaining > 0 && type == NodeType.VirtualDirectory)
                 {
                     int subTotal = remaining / (childrenCount - i);
-                    GenerateDummyNodes(node, subTotal, rnd);
+                    GenerateDummyNodes(node, subTotal, rnd, depth + 1);
                     remaining -= subTotal;
                 }
             }

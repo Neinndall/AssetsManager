@@ -82,77 +82,81 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                await Task.Run(async () =>
+                // Identification and Flattening (Always fast)
+                var allNodes = new List<FileSystemNodeModel>();
+                await Task.Run(() => Flatten(nodes, allNodes, cancellationToken), cancellationToken);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                bool isSearchEmpty = string.IsNullOrWhiteSpace(searchText);
+
+                if (isSearchEmpty)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 1. Flatten the tree for O(1) traversal with cancellation support
-                    var allNodes = new List<FileSystemNodeModel>();
-                    Flatten(nodes, allNodes, cancellationToken);
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    bool isSearchEmpty = string.IsNullOrWhiteSpace(searchText);
-
-                    if (isSearchEmpty)
+                    // 1. Identify prioritized branch (active node path and its siblings)
+                    var prioritizedNodes = new HashSet<FileSystemNodeModel>();
+                    if (activeNode != null)
                     {
-                        // OPTIMIZATION: Prioritize the active node's branch so it populates instantly
-                        var prioritizedNodes = new HashSet<FileSystemNodeModel>();
-                        if (activeNode != null)
+                        var current = activeNode;
+                        while (current != null)
                         {
-                            var current = activeNode;
-                            while (current != null)
+                            prioritizedNodes.Add(current);
+                            if (current.Parent != null)
                             {
-                                prioritizedNodes.Add(current);
-                                if (current.Parent != null)
-                                {
-                                    // Add all siblings of the active path to prioritize their visibility
-                                    foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
-                                }
-                                current = current.Parent;
+                                // Add all siblings of the active path
+                                foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
                             }
-                            
-                            // Add root nodes too as they are always visible
-                            foreach (var root in nodes) prioritizedNodes.Add(root);
-
-                            // Apply priority updates immediately
-                            foreach (var node in prioritizedNodes)
-                            {
-                                if (!node.IsVisible) node.IsVisible = true;
-                                if (node.HasMatch)
-                                {
-                                    node.HasMatch = false;
-                                    node.PreMatch = node.Match = node.PostMatch = null;
-                                }
-                            }
+                            current = current.Parent;
                         }
+                        
+                        // Add root nodes too
+                        foreach (var root in nodes) prioritizedNodes.Add(root);
 
-                        // Fast reset for the rest: Use larger chunks and yield to keep UI responsive
-                        int updatedCount = 0;
-                        foreach (var node in allNodes)
+                        // Apply priority updates immediately (chunked to ensure fluidity)
+                        int pCount = 0;
+                        foreach (var node in prioritizedNodes)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-
-                            if (prioritizedNodes.Contains(node)) continue;
-
-                            bool needsUpdate = !node.IsVisible || node.HasMatch;
-                            if (needsUpdate)
-                            {
-                                node.IsVisible = true;
-                                if (node.HasMatch)
-                                {
-                                    node.HasMatch = false;
-                                    node.PreMatch = node.Match = node.PostMatch = null;
-                                }
-
-                                updatedCount++;
-                                // Batch every 10,000 nodes and yield to allow UI to breathe
-                                if (updatedCount % 10000 == 0) await Task.Yield();
-                            }
+                            ResetNodeState(node);
+                            pCount++;
+                            if (pCount % 400 == 0) await Task.Yield();
                         }
-                        return;
                     }
 
+                    // 2. START BACKGROUND RESET for the rest and RETURN immediately
+                    // This allows the search clearing operation to finish so navigation can begin.
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // Wait a bit to let the prioritized branch render first
+                            await Task.Delay(100, cancellationToken);
+
+                            int updatedCount = 0;
+                            foreach (var node in allNodes)
+                            {
+                                if (cancellationToken.IsCancellationRequested) break;
+                                if (prioritizedNodes.Contains(node)) continue;
+
+                                if (!node.IsVisible || node.HasMatch)
+                                {
+                                    ResetNodeState(node);
+                                    updatedCount++;
+
+                                    // Yield frequently with a real delay to ensure UI thread is never saturated
+                                    if (updatedCount % 500 == 0) await Task.Delay(5, cancellationToken);
+                                }
+                            }
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception) { }
+                    }, cancellationToken);
+
+                    return;
+                }
+
+                // Normal Search Logic
+                await Task.Run(async () =>
+                {
                     // 2. High Performance & Anti-Flicker Filtering
                     // Pass 1: Identification (who should be visible?)
                     var toShow = new HashSet<FileSystemNodeModel>();
@@ -237,6 +241,18 @@ namespace AssetsManager.Services.Explorer
             catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
             {
                 // Silently swallow cancellation or collection modification
+            }
+        }
+
+        private void ResetNodeState(FileSystemNodeModel node)
+        {
+            if (!node.IsVisible) node.IsVisible = true;
+            if (node.HasMatch)
+            {
+                node.HasMatch = false;
+                node.PreMatch = null;
+                node.Match = null;
+                node.PostMatch = null;
             }
         }
 

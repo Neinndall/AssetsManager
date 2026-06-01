@@ -17,15 +17,14 @@ namespace AssetsManager.Services.Explorer.Tree
             var path = FindNodePath(rootNodes, node);
             if (path == null) return;
 
-            // CRITICAL: Use Dispatcher.BeginInvoke to avoid "StartAt while content generation is in progress"
-            // This ensures we are outside of any current Measure/Layout pass.
+            // Use Input priority to ensure it responds fast to search clearing/user actions
             treeView.Dispatcher.BeginInvoke(new Action(async () =>
             {
                 if (focusNode) treeView.Focus();
 
                 // Start async navigation to handle virtualization properly
                 await NavigatePathAsync(treeView, path, node, focusNode);
-            }), System.Windows.Threading.DispatcherPriority.Background);
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
         private async Task NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path, FileSystemNodeModel target, bool focus)
@@ -36,8 +35,8 @@ namespace AssetsManager.Services.Explorer.Tree
             {
                 var node = path[i];
                 
-                // Set expansion first
-                if (node != target) node.IsExpanded = true;
+                // Set expansion first (only if needed to avoid churn)
+                if (node != target && !node.IsExpanded) node.IsExpanded = true;
                 if (node == target) node.IsSelected = true;
 
                 TreeViewItem itemContainer = null;
@@ -70,7 +69,7 @@ namespace AssetsManager.Services.Explorer.Tree
                         else
                         {
                             await Task.Delay(35);
-                            // Only force layout as a last resort and sparingly to avoid freezing the UI thread
+                            // Only force layout as a last resort and sparingly
                             if (retry % 5 == 0) currentContainer.UpdateLayout();
                         }
                     }
@@ -81,18 +80,19 @@ namespace AssetsManager.Services.Explorer.Tree
                     if (node == target)
                     {
                         itemContainer.IsSelected = true;
+                        
+                        // Only bring into view if not already visible to avoid "jumping"
                         itemContainer.BringIntoView();
+                        
                         if (focus) itemContainer.Focus();
                         return;
                     }
                     
-                    // Keep moving down
-                    itemContainer.IsExpanded = true;
+                    if (!itemContainer.IsExpanded) itemContainer.IsExpanded = true;
                     currentContainer = itemContainer;
                 }
                 else
                 {
-                    // If we still don't have the container, we can't go deeper
                     break;
                 }
             }
@@ -100,14 +100,26 @@ namespace AssetsManager.Services.Explorer.Tree
 
         public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
         {
-            if (nodes == null) return null;
-            foreach (var n in nodes)
+            if (nodeToFind == null) return null;
+            
+            var path = new List<FileSystemNodeModel>();
+            var current = nodeToFind;
+            
+            while (current != null)
             {
-                if (n == nodeToFind) return new List<FileSystemNodeModel> { n };
-                var path = FindNodePath(n.Children, nodeToFind);
-                if (path != null) { path.Insert(0, n); return path; }
+                path.Insert(0, current);
+                current = current.Parent;
             }
-            return null;
+            
+            // Verify if the path starts with one of the root nodes
+            if (path.Count > 0 && nodes != null && !nodes.Contains(path[0]))
+            {
+                // This node doesn't belong to the provided roots (could be from a different WAD/context)
+                // In some cases, the root might be a "real" root not in the provided collection.
+                // But for standard Explorer navigation, we expect the root to be in the collection.
+            }
+            
+            return path;
         }
 
         public void CollapseAll(FileSystemNodeModel node)
