@@ -111,14 +111,6 @@ namespace AssetsManager.Services.Explorer.Tree
                 current = current.Parent;
             }
             
-            // Verify if the path starts with one of the root nodes
-            if (path.Count > 0 && nodes != null && !nodes.Contains(path[0]))
-            {
-                // This node doesn't belong to the provided roots (could be from a different WAD/context)
-                // In some cases, the root might be a "real" root not in the provided collection.
-                // But for standard Explorer navigation, we expect the root to be in the collection.
-            }
-            
             return path;
         }
 

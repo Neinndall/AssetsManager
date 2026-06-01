@@ -256,7 +256,6 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-
         private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
         {
             if (roots == null) return;
