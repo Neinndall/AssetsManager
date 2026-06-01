@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
@@ -14,6 +14,8 @@ using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Services.Monitor
 {
+    public record ArchiveResult(bool AlreadyArchived, string ReferenceId);
+
     public class ComparisonHistoryService
     {
         private readonly WadPackagingService _wadPackagingService;
@@ -21,10 +23,15 @@ namespace AssetsManager.Services.Monitor
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
 
+        // Serializes check+archive+register so a background auto-archive and a
+        // manual Save click can't race during the SaveBackupAsync I/O await
+        // and create two physical folders sharing the same ComparisonKey.
+        private readonly SemaphoreSlim _archiveLock = new SemaphoreSlim(1, 1);
+
         public ComparisonHistoryService(
-            WadPackagingService wadPackagingService, 
-            AppSettings appSettings, 
-            DirectoriesCreator directoriesCreator, 
+            WadPackagingService wadPackagingService,
+            AppSettings appSettings,
+            DirectoriesCreator directoriesCreator,
             LogService logService)
         {
             _wadPackagingService = wadPackagingService;
@@ -33,43 +40,123 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
-        public void RegisterComparisonInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version = null)
+        /// <summary>
+        /// Centralized entry point for archiving a comparison. Builds a stable
+        /// identity key from (version + oldPath + newPath). If a previous entry
+        /// with the same key already exists in history, returns its
+        /// <see cref="HistoryEntry.ReferenceId"/> without writing new files.
+        /// Otherwise, packages the backup and registers a new history entry.
+        /// </summary>
+        public async Task<ArchiveResult> EnsureArchivedAsync(
+            List<SerializableChunkDiff> diffs,
+            string oldPbePath,
+            string newPbePath,
+            string version,
+            string displayName)
         {
+            if (diffs == null || diffs.Count == 0)
+            {
+                return new ArchiveResult(true, null);
+            }
+
+            string comparisonKey = BuildComparisonKey(version, oldPbePath, newPbePath);
+
+            await _archiveLock.WaitAsync();
             try
             {
-                // Ensure we don't add duplicates based on the folder name (ReferenceId)
-                bool alreadyInHistory = _appSettings.DiffHistory.Any(h => h.ReferenceId == folderName);
-                if (!alreadyInHistory)
-                {
-                    var entry = new HistoryEntry
-                    {
-                        FileName = comparisonDisplayName, // Preserved for legacy if needed
-                        DisplayName = comparisonDisplayName,
-                        Version = version,
-                        OldFilePath = oldPbePath,
-                        NewFilePath = newPbePath,
-                        Timestamp = DateTime.Now,
-                        Type = HistoryEntryType.WadArchive,
-                        ReferenceId = folderName
-                    };
+                // Re-check inside the lock: another caller may have just archived
+                // the same comparison while we were waiting.
+                // For legacy entries (no ComparisonKey persisted) we recompute it
+                // on the fly from their stored paths so they keep deduping correctly.
+                var existing = _appSettings.DiffHistory
+                    .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
+                                         && !string.IsNullOrEmpty(h.OldFilePath)
+                                         && !string.IsNullOrEmpty(h.NewFilePath)
+                                         && ResolveEntryKey(h) == comparisonKey);
 
-                    _appSettings.DiffHistory.Insert(0, entry);
-                    // Necesita la otra llamada para evitar reload tree?
-                    _appSettings.Save();
-                    _logService.LogSuccess("Comparison history saved successfully.");
+                if (existing != null)
+                {
+                    _logService.Log($"Comparison already archived as {existing.ReferenceId}");
+                    BackfillComparisonKey(existing);
+                    return new ArchiveResult(true, existing.ReferenceId);
                 }
+
+                var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
+                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath);
+
+                RegisterInHistory(folderInfo.FolderName, displayName, oldPbePath, newPbePath, version, comparisonKey);
+                _logService.LogSuccess("Comparison history saved successfully.");
+
+                return new ArchiveResult(false, folderInfo.FolderName);
             }
-            catch (Exception ex)
+            finally
             {
-                _logService.LogError(ex, "Failed to register comparison in history.");
+                _archiveLock.Release();
             }
+        }
+
+        // Returns the dedup key for a history entry, recomputing it on the fly
+        // for legacy entries that predate the ComparisonKey field.
+        private static string ResolveEntryKey(HistoryEntry entry)
+        {
+            if (!string.IsNullOrEmpty(entry.ComparisonKey))
+            {
+                return entry.ComparisonKey;
+            }
+
+            return BuildComparisonKey(entry.Version, entry.OldFilePath, entry.NewFilePath);
+        }
+
+        // Persists the computed key back to a legacy entry so future lookups
+        // can use the fast indexed path instead of recomputing each time.
+        private void BackfillComparisonKey(HistoryEntry entry)
+        {
+            if (string.IsNullOrEmpty(entry.ComparisonKey)
+                && !string.IsNullOrEmpty(entry.OldFilePath)
+                && !string.IsNullOrEmpty(entry.NewFilePath))
+            {
+                entry.ComparisonKey = BuildComparisonKey(entry.Version, entry.OldFilePath, entry.NewFilePath);
+                _appSettings.Save();
+            }
+        }
+
+        /// <summary>
+        /// Builds the identity key used to deduplicate comparisons. Same version
+        /// of the same client, pointing at the same two source paths, is treated
+        /// as the same comparison regardless of session, time, or app restart.
+        /// </summary>
+        public static string BuildComparisonKey(string version, string oldPath, string newPath)
+        {
+            string normalizedVersion = string.IsNullOrWhiteSpace(version) ? "unknown" : version.Trim().ToLowerInvariant();
+            string normalizedOld = PathUtils.NormalizePhysicalPath(oldPath);
+            string normalizedNew = PathUtils.NormalizePhysicalPath(newPath);
+
+            return $"{normalizedVersion}|{normalizedOld}|{normalizedNew}";
+        }
+
+        private void RegisterInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version, string comparisonKey)
+        {
+            var entry = new HistoryEntry
+            {
+                FileName = comparisonDisplayName,
+                DisplayName = comparisonDisplayName,
+                Version = version,
+                OldFilePath = oldPbePath,
+                NewFilePath = newPbePath,
+                Timestamp = DateTime.Now,
+                Type = HistoryEntryType.WadArchive,
+                ReferenceId = folderName,
+                ComparisonKey = comparisonKey
+            };
+
+            _appSettings.DiffHistory.Insert(0, entry);
+            _appSettings.Save();
         }
 
         public async Task<(WadComparisonData Data, string Path)> LoadComparisonAsync(string referenceId)
         {
             try
             {
-                // Centralize: Look into WadComparisonSavePath
                 string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
                 string indexFilePath = Path.Combine(historyDir, "wadcomparison.json");
 
@@ -101,16 +188,13 @@ namespace AssetsManager.Services.Monitor
             {
                 if (entry.Type == HistoryEntryType.WadArchive && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
-                    // 1. Delete physical directory
                     string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);
                     if (Directory.Exists(historyDir))
                     {
                         Directory.Delete(historyDir, true);
                     }
 
-                    // 2. Remove from internal list
                     _appSettings.DiffHistory.Remove(entry);
-                    // Necesita la otra llamada para evitar reload tree?
                     _appSettings.Save();
 
                     _logService.LogSuccess("Comparison results and related files deleted successfully.");

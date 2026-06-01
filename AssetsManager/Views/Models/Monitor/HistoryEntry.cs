@@ -17,5 +17,6 @@ namespace AssetsManager.Views.Models.Monitor
         public System.DateTime Timestamp { get; set; }
         public HistoryEntryType Type { get; set; } = HistoryEntryType.IndividualFile;
         public string ReferenceId { get; set; }
+        public string ComparisonKey { get; set; } // Identity fingerprint: Version + OldPath + NewPath (normalized)
     }
 }

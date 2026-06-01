@@ -13,7 +13,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
@@ -28,11 +27,9 @@ namespace AssetsManager.Views.Dialogs
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
-        private readonly DirectoriesCreator _directoriesCreator;
         private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
         private readonly WadDiffProvider _wadDiffProvider;
-        private readonly WadPackagingService _wadPackagingService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
@@ -48,16 +45,14 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadComparisonResultModel _viewModel;
 
         public WadComparisonResultWindow(
-            IServiceProvider serviceProvider, 
-            CustomMessageBoxService customMessageBoxService, 
-            DirectoriesCreator directoriesCreator, 
-            AssetDownloader assetDownloaderService, 
-            LogService logService, 
-            WadDiffProvider wadDiffProvider, 
-            WadPackagingService wadPackagingService, 
+            IServiceProvider serviceProvider,
+            CustomMessageBoxService customMessageBoxService,
+            AssetDownloader assetDownloaderService,
+            LogService logService,
+            WadDiffProvider wadDiffProvider,
             ComparisonHistoryService comparisonHistoryService,
-            DiffViewService diffViewService, 
-            HashResolverService hashResolverService, 
+            DiffViewService diffViewService,
+            HashResolverService hashResolverService,
             AppSettings appSettings,
             WadContentProvider wadContentProvider,
             VersionService versionService)
@@ -68,11 +63,9 @@ namespace AssetsManager.Views.Dialogs
 
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
-            _directoriesCreator = directoriesCreator;
             _assetDownloaderService = assetDownloaderService;
             _logService = logService;
             _wadDiffProvider = wadDiffProvider;
-            _wadPackagingService = wadPackagingService;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
@@ -346,28 +339,42 @@ namespace AssetsManager.Views.Dialogs
                 }
 
                 _logService.Log("Starting comparison backup and asset packaging...");
-                string displayName = "Unknown";
-                var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
-
-                if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
-                else if (!string.IsNullOrEmpty(_newPbePath)) 
-                {
-                    displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
-                }
-
+                string displayName = ResolveComparisonDisplayName();
                 string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
-                var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.PhysicalPath);
-                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
-                _assignedFolderName = folderInfo.FolderName;
-                _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
+                var result = await _comparisonHistoryService.EnsureArchivedAsync(
+                    _serializableDiffs, _oldPbePath, _newPbePath, version, displayName);
+
+                _assignedFolderName = result.ReferenceId;
+
+                if (result.AlreadyArchived)
+                {
+                    _customMessageBoxService.ShowSuccess("Already Saved", $"This comparison is already stored in your history:\n{result.ReferenceId}", this);
+                }
+                else
+                {
+                    _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
+                }
             }
             catch (Exception ex)
             {
                 _customMessageBoxService.ShowError("Error", $"Failed to save results: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to save comparison results.");
             }
+        }
+
+        private string ResolveComparisonDisplayName()
+        {
+            var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+            if (uniqueWads.Count == 1) return Path.GetFileName(uniqueWads[0]).Split('.')[0];
+
+            if (!string.IsNullOrEmpty(_newPbePath))
+            {
+                return Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+            }
+
+            return "Unknown";
         }
 
         private async void ReloadHashesButton_Click(object sender, RoutedEventArgs e)

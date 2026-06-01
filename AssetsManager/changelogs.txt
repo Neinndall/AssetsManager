@@ -71,6 +71,10 @@ Improvements
   - Architecture / System-Wide Redundancy Cleanup
     * Streamlined Results & Reporting: eliminated redundant WAD re-scanning and duplicate extension guessing logic in the Comparison Results Window and Report Generation Service, resulting in near-instant window openings.
     * Refined Export Efficiency: optimized the Export Service to rely on the tree's pre-processed identity (SSoT), removing unnecessary format detections during file saving.
+  - Comparator / Version-Based Archive Deduplication
+    * Replaced the fragile in-session fingerprint logic with a stable identity key built from Version + OldPath + NewPath, guaranteeing that identical comparisons are correctly deduplicated across sessions and app restarts.
+    * Centralized the archive + register flow in `ComparisonHistoryService.EnsureArchivedAsync`, eliminating duplicated packaging code between MainWindow and the Comparison Results Window.
+    * Added a new `ComparisonKey` field to `HistoryEntry` and serialized access via `SemaphoreSlim` to prevent race conditions when archiving the same comparison concurrently.
 
 Bug Fixes
   - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
@@ -97,6 +101,10 @@ Bug Fixes
     * Fixed an inconsistency in the Asset Watcher where status colors and badges could flicker or desync during rapid file scanning.
   - Core / Build & Syntax Integrity
     * Corrected syntax artifacts and missing namespaces in the Differences and Image windows caused by concurrent file edits.
+  - Comparator / Archive Duplication: fixed a long-standing issue where the same comparison (same version, same paths) was saved again as a new entry on every session, causing redundant physical backups to accumulate in the history folder.
+  - Comparator / Legacy History Dedup: fixed a regression where the version-based dedup logic only matched against entries with a persisted `ComparisonKey`, causing the same comparison to be re-archived when the only existing copy was a legacy entry from before the field was introduced. The system now recomputes the key on the fly for legacy entries and backfills it on first match. Path normalization was also strengthened with `Path.GetFullPath` to absorb case, slash, and long-path variations.
+  - Comparator / Duplicate WAD I/O: fixed redundant WAD opening during comparisons; the engine now reuses the same WadFile instance for chunk counting and diffing, cutting disk I/O and chunk-table parsing in half on large comparisons.
+  - Comparator / Bounded Peak Memory: replaced simultaneous multi-WAD approach with header-based chunk counting (8-274 bytes per file) and per-file processing; peak memory is now constant at 2 WadFile instances regardless of total file count, eliminating the N×2 file handle pressure on massive installs.
     * Eliminated all unawaited task warnings (CS4014) and async-void patterns to achieve a 100% clean and professional build.
   - Commit History / Refined messaging for edge cases when release tags are missing.
   - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.

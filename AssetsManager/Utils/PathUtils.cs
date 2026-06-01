@@ -236,11 +236,33 @@ namespace AssetsManager.Utils
 
         /// <summary>
         /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
+        /// Intended for internal WAD virtual paths (e.g. "plugins/rcp-be-lol-game-data/...").
         /// </summary>
         public static string NormalizePath(string path)
         {
             if (string.IsNullOrEmpty(path)) return string.Empty;
             return path.Replace('\\', '/').ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Normalizes a physical file system path (e.g. "C:\Riot Games\League of Legends").
+        /// Resolves "." / ".." segments, mixed separators, redundant slashes and the long-path
+        /// prefix via <see cref="Path.GetFullPath"/>, then lowercases and trims trailing separators
+        /// so two equivalent installation paths always produce the same key.
+        /// </summary>
+        public static string NormalizePhysicalPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+            try
+            {
+                string absolute = Path.GetFullPath(path);
+                return NormalizePath(absolute).TrimEnd('/');
+            }
+            catch
+            {
+                return NormalizePath(path).TrimEnd('/');
+            }
         }
 
         /// <summary>
