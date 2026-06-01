@@ -122,8 +122,12 @@ namespace AssetsManager.Services.Explorer.Tree
         {
             if (node == null) return;
             node.IsExpanded = false;
-            foreach (var child in node.Children ?? Enumerable.Empty<FileSystemNodeModel>()) 
-                CollapseAll(child);
+            var children = node.LoadedChildren;
+            if (children != null)
+            {
+                foreach (var child in children)
+                    CollapseAll(child);
+            }
         }
 
         public TreeViewItem SafeVisualUpwardSearch(DependencyObject source)
@@ -156,7 +160,8 @@ namespace AssetsManager.Services.Explorer.Tree
             foreach (var node in nodes)
             {
                 if (node.IsMultiSelected) result.Add(node);
-                FindMultiSelectedNodes(node.Children, result);
+                var children = node.LoadedChildren;
+                if (children != null) FindMultiSelectedNodes(children, result);
             }
         }
 

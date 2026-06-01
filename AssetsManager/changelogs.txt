@@ -17,6 +17,7 @@ New Features
   - Viewer / Fully Asynchronous Model Loading: implemented a non-blocking architecture for character (SKN) and legacy (SCO/SCB) models, ensuring a perfectly responsive UI during all loading phases.
 
 Improvements
+  - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.
   - Core / Extreme Binary Parsing Efficiency: optimized BinaryReader extensions with Span and stackalloc to eliminate heap allocations during asset parsing, achieving a 130x speedup in string reading and zero-garbage metadata extraction.
   - Core / Zero-Redundancy Geometry Loading: refactored all model and environment constructors to eliminate redundant array copies, resulting in a 50% reduction in RAM usage for large 3D assets.
   - Viewer / High-Performance Animations: enhanced AnimationPlayer with persistent buffers and pre-calculated joint hashes for smoother 60fps movement with zero per-frame allocations.

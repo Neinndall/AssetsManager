@@ -83,6 +83,9 @@ namespace AssetsManager.Views.Models.Explorer
             set => _children = value;
         }
 
+        public ObservableRangeCollection<FileSystemNodeModel> LoadedChildren => _children;
+        public bool HasLoadedChildren => _children != null && _children.Count > 0;
+
         public static bool CanHaveChildren(NodeType type)
         {
             return type == NodeType.RealDirectory || 

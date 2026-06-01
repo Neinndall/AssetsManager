@@ -254,18 +254,19 @@ namespace AssetsManager.Services.Explorer
                 if (node.IsVisible != shouldBeVisible) { node.IsVisible = shouldBeVisible; changed = true; }
 
                 // 3. Insta-Expansion (Filtered children)
-                if (FileSystemNodeModel.CanHaveChildren(node.Type) && node.Children != null)
+                var children = node.LoadedChildren;
+                if (FileSystemNodeModel.CanHaveChildren(node.Type) && children != null)
                 {
-                    var visibleItems = node.Children.Where(c => toShow.Contains(c)).ToList();
-                    if (visibleItems.Count != node.Children.Count)
+                    var visibleItems = children.Where(c => toShow.Contains(c)).ToList();
+                    if (visibleItems.Count != children.Count)
                     {
-                        if (node.VisibleChildren == node.Children || node.VisibleChildren.Count != visibleItems.Count)
+                        if (node.VisibleChildren == children || node.VisibleChildren.Count != visibleItems.Count)
                         {
                             node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
                             changed = true;
                         }
                     }
-                    else if (node.VisibleChildren != node.Children)
+                    else if (node.VisibleChildren != children)
                     {
                         node.VisibleChildren = null; changed = true;
                     }
@@ -306,8 +307,8 @@ namespace AssetsManager.Services.Explorer
                 while (current != null)
                 {
                     prioritizedNodes.Add(current);
-                    if (current.Parent != null)
-                        foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
+                    if (current.Parent != null && current.Parent.LoadedChildren != null)
+                        foreach (var sibling in current.Parent.LoadedChildren) prioritizedNodes.Add(sibling);
                     current = current.Parent;
                 }
             }
@@ -317,8 +318,9 @@ namespace AssetsManager.Services.Explorer
                 if (node.IsExpanded)
                 {
                     prioritizedNodes.Add(node);
-                    if (node.Children != null)
-                        foreach (var child in node.Children) prioritizedNodes.Add(child);
+                    var children = node.LoadedChildren;
+                    if (children != null)
+                        foreach (var child in children) prioritizedNodes.Add(child);
                 }
             }
 
@@ -341,7 +343,7 @@ namespace AssetsManager.Services.Explorer
                         if (cancellationToken.IsCancellationRequested) break;
                         if (prioritizedNodes.Contains(node)) continue;
 
-                        if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.Children)
+                        if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.LoadedChildren)
                         {
                             ResetNodeState(node);
                             if (bgSw.ElapsedMilliseconds > 16) { await Task.Yield(); bgSw.Restart(); }
@@ -355,7 +357,7 @@ namespace AssetsManager.Services.Explorer
         private void ResetNodeState(FileSystemNodeModel node)
         {
             if (!node.IsVisible) node.IsVisible = true;
-            if (node.VisibleChildren != node.Children) node.VisibleChildren = null;
+            if (node.VisibleChildren != node.LoadedChildren) node.VisibleChildren = null;
             if (node.HasMatch)
             {
                 node.HasMatch = false;
@@ -380,7 +382,7 @@ namespace AssetsManager.Services.Explorer
                 ct.ThrowIfCancellationRequested();
                 var node = stack.Pop();
                 result.Add(node);
-                var children = node.Children;
+                var children = node.LoadedChildren;
                 if (children != null)
                 {
                     for (int i = children.Count - 1; i >= 0; i--) stack.Push(children[i]);
@@ -404,15 +406,16 @@ namespace AssetsManager.Services.Explorer
                 bool isMatch = node.Name.Equals(pathSuffix[0], StringComparison.OrdinalIgnoreCase);
                 if (pathSuffix.Length == 1 && node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase)) return node;
 
-                if (isMatch && pathSuffix.Length > 1 && node.Children != null)
+                var children = node.LoadedChildren;
+                if (isMatch && pathSuffix.Length > 1 && children != null)
                 {
-                    var foundInDescendant = await FindNodeByPathSuffixAsync(node.Children, pathSuffix.Skip(1).ToArray());
+                    var foundInDescendant = await FindNodeByPathSuffixAsync(children, pathSuffix.Skip(1).ToArray());
                     if (foundInDescendant != null) return foundInDescendant;
                 }
 
-                if (node.Children != null && node.Children.Any())
+                if (children != null && children.Any())
                 {
-                    var foundDeeper = await FindNodeByPathSuffixAsync(node.Children, pathSuffix);
+                    var foundDeeper = await FindNodeByPathSuffixAsync(children, pathSuffix);
                     if (foundDeeper != null) return foundDeeper;
                 }
             }
