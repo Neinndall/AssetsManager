@@ -22,7 +22,6 @@ namespace AssetsManager.Services.Explorer.Tree
             treeView.Dispatcher.BeginInvoke(new Action(async () =>
             {
                 if (focusNode) treeView.Focus();
-                treeView.UpdateLayout();
 
                 // Start async navigation to handle virtualization properly
                 await NavigatePathAsync(treeView, path, node, focusNode);
@@ -36,28 +35,45 @@ namespace AssetsManager.Services.Explorer.Tree
             for (int i = 0; i < path.Count; i++)
             {
                 var node = path[i];
-                node.IsExpanded = true;
+                
+                // Set expansion first
+                if (node != target) node.IsExpanded = true;
                 if (node == target) node.IsSelected = true;
 
                 TreeViewItem itemContainer = null;
                 
-                // Retry loop to handle virtualization and async generation
-                for (int retry = 0; retry < 15; retry++)
+                // Initial check: if container is already there, skip loop
+                itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+
+                if (itemContainer == null)
                 {
-                    itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
-
-                    if (itemContainer != null) break;
-
-                    // Virtualization fix: search for the panel and force scroll to index
-                    var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
-                    if (vsp != null)
+                    // Retry loop to handle virtualization and async generation
+                    for (int retry = 0; retry < 15; retry++)
                     {
-                        int index = currentContainer.Items.IndexOf(node);
-                        if (index >= 0) vsp.BringIndexIntoViewPublic(index);
+                        itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+
+                        if (itemContainer != null) break;
+
+                        // Virtualization fix: search for the panel and force scroll to index
+                        var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
+                        if (vsp != null)
+                        {
+                            int index = currentContainer.Items.IndexOf(node);
+                            if (index >= 0) vsp.BringIndexIntoViewPublic(index);
+                        }
+
+                        // Use a shorter initial delay and allow UI thread to process without forcing layout yet
+                        if (retry < 5)
+                        {
+                            await Task.Delay(20);
+                        }
+                        else
+                        {
+                            await Task.Delay(35);
+                            // Only force layout as a last resort and sparingly to avoid freezing the UI thread
+                            if (retry % 5 == 0) currentContainer.UpdateLayout();
+                        }
                     }
-                    
-                    await Task.Delay(50); // Give time for virtualization to render
-                    currentContainer.UpdateLayout();
                 }
 
                 if (itemContainer != null)
@@ -69,6 +85,8 @@ namespace AssetsManager.Services.Explorer.Tree
                         if (focus) itemContainer.Focus();
                         return;
                     }
+                    
+                    // Keep moving down
                     itemContainer.IsExpanded = true;
                     currentContainer = itemContainer;
                 }

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Explorer;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Core.Meta;
 
@@ -204,6 +205,86 @@ namespace AssetsManager.Utils
 
             log.Log("Benchmark completed successfully.");
             log.Log("=================================");
+        }
+
+        public static async Task RunExplorerSearchStressTest(int nodeCount, LogService log)
+        {
+            log.Log("=== EXPLORER SEARCH STRESS TEST ===");
+            log.Log($"Simulating tree with {nodeCount} nodes...");
+
+            var rootNodes = new AssetsManager.Utils.Framework.ObservableRangeCollection<FileSystemNodeModel>();
+            var random = new Random();
+
+            // 1. Generate Massive Tree
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 10; i++)
+            {
+                var root = new FileSystemNodeModel($"Plugins_{i}", NodeType.RealDirectory);
+                rootNodes.Add(root);
+                GenerateDummyNodes(root, nodeCount / 10, random);
+            }
+            sw.Stop();
+            log.LogSuccess($"Tree Generated: {nodeCount} nodes in {sw.ElapsedMilliseconds}ms");
+
+            var searchService = new AssetsManager.Services.Explorer.WadSearchBoxService();
+            var treeManager = new AssetsManager.Services.Explorer.Tree.TreeUIManager();
+
+            // 2. Test Search Performance (Filter)
+            log.Log("Testing Search Filter (searchText: 'icon')...");
+            sw.Restart();
+            await searchService.FilterTreeAsync(rootNodes, "icon", System.Threading.CancellationToken.None);
+            sw.Stop();
+            log.LogSuccess($"Search Filter: {sw.ElapsedMilliseconds}ms");
+
+            // 3. Test Select Deep Node Path Finding
+            log.Log("Finding Deep Node Path...");
+            FileSystemNodeModel deepNode = null;
+            var current = rootNodes[0];
+            while (current.Children != null && current.Children.Count > 0)
+            {
+                deepNode = current.Children[0];
+                current = deepNode;
+            }
+
+            sw.Restart();
+            var path = treeManager.FindNodePath(rootNodes, deepNode);
+            sw.Stop();
+            log.LogSuccess($"Path Finding (depth {path?.Count ?? 0}): {sw.Elapsed.TotalMilliseconds:F2}ms");
+
+            // 4. Test Search Clear Performance (Massive Visibility Reset)
+            log.Log("Testing Search Clear (Resetting Visibility)...");
+            sw.Restart();
+            await searchService.FilterTreeAsync(rootNodes, "", System.Threading.CancellationToken.None, deepNode);
+            sw.Stop();
+            log.LogSuccess($"Search Clear (Prioritizing active path): {sw.ElapsedMilliseconds}ms");
+
+            log.Log("Stress test completed.");
+            log.Log("=================================");
+        }
+
+        private static void GenerateDummyNodes(FileSystemNodeModel parent, int total, Random rnd)
+        {
+            if (total <= 0) return;
+
+            int childrenCount = Math.Min(total, rnd.Next(5, 50));
+            int remaining = total - childrenCount;
+
+            for (int i = 0; i < childrenCount; i++)
+            {
+                var type = rnd.Next(0, 2) == 0 ? NodeType.VirtualDirectory : NodeType.VirtualFile;
+                var node = new FileSystemNodeModel($"Item_{i}_{rnd.Next(1000, 9999)}.jpg", type == NodeType.VirtualDirectory, $"path/to/item_{i}", "source.wad")
+                {
+                    Parent = parent
+                };
+                parent.Children.Add(node);
+
+                if (remaining > 0 && type == NodeType.VirtualDirectory)
+                {
+                    int subTotal = remaining / (childrenCount - i);
+                    GenerateDummyNodes(node, subTotal, rnd);
+                    remaining -= subTotal;
+                }
+            }
         }
     }
 }

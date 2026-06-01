@@ -30,7 +30,8 @@ namespace AssetsManager.Services.Explorer
         public async Task<FileSystemNodeModel> PerformSearchAsync(
             string searchText,
             ObservableRangeCollection<FileSystemNodeModel> rootNodes,
-            Func<FileSystemNodeModel, Task> loadChildrenFunc)
+            Func<FileSystemNodeModel, Task> loadChildrenFunc,
+            FileSystemNodeModel activeNode = null)
         {
             var token = PrepareCancellationToken();
 
@@ -38,7 +39,7 @@ namespace AssetsManager.Services.Explorer
             {
                 if (string.IsNullOrEmpty(searchText))
                 {
-                    await FilterTreeAsync(rootNodes, string.Empty, token);
+                    await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
                     return null;
                 }
 
@@ -46,13 +47,13 @@ namespace AssetsManager.Services.Explorer
                 {
                     // No need to filter if we are navigating to a specific path
                     // But we might want to clear any existing search highlights/filters
-                    await FilterTreeAsync(rootNodes, string.Empty, token);
+                    await FilterTreeAsync(rootNodes, string.Empty, token, activeNode);
                     var targetNode = await ExpandToPathAsync(searchText, rootNodes);
                     return targetNode;
                 }
                 else
                 {
-                    await FilterTreeAsync(rootNodes, searchText, token);
+                    await FilterTreeAsync(rootNodes, searchText, token, activeNode);
                     return null;
                 }
             }
@@ -77,11 +78,11 @@ namespace AssetsManager.Services.Explorer
             return await ExpandToPathAsync(path, rootNodes);
         }
 
-        public async Task FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken)
+        public async Task FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken, FileSystemNodeModel activeNode = null)
         {
             try
             {
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
@@ -95,18 +96,58 @@ namespace AssetsManager.Services.Explorer
 
                     if (isSearchEmpty)
                     {
-                        // Fast reset: Only update if necessary to avoid UI churn
+                        // OPTIMIZATION: Prioritize the active node's branch so it populates instantly
+                        var prioritizedNodes = new HashSet<FileSystemNodeModel>();
+                        if (activeNode != null)
+                        {
+                            var current = activeNode;
+                            while (current != null)
+                            {
+                                prioritizedNodes.Add(current);
+                                if (current.Parent != null)
+                                {
+                                    // Add all siblings of the active path to prioritize their visibility
+                                    foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
+                                }
+                                current = current.Parent;
+                            }
+                            
+                            // Add root nodes too as they are always visible
+                            foreach (var root in nodes) prioritizedNodes.Add(root);
+
+                            // Apply priority updates immediately
+                            foreach (var node in prioritizedNodes)
+                            {
+                                if (!node.IsVisible) node.IsVisible = true;
+                                if (node.HasMatch)
+                                {
+                                    node.HasMatch = false;
+                                    node.PreMatch = node.Match = node.PostMatch = null;
+                                }
+                            }
+                        }
+
+                        // Fast reset for the rest: Use larger chunks and yield to keep UI responsive
+                        int updatedCount = 0;
                         foreach (var node in allNodes)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
 
-                            if (!node.IsVisible) node.IsVisible = true;
-                            if (node.HasMatch)
+                            if (prioritizedNodes.Contains(node)) continue;
+
+                            bool needsUpdate = !node.IsVisible || node.HasMatch;
+                            if (needsUpdate)
                             {
-                                node.HasMatch = false;
-                                node.PreMatch = null;
-                                node.Match = null;
-                                node.PostMatch = null;
+                                node.IsVisible = true;
+                                if (node.HasMatch)
+                                {
+                                    node.HasMatch = false;
+                                    node.PreMatch = node.Match = node.PostMatch = null;
+                                }
+
+                                updatedCount++;
+                                // Batch every 10,000 nodes and yield to allow UI to breathe
+                                if (updatedCount % 10000 == 0) await Task.Yield();
                             }
                         }
                         return;
@@ -142,6 +183,7 @@ namespace AssetsManager.Services.Explorer
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // Pass 2: Surgical Application (Only notify UI if state changes)
+                    int uiUpdateCount = 0;
                     foreach (var node in allNodes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -149,10 +191,13 @@ namespace AssetsManager.Services.Explorer
                         bool shouldBeVisible = toShow.Contains(node);
                         bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
 
+                        bool changed = false;
+
                         // Update match highlighting data
                         if (node.HasMatch != hasMatch)
                         {
                             node.HasMatch = hasMatch;
+                            changed = true;
                         }
                         
                         if (hasMatch)
@@ -162,21 +207,29 @@ namespace AssetsManager.Services.Explorer
                             string match = node.Name.Substring(matchIndex, length);
                             string post = node.Name.Substring(matchIndex + length);
 
-                            if (node.PreMatch != pre) node.PreMatch = pre;
-                            if (node.Match != match) node.Match = match;
-                            if (node.PostMatch != post) node.PostMatch = post;
+                            if (node.PreMatch != pre) { node.PreMatch = pre; changed = true; }
+                            if (node.Match != match) { node.Match = match; changed = true; }
+                            if (node.PostMatch != post) { node.PostMatch = post; changed = true; }
                         }
                         else if (node.PreMatch != null)
                         {
                             node.PreMatch = null;
                             node.Match = null;
                             node.PostMatch = null;
+                            changed = true;
                         }
 
                         // CRITICAL: Only update IsVisible if it's different.
                         if (node.IsVisible != shouldBeVisible)
                         {
                             node.IsVisible = shouldBeVisible;
+                            changed = true;
+                        }
+
+                        if (changed)
+                        {
+                            uiUpdateCount++;
+                            if (uiUpdateCount % 500 == 0) await Task.Yield();
                         }
                     }
                 }, cancellationToken);

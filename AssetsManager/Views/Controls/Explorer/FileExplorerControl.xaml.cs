@@ -1189,7 +1189,8 @@ namespace AssetsManager.Views.Controls.Explorer
                 Toolbar?.AddSearchToHistory(searchText);
             }
 
-            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null);
+            var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
+            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null, selectedNode);
 
             // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))
@@ -1209,16 +1210,13 @@ namespace AssetsManager.Views.Controls.Explorer
                     TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, nodeToSelect, false);
                 }, DispatcherPriority.ContextIdle);
             }
-            else
+            else if (selectedNode != null && string.IsNullOrEmpty(searchText))
             {
-                var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
-                if (selectedNode != null && string.IsNullOrEmpty(searchText))
+                // If search was cleared, ensure the previously selected node is still in view
+                await Dispatcher.InvokeAsync(() =>
                 {
-                    await Dispatcher.InvokeAsync(() =>
-                    {
-                        TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
-                    }, DispatcherPriority.ContextIdle);
-                }
+                    TreeUIManager.SelectAndFocusNode(FileTreeView, _viewModel.RootNodes, selectedNode);
+                }, DispatcherPriority.ContextIdle);
             }
         }
 
