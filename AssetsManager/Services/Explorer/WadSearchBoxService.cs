@@ -94,8 +94,13 @@ namespace AssetsManager.Services.Explorer
 
                 if (isSearchEmpty)
                 {
-                    // 1. Identify prioritized branch (active node path and its siblings)
+                    // 1. Identify prioritized nodes (Roots, Active Path, and Expanded Branches)
                     var prioritizedNodes = new HashSet<FileSystemNodeModel>();
+                    
+                    // Priority A: Root nodes
+                    foreach (var root in nodes) prioritizedNodes.Add(root);
+
+                    // Priority B: Active path and its siblings
                     if (activeNode != null)
                     {
                         var current = activeNode;
@@ -104,34 +109,42 @@ namespace AssetsManager.Services.Explorer
                             prioritizedNodes.Add(current);
                             if (current.Parent != null)
                             {
-                                // Add all siblings of the active path
                                 foreach (var sibling in current.Parent.Children) prioritizedNodes.Add(sibling);
                             }
                             current = current.Parent;
                         }
-                        
-                        // Add root nodes too
-                        foreach (var root in nodes) prioritizedNodes.Add(root);
+                    }
 
-                        // Apply priority updates immediately (chunked to ensure fluidity)
-                        int pCount = 0;
-                        foreach (var node in prioritizedNodes)
+                    // Priority C: Expanded branches (What the user is actually looking at)
+                    foreach (var node in allNodes)
+                    {
+                        if (node.IsExpanded)
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            ResetNodeState(node);
-                            pCount++;
-                            if (pCount % 400 == 0) await Task.Yield();
+                            prioritizedNodes.Add(node);
+                            if (node.Children != null)
+                            {
+                                foreach (var child in node.Children) prioritizedNodes.Add(child);
+                            }
                         }
                     }
 
+                    // Apply priority updates immediately (chunked to ensure fluidity)
+                    int pCount = 0;
+                    foreach (var node in prioritizedNodes)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        ResetNodeState(node);
+                        pCount++;
+                        if (pCount % 400 == 0) await Task.Yield();
+                    }
+
                     // 2. START BACKGROUND RESET for the rest and RETURN immediately
-                    // This allows the search clearing operation to finish so navigation can begin.
                     _ = Task.Run(async () =>
                     {
                         try
                         {
-                            // Wait a bit to let the prioritized branch render first
-                            await Task.Delay(100, cancellationToken);
+                            // Small delay to let the prioritized branch render first
+                            await Task.Delay(50, cancellationToken);
 
                             int updatedCount = 0;
                             foreach (var node in allNodes)
@@ -144,8 +157,8 @@ namespace AssetsManager.Services.Explorer
                                     ResetNodeState(node);
                                     updatedCount++;
 
-                                    // Yield frequently with a real delay to ensure UI thread is never saturated
-                                    if (updatedCount % 500 == 0) await Task.Delay(5, cancellationToken);
+                                    // Yield every 2000 nodes to keep it fast but responsive
+                                    if (updatedCount % 2000 == 0) await Task.Yield();
                                 }
                             }
                         }
