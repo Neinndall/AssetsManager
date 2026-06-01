@@ -142,7 +142,34 @@ namespace AssetsManager.Services.Explorer
         public async Task<NarrativeMetadata> GetMetadataAsync(FileSystemNodeModel node)
         {
             if (node == null || string.IsNullOrEmpty(node.VirtualPath)) return null;
-            return GetMetadataSync(node); // Reuse sync logic since caches are pre-warmed or handled
+
+            string path = PathUtils.NormalizePath(node.VirtualPath);
+
+            // 1. Icons
+            if (path.Contains(RiotCatalogDefinitions.ProfileIconsVirtualPath))
+            {
+                return await GetIconMetadataAsync(node);
+            }
+
+            // 2. Emotes
+            if (path.Contains(RiotCatalogDefinitions.EmotesVirtualPath))
+            {
+                return await GetEmoteMetadataAsync(node);
+            }
+
+            // 3. Wards
+            if (path.Contains(RiotCatalogDefinitions.WardsVirtualPath))
+            {
+                return await GetWardMetadataAsync(node);
+            }
+
+            // 4. Loot
+            if (path.Contains(RiotCatalogDefinitions.LootVirtualPath))
+            {
+                return await GetLootMetadataAsync(node);
+            }
+
+            return null;
         }
 
         // --- Catalog Loading Logic ---
