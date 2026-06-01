@@ -29,50 +29,45 @@ namespace AssetsManager.Services.Explorer.Tree
 
         private async Task NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path, FileSystemNodeModel target, bool focus)
         {
+            // Fast-path: if target is already selected and all ancestors are expanded,
+            // we do not need to do any heavy scrolling or retries. Just ensure focus/view if possible.
+            bool isAlreadyPrepared = path.All(n => n == target || n.IsExpanded);
+            if (target.IsSelected && isAlreadyPrepared)
+            {
+                var finalContainer = GetGeneratedContainerForPath(container, path);
+                if (finalContainer != null)
+                {
+                    if (focus) finalContainer.Focus();
+                    finalContainer.BringIntoView();
+                    return;
+                }
+            }
+
             ItemsControl currentContainer = container;
 
             for (int i = 0; i < path.Count; i++)
             {
                 var node = path[i];
                 
-                // Set expansion first (only if needed to avoid churn)
+                // Ensure expansion
                 if (node != target && !node.IsExpanded) node.IsExpanded = true;
                 if (node == target) node.IsSelected = true;
 
-                TreeViewItem itemContainer = null;
-                
-                // Initial check: if container is already there, skip loop
-                itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+                TreeViewItem itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
 
                 if (itemContainer == null)
                 {
-                    // Retry loop to handle virtualization and async generation
-                    for (int retry = 0; retry < 15; retry++)
+                    // Virtualization fix: scroll to it so the container is generated
+                    var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
+                    if (vsp != null)
                     {
-                        itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
-
-                        if (itemContainer != null) break;
-
-                        // Virtualization fix: search for the panel and force scroll to index
-                        var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
-                        if (vsp != null)
-                        {
-                            int index = currentContainer.Items.IndexOf(node);
-                            if (index >= 0) vsp.BringIndexIntoViewPublic(index);
-                        }
-
-                        // Use a shorter initial delay and allow UI thread to process without forcing layout yet
-                        if (retry < 5)
-                        {
-                            await Task.Delay(20);
-                        }
-                        else
-                        {
-                            await Task.Delay(35);
-                            // Only force layout as a last resort and sparingly
-                            if (retry % 5 == 0) currentContainer.UpdateLayout();
-                        }
+                        int index = currentContainer.Items.IndexOf(node);
+                        if (index >= 0) vsp.BringIndexIntoViewPublic(index);
                     }
+
+                    // A single tiny wait is usually enough for the ItemContainerGenerator to catch up
+                    await Task.Delay(25);
+                    itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
                 }
 
                 if (itemContainer != null)
@@ -80,10 +75,7 @@ namespace AssetsManager.Services.Explorer.Tree
                     if (node == target)
                     {
                         itemContainer.IsSelected = true;
-                        
-                        // Only bring into view if not already visible to avoid "jumping"
                         itemContainer.BringIntoView();
-                        
                         if (focus) itemContainer.Focus();
                         return;
                     }
@@ -96,6 +88,18 @@ namespace AssetsManager.Services.Explorer.Tree
                     break;
                 }
             }
+        }
+
+        private TreeViewItem GetGeneratedContainerForPath(ItemsControl currentContainer, List<FileSystemNodeModel> path)
+        {
+            foreach (var node in path)
+            {
+                if (currentContainer == null) return null;
+                var itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+                if (itemContainer == null) return null;
+                currentContainer = itemContainer;
+            }
+            return currentContainer as TreeViewItem;
         }
 
         public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
@@ -136,17 +140,13 @@ namespace AssetsManager.Services.Explorer.Tree
 
             if (selected.Count > 0)
             {
-                // Si hay multi-selección, aseguramos que el ítem principal (SelectedItem) 
-                // también esté en la lista si no lo estaba ya.
                 if (currentSelectedItem != null && !selected.Contains(currentSelectedItem))
                 {
-                    // Lo insertamos al principio para que sea el "líder" de la selección
                     selected.Insert(0, currentSelectedItem);
                 }
                 return selected;
             }
 
-            // Si no hay multi-selección, devolvemos solo el seleccionado actual
             return currentSelectedItem != null ? new List<FileSystemNodeModel> { currentSelectedItem } : new List<FileSystemNodeModel>();
         }
 
