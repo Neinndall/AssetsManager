@@ -31,6 +31,7 @@ namespace AssetsManager.Views.Models.Explorer
         public int Id { get; set; }
         public string Name { get; set; }
         public string Description { get; set; }
+        public string WardImagePath { get; set; }
         public List<WardRegionalDescription> RegionalDescriptions { get; set; }
     }
 
