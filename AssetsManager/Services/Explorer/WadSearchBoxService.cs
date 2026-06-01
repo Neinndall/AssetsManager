@@ -53,6 +53,8 @@ namespace AssetsManager.Services.Explorer
                 }
                 else
                 {
+                    // Normal search: Filter the tree but DO NOT return a match for auto-navigation.
+                    // The user prefers to navigate the filtered tree manually.
                     await FilterTreeAsync(rootNodes, searchText, token, activeNode);
                     return null;
                 }
@@ -78,7 +80,7 @@ namespace AssetsManager.Services.Explorer
             return await ExpandToPathAsync(path, rootNodes);
         }
 
-        public async Task FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken, FileSystemNodeModel activeNode = null)
+        public async Task<FileSystemNodeModel> FilterTreeAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, string searchText, CancellationToken cancellationToken, FileSystemNodeModel activeNode = null)
         {
             try
             {
@@ -137,7 +139,7 @@ namespace AssetsManager.Services.Explorer
                                 if (cancellationToken.IsCancellationRequested) break;
                                 if (prioritizedNodes.Contains(node)) continue;
 
-                                if (!node.IsVisible || node.HasMatch)
+                                if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.Children)
                                 {
                                     ResetNodeState(node);
                                     updatedCount++;
@@ -151,10 +153,12 @@ namespace AssetsManager.Services.Explorer
                         catch (Exception) { }
                     }, cancellationToken);
 
-                    return;
+                    return null;
                 }
 
                 // Normal Search Logic
+                FileSystemNodeModel firstMatch = null;
+
                 await Task.Run(async () =>
                 {
                     // 2. High Performance & Anti-Flicker Filtering
@@ -171,6 +175,8 @@ namespace AssetsManager.Services.Explorer
                         int index = node.Name.IndexOf(searchText, StringComparison.OrdinalIgnoreCase);
                         if (index >= 0)
                         {
+                            if (firstMatch == null) firstMatch = node;
+
                             matchIndices[node] = index;
                             toShow.Add(node);
 
@@ -230,6 +236,25 @@ namespace AssetsManager.Services.Explorer
                             changed = true;
                         }
 
+                        // ULTRA-PERFORMANCE: If node has children, only show matching children to make expansion INSTANT
+                        if (FileSystemNodeModel.CanHaveChildren(node.Type) && node.Children != null)
+                        {
+                            var visibleItems = node.Children.Where(c => toShow.Contains(c)).ToList();
+                            if (visibleItems.Count != node.Children.Count)
+                            {
+                                if (node.VisibleChildren == node.Children || node.VisibleChildren.Count != visibleItems.Count)
+                                {
+                                    node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
+                                    changed = true;
+                                }
+                            }
+                            else if (node.VisibleChildren != node.Children)
+                            {
+                                node.VisibleChildren = null;
+                                changed = true;
+                            }
+                        }
+
                         if (changed)
                         {
                             uiUpdateCount++;
@@ -237,16 +262,19 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
                 }, cancellationToken);
+
+                return firstMatch;
             }
             catch (Exception ex) when (ex is OperationCanceledException || ex is InvalidOperationException)
             {
-                // Silently swallow cancellation or collection modification
+                return null;
             }
         }
 
         private void ResetNodeState(FileSystemNodeModel node)
         {
             if (!node.IsVisible) node.IsVisible = true;
+            if (node.VisibleChildren != node.Children) node.VisibleChildren = null;
             if (node.HasMatch)
             {
                 node.HasMatch = false;

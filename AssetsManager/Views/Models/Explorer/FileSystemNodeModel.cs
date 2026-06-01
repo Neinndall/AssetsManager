@@ -173,6 +173,17 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
+        private ObservableRangeCollection<FileSystemNodeModel> _visibleChildren;
+        public ObservableRangeCollection<FileSystemNodeModel> VisibleChildren
+        {
+            get => _visibleChildren ?? Children;
+            set
+            {
+                _visibleChildren = value;
+                OnPropertyChanged(nameof(VisibleChildren));
+            }
+        }
+
         private bool _isExpanded;
         public bool IsExpanded
         {
