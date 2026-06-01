@@ -20,9 +20,11 @@ namespace AssetsManager.Services.Explorer
         private List<SummonerIconJsonEntry> _cachedIcons;
         private List<EmoteJsonEntry> _cachedEmotes;
         private List<WardJsonEntry> _cachedWards;
+        private List<LootJsonEntry> _cachedLoot;
         private string _cachedIconsSourceWad;
         private string _cachedEmotesSourceWad;
         private string _cachedWardsSourceWad;
+        private string _cachedLootSourceWad;
 
         public NarrativeMetadataService(LogService logService, WadContentProvider wadContentProvider, AppSettings appSettings)
         {
@@ -53,6 +55,12 @@ namespace AssetsManager.Services.Explorer
             if (path.Contains(RiotCatalogDefinitions.WardsVirtualPath))
             {
                 return await GetWardMetadataAsync(node);
+            }
+
+            // 4. Check for Loot
+            if (path.Contains(RiotCatalogDefinitions.LootVirtualPath))
+            {
+                return await GetLootMetadataAsync(node);
             }
 
             return null;
@@ -159,6 +167,40 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        private async Task<NarrativeMetadata> GetLootMetadataAsync(FileSystemNodeModel node)
+        {
+            try
+            {
+                var lootList = await LoadLootMetadataAsync(node);
+                if (lootList == null) return null;
+
+                string normalizedNodePath = PathUtils.NormalizePath(node.VirtualPath);
+                string token = "assets/loot/";
+                int tokenIndex = normalizedNodePath.IndexOf(token);
+                if (tokenIndex == -1) return null;
+
+                string nodeSuffix = Path.ChangeExtension(normalizedNodePath.Substring(tokenIndex), null);
+
+                var entry = lootList.FirstOrDefault(e => {
+                    if (string.IsNullOrEmpty(e.Image)) return false;
+                    string jsonPath = PathUtils.NormalizePath(e.Image);
+                    int jsonTokenIndex = jsonPath.IndexOf(token);
+                    if (jsonTokenIndex == -1) return false;
+
+                    return nodeSuffix == Path.ChangeExtension(jsonPath.Substring(jsonTokenIndex), null);
+                });
+
+                if (entry != null) return MapLootToMetadata(entry);
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to get loot metadata for node {node.Name}");
+                return null;
+            }
+        }
+
         private NarrativeMetadata MapEmoteToMetadata(EmoteJsonEntry entry)
         {
             return new NarrativeMetadata
@@ -175,6 +217,15 @@ namespace AssetsManager.Services.Explorer
                 Title = string.IsNullOrWhiteSpace(entry.Name) ? "N/A" : entry.Name,
                 Description = entry.RegionalDescriptions?.FirstOrDefault(d => d.Region == "riot")?.Description
                               ?? (!string.IsNullOrWhiteSpace(entry.Description) ? entry.Description : "N/A")
+            };
+        }
+
+        private NarrativeMetadata MapLootToMetadata(LootJsonEntry entry)
+        {
+            return new NarrativeMetadata
+            {
+                Title = string.IsNullOrWhiteSpace(entry.Name) ? "N/A" : entry.Name,
+                Description = string.IsNullOrWhiteSpace(entry.Description) ? "N/A" : entry.Description
             };
         }
 
@@ -237,6 +288,48 @@ namespace AssetsManager.Services.Explorer
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to parse ward-skins.json");
+                return null;
+            }
+        }
+
+        private async Task<List<LootJsonEntry>> LoadLootMetadataAsync(FileSystemNodeModel node)
+        {
+            if (_cachedLoot != null && _cachedLootSourceWad == node.SourceWadPath) return _cachedLoot;
+
+            byte[] jsonData = await LoadJsonFromContextAsync(node, RiotCatalogDefinitions.LootJsonPath);
+            if (jsonData == null) return null;
+
+            try
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                
+                using (var doc = JsonDocument.Parse(jsonData))
+                {
+                    JsonElement root = doc.RootElement;
+
+                    // If it's a wrapper object (e.g., { "LootItems": [...] }), go deeper
+                    if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("LootItems", out var lootItemsProp))
+                    {
+                        root = lootItemsProp;
+                    }
+
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        _cachedLoot = JsonSerializer.Deserialize<List<LootJsonEntry>>(root.GetRawText(), options);
+                    }
+                    else if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        var dict = JsonSerializer.Deserialize<Dictionary<string, LootJsonEntry>>(root.GetRawText(), options);
+                        _cachedLoot = dict?.Values.ToList();
+                    }
+                }
+
+                _cachedLootSourceWad = node.SourceWadPath;
+                return _cachedLoot;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse loot.json");
                 return null;
             }
         }

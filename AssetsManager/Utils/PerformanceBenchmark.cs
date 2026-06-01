@@ -13,6 +13,81 @@ namespace AssetsManager.Utils
 {
     public static class PerformanceBenchmark
     {
+        public static async Task RunAdaptiveResetPerformanceTest(int nodeCount, LogService log)
+        {
+            log.Log("=== ADAPTIVE RESET PERFORMANCE VALIDATION ===");
+            log.Log($"Simulating massive tree with {nodeCount} nodes...");
+
+            var rootNodes = new AssetsManager.Utils.Framework.ObservableRangeCollection<FileSystemNodeModel>();
+            var allNodes = new List<FileSystemNodeModel>();
+            
+            // 1. Setup Phase
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 10; i++)
+            {
+                var root = new FileSystemNodeModel($"Root_{i}", NodeType.RealDirectory);
+                rootNodes.Add(root);
+                GenerateDummyNodesForReset(root, nodeCount / 10, allNodes);
+            }
+            sw.Stop();
+            log.Log($"- Tree structure built in {sw.ElapsedMilliseconds}ms");
+
+            // Mock search state: make all nodes invisible/matched
+            foreach (var node in allNodes) { node.IsVisible = false; node.HasMatch = true; }
+
+            var searchService = new AssetsManager.Services.Explorer.WadSearchBoxService();
+
+            // 2. Execution Phase: Reset using the 16ms strategy
+            log.Log("Executing Adaptive Search Clear (16ms time-slicing)...");
+            
+            var totalSw = System.Diagnostics.Stopwatch.StartNew();
+            
+            // We use the real service method
+            // Note: In a console benchmark, Task.Yield() returns immediately, 
+            // but we can still measure the overhead and logic correctness.
+            await searchService.FilterTreeAsync(rootNodes, string.Empty, System.Threading.CancellationToken.None);
+            
+            totalSw.Stop();
+
+            log.LogSuccess("Reset Logic verification:");
+            log.Log($"- Total Nodes Processed: {allNodes.Count}");
+            log.Log($"- Total Time (Main Logic Return): {totalSw.ElapsedMilliseconds}ms");
+            
+            log.Log("Note: The background reset continues asynchronously. Let's verify a sample of nodes...");
+            
+            // Wait a bit for the background task to finish (it yields every 16ms)
+            int waitTime = 0;
+            while (allNodes.Any(n => !n.IsVisible) && waitTime < 5000)
+            {
+                await Task.Delay(100);
+                waitTime += 100;
+            }
+
+            int visibleCount = allNodes.Count(n => n.IsVisible);
+            log.Log($"- Background Reset Visibility: {visibleCount}/{allNodes.Count} nodes restored");
+            log.Log($"- Estimated Background Finish Time: {waitTime}ms");
+
+            if (visibleCount == allNodes.Count)
+            {
+                log.LogSuccess("VERDICT: PERFECT. The system prioritized visibility and finished the rest without blocking.");
+            }
+            else
+            {
+                log.LogWarning("VERDICT: BACKGROUND STILL WORKING. Increase wait time for massive datasets.");
+            }
+            log.Log("=================================");
+        }
+
+        private static void GenerateDummyNodesForReset(FileSystemNodeModel parent, int count, List<FileSystemNodeModel> allNodes)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var node = new FileSystemNodeModel($"Node_{i}", false, "path", "wad") { Parent = parent };
+                parent.Children.Add(node);
+                allNodes.Add(node);
+            }
+        }
+
         public static async Task RunFilteredExpansionTest(int childCount, LogService log)
         {
             log.Log("=== TARGETED FILTERED EXPANSION TEST ===");

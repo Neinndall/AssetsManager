@@ -128,14 +128,19 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
 
-                    // Apply priority updates immediately (chunked to ensure fluidity)
-                    int pCount = 0;
+                    // Apply priority updates immediately (Time-sliced for fluidity)
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
                     foreach (var node in prioritizedNodes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         ResetNodeState(node);
-                        pCount++;
-                        if (pCount % 400 == 0) await Task.Yield();
+                        
+                        // If we've worked for more than 16ms (one frame), yield to keep UI responsive
+                        if (sw.ElapsedMilliseconds > 16)
+                        {
+                            await Task.Yield();
+                            sw.Restart();
+                        }
                     }
 
                     // 2. START BACKGROUND RESET for the rest and RETURN immediately
@@ -146,7 +151,7 @@ namespace AssetsManager.Services.Explorer
                             // Small delay to let the prioritized branch render first
                             await Task.Delay(50, cancellationToken);
 
-                            int updatedCount = 0;
+                            var bgSw = System.Diagnostics.Stopwatch.StartNew();
                             foreach (var node in allNodes)
                             {
                                 if (cancellationToken.IsCancellationRequested) break;
@@ -155,10 +160,13 @@ namespace AssetsManager.Services.Explorer
                                 if (!node.IsVisible || node.HasMatch || node.VisibleChildren != node.Children)
                                 {
                                     ResetNodeState(node);
-                                    updatedCount++;
 
-                                    // Yield every 2000 nodes to keep it fast but responsive
-                                    if (updatedCount % 2000 == 0) await Task.Yield();
+                                    // Yield every 16ms to keep background processing efficient but non-blocking
+                                    if (bgSw.ElapsedMilliseconds > 16)
+                                    {
+                                        await Task.Yield();
+                                        bgSw.Restart();
+                                    }
                                 }
                             }
                         }

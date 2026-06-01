@@ -40,6 +40,16 @@ namespace AssetsManager.Views.Models.Explorer
         public string Description { get; set; }
     }
 
+    public class LootJsonEntry
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Image { get; set; }
+        public string Rarity { get; set; }
+        public string Type { get; set; }
+    }
+
     public class DescriptionEntry
     {
         public string Region { get; set; }
