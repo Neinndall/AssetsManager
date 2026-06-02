@@ -46,7 +46,7 @@ namespace AssetsManager.Services.Explorer
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
 
-        private bool _wasPreviousContainer;
+        private bool _isGridActive;
 
         public ExplorerPreviewService(
             LogService logService, 
@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Explorer
                 // If we've already started browsing files, we DON'T reset. 
                 if (_viewModel.HasEverPreviewedAFile)
                 {
-                    _wasPreviousContainer = true;
+                    _isGridActive = true;
                     return;
                 }
 
@@ -107,15 +107,16 @@ namespace AssetsManager.Services.Explorer
                 if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer) return;
             }
 
-            // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
-            _viewModel.PrepareSlotForFile(node);
+            // Step 1: Prepare the correct slot (Image or Content)
+            PrepareSlotForFile(node);
 
-            // Step 1b: If transitioning from a container (grid/folder), hide old content immediately.
-            // This prevents the old preview from flashing when the grid hides and the preview panel
-            // becomes visible, while keeping old content as placeholder during file→file transitions.
-            if (_wasPreviousContainer)
+            // Step 1b: If transitioning from grid/folder view, hide old content immediately.
+            // The grid was showing and the preview content is stale — reset visibility
+            // so the new file appears cleanly without flashing old content.
+            // For file→file transitions, old content stays as a placeholder during I/O.
+            if (_isGridActive)
             {
-                _wasPreviousContainer = false;
+                _isGridActive = false;
                 _viewModel.IsContentVisible = true;
                 _viewModel.IsTextVisible = false;
                 _viewModel.IsWebVisible = false;
@@ -177,6 +178,47 @@ namespace AssetsManager.Services.Explorer
 
             // Step 2: Restore the UI state
             await SetPreviewerAsync(Previewer.StatusPanel);
+        }
+
+        public void PrepareSlotForFile(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            _viewModel.IsWelcomeVisible = false;
+            _viewModel.HasEverPreviewedAFile = true;
+
+            bool isImage = node.Extension != null &&
+                (SupportedFileTypes.Images.Contains(node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+
+            if (isImage)
+            {
+                _viewModel.IsImageUnsupportedVisible = false;
+            }
+            else
+            {
+                _viewModel.IsUnsupportedVisible = false;
+                _viewModel.IsContentVisible = true;
+            }
+        }
+
+        public void CloseSlotByCategory(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            bool isImage = node.Extension != null &&
+                (SupportedFileTypes.Images.Contains(node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+
+            bool hasMoreOfSameCategory = _viewModel.PinnedFilesManager.PinnedFiles.Any(p =>
+                p.Node != node &&
+                (SupportedFileTypes.Images.Contains(p.Node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(p.Node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
+
+            _viewModel.UnloadSlotByCategory(isImage, hasMoreOfSameCategory);
         }
 
         private async Task PreviewRealFile(FileSystemNodeModel node)
@@ -299,8 +341,7 @@ namespace AssetsManager.Services.Explorer
                         _viewModel.IsImageVisible = true;
                         _activeImagePreviewer = Previewer.Image;
 
-                        // Clear "Unsupported" error status if active, so the valid image is shown full screen
-                        if (_viewModel.IsUnsupportedVisible)
+                        if (_viewModel.IsUnsupportedVisible && !_viewModel.IsContentVisible)
                         {
                             _viewModel.IsUnsupportedVisible = false;
                             _viewModel.IsContentVisible = false;

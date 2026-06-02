@@ -239,44 +239,8 @@ namespace AssetsManager.Views.Models.Explorer
             set { _canScrollRight = value; OnPropertyChanged(); }
         }
 
-        public void PrepareSlotForFile(FileSystemNodeModel node)
+        public void UnloadSlotByCategory(bool isImage, bool hasMoreOfSameCategory)
         {
-            if (node == null) return;
-
-            IsWelcomeVisible = false;
-            HasEverPreviewedAFile = true;
-
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
-
-            if (isImage)
-            {
-                IsImageUnsupportedVisible = false;
-            }
-            else
-            {
-                IsUnsupportedVisible = false;
-                IsContentVisible = true;
-            }
-        }
-
-        public void ClosePanelByCategory(FileSystemNodeModel node)
-        {
-            if (node == null) return;
-
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
-
-            // Check if there are other pinned files of the same category remaining
-            // (excluding the one being closed right now)
-            bool hasMoreOfSameCategory = PinnedFilesManager.PinnedFiles.Any(p => 
-                p.Node != node && 
-                (SupportedFileTypes.Images.Contains(p.Node.Extension) || 
-                 SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
-                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
-
             if (!hasMoreOfSameCategory)
             {
                 if (isImage)
@@ -293,7 +257,6 @@ namespace AssetsManager.Views.Models.Explorer
                 }
             }
 
-            // If absolutely nothing is visible after closing AND no tabs are left, we show Welcome again
             if (!IsImageVisible && !IsContentVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
             {
                 HasEverPreviewedAFile = false;

@@ -195,10 +195,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
             {
-                // 1. First check the category logic to see if panels should hide
-                ViewModel.ClosePanelByCategory(vm.Node);
-                
-                // 2. Unpin the file. The manager will automatically select the previous tab if this was the active one.
+                ExplorerPreviewService.CloseSlotByCategory(vm.Node);
                 ViewModel.PinnedFilesManager.UnpinFile(vm);
             }
         }
