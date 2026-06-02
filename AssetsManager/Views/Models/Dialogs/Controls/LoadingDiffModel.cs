@@ -16,7 +16,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         CalculatingDifferences,
         DecodingTextures,
         Finalizing,
-        Ready
+        Ready,
+        BatchLoadingFile,
+        BatchFormattingFile,
+        BatchFileReady
     }
 
     public class LoadingDiffModel : INotifyPropertyChanged
@@ -25,6 +28,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         private string _description = "Please wait while the differences are being calculated...";
         private double _progressValue = 0;
         private bool _isBusy = false;
+        private int _currentBatchFile;
+        private int _totalBatchFiles;
 
         public string Title
         {
@@ -48,6 +53,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         {
             get => _isBusy;
             set { _isBusy = value; OnPropertyChanged(); }
+        }
+
+        public void SetBatchIndex(int currentFile, int totalFiles)
+        {
+            _currentBatchFile = currentFile;
+            _totalBatchFiles = totalFiles;
         }
 
         public void SetState(DiffLoadingState state)
@@ -110,6 +121,29 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     Description = "Done! Displaying results...";
                     ProgressValue = 100;
                     break;
+
+                // BATCH STATES
+                case DiffLoadingState.BatchLoadingFile:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    Description = $"Loading file {_currentBatchFile} of {_totalBatchFiles}...";
+                    ProgressValue = (_currentBatchFile - 1) * share + share * 0.15;
+                    break;
+                }
+                case DiffLoadingState.BatchFormattingFile:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    Description = $"Formatting file {_currentBatchFile} of {_totalBatchFiles}...";
+                    ProgressValue = (_currentBatchFile - 1) * share + share * 0.55;
+                    break;
+                }
+                case DiffLoadingState.BatchFileReady:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    Description = $"File {_currentBatchFile} of {_totalBatchFiles} ready.";
+                    ProgressValue = _currentBatchFile * share;
+                    break;
+                }
             }
         }
 

@@ -29,6 +29,11 @@ namespace AssetsManager.Views.Dialogs
             LoadingControl.SetState(state);
         }
 
+        public void SetBatchIndex(int currentFile, int totalFiles)
+        {
+            LoadingControl.SetBatchIndex(currentFile, totalFiles);
+        }
+
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             LoadingControl.ShowLoading(true);

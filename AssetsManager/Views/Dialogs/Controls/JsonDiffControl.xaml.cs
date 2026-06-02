@@ -21,6 +21,7 @@ using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
@@ -46,6 +47,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
         public JsonDiffWindow ParentWindow { get; set; }
+        public LoadingDiffWindow LoadingWindow { get; set; }
         #endregion
 
         #region Constructor & Setup
@@ -293,13 +295,20 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (ViewModel.BatchItems == null || ViewModel.BatchItems.Count == 0 || ViewModel.LoadDataFunc == null) return;
 
+            LoadingWindow?.SetBatchIndex(ViewModel.CurrentFileIndex, ViewModel.TotalFilesCount);
+            LoadingWindow?.SetState(DiffLoadingState.BatchLoadingFile);
+
             var currentItem = ViewModel.BatchItems[ViewModel.CurrentFileIndex - 1];
 
             var (oldText, newText) = await ViewModel.LoadDataFunc(currentItem, ViewModel.OldPbePath, ViewModel.NewPbePath);
 
+            LoadingWindow?.SetState(DiffLoadingState.BatchFormattingFile);
+
             await LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
             FocusFirstDifference();
             RefreshGuidePosition();
+
+            LoadingWindow?.SetState(DiffLoadingState.BatchFileReady);
         }
         #endregion
 

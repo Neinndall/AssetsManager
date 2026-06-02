@@ -1,7 +1,13 @@
 AssetsManager - League of Legends | v4.0.1.0
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
+  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+AssetsManager - League of Legends | v4.0.1.0
 
 MEDIUM UPDATE
-
 
 New Features
   - Monitor / Pass Rewards Browser: implemented a multi-event caching system with dynamic event-named files and a dedicated UI selector.
@@ -66,6 +72,8 @@ Improvements
   - Comparator / High-Performance Engine & SSoT
     * Optimized WAD comparison architecture: implemented a single-pass comparison engine with session-wide resolution caching, achieving a 26% reduction in memory allocation and consistent 2-3s execution times for massive datasets.
     * Integrated Smart Asset Identification: added "in-situ" extension guessing for unknown hashes (0x...) by reading file headers directly during the comparison phase, ensuring professional-grade results without additional disk I/O.
+    * Removed a redundant chunk iteration: the rename-detection map was being built in two passes over the old chunks, where the second pass fully subsumed the first. Reduced iterations by 33% with zero behavior change.
+    * Eliminated double WPK parsing during audio bank extraction: the WPK is now parsed only once (inside the audio tree builder), and the byte routing leverages the WEM source flag already populated on each sound node.
   - UI / High-Fidelity Progress Feedback
     * Refined progress reporting frequency: updated the unified notification system to report every 100 chunks, ensuring a perfectly smooth and progressive visual experience regardless of file volume.
   - Architecture / System-Wide Redundancy Cleanup
@@ -109,6 +117,7 @@ Bug Fixes
   - Commit History / Refined messaging for edge cases when release tags are missing.
   - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
   - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
+  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

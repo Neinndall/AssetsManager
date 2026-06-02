@@ -111,8 +111,8 @@ namespace AssetsManager.Views.Dialogs
             this.Activate();
             this.Focus();
 
-            // 3. Smooth Handover: Close loading window now that we are ready
-            if (LoadingWindow != null)
+            // 3. Smooth Handover: Close loading window now that we are ready (keep open in batch mode for progress updates on subsequent items)
+            if (LoadingWindow != null && !IsBatchMode)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
@@ -181,16 +181,18 @@ namespace AssetsManager.Views.Dialogs
         {
             if (_batchItems == null || _batchItems.Count == 0 || _loadDataFunc == null) return;
 
+            LoadingWindow?.SetBatchIndex(CurrentFileIndex, TotalFilesCount);
+            LoadingWindow?.SetState(DiffLoadingState.BatchLoadingFile);
+
             var currentItem = _batchItems[CurrentFileIndex - 1];
 
-            // Show a loading indicator or similar if needed
             var (oldImage, newImage) = await _loadDataFunc(currentItem, _oldPbePath, _newPbePath);
 
+            LoadingWindow?.SetState(DiffLoadingState.BatchFormattingFile);
+
             SetImageData(oldImage, newImage, currentItem.OldPath, currentItem.NewPath);
-            
-            // Reset zoom/pan when changing file? (Optional)
-            // _currentZoom = 1.0;
-            // ApplyTransform(scale: 1.0, deltaX: -OldTranslate.X, deltaY: -OldTranslate.Y);
+
+            LoadingWindow?.SetState(DiffLoadingState.BatchFileReady);
         }
 
         private async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
@@ -392,6 +394,11 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.Close();
+                LoadingWindow = null;
+            }
             OldImage.Source = null;
             NewImage.Source = null;
             OldImageOverlay.Source = null;

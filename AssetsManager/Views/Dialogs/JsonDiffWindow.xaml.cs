@@ -32,6 +32,11 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.Close();
+                LoadingWindow = null;
+            }
             JsonDiffControl.Dispose();
         }
 
@@ -56,8 +61,8 @@ namespace AssetsManager.Views.Dialogs
             this.Activate();
             this.Focus();
 
-            // 4. Smooth Handover: Close loading window now that we are ready
-            if (LoadingWindow != null)
+            // 4. Smooth Handover: Close loading window now that we are ready (keep open in batch mode for progress updates on subsequent items)
+            if (LoadingWindow != null && !JsonDiffControl.ViewModel.IsBatchMode)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
@@ -87,6 +92,7 @@ namespace AssetsManager.Views.Dialogs
             LoadingDiffWindow loadingWindow = null)
         {
             LoadingWindow = loadingWindow; // Take custody
+            JsonDiffControl.LoadingWindow = loadingWindow; // Pass to control for batch progress updates
             await JsonDiffControl.LoadAndDisplayBatchDiffAsync(items, startIndex, oldPbePath, newPbePath, loadDataFunc);
         }
     }
