@@ -148,6 +148,38 @@ namespace AssetsManager.Services.Explorer
 
         #region Export Orchestration
 
+        public async Task<int> ExportNodesAsync(
+            List<FileSystemNodeModel> nodes,
+            string destinationPath,
+            WadExportMode mode,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            string currentRootPath,
+            CancellationToken cancellationToken,
+            Action<int, int, string> onProgress = null,
+            Action<string> onFileSaved = null)
+        {
+            int totalFiles = await CalculateTotalAsync(nodes, rootNodes, currentRootPath, mode, cancellationToken);
+            onProgress?.Invoke(0, totalFiles, null);
+
+            int processedCount = 0;
+            bool forceSmart = mode == WadExportMode.Smart;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                await ExportAsync(node, destinationPath, mode, rootNodes, currentRootPath, cancellationToken,
+                    (path) =>
+                    {
+                        processedCount++;
+                        string fileName = Path.GetFileName(path);
+                        onProgress?.Invoke(processedCount, totalFiles, fileName);
+                        onFileSaved?.Invoke(path);
+                    }, forceSmart);
+            }
+
+            return processedCount;
+        }
+
         public async Task ExportAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null, bool forceSmart = false)
         {
             cancellationToken.ThrowIfCancellationRequested();

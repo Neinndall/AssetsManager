@@ -12,6 +12,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Settings;
 
@@ -36,6 +37,65 @@ namespace AssetsManager.Services.Monitor
             _directoriesCreator = directoriesCreator;
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
+        }
+
+        public async Task<(bool Added, string DuplicateAssetPath)> AddAssetAsync(
+            FileSystemNodeModel node,
+            List<FileSystemNodeModel> nodePath,
+            string baseDirectoryForRelativePath,
+            string versionDetectionPath)
+        {
+            var validNodes = nodePath.Where(n => n.Name != "Loading...").ToList();
+
+            AssetSourceType sourceType = AssetSourceType.Game;
+            if (validNodes[0].Name.Contains("Plugins", StringComparison.OrdinalIgnoreCase))
+                sourceType = AssetSourceType.Plugins;
+
+            var wadNode = validNodes.FirstOrDefault(n => n.Type == NodeType.WadFile);
+            if (wadNode == null) return (false, null);
+
+            int wadIdx = validNodes.IndexOf(wadNode);
+            string internalPath = string.Join("/", validNodes.Skip(wadIdx + 1).Select(n => n.Name));
+            string logicalPath = $"{(sourceType == AssetSourceType.Plugins ? "Plugins" : "Game")}/{wadNode.Name}/{internalPath}";
+
+            if (_appSettings.MonitoredAssets.Any(a => a.AssetPath == logicalPath))
+                return (false, logicalPath);
+
+            string wadPhysicalPath = node.SourceWadPath;
+            string wadRelativePath = wadPhysicalPath;
+            if (!string.IsNullOrEmpty(baseDirectoryForRelativePath) && wadPhysicalPath.StartsWith(baseDirectoryForRelativePath, StringComparison.OrdinalIgnoreCase))
+                wadRelativePath = wadPhysicalPath.Substring(baseDirectoryForRelativePath.Length).TrimStart('/', '\\');
+
+            string currentVersion = null;
+            try
+            {
+                currentVersion = await _versionService.GetGameVersionAsync(versionDetectionPath);
+                if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
+                {
+                    string wadDir = Path.GetDirectoryName(wadPhysicalPath);
+                    currentVersion = await _versionService.GetGameVersionAsync(wadDir);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Watcher: Could not detect game version for asset: {node.Name}");
+            }
+
+            var newAsset = new MonitoredAsset
+            {
+                Alias = node.Name,
+                AssetPath = logicalPath,
+                WadName = wadRelativePath,
+                InternalPath = internalPath,
+                SourceType = sourceType,
+                Version = currentVersion,
+                LastKnownHash = node.SourceChunkPathHash != 0 ? node.SourceChunkPathHash : 0
+            };
+
+            _appSettings.MonitoredAssets.Add(newAsset);
+            AppSettings.SaveSettings(_appSettings);
+
+            return (true, null);
         }
 
         public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)

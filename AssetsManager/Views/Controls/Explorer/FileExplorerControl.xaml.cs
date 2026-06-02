@@ -594,38 +594,22 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 ExtractMenuItem.IsEnabled = false;
                 SaveMenuItem.IsEnabled = false;
-                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
                 try
                 {
-                    // Show immediate activity
                     ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
 
-                    // Calculate total files for accurate progress (Original Mode)
-                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Original, cancellationToken);
-                    
-                    // Update with real total
-                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", totalFiles));
-
-                    int processedCount = 0;
-                    foreach (var node in selectedNodes)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        
-                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Original, _viewModel.RootNodes, _currentRootPath, cancellationToken, (fileName) => 
-                        {
-                            processedCount++;
-                            ProgressUIManager?.OnExtractionProgressChanged(processedCount, totalFiles, Path.GetFileName(fileName));
-                        }, false); // forceSmart: false
-                    }
+                    int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Original,
+                        _viewModel.RootNodes, _currentRootPath, cancellationToken,
+                        (current, total, fileName) => ProgressUIManager?.OnExtractionProgressChanged(current, total, fileName));
 
                     if (selectedNodes.Count == 1)
                     {
                         var node = selectedNodes[0];
                         string logName = PathUtils.GetLogName(node.Name);
                         string logPath = destinationPath;
-                        
-                        // Use the cleaned name (without suffixes) so the log link matches the folder on disk
+
                         if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
                         {
                             string cleanName = PathUtils.GetLogName(node.Name);
@@ -638,7 +622,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
                     }
-                    
+
                     TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
@@ -698,65 +682,44 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 ExtractMenuItem.IsEnabled = false;
                 SaveMenuItem.IsEnabled = false;
-                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation(); // Get new token for this operation
+                CancellationToken cancellationToken = TaskCancellationManager.PrepareNewOperation();
 
                 try
                 {
-                    // Show immediate activity
                     ProgressUIManager?.OnSavingStarted(0);
 
-                    // Calculate total files for accurate progress (Smart Mode)
-                    int totalFiles = await WadExportService.CalculateTotalAsync(selectedNodes, _viewModel.RootNodes, _currentRootPath, WadExportMode.Smart, cancellationToken);
-                    
-                    // Update with real total
-                    ProgressUIManager?.OnSavingStarted(totalFiles);
-
-                    string singleSavedPath = null;
-                    string singleDisplayName = null;
-
-                    int processedCount = 0;
-                    foreach (var node in selectedNodes)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        var savedFiles = new List<string>();
-                        await WadExportService.ExportAsync(node, destinationPath, WadExportMode.Smart, _viewModel.RootNodes, _currentRootPath, cancellationToken, (path) => 
-                        {
-                            processedCount++;
-                            ProgressUIManager?.OnSavingProgressChanged(processedCount, totalFiles, Path.GetFileName(path));
-                            savedFiles.Add(path);
-                        }, true); // forceSmart: true -> always converts (ignores Original setting)
-
-                        if (selectedNodes.Count == 1 && savedFiles.Count > 0)
-                        {
-                            singleSavedPath = destinationPath;
-                            singleDisplayName = node.Name;
-
-                            if (node.Type == NodeType.SoundBank)
-                            {
-                                string cleanName = PathUtils.GetLogName(node.Name);
-                                singleSavedPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
-                            }
-                            else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
-                            {
-                                string cleanName = PathUtils.GetLogName(node.Name);
-                                singleSavedPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                            }
-
-                            if (savedFiles.Count == 1)
-                            {
-                                singleSavedPath = savedFiles.First();
-                                singleDisplayName = Path.GetFileName(singleSavedPath);
-                            }
-                        }
-                    }
+                    var allSavedFiles = new List<string>();
+                    int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Smart,
+                        _viewModel.RootNodes, _currentRootPath, cancellationToken,
+                        (current, total, fileName) => ProgressUIManager?.OnSavingProgressChanged(current, total, fileName),
+                        (path) => allSavedFiles.Add(path));
 
                     if (selectedNodes.Count == 1)
                     {
-                        if (singleSavedPath != null)
+                        var node = selectedNodes[0];
+                        string logPath = destinationPath;
+                        string logName = node.Name;
+
+                        if (node.Type == NodeType.SoundBank)
                         {
-                            LogService.LogInteractiveSuccess($"Successfully saved {singleDisplayName}", singleSavedPath, singleDisplayName);
+                            string cleanName = PathUtils.GetLogName(node.Name);
+                            logPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(cleanName));
+                            logName = PathUtils.GetLogName(node.Name);
                         }
+                        else if (node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.AudioEvent)
+                        {
+                            string cleanName = PathUtils.GetLogName(node.Name);
+                            logPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
+                            logName = PathUtils.GetLogName(node.Name);
+                        }
+
+                        if (allSavedFiles.Count == 1)
+                        {
+                            logPath = allSavedFiles.First();
+                            logName = Path.GetFileName(logPath);
+                        }
+
+                        LogService.LogInteractiveSuccess($"Successfully saved {logName}", logPath, logName);
                     }
                     else
                     {
@@ -868,78 +831,15 @@ namespace AssetsManager.Views.Controls.Explorer
                 var path = TreeUIManager.FindNodePath(_viewModel.RootNodes, selectedNode);
                 if (path == null) return;
 
-                // Build logical path: Source/WadName/InternalPath
-                // Assuming first node is the root/source
-                var validNodes = path.Where(n => n.Name != "Loading...").ToList();
-                
-                // Determine source type (Plugins or Game)
-                AssetSourceType sourceType = AssetSourceType.Game;
-                if (validNodes[0].Name.Contains("Plugins", StringComparison.OrdinalIgnoreCase))
-                    sourceType = AssetSourceType.Plugins;
+                var (added, duplicatePath) = await AssetWatcherService.AddAssetAsync(selectedNode, path, AppSettings.LolPbeDirectory, NewPbePath);
 
-                // Find WAD node
-                var wadNode = validNodes.FirstOrDefault(n => n.Type == NodeType.WadFile);
-                if (wadNode == null) return;
-
-                int wadIdx = validNodes.IndexOf(wadNode);
-                string internalPath = string.Join("/", validNodes.Skip(wadIdx + 1).Select(n => n.Name));
-                
-                // The logical path for the monitor service parser
-                string logicalPath = $"{(sourceType == AssetSourceType.Plugins ? "Plugins" : "Game")}/{wadNode.Name}/{internalPath}";
-
-                if (AppSettings.MonitoredAssets.Any(a => a.AssetPath == logicalPath))
+                if (!added && duplicatePath != null)
                 {
                     CustomMessageBoxService.ShowWarning("Warning", "This asset is already being monitored.", Window.GetWindow(this));
                     return;
                 }
 
-                // Use the physical source path provided by the node
-                string wadPhysicalPath = selectedNode.SourceWadPath;
-                string wadRelativePath = wadPhysicalPath;
-
-                if (!string.IsNullOrEmpty(AppSettings.LolPbeDirectory) && wadPhysicalPath.StartsWith(AppSettings.LolPbeDirectory, StringComparison.OrdinalIgnoreCase))
-                {
-                    wadRelativePath = wadPhysicalPath.Substring(AppSettings.LolPbeDirectory.Length).TrimStart('/', '\\');
-                }
-
-                string currentVersion = null;
-                try
-                {
-                    // 1. Try primary path
-                    currentVersion = await VersionService.GetGameVersionAsync(NewPbePath);
-
-                    // 2. Fallback: Try the directory of the WAD itself if primary failed
-                    if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
-                    {
-                        string wadDir = Path.GetDirectoryName(wadPhysicalPath);
-                        currentVersion = await VersionService.GetGameVersionAsync(wadDir);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, $"Watcher: Could not detect game version for asset: {selectedNode.Name}");
-                }
-
-                var newAsset = new MonitoredAsset
-                {
-                    Alias = selectedNode.Name,
-                    AssetPath = logicalPath,
-                    WadName = wadRelativePath,
-                    InternalPath = internalPath,
-                    SourceType = sourceType,
-                    Version = currentVersion,
-                    LastKnownHash = selectedNode.SourceChunkPathHash != 0 ? selectedNode.SourceChunkPathHash : 0
-                };
-
-                // If we don't have the hash, we'll get it during the first check
-                AppSettings.MonitoredAssets.Add(newAsset);
-                
-                // Silent save: Persist data but DON'T fire ConfigurationSaved event to avoid tree reload
-                AppSettings.SaveSettings(AppSettings);
-                
-                // Notify MonitorService to update the UI list in the other tab
                 MonitorService?.LoadMonitoredAssets();
-                
                 LogService.LogSuccess($"Asset added to watcher: {selectedNode.Name}");
             }
         }
@@ -954,64 +854,8 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (selectedNodes == null || selectedNodes.Count == 0) return;
 
-            int addedCount = 0;
             foreach (var node in selectedNodes)
-            {
-                // Only process files that are supported images or textures
-                if (!(SupportedFileTypes.Images.Contains(node.Extension) || SupportedFileTypes.Textures.Contains(node.Extension)) ||
-                    !(node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    byte[] data = null;
-                    if (node.Type == NodeType.VirtualFile)
-                        data = await WadContentProvider.GetVirtualFileBytesAsync(node);
-                    else if (node.Type == NodeType.RealFile)
-                        data = await File.ReadAllBytesAsync(node.VirtualPath);
-
-                    if (data == null) continue;
-
-                    BitmapSource bitmap = null;
-                    if (SupportedFileTypes.Textures.Contains(node.Extension))
-                    {
-                        using (var stream = new MemoryStream(data))
-                        {
-                            bitmap = TextureUtils.LoadTexture(stream, node.Extension);
-                        }
-                    }
-                    else
-                    {
-                        using (var stream = new MemoryStream(data))
-                        {
-                            var bmp = new BitmapImage();
-                            bmp.BeginInit();
-                            bmp.StreamSource = stream;
-                            bmp.CacheOption = BitmapCacheOption.OnLoad;
-                            bmp.EndInit();
-                            bmp.Freeze();
-                            bitmap = bmp;
-                        }
-                    }
-
-                    if (bitmap != null)
-                    {
-                        ImageMergerService.AddItem(new ImageMergerItem
-                        {
-                            Name = node.Name,
-                            Path = node.VirtualPath ?? node.Name,
-                            Image = bitmap
-                        });
-                        addedCount++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
-                }
-            }
+                await ImageMergerService.AddNodeAsync(node);
         }
 
         private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
