@@ -262,13 +262,6 @@ namespace AssetsManager.Services.Comparator
             var oldChecksumMap = new Dictionary<ulong, ulong>();
             foreach (var oldChunk in oldChunks.Values)
             {
-                if (!newChunks.ContainsKey(oldChunk.PathHash))
-                {
-                    oldChecksumMap.TryAdd(oldChunk.Checksum, oldChunk.PathHash);
-                }
-            }
-            foreach (var oldChunk in oldChunks.Values)
-            {
                 oldChecksumMap.TryAdd(oldChunk.Checksum, oldChunk.PathHash);
             }
 
