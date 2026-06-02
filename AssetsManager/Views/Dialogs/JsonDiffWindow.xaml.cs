@@ -32,11 +32,6 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
-            if (LoadingWindow != null)
-            {
-                LoadingWindow.Close();
-                LoadingWindow = null;
-            }
             JsonDiffControl.Dispose();
         }
 
@@ -61,8 +56,8 @@ namespace AssetsManager.Views.Dialogs
             this.Activate();
             this.Focus();
 
-            // 4. Smooth Handover: Close loading window now that we are ready (keep open in batch mode for progress updates on subsequent items)
-            if (LoadingWindow != null && !JsonDiffControl.ViewModel.IsBatchMode)
+            // 4. Smooth Handover: Close loading window now that we are ready
+            if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
@@ -83,17 +78,9 @@ namespace AssetsManager.Views.Dialogs
             await JsonDiffControl.LoadAndDisplayDiffAsync(oldText, newText, oldFileName, newFileName);
         }
 
-        public async Task LoadAndDisplayBatchDiffAsync(
-            List<SerializableChunkDiff> items, 
-            int startIndex, 
-            string oldPbePath, 
-            string newPbePath,
-            Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc,
-            LoadingDiffWindow loadingWindow = null)
+        public async Task LoadAndDisplayPreloadedBatchAsync(List<(string oldText, string newText, string oldPath, string newPath)> items, int startIndex)
         {
-            LoadingWindow = loadingWindow; // Take custody
-            JsonDiffControl.LoadingWindow = loadingWindow; // Pass to control for batch progress updates
-            await JsonDiffControl.LoadAndDisplayBatchDiffAsync(items, startIndex, oldPbePath, newPbePath, loadDataFunc);
+            await JsonDiffControl.LoadAndDisplayPreloadedBatchAsync(items, startIndex);
         }
     }
 }

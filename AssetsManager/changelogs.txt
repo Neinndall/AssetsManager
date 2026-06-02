@@ -117,7 +117,7 @@ Bug Fixes
   - Commit History / Refined messaging for edge cases when release tags are missing.
   - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
   - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
-  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
+  - Diff Viewer / Batch comparison progress is now fully handled by the comparison engine with consistent loading states, matching the individual file experience.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

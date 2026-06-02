@@ -105,17 +105,25 @@ namespace AssetsManager.Services.Core
                         return;
                     }
 
-                    var imageDiffWindow = new ImageDiffWindow();
-                    imageDiffWindow.Owner = owner;
-                    await imageDiffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (d, oldP, newP) =>
+                    var preparedImages = new List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)>();
+                    for (int i = 0; i < diffs.Count; i++)
                     {
-                        var (dataType, oldD, newD, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(d, oldP, newP);
-                        var ext = Path.GetExtension(d.NewPath ?? d.OldPath).ToLowerInvariant();
+                        var diff = diffs[i];
+                        loadingWindow.SetBatchIndex(i + 1, diffs.Count);
+                        loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
+                        var (dataType, oldD, newD, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
+                        loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
+                        var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
                         var oldImg = TextureUtils.LoadTexture((byte[])oldD, ext);
                         var newImg = TextureUtils.LoadTexture((byte[])newD, ext);
-                        return (oldImg, newImg);
-                    }, loadingWindow);
+                        preparedImages.Add((oldImg, newImg, diff.OldPath, diff.NewPath));
+                        loadingWindow.SetState(DiffLoadingState.BatchFileReady);
+                    }
 
+                    var imageDiffWindow = new ImageDiffWindow();
+                    imageDiffWindow.Owner = owner;
+                    imageDiffWindow.LoadingWindow = loadingWindow;
+                    imageDiffWindow.LoadAndDisplayPreloadedBatchAsync(preparedImages, startIndex);
                     imageDiffWindow.ShowDialog();
                     owner?.Activate();
                 }
@@ -131,13 +139,23 @@ namespace AssetsManager.Services.Core
                         return;
                     }
 
+                    var preparedData = new List<(string oldText, string newText, string oldPath, string newPath)>();
+                    for (int i = 0; i < diffs.Count; i++)
+                    {
+                        var diff = diffs[i];
+                        loadingWindow.SetBatchIndex(i + 1, diffs.Count);
+                        loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
+                        var (dataType, oldD, newD, oldPath, newPath) = await _wadDiffProvider.PrepareDifferenceDataAsync(diff, oldPbePath, newPbePath);
+                        loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
+                        var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldD, (byte[])newD);
+                        preparedData.Add((oldText, newText, oldPath ?? diff.OldPath, newPath ?? diff.NewPath));
+                        loadingWindow.SetState(DiffLoadingState.BatchFileReady);
+                    }
+
                     var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                     diffWindow.Owner = owner;
-                    await diffWindow.LoadAndDisplayBatchDiffAsync(diffs, startIndex, oldPbePath, newPbePath, async (d, oldP, newP) =>
-                    {
-                        var (dataType, oldD, newD, _, _) = await _wadDiffProvider.PrepareDifferenceDataAsync(d, oldP, newP);
-                        return await ProcessDataAsync(dataType, (byte[])oldD, (byte[])newD);
-                    }, loadingWindow);
+                    diffWindow.LoadingWindow = loadingWindow;
+                    await diffWindow.LoadAndDisplayPreloadedBatchAsync(preparedData, startIndex);
 
                     diffWindow.ShowDialog();
                     owner?.Activate();
@@ -145,7 +163,10 @@ namespace AssetsManager.Services.Core
             }
             catch (Exception ex)
             {
-                loadingWindow.Close();
+                if (loadingWindow != null)
+                {
+                    loadingWindow.Close();
+                }
                 _customMessageBoxService.ShowError("Batch Comparison Error", $"An unexpected error occurred: {ex.Message}", owner);
                 _logService.LogError(ex, "Error showing batch WAD diff");
             }

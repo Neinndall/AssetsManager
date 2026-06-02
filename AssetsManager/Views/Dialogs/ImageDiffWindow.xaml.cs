@@ -9,7 +9,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs
@@ -46,10 +45,7 @@ namespace AssetsManager.Views.Dialogs
             set => SetValue(TotalFilesCountProperty, value);
         }
 
-        private List<SerializableChunkDiff> _batchItems;
-        private string _oldPbePath;
-        private string _newPbePath;
-        private Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> _loadDataFunc;
+        private List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> _preloadedImages;
 
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -111,8 +107,8 @@ namespace AssetsManager.Views.Dialogs
             this.Activate();
             this.Focus();
 
-            // 3. Smooth Handover: Close loading window now that we are ready (keep open in batch mode for progress updates on subsequent items)
-            if (LoadingWindow != null && !IsBatchMode)
+            // 3. Smooth Handover: Close loading window now that we are ready
+            if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
@@ -156,60 +152,43 @@ namespace AssetsManager.Views.Dialogs
 
         private bool diffBtn_IsChecked() => DiffBtn?.IsChecked == true;
 
-        public async Task LoadAndDisplayBatchDiffAsync(
-            List<SerializableChunkDiff> items,
-            int startIndex,
-            string oldPbePath,
-            string newPbePath,
-            Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> loadDataFunc,
-            LoadingDiffWindow loadingWindow = null)
+        public void LoadAndDisplayPreloadedBatchAsync(
+            List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> items,
+            int startIndex)
         {
-            LoadingWindow = loadingWindow; // Take custody of the loading window
-            _batchItems = items;
-            _oldPbePath = oldPbePath;
-            _newPbePath = newPbePath;
-            _loadDataFunc = loadDataFunc;
+            _preloadedImages = items;
 
             IsBatchMode = true;
             TotalFilesCount = items.Count;
             CurrentFileIndex = startIndex + 1;
 
-            await LoadCurrentBatchItemAsync();
+            LoadCurrentBatchItem();
         }
 
-        private async Task LoadCurrentBatchItemAsync()
+        private void LoadCurrentBatchItem()
         {
-            if (_batchItems == null || _batchItems.Count == 0 || _loadDataFunc == null) return;
+            if (_preloadedImages == null || _preloadedImages.Count == 0) return;
 
-            LoadingWindow?.SetBatchIndex(CurrentFileIndex, TotalFilesCount);
-            LoadingWindow?.SetState(DiffLoadingState.BatchLoadingFile);
+            var currentItem = _preloadedImages[CurrentFileIndex - 1];
 
-            var currentItem = _batchItems[CurrentFileIndex - 1];
-
-            var (oldImage, newImage) = await _loadDataFunc(currentItem, _oldPbePath, _newPbePath);
-
-            LoadingWindow?.SetState(DiffLoadingState.BatchFormattingFile);
-
-            SetImageData(oldImage, newImage, currentItem.OldPath, currentItem.NewPath);
-
-            LoadingWindow?.SetState(DiffLoadingState.BatchFileReady);
+            SetImageData(currentItem.oldImage, currentItem.newImage, currentItem.oldPath, currentItem.newPath);
         }
 
-        private async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        private void BtnPrevFile_Click(object sender, RoutedEventArgs e)
         {
             if (CurrentFileIndex > 1)
             {
                 CurrentFileIndex--;
-                await LoadCurrentBatchItemAsync();
+                LoadCurrentBatchItem();
             }
         }
 
-        private async void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        private void BtnNextFile_Click(object sender, RoutedEventArgs e)
         {
             if (CurrentFileIndex < TotalFilesCount)
             {
                 CurrentFileIndex++;
-                await LoadCurrentBatchItemAsync();
+                LoadCurrentBatchItem();
             }
         }
 
@@ -394,11 +373,6 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnWindowClosed(object sender, EventArgs e)
         {
-            if (LoadingWindow != null)
-            {
-                LoadingWindow.Close();
-                LoadingWindow = null;
-            }
             OldImage.Source = null;
             NewImage.Source = null;
             OldImageOverlay.Source = null;

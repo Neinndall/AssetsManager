@@ -21,7 +21,6 @@ using AssetsManager.Services.Formatting;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
-using AssetsManager.Views.Dialogs;
 
 namespace AssetsManager.Views.Dialogs.Controls
 {
@@ -47,7 +46,6 @@ namespace AssetsManager.Views.Dialogs.Controls
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public JsonFormatterService JsonFormatterService { get; set; }
         public JsonDiffWindow ParentWindow { get; set; }
-        public LoadingDiffWindow LoadingWindow { get; set; }
         #endregion
 
         #region Constructor & Setup
@@ -272,17 +270,9 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void JumpToDeletion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Deleted);
         private void JumpToModification_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Modified);
 
-        public async Task LoadAndDisplayBatchDiffAsync(
-            List<AssetsManager.Views.Models.Wad.SerializableChunkDiff> items,
-            int startIndex,
-            string oldPbePath,
-            string newPbePath,
-            Func<AssetsManager.Views.Models.Wad.SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        public async Task LoadAndDisplayPreloadedBatchAsync(List<(string oldText, string newText, string oldPath, string newPath)> items, int startIndex)
         {
-            ViewModel.BatchItems = items;
-            ViewModel.OldPbePath = oldPbePath;
-            ViewModel.NewPbePath = newPbePath;
-            ViewModel.LoadDataFunc = loadDataFunc;
+            ViewModel.PreloadedData = items;
 
             ViewModel.IsBatchMode = true;
             ViewModel.TotalFilesCount = items.Count;
@@ -293,22 +283,13 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async Task LoadCurrentBatchItemAsync()
         {
-            if (ViewModel.BatchItems == null || ViewModel.BatchItems.Count == 0 || ViewModel.LoadDataFunc == null) return;
+            if (ViewModel.PreloadedData == null || ViewModel.PreloadedData.Count == 0) return;
 
-            LoadingWindow?.SetBatchIndex(ViewModel.CurrentFileIndex, ViewModel.TotalFilesCount);
-            LoadingWindow?.SetState(DiffLoadingState.BatchLoadingFile);
+            var currentItem = ViewModel.PreloadedData[ViewModel.CurrentFileIndex - 1];
 
-            var currentItem = ViewModel.BatchItems[ViewModel.CurrentFileIndex - 1];
-
-            var (oldText, newText) = await ViewModel.LoadDataFunc(currentItem, ViewModel.OldPbePath, ViewModel.NewPbePath);
-
-            LoadingWindow?.SetState(DiffLoadingState.BatchFormattingFile);
-
-            await LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
+            await LoadAndDisplayDiffAsync(currentItem.oldText, currentItem.newText, currentItem.oldPath, currentItem.newPath);
             FocusFirstDifference();
             RefreshGuidePosition();
-
-            LoadingWindow?.SetState(DiffLoadingState.BatchFileReady);
         }
         #endregion
 
@@ -450,14 +431,14 @@ namespace AssetsManager.Views.Dialogs.Controls
             PreviousDiffButton_Click(null, null);
         }
 
-        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
-        {
-            BtnNextFile_Click(null, null);
-        }
-
         private void PreviousFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
         {
             BtnPrevFile_Click(null, null);
+        }
+
+        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnNextFile_Click(null, null);
         }
         #endregion
 
