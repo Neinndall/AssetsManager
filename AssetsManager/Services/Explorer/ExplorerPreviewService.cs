@@ -46,6 +46,8 @@ namespace AssetsManager.Services.Explorer
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
 
+        private bool _wasPreviousContainer;
+
         public ExplorerPreviewService(
             LogService logService, 
             DirectoriesCreator directoriesCreator, 
@@ -82,6 +84,7 @@ namespace AssetsManager.Services.Explorer
                 // If we've already started browsing files, we DON'T reset. 
                 if (_viewModel.HasEverPreviewedAFile)
                 {
+                    _wasPreviousContainer = true;
                     return;
                 }
 
@@ -106,6 +109,17 @@ namespace AssetsManager.Services.Explorer
 
             // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
             _viewModel.PrepareSlotForFile(node);
+
+            // Step 1b: If transitioning from a container (grid/folder), hide old content immediately.
+            // This prevents the old preview from flashing when the grid hides and the preview panel
+            // becomes visible, while keeping old content as placeholder during file→file transitions.
+            if (_wasPreviousContainer)
+            {
+                _wasPreviousContainer = false;
+                _viewModel.IsContentVisible = true;
+                _viewModel.IsTextVisible = false;
+                _viewModel.IsWebVisible = false;
+            }
 
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
             // We only update/clear metadata if the current node is an image. 
