@@ -59,26 +59,19 @@ namespace AssetsManager.Services.Monitor
                 return new ArchiveResult(true, null);
             }
 
-            string comparisonKey = BuildComparisonKey(version, oldPbePath, newPbePath);
+            string comparisonKey = PathUtils.BuildComparisonKey(version, oldPbePath, newPbePath);
 
             await _archiveLock.WaitAsync();
             try
             {
-                // Re-check inside the lock: another caller may have just archived
-                // the same comparison while we were waiting.
-                // For legacy entries (no ComparisonKey persisted) we recompute it
-                // on the fly from their stored paths so they keep deduping correctly.
-                var existing = _appSettings.DiffHistory
-                    .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
-                                         && !string.IsNullOrEmpty(h.OldFilePath)
-                                         && !string.IsNullOrEmpty(h.NewFilePath)
-                                         && ResolveEntryKey(h) == comparisonKey);
+                // Re-check inside the lock: a background auto-archive and a
+                // manual Save click can race during the SaveBackupAsync I/O await.
+                string existingReferenceId = FindExistingReferenceId(comparisonKey);
 
-                if (existing != null)
+                if (existingReferenceId != null)
                 {
-                    _logService.Log($"Comparison already archived as {existing.ReferenceId}");
-                    BackfillComparisonKey(existing);
-                    return new ArchiveResult(true, existing.ReferenceId);
+                    _logService.Log($"Comparison already archived as {existingReferenceId}.");
+                    return new ArchiveResult(true, existingReferenceId);
                 }
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
@@ -104,34 +97,19 @@ namespace AssetsManager.Services.Monitor
                 return entry.ComparisonKey;
             }
 
-            return BuildComparisonKey(entry.Version, entry.OldFilePath, entry.NewFilePath);
+            return PathUtils.BuildComparisonKey(entry.Version, entry.OldFilePath, entry.NewFilePath);
         }
 
-        // Persists the computed key back to a legacy entry so future lookups
-        // can use the fast indexed path instead of recomputing each time.
-        private void BackfillComparisonKey(HistoryEntry entry)
+        // Returns the ReferenceId of the first history entry whose dedup key
+        // matches comparisonKey, or null if none matches.
+        private string FindExistingReferenceId(string comparisonKey)
         {
-            if (string.IsNullOrEmpty(entry.ComparisonKey)
-                && !string.IsNullOrEmpty(entry.OldFilePath)
-                && !string.IsNullOrEmpty(entry.NewFilePath))
-            {
-                entry.ComparisonKey = BuildComparisonKey(entry.Version, entry.OldFilePath, entry.NewFilePath);
-                _appSettings.Save();
-            }
-        }
-
-        /// <summary>
-        /// Builds the identity key used to deduplicate comparisons. Same version
-        /// of the same client, pointing at the same two source paths, is treated
-        /// as the same comparison regardless of session, time, or app restart.
-        /// </summary>
-        public static string BuildComparisonKey(string version, string oldPath, string newPath)
-        {
-            string normalizedVersion = string.IsNullOrWhiteSpace(version) ? "unknown" : version.Trim().ToLowerInvariant();
-            string normalizedOld = PathUtils.NormalizePhysicalPath(oldPath);
-            string normalizedNew = PathUtils.NormalizePhysicalPath(newPath);
-
-            return $"{normalizedVersion}|{normalizedOld}|{normalizedNew}";
+            return _appSettings.DiffHistory
+                .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
+                                     && !string.IsNullOrEmpty(h.OldFilePath)
+                                     && !string.IsNullOrEmpty(h.NewFilePath)
+                                     && ResolveEntryKey(h) == comparisonKey)
+                ?.ReferenceId;
         }
 
         private void RegisterInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version, string comparisonKey)

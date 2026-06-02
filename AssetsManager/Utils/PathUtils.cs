@@ -247,8 +247,9 @@ namespace AssetsManager.Utils
         /// <summary>
         /// Normalizes a physical file system path (e.g. "C:\Riot Games\League of Legends").
         /// Resolves "." / ".." segments, mixed separators, redundant slashes and the long-path
-        /// prefix via <see cref="Path.GetFullPath"/>, then lowercases and trims trailing separators
-        /// so two equivalent installation paths always produce the same key.
+        /// prefix via <see cref="Path.GetFullPath"/> (which on Windows returns the canonical
+        /// "\" separator), then lowercases and trims trailing separators so two equivalent
+        /// installation paths always produce the same key.
         /// </summary>
         public static string NormalizePhysicalPath(string path)
         {
@@ -257,11 +258,13 @@ namespace AssetsManager.Utils
             try
             {
                 string absolute = Path.GetFullPath(path);
-                return NormalizePath(absolute).TrimEnd('/');
+                return absolute.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                               .ToLowerInvariant();
             }
             catch
             {
-                return NormalizePath(path).TrimEnd('/');
+                return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                             .ToLowerInvariant();
             }
         }
 
@@ -271,6 +274,21 @@ namespace AssetsManager.Utils
         public static string ToVirtualPath(string path)
         {
             return NormalizePath(path).TrimStart('/');
+        }
+
+        /// <summary>
+        /// Builds the canonical identity key used to deduplicate WAD comparisons:
+        /// normalized Version + OldPath + NewPath. Returns null if paths are missing.
+        /// </summary>
+        public static string BuildComparisonKey(string version, string oldPath, string newPath)
+        {
+            if (string.IsNullOrWhiteSpace(oldPath) || string.IsNullOrWhiteSpace(newPath)) return null;
+
+            string normalizedVersion = string.IsNullOrWhiteSpace(version) ? "unknown" : version.Trim().ToLowerInvariant();
+            string normalizedOld = NormalizePhysicalPath(oldPath);
+            string normalizedNew = NormalizePhysicalPath(newPath);
+
+            return $"{normalizedVersion}|{normalizedOld}|{normalizedNew}";
         }
     }
 }

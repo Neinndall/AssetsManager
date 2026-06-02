@@ -108,7 +108,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     if (data != null)
                     {
                         var resultWindow = ServiceProvider.GetRequiredService<WadComparisonResultWindow>();
-                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path, selectedEntry.ReferenceId);
+                        resultWindow.Initialize(data.Diffs, data.OldLolPath, data.NewLolPath, path);
                         resultWindow.Owner = Window.GetWindow(this);
                         resultWindow.Show();
                     }

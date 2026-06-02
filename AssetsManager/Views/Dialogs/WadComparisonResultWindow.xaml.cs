@@ -40,7 +40,6 @@ namespace AssetsManager.Views.Dialogs
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath;
-        private string _assignedFolderName;
 
         private readonly WadComparisonResultModel _viewModel;
 
@@ -147,11 +146,10 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string assignedFolderName = null)
+        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
-            _assignedFolderName = assignedFolderName;
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -167,13 +165,12 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
         }
 
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string assignedFolderName = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
         {
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
-            _assignedFolderName = assignedFolderName;
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
@@ -332,20 +329,12 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                if (!string.IsNullOrEmpty(_assignedFolderName))
-                {
-                    _customMessageBoxService.ShowSuccess("Already Saved", $"This comparison is already stored in your history:\n{_assignedFolderName}", this);
-                    return;
-                }
-
                 _logService.Log("Starting comparison backup and asset packaging...");
                 string displayName = ResolveComparisonDisplayName();
                 string version = await _versionService.GetGameVersionAsync(_newPbePath);
 
                 var result = await _comparisonHistoryService.EnsureArchivedAsync(
                     _serializableDiffs, _oldPbePath, _newPbePath, version, displayName);
-
-                _assignedFolderName = result.ReferenceId;
 
                 if (result.AlreadyArchived)
                 {
