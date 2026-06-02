@@ -124,9 +124,9 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                _textEditorPreview.Clear();
-                // Note: WebView cleanup is handled inside SetPreviewerAsync 
-                // when the new media is ready to be injected.
+                // Keep old content visible until new data is ready in SetPreviewerAsync.
+                // This prevents both the blank ContentPanel flash (Dual View collapsing)
+                // and the empty TextEditor flash during async I/O + parsing.
                 _currentContentNode = node;
             }
 
@@ -302,6 +302,7 @@ namespace AssetsManager.Services.Explorer
                         if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
 
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = false;
                         _viewModel.IsWebVisible = true;
                         _activeContentPreviewer = Previewer.WebView;
@@ -313,6 +314,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsWebVisible = false;
                         _viewModel.IsTextVisible = true;
                         _textEditorPreview.Focus();
