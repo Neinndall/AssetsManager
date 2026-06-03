@@ -1,6 +1,10 @@
 AssetsManager - League of Legends | v4.0.1.0
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+  - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
+  - Explorer / Fixed image files incorrectly triggering dual view when selected from search filter results.
+  - Explorer / Fixed false error logs on normal debounce cancellation during rapid typing.
+  - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
     * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
   - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
@@ -86,6 +90,8 @@ Improvements
 
 Bug Fixes
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
+  - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.
+  - Explorer / Search filtering no longer logs false error messages when the user types rapidly (cancellation is now handled as expected behavior).
   - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
   - Fixed focus loss and unexpected minimization when closing comparison or settings windows.
   - Implemented image support for the difference viewer in Asset Watcher and History modules.

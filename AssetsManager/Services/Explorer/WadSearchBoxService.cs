@@ -140,6 +140,10 @@ namespace AssetsManager.Services.Explorer
 
                 return null; // Always return null during search to enforce manual navigation
             }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "An error occurred during search filtering.");
