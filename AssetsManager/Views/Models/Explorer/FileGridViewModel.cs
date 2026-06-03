@@ -89,10 +89,21 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
+        private readonly System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> _imageLoader;
+        private bool _isImageLoading = false;
+
         private ImageSource _imagePreview;
         public ImageSource ImagePreview
         {
-            get { return _imagePreview; }
+            get
+            {
+                if (_imagePreview == null && !_isImageLoading && _imageLoader != null)
+                {
+                    _isImageLoading = true;
+                    _ = LoadPreviewAsync();
+                }
+                return _imagePreview;
+            }
             set
             {
                 if (_imagePreview != value)
@@ -103,9 +114,26 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public FileGridViewModel(FileSystemNodeModel node)
+        private async System.Threading.Tasks.Task LoadPreviewAsync()
+        {
+            try
+            {
+                var image = await _imageLoader(Node);
+                if (image != null)
+                {
+                    ImagePreview = image;
+                }
+            }
+            catch
+            {
+                // Ignore loader errors silently
+            }
+        }
+
+        public FileGridViewModel(FileSystemNodeModel node, System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> imageLoader = null)
         {
             Node = node;
+            _imageLoader = imageLoader;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
