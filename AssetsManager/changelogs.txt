@@ -118,6 +118,8 @@ Bug Fixes
   - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
   - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
   - Diff Viewer / Batch comparison progress is now fully handled by the comparison engine with consistent loading states, matching the individual file experience.
+     - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
+   - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

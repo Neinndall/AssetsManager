@@ -973,6 +973,7 @@ namespace AssetsManager.Views.Controls.Explorer
                     containerNode = path[i];
                     break;
                 }
+
             }
 
             if (containerNode == null && path.Count > 0)
