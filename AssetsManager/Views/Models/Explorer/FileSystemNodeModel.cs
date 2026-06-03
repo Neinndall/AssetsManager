@@ -47,16 +47,24 @@ namespace AssetsManager.Views.Models.Explorer
             set => _virtualPath = value;
         }
 
+        private string _copyFullPath;
         public string CopyFullPath
         {
             get
             {
-                if (Parent != null)
+                if (_copyFullPath == null)
                 {
-                    var parentPath = Parent.CopyFullPath;
-                    return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                    if (Parent != null)
+                    {
+                        var parentPath = Parent.CopyFullPath;
+                        _copyFullPath = string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                    }
+                    else
+                    {
+                        _copyFullPath = Name;
+                    }
                 }
-                return Name;
+                return _copyFullPath;
             }
         }
 
@@ -141,42 +149,59 @@ namespace AssetsManager.Views.Models.Explorer
         }
         public bool IsGroupingFolder { get; set; }
 
+        private string _displayName;
         public string DisplayName
         {
             get
             {
-                if (Type == NodeType.WadFile)
+                if (_displayName == null)
                 {
-                    string lowerName = Name.ToLowerInvariant();
-                    if (lowerName.EndsWith(".wad.client"))
+                    if (Type == NodeType.WadFile)
                     {
-                        return Name.Substring(0, Name.Length - ".wad.client".Length);
+                        string lowerName = Name.ToLowerInvariant();
+                        if (lowerName.EndsWith(".wad.client"))
+                        {
+                            _displayName = Name.Substring(0, Name.Length - ".wad.client".Length);
+                        }
+                        else if (lowerName.EndsWith(".wad"))
+                        {
+                            _displayName = Name.Substring(0, Name.Length - ".wad".Length);
+                        }
+                        else
+                        {
+                            _displayName = Name;
+                        }
                     }
-                    else if (lowerName.EndsWith(".wad"))
+                    else
                     {
-                        return Name.Substring(0, Name.Length - ".wad".Length);
+                        _displayName = Name;
                     }
                 }
-                return Name;
+                return _displayName;
             }
         }
 
+        private string _breadcrumbDisplayName;
         public string BreadcrumbDisplayName
         {
             get
             {
-                var name = DisplayName;
-
-                int parenthesisIndex = name.LastIndexOf(" (");
-                if (parenthesisIndex > 0)
+                if (_breadcrumbDisplayName == null)
                 {
-                    string potentialNumber = name.Substring(parenthesisIndex + 2);
-                    if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
+                    var name = DisplayName;
+
+                    int parenthesisIndex = name.LastIndexOf(" (");
+                    if (parenthesisIndex > 0)
                     {
-                        name = name.Substring(0, parenthesisIndex).Trim();
+                        string potentialNumber = name.Substring(parenthesisIndex + 2);
+                        if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
+                        {
+                            name = name.Substring(0, parenthesisIndex).Trim();
+                        }
                     }
+                    _breadcrumbDisplayName = name;
                 }
-                return name;
+                return _breadcrumbDisplayName;
             }
         }
 
@@ -404,6 +429,8 @@ namespace AssetsManager.Views.Models.Explorer
             _sourceWadPath = null;
             BackupChunkPath = null;
             _virtualPath = null;
+            _copyFullPath = null;
+            _breadcrumbDisplayName = null;
             OldPath = null;
             Name = null;
 

@@ -46,6 +46,8 @@ namespace AssetsManager.Views.Models.Monitor
         private AssetStatus _status;
         private Brush _statusColor;
         private bool _hasChanges;
+        private string _cachedStatusText;
+        private string _cachedLastCheckedInfo;
 
         public string Alias
         {
@@ -86,16 +88,16 @@ namespace AssetsManager.Views.Models.Monitor
         public DateTime LastUpdated
         {
             get => _lastUpdated;
-            set { if (_lastUpdated != value) { _lastUpdated = value; OnPropertyChanged(); } }
+            set { if (_lastUpdated != value) { _lastUpdated = value; _cachedLastCheckedInfo = null; OnPropertyChanged(); UpdateStatusInfo(); } }
         }
 
         public AssetStatus Status
         {
             get => _status;
-            set { if (_status != value) { _status = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); UpdateStatusInfo(); } }
+            set { if (_status != value) { _status = value; _cachedStatusText = null; _cachedLastCheckedInfo = null; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); UpdateStatusInfo(); } }
         }
 
-        public string StatusText => GetStatusText();
+        public string StatusText => _cachedStatusText ??= GetStatusText();
 
         public Brush StatusColor
         {
@@ -109,7 +111,7 @@ namespace AssetsManager.Views.Models.Monitor
             set { if (_hasChanges != value) { _hasChanges = value; OnPropertyChanged(); } }
         }
 
-        public string LastCheckedInfo => $"Status: {GetStatusText()} | Last Update: {(_lastUpdated == DateTime.MinValue ? "N/A" : _lastUpdated.ToString("yyyy-MMM-dd HH:mm"))}";
+        public string LastCheckedInfo => _cachedLastCheckedInfo ??= $"Status: {GetStatusText()} | Last Update: {(_lastUpdated == DateTime.MinValue ? "N/A" : _lastUpdated.ToString("yyyy-MMM-dd HH:mm"))}";
 
         private string GetStatusText()
         {

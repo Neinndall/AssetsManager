@@ -19,12 +19,15 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isSelectedNodeContainer;
 
         private SerializableChunkDiff _renamedDiffDetails;
+        private bool _isRenamedInfoVisible;
+        private bool _isRenamedInfoVisibleComputed;
         public SerializableChunkDiff RenamedDiffDetails
         {
             get => _renamedDiffDetails;
             set 
             { 
                 _renamedDiffDetails = value; 
+                _isRenamedInfoVisibleComputed = false;
                 OnPropertyChanged(); 
                 OnPropertyChanged(nameof(IsRenamedInfoVisible));
             }
@@ -39,7 +42,18 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsNarrativeMetadataVisible => NarrativeMetadata != null;
 
-        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+        public bool IsRenamedInfoVisible
+        {
+            get
+            {
+                if (!_isRenamedInfoVisibleComputed)
+                {
+                    _isRenamedInfoVisibleComputed = true;
+                    _isRenamedInfoVisible = RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+                }
+                return _isRenamedInfoVisible;
+            }
+        }
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 

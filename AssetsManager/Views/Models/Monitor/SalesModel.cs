@@ -21,9 +21,10 @@ namespace AssetsManager.Views.Models.Monitor
         public string SubInventoryType { get; set; }
 
         [JsonPropertyName("rp")]
-        public int? Rp { get; set; } // This is the original price RP
+        public int? Rp { get; set; }
 
-        public string FormattedOriginalPrice => Rp.HasValue ? $"Original Price: {Rp.Value} RP" : "Original Price: N/A";
+        private string _formattedOriginalPrice;
+        public string FormattedOriginalPrice => _formattedOriginalPrice ??= Rp.HasValue ? $"Original Price: {Rp.Value} RP" : "Original Price: N/A";
 
         [JsonPropertyName("ip")]
         public int? Ip { get; set; }
@@ -67,7 +68,10 @@ namespace AssetsManager.Views.Models.Monitor
         [JsonPropertyName("endDate")]
         public DateTime EndDateValue { get; set; }
 
-        public string FormattedEndDate => FormatUtils.FormatTimeRemaining(EndDateValue);
-        public string FormattedSaleDetails => $"Sale: {Rp} RP ({PercentOff}% dto)";
+        private string _formattedEndDate;
+        public string FormattedEndDate => _formattedEndDate ??= FormatUtils.FormatTimeRemaining(EndDateValue);
+
+        private string _formattedSaleDetails;
+        public string FormattedSaleDetails => _formattedSaleDetails ??= $"Sale: {Rp} RP ({PercentOff}% dto)";
     }
 }

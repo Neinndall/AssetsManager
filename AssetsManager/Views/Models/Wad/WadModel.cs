@@ -75,30 +75,46 @@ namespace AssetsManager.Views.Models.Wad
         public string Path => NewPath ?? OldPath;
 
         [JsonIgnore]
-        public string FileName => System.IO.Path.GetFileName(Path);
+        private string _fileName;
+        [JsonIgnore]
+        public string FileName => _fileName ?? (_fileName = System.IO.Path.GetFileName(Path));
 
+        [JsonIgnore]
+        private string _displayPath;
         [JsonIgnore]
         public string DisplayPath
         {
             get
             {
-                string dir = System.IO.Path.GetDirectoryName(Path);
-                return string.IsNullOrEmpty(dir) ? "N/A" : dir;
+                if (_displayPath == null)
+                {
+                    string dir = System.IO.Path.GetDirectoryName(Path);
+                    _displayPath = string.IsNullOrEmpty(dir) ? "N/A" : dir;
+                }
+                return _displayPath;
             }
         }
 
         [JsonIgnore]
-        public string OldSizeString => OldUncompressedSize.HasValue ? FormatUtils.FormatSize((long)OldUncompressedSize.Value) : "N/A";
+        private string _oldSizeString;
+        [JsonIgnore]
+        public string OldSizeString => _oldSizeString ??= OldUncompressedSize.HasValue ? FormatUtils.FormatSize((long)OldUncompressedSize.Value) : "N/A";
         
         [JsonIgnore]
-        public string NewSizeString => NewUncompressedSize.HasValue ? FormatUtils.FormatSize((long)NewUncompressedSize.Value) : "N/A";
+        private string _newSizeString;
+        [JsonIgnore]
+        public string NewSizeString => _newSizeString ??= NewUncompressedSize.HasValue ? FormatUtils.FormatSize((long)NewUncompressedSize.Value) : "N/A";
 
+        [JsonIgnore]
+        private string _sizeDifferenceString;
         [JsonIgnore]
         public string SizeDifferenceString
         {
             get
             {
-                if (Type == ChunkDiffType.Dependency) return "N/A";
+                if (_sizeDifferenceString != null) return _sizeDifferenceString;
+
+                if (Type == ChunkDiffType.Dependency) { _sizeDifferenceString = "N/A"; return _sizeDifferenceString; }
 
                 long diff = Type switch
                 {
@@ -111,11 +127,12 @@ namespace AssetsManager.Views.Models.Wad
 
                 if (diff == 0)
                 {
-                    if (Type == ChunkDiffType.Modified || Type == ChunkDiffType.Renamed) return "±0 B";
-                    return "0 B";
+                    _sizeDifferenceString = (Type == ChunkDiffType.Modified || Type == ChunkDiffType.Renamed) ? "±0 B" : "0 B";
+                    return _sizeDifferenceString;
                 }
                 
-                return (diff > 0 ? "+" : "-") + FormatUtils.FormatSize(Math.Abs(diff));
+                _sizeDifferenceString = (diff > 0 ? "+" : "-") + FormatUtils.FormatSize(Math.Abs(diff));
+                return _sizeDifferenceString;
             }
         }
 

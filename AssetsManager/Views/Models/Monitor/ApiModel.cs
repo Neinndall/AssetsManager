@@ -60,13 +60,20 @@ namespace AssetsManager.Views.Models.Monitor
 
         public ObservableRangeCollection<PassRewardModel> PassRewards { get; }
 
-        // Computed properties for display
-        public string RegionText => $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
-        public string PlatformText => $"Platform: {_apiSettings?.Token?.Platform ?? "N/A"}";
-        public string SummonerIdText => $"Summoner ID: {(_apiSettings?.Token?.SummonerId > 0 ? _apiSettings.Token.SummonerId.ToString() : "N/A")}";
-        public string PuuidText => $"PUUID: {_apiSettings?.Token?.Puuid ?? "N/A"}";
-        public string IssuedAtText => $"Issued: {(_apiSettings?.Token?.IssuedAt > DateTime.MinValue ? _apiSettings.Token.IssuedAt.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
-        public string ExpirationText => $"Expires: {(_apiSettings?.Token?.Expiration > DateTime.MinValue ? _apiSettings.Token.Expiration.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
+        // Computed properties for display (cached, invalidated by Update)
+        private string _regionText;
+        private string _platformText;
+        private string _summonerIdText;
+        private string _puuidText;
+        private string _issuedAtText;
+        private string _expirationText;
+
+        public string RegionText => _regionText ??= $"Region: {_apiSettings?.Token?.Region ?? "N/A"}";
+        public string PlatformText => _platformText ??= $"Platform: {_apiSettings?.Token?.Platform ?? "N/A"}";
+        public string SummonerIdText => _summonerIdText ??= $"Summoner ID: {(_apiSettings?.Token?.SummonerId > 0 ? _apiSettings.Token.SummonerId.ToString() : "N/A")}";
+        public string PuuidText => _puuidText ??= $"PUUID: {_apiSettings?.Token?.Puuid ?? "N/A"}";
+        public string IssuedAtText => _issuedAtText ??= $"Issued: {(_apiSettings?.Token?.IssuedAt > DateTime.MinValue ? _apiSettings.Token.IssuedAt.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
+        public string ExpirationText => _expirationText ??= $"Expires: {(_apiSettings?.Token?.Expiration > DateTime.MinValue ? _apiSettings.Token.Expiration.ToLocalTime().ToString("HH:mm:ss") : "N/A")}";
 
         public ApiModel()
         {
@@ -107,6 +114,12 @@ namespace AssetsManager.Views.Models.Monitor
         public void Update(AppSettings appSettings)
         {
             _apiSettings = appSettings?.ApiSettings;
+            _regionText = null;
+            _platformText = null;
+            _summonerIdText = null;
+            _puuidText = null;
+            _issuedAtText = null;
+            _expirationText = null;
             // Notify that all computed properties may have changed
             OnPropertyChanged(nameof(RegionText));
             OnPropertyChanged(nameof(PlatformText));

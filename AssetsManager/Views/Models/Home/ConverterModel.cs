@@ -74,13 +74,17 @@ namespace AssetsManager.Views.Models.Home
             set { _isProcessing = value; OnPropertyChanged(); }
         }
 
-        public bool HasImages => Items.Any(i => i.FileType == ConverterFileType.Image);
-        public bool HasAudio => Items.Any(i => i.FileType == ConverterFileType.Audio);
+        private bool? _hasImages;
+        private bool? _hasAudio;
+        public bool HasImages => _hasImages ??= Items.Any(i => i.FileType == ConverterFileType.Image);
+        public bool HasAudio => _hasAudio ??= Items.Any(i => i.FileType == ConverterFileType.Audio);
 
         public ConverterModel()
         {
             Items.CollectionChanged += (s, e) => 
             {
+                _hasImages = null;
+                _hasAudio = null;
                 OnPropertyChanged(nameof(HasImages));
                 OnPropertyChanged(nameof(HasAudio));
             };

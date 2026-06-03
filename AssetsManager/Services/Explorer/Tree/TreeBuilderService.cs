@@ -102,10 +102,15 @@ namespace AssetsManager.Services.Explorer.Tree
                 return; // Errors are logged by the service
             }
 
-            // Read other file data from the WAD.
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+            // Read other file data from the WAD in parallel (3 independent I/O operations).
+            var eventsTask = linkedBank.EventsBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : Task.FromResult<byte[]>(null);
+            var wpkTask = linkedBank.WpkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : Task.FromResult<byte[]>(null);
+            var audioBnkTask = linkedBank.AudioBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : Task.FromResult<byte[]>(null);
+
+            await Task.WhenAll(eventsTask, wpkTask, audioBnkTask);
+            var eventsData = eventsTask.Result;
+            byte[] wpkData = wpkTask.Result;
+            byte[] audioBnkFileData = audioBnkTask.Result;
 
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)

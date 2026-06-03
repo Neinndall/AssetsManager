@@ -9,13 +9,12 @@ namespace AssetsManager.Views.Models.Help
 {
     public class AboutModel : INotifyPropertyChanged
     {
-        // Technical Identity Properties
+        private static Brush _cachedBuildBrush;
         public string ApplicationVersion => ApplicationInfos.Version;
         public string BuildType => ApplicationInfos.BuildType;
         public MaterialIconKind BuildIcon => ApplicationInfos.BuildIcon;
 
-        // Visual properties resolved from ResourceDictionary
-        public Brush BuildBrush => Application.Current.FindResource(ApplicationInfos.BuildColorKey) as Brush;
+        public Brush BuildBrush => _cachedBuildBrush ??= Application.Current.FindResource(ApplicationInfos.BuildColorKey) as Brush;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string name = null)

@@ -126,16 +126,17 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int CurrentFileIndex
         {
             get => _currentFileIndex;
-            set { _currentFileIndex = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
+            set { _currentFileIndex = value; _totalFilesCountString = null; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
 
         public int TotalFilesCount
         {
             get => _totalFilesCount;
-            set { _totalFilesCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
+            set { _totalFilesCount = value; _totalFilesCountString = null; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
 
-        public string TotalFilesCountString => $"{_currentFileIndex} / {_totalFilesCount}";
+        private string _totalFilesCountString;
+        public string TotalFilesCountString => _totalFilesCountString ??= $"{_currentFileIndex} / {_totalFilesCount}";
 
         // Preloaded batch data
         public List<(string oldText, string newText, string oldPath, string newPath)> PreloadedData { get; set; }

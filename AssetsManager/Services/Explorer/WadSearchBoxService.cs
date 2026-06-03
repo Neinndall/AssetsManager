@@ -350,7 +350,11 @@ namespace AssetsManager.Services.Explorer
                         }
                     }
                 }
-                catch (Exception) { }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "An error occurred during background search reset.");
+                }
             }, cancellationToken);
         }
 
@@ -395,27 +399,32 @@ namespace AssetsManager.Services.Explorer
             path = path.Replace("\\", "/").Trim('/');
             if (string.IsNullOrEmpty(path)) return null;
             string[] pathComponents = path.Split('/');
-            return await FindNodeByPathSuffixAsync(rootNodes, pathComponents);
+            return await FindNodeByPathSuffixAsync(rootNodes, pathComponents, 0);
         }
 
-        private async Task<FileSystemNodeModel> FindNodeByPathSuffixAsync(IEnumerable<FileSystemNodeModel> nodes, string[] pathSuffix)
+        private async Task<FileSystemNodeModel> FindNodeByPathSuffixAsync(IEnumerable<FileSystemNodeModel> nodes, string[] pathSuffix, int suffixIndex)
         {
             if (nodes == null) return null;
             foreach (var node in nodes)
             {
-                bool isMatch = node.Name.Equals(pathSuffix[0], StringComparison.OrdinalIgnoreCase);
-                if (pathSuffix.Length == 1 && node.Name.StartsWith(pathSuffix[0], StringComparison.OrdinalIgnoreCase)) return node;
+                bool isMatch = node.Name.Equals(pathSuffix[suffixIndex], StringComparison.OrdinalIgnoreCase);
 
-                var children = node.LoadedChildren;
-                if (isMatch && pathSuffix.Length > 1 && children != null)
+                if (isMatch)
                 {
-                    var foundInDescendant = await FindNodeByPathSuffixAsync(children, pathSuffix.Skip(1).ToArray());
-                    if (foundInDescendant != null) return foundInDescendant;
+                    if (suffixIndex == pathSuffix.Length - 1) return node;
+
+                    var children = node.LoadedChildren;
+                    if (children != null)
+                    {
+                        var foundInDescendant = await FindNodeByPathSuffixAsync(children, pathSuffix, suffixIndex + 1);
+                        if (foundInDescendant != null) return foundInDescendant;
+                    }
                 }
 
-                if (children != null && children.Any())
+                var childrenFallback = node.LoadedChildren;
+                if (childrenFallback != null && childrenFallback.Any())
                 {
-                    var foundDeeper = await FindNodeByPathSuffixAsync(children, pathSuffix);
+                    var foundDeeper = await FindNodeByPathSuffixAsync(childrenFallback, pathSuffix, suffixIndex);
                     if (foundDeeper != null) return foundDeeper;
                 }
             }

@@ -163,7 +163,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         public string BuildType => ApplicationInfos.BuildType;
         public string BuildChannel => ApplicationInfos.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
-        public string BuildSha => ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
+        private static string _cachedBuildSha;
+        public string BuildSha => _cachedBuildSha ??= ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
 
         private Brush _appVersionColor;
         public Brush AppVersionColor

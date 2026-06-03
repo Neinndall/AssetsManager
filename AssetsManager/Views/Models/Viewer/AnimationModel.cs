@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (SetField(ref _currentTime, value))
                 {
+                    _cachedProgressText = null;
                     OnPropertyChanged(nameof(ProgressText));
                 }
             }
@@ -35,7 +36,7 @@ namespace AssetsManager.Views.Models.Viewer
         public double TotalDuration
         {
             get => _totalDuration;
-            set => SetField(ref _totalDuration, value);
+            set { _cachedProgressText = null; SetField(ref _totalDuration, value); }
         }
 
         private double _speed = 1.0;
@@ -45,32 +46,34 @@ namespace AssetsManager.Views.Models.Viewer
             set => SetField(ref _speed, value);
         }
 
+        private string _cachedProgressText;
         public string ProgressText
         {
             get
             {
+                if (_cachedProgressText != null) return _cachedProgressText;
+
                 try
                 {
-                    // Use the comprehensive checks from the "robust" version
                     if (double.IsNaN(TotalDuration) || double.IsInfinity(TotalDuration) || TotalDuration <= 0 ||
                         double.IsNaN(CurrentTime) || double.IsInfinity(CurrentTime))
                     {
-                        return "--:-- / --:--";
+                        _cachedProgressText = "--:-- / --:--";
+                        return _cachedProgressText;
                     }
 
-                    // Clamp CurrentTime to be within the valid duration
                     var clampedCurrentTime = Math.Max(0, Math.Min(CurrentTime, TotalDuration));
 
-                    // Use a simpler format "ss.ffff" with an invariant culture to force "." as separator
                     var totalStr = TotalDuration.ToString("0.0000", CultureInfo.InvariantCulture);
                     var currentStr = clampedCurrentTime.ToString("0.0000", CultureInfo.InvariantCulture);
 
-                    return $"{currentStr} / {totalStr}";
+                    _cachedProgressText = $"{currentStr} / {totalStr}";
+                    return _cachedProgressText;
                 }
                 catch (Exception)
                 {
-                    // This catch is still a good safeguard, just in case.
-                    return "Error";
+                    _cachedProgressText = "Error";
+                    return _cachedProgressText;
                 }
             }
         }

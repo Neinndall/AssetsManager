@@ -72,27 +72,48 @@ namespace AssetsManager.Views.Models.Dialogs
         public string ParentBuildSha { get; set; }
         public bool HasInheritedBuild => DownloadableAsset == null && ParentBuildAsset != null;
         public bool IsLatest { get; set; }
-        public string ShortSha => Sha?.Substring(0, 7) ?? "";
 
-        // UI Helpers for segmented messages
-        public string MessageSummary => Commit?.Message?.Split('\n').FirstOrDefault()?.Trim() ?? string.Empty;
+        private string _shortSha;
+        public string ShortSha => _shortSha ?? (_shortSha = Sha?.Substring(0, 7) ?? "");
+
+        private string _messageSummary;
+        public string MessageSummary => _messageSummary ?? (_messageSummary = Commit?.Message?.Split('\n').FirstOrDefault()?.Trim() ?? string.Empty);
+
+        private string _messageBody;
+        private bool _messageBodyComputed;
         public string MessageBody
         {
             get
             {
-                if (string.IsNullOrEmpty(Commit?.Message)) return string.Empty;
-                var lines = Commit.Message.Split('\n');
-                if (lines.Length <= 1) return string.Empty;
-
-                // Trim each line individually to remove indentation and filter empty lines
-                var trimmedLines = lines.Skip(1)
-                                        .Select(l => l.Trim())
-                                        .Where(l => !string.IsNullOrEmpty(l));
-
-                return string.Join(Environment.NewLine, trimmedLines);
+                if (!_messageBodyComputed)
+                {
+                    _messageBodyComputed = true;
+                    if (string.IsNullOrEmpty(Commit?.Message))
+                    {
+                        _messageBody = string.Empty;
+                    }
+                    else
+                    {
+                        var lines = Commit.Message.Split('\n');
+                        if (lines.Length <= 1)
+                        {
+                            _messageBody = string.Empty;
+                        }
+                        else
+                        {
+                            var trimmedLines = lines.Skip(1)
+                                                    .Select(l => l.Trim())
+                                                    .Where(l => !string.IsNullOrEmpty(l));
+                            _messageBody = string.Join(Environment.NewLine, trimmedLines);
+                        }
+                    }
+                }
+                return _messageBody;
             }
         }
-        public bool HasDescription => !string.IsNullOrEmpty(MessageBody);
+
+        private bool? _hasDescription;
+        public bool HasDescription => _hasDescription ??= !string.IsNullOrEmpty(MessageBody);
     }
 
     public class CommitInfo

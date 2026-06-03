@@ -24,6 +24,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_selectedCount != value)
                 {
                     _selectedCount = value;
+                    _selectedCountDisplay = null;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsActionBarVisible));
                     OnPropertyChanged(nameof(SelectedCountDisplay));
@@ -32,7 +33,8 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         public bool IsActionBarVisible => SelectedCount > 1;
-        public string SelectedCountDisplay => $"{SelectedCount} items selected";
+        private string _selectedCountDisplay;
+        public string SelectedCountDisplay => _selectedCountDisplay ??= $"{SelectedCount} items selected";
 
         private string _currentFilter = "All";
         public string CurrentFilter
@@ -56,9 +58,11 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsFolder => Node.Type == NodeType.VirtualDirectory || Node.Type == NodeType.RealDirectory || Node.Type == NodeType.WadFile || Node.Type == NodeType.SoundBank || Node.Type == NodeType.AudioEvent;
 
-        public string FileExtensionDisplay => IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper());
+        private string _fileExtensionDisplay;
+        public string FileExtensionDisplay => _fileExtensionDisplay ?? (_fileExtensionDisplay = IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper()));
 
-        public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
+        private string _displayNameShort;
+        public string DisplayNameShort => _displayNameShort ?? (_displayNameShort = PathUtils.TruncateForDisplay(Node.DisplayName, 50));
 
         private string _subfolderCount;
         public string SubfolderCount => _subfolderCount ?? (_subfolderCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());

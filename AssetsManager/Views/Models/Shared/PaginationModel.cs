@@ -48,6 +48,7 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _totalPages, value))
                 {
+                    _pageInfo = null;
                     OnPropertyChanged(nameof(CanGoToNextPage));
                     OnPropertyChanged(nameof(CanGoToPreviousPage));
                     OnPropertyChanged(nameof(PageInfo));
@@ -57,7 +58,8 @@ namespace AssetsManager.Views.Models.Shared
 
         public bool CanGoToPreviousPage => CurrentPage > 1;
         public bool CanGoToNextPage => CurrentPage < TotalPages;
-        public string PageInfo => $"Page {CurrentPage} / {TotalPages}";
+        private string _pageInfo;
+        public string PageInfo => _pageInfo ??= $"Page {CurrentPage} / {TotalPages}";
 
         public void SetFullList(IEnumerable<T> fullList)
         {
