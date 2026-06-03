@@ -51,4 +51,38 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Modern Rounded ProgressBar without animation delay (Instant response) -->
+    <Style x:Key="InstantProgressBar" TargetType="ProgressBar">
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="TemplateRoot" SnapsToDevicePixels="true">
+                        <Border x:Name="Track" 
+                                CornerRadius="4" 
+                                Background="{TemplateBinding Background}"/>
+                        <Border CornerRadius="4" ClipToBounds="True">
+                            <Grid x:Name="PART_Track" Background="Transparent">
+                                <Border x:Name="PART_Indicator" 
+                                        Background="{TemplateBinding Foreground}"
+                                        CornerRadius="4"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Stretch"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsIndeterminate" Value="true">
+                            <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>
