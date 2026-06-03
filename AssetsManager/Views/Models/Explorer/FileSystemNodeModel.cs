@@ -48,24 +48,16 @@ namespace AssetsManager.Views.Models.Explorer
             set => _virtualPath = value;
         }
 
-        private string _copyFullPath;
         public string CopyFullPath
         {
             get
             {
-                if (_copyFullPath == null)
+                if (Parent != null)
                 {
-                    if (Parent != null)
-                    {
-                        var parentPath = Parent.CopyFullPath;
-                        _copyFullPath = string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
-                    }
-                    else
-                    {
-                        _copyFullPath = Name;
-                    }
+                    var parentPath = Parent.CopyFullPath;
+                    return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
                 }
-                return _copyFullPath;
+                return Name;
             }
         }
 
@@ -130,79 +122,57 @@ namespace AssetsManager.Views.Models.Explorer
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
-        private string _extension;
         public string Extension
         {
             get
             {
-                if (_extension == null)
-                {
-                    if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
-                        _extension = "";
-                    else
-                    {
-                        string path = VirtualPath;
-                        _extension = string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
-                    }
-                }
-                return _extension;
+                if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
+                    return "";
+
+                string path = VirtualPath;
+                return string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
             }
         }
         public bool IsGroupingFolder { get; set; }
 
-        private string _displayName;
         public string DisplayName
         {
             get
             {
-                if (_displayName == null)
+                if (Type == NodeType.WadFile)
                 {
-                    if (Type == NodeType.WadFile)
+                    if (string.IsNullOrEmpty(Name)) return string.Empty;
+                    string lowerName = Name.ToLowerInvariant();
+                    if (lowerName.EndsWith(".wad.client"))
                     {
-                        string lowerName = Name.ToLowerInvariant();
-                        if (lowerName.EndsWith(".wad.client"))
-                        {
-                            _displayName = Name.Substring(0, Name.Length - ".wad.client".Length);
-                        }
-                        else if (lowerName.EndsWith(".wad"))
-                        {
-                            _displayName = Name.Substring(0, Name.Length - ".wad".Length);
-                        }
-                        else
-                        {
-                            _displayName = Name;
-                        }
+                        return Name.Substring(0, Name.Length - ".wad.client".Length);
                     }
-                    else
+                    else if (lowerName.EndsWith(".wad"))
                     {
-                        _displayName = Name;
+                        return Name.Substring(0, Name.Length - ".wad".Length);
                     }
                 }
-                return _displayName;
+                return Name;
             }
         }
 
-        private string _breadcrumbDisplayName;
         public string BreadcrumbDisplayName
         {
             get
             {
-                if (_breadcrumbDisplayName == null)
-                {
-                    var name = DisplayName;
+                var name = DisplayName;
+                if (string.IsNullOrEmpty(name)) return string.Empty;
 
-                    int parenthesisIndex = name.LastIndexOf(" (");
-                    if (parenthesisIndex > 0)
+                int parenthesisIndex = name.LastIndexOf(" (");
+                if (parenthesisIndex > 0)
+                {
+                    string potentialNumber = name.Substring(parenthesisIndex + 2);
+                    if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
                     {
-                        string potentialNumber = name.Substring(parenthesisIndex + 2);
-                        if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
-                        {
-                            name = name.Substring(0, parenthesisIndex).Trim();
-                        }
+                        return name.Substring(0, parenthesisIndex).Trim();
                     }
-                    _breadcrumbDisplayName = name;
                 }
-                return _breadcrumbDisplayName;
+                return name;
             }
         }
 
@@ -430,8 +400,6 @@ namespace AssetsManager.Views.Models.Explorer
             _sourceWadPath = null;
             BackupChunkPath = null;
             _virtualPath = null;
-            _copyFullPath = null;
-            _breadcrumbDisplayName = null;
             OldPath = null;
             Name = null;
 
