@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.IO;
 using AssetsManager.Services.Hashes;
 using System.Linq;
-using Serilog;
 using System.Threading;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
@@ -238,8 +236,8 @@ namespace AssetsManager.Services.Comparator
         {
             var diffs = new List<ChunkDiff>();
 
-            var oldChunks = oldWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
-            var newChunks = newWad.Chunks.ToDictionary(c => c.Key, c => c.Value);
+            var oldChunks = oldWad.Chunks;
+            var newChunks = newWad.Chunks;
 
             foreach (var oldChunk in oldChunks.Values)
             {
@@ -328,22 +326,6 @@ namespace AssetsManager.Services.Comparator
             {
                 NotifyComparisonProgressChanged(completed, statusMsg, true, null);
             }
-        }
-
-        private async Task<Dictionary<ulong, ulong>> GetChunkChecksumsAsync(IEnumerable<WadChunk> chunks, CancellationToken cancellationToken, string statusMsg)
-        {
-            var checksums = new Dictionary<ulong, ulong>();
-            // This method is now unused by CollectDiffsAsync but kept for compatibility if needed.
-            await Task.Run(() =>
-            {
-                foreach (var chunk in chunks)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    checksums[chunk.PathHash] = chunk.Checksum;
-                    ReportProgress(statusMsg);
-                }
-            });
-            return checksums;
         }
 
     }

@@ -70,7 +70,8 @@ namespace AssetsManager.Services.Monitor
 
                 if (existingReferenceId != null)
                 {
-                    _logService.Log($"Comparison already archived as {existingReferenceId}.");
+                    string archivePath = Path.Combine(_directoriesCreator.WadComparisonSavePath, existingReferenceId);
+                    _logService.LogInteractiveInfo("Comparison already archived as", archivePath, $"{existingReferenceId}.");
                     return new ArchiveResult(true, existingReferenceId);
                 }
 
