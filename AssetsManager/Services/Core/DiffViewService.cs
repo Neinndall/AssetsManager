@@ -120,6 +120,9 @@ namespace AssetsManager.Services.Core
                         loadingWindow.SetState(DiffLoadingState.BatchFileReady);
                     }
 
+                    // Force a render pass to ensure progress bar paints 100% before displaying the new window
+                    await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+
                     var imageDiffWindow = new ImageDiffWindow();
                     imageDiffWindow.Owner = owner;
                     imageDiffWindow.LoadingWindow = loadingWindow;
@@ -151,6 +154,9 @@ namespace AssetsManager.Services.Core
                         preparedData.Add((oldText, newText, oldPath ?? diff.OldPath, newPath ?? diff.NewPath));
                         loadingWindow.SetState(DiffLoadingState.BatchFileReady);
                     }
+
+                    // Force a render pass to ensure progress bar paints 100% before displaying the new window
+                    await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
                     var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                     diffWindow.Owner = owner;
