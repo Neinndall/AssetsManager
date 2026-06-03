@@ -1,12 +1,13 @@
 using System;
 using System.Collections;
-using System.Linq;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Helpers
 {
@@ -146,20 +147,19 @@ namespace AssetsManager.Views.Helpers
 
         private static bool GetIsMultiSelected(object dc)
         {
-            if (dc == null) return false;
-            var prop = dc.GetType().GetProperty("IsMultiSelected");
-            return prop != null && (bool)prop.GetValue(dc);
+            if (dc is FileSystemNodeModel fsm) return fsm.IsMultiSelected;
+            if (dc is WadGroupViewModel wgv) return wgv.IsMultiSelected;
+            if (dc is DiffTypeGroupViewModel dtgv) return dtgv.IsMultiSelected;
+            if (dc is SerializableChunkDiff scd) return scd.IsMultiSelected;
+            return false;
         }
 
         private static bool SetIsMultiSelected(object dc, bool value)
         {
-            if (dc == null) return false;
-            var prop = dc.GetType().GetProperty("IsMultiSelected");
-            if (prop != null && prop.CanWrite)
-            {
-                prop.SetValue(dc, value);
-                return true;
-            }
+            if (dc is FileSystemNodeModel fsm) { fsm.IsMultiSelected = value; return true; }
+            if (dc is WadGroupViewModel wgv) { wgv.IsMultiSelected = value; return true; }
+            if (dc is DiffTypeGroupViewModel dtgv) { dtgv.IsMultiSelected = value; return true; }
+            if (dc is SerializableChunkDiff scd) { scd.IsMultiSelected = value; return true; }
             return false;
         }
 
@@ -169,19 +169,25 @@ namespace AssetsManager.Views.Helpers
             foreach (var node in nodes)
             {
                 if (node == null) continue;
-                var type = node.GetType();
-                var multiProp = type.GetProperty("IsMultiSelected");
-                if (multiProp != null && (bool)multiProp.GetValue(node)) multiProp.SetValue(node, false);
 
-                var childrenNames = new[] { "Children", "Types", "Diffs" };
-                foreach (var name in childrenNames)
+                if (node is FileSystemNodeModel fsm)
                 {
-                    var childProp = type.GetProperty(name);
-                    if (childProp != null && typeof(IEnumerable).IsAssignableFrom(childProp.PropertyType))
-                    {
-                        if (childProp.GetValue(node) is IEnumerable children) ClearAllMultiSelected(children);
-                        break;
-                    }
+                    if (fsm.IsMultiSelected) fsm.IsMultiSelected = false;
+                    if (fsm.HasLoadedChildren) ClearAllMultiSelected(fsm.Children);
+                }
+                else if (node is WadGroupViewModel wgv)
+                {
+                    if (wgv.IsMultiSelected) wgv.IsMultiSelected = false;
+                    if (wgv.Types != null) ClearAllMultiSelected(wgv.Types);
+                }
+                else if (node is DiffTypeGroupViewModel dtgv)
+                {
+                    if (dtgv.IsMultiSelected) dtgv.IsMultiSelected = false;
+                    if (dtgv.Diffs != null) ClearAllMultiSelected(dtgv.Diffs);
+                }
+                else if (node is SerializableChunkDiff scd)
+                {
+                    if (scd.IsMultiSelected) scd.IsMultiSelected = false;
                 }
             }
         }
