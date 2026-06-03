@@ -117,7 +117,10 @@ namespace AssetsManager.Services.Explorer
             if (_isGridActive)
             {
                 _isGridActive = false;
-                _viewModel.IsContentVisible = true;
+                if (!isImage)
+                {
+                    _viewModel.IsContentVisible = true;
+                }
                 _viewModel.IsTextVisible = false;
                 _viewModel.IsWebVisible = false;
             }
