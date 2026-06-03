@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Threading.Tasks;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -15,7 +16,7 @@ namespace AssetsManager.Views.Models.Explorer
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
-    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
+    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, IMultiSelectable
     {
         private static readonly Dictionary<string, string> _wadPathPool = new(StringComparer.OrdinalIgnoreCase);
 

@@ -69,8 +69,22 @@ namespace AssetsManager.Views.Controls.Explorer
             if (_isUpdatingItemsSource) return;
 
             // Sync selection state to ViewModels for multi-select consistency
-            foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
-            foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
+            foreach (FileGridViewModel item in e.RemovedItems)
+            {
+                item.IsSelected = false;
+                item.IsMultiSelected = false;
+            }
+            foreach (FileGridViewModel item in e.AddedItems)
+            {
+                item.IsSelected = true;
+            }
+
+            // Sync IsMultiSelected if multiple items are selected OR if the user is using CTRL to select
+            bool isMulti = FileGridListBox.SelectedItems.Count > 1 || SelectionBehavior.IsMultiSelectIntent();
+            foreach (FileGridViewModel item in DisplayItems)
+            {
+                item.IsMultiSelected = isMulti && FileGridListBox.SelectedItems.Contains(item);
+            }
 
             if (ViewModel != null)
             {

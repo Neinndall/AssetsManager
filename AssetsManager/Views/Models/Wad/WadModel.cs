@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.Json.Serialization;
 using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -38,7 +39,7 @@ namespace AssetsManager.Views.Models.Wad
         public bool WasTopLevelDiff { get; set; }
     }
 
-    public class SerializableChunkDiff : INotifyPropertyChanged
+    public class SerializableChunkDiff : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;

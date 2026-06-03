@@ -97,17 +97,18 @@
                 <!-- Selection Overlay (Now at the top of the Z-stack) -->
                 <Border Grid.RowSpan="2" BorderThickness="1.5" CornerRadius="10" 
                         BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
-                        Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" 
                                             Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom" 
                                             Margin="0,0,12,12" 
-                                            Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                            Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
             </Grid>
         </Border>
     </DataTemplate>
 
     <!-- 1. Individual Card Container Style -->
     <Style x:Key="FileGridItemStyle" TargetType="ListBoxItem">
+        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>

@@ -96,18 +96,21 @@ namespace AssetsManager.Views.Helpers
             if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
 
             // 1. Lógica de Selección Múltiple (CTRL)
-            if (InteractionHelper.IsMultiSelectIntent())
+            if (IsMultiSelectIntent())
             {
-                bool current = GetIsMultiSelected(item.DataContext);
-                if (SetIsMultiSelected(item.DataContext, !current))
+                if (item is TreeViewItem)
                 {
-                    e.Handled = true;
-                    return;
+                    bool current = GetIsMultiSelected(item.DataContext);
+                    if (SetIsMultiSelected(item.DataContext, !current))
+                    {
+                        e.Handled = true;
+                        return;
+                    }
                 }
             }
 
             // 2. Lógica de Acción Primaria / Navegación
-            if (InteractionHelper.IsPrimaryActionIntent())
+            if (IsPrimaryActionIntent())
             {
                 // Limpiar selección múltiple en todo el árbol/lista
                 var rootControl = (ItemsControl)FindAncestor<TreeView>(item) ?? FindAncestor<ListBox>(item);
@@ -131,6 +134,16 @@ namespace AssetsManager.Views.Helpers
 
         #region Helpers
 
+        public static bool IsMultiSelectIntent()
+        {
+            return Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+        }
+
+        public static bool IsPrimaryActionIntent()
+        {
+            return !IsMultiSelectIntent();
+        }
+
         private static bool IsItemSelected(FrameworkElement container)
         {
             if (container is ListBoxItem lbi) return lbi.IsSelected;
@@ -147,19 +160,16 @@ namespace AssetsManager.Views.Helpers
 
         private static bool GetIsMultiSelected(object dc)
         {
-            if (dc is FileSystemNodeModel fsm) return fsm.IsMultiSelected;
-            if (dc is WadGroupViewModel wgv) return wgv.IsMultiSelected;
-            if (dc is DiffTypeGroupViewModel dtgv) return dtgv.IsMultiSelected;
-            if (dc is SerializableChunkDiff scd) return scd.IsMultiSelected;
-            return false;
+            return dc is IMultiSelectable ms && ms.IsMultiSelected;
         }
 
         private static bool SetIsMultiSelected(object dc, bool value)
         {
-            if (dc is FileSystemNodeModel fsm) { fsm.IsMultiSelected = value; return true; }
-            if (dc is WadGroupViewModel wgv) { wgv.IsMultiSelected = value; return true; }
-            if (dc is DiffTypeGroupViewModel dtgv) { dtgv.IsMultiSelected = value; return true; }
-            if (dc is SerializableChunkDiff scd) { scd.IsMultiSelected = value; return true; }
+            if (dc is IMultiSelectable ms)
+            {
+                ms.IsMultiSelected = value;
+                return true;
+            }
             return false;
         }
 
@@ -170,24 +180,22 @@ namespace AssetsManager.Views.Helpers
             {
                 if (node == null) continue;
 
-                if (node is FileSystemNodeModel fsm)
+                if (node is IMultiSelectable ms)
                 {
-                    if (fsm.IsMultiSelected) fsm.IsMultiSelected = false;
-                    if (fsm.HasLoadedChildren) ClearAllMultiSelected(fsm.Children);
+                    if (ms.IsMultiSelected) ms.IsMultiSelected = false;
                 }
-                else if (node is WadGroupViewModel wgv)
+
+                if (node is FileSystemNodeModel fsm && fsm.HasLoadedChildren)
                 {
-                    if (wgv.IsMultiSelected) wgv.IsMultiSelected = false;
-                    if (wgv.Types != null) ClearAllMultiSelected(wgv.Types);
+                    ClearAllMultiSelected(fsm.Children);
                 }
-                else if (node is DiffTypeGroupViewModel dtgv)
+                else if (node is WadGroupViewModel wgv && wgv.Types != null)
                 {
-                    if (dtgv.IsMultiSelected) dtgv.IsMultiSelected = false;
-                    if (dtgv.Diffs != null) ClearAllMultiSelected(dtgv.Diffs);
+                    ClearAllMultiSelected(wgv.Types);
                 }
-                else if (node is SerializableChunkDiff scd)
+                else if (node is DiffTypeGroupViewModel dtgv && dtgv.Diffs != null)
                 {
-                    if (scd.IsMultiSelected) scd.IsMultiSelected = false;
+                    ClearAllMultiSelected(dtgv.Diffs);
                 }
             }
         }

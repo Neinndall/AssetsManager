@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices; // Added for CallerMemberName
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
@@ -68,7 +69,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
     }
 
-    public class WadGroupViewModel : INotifyPropertyChanged
+    public class WadGroupViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
@@ -95,7 +96,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; } = new ObservableRangeCollection<DiffTypeGroupViewModel>();
     }
 
-    public class DiffTypeGroupViewModel : INotifyPropertyChanged
+    public class DiffTypeGroupViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;

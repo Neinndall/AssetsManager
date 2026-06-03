@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -52,7 +53,7 @@ namespace AssetsManager.Views.Models.Explorer
     /// <summary>
     /// Model for each individual item in the Grid
     /// </summary>
-    public class FileGridViewModel : INotifyPropertyChanged
+    public class FileGridViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public FileSystemNodeModel Node { get; private set; }
 
@@ -87,6 +88,19 @@ namespace AssetsManager.Views.Models.Explorer
         {
             get => _isSelected;
             set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
+        }
+
+        public bool IsMultiSelected
+        {
+            get => Node.IsMultiSelected;
+            set
+            {
+                if (Node.IsMultiSelected != value)
+                {
+                    Node.IsMultiSelected = value;
+                    OnPropertyChanged(nameof(IsMultiSelected));
+                }
+            }
         }
 
         private readonly System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> _imageLoader;
@@ -134,6 +148,19 @@ namespace AssetsManager.Views.Models.Explorer
         {
             Node = node;
             _imageLoader = imageLoader;
+
+            if (Node != null)
+            {
+                PropertyChangedEventManager.AddHandler(Node, Node_PropertyChanged, nameof(FileSystemNodeModel.IsMultiSelected));
+            }
+        }
+
+        private void Node_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FileSystemNodeModel.IsMultiSelected))
+            {
+                OnPropertyChanged(nameof(IsMultiSelected));
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
