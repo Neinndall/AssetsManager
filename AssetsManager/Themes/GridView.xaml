@@ -130,10 +130,10 @@
         
         <!-- Core Virtualization Settings (STABILIZED) -->
         <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True"/>
-        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Standard"/>
-        <Setter Property="VirtualizingPanel.CacheLength" Value="2,2"/>
-        <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Page"/>
-        <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel"/>
+        <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+        <Setter Property="VirtualizingPanel.CacheLength" Value="30,30"/>
+        <Setter Property="VirtualizingPanel.CacheLengthUnit" Value="Item"/>
+        <Setter Property="VirtualizingPanel.ScrollUnit" Value="Item"/>
         <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource FileGridItemStyle}"/>
         
