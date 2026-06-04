@@ -1123,8 +1123,11 @@
     </Style>
 
     <!-- [ViewerPanelControl.xaml, TreeViewStyles.xaml] Animated chevron for any collapsible parent.
-         Auto-rotates -90° (collapses to right) when the parent ToggleButton is unchecked.
-         Hover (over the parent ToggleButton) brightens the icon from TextSecondary to TextPrimary. -->
+         Base angle is -90° (chevron pointing right) so the initial state is correct without
+         depending on the DataTrigger's EnterActions. The DataTrigger animates to 0° (chevron
+         pointing down) when the parent ToggleButton becomes checked (expanded). This avoids a
+         visual lag where freshly generated TreeViewItem containers briefly render at the wrong
+         angle during folder expansion animations. -->
     <Style x:Key="AnimatedChevronStyle" TargetType="materialIcons:MaterialIcon">
         <Setter Property="Kind" Value="ChevronDown"/>
         <Setter Property="Width" Value="14"/>
@@ -1135,25 +1138,25 @@
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
         <Setter Property="RenderTransform">
             <Setter.Value>
-                <RotateTransform Angle="0"/>
+                <RotateTransform Angle="-90"/>
             </Setter.Value>
         </Setter>
         <Style.Triggers>
             <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=IsMouseOver}" Value="True">
                 <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
             </DataTrigger>
-            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=IsChecked}" Value="False">
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=IsChecked}" Value="True">
                 <DataTrigger.EnterActions>
                     <BeginStoryboard>
                         <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="-90" Duration="0:0:0.15"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="0" Duration="0:0:0.15" FillBehavior="HoldEnd"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </DataTrigger.EnterActions>
                 <DataTrigger.ExitActions>
                     <BeginStoryboard>
                         <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="0" Duration="0:0:0.15"/>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="-90" Duration="0:0:0.15" FillBehavior="HoldEnd"/>
                         </Storyboard>
                     </BeginStoryboard>
                 </DataTrigger.ExitActions>
