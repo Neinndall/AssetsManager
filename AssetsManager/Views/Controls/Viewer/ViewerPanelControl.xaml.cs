@@ -306,6 +306,46 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.SelectedModel == null) return;
+
+            // DataContext of the toggle is the SelectedAnimation (inherited from the panel Border).
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
+            {
+                _currentlyPlayingAnimation.IsPlaying = false;
+            }
+
+            _currentlyPlayingAnimation = animationModel;
+
+            if (animationModel.IsPlaying)
+            {
+                // Was playing -> Pause
+                animationModel.IsPlaying = false;
+                Viewport?.TogglePauseResume(animationModel);
+            }
+            else
+            {
+                // Was paused/stopped -> Play
+                animationModel.IsPlaying = true;
+                Viewport?.SetAnimation(animationModel);
+            }
+        }
+
+        private void StopButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            // Toggle pause/resume at current time (NO reset to 0).
+            // The Viewport's TogglePauseResume updates IsAnimationPaused and notifies
+            // the panel via SetAnimationPlayingState, which keeps the binding in sync.
+            Viewport?.TogglePauseResume(animationModel);
+        }
+
+        private void TextureThumbnail_Click(object sender, RoutedEventArgs e) { /* removed: see textures ComboBox */ }
+
         private async void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMode == ViewerType.Skn)
@@ -563,24 +603,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.SelectedModel == null)
-            {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
-                return;
-            }
-
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
-            {
-                if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
-                {
-                    _currentlyPlayingAnimation.IsPlaying = false;
-                }
-
-                _currentlyPlayingAnimation = animationModel;
-                _currentlyPlayingAnimation.IsPlaying = true;
-
-                Viewport?.SetAnimation(animationModel);
-            }
+            // Legacy handler kept for compatibility; playback now lives in the
+            // Mini Player (PlayPauseButton_Click / StopButton_Click).
         }
 
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
@@ -635,14 +659,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
-            {
-                Viewport?.TogglePauseResume(animationModel);
-            }
-        }
-
         public void SetAnimationPlayingState(AnimationModel animationModel, bool isPlaying)
         {
             if (animationModel != null)
@@ -673,7 +689,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void AnimationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel && _isSliderDragging)
+            // Use the slider's DataContext (inherited from the panel Border = SelectedAnimation)
+            // so seek works correctly even when the animation is unselected in the list.
+            if ((sender as FrameworkElement)?.DataContext is AnimationModel && _isSliderDragging)
             {
                 Viewport?.SeekAnimation(TimeSpan.FromSeconds(e.NewValue));
             }

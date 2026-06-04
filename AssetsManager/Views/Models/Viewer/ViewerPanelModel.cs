@@ -52,7 +52,7 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         // --- Navigation State (Control Deck v3.3) ---
-        private bool _isModelsSectionExpanded = true;
+        private bool _isModelsSectionExpanded = false;
         private bool _isInspectorSectionExpanded = true;
         private bool _isEnvironmentSectionExpanded = false;
         private bool _isCameraSectionExpanded = false;

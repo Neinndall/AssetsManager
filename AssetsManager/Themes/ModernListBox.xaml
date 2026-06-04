@@ -56,13 +56,22 @@
         </Setter>
     </Style>
 
-    <!-- Estilo para ListBox con Scroll Suave y apariencia unificada. Utilizado para la lista de modelos y la lista de animaciones. -->
-    <Style x:Key="SmoothScrollListBox" TargetType="ListBox">
-        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+    <!-- Estilo base para ListBox sin virtualización (las listas del Viewer no manejan
+         tantos ítems como para requerirla). Centraliza apariencia y scroll. -->
+    <Style x:Key="ModernListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+    </Style>
+
+    <!-- Especialización con SidebarBackground y scroll suave para listas de tarjetas (Models/Animations). -->
+    <Style x:Key="SmoothScrollListBox" TargetType="ListBox" BasedOn="{StaticResource ModernListBox}">
+        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource ListBoxItemStyle}"/>
     </Style>
+
 
     <!-- ESTILO MAESTRO PARA TARJETAS SELECCIONABLES (Usado en Models, Animations e Image Merger) -->
     <Style x:Key="ModernSelectableCardItemStyle" TargetType="ListBoxItem">
@@ -82,7 +91,7 @@
                             <Grid Margin="14,9">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="24"/>
                                 </Grid.ColumnDefinitions>
                                 <ContentPresenter Grid.Column="0" />
                                 <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="1" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="16" Height="16" Margin="8,0,0,0" Visibility="Hidden"/>

@@ -1,15 +1,16 @@
 AssetsManager - League of Legends | v4.0.1.0
-  - Viewer / Eliminated double CompositionTarget.Rendering subscription that caused duplicate per-frame work.
-  - Viewer / ModelPart dispose no longer destroys textures shared with sibling meshes.
-  - Viewer / AnimationPlayer buffers are now fully released between model switches.
-  - Viewer / Transforms are persistent: position/rotation/scale sliders no longer allocate on every change.
-  - Viewer / Loading a new model cancels any in-flight load and discards its result to free RAM immediately.
-  - Viewer / Chroma gallery thumbnails are loaded at 256px instead of full size, drastically reducing RAM usage.
-  - Viewer / Animation slider label updates at ~10/s instead of 60/s, lowering UI thread pressure.
-  - Viewer / Cleanup is now exception-safe and symmetrically unsubscribes every event handler.
-  - Viewer / Load dialogs unified: SKN, Chroma and MapGeo now use a single Peer-to-Peer flow (Container) instead of an event bridge.
-  - Viewer / Removing and re-adding a model is now instant: ground/sky textures are reused between loads instead of being rebuilt.
-  - Viewer / Auto-rotate now stops the model exactly where you deactivate it, preserving the rotation angle.
+  - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
+  - Viewer / Removing and re-adding a model is now instant.
+  - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.
+  - Viewer / Model loading dialogs are now unified in a single flow.
+  - Viewer / Cleanup is more reliable when closing models.
+  - Viewer / Animation time label updates less frequently for smoother playback.
+  - Viewer / Chroma gallery now uses lighter thumbnails to reduce memory usage.
+  - Viewer / Loading a new model cancels any pending load to free memory faster.
+  - Viewer / Moving models is smoother: position, rotation and scale no longer cause hitches.
+  - Viewer / Animation memory is fully released when switching models.
+  - Viewer / Disposed model textures no longer affect other visible models.
+  - Viewer / Eliminated duplicate auto-rotation rendering for better performance.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
   - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
@@ -38,6 +39,13 @@ New Features
     * Added a dedicated HUD-styled Popup with a clean vertical list of recent searches, complete with hover-based delete buttons and a global "Clear" option.
     * Integrated full Keyboard Navigation to let users cycle through recent queries using Arrow Keys and press Enter to select or Escape to close the list.
   - Viewer / Fully Asynchronous Model Loading: implemented a non-blocking architecture for character (SKN) and legacy (SCO/SCB) models, ensuring a perfectly responsive UI during all loading phases.
+  - Viewer / Redesigned MESHES List: each mesh is now its own card with icon, name, visibility toggle, and texture selector — no row selection, no hover state, pure visual clarity.
+  - Viewer / Compact Animation Rows: animations list redesigned for density with a per-item "ANIM" badge, freeing vertical space for the player panel.
+  - Viewer / MODELS Hidden by Default: the Models hierarchy now starts collapsed when loading a model, maximizing Inspector space; expand manually when you need to switch models.
+  - Viewer / Slim Animation Player: timeline scrubber, slim play/pause + stop/resume, and continuous speed slider (0.25x-2.0x) replace the old preset chips.
+  - Viewer / Unified Inner Scroll: scrolling over a nested list (animations, meshes) always scrolls the inner list natively and never falls back to the outer panel.
+  - UI / Unified Animated Chevrons: a single style now drives both Viewer section headers and FileExplorer tree expanders — consistent rotation, hover feedback, and timing across the entire app.
+  - UI / Stable Selection Layout: card-based list items no longer shift their content when selected, so action buttons (trash, etc.) stay perfectly in place.
 
 Improvements
   - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.

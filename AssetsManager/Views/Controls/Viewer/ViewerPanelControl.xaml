@@ -148,7 +148,7 @@
                                 <Border Grid.Column="2" Background="{StaticResource AccentBrush}" CornerRadius="9" Padding="8,3" Margin="0,0,6,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="ModelsCounterText" Text="0" FontSize="10" FontWeight="Bold" Foreground="White"/>
                                 </Border>
-                                <materialIcons:MaterialIcon Grid.Column="3" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="3" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
@@ -174,13 +174,11 @@
                                 </StackPanel>
                             </Border>
 
-                            <ListBox x:Name="ModelsListBox" 
+                            <ListBox x:Name="ModelsListBox"
                                      ItemsSource="{Binding FilteredModels}"
                                      SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
-                                     Style="{StaticResource SmoothScrollListBox}" 
+                                     Style="{StaticResource SmoothScrollListBox}"
                                      ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
-                                     Background="Transparent" BorderThickness="0"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
                                      MinHeight="120" MaxHeight="240"
                                      Visibility="{Binding HasLoadedModels, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <ListBox.ItemTemplate>
@@ -246,7 +244,7 @@
                                 <Border Grid.Column="2" Background="{StaticResource AccentPurple}" CornerRadius="9" Padding="8,3" Margin="0,0,6,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="InspectorCounterText" Text="M" FontSize="10" FontWeight="Bold" Foreground="White"/>
                                 </Border>
-                                <materialIcons:MaterialIcon Grid.Column="3" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="3" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
@@ -323,15 +321,12 @@
                                         </Grid>
                                     </Border>
 
-                                    <ListBox x:Name="MeshesListBox" 
+                                    <!-- Meshes list with texture dropdown (vertical layout, no selection, card-per-item) -->
+                                    <ListBox x:Name="MeshesListBox"
                                              Grid.Row="1"
                                              ItemsSource="{Binding SelectedModelParts}"
-                                             Background="Transparent" 
+                                             Background="Transparent"
                                              BorderThickness="0"
-                                             VirtualizingStackPanel.IsVirtualizing="True"
-                                             VirtualizingStackPanel.VirtualizationMode="Recycling"
-                                             VirtualizingStackPanel.CacheLengthUnit="Item"
-                                             VirtualizingStackPanel.CacheLength="10,10"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                                         <ListBox.ItemContainerStyle>
@@ -350,25 +345,35 @@
                                         </ListBox.ItemContainerStyle>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,8" Padding="12,10">
+                                                <Border Background="{StaticResource CardBackground}" CornerRadius="8"
+                                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                                        Margin="0,0,0,6" Padding="10,8">
                                                     <StackPanel>
-                                                        <Grid Margin="0,0,0,8">
+                                                        <!-- Top: mesh icon + name -->
+                                                        <DockPanel LastChildFill="True" Margin="0,0,0,8" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="CubeOutline" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontWeight="SemiBold" FontSize="12"
+                                                                       Foreground="{StaticResource TextPrimary}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </DockPanel>
+                                                        <!-- Bottom: visibility checkbox + texture dropdown -->
+                                                        <Grid VerticalAlignment="Center">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto"/>
                                                                 <ColumnDefinition Width="*"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <CheckBox Style="{StaticResource ModernCheckBox}" IsChecked="{Binding IsVisible, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                        </Grid>
-                                                        <Grid>
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="Auto"/>
-                                                                <ColumnDefinition Width="*"/>
-                                                            </Grid.ColumnDefinitions>
-                                                            <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="6" Width="30" Height="30" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                                 <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ComboBox Grid.Column="1" Style="{StaticResource ModernComboBox}" Height="30" FontSize="11" ItemsSource="{Binding AvailableTextureNames}" SelectedItem="{Binding SelectedTextureName}" VerticalAlignment="Center"/>
+                                                            <CheckBox Grid.Column="0"
+                                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                                      Style="{StaticResource ModernCheckBox}"
+                                                                      VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                            <ComboBox Grid.Column="1"
+                                                                      ItemsSource="{Binding AvailableTextureNames}"
+                                                                      SelectedItem="{Binding SelectedTextureName, Mode=TwoWay}"
+                                                                      Style="{StaticResource ModernComboBox}"
+                                                                      Height="30" FontSize="11"
+                                                                      ToolTip="Select texture"/>
                                                         </Grid>
                                                     </StackPanel>
                                                 </Border>
@@ -667,14 +672,14 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <ListBox x:Name="AnimationsListBox" 
+                                        <ListBox x:Name="AnimationsListBox"
                                                  Grid.Row="1"
                                                  ItemsSource="{Binding FilteredAnimations}"
                                                  SelectedItem="{Binding SelectedAnimation, Mode=TwoWay}"
-                                                 Background="Transparent" BorderThickness="0" 
                                                  Style="{StaticResource SmoothScrollListBox}"
-                                                 Visibility="{Binding HasAnimations, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                                 ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}">
+                                                 ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
+                                                 MinHeight="120" MaxHeight="240"
+                                                 Visibility="{Binding HasAnimations, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -682,72 +687,107 @@
                                                             <ColumnDefinition Width="*"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
-                                                        
-                                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="4,0,6,0"/>
+
+                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="4,0,6,0" VerticalAlignment="Center"/>
                                                             <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
                                                                 <TextBlock Text="ANIM" Foreground="{StaticResource TextMuted}" FontSize="8" FontWeight="Black"/>
                                                             </Border>
                                                         </StackPanel>
 
-                                                        <Button Grid.Column="1" Click="DeleteAnimationButton_Click" Tag="{Binding}" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Animation">
+                                                        <Button Grid.Column="1" Click="DeleteAnimationButton_Click" Tag="{Binding}" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" Margin="4,0,0,0" ToolTip="Remove Animation" VerticalAlignment="Center">
                                                             <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                         </Button>
                                                     </Grid>
                                                 </DataTemplate>
                                             </ListBox.ItemTemplate>
-                                        </ListBox>                
+                                        </ListBox>
                                     </Grid>
                                     
                                     <!-- Mini Player -->
-                                    <Border Grid.Row="2" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="14,12" Margin="0,12,0,0" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" DataContext="{Binding SelectedAnimation}" Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
+                                    <Border Grid.Row="2" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="14,12" Margin="0,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" DataContext="{Binding SelectedAnimation}" Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
                                         <StackPanel>
-                                            <!-- Timeline & Time Labels -->
-                                            <Grid Margin="0,0,0,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
-                                                <Slider Grid.Column="1" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="20" Margin="10,0" Style="{StaticResource HUDSliderStyleSpacious}"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding TotalDuration, StringFormat={}{0:F1}s}" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            </Grid>
-                                            
-                                            <!-- Action Controls -->
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <!-- Play/Pause Buttons -->
-                                                <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" CornerRadius="7" Padding="2">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Button Click="PlayButton_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Play Animation">
-                                                            <materialIcons:MaterialIcon Kind="Play" Width="16" Foreground="{StaticResource AccentGreen}"/>
-                                                        </Button>
-                                                        <ToggleButton Click="StopButton_Click" IsChecked="{Binding IsPlaying, Mode=OneWay}" Style="{StaticResource TransparentIconToggleButton}" Width="30" Height="30" Margin="2,0,0,0" ToolTip="Pause/Stop">
-                                                            <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Pause,Stop'}" Width="16" Foreground="{StaticResource AccentRed}"/>
-                                                        </ToggleButton>
-                                                    </StackPanel>
-                                                </Border>
+                                            <!-- Animation name header -->
+                                            <DockPanel LastChildFill="True" Margin="0,0,0,10">
+                                                <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="AnimationPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                            </DockPanel>
 
-                                                <!-- Speed Control -->
-                                                <Grid Grid.Column="1" Margin="14,0">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <materialIcons:MaterialIcon Kind="Speedometer" Width="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                    <Slider Grid.Column="1" Minimum="0.1" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}" VerticalAlignment="Center" Height="18" Style="{StaticResource HUDSliderStyleSpacious}"/>
-                                                </Grid>
-                                                
-                                                <!-- Speed Indicator Badge -->
-                                                <Border Grid.Column="2" Background="{StaticResource HoverColor}" CornerRadius="5" Padding="8,3" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Speed, StringFormat={}{0:F1}x}" FontSize="10" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
-                                                </Border>
+                                            <!-- Timeline & Time Labels -->
+                                            <Grid Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Slider x:Name="AnimationSlider" Grid.Column="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="14" Style="{StaticResource HUDSliderStyleSpacious}"/>
+                                                <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
+                                                    <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                                                    <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
+                                                    <Run Text="{Binding TotalDuration, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
+                                                </TextBlock>
+                                            </Grid>
+
+                                            <!-- Transport row: Play/Pause | Stop | Speed slider+value -->
+                                            <Grid VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <Button x:Name="PlayPauseButton" Grid.Column="0" Click="PlayPauseButton_Click"
+                                                        Width="32" Height="32" Margin="0,0,6,0"
+                                                        Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
+                                                        ToolTip="Play / Pause" VerticalAlignment="Center">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
+                                                </Button>
+
+                                                <Button Grid.Column="1" Click="StopButton_Click"
+                                                        Width="32" Height="32" Margin="0,0,12,0"
+                                                        ToolTip="Pause / Resume" VerticalAlignment="Center" Cursor="Hand">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Square" CornerRadius="4" Background="#E53935">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
+                                                </Button>
+
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="Speed" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                    <Slider Minimum="0.25" Maximum="2"
+                                                            Value="{Binding Speed, Mode=TwoWay}"
+                                                            IsMoveToPointEnabled="True" IsSnapToTickEnabled="False"
+                                                            VerticalAlignment="Center" Height="12" MinWidth="80"
+                                                            ToolTip="Playback speed"
+                                                            Style="{StaticResource HUDSliderStyleSpacious}"/>
+                                                    <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="38" TextAlignment="Right"/>
+                                                </StackPanel>
                                             </Grid>
                                         </StackPanel>
                                     </Border>
@@ -782,7 +822,7 @@
                                     <TextBlock Text="ENVIRONMENT" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     <TextBlock Text="Sky and background" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                 </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
@@ -829,7 +869,7 @@
                                     <TextBlock Text="CAMERA" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     <TextBlock Text="Field of view" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                 </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
@@ -870,7 +910,7 @@
                                     <TextBlock Text="STUDIO LIGHTING" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     <TextBlock Text="Ambient &amp; directional" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                 </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
@@ -935,7 +975,7 @@
                                     <TextBlock Text="RENDER" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                     <TextBlock Text="Snapshot actions" FontSize="9" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
                                 </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource CollapsibleSectionChevronStyle}"/>
+                                <materialIcons:MaterialIcon Grid.Column="2" Style="{StaticResource AnimatedChevronStyle}"/>
                             </Grid>
                         </ToggleButton>
 
