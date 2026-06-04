@@ -3,7 +3,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Utils.Framework;
-using Material.Icons;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -23,25 +22,25 @@ namespace AssetsManager.Views.Models.Viewer
         public string Name
         {
             get => _name;
-            set { _name = value; OnPropertyChanged(); }
+            set { if (_name != value) { _name = value; OnPropertyChanged(); } }
         }
 
         public string TexturePath
         {
             get => _texturePath;
-            set { _texturePath = value; OnPropertyChanged(); }
+            set { if (_texturePath != value) { _texturePath = value; OnPropertyChanged(); } }
         }
 
         public string PreviewTextureName
         {
             get => _previewTextureName;
-            set { _previewTextureName = value; OnPropertyChanged(); }
+            set { if (_previewTextureName != value) { _previewTextureName = value; OnPropertyChanged(); } }
         }
 
         public string ModelPath
         {
             get => _modelPath;
-            set { _modelPath = value; OnPropertyChanged(); }
+            set { if (_modelPath != value) { _modelPath = value; OnPropertyChanged(); } }
         }
 
         public string TypeText { get; set; } = "SKIN";
@@ -49,19 +48,19 @@ namespace AssetsManager.Views.Models.Viewer
         public Color SwatchColor
         {
             get => _swatchColor;
-            set { _swatchColor = value; OnPropertyChanged(); }
+            set { if (_swatchColor != value) { _swatchColor = value; OnPropertyChanged(); } }
         }
 
         public ImageSource PreviewImage
         {
             get => _previewImage;
-            set { _previewImage = value; OnPropertyChanged(); }
+            set { if (_previewImage != value) { _previewImage = value; OnPropertyChanged(); } }
         }
 
         public bool IsSelected
         {
             get => _isSelected;
-            set { _isSelected = value; OnPropertyChanged(); }
+            set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(); } }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

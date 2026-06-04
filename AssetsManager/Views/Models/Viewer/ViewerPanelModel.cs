@@ -144,7 +144,6 @@ namespace AssetsManager.Views.Models.Viewer
         public void ShowMainContent()
         {
             IsMainContentVisible = true;
-            MainContentRequested?.Invoke();
         }
 
         /// <summary>
@@ -153,11 +152,8 @@ namespace AssetsManager.Views.Models.Viewer
         public void ShowEmptyState()
         {
             IsMainContentVisible = false;
-            EmptyStateRequested?.Invoke();
         }
 
-        public event System.Action MainContentRequested;
-        public event System.Action EmptyStateRequested;
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

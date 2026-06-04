@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using AssetsManager.Views.Models.Viewer;
 using System.Collections.Generic;
 
 namespace AssetsManager.Views.Models.Viewer
@@ -26,17 +25,37 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (SetField(ref _currentTime, value))
                 {
-                    _cachedProgressText = null;
-                    OnPropertyChanged(nameof(ProgressText));
+                    // Throttle ProgressText notifications: only fire when the
+                    // display value would actually change at 0.1s precision.
+                    // At 60fps the setter is called 60 times/s; notifying
+                    // PropertyChanged for a 4-decimal string wastes CPU
+                    // rebuilding a label that the user cannot visually read
+                    // at that resolution.
+                    double displaySeconds = Math.Round(Math.Max(0, Math.Min(value, TotalDuration)), 1);
+                    if (displaySeconds != _lastNotifiedDisplaySeconds)
+                    {
+                        _lastNotifiedDisplaySeconds = displaySeconds;
+                        _cachedProgressText = null;
+                        OnPropertyChanged(nameof(ProgressText));
+                    }
                 }
             }
         }
+        private double _lastNotifiedDisplaySeconds = -1;
 
         private double _totalDuration;
         public double TotalDuration
         {
             get => _totalDuration;
-            set { _cachedProgressText = null; SetField(ref _totalDuration, value); }
+            set
+            {
+                if (SetField(ref _totalDuration, value))
+                {
+                    _cachedProgressText = null;
+                    _lastNotifiedDisplaySeconds = -1;
+                    OnPropertyChanged(nameof(ProgressText));
+                }
+            }
         }
 
         private double _speed = 1.0;

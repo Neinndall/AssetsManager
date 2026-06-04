@@ -1,4 +1,15 @@
 AssetsManager - League of Legends | v4.0.1.0
+  - Viewer / Eliminated double CompositionTarget.Rendering subscription that caused duplicate per-frame work.
+  - Viewer / ModelPart dispose no longer destroys textures shared with sibling meshes.
+  - Viewer / AnimationPlayer buffers are now fully released between model switches.
+  - Viewer / Transforms are persistent: position/rotation/scale sliders no longer allocate on every change.
+  - Viewer / Loading a new model cancels any in-flight load and discards its result to free RAM immediately.
+  - Viewer / Chroma gallery thumbnails are loaded at 256px instead of full size, drastically reducing RAM usage.
+  - Viewer / Animation slider label updates at ~10/s instead of 60/s, lowering UI thread pressure.
+  - Viewer / Cleanup is now exception-safe and symmetrically unsubscribes every event handler.
+  - Viewer / Load dialogs unified: SKN, Chroma and MapGeo now use a single Peer-to-Peer flow (Container) instead of an event bridge.
+  - Viewer / Removing and re-adding a model is now instant: ground/sky textures are reused between loads instead of being rebuilt.
+  - Viewer / Auto-rotate now stops the model exactly where you deactivate it, preserving the rotation angle.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
   - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.

@@ -46,17 +46,35 @@ namespace AssetsManager.Views.Models.Viewer
         public double RotationZ { get => _rotationZ; set { if (SetField(ref _rotationZ, value)) UpdateTransform(); } }
         public double Scale { get => _scale; set { if (SetField(ref _scale, value)) UpdateTransform(); } }
 
+        // Persistent transforms to avoid per-property-change allocations
+        private readonly TranslateTransform3D _translateTransform = new TranslateTransform3D();
+        private readonly ScaleTransform3D _scaleTransform = new ScaleTransform3D(1, 1, 1);
+        private readonly RotateTransform3D _rotateXTransform = new RotateTransform3D();
+        private readonly RotateTransform3D _rotateYTransform = new RotateTransform3D();
+        private readonly RotateTransform3D _rotateZTransform = new RotateTransform3D();
+        private readonly Transform3DGroup _userTransformGroup = new Transform3DGroup();
+
+        /// <summary>
+        /// The persistent Transform3DGroup that owns the user-defined Position/Rotation/Scale.
+        /// Exposed so the Viewport can safely inject the auto-rotation transform
+        /// without losing its reference when properties change.
+        /// </summary>
+        public Transform3DGroup UserTransformGroup => _userTransformGroup;
+
         private void UpdateTransform()
         {
-            var group = new Transform3DGroup();
-            group.Children.Add(new ScaleTransform3D(_scale, _scale, _scale));
-            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(1, 0, 0), _rotationX)));
-            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), _rotationY)));
-            group.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 0, 1), _rotationZ)));
-            group.Children.Add(new TranslateTransform3D(_positionX, _positionY, _positionZ));
+            // Only mutate values on persistent transforms — no allocations.
+            _translateTransform.OffsetX = _positionX;
+            _translateTransform.OffsetY = _positionY;
+            _translateTransform.OffsetZ = _positionZ;
 
-            if (RootVisual != null)
-                RootVisual.Transform = group;
+            _scaleTransform.ScaleX = _scale;
+            _scaleTransform.ScaleY = _scale;
+            _scaleTransform.ScaleZ = _scale;
+
+            ((AxisAngleRotation3D)_rotateXTransform.Rotation).Angle = _rotationX;
+            ((AxisAngleRotation3D)_rotateYTransform.Rotation).Angle = _rotationY;
+            ((AxisAngleRotation3D)_rotateZTransform.Rotation).Angle = _rotationZ;
         }
 
         private ObservableRangeCollection<ModelPart> _parts;
@@ -133,8 +151,21 @@ namespace AssetsManager.Views.Models.Viewer
 
         public SceneModel()
         {
+            _rotateXTransform.Rotation = new AxisAngleRotation3D(new Vector3D(1, 0, 0), 0);
+            _rotateYTransform.Rotation = new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0);
+            _rotateZTransform.Rotation = new AxisAngleRotation3D(new Vector3D(0, 0, 1), 0);
+
+            _userTransformGroup.Children.Add(_scaleTransform);
+            _userTransformGroup.Children.Add(_rotateXTransform);
+            _userTransformGroup.Children.Add(_rotateYTransform);
+            _userTransformGroup.Children.Add(_rotateZTransform);
+            _userTransformGroup.Children.Add(_translateTransform);
+
             RootVisual = new ModelVisual3D();
+            RootVisual.Transform = _userTransformGroup;
+
             UpdateTransform();
+
             Parts = new ObservableRangeCollection<ModelPart>();
             Animations = new ObservableRangeCollection<AnimationData>();
         }
@@ -206,13 +237,19 @@ namespace AssetsManager.Views.Models.Viewer
             }
             Animations?.Clear();
 
-            // 4. Cortar todas las referencias finales
+            // 4. Detach the auto-rotation transform if the viewport injected it
+            if (_userTransformGroup.Children.Contains(_scaleTransform))
+            {
+                _userTransformGroup.Children.Clear();
+            }
+
+            // 5. Cortar todas las referencias finales
             CurrentAnimation = null;
             SkinnedMesh = null;
             Skeleton = null;
             RootVisual = null;
-            
-            // 5. Limpiar eventos y estados
+
+            // 6. Limpiar eventos y estados
             IsAnimationPaused = false;
             AnimationTime = 0;
             PropertyChanged = null;

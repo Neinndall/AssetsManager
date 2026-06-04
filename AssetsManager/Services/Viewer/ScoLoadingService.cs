@@ -90,12 +90,8 @@ namespace AssetsManager.Services.Viewer
             var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(directoryPath) || !Directory.Exists(directoryPath)) return loadedTextures;
 
-            string[] textureFiles = Directory.GetFiles(directoryPath, "*.tex", SearchOption.TopDirectoryOnly); // Also .dds?
-             // LeagueToolkit might handle .dds inside LoadTexture?
-             // Let's stick to what SknModelLoadingService does: *.tex. 
-             // Actually, usually old models use .dds or .tga. TextureUtils.LoadTexture handles extensions.
-             // Let's add dds just in case, as old sco files might be paired with dds.
-            
+            // Old SCO/SCB models are typically paired with .tex or .dds textures.
+            // TextureUtils.LoadTexture handles both extensions internally.
             var allFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(s => s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase));
 

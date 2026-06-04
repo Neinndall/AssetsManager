@@ -99,7 +99,11 @@ namespace AssetsManager.Services.Viewer
 
                                 using (FileStream stream = new FileStream(primaryTex, FileMode.Open, FileAccess.Read, FileShare.Read))
                                 {
-                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
+                                    // Chroma previews are tiny gallery thumbnails, not full-size render assets.
+                                    // Capping the texture to 256px reduces GPU/CPU memory by 10-50x per chroma
+                                    // (typical 2K source → ~64x reduction in pixels) while preserving visual fidelity
+                                    // at the small card size used by ChromaSelectionControl.
+                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex", 256, 256);
                                     if (bitmap != null)
                                     {
                                         bitmap.Freeze();

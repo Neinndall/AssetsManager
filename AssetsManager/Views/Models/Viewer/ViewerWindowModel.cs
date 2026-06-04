@@ -9,6 +9,9 @@ namespace AssetsManager.Views.Models.Viewer
     /// </summary>
     public class ViewerWindowModel : INotifyPropertyChanged
     {
+        public const string MapGeoLoadingTitle = "Loading MapGeometry...";
+        public const string MapGeoLoadingDescription = "Processing geometry and textures.";
+
         private bool _isLoadingVisible = false;
         private string _loadingTitle = "Loading...";
         private string _loadingDescription = "Please wait.";

@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
@@ -30,13 +31,12 @@ namespace AssetsManager.Views.Controls.Viewer
         public ChromaScannerService ChromaScannerService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         // Peer Controls (Direct communication)
+        public ViewerWindow ParentWindow { get; set; }
         public ViewerViewportControl Viewport { get; set; }
         public ChromaSelectionControl ChromaGallery { get; set; }
-
-        public event Action<Visibility> EmptyStateVisibilityChanged;
-        public event Action<Visibility> MainContentVisibilityChanged;
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
@@ -49,60 +49,56 @@ namespace AssetsManager.Views.Controls.Viewer
 
             InitializeComponent();
 
-            _viewModel.MainContentRequested += () => 
-            {
-                EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
-                MainContentVisibilityChanged?.Invoke(Visibility.Visible);
-            };
+            _viewModel.LoadedModels.CollectionChanged += OnLoadedModelsCollectionChanged;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-            _viewModel.EmptyStateRequested += () => 
-            {
-                MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
-                EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
-            };
+            Unloaded += OnPanelUnloaded;
+        }
 
-            _viewModel.LoadedModels.CollectionChanged += (s, e) =>
+        private void OnLoadedModelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
             {
-                if (e.NewItems != null)
+                foreach (SceneModel model in e.NewItems)
                 {
-                    foreach (SceneModel model in e.NewItems)
-                    {
-                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                        model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
-                    }
+                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                    model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
                 }
-                if (e.OldItems != null)
-                {
-                    foreach (SceneModel model in e.OldItems)
-                    {
-                        model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-                    }
-                }
-            };
-
-            _viewModel.PropertyChanged += (s, e) =>
+            }
+            if (e.OldItems != null)
             {
-                if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
+                foreach (SceneModel model in e.OldItems)
                 {
-                    HandleSelectedModelChanged();
+                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
                 }
-                else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
-                {
-                    if (_viewModel.IsAnimationSyncEnabled)
-                    {
-                        SyncLoadingForAllModels();
-                    }
-                }
-                else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
-                {
-                    foreach (var model in _viewModel.LoadedModels)
-                    {
-                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                    }
-                }
-            };
+            }
+        }
 
-            Unloaded += (s, e) => Cleanup();
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
+            {
+                HandleSelectedModelChanged();
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
+            {
+                if (_viewModel.IsAnimationSyncEnabled)
+                {
+                    SyncLoadingForAllModels();
+                }
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
+            {
+                foreach (var model in _viewModel.LoadedModels)
+                {
+                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                }
+            }
+        }
+
+        private void OnPanelUnloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void HandleMeshVisibilityChanged(ModelPart sourcePart)
@@ -189,7 +185,27 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void Cleanup()
         {
-            ResetScene();
+            try
+            {
+                // Symmetric unsubscription: detach every handler we registered in the
+                // constructor so the panel can be garbage-collected without leaking
+                // references to the ViewModel singleton.
+                _viewModel.LoadedModels.CollectionChanged -= OnLoadedModelsCollectionChanged;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+                // Also detach MeshVisibilityChanged from any model still in the list,
+                // in case Cleanup is called before ResetScene.
+                foreach (var model in _viewModel.LoadedModels)
+                {
+                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                }
+
+                ResetScene();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error during ViewerPanelControl.Cleanup");
+            }
         }
 
         public void ResetScene()
@@ -197,7 +213,11 @@ namespace AssetsManager.Views.Controls.Viewer
             // 1. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _viewModel.LoadedModels)
             {
-                model?.Dispose();
+                if (model != null)
+                {
+                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                    model.Dispose();
+                }
             }
             _viewModel.LoadedModels.Clear();
 
@@ -221,7 +241,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
-                modelToDelete?.Dispose();
                 _viewModel.LoadedModels.Remove(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
@@ -264,39 +283,17 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_currentMode == ViewerType.Skn)
             {
-                var openFileDialog = new CommonOpenFileDialog
-                {
-                    Filters = { 
-                        new CommonFileDialogFilter("SKN files", "*.skn"), 
-                        new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
-                        new CommonFileDialogFilter("All files", "*.*") 
-                    },
-                    Title = "Select a model file"
-                };
-
-                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    await ProcessModelLoading(openFileDialog.FileName, null, false);
-                }
+                await ParentWindow?.OpenSknModel();
             }
             else
             {
-                Viewport?.HandleMapGeometryLoadRequest();
+                await ParentWindow?.OpenMapGeometry();
             }
         }
 
         private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
         {
-            var folderBrowserDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select the skins folder of the character"
-            };
-
-            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
-            }
+            ParentWindow?.OpenChromaFolder();
         }
 
         /// <summary>
@@ -379,23 +376,42 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentMode = ViewerType.Skn;
             ViewModel.IsMapMode = false;
 
+            // Start a new cancellable operation. If another load is already in flight
+            // (rapid clicks, double-load) it will be cancelled and its result dropped.
+            var cancellationToken = TaskCancellationManager != null
+                ? TaskCancellationManager.PrepareNewOperation()
+                : System.Threading.CancellationToken.None;
+
             SceneModel newModel = null;
             string extension = Path.GetExtension(modelPath).ToLowerInvariant();
 
-            if (extension == ".sco" || extension == ".scb")
+            try
             {
-                newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath));
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(texturePath))
+                if (extension == ".sco" || extension == ".scb")
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath));
+                    newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath), cancellationToken);
                 }
                 else
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath));
+                    if (string.IsNullOrEmpty(texturePath))
+                    {
+                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
+                    }
+                    else
+                    {
+                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
+                    }
                 }
+            }
+            catch (System.OperationCanceledException)
+            {
+                LogService?.LogDebug("Model loading cancelled before completion.");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                newModel = null;
             }
 
             if (newModel != null)
@@ -414,7 +430,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    Viewport?.HandleSceneSetupRequest();
+                    ParentWindow?.SetupScene(false);
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
@@ -545,19 +561,36 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentMode = ViewerType.MapGeometry;
             ViewModel.IsMapMode = true;
 
+            var cancellationToken = TaskCancellationManager != null
+                ? TaskCancellationManager.PrepareNewOperation()
+                : System.Threading.CancellationToken.None;
+
             SceneModel newModel;
-            if (!string.IsNullOrEmpty(materialsPath))
+            try
             {
-                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                if (!string.IsNullOrEmpty(materialsPath))
+                {
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                }
+                else
+                {
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                }
             }
-            else
+            catch (System.OperationCanceledException)
             {
-                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                LogService?.LogDebug("Map geometry loading cancelled before completion.");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                newModel = null;
             }
 
             if (newModel != null)
             {
-                Viewport?.HandleSceneSetupRequest();
+                ParentWindow?.SetupScene(true);
                 ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
@@ -639,14 +672,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_viewModel.SelectedModel == null) return;
             if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
-        }
-
-        public void ApplyAutoRotation(double angle)
-        {
-            if (_viewModel.SelectedModel != null)
-            {
-                _viewModel.SelectedModel.RotationY = (_viewModel.SelectedModel.RotationY + angle) % 360;
-            }
         }
 
         // STUDIO HANDLERS

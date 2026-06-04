@@ -1,11 +1,11 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.ComponentModel;
 using HelixToolkit.Wpf;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.IO;
 using System.Windows.Media.Media3D;
 using System.Diagnostics;
 using LeagueToolkit.Core.Animation;
@@ -32,8 +32,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
-        public event Action SceneSetupRequested;
-        public event Action MapGeometryLoadRequested;
 
         private CustomCameraController _cameraController;
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
@@ -58,50 +56,58 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel = new ViewerViewportModel();
             DataContext = _viewModel;
 
-            _viewModel.PropertyChanged += (s, e) =>
+            _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
+
+            Loaded += OnViewportLoaded;
+            Unloaded += OnViewportUnloaded;
+        }
+
+        private void OnViewportViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
             {
-                if (e.PropertyName == nameof(ViewerViewportModel.IsAutoRotateActive))
-                {
+                case nameof(ViewerViewportModel.IsAutoRotateActive):
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
-                }
-                else if (e.PropertyName == nameof(ViewerViewportModel.AmbientIntensity) ||
-                         e.PropertyName == nameof(ViewerViewportModel.LightRotation) ||
-                         e.PropertyName == nameof(ViewerViewportModel.LightHeight))
-                {
+                    break;
+                case nameof(ViewerViewportModel.AmbientIntensity):
+                case nameof(ViewerViewportModel.LightRotation):
+                case nameof(ViewerViewportModel.LightHeight):
                     UpdateStudioLighting();
-                }
-                else if (e.PropertyName == nameof(ViewerViewportModel.FieldOfView))
-                {
+                    break;
+                case nameof(ViewerViewportModel.FieldOfView):
                     UpdateFieldOfView();
-                }
-                else if (e.PropertyName == nameof(ViewerViewportModel.IsTransparentBg))
-                {
+                    break;
+                case nameof(ViewerViewportModel.IsTransparentBg):
                     SetGroundVisibility(!_viewModel.IsTransparentBg);
-                }
-                else if (e.PropertyName == nameof(ViewerViewportModel.ShowSkybox))
-                {
+                    break;
+                case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
-                }
-            };
+                    break;
+            }
+        }
 
-            Loaded += (s, e) =>
-            {
-                _animationPlayer = new AnimationPlayer(LogService);
-                _cameraController = new CustomCameraController(Viewport3D);
+        private void OnViewportLoaded(object sender, RoutedEventArgs e)
+        {
+            // Self-healing: only create the camera controller and animation player
+            // here. The window must not instantiate them too — see ViewerWindow notes.
+            _animationPlayer = new AnimationPlayer(LogService);
+            _cameraController = new CustomCameraController(Viewport3D);
 
-                // Re-add skeleton visual guides to viewport if they were cleared
-                if (!Viewport.Children.Contains(_skeletonVisual))
-                    Viewport.Children.Add(_skeletonVisual);
-                if (!Viewport.Children.Contains(_jointsVisual))
-                    Viewport.Children.Add(_jointsVisual);
+            // Re-add skeleton visual guides to viewport if they were cleared
+            if (!Viewport.Children.Contains(_skeletonVisual))
+                Viewport.Children.Add(_skeletonVisual);
+            if (!Viewport.Children.Contains(_jointsVisual))
+                Viewport.Children.Add(_jointsVisual);
 
-                // Self-healing subscription to rendering loop
-                CompositionTarget.Rendering -= CompositionTarget_Rendering;
-                CompositionTarget.Rendering += CompositionTarget_Rendering;
-                _lastFrameTime = DateTime.Now;
-            };
+            // Self-healing subscription to the rendering loop
+            CompositionTarget.Rendering -= CompositionTarget_Rendering;
+            CompositionTarget.Rendering += CompositionTarget_Rendering;
+            _lastFrameTime = DateTime.Now;
+        }
 
-            Unloaded += (s, e) => Cleanup();
+        private void OnViewportUnloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         public void RegisterEnvironment(ModelVisual3D sky, ModelVisual3D ground)
@@ -117,31 +123,43 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void Cleanup()
         {
-            // 1. Desuscribir eventos
-            CompositionTarget.Rendering -= CompositionTarget_Rendering;
+            try
+            {
+                // 1. Desuscribir eventos
+                CompositionTarget.Rendering -= CompositionTarget_Rendering;
+                _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
 
-            // 2. Limpiar escena y animaciones (ahora con Dispose)
-            ResetScene();
+                // 2. Limpiar escena y animaciones
+                ResetScene();
 
-            // 3. Limpiar visuales de esqueleto
-            _skeletonVisual.Points?.Clear();
-            _jointsVisual.Points?.Clear();
+                // 3. Limpiar visuales de esqueleto
+                _skeletonVisual.Points?.Clear();
+                _jointsVisual.Points?.Clear();
 
-            // 4. Remover visuales del viewport
-            if (Viewport.Children.Contains(_skeletonVisual))
-                Viewport.Children.Remove(_skeletonVisual);
-            if (Viewport.Children.Contains(_jointsVisual))
-                Viewport.Children.Remove(_jointsVisual);
+                // 4. Remover visuales del viewport
+                if (Viewport.Children.Contains(_skeletonVisual))
+                    Viewport.Children.Remove(_skeletonVisual);
+                if (Viewport.Children.Contains(_jointsVisual))
+                    Viewport.Children.Remove(_jointsVisual);
 
-            // 5. Limpiar todo el viewport
-            Viewport.Children.Clear();
+                // 5. Limpiar todo el viewport
+                Viewport.Children.Clear();
 
-            // 6. Limpiar referencias
-            _animationPlayer = null;
-            _cameraController?.Dispose();
-            _cameraController = null;
-            _skyVisual = null;
-            _groundVisual = null;
+                // 6. Liberar el AnimationPlayer y todos sus buffers cacheados
+                _animationPlayer?.Dispose();
+                _animationPlayer = null;
+
+                // 7. Liberar el CameraController (dueño único)
+                _cameraController?.Dispose();
+                _cameraController = null;
+
+                _skyVisual = null;
+                _groundVisual = null;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error during ViewerViewportControl.Cleanup");
+            }
         }
 
         public void SetAnimation(AnimationModel animationModel)
@@ -285,12 +303,16 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             _loadedModels.Clear();
             _activeSceneModel = null;
-            
+
             _viewModel.IsAutoRotateActive = false;
             ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
             _skeletonVisual.Points?.Clear();
             _jointsVisual.Points?.Clear();
+
+            // CRITICAL: Free cached vertex/skin buffers from the previous model so
+            // the next load does not retain RAM of a model that is no longer in use.
+            _animationPlayer?.ClearCache();
         }
 
         public void AddModel(SceneModel model)
@@ -354,7 +376,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                 if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                 {
+                    double accumulatedAngle = ((AxisAngleRotation3D)_autoRotation.Rotation).Angle;
+                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + accumulatedAngle) % 360;
                     transformGroup.Children.Remove(_autoRotation);
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }
             }
 
@@ -396,14 +421,16 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Synchronize playback timing across all models if enabled (v3.2.3.2)
                 // IMPORTANT: Only sync if the master model actually has an animation to sync from.
-                bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true && 
-                                     _activeSceneModel != null && 
+                bool isPlaybackSync = Panel?.ViewModel.IsAnimationPlaybackSyncEnabled == true &&
+                                     _activeSceneModel != null &&
                                      _activeSceneModel.CurrentAnimation != null;
-                
-                double masterTime = _activeSceneModel?.AnimationTime ?? 0;
 
-                foreach (var model in _loadedModels)
+                double masterTime = _activeSceneModel?.AnimationTime ?? 0;
+                double speed = _activeAnimationModel?.Speed ?? 1.0;
+
+                for (int i = 0; i < _loadedModels.Count; i++)
                 {
+                    var model = _loadedModels[i];
                     if (model.CurrentAnimation != null && model.Skeleton != null && model.SkinnedMesh != null)
                     {
                         if (isPlaybackSync && model != _activeSceneModel)
@@ -413,7 +440,6 @@ namespace AssetsManager.Views.Controls.Viewer
                         }
                         else if (!model.IsAnimationPaused)
                         {
-                            var speed = _activeAnimationModel?.Speed ?? 1.0;
                             model.AnimationTime += deltaTime * speed;
 
                             var duration = model.CurrentAnimation.Duration;
@@ -423,15 +449,19 @@ namespace AssetsManager.Views.Controls.Viewer
                             }
                         }
 
-                        // Update skinning for all models that have an animation to ensure they are visible and moving
+                        bool isActive = model == _activeSceneModel;
+
+                        // Update skinning for all models that have an animation to ensure they are visible and moving.
+                        // ObservableRangeCollection is passable directly to the AnimationPlayer (it iterates internally);
+                        // the previous ToList() allocation per-frame has been removed.
                         _animationPlayer.Update(
                             (float)model.AnimationTime,
                             model.CurrentAnimation,
                             model.Skeleton,
                             model.SkinnedMesh,
-                            model.Parts.ToList(),
-                            model == _activeSceneModel ? _skeletonVisual : null,
-                            model == _activeSceneModel ? _jointsVisual : null,
+                            model.Parts,
+                            isActive ? _skeletonVisual : null,
+                            isActive ? _jointsVisual : null,
                             model.Name
                         );
                     }
@@ -648,9 +678,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void HandleSceneSetupRequest() => SceneSetupRequested?.Invoke();
-        public void HandleMapGeometryLoadRequest() => MapGeometryLoadRequested?.Invoke();
-
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
             ResetCamera();
@@ -668,7 +695,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
                 if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
                 {
-                    Panel?.ApplyAutoRotation(((AxisAngleRotation3D)_autoRotation.Rotation).Angle);
+                    double accumulatedAngle = ((AxisAngleRotation3D)_autoRotation.Rotation).Angle;
+                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + accumulatedAngle) % 360;
                     transformGroup.Children.Remove(_autoRotation);
                     ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }

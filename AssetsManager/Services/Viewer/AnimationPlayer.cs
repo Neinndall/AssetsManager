@@ -16,7 +16,7 @@ using Quaternion = System.Numerics.Quaternion;
 
 namespace AssetsManager.Services.Viewer
 {
-    public class AnimationPlayer
+    public class AnimationPlayer : IDisposable
     {
         private readonly Dictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> _currentPose = new();
         private readonly LogService _logService;
@@ -34,13 +34,38 @@ namespace AssetsManager.Services.Viewer
         private (byte x, byte y, byte z, byte w)[] _cachedBlendIndices;
         private Vector4[] _cachedBlendWeights;
 
+        private bool _isDisposed;
+
         public AnimationPlayer(LogService logService)
         {
             _logService = logService;
         }
 
+        /// <summary>
+        /// Releases cached buffers from the previous model so a new load does not
+        /// accumulate GPU/CPU memory across multiple model switches.
+        /// Buffers are recreated lazily on the next Update call.
+        /// </summary>
+        public void ClearCache()
+        {
+            _lastModelName = null;
+            _lastVerticesView = null;
+            _cachedPositions = null;
+            _cachedBlendIndices = null;
+            _cachedBlendWeights = null;
+            _skinnedVertices = null;
+
+            // _boneTransforms / _finalBoneTransforms / _jointHashes are sized by
+            // joint count, not vertex count, so they can be reused if the next
+            // model has a similar skeleton. We only invalidate them when sizes differ
+            // (handled in EnsureBuffers). Clearing here would force a re-hash on
+            // every reload, which is expensive.
+        }
+
         private void EnsureBuffers(RigResource skeleton, SkinnedMesh skin, string modelName)
         {
+            if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationPlayer));
+
             int jointCount = skeleton.Joints.Count;
             if (_boneTransforms == null || _boneTransforms.Length != jointCount)
             {
@@ -60,7 +85,7 @@ namespace AssetsManager.Services.Viewer
 
                 var posAccessor = skin.VerticesView.GetAccessor(VertexElement.POSITION.Name);
                 _cachedPositions = posAccessor.AsVector3Array().ToArray();
-                
+
                 var blendIdxAccessor = skin.VerticesView.GetAccessor(VertexElement.BLEND_INDEX.Name);
                 _cachedBlendIndices = blendIdxAccessor.AsXyzwU8Array().ToArray();
 
@@ -72,8 +97,9 @@ namespace AssetsManager.Services.Viewer
         }
 
         public void Update(float totalSeconds, IAnimationAsset animation, RigResource skeleton, SkinnedMesh skin,
-            List<ModelPart> modelParts, LinesVisual3D skeletonVisual, PointsVisual3D jointsVisual, string modelName)
+            System.Collections.Generic.IList<ModelPart> modelParts, LinesVisual3D skeletonVisual, PointsVisual3D jointsVisual, string modelName)
         {
+            if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
             {
                 return;
@@ -180,9 +206,21 @@ namespace AssetsManager.Services.Viewer
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "CRASH: Exception during skinning!");
+                _logService.LogError(ex, "Error during skinning.");
                 return;
             }
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed) return;
+            _isDisposed = true;
+
+            // Clear persistent buffers so the GC can reclaim the memory
+            ClearCache();
+            _boneTransforms = null;
+            _finalBoneTransforms = null;
+            _jointHashes = null;
         }
     }
 }
