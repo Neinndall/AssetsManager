@@ -17,6 +17,6 @@
                  BorderThickness="0"
                  VerticalContentAlignment="Center"
                  TextChanged="SearchTextBox_TextChanged"
-                 Tag="Search files..."/>
+                 Tag="{Binding Tag, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
     </Border>
 </UserControl>

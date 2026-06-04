@@ -80,7 +80,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     UpdateFieldOfView();
                     break;
                 case nameof(ViewerViewportModel.IsTransparentBg):
-                    SetGroundVisibility(!_viewModel.IsTransparentBg);
+                case nameof(ViewerViewportModel.IsGroundVisible):
+                    SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
@@ -335,6 +336,8 @@ namespace AssetsManager.Views.Controls.Viewer
             // CRITICAL: Free cached vertex/skin buffers from the previous model so
             // the next load does not retain RAM of a model that is no longer in use.
             _animationPlayer?.ClearCache();
+
+            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
         public void AddModel(SceneModel model)
@@ -348,6 +351,7 @@ namespace AssetsManager.Views.Controls.Viewer
             
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
+            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
         public void RemoveModel(SceneModel model)
@@ -372,6 +376,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 Viewport.Children.Remove(model.RootVisual);
             }
             model.Dispose();
+            _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)

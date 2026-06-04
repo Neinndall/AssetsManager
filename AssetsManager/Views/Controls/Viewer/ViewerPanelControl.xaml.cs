@@ -2,8 +2,10 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using LeagueToolkit.Core.Animation;
@@ -13,6 +15,7 @@ using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Controls.Shared;
 using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -50,12 +53,17 @@ namespace AssetsManager.Views.Controls.Viewer
             InitializeComponent();
 
             _viewModel.LoadedModels.CollectionChanged += OnLoadedModelsCollectionChanged;
+            _viewModel.AnimationModels.CollectionChanged += OnAnimationModelsCollectionChanged;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+            UpdateHeroStats();
+            UpdateHeroSubtitle();
+            UpdateInspectorInfo();
 
             Unloaded += OnPanelUnloaded;
         }
 
-        private void OnLoadedModelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void OnLoadedModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.NewItems != null)
             {
@@ -72,6 +80,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
                 }
             }
+            UpdateHeroStats();
+        }
+
+        private void OnAnimationModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateHeroStats();
         }
 
         private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -93,6 +107,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
                 }
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.SelectedModelParts))
+            {
+                UpdateHeroStats();
             }
         }
 
@@ -191,6 +209,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 // constructor so the panel can be garbage-collected without leaking
                 // references to the ViewModel singleton.
                 _viewModel.LoadedModels.CollectionChanged -= OnLoadedModelsCollectionChanged;
+                _viewModel.AnimationModels.CollectionChanged -= OnAnimationModelsCollectionChanged;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
                 // Also detach MeshVisibilityChanged from any model still in the list,
@@ -227,6 +246,12 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.AnimationModels.Clear();
             _viewModel.SelectedModel = null;
 
+            // Reset search states for clean re-entry
+            _viewModel.ModelsSearchText = string.Empty;
+            _viewModel.AnimationsSearchText = string.Empty;
+            if (ModelsSearchBox != null) ModelsSearchBox.Text = string.Empty;
+            if (AnimationsSearchBox != null) AnimationsSearchBox.Text = string.Empty;
+
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
 
@@ -235,6 +260,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LoadAnimationButton.IsEnabled = true;
             }
+
+            UpdateHeroStats();
         }
 
         private void DeleteModelButton_Click(object sender, RoutedEventArgs e)
@@ -742,6 +769,93 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.ViewportViewModel.FieldOfView = 45;
                 _viewModel.ViewportViewModel.IsTransparentBg = false;
                 _viewModel.ViewportViewModel.ShowSkybox = true;
+            }
+        }
+
+        // ===== Control Deck navigation handlers =====
+
+        private void ExpandAllToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is ToggleButton toggle)
+            {
+                _viewModel.SetAllSectionsExpanded(toggle.IsChecked == true);
+            }
+        }
+
+        private void ModelsSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is SearchBoxControl searchBox)
+            {
+                _viewModel.ModelsSearchText = searchBox.Text;
+            }
+        }
+
+        private void AnimationsSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is SearchBoxControl searchBox)
+            {
+                _viewModel.AnimationsSearchText = searchBox.Text;
+            }
+        }
+
+        private void ResetAllTransforms_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.SelectedModel == null) return;
+            if (PositionXLock.IsChecked == false) _viewModel.SelectedModel.PositionX = 0;
+            if (PositionYLock.IsChecked == false) _viewModel.SelectedModel.PositionY = SceneElements.GroundLevel;
+            if (PositionZLock.IsChecked == false) _viewModel.SelectedModel.PositionZ = 0;
+            if (RotationXLock.IsChecked == false) _viewModel.SelectedModel.RotationX = 0;
+            if (RotationYLock.IsChecked == false) _viewModel.SelectedModel.RotationY = 0;
+            if (RotationZLock.IsChecked == false) _viewModel.SelectedModel.RotationZ = 0;
+            if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
+        }
+
+        private void TabScene_Checked(object sender, RoutedEventArgs e) => UpdateHeroSubtitle();
+        private void TabEnvironment_Checked(object sender, RoutedEventArgs e) => UpdateHeroSubtitle();
+        private void TabMeshes_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabTransform_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabAnimations_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+
+        // ===== Hero & Inspector update helpers =====
+
+        private void UpdateHeroStats()
+        {
+            if (HeroModelsCountText != null)
+                HeroModelsCountText.Text = _viewModel.LoadedModels.Count.ToString();
+            if (HeroAnimsCountText != null)
+                HeroAnimsCountText.Text = _viewModel.AnimationModels.Count.ToString();
+            if (HeroMeshesCountText != null)
+                HeroMeshesCountText.Text = _viewModel.MeshPartCount.ToString();
+            if (ModelsCounterText != null)
+                ModelsCounterText.Text = _viewModel.LoadedModels.Count.ToString();
+        }
+
+        private void UpdateHeroSubtitle()
+        {
+            if (HeroSubtitleText == null) return;
+            HeroSubtitleText.Text = TabEnvironment != null && TabEnvironment.IsChecked == true
+                ? "Studio Environment"
+                : "Scene Editor";
+        }
+
+        private void UpdateInspectorInfo()
+        {
+            if (InspectorCounterText == null) return;
+
+            if (TabMeshes != null && TabMeshes.IsChecked == true)
+            {
+                InspectorCounterText.Text = "M";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Textures & meshes";
+            }
+            else if (TabTransform != null && TabTransform.IsChecked == true)
+            {
+                InspectorCounterText.Text = "T";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Transform & rotation";
+            }
+            else if (TabAnimations != null && TabAnimations.IsChecked == true)
+            {
+                InspectorCounterText.Text = "A";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
             }
         }
     }

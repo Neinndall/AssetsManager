@@ -19,6 +19,8 @@ namespace AssetsManager.Views.Models.Viewer
         private double _lightRotation = 0; // Phi
         private double _lightHeight = 0;   // Theta
         private double _fieldOfView = 45;
+        private bool _isGroundVisible = true;
+        private string _sceneDisplayName = "No model loaded";
 
         public bool IsFpsVisible
         {
@@ -42,6 +44,32 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isToolbarVisible;
             set { if (_isToolbarVisible != value) { _isToolbarVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsGroundVisible
+        {
+            get => _isGroundVisible;
+            set { if (_isGroundVisible != value) { _isGroundVisible = value; OnPropertyChanged(); } }
+        }
+
+        public string SceneDisplayName
+        {
+            get => _sceneDisplayName;
+            private set { if (_sceneDisplayName != value) { _sceneDisplayName = value; OnPropertyChanged(); } }
+        }
+
+        /// <summary>
+        /// Updates the scene badge label based on the current model list state.
+        /// Called by the ViewportControl whenever the loaded models collection changes.
+        /// </summary>
+        public void UpdateSceneDisplay(int modelCount, string firstModelName)
+        {
+            if (modelCount == 0)
+                SceneDisplayName = "No model loaded";
+            else if (modelCount == 1)
+                SceneDisplayName = string.IsNullOrEmpty(firstModelName) ? "Untitled model" : firstModelName;
+            else
+                SceneDisplayName = $"{modelCount} models";
         }
 
         public double AmbientIntensity

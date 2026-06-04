@@ -54,12 +54,6 @@ namespace AssetsManager.Services.Viewer
             _cachedBlendIndices = null;
             _cachedBlendWeights = null;
             _skinnedVertices = null;
-
-            // _boneTransforms / _finalBoneTransforms / _jointHashes are sized by
-            // joint count, not vertex count, so they can be reused if the next
-            // model has a similar skeleton. We only invalidate them when sizes differ
-            // (handled in EnsureBuffers). Clearing here would force a re-hash on
-            // every reload, which is expensive.
         }
 
         private void EnsureBuffers(RigResource skeleton, SkinnedMesh skin, string modelName)

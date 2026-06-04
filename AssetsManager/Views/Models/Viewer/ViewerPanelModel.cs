@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
 using Material.Icons;
@@ -33,6 +35,32 @@ namespace AssetsManager.Views.Models.Viewer
         private SceneModel _selectedModel;
         private AnimationModel _selectedAnimation;
 
+        public ViewerPanelModel()
+        {
+            _loadedModels.CollectionChanged += (_, __) =>
+            {
+                OnPropertyChanged(nameof(HasLoadedModels));
+                OnPropertyChanged(nameof(HasMultipleModels));
+                OnPropertyChanged(nameof(FilteredModels));
+            };
+            _animationModels.CollectionChanged += (_, __) =>
+            {
+                OnPropertyChanged(nameof(HasAnimations));
+                OnPropertyChanged(nameof(HasMultipleAnimations));
+                OnPropertyChanged(nameof(FilteredAnimations));
+            };
+        }
+
+        // --- Navigation State (Control Deck v3.3) ---
+        private bool _isModelsSectionExpanded = true;
+        private bool _isInspectorSectionExpanded = true;
+        private bool _isEnvironmentSectionExpanded = false;
+        private bool _isCameraSectionExpanded = false;
+        private bool _isLightingSectionExpanded = false;
+        private bool _isRenderSectionExpanded = false;
+        private string _modelsSearchText = string.Empty;
+        private string _animationsSearchText = string.Empty;
+
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
 
@@ -57,13 +85,13 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableRangeCollection<ModelPart> SelectedModelParts
         {
             get => _selectedModelParts;
-            set { if (_selectedModelParts != value) { _selectedModelParts = value; OnPropertyChanged(); } }
+            set { if (_selectedModelParts != value) { _selectedModelParts = value; OnPropertyChanged(); OnPropertyChanged(nameof(MeshPartCount)); } }
         }
 
         public SceneModel SelectedModel
         {
             get => _selectedModel;
-            set { if (_selectedModel != value) { _selectedModel = value; OnPropertyChanged(); } }
+            set { if (_selectedModel != value) { _selectedModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasSelectedModel)); } }
         }
 
         public AnimationModel SelectedAnimation
@@ -120,6 +148,124 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _loadButtonIcon;
             private set { _loadButtonIcon = value; OnPropertyChanged(); }
+        }
+
+        // --- Navigation State (Control Deck v3.3) ---
+
+        public bool IsModelsSectionExpanded
+        {
+            get => _isModelsSectionExpanded;
+            set { if (_isModelsSectionExpanded != value) { _isModelsSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsInspectorSectionExpanded
+        {
+            get => _isInspectorSectionExpanded;
+            set { if (_isInspectorSectionExpanded != value) { _isInspectorSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsEnvironmentSectionExpanded
+        {
+            get => _isEnvironmentSectionExpanded;
+            set { if (_isEnvironmentSectionExpanded != value) { _isEnvironmentSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsCameraSectionExpanded
+        {
+            get => _isCameraSectionExpanded;
+            set { if (_isCameraSectionExpanded != value) { _isCameraSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsLightingSectionExpanded
+        {
+            get => _isLightingSectionExpanded;
+            set { if (_isLightingSectionExpanded != value) { _isLightingSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsRenderSectionExpanded
+        {
+            get => _isRenderSectionExpanded;
+            set { if (_isRenderSectionExpanded != value) { _isRenderSectionExpanded = value; OnPropertyChanged(); } }
+        }
+
+        public string ModelsSearchText
+        {
+            get => _modelsSearchText;
+            set
+            {
+                var v = value ?? string.Empty;
+                if (_modelsSearchText != v)
+                {
+                    _modelsSearchText = v;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasModelsSearchText));
+                    OnPropertyChanged(nameof(FilteredModels));
+                }
+            }
+        }
+
+        public string AnimationsSearchText
+        {
+            get => _animationsSearchText;
+            set
+            {
+                var v = value ?? string.Empty;
+                if (_animationsSearchText != v)
+                {
+                    _animationsSearchText = v;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasAnimationsSearchText));
+                    OnPropertyChanged(nameof(FilteredAnimations));
+                }
+            }
+        }
+
+        public bool HasModelsSearchText => !string.IsNullOrWhiteSpace(_modelsSearchText);
+        public bool HasAnimationsSearchText => !string.IsNullOrWhiteSpace(_animationsSearchText);
+
+        public IEnumerable<SceneModel> FilteredModels
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_modelsSearchText)) return _loadedModels;
+                return _loadedModels.Where(m =>
+                    m != null && m.Name != null &&
+                    m.Name.IndexOf(_modelsSearchText, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+        }
+
+        public IEnumerable<AnimationModel> FilteredAnimations
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(_animationsSearchText)) return _animationModels;
+                return _animationModels.Where(a =>
+                    a != null && a.Name != null &&
+                    a.Name.IndexOf(_animationsSearchText, StringComparison.OrdinalIgnoreCase) >= 0);
+            }
+        }
+
+        public int MeshPartCount => _selectedModelParts?.Count ?? 0;
+
+        public bool HasSelectedModel => _selectedModel != null;
+        public bool HasLoadedModels => _loadedModels.Count > 0;
+        public bool HasAnimations => _animationModels.Count > 0;
+        public bool HasMultipleModels => _loadedModels.Count >= 3;
+        public bool HasMultipleAnimations => _animationModels.Count >= 3;
+
+        // --- Commands / Actions ---
+
+        /// <summary>
+        /// Expands or collapses every collapsible section in the panel at once.
+        /// </summary>
+        public void SetAllSectionsExpanded(bool expanded)
+        {
+            IsModelsSectionExpanded = expanded;
+            IsInspectorSectionExpanded = expanded;
+            IsEnvironmentSectionExpanded = expanded;
+            IsCameraSectionExpanded = expanded;
+            IsLightingSectionExpanded = expanded;
+            IsRenderSectionExpanded = expanded;
         }
 
         private void UpdateModeData()

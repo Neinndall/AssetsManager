@@ -1081,4 +1081,88 @@
         </Style.Triggers>
     </Style>
 
+    <!-- [ViewerPanelControl.xaml] Collapsible section header (ToggleButton) with hover overlay and accent strip -->
+    <Style x:Key="CollapsibleSectionHeaderStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Padding" Value="4,2"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Border x:Name="HoverOverlay" Background="{StaticResource HoverColor}" CornerRadius="10" Opacity="0"/>
+                        <Border x:Name="AccentStrip" 
+                                Background="{StaticResource AccentBrush}" 
+                                Width="3" 
+                                CornerRadius="1.5"
+                                HorizontalAlignment="Left" 
+                                Margin="2,6,0,6" 
+                                Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#FF5C85FF" Opacity="0.6"/>
+                            </Border.Effect>
+                        </Border>
+                        <ContentPresenter Margin="{TemplateBinding Padding}" 
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                          VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="HoverOverlay" Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="AccentStrip" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- [ViewerPanelControl.xaml] Hero stat badge (compact counter for the hero card) -->
+    <Style x:Key="HeroStatBadgeStyle" TargetType="Border">
+        <Setter Property="Background" Value="#15FFFFFF"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,6"/>
+        <Setter Property="BorderBrush" Value="#22FFFFFF"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- [ViewerPanelControl.xaml] Animated chevron for collapsible section headers.
+         Auto-rotates -90° (collapses to right) when the parent ToggleButton is unchecked. -->
+    <Style x:Key="CollapsibleSectionChevronStyle" TargetType="materialIcons:MaterialIcon">
+        <Setter Property="Kind" Value="ChevronDown"/>
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="16"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+        <Setter Property="RenderTransform">
+            <Setter.Value>
+                <RotateTransform Angle="0"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ToggleButton}, Path=IsChecked}" Value="False">
+                <DataTrigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="-90" Duration="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </DataTrigger.EnterActions>
+                <DataTrigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" To="0" Duration="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </DataTrigger.ExitActions>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
 </ResourceDictionary>
