@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -29,6 +30,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public HelixViewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
+        public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
@@ -110,10 +112,30 @@ namespace AssetsManager.Views.Controls.Viewer
             Cleanup();
         }
 
-        public void RegisterEnvironment(ModelVisual3D sky, ModelVisual3D ground)
+        public void SetupScene(bool isMapGeometry)
         {
-            _skyVisual = sky;
-            _groundVisual = ground;
+            if (isMapGeometry)
+            {
+                if (_skyVisual != null && Viewport.Children.Contains(_skyVisual))
+                    Viewport.Children.Remove(_skyVisual);
+                if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
+                    Viewport.Children.Remove(_groundVisual);
+                _skyVisual = null;
+                _groundVisual = null;
+                return;
+            }
+
+            if (_groundVisual == null)
+            {
+                _groundVisual = SceneElements.CreateGroundPlane(p => SceneElements.LoadSceneTexture(p, LogService), LogService.LogError, AppSettings?.CustomFloorTexturePath);
+                Viewport.Children.Add(_groundVisual);
+            }
+
+            if (_skyVisual == null)
+            {
+                _skyVisual = SceneElements.CreateSidePlanes(p => SceneElements.LoadSceneTexture(p, LogService), LogService.LogError);
+                Viewport.Children.Add(_skyVisual);
+            }
 
             // Ensure initial state is applied
             SetGroundVisibility(!_viewModel.IsTransparentBg);

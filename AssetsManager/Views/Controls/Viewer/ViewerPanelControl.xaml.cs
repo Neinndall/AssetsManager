@@ -34,7 +34,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public TaskCancellationManager TaskCancellationManager { get; set; }
 
         // Peer Controls (Direct communication)
-        public ViewerWindow ParentWindow { get; set; }
+        public ViewerWindowModel WindowViewModel { get; set; }
         public ViewerViewportControl Viewport { get; set; }
         public ChromaSelectionControl ChromaGallery { get; set; }
 
@@ -283,17 +283,17 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_currentMode == ViewerType.Skn)
             {
-                await ParentWindow?.OpenSknModel();
+                await OpenSknModel();
             }
             else
             {
-                await ParentWindow?.OpenMapGeometry();
+                await OpenMapGeometry();
             }
         }
 
         private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
         {
-            ParentWindow?.OpenChromaFolder();
+            OpenChromaFolder();
         }
 
         /// <summary>
@@ -430,7 +430,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    ParentWindow?.SetupScene(false);
+                    Viewport?.SetupScene(false);
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
@@ -590,7 +590,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                ParentWindow?.SetupScene(true);
+                Viewport?.SetupScene(true);
                 ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
@@ -672,6 +672,58 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_viewModel.SelectedModel == null) return;
             if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
+        }
+
+        // DIALOG METHODS (moved from ViewerWindow for passive orchestrator pattern)
+        public async Task OpenSknModel()
+        {
+            var openFileDialog = new CommonOpenFileDialog
+            {
+                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), new CommonFileDialogFilter("All Files", "*.*") },
+                Title = "Select a model file"
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var extension = Path.GetExtension(openFileDialog.FileName).ToLower();
+                if (extension == ".skl") LoadSkeleton(openFileDialog.FileName);
+                else await LoadInitialModel(openFileDialog.FileName);
+            }
+        }
+
+        public void OpenChromaFolder()
+        {
+            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the 'skins' folder" };
+
+            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
+            }
+        }
+
+        public async Task OpenMapGeometry()
+        {
+            var openMapGeoDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo") }, Title = "Select a mapgeo file" };
+
+            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                string mapGeoPath = openMapGeoDialog.FileName;
+                string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
+
+                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select map root" };
+                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    if (WindowViewModel != null)
+                    {
+                        WindowViewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
+                        WindowViewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
+                        WindowViewModel.IsLoadingVisible = true;
+                    }
+                    await LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
+                    if (WindowViewModel != null)
+                        WindowViewModel.IsLoadingVisible = false;
+                }
+            }
         }
 
         // STUDIO HANDLERS
