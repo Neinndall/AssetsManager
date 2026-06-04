@@ -8,20 +8,9 @@ using System.Windows.Media;
 namespace AssetsManager.Views.Helpers
 {
     /// <summary>
-    /// Attached property that forces every wheel event over a <see cref="ScrollViewer"/>'s
-    /// descendants to scroll that viewer, never the inner controls.
-    ///
-    /// Uses the <b>tunneling</b> (Preview) phase so the event is intercepted before it
-    /// reaches nested controls (Sliders, ComboBoxes, ListBoxes, inner ScrollViewers, etc.)
-    /// that would otherwise mark it as handled and stop the outer from scrolling.
-    ///
-    /// <b>Exception:</b> when the wheel originates inside an open <see cref="Popup"/>
-    /// (e.g. a ComboBox dropdown), the event is allowed to bubble so the popup's own
-    /// scrollviewer can handle the scroll. Without this, the user would be unable to
-    /// scroll the dropdown list with the wheel.
-    ///
-    /// Apply on a root ScrollViewer with <c>helpers:ScrollBubbleHelper.BubbleScroll="True"</c>
-    /// and any wheel movement over its descendants will always scroll that viewer.
+    /// Attached property that routes wheel events to a root <see cref="ScrollViewer"/>
+    /// via tunneling, while gracefully yielding to nested scrollable areas and open
+    /// ComboBox dropdowns so they can scroll natively.
     /// </summary>
     public static class ScrollBubbleHelper
     {

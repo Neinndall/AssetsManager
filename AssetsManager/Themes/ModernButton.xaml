@@ -1122,15 +1122,6 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerPanelControl.xaml] Hero stat badge (compact counter for the hero card) -->
-    <Style x:Key="HeroStatBadgeStyle" TargetType="Border">
-        <Setter Property="Background" Value="#15FFFFFF"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="10,6"/>
-        <Setter Property="BorderBrush" Value="#22FFFFFF"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-
     <!-- [ViewerPanelControl.xaml, TreeViewStyles.xaml] Animated chevron for any collapsible parent.
          Auto-rotates -90° (collapses to right) when the parent ToggleButton is unchecked.
          Hover (over the parent ToggleButton) brightens the icon from TextSecondary to TextPrimary. -->
@@ -1168,79 +1159,6 @@
                 </DataTrigger.ExitActions>
             </DataTrigger>
         </Style.Triggers>
-    </Style>
-
-    <!-- [ViewerPanelControl.xaml] Speed preset chip (radio styled as compact pill).
-         Use with EqualityConverter binding to highlight the currently active speed. -->
-    <Style x:Key="SpeedPresetRadioStyle" TargetType="RadioButton">
-        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-        <Setter Property="FontSize" Value="10"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="MinWidth" Value="36"/>
-        <Setter Property="MinHeight" Value="26"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="Margin" Value="0,0,4,0"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Chip" Background="Transparent"
-                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                            CornerRadius="6" Padding="6,4">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chip" Property="Background" Value="{StaticResource HoverColor}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                        </Trigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Chip" Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- [ViewerPanelControl.xaml] Big circular play button (44x44, accent fill, white icon). -->
-    <Style x:Key="CircularPlayButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Grid>
-                        <Border x:Name="Glow" CornerRadius="22" Width="44" Height="44"
-                                Background="{TemplateBinding Background}" Opacity="0.35"
-                                Margin="-2">
-                            <Border.Effect>
-                                <BlurEffect Radius="6"/>
-                            </Border.Effect>
-                        </Border>
-                        <Border x:Name="Circle" CornerRadius="22" Width="44" Height="44"
-                                Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Circle" Property="Background" Value="{StaticResource AccentBlue}"/>
-                            <Setter TargetName="Glow" Property="Opacity" Value="0.55"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Circle" Property="Background" Value="{StaticResource AccentPurple}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
 </ResourceDictionary>
