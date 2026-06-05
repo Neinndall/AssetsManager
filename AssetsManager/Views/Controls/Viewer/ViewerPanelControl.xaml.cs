@@ -344,6 +344,26 @@ namespace AssetsManager.Views.Controls.Viewer
             Viewport?.TogglePauseResume(animationModel);
         }
 
+        private void CloseAnimationPlayer_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            // Stop playback if currently playing
+            if (animationModel.IsPlaying)
+            {
+                animationModel.IsPlaying = false;
+                Viewport?.TogglePauseResume(animationModel);
+            }
+
+            if (_currentlyPlayingAnimation == animationModel)
+            {
+                _currentlyPlayingAnimation = null;
+            }
+
+            // Clear the selection to hide the player (preserves the animation in the list)
+            _viewModel.SelectedAnimation = null;
+        }
+
         private void TextureThumbnail_Click(object sender, RoutedEventArgs e) { /* removed: see textures ComboBox */ }
 
         private async void LoadModelButton_Click(object sender, RoutedEventArgs e)

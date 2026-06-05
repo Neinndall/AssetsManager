@@ -43,11 +43,14 @@ New Features
   - Viewer / Compact Animation Rows: animations list redesigned for density with a per-item "ANIM" badge, freeing vertical space for the player panel.
   - Viewer / MODELS Hidden by Default: the Models hierarchy now starts collapsed when loading a model, maximizing Inspector space; expand manually when you need to switch models.
   - Viewer / Slim Animation Player: timeline scrubber, slim play/pause + stop/resume, and continuous speed slider (0.25x-2.0x) replace the old preset chips.
-  - Viewer / Unified Inner Scroll: scrolling over a nested list (animations, meshes) always scrolls the inner list natively and never falls back to the outer panel.
+  - Viewer / Unified Inner Scroll: scrolling over a nested list (animations, meshes) always scrolls the outer panel natively without getting trapped by inner scroll viewers.
   - UI / Unified Animated Chevrons: a single style now drives both Viewer section headers and FileExplorer tree expanders — consistent rotation, hover feedback, and timing across the entire app.
   - UI / Stable Selection Layout: card-based list items no longer shift their content when selected, so action buttons (trash, etc.) stay perfectly in place.
+  - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
 
 Improvements
+  - Viewer / Scroll wheel now always drives the main panel: scrolling over the mesh list, pose controls, or animation list no longer gets trapped by inner lists.
+  - Viewer / Animation player stays pinned just above the bottom dock for instant access to playback controls without scrolling.
   - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.
   - Core / Extreme Binary Parsing Efficiency: optimized BinaryReader extensions with Span and stackalloc to eliminate heap allocations during asset parsing, achieving a 130x speedup in string reading and zero-garbage metadata extraction.
   - Core / Zero-Redundancy Geometry Loading: refactored all model and environment constructors to eliminate redundant array copies, resulting in a 50% reduction in RAM usage for large 3D assets.
@@ -110,6 +113,7 @@ Improvements
     * Added a new `ComparisonKey` field to `HistoryEntry` and serialized access via `SemaphoreSlim` to prevent race conditions when archiving the same comparison concurrently.
 
 Bug Fixes
+  - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
   - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.
   - Explorer / Search filtering no longer logs false error messages when the user types rapidly (cancellation is now handled as expected behavior).

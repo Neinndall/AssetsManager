@@ -6,7 +6,6 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:viewer="clr-namespace:AssetsManager.Views.Models.Viewer"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
-             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              mc:Ignorable="d" 
              d:DesignHeight="850" d:DesignWidth="300">
 
@@ -18,6 +17,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/> <!-- Hero Card -->
                 <RowDefinition Height="*"/>    <!-- Content -->
+                <RowDefinition Height="Auto"/> <!-- Animation Player (sticky above dock) -->
                 <RowDefinition Height="Auto"/> <!-- Bottom Actions -->
             </Grid.RowDefinitions>
 
@@ -121,7 +121,6 @@
 
                 <!-- SCENE PANEL (Hierarchy + Inspector) -->
                 <ScrollViewer x:Name="ScenePanel"
-                              helpers:ScrollBubbleHelper.BubbleScroll="True"
                               VerticalScrollBarVisibility="Auto"
                               Visibility="{Binding IsChecked, ElementName=TabScene, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel Margin="14,0,14,14">
@@ -322,28 +321,10 @@
                                     </Border>
 
                                     <!-- Meshes list with texture dropdown (vertical layout, no selection, card-per-item) -->
-                                    <ListBox x:Name="MeshesListBox"
-                                             Grid.Row="1"
-                                             ItemsSource="{Binding SelectedModelParts}"
-                                             Background="Transparent"
-                                             BorderThickness="0"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Background" Value="Transparent"/>
-                                                <Setter Property="Padding" Value="0"/>
-                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                            <ContentPresenter />
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                        <ListBox.ItemTemplate>
+                                    <ItemsControl x:Name="MeshesListBox"
+                                                  Grid.Row="1"
+                                                  ItemsSource="{Binding SelectedModelParts}">
+                                        <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Background="{StaticResource CardBackground}" CornerRadius="8"
                                                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
@@ -378,15 +359,13 @@
                                                     </StackPanel>
                                                 </Border>
                                             </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </Grid>
 
                                 <!-- POSE / TRANSFORM -->
-                                <ScrollViewer x:Name="TransformPanel"
-                                              helpers:ScrollBubbleHelper.BubbleScroll="True"
-                                              VerticalScrollBarVisibility="Auto"
-                                              Visibility="{Binding IsChecked, ElementName=TabTransform, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid x:Name="TransformPanel"
+                                      Visibility="{Binding IsChecked, ElementName=TabTransform, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <StackPanel>
                                         <!-- Reset All Bar -->
                                         <Border Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="12,8" Margin="0,0,0,10">
@@ -591,14 +570,14 @@
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
-                                </ScrollViewer>
+                                </Grid>
 
                                 <!-- ANIMATIONS -->
                                 <Grid x:Name="AnimationsPanel"
                                       Visibility="{Binding IsChecked, ElementName=TabAnimations, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     
@@ -646,23 +625,20 @@
                                             </Grid>
                                         </Border>
                                     </StackPanel>
-                                    
-                                    <!-- Animations search + list -->
-                                    <Grid Grid.Row="1">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
 
-                                        <shared:SearchBoxControl x:Name="AnimationsSearchBox" 
-                                                                 Tag="Search animations..."
-                                                                 SearchTextChanged="AnimationsSearchBox_SearchTextChanged"
-                                                                 Height="44" Margin="0,0,0,8"
-                                                                 Visibility="{Binding HasMultipleAnimations, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                    <!-- Search -->
+                                    <shared:SearchBoxControl x:Name="AnimationsSearchBox"
+                                                             Grid.Row="1"
+                                                             Tag="Search animations..."
+                                                             SearchTextChanged="AnimationsSearchBox_SearchTextChanged"
+                                                             Height="44" Margin="0,0,0,8"
+                                                             Visibility="{Binding HasMultipleAnimations, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
+                                    <!-- Animations list (or empty state) -->
+                                    <Grid Grid.Row="2">
                                         <!-- Empty state for no animations -->
-                                        <Border Grid.Row="1" Background="{StaticResource CardBackground}" CornerRadius="10" 
-                                                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="10"
+                                                BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                                 Padding="14,16"
                                                 Visibility="{Binding HasAnimations, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                                             <StackPanel HorizontalAlignment="Center">
@@ -673,13 +649,15 @@
                                         </Border>
 
                                         <ListBox x:Name="AnimationsListBox"
-                                                 Grid.Row="1"
                                                  ItemsSource="{Binding FilteredAnimations}"
                                                  SelectedItem="{Binding SelectedAnimation, Mode=TwoWay}"
-                                                 Style="{StaticResource SmoothScrollListBox}"
                                                  ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
-                                                 MinHeight="120" MaxHeight="240"
                                                  Visibility="{Binding HasAnimations, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <ListBox.Template>
+                                                <ControlTemplate TargetType="ListBox">
+                                                    <ItemsPresenter />
+                                                </ControlTemplate>
+                                            </ListBox.Template>
                                             <ListBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <Grid>
@@ -703,94 +681,6 @@
                                             </ListBox.ItemTemplate>
                                         </ListBox>
                                     </Grid>
-                                    
-                                    <!-- Mini Player -->
-                                    <Border Grid.Row="2" x:Name="AnimationControlsPanel" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="14,12" Margin="0,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" DataContext="{Binding SelectedAnimation}" Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
-                                        <StackPanel>
-                                            <!-- Animation name header -->
-                                            <DockPanel LastChildFill="True" Margin="0,0,0,10">
-                                                <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="AnimationPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                            </DockPanel>
-
-                                            <!-- Timeline & Time Labels -->
-                                            <Grid Margin="0,0,0,10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Slider x:Name="AnimationSlider" Grid.Column="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="14" Style="{StaticResource HUDSliderStyle}"/>
-                                                <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
-                                                    <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
-                                                    <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                                                    <Run Text="{Binding TotalDuration, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
-                                                </TextBlock>
-                                            </Grid>
-
-                                            <!-- Transport row: Play/Pause | Stop | Speed slider+value -->
-                                            <Grid VerticalAlignment="Center">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-
-                                                <Button x:Name="PlayPauseButton" Grid.Column="0" Click="PlayPauseButton_Click"
-                                                        Width="32" Height="32" Margin="0,0,6,0"
-                                                        Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
-                                                        ToolTip="Play / Pause" VerticalAlignment="Center">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsPressed" Value="True">
-                                                                    <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                    <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
-                                                </Button>
-
-                                                <Button Grid.Column="1" Click="StopButton_Click"
-                                                        Width="32" Height="32" Margin="0,0,12,0"
-                                                        ToolTip="Pause / Resume" VerticalAlignment="Center" Cursor="Hand">
-                                                    <Button.Template>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <Border x:Name="Square" CornerRadius="4" Background="#E53935">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsPressed" Value="True">
-                                                                    <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Button.Template>
-                                                    <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
-                                                </Button>
-
-                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock Text="Speed" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                    <Slider Minimum="0.25" Maximum="2"
-                                                            Value="{Binding Speed, Mode=TwoWay}"
-                                                            IsMoveToPointEnabled="True" IsSnapToTickEnabled="False"
-                                                            VerticalAlignment="Center" Height="12" MinWidth="80"
-                                                            ToolTip="Playback speed"
-                                                            Style="{StaticResource HUDSliderStyle}"/>
-                                                    <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="38" TextAlignment="Right"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
                                 </Grid>
                             </Grid>
                         </StackPanel>
@@ -799,7 +689,6 @@
 
                 <!-- STUDIO PANEL (Environment) -->
                 <ScrollViewer x:Name="StudioPanel"
-                              helpers:ScrollBubbleHelper.BubbleScroll="True"
                               VerticalScrollBarVisibility="Auto"
                               Visibility="{Binding IsChecked, ElementName=TabEnvironment, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <StackPanel Margin="14,0,14,14">
@@ -999,9 +888,112 @@
             </Grid>
 
             <!-- ============================================ -->
+            <!-- ANIMATION PLAYER (sticky above Bottom Dock)  -->
+            <!-- ============================================ -->
+            <Border Grid.Row="2" x:Name="AnimationControlsPanel" 
+                    Background="{StaticResource CardBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="0,1,0,1" 
+                    Padding="14,12" 
+                    Margin="14,8,14,10"
+                    CornerRadius="12"
+                    DataContext="{Binding SelectedItem, ElementName=AnimationsListBox}" 
+                    Visibility="{Binding SelectedItem, ElementName=AnimationsListBox, Converter={StaticResource NullToVisibilityConverter}}">
+                <StackPanel>
+                    <!-- Animation name header -->
+                    <DockPanel LastChildFill="True" Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" 
+                                Click="CloseAnimationPlayer_Click" 
+                                Style="{StaticResource SmallCloseButtonStyle}" 
+                                Width="24" Height="24"
+                                ToolTip="Close player"/>
+                        <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="AnimationPlayOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    </DockPanel>
+
+                    <!-- Timeline & Time Labels -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="AnimationSlider" Grid.Column="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="14" Style="{StaticResource HUDSliderStyle}"/>
+                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
+                            <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                            <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
+                            <Run Text="{Binding TotalDuration, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
+                        </TextBlock>
+                    </Grid>
+
+                    <!-- Transport row: Play/Pause | Stop | Speed slider+value -->
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="PlayPauseButton" Grid.Column="0" Click="PlayPauseButton_Click"
+                                Width="32" Height="32" Margin="0,0,6,0"
+                                Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
+                                ToolTip="Play / Pause" VerticalAlignment="Center">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
+                        </Button>
+
+                        <Button Grid.Column="1" Click="StopButton_Click"
+                                Width="32" Height="32" Margin="0,0,12,0"
+                                ToolTip="Pause / Resume" VerticalAlignment="Center" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Square" CornerRadius="4" Background="#E53935">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
+                        </Button>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Speed" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Slider Minimum="0.25" Maximum="2"
+                                    Value="{Binding Speed, Mode=TwoWay}"
+                                    IsMoveToPointEnabled="True" IsSnapToTickEnabled="False"
+                                    VerticalAlignment="Center" Height="12" MinWidth="80"
+                                    ToolTip="Playback speed"
+                                    Style="{StaticResource HUDSliderStyle}"/>
+                            <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="38" TextAlignment="Right"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================================ -->
             <!-- BOTTOM DOCK (Quick Actions)                 -->
             <!-- ============================================ -->
-            <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="14,12">
+            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="14,12">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
