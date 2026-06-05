@@ -28,6 +28,7 @@ AssetsManager - League of Legends | v4.0.1.0
 MEDIUM UPDATE
 
 New Features
+  - Diff Viewer / Audio bank diffs in LIVE comparisons now show event names and structure (was raw HIRC bytes only).
   - Monitor / Pass Rewards Browser: implemented a multi-event caching system with dynamic event-named files and a dedicated UI selector.
   - Monitor / Image Comparison: added support for viewing image differences in Asset Watcher and History (previously unavailable).
   - Explorer / Narrative Metadata Expansion
@@ -116,6 +117,7 @@ Improvements
   - Viewer / Filtered models and animations lists now use cached results, keeping the panel responsive while typing in the search box.
 
 Bug Fixes
+  - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".
   - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
   - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.

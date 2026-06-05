@@ -28,7 +28,6 @@ namespace AssetsManager.Services.Core
         private readonly WadDiffProvider _wadDiffProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
-        private readonly JsonFormatterService _jsonFormatterService;
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
 
@@ -38,7 +37,6 @@ namespace AssetsManager.Services.Core
             WadDiffProvider wadDiffProvider,
             CustomMessageBoxService customMessageBoxService,
             LogService logService,
-            JsonFormatterService jsonFormatterService,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService)
         {
@@ -47,7 +45,6 @@ namespace AssetsManager.Services.Core
             _wadDiffProvider = wadDiffProvider;
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
-            _jsonFormatterService = jsonFormatterService;
             _audioBankService = audioBankService;
             _audioBankLinkerService = audioBankLinkerService;
         }
@@ -206,121 +203,158 @@ namespace AssetsManager.Services.Core
                 string backupRoot = !string.IsNullOrEmpty(sourceJsonPath) ? Path.GetDirectoryName(sourceJsonPath) : null;
                 if (string.IsNullOrEmpty(backupRoot))
                 {
-                    bool liveOk = await TryShowParsedAudioBankDiffAsync(
-                        () => _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldBnk, newBnkBytes),
-                        oldPath, newPath, owner, loadingWindow);
-                    if (!liveOk)
+                    loadingWindow.SetState(DiffLoadingState.ParsingAudioHierarchy);
+                    List<AudioEventNode> liveOldNodes;
+                    List<AudioEventNode> liveNewNodes;
+                    try
+                    {
+                        (liveOldNodes, liveNewNodes) = await _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldBnk, newBnkBytes);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Error resolving live audio bank diff; falling back to raw view.");
+                        await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
+                        return;
+                    }
+
+                    if (liveOldNodes == null || liveNewNodes == null)
                     {
                         await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
+                        return;
                     }
+
+                    loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+
+                    var settings = new JsonSerializerOptions
+                    {
+                        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                        WriteIndented = true
+                    };
+                    string oldJson = JsonSerializer.Serialize(liveOldNodes, settings);
+                    string newJson = JsonSerializer.Serialize(liveNewNodes, settings);
+
+                    if (oldJson == newJson)
+                    {
+                        loadingWindow.Close();
+                        _customMessageBoxService.ShowInfo("Information", "No differences found in parsed audio bank.", owner);
+                        return;
+                    }
+
+                    var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                    diffWindow.Owner = owner;
+                    await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
+                    diffWindow.ShowDialog();
+                    owner?.Activate();
                     return;
                 }
 
                 loadingWindow.SetState(DiffLoadingState.LinkingAudio);
 
-                List<AudioDependencyInfo> resolvedDeps = _audioBankLinkerService.ResolveAudioBankDependencies(diff);
-                Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
-                    .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-                bool clickedIsEventsBnk = (diff.NewPath ?? diff.OldPath ?? string.Empty).Contains("_events", StringComparison.OrdinalIgnoreCase);
-                string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
-                string baseName = Path.GetFileNameWithoutExtension(StripBankSuffix(fileName));
-
-                byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
-                byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
-                foreach (var dep in resolvedDeps)
                 {
-                    if (!depByPath.TryGetValue(dep.Path, out var assoc) || assoc == null)
+                    List<AudioDependencyInfo> resolvedDeps = _audioBankLinkerService.ResolveAudioBankDependencies(diff);
+                    Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
+                        .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                    bool clickedIsEventsBnk = (diff.NewPath ?? diff.OldPath ?? string.Empty).Contains("_events", StringComparison.OrdinalIgnoreCase);
+                    string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
+                    string baseName = Path.GetFileNameWithoutExtension(StripBankSuffix(fileName));
+
+                    byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
+                    byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
+                    foreach (var dep in resolvedDeps)
                     {
-                        continue;
+                        if (!depByPath.TryGetValue(dep.Path, out var assoc) || assoc == null)
+                        {
+                            continue;
+                        }
+
+                        byte[] oldBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType, isOld: true);
+                        byte[] newBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType, isOld: false);
+
+                        switch (dep.Type)
+                        {
+                            case AudioDependencyType.EventsBnk:
+                                oldEventsBnk = oldBytes;
+                                newEventsBnk = newBytes;
+                                break;
+                            case AudioDependencyType.AudioBnk:
+                                oldAudioBnk = oldBytes;
+                                newAudioBnk = newBytes;
+                                break;
+                            case AudioDependencyType.AudioWpk:
+                                oldWpk = oldBytes;
+                                newWpk = newBytes;
+                                break;
+                            case AudioDependencyType.Bin:
+                                oldBin = oldBytes;
+                                newBin = newBytes;
+                                break;
+                        }
                     }
 
-                    byte[] oldBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType, isOld: true);
-                    byte[] newBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType, isOld: false);
-
-                    switch (dep.Type)
+                    if (clickedIsEventsBnk)
                     {
-                        case AudioDependencyType.EventsBnk:
-                            oldEventsBnk = oldBytes;
-                            newEventsBnk = newBytes;
-                            break;
-                        case AudioDependencyType.AudioBnk:
-                            oldAudioBnk = oldBytes;
-                            newAudioBnk = newBytes;
-                            break;
-                        case AudioDependencyType.AudioWpk:
-                            oldWpk = oldBytes;
-                            newWpk = newBytes;
-                            break;
-                        case AudioDependencyType.Bin:
-                            oldBin = oldBytes;
-                            newBin = newBytes;
-                            break;
+                        oldEventsBnk = oldEventsBnk ?? oldBnk;
+                        newEventsBnk = newEventsBnk ?? newBnkBytes;
                     }
+                    else
+                    {
+                        oldAudioBnk = oldAudioBnk ?? oldBnk;
+                        newAudioBnk = newAudioBnk ?? newBnkBytes;
+                    }
+
+                    if (oldEventsBnk == null && oldAudioBnk == null)
+                    {
+                        await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
+                        return;
+                    }
+
+                    var oldNodes = _audioBankService.ParseAudioBank(
+                        wpkData: oldWpk,
+                        audioBnkData: oldAudioBnk,
+                        eventsData: oldEventsBnk,
+                        binData: oldBin,
+                        baseName: baseName,
+                        binType: BinType.Unknown);
+
+                    var newNodes = _audioBankService.ParseAudioBank(
+                        wpkData: newWpk,
+                        audioBnkData: newAudioBnk,
+                        eventsData: newEventsBnk,
+                        binData: newBin,
+                        baseName: baseName,
+                        binType: BinType.Unknown);
+
+                    if (oldNodes == null || newNodes == null)
+                    {
+                        await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
+                        return;
+                    }
+
+                    loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+
+                    var settings = new JsonSerializerOptions
+                    {
+                        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                        WriteIndented = true
+                    };
+                    string oldJson = JsonSerializer.Serialize(oldNodes, settings);
+                    string newJson = JsonSerializer.Serialize(newNodes, settings);
+
+                    if (oldJson == newJson)
+                    {
+                        loadingWindow.Close();
+                        _customMessageBoxService.ShowInfo("Information", "No differences found in parsed audio bank.", owner);
+                        return;
+                    }
+
+                    var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                    diffWindow.Owner = owner;
+                    await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
+                    diffWindow.ShowDialog();
+                    owner?.Activate();
                 }
-
-                if (clickedIsEventsBnk)
-                {
-                    oldEventsBnk = oldEventsBnk ?? oldBnk;
-                    newEventsBnk = newEventsBnk ?? newBnkBytes;
-                }
-                else
-                {
-                    oldAudioBnk = oldAudioBnk ?? oldBnk;
-                    newAudioBnk = newAudioBnk ?? newBnkBytes;
-                }
-
-                if (oldEventsBnk == null && oldAudioBnk == null)
-                {
-                    await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
-                    return;
-                }
-
-                var oldNodes = _audioBankService.ParseAudioBank(
-                    wpkData: oldWpk,
-                    audioBnkData: oldAudioBnk,
-                    eventsData: oldEventsBnk,
-                    binData: oldBin,
-                    baseName: baseName,
-                    binType: BinType.Unknown);
-
-                var newNodes = _audioBankService.ParseAudioBank(
-                    wpkData: newWpk,
-                    audioBnkData: newAudioBnk,
-                    eventsData: newEventsBnk,
-                    binData: newBin,
-                    baseName: baseName,
-                    binType: BinType.Unknown);
-
-                if (oldNodes == null || newNodes == null)
-                {
-                    await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
-                    return;
-                }
-
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
-
-                var settings = new JsonSerializerOptions
-                {
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    WriteIndented = true
-                };
-                string oldJson = JsonSerializer.Serialize(oldNodes, settings);
-                string newJson = JsonSerializer.Serialize(newNodes, settings);
-
-                if (oldJson == newJson)
-                {
-                    loadingWindow.Close();
-                    _customMessageBoxService.ShowInfo("Information", "No differences found in parsed audio bank.", owner);
-                    return;
-                }
-
-                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                diffWindow.Owner = owner;
-                await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
-                diffWindow.ShowDialog();
-                owner?.Activate();
             }
             catch (Exception ex)
             {
@@ -369,54 +403,6 @@ namespace AssetsManager.Services.Core
             if (fileName.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
                 return fileName.Substring(0, fileName.Length - 4);
             return fileName;
-        }
-
-        // Renders the side-by-side diff window for parsed audio bank trees
-        // produced by AudioBankLinkerService (either from the BACKUP archive or
-        // from the LIVE local-WAD resolution path). Shared by both flows so
-        // DiffViewService stays a thin orchestrator.
-        private async Task<bool> TryShowParsedAudioBankDiffAsync(
-            Func<Task<(List<AudioEventNode> oldNodes, List<AudioEventNode> newNodes)>> resolveNodesAsync,
-            string oldPath, string newPath, Window owner, LoadingDiffWindow loadingWindow)
-        {
-            try
-            {
-                loadingWindow.SetState(DiffLoadingState.ParsingAudioHierarchy);
-                var (oldNodes, newNodes) = await resolveNodesAsync();
-                if (oldNodes == null || newNodes == null)
-                {
-                    return false;
-                }
-
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
-
-                var settings = new JsonSerializerOptions
-                {
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    WriteIndented = true
-                };
-                string oldJson = JsonSerializer.Serialize(oldNodes, settings);
-                string newJson = JsonSerializer.Serialize(newNodes, settings);
-
-                if (oldJson == newJson)
-                {
-                    loadingWindow.Close();
-                    _customMessageBoxService.ShowInfo("Information", "No differences found in parsed audio bank.", owner);
-                    return true;
-                }
-
-                var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                diffWindow.Owner = owner;
-                await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
-                diffWindow.ShowDialog();
-                owner?.Activate();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Error showing parsed audio bank diff. Caller will fall back to raw view.");
-                return false;
-            }
         }
 
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
