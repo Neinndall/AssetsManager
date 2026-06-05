@@ -212,7 +212,7 @@ namespace AssetsManager.Services.Core
 
                 loadingWindow.SetState(DiffLoadingState.LinkingAudio);
 
-                List<AudioBankLinkerService.AudioDependencyInfo> resolvedDeps = _audioBankLinkerService.ResolveAudioBankDependencies(diff);
+                List<AudioDependencyInfo> resolvedDeps = _audioBankLinkerService.ResolveAudioBankDependencies(diff);
                 Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
                     .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -235,19 +235,19 @@ namespace AssetsManager.Services.Core
 
                     switch (dep.Type)
                     {
-                        case AudioBankLinkerService.AudioDependencyType.EventsBnk:
+                        case AudioDependencyType.EventsBnk:
                             oldEventsBnk = oldBytes;
                             newEventsBnk = newBytes;
                             break;
-                        case AudioBankLinkerService.AudioDependencyType.AudioBnk:
+                        case AudioDependencyType.AudioBnk:
                             oldAudioBnk = oldBytes;
                             newAudioBnk = newBytes;
                             break;
-                        case AudioBankLinkerService.AudioDependencyType.AudioWpk:
+                        case AudioDependencyType.AudioWpk:
                             oldWpk = oldBytes;
                             newWpk = newBytes;
                             break;
-                        case AudioBankLinkerService.AudioDependencyType.Bin:
+                        case AudioDependencyType.Bin:
                             oldBin = oldBytes;
                             newBin = newBytes;
                             break;

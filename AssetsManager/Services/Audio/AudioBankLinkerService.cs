@@ -490,21 +490,6 @@ namespace AssetsManager.Services.Audio
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
 
-        public record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
-
-        // Public metadata for an audio-bank dependency (used by DiffViewService
-        // to read bytes from the wad_chunks/old|new backup directory without
-        // re-running the resolution logic).
-        public enum AudioDependencyType { Bin, EventsBnk, AudioBnk, AudioWpk }
-
-        public class AudioDependencyInfo
-        {
-            public string Path { get; set; }
-            public string SourceWad { get; set; }
-            public ulong PathHash { get; set; }
-            public AudioDependencyType Type { get; set; }
-        }
-
         // String-based public entry point. Reuses the exact same 5-strategy
         // resolution as the FileSystemNodeModel overload so that WadPackagingService
         // (which works on SerializableChunkDiff / virtual paths) and DiffViewService
