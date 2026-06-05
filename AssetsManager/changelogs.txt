@@ -159,6 +159,7 @@ Bug Fixes
    - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
   - Comparator / File Type Detection: restored automatic extension assignment for images (PNG, JPG), audio banks (BNK), and 3D assets in nameless hash files, fixing the issue where some files appeared without an extension in comparison results.
   - Monitor / History Self-Heal: when a historical archive is detected as already archived but its physical folder is missing, the system now removes the orphan reference and creates a fresh snapshot automatically.
+  - Comparator / Modified Count Fidelity: comparison history now shows the same Modified count as the live comparison. Audio-bank support files (.bin) that are independently categorized as New/Modified/Removed/Renamed are no longer removed from the top-level list during packaging; they remain counted in their category while still being linked as a dependency of the parent audio bank for self-contained backups.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

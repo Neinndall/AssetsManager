@@ -189,12 +189,6 @@ namespace AssetsManager.Services.Comparator
                     {
                         audioBankDiff.Dependencies.Add(binDependency);
                         _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added .bin dependency for '{binStrategy.BinPath}'.");
-
-                        if (diffForBinDependency != null)
-                        {
-                            finalDiffs.Remove(diffForBinDependency);
-                            _logService.LogDebug($"[CreateLeanWadPackageAsync] Removed top-level diff (now embedded as dependency): '{binStrategy.BinPath}'.");
-                        }
                     }
                     else
                     {
