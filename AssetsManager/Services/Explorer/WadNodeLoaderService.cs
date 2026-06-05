@@ -43,15 +43,6 @@ namespace AssetsManager.Services.Explorer
 
             var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
 
-            int totalDeps = comparisonData?.Diffs?.Sum(d => d.Dependencies?.Count ?? 0) ?? 0;
-            int diffsWithDeps = comparisonData?.Diffs?.Count(d => d.Dependencies != null && d.Dependencies.Count > 0) ?? 0;
-            _logService.Log($"[DIAG_DESER] After Deserialize: {comparisonData?.Diffs?.Count ?? 0} diffs, {diffsWithDeps} with deps, {totalDeps} total deps");
-            var sampleAudioDiff = comparisonData?.Diffs?.FirstOrDefault(d => (d.NewPath ?? d.OldPath ?? "").EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase));
-            if (sampleAudioDiff != null)
-            {
-                _logService.Log($"[DIAG_DESER] Sample audio diff: '{sampleAudioDiff.NewPath ?? sampleAudioDiff.OldPath}', Deps count = {sampleAudioDiff.Dependencies?.Count ?? 0}");
-            }
-
             var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
             if (comparisonData?.Diffs == null || !comparisonData.Diffs.Any())
             {
@@ -104,10 +95,6 @@ namespace AssetsManager.Services.Explorer
 
                         node.ChunkDiff = file;
                         node.BackupChunkPath = chunkPath;
-                        if (file.NewPath?.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase) == true || file.NewPath?.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase) == true)
-                        {
-                            _logService.Log($"[DIAG_NODE] Setting ChunkDiff for '{file.NewPath}', Deps count = {file.Dependencies?.Count ?? 0}, node instance id = {node.GetHashCode()}, file instance id = {file.GetHashCode()}");
-                        }
                         if (file.Type == ChunkDiffType.Renamed)
                         {
                             node.OldPath = file.OldPath;

@@ -312,8 +312,6 @@ namespace AssetsManager.Services.Audio
             string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
             if (string.IsNullOrEmpty(pathForStrategy)) return deps;
 
-            _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS] Input: pathForStrategy='{pathForStrategy}', SourceWadFile='{audioBankDiff.SourceWadFile}'");
-
             // 1. .bin sibling (5 strategies)
             var binStrategy = GetBinFileSearchStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
             if (binStrategy != null)
@@ -324,9 +322,6 @@ namespace AssetsManager.Services.Audio
                 string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
                 string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
 
-                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Bin strategy: BinPath='{binVirtualPath}', TargetWadName='{binStrategy.TargetWadName}'");
-                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   sourceWadRelativePath='{sourceWadRelativePath}', sourceWadDirectory='{sourceWadDirectory}', sourceWadFileName='{sourceWadFileName}'");
-
                 if (string.Equals(sourceWadFileName, binStrategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
                 {
                     targetWadRelativePath = sourceWadRelativePath;
@@ -336,8 +331,6 @@ namespace AssetsManager.Services.Audio
                     targetWadRelativePath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
                 }
 
-                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Final bin dep: Path='{binVirtualPath}', SourceWad='{targetWadRelativePath}'");
-
                 deps.Add(new AudioDependencyInfo
                 {
                     Path = binVirtualPath,
@@ -346,18 +339,9 @@ namespace AssetsManager.Services.Audio
                     Type = AudioDependencyType.Bin
                 });
             }
-            else
-            {
-                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   No bin strategy found.");
-            }
 
             // 2. Sibling audio banks
             var siblings = GetAudioBankSiblings(pathForStrategy, audioBankDiff.SourceWadFile);
-            _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Siblings count: {siblings.Count}");
-            foreach (var s in siblings)
-            {
-                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]     Sibling: Path='{s.Path}', SourceWad='{s.SourceWad}', Type={s.Type}");
-            }
             deps.AddRange(siblings);
             return deps;
         }
@@ -485,8 +469,6 @@ namespace AssetsManager.Services.Audio
             string pathForStrategy = diff.NewPath ?? diff.OldPath;
             var binStrategy = GetBinFileSearchStrategy(pathForStrategy, sourceWadRelativePath);
 
-            _logService.Log($"[LIVE_AUDIO_BANK_DIFF] baseName='{baseName}', clickedIsEventsBnk={clickedIsEventsBnk}, binStrategy={(binStrategy != null ? binStrategy.ToString() : "null")}");
-
             byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
             byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
 
@@ -514,7 +496,6 @@ namespace AssetsManager.Services.Audio
 
             if (oldEventsBnk == null && oldAudioBnk == null && newEventsBnk == null && newAudioBnk == null)
             {
-                _logService.Log($"[LIVE_AUDIO_BANK_DIFF] No audio bank bytes resolved on either side. Caller will fall back to raw view.");
                 return (null, null);
             }
 
@@ -550,7 +531,6 @@ namespace AssetsManager.Services.Audio
             string sourceWadFullPath = Path.Combine(basePath, sourceWadRelativePath);
             if (!File.Exists(sourceWadFullPath))
             {
-                _logService.Log($"[LIVE_AUDIO_BANK_DIFF] Source WAD not found: '{sourceWadFullPath}'");
                 return (eventsBnk, audioBnk, wpk, bin);
             }
 
@@ -564,12 +544,10 @@ namespace AssetsManager.Services.Audio
                 if (wpkNode != null) wpk = await _wadContentProvider.GetVirtualFileBytesAsync(wpkNode);
                 if (audioBnkNode != null) audioBnk = await _wadContentProvider.GetVirtualFileBytesAsync(audioBnkNode);
                 if (eventsBnkNode != null) eventsBnk = await _wadContentProvider.GetVirtualFileBytesAsync(eventsBnkNode);
-
-                _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': eventsBnk={(eventsBnk?.Length ?? 0)}B, audioBnk={(audioBnk?.Length ?? 0)}B, wpk={(wpk?.Length ?? 0)}B");
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"[LIVE_AUDIO_BANK_DIFF] Failed reading source WAD: '{sourceWadFullPath}'");
+                _logService.LogError(ex, $"Failed reading source WAD: '{sourceWadFullPath}'");
             }
 
             if (binStrategy != null)
@@ -598,21 +576,12 @@ namespace AssetsManager.Services.Audio
                         if (binNode != null)
                         {
                             bin = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                            _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': bin={(bin?.Length ?? 0)}B (from '{targetWadRelativePath}')");
-                        }
-                        else
-                        {
-                            _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': .bin node '{binStrategy.BinPath}' NOT FOUND in '{targetWadRelativePath}'");
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogError(ex, $"[LIVE_AUDIO_BANK_DIFF] Failed reading target WAD for .bin: '{targetWadFullPath}'");
+                        _logService.LogError(ex, $"Failed reading target WAD for .bin: '{targetWadFullPath}'");
                     }
-                }
-                else
-                {
-                    _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': target WAD '{targetWadRelativePath}' not found on disk.");
                 }
             }
 

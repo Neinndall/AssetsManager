@@ -28,7 +28,6 @@ namespace AssetsManager.Services.Core
         private readonly WadDiffProvider _wadDiffProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
-        private static int s_audioBankDiffInvocation = 0;
         private readonly JsonFormatterService _jsonFormatterService;
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
@@ -192,9 +191,6 @@ namespace AssetsManager.Services.Core
         // cannot be linked, parsed, or the comparison has not been archived yet.
         private async Task HandleParsedAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow, string sourceJsonPath)
         {
-            _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] === FUNCTION ENTRY === sourceJsonPath='{sourceJsonPath}', oldPbePath='{oldPbePath}', newPbePath='{newPbePath}'");
-            _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Diff: NewPath='{diff.NewPath}', OldPath='{diff.OldPath}', SourceWadFile='{diff.SourceWadFile}', Type={diff.Type}");
-
             try
             {
                 loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData);
@@ -208,15 +204,11 @@ namespace AssetsManager.Services.Core
                 }
 
                 string backupRoot = !string.IsNullOrEmpty(sourceJsonPath) ? Path.GetDirectoryName(sourceJsonPath) : null;
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Computed backupRoot='{backupRoot}' (isNull={string.IsNullOrEmpty(backupRoot)})");
                 if (string.IsNullOrEmpty(backupRoot))
                 {
-                    int inv = ++s_audioBankDiffInvocation;
-                    _logService.Log($"[HELPER_VS_INLINE] #{inv} === LIVE BRANCH — will use TryShowParsedAudioBankDiffAsync helper ===");
                     bool liveOk = await TryShowParsedAudioBankDiffAsync(
                         () => _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldBnk, newBnkBytes),
                         oldPath, newPath, owner, loadingWindow);
-                    _logService.Log($"[HELPER_VS_INLINE] #{inv} === LIVE BRANCH END — helper returned {liveOk} ===");
                     if (!liveOk)
                     {
                         await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
@@ -230,26 +222,6 @@ namespace AssetsManager.Services.Core
                 Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
                     .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] === DIAGNOSTIC START ===");
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Clicked file: NewPath='{diff.NewPath}', OldPath='{diff.OldPath}', SourceWadFile='{diff.SourceWadFile}', Type={diff.Type}");
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] backupRoot='{backupRoot}'");
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Resolved deps count: {resolvedDeps.Count}");
-                for (int i = 0; i < resolvedDeps.Count; i++)
-                {
-                    var d = resolvedDeps[i];
-                    _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF]   ResolvedDep[{i}]: Path='{d.Path}', SourceWad='{d.SourceWad}', Type={d.Type}, PathHash={d.PathHash:X16}");
-                }
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] diff.Dependencies count: {(diff.Dependencies?.Count ?? 0)}");
-                if (diff.Dependencies != null)
-                {
-                    for (int i = 0; i < diff.Dependencies.Count; i++)
-                    {
-                        var d = diff.Dependencies[i];
-                        _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF]   JsonDep[{i}]: Path='{d.Path}', SourceWad='{d.SourceWad}', OldHash={d.OldPathHash:X16}, NewHash={d.NewPathHash:X16}, Compression={d.CompressionType}");
-                    }
-                }
-                _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] depByPath keys: [{string.Join(", ", depByPath.Keys.Select(k => "'" + k + "'"))}]");
 
                 bool clickedIsEventsBnk = (diff.NewPath ?? diff.OldPath ?? string.Empty).Contains("_events", StringComparison.OrdinalIgnoreCase);
                 string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
@@ -266,8 +238,6 @@ namespace AssetsManager.Services.Core
 
                     byte[] oldBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType, isOld: true);
                     byte[] newBytes = await TryReadBackupChunkAsync(backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType, isOld: false);
-
-                    _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Chunk read for dep.Path='{dep.Path}': oldBytes={(oldBytes?.Length ?? 0)}, newBytes={(newBytes?.Length ?? 0)}");
 
                     switch (dep.Type)
                     {
@@ -329,8 +299,6 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
-                int invBackup = ++s_audioBankDiffInvocation;
-                _logService.Log($"[HELPER_VS_INLINE] #{invBackup} === BACKUP BRANCH — INLINE show window (NOT using helper) ===");
                 loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
 
                 var settings = new JsonSerializerOptions
@@ -353,7 +321,6 @@ namespace AssetsManager.Services.Core
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
                 diffWindow.ShowDialog();
                 owner?.Activate();
-                _logService.Log($"[HELPER_VS_INLINE] #{invBackup} === BACKUP BRANCH END ===");
             }
             catch (Exception ex)
             {
@@ -384,7 +351,6 @@ namespace AssetsManager.Services.Core
                 if (string.IsNullOrEmpty(backupRoot) || hash == 0) return null;
                 string chunkDir = isOld ? "old" : "new";
                 string chunkPath = Path.Combine(backupRoot, "wad_chunks", chunkDir, sourceWad ?? string.Empty, $"{hash:X16}.chunk");
-                _logService.Log($"[TRY_READ_BACKUP_CHUNK] Looking for: '{chunkPath}' (exists: {File.Exists(chunkPath)})");
                 if (!File.Exists(chunkPath)) return null;
                 byte[] compressedData = File.ReadAllBytes(chunkPath);
                 return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
@@ -415,12 +381,10 @@ namespace AssetsManager.Services.Core
         {
             try
             {
-                _logService.Log($"[HELPER_VS_INLINE] === HELPER BODY ENTRY for invocation #{s_audioBankDiffInvocation} ===");
                 loadingWindow.SetState(DiffLoadingState.ParsingAudioHierarchy);
                 var (oldNodes, newNodes) = await resolveNodesAsync();
                 if (oldNodes == null || newNodes == null)
                 {
-                    _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Parsed audio nodes null on at least one side. Caller will fall back to raw view.");
                     return false;
                 }
 
