@@ -79,6 +79,17 @@ namespace AssetsManager.Views.Helpers
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MaximizeWindowCommand, (s, e) => SystemCommands.MaximizeWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.MinimizeWindowCommand, (s, e) => SystemCommands.MinimizeWindow(this)));
             this.CommandBindings.Add(new System.Windows.Input.CommandBinding(SystemCommands.RestoreWindowCommand, (s, e) => SystemCommands.RestoreWindow(this)));
+
+            this.Closed += OnHudWindowClosed;
+        }
+
+        private void OnHudWindowClosed(object sender, EventArgs e)
+        {
+            this.Closed -= OnHudWindowClosed;
+            
+            // Garantía de Retorno de Foco: Forzar activación del padre al cerrar
+            // Evita que Windows ceda el foco a aplicaciones de fondo (ej. Chrome, CLI)
+            this.Owner?.Activate();
         }
 
         private void HudWindow_StateChanged(object sender, EventArgs e)

@@ -128,7 +128,6 @@ namespace AssetsManager.Services.Core
                     imageDiffWindow.LoadingWindow = loadingWindow;
                     imageDiffWindow.LoadAndDisplayPreloadedBatchAsync(preparedImages, startIndex);
                     imageDiffWindow.ShowDialog();
-                    owner?.Activate();
                 }
                 else
                 {
@@ -164,17 +163,10 @@ namespace AssetsManager.Services.Core
                     await diffWindow.LoadAndDisplayPreloadedBatchAsync(preparedData, startIndex);
 
                     diffWindow.ShowDialog();
-                    owner?.Activate();
                 }
             }, "Batch WAD diff");
         }
 
-        // Parsed audio-bank diff: locates the bank siblings (audio.bnk / .wpk / .bin)
-        // via AudioBankLinkerService (the same 5-strategy .bin resolver + sibling
-        // detection used by WadPackagingService.CreateLeanWadPackageAsync), then
-        // reads the bytes exclusively from the comparison's wad_chunks/old|new
-        // directory. Falls back to the standard raw-JSON text view when the bank
-        // cannot be linked, parsed, or the comparison has not been archived yet.
         private async Task HandleParsedAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow, string sourceJsonPath)
         {
             try
@@ -184,7 +176,6 @@ namespace AssetsManager.Services.Core
 
                 if (oldData is not byte[] oldBnk || newData is not byte[] newBnkBytes)
                 {
-                    // Defensive: if either side is missing, fall through to raw text view.
                     await ShowTextComparisonInternal((byte[])oldData, (byte[])newData, "bnk", oldPath, newPath, owner, loadingWindow);
                     return;
                 }
@@ -230,7 +221,6 @@ namespace AssetsManager.Services.Core
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
                 diffWindow.ShowDialog();
-                owner?.Activate();
             }
             catch (Exception ex)
             {
@@ -283,7 +273,6 @@ namespace AssetsManager.Services.Core
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath, loadingWindow);
 
             diffWindow.ShowDialog();
-            owner?.Activate();
         }
 
         private async Task ShowImageComparisonInternal(byte[] oldData, byte[] newData, string oldPath, string newPath, string extension, Window owner, LoadingDiffWindow loadingWindow)
@@ -299,7 +288,6 @@ namespace AssetsManager.Services.Core
             };
             
             imageDiffWindow.ShowDialog();
-            owner?.Activate();
         }
 
         public async Task ShowFileDiffAsync(string oldFilePath, string newFilePath, Window owner)
@@ -362,7 +350,6 @@ namespace AssetsManager.Services.Core
                    SupportedFileTypes.PlainText.Contains(extension);
         }
 
-        // Centraliza el ciclo de vida de la ventana de carga
         private async Task RunWithLoadingAsync(Window owner, Func<LoadingDiffWindow, Task> body, string operationLabel)
         {
             var loadingWindow = new LoadingDiffWindow { Owner = owner };

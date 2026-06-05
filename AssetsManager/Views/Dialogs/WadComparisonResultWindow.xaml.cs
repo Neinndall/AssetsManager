@@ -174,6 +174,7 @@ namespace AssetsManager.Views.Dialogs
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
+
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
