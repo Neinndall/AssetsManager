@@ -51,7 +51,15 @@ namespace AssetsManager.Services.Core
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
         {
+            if (diff == null) return;
+
             var pathForCheck = diff.NewPath ?? diff.OldPath;
+            if (!IsDiffSupported(pathForCheck))
+            {
+                _customMessageBoxService.ShowInfo("Info", "This file type cannot be displayed in the difference viewer.", owner);
+                return;
+            }
+
             string extension = Path.GetExtension(pathForCheck).ToLowerInvariant();
 
             var loadingWindow = new LoadingDiffWindow { Owner = owner };
@@ -59,7 +67,7 @@ namespace AssetsManager.Services.Core
 
             try
             {
-                if (SupportedFileTypes.IsImage(pathForCheck))
+                if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
                 {
                     await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension, loadingWindow);
                 }
@@ -505,6 +513,25 @@ namespace AssetsManager.Services.Core
             await Task.WhenAll(oldTextTask, newTextTask);
 
             return (await oldTextTask, await newTextTask);
+        }
+
+        private bool IsDiffSupported(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath)) return false;
+
+            string extension = Path.GetExtension(filePath).ToLowerInvariant();
+
+            return SupportedFileTypes.Images.Contains(extension) ||
+                   SupportedFileTypes.Textures.Contains(extension) ||
+                   SupportedFileTypes.Json.Contains(extension) ||
+                   SupportedFileTypes.JavaScript.Contains(extension) ||
+                   SupportedFileTypes.Css.Contains(extension) ||
+                   SupportedFileTypes.Bin.Contains(extension) ||
+                   SupportedFileTypes.StringTable.Contains(extension) ||
+                   SupportedFileTypes.Troybin.Contains(extension) ||
+                   SupportedFileTypes.Preload.Contains(extension) ||
+                   extension == ".bnk" ||
+                   SupportedFileTypes.PlainText.Contains(extension);
         }
     }
 }
