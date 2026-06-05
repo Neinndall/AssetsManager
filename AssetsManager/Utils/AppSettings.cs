@@ -3,6 +3,8 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Shared;
@@ -60,7 +62,7 @@ namespace AssetsManager.Utils
         public event EventHandler ConfigurationSaved;
 
         private const string ConfigFilePath = "config.json";
-        private static readonly object _saveLock = new object();
+        private static readonly SemaphoreSlim _saveSemaphore = new SemaphoreSlim(1, 1);
 
         public void Save()
         {
@@ -68,9 +70,16 @@ namespace AssetsManager.Utils
             ConfigurationSaved?.Invoke(this, EventArgs.Empty);
         }
 
+        public async Task SaveAsync()
+        {
+            await SaveSettingsAsync(this);
+            ConfigurationSaved?.Invoke(this, EventArgs.Empty);
+        }
+
         public static AppSettings LoadSettings()
         {
-            lock (_saveLock)
+            _saveSemaphore.Wait();
+            try
             {
                 if (!File.Exists(ConfigFilePath))
                 {
@@ -119,6 +128,10 @@ namespace AssetsManager.Utils
                 }
 
                 return settings;
+            }
+            finally
+            {
+                _saveSemaphore.Release();
             }
         }
 
@@ -180,10 +193,29 @@ namespace AssetsManager.Utils
 
         public static void SaveSettings(AppSettings settings)
         {
-            lock (_saveLock)
+            _saveSemaphore.Wait();
+            try
             {
                 var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
                 File.WriteAllText(ConfigFilePath, json);
+            }
+            finally
+            {
+                _saveSemaphore.Release();
+            }
+        }
+
+        public static async Task SaveSettingsAsync(AppSettings settings)
+        {
+            await _saveSemaphore.WaitAsync();
+            try
+            {
+                var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+                await File.WriteAllTextAsync(ConfigFilePath, json);
+            }
+            finally
+            {
+                _saveSemaphore.Release();
             }
         }
 

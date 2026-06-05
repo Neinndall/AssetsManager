@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -402,13 +403,23 @@ namespace AssetsManager.Services.Comparator
                 foreach (var chunk in chunksToProcess)
                 {
                     fs.Seek(chunk.DataOffset, SeekOrigin.Begin);
-                    byte[] rawChunkData = new byte[chunk.CompressedSize];
-                    await fs.ReadExactlyAsync(rawChunkData, 0, rawChunkData.Length);
+                    byte[] rawChunkData = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
+                    try
+                    {
+                        await fs.ReadExactlyAsync(rawChunkData, 0, (int)chunk.CompressedSize);
 
-                    string chunkFileName = $"{chunk.PathHash:X16}.chunk";
-                    string destChunkPath = Path.Combine(finalTargetDir, chunkFileName);
+                        string chunkFileName = $"{chunk.PathHash:X16}.chunk";
+                        string destChunkPath = Path.Combine(finalTargetDir, chunkFileName);
 
-                    await File.WriteAllBytesAsync(destChunkPath, rawChunkData);
+                        await using (var destFs = new FileStream(destChunkPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
+                        {
+                            await destFs.WriteAsync(rawChunkData.AsMemory(0, (int)chunk.CompressedSize));
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(rawChunkData);
+                    }
                 }
             }
             catch (System.Exception ex)

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.MemoryMappedFiles;
@@ -270,10 +271,16 @@ namespace AssetsManager.Utils
             int offset = _offsetAccessor.ReadInt32(index * 4);
             int length = _dataAccessor.ReadInt32(offset);
             
-            byte[] bytes = new byte[length];
-            _dataAccessor.ReadArray(offset + 4, bytes, 0, length);
-            
-            return Encoding.UTF8.GetString(bytes);
+            byte[] bytes = ArrayPool<byte>.Shared.Rent(length);
+            try
+            {
+                _dataAccessor.ReadArray(offset + 4, bytes, 0, length);
+                return Encoding.UTF8.GetString(bytes, 0, length);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(bytes);
+            }
         }
 
         public ulong GetHash(int index)

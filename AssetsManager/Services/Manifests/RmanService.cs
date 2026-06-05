@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,8 +11,6 @@ namespace AssetsManager.Services.Manifests;
 
 public class RmanService
 {
-    private byte[] _data = Array.Empty<byte>();
-
     public RmanManifest Parse(string filePath)
     {
         byte[] rawData = File.ReadAllBytes(filePath);
@@ -28,28 +27,43 @@ public class RmanService
         ulong manifestId = BitConverter.ToUInt64(data, 16);
         uint uncompressedSize = BitConverter.ToUInt32(data, 24);
 
-        byte[] compressedBody = new byte[compressedSize];
-        Array.Copy(data, headerSize, compressedBody, 0, compressedSize);
-
-        using (var decompressor = new Decompressor())
+        byte[] uncompressedBody = ArrayPool<byte>.Shared.Rent((int)uncompressedSize);
+        try
         {
-            byte[] uncompressedBody = decompressor.Unwrap(compressedBody).ToArray();
+            using (var decompressor = new Decompressor())
+            {
+                int decompressedBytes = decompressor.Unwrap(data.AsSpan((int)headerSize, (int)compressedSize), uncompressedBody.AsSpan(0, (int)uncompressedSize));
+                if (decompressedBytes != uncompressedSize)
+                    throw new Exception("Decompression failed: size mismatch.");
 
-            if (uncompressedBody.Length != uncompressedSize)
-                throw new Exception("Decompression failed: size mismatch.");
-
-            return ParseBody(uncompressedBody, manifestId);
+                var parser = new RmanParser(uncompressedBody, (int)uncompressedSize, manifestId);
+                return parser.Parse();
+            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(uncompressedBody);
         }
     }
 
-    private RmanManifest ParseBody(byte[] body, ulong manifestId)
+    private struct RmanParser
     {
-        _data = body;
-        try
+        private readonly byte[] _data;
+        private readonly int _dataLength;
+        private readonly ulong _manifestId;
+
+        public RmanParser(byte[] data, int dataLength, ulong manifestId)
+        {
+            _data = data;
+            _dataLength = dataLength;
+            _manifestId = manifestId;
+        }
+
+        public RmanManifest Parse()
         {
             int rootOffset = BitConverter.ToInt32(_data, 0);
             var root = GetObject(rootOffset);
-            var manifest = new RmanManifest { ManifestId = manifestId };
+            var manifest = new RmanManifest { ManifestId = _manifestId };
 
             // 1. Bundles & Chunks
             var bundleOffsets = GetVector(GetFieldOffset(root, 0));
@@ -108,7 +122,8 @@ public class RmanService
             // 4. Files
             var fileOffsets = GetVector(GetFieldOffset(root, 2));
             var paramOffsets = GetVector(GetFieldOffset(root, 5));
-            var hashTypes = paramOffsets.Select(p => (HashType)GetByte(GetFieldOffset(GetObject(p), 1))).ToList();
+            var parser = this;
+            var hashTypes = paramOffsets.Select(p => (HashType)parser.GetByte(parser.GetFieldOffset(parser.GetObject(p), 1))).ToList();
 
             foreach (var fileOffset in fileOffsets)
             {
@@ -142,104 +157,100 @@ public class RmanService
             ResolveFullPaths(manifest);
             return manifest;
         }
-        finally
-        {
-            _data = Array.Empty<byte>();
-        }
-    }
 
-    private void ResolveFullPaths(RmanManifest manifest)
-    {
-        var dirMap = new Dictionary<ulong, RmanDirectory>();
-        foreach (var dir in manifest.Directories)
+        private void ResolveFullPaths(RmanManifest manifest)
         {
-            if (dir.DirectoryId != 0) dirMap.TryAdd(dir.DirectoryId, dir);
-        }
-
-        foreach (var file in manifest.Files)
-        {
-            var pathParts = new List<string> { file.Name };
-            ulong currentDirId = file.DirectoryId;
-
-            while (currentDirId != 0 && dirMap.TryGetValue(currentDirId, out var dir))
+            var dirMap = new Dictionary<ulong, RmanDirectory>();
+            foreach (var dir in manifest.Directories)
             {
-                if (!string.IsNullOrEmpty(dir.Name)) pathParts.Insert(0, dir.Name);
-                currentDirId = dir.ParentId;
+                if (dir.DirectoryId != 0) dirMap.TryAdd(dir.DirectoryId, dir);
             }
 
-            file.Name = string.Join("/", pathParts);
+            foreach (var file in manifest.Files)
+            {
+                var pathParts = new List<string> { file.Name };
+                ulong currentDirId = file.DirectoryId;
+
+                while (currentDirId != 0 && dirMap.TryGetValue(currentDirId, out var dir))
+                {
+                    if (!string.IsNullOrEmpty(dir.Name)) pathParts.Insert(0, dir.Name);
+                    currentDirId = dir.ParentId;
+                }
+
+                file.Name = string.Join("/", pathParts);
+            }
         }
-    }
 
-    #region FlatBuffer Helpers
-    private struct FBObject { public int Offset; public int VTableOffset; }
+        #region FlatBuffer Helpers
+        private struct FBObject { public int Offset; public int VTableOffset; }
 
-    private FBObject GetObject(int offset)
-    {
-        if (offset < 0 || offset + 4 > _data.Length) return new FBObject { Offset = -1 };
-        int vtableOffset = offset - BitConverter.ToInt32(_data, offset);
-        if (vtableOffset < 0 || vtableOffset + 2 > _data.Length) return new FBObject { Offset = -1 };
-        return new FBObject { Offset = offset, VTableOffset = vtableOffset };
-    }
-
-    private int GetFieldOffset(FBObject obj, int index)
-    {
-        if (obj.Offset == -1 || obj.VTableOffset < 0 || obj.VTableOffset + 2 > _data.Length) return 0;
-        ushort vtableSize = BitConverter.ToUInt16(_data, obj.VTableOffset);
-        int fieldOffsetInVTable = 4 + (index * 2);
-        if (fieldOffsetInVTable + 2 > vtableSize || obj.VTableOffset + fieldOffsetInVTable + 2 > _data.Length) return 0;
-        ushort offsetInObject = BitConverter.ToUInt16(_data, obj.VTableOffset + fieldOffsetInVTable);
-        if (offsetInObject == 0) return 0;
-        int finalOffset = obj.Offset + offsetInObject;
-        return (finalOffset < 0 || finalOffset >= _data.Length) ? 0 : finalOffset;
-    }
-
-    private uint GetUInt32(int offset) => (offset <= 0 || offset + 4 > _data.Length) ? (uint)0 : BitConverter.ToUInt32(_data, offset);
-    private ulong GetUInt64(int offset) => (offset <= 0 || offset + 8 > _data.Length) ? (ulong)0 : BitConverter.ToUInt64(_data, offset);
-    private byte GetByte(int offset) => (offset <= 0 || offset >= _data.Length) ? (byte)0 : _data[offset];
-
-    private string GetString(int offset)
-    {
-        if (offset <= 0 || offset + 4 > _data.Length) return string.Empty;
-        int stringOffset = offset + BitConverter.ToInt32(_data, offset);
-        if (stringOffset < 0 || stringOffset + 4 > _data.Length) return string.Empty;
-        uint length = BitConverter.ToUInt32(_data, stringOffset);
-        if (stringOffset + 4 + length > _data.Length) return string.Empty;
-        return Encoding.UTF8.GetString(_data, stringOffset + 4, (int)length);
-    }
-
-    private List<int> GetVector(int offset)
-    {
-        var result = new List<int>();
-        if (offset <= 0 || offset + 4 > _data.Length) return result;
-        int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
-        if (vectorOffset < 0 || vectorOffset + 4 > _data.Length) return result;
-        uint length = BitConverter.ToUInt32(_data, vectorOffset);
-        if (length > 1000000) length = 1000000;
-        for (int i = 0; i < (int)length; i++)
+        private FBObject GetObject(int offset)
         {
-            int itemPos = vectorOffset + 4 + (i * 4);
-            if (itemPos + 4 <= _data.Length) result.Add(itemPos + BitConverter.ToInt32(_data, itemPos));
-            else break;
+            if (offset < 0 || offset + 4 > _dataLength) return new FBObject { Offset = -1 };
+            int vtableOffset = offset - BitConverter.ToInt32(_data, offset);
+            if (vtableOffset < 0 || vtableOffset + 2 > _dataLength) return new FBObject { Offset = -1 };
+            return new FBObject { Offset = offset, VTableOffset = vtableOffset };
         }
-        return result;
-    }
 
-    private List<ulong> GetVectorULong(int offset)
-    {
-        var result = new List<ulong>();
-        if (offset <= 0 || offset + 4 > _data.Length) return result;
-        int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
-        if (vectorOffset < 0 || vectorOffset + 4 > _data.Length) return result;
-        uint length = BitConverter.ToUInt32(_data, vectorOffset);
-        if (length > 1000000) length = 1000000;
-        for (int i = 0; i < (int)length; i++)
+        private int GetFieldOffset(FBObject obj, int index)
         {
-            int itemOffset = vectorOffset + 4 + (i * 8);
-            if (itemOffset >= 0 && itemOffset + 8 <= _data.Length) result.Add(BitConverter.ToUInt64(_data, itemOffset));
-            else break;
+            if (obj.Offset == -1 || obj.VTableOffset < 0 || obj.VTableOffset + 2 > _dataLength) return 0;
+            ushort vtableSize = BitConverter.ToUInt16(_data, obj.VTableOffset);
+            int fieldOffsetInVTable = 4 + (index * 2);
+            if (fieldOffsetInVTable + 2 > vtableSize || obj.VTableOffset + fieldOffsetInVTable + 2 > _dataLength) return 0;
+            ushort offsetInObject = BitConverter.ToUInt16(_data, obj.VTableOffset + fieldOffsetInVTable);
+            if (offsetInObject == 0) return 0;
+            int finalOffset = obj.Offset + offsetInObject;
+            return (finalOffset < 0 || finalOffset >= _dataLength) ? 0 : finalOffset;
         }
-        return result;
+
+        private uint GetUInt32(int offset) => (offset <= 0 || offset + 4 > _dataLength) ? (uint)0 : BitConverter.ToUInt32(_data, offset);
+        private ulong GetUInt64(int offset) => (offset <= 0 || offset + 8 > _dataLength) ? (ulong)0 : BitConverter.ToUInt64(_data, offset);
+        private byte GetByte(int offset) => (offset <= 0 || offset >= _dataLength) ? (byte)0 : _data[offset];
+
+        private string GetString(int offset)
+        {
+            if (offset <= 0 || offset + 4 > _dataLength) return string.Empty;
+            int stringOffset = offset + BitConverter.ToInt32(_data, offset);
+            if (stringOffset < 0 || stringOffset + 4 > _dataLength) return string.Empty;
+            uint length = BitConverter.ToUInt32(_data, stringOffset);
+            if (stringOffset + 4 + length > _dataLength) return string.Empty;
+            return Encoding.UTF8.GetString(_data, stringOffset + 4, (int)length);
+        }
+
+        private List<int> GetVector(int offset)
+        {
+            var result = new List<int>();
+            if (offset <= 0 || offset + 4 > _dataLength) return result;
+            int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
+            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return result;
+            uint length = BitConverter.ToUInt32(_data, vectorOffset);
+            if (length > 1000000) length = 1000000;
+            for (int i = 0; i < (int)length; i++)
+            {
+                int itemPos = vectorOffset + 4 + (i * 4);
+                if (itemPos + 4 <= _dataLength) result.Add(itemPos + BitConverter.ToInt32(_data, itemPos));
+                else break;
+            }
+            return result;
+        }
+
+        private List<ulong> GetVectorULong(int offset)
+        {
+            var result = new List<ulong>();
+            if (offset <= 0 || offset + 4 > _dataLength) return result;
+            int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
+            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return result;
+            uint length = BitConverter.ToUInt32(_data, vectorOffset);
+            if (length > 1000000) length = 1000000;
+            for (int i = 0; i < (int)length; i++)
+            {
+                int itemOffset = vectorOffset + 4 + (i * 8);
+                if (itemOffset >= 0 && itemOffset + 8 <= _dataLength) result.Add(BitConverter.ToUInt64(_data, itemOffset));
+                else break;
+            }
+            return result;
+        }
+        #endregion
     }
-    #endregion
 }

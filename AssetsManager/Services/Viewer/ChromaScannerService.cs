@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -148,29 +149,36 @@ namespace AssetsManager.Services.Viewer
 
                 Int32Rect sourceRect = new Int32Rect(startX, startY, width, height);
                 int stride = (width * bitmap.Format.BitsPerPixel + 7) / 8;
+                int bufferSize = stride * height;
                 
-                // Use a small buffer (stackalloc if possible, but 64x64*4 = 16KB is safe for heap too)
-                byte[] samplePixels = new byte[stride * height];
-                bitmap.CopyPixels(sourceRect, samplePixels, stride, 0);
-
-                long r = 0, g = 0, b = 0;
-                int samples = 0;
-                int bytesPerPixel = bitmap.Format.BitsPerPixel / 8;
-
-                for (int i = 0; i < samplePixels.Length; i += bytesPerPixel)
+                byte[] samplePixels = ArrayPool<byte>.Shared.Rent(bufferSize);
+                try
                 {
-                    if (i + 2 < samplePixels.Length)
-                    {
-                        // Assuming Bgra32 or Bgr32
-                        b += samplePixels[i];
-                        g += samplePixels[i + 1];
-                        r += samplePixels[i + 2];
-                        samples++;
-                    }
-                }
+                    bitmap.CopyPixels(sourceRect, samplePixels, stride, 0);
 
-                if (samples == 0) return Colors.Gray;
-                return Color.FromRgb((byte)(r / samples), (byte)(g / samples), (byte)(b / samples));
+                    long r = 0, g = 0, b = 0;
+                    int samples = 0;
+                    int bytesPerPixel = bitmap.Format.BitsPerPixel / 8;
+
+                    for (int i = 0; i < bufferSize; i += bytesPerPixel)
+                    {
+                        if (i + 2 < bufferSize)
+                        {
+                            // Assuming Bgra32 or Bgr32
+                            b += samplePixels[i];
+                            g += samplePixels[i + 1];
+                            r += samplePixels[i + 2];
+                            samples++;
+                        }
+                    }
+
+                    if (samples == 0) return Colors.Gray;
+                    return Color.FromRgb((byte)(r / samples), (byte)(g / samples), (byte)(b / samples));
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(samplePixels);
+                }
             }
             catch
             {

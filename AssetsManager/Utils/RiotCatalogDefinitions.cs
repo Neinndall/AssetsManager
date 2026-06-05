@@ -37,16 +37,14 @@ namespace AssetsManager.Utils
         public static readonly CatalogInfo IconCatalog = new CatalogInfo { Path = IconsJsonPath, NameKey = "title", PathKey = "imagePath" };
         public static readonly CatalogInfo LootCatalog = new CatalogInfo { Path = LootJsonPath, NameKey = "name", PathKey = "image" };
 
+        private static readonly CatalogInfo[] AllCatalogs = { SkinCatalog, EmoteCatalog, WardCatalog, IconCatalog, LootCatalog };
+
         /// <summary>
         /// Returns all available catalogs for batch processing.
         /// </summary>
         public static IEnumerable<CatalogInfo> GetAllCatalogs()
         {
-            yield return SkinCatalog;
-            yield return EmoteCatalog;
-            yield return WardCatalog;
-            yield return IconCatalog;
-            yield return LootCatalog;
+            return AllCatalogs;
         }
     }
 }

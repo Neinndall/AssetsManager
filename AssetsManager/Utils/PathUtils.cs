@@ -17,9 +17,8 @@ namespace AssetsManager.Utils
 
             string normalizedUrl = url.ToLowerInvariant();
 
-            // 1. Eliminamos todo hasta el primer "assets/" (que suele ser /lol-game-data/assets/)
-            // Esto nos deja con la ruta relativa dentro de la raíz de datos del cliente.
-            string basePath = Regex.Replace(normalizedUrl, @"^.*?assets/", "");
+            int assetsIndex = normalizedUrl.IndexOf("assets/", StringComparison.Ordinal);
+            string basePath = assetsIndex >= 0 ? normalizedUrl.Substring(assetsIndex + 7) : normalizedUrl;
 
             // La raíz virtual /lol-game-data/assets/ mapea directamente a plugins/rcp-be-lol-game-data/global/default/
             // No debemos forzar un segmento "assets/" adicional ya que muchas rutas (como v1/...) están en la raíz.
@@ -63,10 +62,41 @@ namespace AssetsManager.Utils
             return clean;
         }
 
+        private static readonly System.Collections.Generic.HashSet<char> InvalidFileNameChars = 
+            new System.Collections.Generic.HashSet<char>(Path.GetInvalidFileNameChars());
+
         public static string SanitizeName(string name)
         {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+
+            bool hasInvalid = false;
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (InvalidFileNameChars.Contains(name[i]))
+                {
+                    hasInvalid = true;
+                    break;
+                }
+            }
+
+            string sanitized;
+            if (!hasInvalid)
+            {
+                sanitized = name.Trim();
+            }
+            else
+            {
+                var sb = new System.Text.StringBuilder(name.Length);
+                for (int i = 0; i < name.Length; i++)
+                {
+                    char c = name[i];
+                    if (!InvalidFileNameChars.Contains(c))
+                    {
+                        sb.Append(c);
+                    }
+                }
+                sanitized = sb.ToString().Trim();
+            }
 
             const int MaxLength = 240; // A bit less than 255 to be safe.
             if (sanitized.Length > MaxLength)

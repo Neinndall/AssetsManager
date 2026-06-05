@@ -20,19 +20,20 @@ namespace AssetsManager.Utils.Framework
 
         public ObservableRangeCollection(List<T> list) : base(list) { }
 
-        /// <summary> 
-        /// Adds a range of items and raises a single Reset notification.
-        /// </summary>
         public void AddRange(IEnumerable<T> collection)
         {
             if (collection == null) throw new ArgumentNullException(nameof(collection));
 
+            var list = new List<T>(collection);
+            if (list.Count == 0) return;
+
             _isSuppressingNotification = true;
+            int startIndex = Count;
             try
             {
-                foreach (var item in collection)
+                foreach (var item in list)
                 {
-                    Add(item);
+                    Items.Add(item);
                 }
             }
             finally
@@ -42,7 +43,14 @@ namespace AssetsManager.Utils.Framework
 
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
             OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+
+            const int BatchSize = 500;
+            for (int i = 0; i < list.Count; i += BatchSize)
+            {
+                int count = Math.Min(BatchSize, list.Count - i);
+                var batch = list.GetRange(i, count);
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, batch, startIndex + i));
+            }
         }
 
         /// <summary> 

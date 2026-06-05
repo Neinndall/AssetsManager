@@ -20,9 +20,56 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
+        private static readonly Regex NormalizeNameRegex = new Regex(@"(skin|_)(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         private static string NormalizeName(string name)
         {
-            return Regex.Replace(name, @"(skin|_)(\d+)", "", RegexOptions.IgnoreCase);
+            return NormalizeNameRegex.Replace(name, "");
+        }
+
+        private static readonly System.Collections.Generic.HashSet<string> GenericMaterialKeywords = 
+            new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase) 
+            { "body", "face", "head", "hair", "mask", "eyes", "leg" };
+
+        private static readonly char[] SeparatorChars = { '_', '-', ' ' };
+
+        private static List<string> GetKeywords(string name)
+        {
+            string normalizedName = NormalizeName(name);
+            var parts = normalizedName.Split(SeparatorChars, StringSplitOptions.RemoveEmptyEntries);
+            var keywords = new List<string>();
+
+            foreach (var part in parts)
+            {
+                // PascalCase splitting manually (no regex)
+                int lastStart = 0;
+                for (int i = 1; i < part.Length; i++)
+                {
+                    if (char.IsUpper(part[i]))
+                    {
+                        AddKeyword(keywords, part.Substring(lastStart, i - lastStart));
+                        lastStart = i;
+                    }
+                }
+                if (part.Length > lastStart)
+                {
+                    AddKeyword(keywords, part.Substring(lastStart));
+                }
+            }
+
+            return keywords;
+        }
+
+        private static void AddKeyword(List<string> list, string word)
+        {
+            if (string.IsNullOrEmpty(word)) return;
+            if (word.Equals("mat", StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("tx", StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("cm", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            list.Add(word.ToLowerInvariant());
         }
 
         public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
@@ -36,12 +83,15 @@ namespace AssetsManager.Utils
                 return exactMatch;
             }
 
-            var genericMaterialKeywords = new List<string> { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-            string lowerMaterialName = materialName.ToLower();
-            if (genericMaterialKeywords.Any(keyword =>
-                lowerMaterialName.Equals(keyword) ||
-                lowerMaterialName.Equals($"{keyword}_mat")
-            ))
+            string lowerMaterialName = materialName.ToLowerInvariant();
+            bool isGeneric = GenericMaterialKeywords.Contains(lowerMaterialName);
+            if (!isGeneric && lowerMaterialName.EndsWith("_mat") && lowerMaterialName.Length > 4)
+            {
+                string baseWord = lowerMaterialName.Substring(0, lowerMaterialName.Length - 4);
+                isGeneric = GenericMaterialKeywords.Contains(baseWord);
+            }
+
+            if (isGeneric)
             {
                 string mainTextureCandidate = $"{skinName}_tx_cm";
                 string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
@@ -53,27 +103,15 @@ namespace AssetsManager.Utils
             }
 
             logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
-            var separatorChars = new[] { '_', '-', ' ' };
 
-            Func<string, List<string>> getKeywords = (name) =>
-            {
-                string normalizedName = NormalizeName(name);
-                var initialSplit = normalizedName.Split(separatorChars, StringSplitOptions.RemoveEmptyEntries);
-                return initialSplit
-                    .SelectMany(word => Regex.Split(word, @"(?<!^)(?=[A-Z])")) // Splits PascalCase
-                    .Where(k => !k.Equals("mat", StringComparison.OrdinalIgnoreCase) && !k.Equals("tx", StringComparison.OrdinalIgnoreCase) && !k.Equals("cm", StringComparison.OrdinalIgnoreCase))
-                    .Select(k => k.ToLower())
-                    .ToList();
-            };
-
-            var materialKeywords = getKeywords(materialName);
+            var materialKeywords = GetKeywords(materialName);
             string bestScoringMatch = null;
             int bestScore = -1; // Initialize with -1 to ensure any valid score is higher
 
             foreach (string key in availableTextureKeys)
             {
-                var textureKeywords = getKeywords(key);
-                string lowerKey = key.ToLower();
+                var textureKeywords = GetKeywords(key);
+                string lowerKey = key.ToLowerInvariant();
                 int currentScore = 0;
 
                 // Score for exact keyword matches or partial matches
@@ -114,7 +152,7 @@ namespace AssetsManager.Utils
                 {
                     // Tie-breaking:
                     // 1. Prefer textures that contain "_tx_cm" if scores are equal
-                    bool bestIsTxCm = bestScoringMatch?.ToLower().Contains("_tx_cm") ?? false;
+                    bool bestIsTxCm = bestScoringMatch?.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase) ?? false;
                     bool currentIsTxCm = lowerKey.Contains("_tx_cm");
 
                     if (currentIsTxCm && !bestIsTxCm)
@@ -126,8 +164,6 @@ namespace AssetsManager.Utils
                         // Keep bestScoringMatch
                     }
                     // 2. If still a tie, prefer the one that is a better substring match (longer common substring)
-                    // This is implicitly handled by the scoring, but if scores are equal, we need another tie-breaker.
-                    // For now, let's keep the "prefer shorter name" as a last resort, but it's less likely to be hit.
                     else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length) // Prefer shorter name
                     {
                         bestScoringMatch = key;

@@ -23,17 +23,18 @@ namespace AssetsManager.Utils
             return $"Expires in {remaining.Minutes}m";
         }
 
+        private static readonly string[] Suffixes = { "B", "KB", "MB", "GB", "TB" };
+
         public static string FormatSize(long sizeInBytes)
         {
-            string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
             int counter = 0;
             decimal number = (decimal)sizeInBytes;
-            while (Math.Round(number / 1024) >= 1 && counter < suffixes.Length - 1)
+            while (Math.Round(number / 1024) >= 1 && counter < Suffixes.Length - 1)
             {
                 number = number / 1024;
                 counter++;
             }
-            return string.Format("{0:n1} {1}", number, suffixes[counter]);
+            return string.Format("{0:n1} {1}", number, Suffixes[counter]);
         }
     }
 }

@@ -56,7 +56,21 @@ namespace AssetsManager.Utils
 
         public void Dispose()
         {
-            _cancellationTokenSource?.Dispose();
+            if (_cancellationTokenSource != null)
+            {
+                try
+                {
+                    if (!_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        _cancellationTokenSource.Cancel();
+                    }
+                }
+                catch (ObjectDisposedException) { }
+
+                _cancellationTokenSource.Dispose();
+                _cancellationTokenSource = null;
+            }
+            IsCancelling = false;
         }
     }
 }
