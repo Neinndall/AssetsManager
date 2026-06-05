@@ -30,7 +30,7 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly JsonFormatterService _jsonFormatterService;
         private readonly AudioBankService _audioBankService;
-        private readonly WadPackagingService _wadPackagingService;
+        private readonly AudioBankLinkerService _audioBankLinkerService;
 
         public DiffViewService(
             IServiceProvider serviceProvider,
@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Core
             LogService logService,
             JsonFormatterService jsonFormatterService,
             AudioBankService audioBankService,
-            WadPackagingService wadPackagingService)
+            AudioBankLinkerService audioBankLinkerService)
         {
             _serviceProvider = serviceProvider;
             _contentFormatterService = contentFormatterService;
@@ -49,7 +49,7 @@ namespace AssetsManager.Services.Core
             _logService = logService;
             _jsonFormatterService = jsonFormatterService;
             _audioBankService = audioBankService;
-            _wadPackagingService = wadPackagingService;
+            _audioBankLinkerService = audioBankLinkerService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -184,11 +184,11 @@ namespace AssetsManager.Services.Core
         }
 
         // Parsed audio-bank diff: locates the bank siblings (audio.bnk / .wpk / .bin)
-        // via WadPackagingService.ResolveAudioBankDependencies (the same 5-strategy
-        // .bin resolver + sibling detection used by SaveBackupAsync), then reads the
-        // bytes exclusively from the comparison's wad_chunks/old|new directory.
-        // Falls back to the standard raw-JSON text view when the bank cannot be
-        // linked, parsed, or the comparison has not been archived yet.
+        // via AudioBankLinkerService (the same 5-strategy .bin resolver + sibling
+        // detection used by WadPackagingService.CreateLeanWadPackageAsync), then
+        // reads the bytes exclusively from the comparison's wad_chunks/old|new
+        // directory. Falls back to the standard raw-JSON text view when the bank
+        // cannot be linked, parsed, or the comparison has not been archived yet.
         private async Task HandleParsedAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow, string sourceJsonPath)
         {
             try
@@ -212,7 +212,7 @@ namespace AssetsManager.Services.Core
 
                 loadingWindow.SetState(DiffLoadingState.LinkingAudio);
 
-                List<WadPackagingService.AudioDependencyInfo> resolvedDeps = _wadPackagingService.ResolveAudioBankDependencies(diff);
+                List<AudioBankLinkerService.AudioDependencyInfo> resolvedDeps = _audioBankLinkerService.ResolveAudioBankDependencies(diff);
                 Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
                     .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
@@ -235,19 +235,19 @@ namespace AssetsManager.Services.Core
 
                     switch (dep.Type)
                     {
-                        case WadPackagingService.AudioDependencyType.EventsBnk:
+                        case AudioBankLinkerService.AudioDependencyType.EventsBnk:
                             oldEventsBnk = oldBytes;
                             newEventsBnk = newBytes;
                             break;
-                        case WadPackagingService.AudioDependencyType.AudioBnk:
+                        case AudioBankLinkerService.AudioDependencyType.AudioBnk:
                             oldAudioBnk = oldBytes;
                             newAudioBnk = newBytes;
                             break;
-                        case WadPackagingService.AudioDependencyType.AudioWpk:
+                        case AudioBankLinkerService.AudioDependencyType.AudioWpk:
                             oldWpk = oldBytes;
                             newWpk = newBytes;
                             break;
-                        case WadPackagingService.AudioDependencyType.Bin:
+                        case AudioBankLinkerService.AudioDependencyType.Bin:
                             oldBin = oldBytes;
                             newBin = newBytes;
                             break;

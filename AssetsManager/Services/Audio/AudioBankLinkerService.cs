@@ -490,13 +490,46 @@ namespace AssetsManager.Services.Audio
             return (wpkNode, audioBnkNode, eventsBnkNode);
         }
 
-        private record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
+        public record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
+
+        // Public metadata for an audio-bank dependency (used by DiffViewService
+        // to read bytes from the wad_chunks/old|new backup directory without
+        // re-running the resolution logic).
+        public enum AudioDependencyType { Bin, EventsBnk, AudioBnk, AudioWpk }
+
+        public class AudioDependencyInfo
+        {
+            public string Path { get; set; }
+            public string SourceWad { get; set; }
+            public ulong PathHash { get; set; }
+            public AudioDependencyType Type { get; set; }
+        }
+
+        // String-based public entry point. Reuses the exact same 5-strategy
+        // resolution as the FileSystemNodeModel overload so that WadPackagingService
+        // (which works on SerializableChunkDiff / virtual paths) and DiffViewService
+        // get identical results to the Explorer tree linking flow.
+        public BinFileStrategy GetBinFileSearchStrategy(string virtualPath, string sourceWadPath)
+        {
+            if (string.IsNullOrEmpty(virtualPath) || string.IsNullOrEmpty(sourceWadPath)) return null;
+            return GetBinFileSearchStrategyCore(virtualPath, sourceWadPath, Path.GetFileName(virtualPath));
+        }
 
         private BinFileStrategy GetBinFileSearchStrategy(FileSystemNodeModel clickedNode)
         {
             // 1. IDENTIDAD DEL CONTENEDOR (WAD) - Fuente de verdad absoluta
             string sourceWadPath = clickedNode.SourceWadPath ?? clickedNode.ChunkDiff?.SourceWadFile;
             if (string.IsNullOrEmpty(sourceWadPath)) return null;
+            return GetBinFileSearchStrategyCore(clickedNode.VirtualPath, sourceWadPath, clickedNode.Name);
+        }
+
+        // Core resolution: container-aware (Map/Common) -> container-aware
+        // (Champion/regional) -> path-based (Companion) -> filename-fallback (VO).
+        // Shared by the FileSystemNodeModel-based tree linking flow and the
+        // string-based diff/packaging flows.
+        private BinFileStrategy GetBinFileSearchStrategyCore(string virtualPath, string sourceWadPath, string fileName)
+        {
+            if (string.IsNullOrEmpty(virtualPath) || string.IsNullOrEmpty(sourceWadPath)) return null;
 
             string sourceWadName = Path.GetFileName(sourceWadPath); // Ej: Aatrox.en_US.wad.client
             var wadParts = sourceWadName.Split('.');
@@ -505,7 +538,7 @@ namespace AssetsManager.Services.Audio
             string wadPrefix = wadParts[0]; // Map11, Common, Aatrox, etc.
             bool isMap = wadPrefix.StartsWith("Map", StringComparison.OrdinalIgnoreCase);
             bool isCommon = wadPrefix.Equals("Common", StringComparison.OrdinalIgnoreCase);
-            
+
             _logService.LogDebug($"[GetBinFileSearchStrategy] Container identified: '{sourceWadName}' (Prefix: {wadPrefix})");
 
             // 2. DETECCIÓN POR CONTENEDOR (Mapas)
@@ -521,26 +554,26 @@ namespace AssetsManager.Services.Audio
 
             // 3. DETECCIÓN POR CONTENEDOR (Campeones Regionales / Skins)
             // Aquí aplicamos la lógica de prioridad: Nombre de archivo > Carpeta > Skin0
-            if (wadParts.Length >= 4 || clickedNode.VirtualPath.Contains("/characters/"))
+            if (wadParts.Length >= 4 || virtualPath.Contains("/characters/"))
             {
                 string champName = wadPrefix.ToLower();
-                
+
                 // Si la ruta no coincide con el prefijo, lo sacamos de la ruta (caso de archivos sueltos en WADs globales)
-                if (clickedNode.VirtualPath.Contains("/characters/"))
+                if (virtualPath.Contains("/characters/"))
                 {
-                    var pathParts = clickedNode.VirtualPath.Split('/');
+                    var pathParts = virtualPath.Split('/');
                     int charIndex = Array.IndexOf(pathParts, "characters");
                     if (pathParts.Length > charIndex + 1) champName = pathParts[charIndex + 1].ToLower();
                 }
 
                 string skinName = "skin0";
-                string fileName = clickedNode.Name.ToLower();
+                string fileNameLower = (fileName ?? string.Empty).ToLower();
 
                 // PRIORIDAD 1: Buscar patrón _skinXX_ en el nombre del archivo
-                if (fileName.Contains("_skin"))
+                if (fileNameLower.Contains("_skin"))
                 {
-                    int skinIdx = fileName.IndexOf("_skin");
-                    string sub = fileName.Substring(skinIdx + 5);
+                    int skinIdx = fileNameLower.IndexOf("_skin");
+                    string sub = fileNameLower.Substring(skinIdx + 5);
                     string idStr = "";
                     foreach (char c in sub)
                     {
@@ -554,9 +587,9 @@ namespace AssetsManager.Services.Audio
                     }
                 }
                 // PRIORIDAD 2: Buscar en la ruta de carpetas
-                else if (clickedNode.VirtualPath.Contains("/skins/"))
+                else if (virtualPath.Contains("/skins/"))
                 {
-                    var pathParts = clickedNode.VirtualPath.Split('/');
+                    var pathParts = virtualPath.Split('/');
                     int skinsIndex = Array.IndexOf(pathParts, "skins");
                     if (pathParts.Length > skinsIndex + 1)
                     {
@@ -567,7 +600,7 @@ namespace AssetsManager.Services.Audio
                             string idStr = new string(skinFolder.Where(char.IsDigit).ToArray());
                             if (!string.IsNullOrEmpty(idStr)) int.TryParse(idStr, out id);
                         }
-                        
+
                         if (id != -1)
                         {
                             skinName = $"skin{id}";
@@ -581,9 +614,9 @@ namespace AssetsManager.Services.Audio
             }
 
             // 4. ESTRATEGIAS POR RUTA (Companions)
-            if (clickedNode.VirtualPath.Contains("/companions/pets/"))
+            if (virtualPath.Contains("/companions/pets/"))
             {
-                var pathParts = clickedNode.VirtualPath.Split('/');
+                var pathParts = virtualPath.Split('/');
                 int petsIndex = Array.IndexOf(pathParts, "pets");
                 if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
                 {
@@ -595,9 +628,9 @@ namespace AssetsManager.Services.Audio
             }
 
             // 5. INFERENCIA FINAL (Fallback de emergencia)
-            if (clickedNode.Name.Contains("_vo_", StringComparison.OrdinalIgnoreCase))
+            if ((fileName ?? string.Empty).Contains("_vo_", StringComparison.OrdinalIgnoreCase))
             {
-                string baseName = GetBaseName(clickedNode.Name);
+                string baseName = GetBaseName(fileName);
                 string[] baseParts = baseName.Split('_');
                 if (baseParts.Length > 0)
                 {
@@ -611,6 +644,98 @@ namespace AssetsManager.Services.Audio
             }
 
             return null;
+        }
+
+        // Sibling detection for an audio bank path. Returns the metadata of the
+        // _audio.bnk / _events.bnk / _audio.wpk companions that live alongside
+        // the audio bank inside its WAD. Used by WadPackagingService and
+        // DiffViewService to identify the bank family without touching the disk.
+        public List<AudioDependencyInfo> GetAudioBankSiblings(string pathForStrategy, string sourceWadFile)
+        {
+            var siblings = new List<AudioDependencyInfo>();
+            if (string.IsNullOrEmpty(pathForStrategy) || string.IsNullOrEmpty(sourceWadFile)) return siblings;
+
+            string fileName = Path.GetFileName(pathForStrategy);
+            List<(string siblingFileName, AudioDependencyType siblingType)> potential = new();
+
+            if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+            {
+                string basePart = fileName.Substring(0, fileName.Length - 11);
+                potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
+                potential.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
+            }
+            else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
+            {
+                string basePart = fileName.Substring(0, fileName.Length - 10);
+                potential.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
+                potential.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
+            }
+            else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
+            {
+                string basePart = fileName.Substring(0, fileName.Length - 10);
+                potential.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
+                potential.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
+            }
+
+            string siblingDir = Path.GetDirectoryName(pathForStrategy)?.Replace('\\', '/') ?? string.Empty;
+            foreach (var (siblingFileName, siblingType) in potential)
+            {
+                string siblingVirtualPath = string.IsNullOrEmpty(siblingDir)
+                    ? siblingFileName
+                    : Path.Combine(siblingDir, siblingFileName).Replace('\\', '/');
+
+                siblings.Add(new AudioDependencyInfo
+                {
+                    Path = siblingVirtualPath,
+                    SourceWad = sourceWadFile,
+                    PathHash = XxHash64Ext.Hash(siblingVirtualPath.ToLower()),
+                    Type = siblingType
+                });
+            }
+
+            return siblings;
+        }
+
+        // Resolves the metadata for every dependency of an audio-bank diff:
+        // the .bin sibling (if any strategy matches) plus the audio bank
+        // companions. Path hashes are pre-computed for convenience.
+        public List<AudioDependencyInfo> ResolveAudioBankDependencies(SerializableChunkDiff audioBankDiff)
+        {
+            var deps = new List<AudioDependencyInfo>();
+            string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
+            if (string.IsNullOrEmpty(pathForStrategy)) return deps;
+
+            // 1. .bin sibling (5 strategies)
+            var binStrategy = GetBinFileSearchStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
+            if (binStrategy != null)
+            {
+                string binVirtualPath = binStrategy.BinPath;
+                string targetWadRelativePath = binStrategy.TargetWadName;
+                string sourceWadRelativePath = audioBankDiff.SourceWadFile;
+                string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
+                string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
+
+                if (string.Equals(sourceWadFileName, binStrategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
+                {
+                    targetWadRelativePath = sourceWadRelativePath;
+                }
+                else if (!string.IsNullOrEmpty(sourceWadDirectory))
+                {
+                    targetWadRelativePath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                }
+
+                deps.Add(new AudioDependencyInfo
+                {
+                    Path = binVirtualPath,
+                    SourceWad = targetWadRelativePath,
+                    PathHash = XxHash64Ext.Hash(binVirtualPath.ToLower()),
+                    Type = AudioDependencyType.Bin
+                });
+            }
+
+            // 2. Sibling audio banks
+            deps.AddRange(GetAudioBankSiblings(pathForStrategy, audioBankDiff.SourceWadFile));
+            return deps;
         }
 
         private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileFromWadsAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)

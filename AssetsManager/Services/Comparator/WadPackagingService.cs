@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Services.Audio;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Audio;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Comparator
@@ -19,146 +19,14 @@ namespace AssetsManager.Services.Comparator
         private readonly LogService _logService;
         private readonly HashResolverService _hashResolverService;
         private readonly DirectoriesCreator _directoriesCreator;
+        private readonly AudioBankLinkerService _audioBankLinkerService;
 
-        public WadPackagingService(LogService logService, HashResolverService hashResolverService, DirectoriesCreator directoriesCreator)
+        public WadPackagingService(LogService logService, HashResolverService hashResolverService, DirectoriesCreator directoriesCreator, AudioBankLinkerService audioBankLinkerService)
         {
             _logService = logService;
             _hashResolverService = hashResolverService;
             _directoriesCreator = directoriesCreator;
-        }
-
-        public record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
-
-        public enum AudioDependencyType { Bin, EventsBnk, AudioBnk, AudioWpk }
-
-        // Lightweight DTO used by DiffViewService to read bytes for a sibling
-        // of an audio bank without having to re-run the resolution logic.
-        public class AudioDependencyInfo
-        {
-            public string Path { get; set; }             // Virtual path inside the WAD
-            public string SourceWad { get; set; }        // Relative WAD path (e.g. "kaisa.wad.client")
-            public ulong PathHash { get; set; }          // XxHash64 of the lowercased path
-            public AudioDependencyType Type { get; set; } // Kind of dependency
-        }
-
-        // Exposes the same 5-strategy .bin resolution used by CreateLeanWadPackageAsync
-        // so external callers (e.g. DiffViewService) can identify the .bin sibling
-        // for an audio bank without duplicating the path heuristics.
-        public BinFileStrategy GetBinFileSearchStrategy(string virtualPath, string sourceWadPath)
-        {
-            return ResolveBinFileStrategy(virtualPath, sourceWadPath);
-        }
-
-        // Internal worker so the public method can stay read-only with respect
-        // to caller intent (no duplicate debug logging on recursive calls).
-        private BinFileStrategy ResolveBinFileStrategy(string virtualPath, string sourceWadPath)
-        {
-            _logService.LogDebug($"[GetBinFileSearchStrategy] Searching for BIN strategy. VirtualPath: '{virtualPath}', SourceWad: '{sourceWadPath}'");
-            string sourceWadName = Path.GetFileName(sourceWadPath);
-
-            // Strategy 0: Infer from companion path structure
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 0: Infer from companion path structure.");
-            if (virtualPath.Contains("/companions/pets/"))
-            {
-                var pathParts = virtualPath.Split('/');
-                int petsIndex = Array.IndexOf(pathParts, "pets");
-
-                if (petsIndex != -1 && pathParts.Length > petsIndex + 2)
-                {
-                    string petName = pathParts[petsIndex + 1];
-                    string themeName = pathParts[petsIndex + 2];
-
-                    if (!string.IsNullOrEmpty(petName) && !string.IsNullOrEmpty(themeName))
-                    {
-                        string binPath = $"data/characters/{petName}/themes/{themeName}/root.bin";
-                        string targetWadName = "companions.wad.client";
-                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Companion);
-                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 0 successful. Found: {strategy}");
-                        return strategy;
-                    }
-                }
-            }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 0 failed or was not applicable.");
-
-            // Strategy 1: Infer from full path structure
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 1: Infer from full path structure.");
-            if (virtualPath.Contains("/characters/") && virtualPath.Contains("/skins/"))
-            {
-                var pathParts = virtualPath.Split('/');
-                int charactersIndex = Array.IndexOf(pathParts, "characters");
-                int skinsIndex = Array.IndexOf(pathParts, "skins");
-
-                if (skinsIndex > charactersIndex + 1)
-                {
-                    string championName = pathParts[charactersIndex + 1];
-                    string skinFolder = pathParts[skinsIndex + 1];
-
-                    if (!string.IsNullOrEmpty(championName) && !string.IsNullOrEmpty(skinFolder))
-                    {
-                        string skinName = (skinFolder == "base") ? "skin0" : $"skin{int.Parse(skinFolder.Replace("skin", ""))}";
-                        string binPath = $"data/characters/{championName}/skins/{skinName}.bin";
-                        string targetWadName = $"{championName.ToLower()}.wad.client";
-                        var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                        _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 1 successful. Found: {strategy}");
-                        return strategy;
-                    }
-                }
-            }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 1 failed or was not applicable.");
-
-            // Strategy 2: Infer from WAD file name (for champions)
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 2: Infer from WAD file name (for champions).");
-            var wadNameParts = sourceWadName.Split('.');
-            if (wadNameParts.Length > 0)
-            {
-                string championName = wadNameParts[0];
-                if (!championName.StartsWith("map", StringComparison.OrdinalIgnoreCase) && 
-                    !championName.Equals("common", StringComparison.OrdinalIgnoreCase) &&
-                    !championName.Equals("companions", StringComparison.OrdinalIgnoreCase))
-                {
-                    string skinName = "skin0";
-                    string binPath = $"data/characters/{championName.ToLower()}/skins/{skinName}.bin";
-                    string targetWadName = $"{championName.ToLower()}.wad.client";
-                    var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Champion);
-                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 2 successful. Found: {strategy}");
-                    return strategy;
-                }
-            }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 2 failed or was not applicable.");
-
-            // Strategy 3: Infer for locale VO files
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 3: Infer for locale VO files.");
-            if (virtualPath.Contains("_vo_", StringComparison.OrdinalIgnoreCase) &&
-                sourceWadName.StartsWith("Common.", StringComparison.OrdinalIgnoreCase) &&
-                sourceWadName.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) &&
-                !sourceWadName.Equals("Common.wad.client", StringComparison.OrdinalIgnoreCase))
-            {
-                string binPath = "data/maps/shipping/common/common.bin";
-                string targetWadName = "Common.wad.client";
-                var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
-                _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 3 successful. Found: {strategy}");
-                return strategy;
-            }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 3 failed or was not applicable.");
-
-            // Strategy 4 (Unified Map/Common): Infer from WAD file name for maps.
-            _logService.LogDebug("[GetBinFileSearchStrategy] Attempting Strategy 4: Infer from WAD file name for Maps/Common.");
-            if (wadNameParts.Length > 0 && (sourceWadName.StartsWith("Map", StringComparison.OrdinalIgnoreCase) || sourceWadName.StartsWith("Common", StringComparison.OrdinalIgnoreCase)))
-            {
-                string mapName = wadNameParts[0];
-                if (!string.IsNullOrEmpty(mapName))
-                {
-                    string binPath = $"data/maps/shipping/{mapName.ToLower()}/{mapName.ToLower()}.bin";
-                    string targetWadName = $"{mapName.ToLower()}.wad.client";
-                    var strategy = new BinFileStrategy(binPath, targetWadName, BinType.Map);
-                    _logService.LogDebug($"[GetBinFileSearchStrategy] Strategy 4 successful. Found: {strategy}");
-                    return strategy;
-                }
-            }
-            _logService.LogDebug("[GetBinFileSearchStrategy] Strategy 4 failed or was not applicable.");
-
-            _logService.LogWarning($"[GetBinFileSearchStrategy] No BIN file strategy found for '{virtualPath}'.");
-            return null;
+            _audioBankLinkerService = audioBankLinkerService;
         }
 
         public async Task<List<SerializableChunkDiff>> CreateLeanWadPackageAsync(IEnumerable<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string targetOldWadsPath, string targetNewWadsPath)
@@ -179,7 +47,7 @@ namespace AssetsManager.Services.Comparator
 
                 // --- 1. Handle .bin dependency ---
                 _logService.LogDebug($"[CreateLeanWadPackageAsync] Searching for .bin dependency for '{pathForStrategy}'...");
-                var binStrategy = ResolveBinFileStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
+                var binStrategy = _audioBankLinkerService.GetBinFileSearchStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
                 if (binStrategy != null)
                 {
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Found bin strategy: {binStrategy}. Resolving target WAD path...");
@@ -224,36 +92,15 @@ namespace AssetsManager.Services.Comparator
 
                 // --- 2. Handle sibling audio dependency ---
                 _logService.LogDebug($"[CreateLeanWadPackageAsync] Searching for sibling audio dependencies for '{pathForStrategy}'...");
-                string fileName = Path.GetFileName(pathForStrategy);
-                List<string> potentialSiblingsList = new List<string>();
+                var potentialSiblingsList = _audioBankLinkerService.GetAudioBankSiblings(pathForStrategy, audioBankDiff.SourceWadFile);
+                _logService.LogDebug($"[CreateLeanWadPackageAsync] Potential siblings identified: {string.Join(", ", potentialSiblingsList.Select(s => s.Path))}");
 
-                if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+                foreach (var sibling in potentialSiblingsList)
                 {
-                    string basePart = fileName.Substring(0, fileName.Length - 11);
-                    potentialSiblingsList.Add(basePart + "_audio.bnk");
-                    potentialSiblingsList.Add(basePart + "_audio.wpk");
-                }
-                else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
-                {
-                    string basePart = fileName.Substring(0, fileName.Length - 10);
-                    potentialSiblingsList.Add(basePart + "_events.bnk");
-                    potentialSiblingsList.Add(basePart + "_audio.wpk");
-                }
-                else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
-                {
-                    string basePart = fileName.Substring(0, fileName.Length - 10);
-                    potentialSiblingsList.Add(basePart + "_events.bnk");
-                    potentialSiblingsList.Add(basePart + "_audio.bnk");
-                }
-                
-                _logService.LogDebug($"[CreateLeanWadPackageAsync] Potential siblings identified: {string.Join(", ", potentialSiblingsList)}");
-
-                foreach (var siblingFileName in potentialSiblingsList)
-                {
-                    string siblingVirtualPath = Path.Combine(Path.GetDirectoryName(pathForStrategy), siblingFileName).Replace('\\', '/');
+                    string siblingVirtualPath = sibling.Path;
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingVirtualPath}'");
                     var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingVirtualPath, StringComparison.OrdinalIgnoreCase));
-                    var siblingDependency = await CreateDependencyAsync(siblingVirtualPath, XxHash64Ext.Hash(siblingVirtualPath.ToLower()), audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
+                    var siblingDependency = await CreateDependencyAsync(siblingVirtualPath, sibling.PathHash, audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
                     if (siblingDependency != null)
                     {
                         audioBankDiff.Dependencies.Add(siblingDependency);
@@ -390,90 +237,6 @@ namespace AssetsManager.Services.Comparator
                 }
                 return null;
             });
-        }
-
-        // Resolves the metadata for every dependency of an audio-bank diff
-        // (the .bin sibling, plus the audio.bnk / events.bnk / .wpk companions).
-        // Reuses the same 5-strategy .bin logic and sibling detection as
-        // CreateLeanWadPackageAsync, but does NOT touch the disk. This lets
-        // DiffViewService stream the bytes from either the live WADs or the
-        // wad_chunks/old|new backup directory.
-        public List<AudioDependencyInfo> ResolveAudioBankDependencies(SerializableChunkDiff audioBankDiff)
-        {
-            var deps = new List<AudioDependencyInfo>();
-            string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
-            if (string.IsNullOrEmpty(pathForStrategy)) return deps;
-
-            // --- 1. .bin sibling (5 strategies) ---
-            var binStrategy = ResolveBinFileStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
-            if (binStrategy != null)
-            {
-                string binVirtualPath = binStrategy.BinPath;
-                // Resolve the target WAD relative path (same logic as CreateLeanWadPackageAsync)
-                string targetWadRelativePath = binStrategy.TargetWadName;
-                string sourceWadRelativePath = audioBankDiff.SourceWadFile;
-                string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
-                string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
-
-                if (string.Equals(sourceWadFileName, binStrategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
-                {
-                    targetWadRelativePath = sourceWadRelativePath;
-                }
-                else if (!string.IsNullOrEmpty(sourceWadDirectory))
-                {
-                    string potentialPath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
-                    targetWadRelativePath = potentialPath;
-                }
-
-                deps.Add(new AudioDependencyInfo
-                {
-                    Path = binVirtualPath,
-                    SourceWad = targetWadRelativePath,
-                    PathHash = XxHash64Ext.Hash(binVirtualPath.ToLower()),
-                    Type = AudioDependencyType.Bin
-                });
-            }
-
-            // --- 2. Sibling audio banks (_events.bnk ↔ _audio.bnk ↔ _audio.wpk) ---
-            string fileName = Path.GetFileName(pathForStrategy);
-            List<(string siblingFileName, AudioDependencyType siblingType)> potentialSiblings = new();
-
-            if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
-            {
-                string basePart = fileName.Substring(0, fileName.Length - 11);
-                potentialSiblings.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
-                potentialSiblings.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
-            }
-            else if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
-            {
-                string basePart = fileName.Substring(0, fileName.Length - 10);
-                potentialSiblings.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
-                potentialSiblings.Add((basePart + "_audio.wpk", AudioDependencyType.AudioWpk));
-            }
-            else if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
-            {
-                string basePart = fileName.Substring(0, fileName.Length - 10);
-                potentialSiblings.Add((basePart + "_events.bnk", AudioDependencyType.EventsBnk));
-                potentialSiblings.Add((basePart + "_audio.bnk", AudioDependencyType.AudioBnk));
-            }
-
-            string siblingDir = Path.GetDirectoryName(pathForStrategy)?.Replace('\\', '/') ?? string.Empty;
-            foreach (var (siblingFileName, siblingType) in potentialSiblings)
-            {
-                string siblingVirtualPath = string.IsNullOrEmpty(siblingDir)
-                    ? siblingFileName
-                    : Path.Combine(siblingDir, siblingFileName).Replace('\\', '/');
-
-                deps.Add(new AudioDependencyInfo
-                {
-                    Path = siblingVirtualPath,
-                    SourceWad = audioBankDiff.SourceWadFile,
-                    PathHash = XxHash64Ext.Hash(siblingVirtualPath.ToLower()),
-                    Type = siblingType
-                });
-            }
-
-            return deps;
         }
 
         private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<SerializableChunkDiff> chunkDiffs, string wadRelativePath, bool useOld)
