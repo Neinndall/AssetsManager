@@ -111,6 +111,9 @@ Improvements
     * Replaced the fragile in-session fingerprint logic with a stable identity key built from Version + OldPath + NewPath, guaranteeing that identical comparisons are correctly deduplicated across sessions and app restarts.
     * Centralized the archive + register flow in `ComparisonHistoryService.EnsureArchivedAsync`, eliminating duplicated packaging code between MainWindow and the Comparison Results Window.
     * Added a new `ComparisonKey` field to `HistoryEntry` and serialized access via `SemaphoreSlim` to prevent race conditions when archiving the same comparison concurrently.
+  - Viewer / Animation memory is now released immediately when deleting an animation, removing a model, or closing the viewer.
+  - Viewer / Chroma preview thumbnails are released as soon as the gallery is closed, no longer waiting for the next scan.
+  - Viewer / Filtered models and animations lists now use cached results, keeping the panel responsive while typing in the search box.
 
 Bug Fixes
   - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
@@ -152,6 +155,7 @@ Bug Fixes
   - Diff Viewer / Batch comparison progress is now fully handled by the comparison engine with consistent loading states, matching the individual file experience.
      - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
    - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
+   - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
