@@ -151,7 +151,6 @@ namespace AssetsManager
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
-      services.AddSingleton<WadDiffProvider>();
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 

@@ -22,9 +22,8 @@ namespace AssetsManager.Views.Dialogs
             JsonDiffControl.JsonFormatterService = jsonFormatterService;
             JsonDiffControl.ParentWindow = this;
 
-            // [PLAN B] Start invisible to prevent visual jump and transparency gaps on massive files.
-            // If you uncomment this, also uncomment the Visibility.Visible line in JsonDiffWindow_Loaded.
-            // Visibility = Visibility.Hidden;
+            // Start invisible to prevent visual jump/flash during the transition
+            Visibility = Visibility.Hidden;
 
             Loaded += JsonDiffWindow_Loaded;
             Closed += OnWindowClosed;
@@ -48,20 +47,22 @@ namespace AssetsManager.Views.Dialogs
             // 1. Scroll to the first difference
             JsonDiffControl.FocusFirstDifference();
 
-            // 2. IMPORTANT: Wait for the UI to process the initial rendering of the heavy text
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            // 2. CRITICAL: Wait for the UI to finish the initial render of the heavy text
+            // before swapping the loading card out. ContextIdle runs after layout, render
+            // and data binding are all done, so the window is fully painted on screen.
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
 
-            // 3. Ensure activation and focus (Plan B: Uncomment Visibility.Visible if Hidden was used)
-            // this.Visibility = Visibility.Visible;
-            this.Activate();
-            this.Focus();
-
-            // 4. Smooth Handover: Close loading window now that we are ready
+            // 3. Close the loading window synchronously so it disappears first
             if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
             }
+
+            // 4. Show the new window now that the loading window is closed
+            this.Visibility = Visibility.Visible;
+            this.Activate();
+            this.Focus();
 
             // 5. Final adjustments (Guide, etc)
             await Dispatcher.InvokeAsync(() =>

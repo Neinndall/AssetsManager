@@ -224,6 +224,28 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Strips trailing audio-related extensions and suffixes (e.g. "_events.bnk", "_audio.bnk", ".wpk") 
+        /// from a file name to obtain the common base name.
+        /// </summary>
+        public static string StripBankSuffix(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return fileName;
+
+            if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 11);
+            if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 10);
+            if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 10);
+            if (fileName.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 4);
+            if (fileName.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 4);
+
+            return fileName;
+        }
+
+        /// <summary>
         /// Robust check to see if a path is the same or a sub-path of another.
         /// </summary>
         public static bool IsSameOrSubPath(string root, string sub)

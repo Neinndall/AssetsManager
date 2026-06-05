@@ -29,7 +29,6 @@ namespace AssetsManager.Views.Dialogs
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
-        private readonly WadDiffProvider _wadDiffProvider;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
@@ -48,7 +47,6 @@ namespace AssetsManager.Views.Dialogs
             CustomMessageBoxService customMessageBoxService,
             AssetDownloader assetDownloaderService,
             LogService logService,
-            WadDiffProvider wadDiffProvider,
             ComparisonHistoryService comparisonHistoryService,
             DiffViewService diffViewService,
             HashResolverService hashResolverService,
@@ -64,7 +62,6 @@ namespace AssetsManager.Views.Dialogs
             _customMessageBoxService = customMessageBoxService;
             _assetDownloaderService = assetDownloaderService;
             _logService = logService;
-            _wadDiffProvider = wadDiffProvider;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;

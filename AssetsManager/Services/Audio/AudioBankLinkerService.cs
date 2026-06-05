@@ -17,6 +17,7 @@ using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Audio
 {
@@ -237,7 +238,7 @@ namespace AssetsManager.Services.Audio
             // 5. INFERENCIA FINAL (Fallback de emergencia)
             if ((fileName ?? string.Empty).Contains("_vo_", StringComparison.OrdinalIgnoreCase))
             {
-                string baseName = GetBaseName(fileName);
+                string baseName = PathUtils.StripBankSuffix(fileName);
                 string[] baseParts = baseName.Split('_');
                 if (baseParts.Length > 0)
                 {
@@ -349,7 +350,7 @@ namespace AssetsManager.Services.Audio
         private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             bool isBackupMode = clickedNode.ChunkDiff != null;
-            string baseName = GetBaseName(clickedNode.Name);
+            string baseName = PathUtils.StripBankSuffix(clickedNode.Name);
             string expectedWpkName = baseName + "_audio.wpk";
             string expectedAudioBnkName = baseName + "_audio.bnk";
             string expectedEventsBnkName = baseName + "_events.bnk";
@@ -374,9 +375,9 @@ namespace AssetsManager.Services.Audio
             }
         }
 
-        private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
+        private async Task<(FileSystemNodeModel BinNode, string baseName, BinType Type)> FindAssociatedBinFileAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
-            string baseName = GetBaseName(clickedNode.Name);
+            string baseName = PathUtils.StripBankSuffix(clickedNode.Name);
             var strategy = GetBinFileSearchStrategy(clickedNode);
             if (strategy == null) return (null, baseName, BinType.Unknown);
 
@@ -438,16 +439,6 @@ namespace AssetsManager.Services.Audio
             return (null, baseName, strategy.Type);
         }
 
-        private string GetBaseName(string name)
-        {
-            if (name.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 10);
-            if (name.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 10);
-            if (name.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 11);
-            if (name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
-            if (name.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
-            return name;
-        }
-
         // LIVE mode entry point for direct (non-archived) comparison: opens the
         // local source/target WADs from the user-supplied PBE paths, resolves
         // the audio bank siblings (audio.bnk / .wpk / .bin) and feeds the
@@ -461,9 +452,7 @@ namespace AssetsManager.Services.Audio
         {
             string sourceWadRelativePath = diff.SourceWadFile;
             string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
-            string baseName = Path.GetFileNameWithoutExtension(fileName);
-            if (baseName.EndsWith("_events", StringComparison.OrdinalIgnoreCase))
-                baseName = baseName.Substring(0, baseName.Length - "_events".Length);
+            string baseName = PathUtils.StripBankSuffix(fileName);
             bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
 
             string pathForStrategy = diff.NewPath ?? diff.OldPath;
@@ -514,6 +503,81 @@ namespace AssetsManager.Services.Audio
                 binData: newBin,
                 baseName: baseName,
                 binType: binStrategy?.Type ?? BinType.Unknown);
+
+            return (oldNodes, newNodes);
+        }
+
+        // ARCHIVED mode entry point for comparisons saved in wad_chunks/:
+        // resolves audio bank siblings (.bnk / .wpk / .bin) via the comparison's
+        // dependency index, reads the bytes from the archived .chunk files via
+        // WadContentProvider, and returns the parsed audio event trees.
+        public async Task<(List<AudioEventNode> OldNodes, List<AudioEventNode> NewNodes)> ResolveArchivedAudioBankDiffAsync(
+            SerializableChunkDiff diff, string backupRoot, byte[] oldClickedBnk, byte[] newClickedBnk)
+        {
+            if (string.IsNullOrEmpty(backupRoot)) return (null, null);
+
+            List<AudioDependencyInfo> resolvedDeps = ResolveAudioBankDependencies(diff);
+            Dictionary<string, AssociatedDependency> depByPath = (diff.Dependencies ?? new List<AssociatedDependency>())
+                .GroupBy(d => d.Path, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
+            string baseName = PathUtils.StripBankSuffix(fileName);
+            bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
+
+            var binStrategy = GetBinFileSearchStrategy(diff.NewPath ?? diff.OldPath, diff.SourceWadFile);
+            var binType = binStrategy?.Type ?? BinType.Unknown;
+
+            byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
+            byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
+
+            foreach (var dep in resolvedDeps)
+            {
+                if (!depByPath.TryGetValue(dep.Path, out var assoc) || assoc == null) continue;
+
+                byte[] oldBytes = await _wadContentProvider.GetBackupChunkBytesAsync(backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType, isOld: true);
+                byte[] newBytes = await _wadContentProvider.GetBackupChunkBytesAsync(backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType, isOld: false);
+
+                switch (dep.Type)
+                {
+                    case AudioDependencyType.EventsBnk: oldEventsBnk = oldBytes; newEventsBnk = newBytes; break;
+                    case AudioDependencyType.AudioBnk: oldAudioBnk = oldBytes; newAudioBnk = newBytes; break;
+                    case AudioDependencyType.AudioWpk: oldWpk = oldBytes; newWpk = newBytes; break;
+                    case AudioDependencyType.Bin: oldBin = oldBytes; newBin = newBytes; break;
+                }
+            }
+
+            if (clickedIsEventsBnk)
+            {
+                oldEventsBnk = oldEventsBnk ?? oldClickedBnk;
+                newEventsBnk = newEventsBnk ?? newClickedBnk;
+            }
+            else
+            {
+                oldAudioBnk = oldAudioBnk ?? oldClickedBnk;
+                newAudioBnk = newAudioBnk ?? newClickedBnk;
+            }
+
+            if (oldEventsBnk == null && oldAudioBnk == null && newEventsBnk == null && newAudioBnk == null)
+            {
+                return (null, null);
+            }
+
+            var oldNodes = _audioBankService.ParseAudioBank(
+                wpkData: oldWpk,
+                audioBnkData: oldAudioBnk,
+                eventsData: oldEventsBnk,
+                binData: oldBin,
+                baseName: baseName,
+                binType: binType);
+
+            var newNodes = _audioBankService.ParseAudioBank(
+                wpkData: newWpk,
+                audioBnkData: newAudioBnk,
+                eventsData: newEventsBnk,
+                binData: newBin,
+                baseName: baseName,
+                binType: binType);
 
             return (oldNodes, newNodes);
         }

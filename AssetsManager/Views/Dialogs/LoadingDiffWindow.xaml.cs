@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs
@@ -52,6 +53,20 @@ namespace AssetsManager.Views.Dialogs
             }
             Loaded -= OnLoaded;
             Closing -= OnClosing;
+        }
+
+        // Atomic Handover: removes the owner BlurEffect and closes the loading window
+        // in a single dispatcher pass at ContextIdle priority, so the new window is
+        // already painted on screen and the visual swap is seamless (no flash of
+        // the closing loading card while the result window is appearing).
+        public void BeginAtomicHandover()
+        {
+            if (Owner != null)
+            {
+                Owner.Effect = null;
+            }
+
+            Dispatcher.BeginInvoke(new System.Action(Close), DispatcherPriority.ContextIdle);
         }
     }
 }

@@ -60,9 +60,9 @@ namespace AssetsManager.Views.Dialogs
         public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
         {
             InitializeComponent();
-            
-            // [PLAN B] Start invisible to prevent visual jump. Uncomment this and Visibility.Visible in Loaded if needed.
-            // Visibility = Visibility.Hidden;
+
+            // Start invisible to prevent visual jump/flash during the transition
+            Visibility = Visibility.Hidden;
 
             // Smooth Handover: Handled via Loaded event if LoadingWindow is set
             Loaded += ImageDiffWindow_Loaded;
@@ -98,21 +98,22 @@ namespace AssetsManager.Views.Dialogs
                 LoadingWindow.SetState(DiffLoadingState.Ready);
             }
 
-            // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
-            // Using Render priority for images as they are faster to draw than heavy text
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            // 1. CRITICAL: Wait for the UI to finish the initial render of the high-res
+            // textures. ContextIdle runs after layout, render and data binding are done,
+            // so the window is fully painted on screen before the handover.
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
 
-            // 2. Ensure activation and focus (Plan B: Uncomment Visibility.Visible if Hidden was used)
-            // this.Visibility = Visibility.Visible;
-            this.Activate();
-            this.Focus();
-
-            // 3. Smooth Handover: Close loading window now that we are ready
+            // 2. Close the loading window synchronously so it disappears first
             if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
                 LoadingWindow = null;
             }
+
+            // 3. Show the new window now that the loading window is closed
+            this.Visibility = Visibility.Visible;
+            this.Activate();
+            this.Focus();
         }
 
         private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)

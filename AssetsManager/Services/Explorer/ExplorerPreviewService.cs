@@ -3,6 +3,7 @@ using System.Xml;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Windows;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -39,33 +40,33 @@ namespace AssetsManager.Services.Explorer
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadDiffProvider _wadDiffProvider;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
+        private readonly DiffViewService _diffViewService;
 
         private bool _isGridActive;
 
         public ExplorerPreviewService(
             LogService logService, 
             DirectoriesCreator directoriesCreator, 
-            WadDiffProvider wadDiffProvider, 
             ContentFormatterService contentFormatterService, 
             AudioConversionService audioConversionService, 
             WadContentProvider wadContentProvider,
             SvgParser svgParser,
-            NarrativeMetadataService narrativeMetadataService)
+            NarrativeMetadataService narrativeMetadataService,
+            DiffViewService diffViewService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _wadDiffProvider = wadDiffProvider;
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
             _svgParser = svgParser;
             _narrativeMetadataService = narrativeMetadataService;
+            _diffViewService = diffViewService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -758,6 +759,11 @@ namespace AssetsManager.Services.Explorer
             }
 
             return null;
+        }
+
+        public async Task ShowFileDiffAsync(string oldPath, string newPath, Window owner)
+        {
+            await _diffViewService.ShowFileDiffAsync(oldPath, newPath, owner);
         }
     }
 }
