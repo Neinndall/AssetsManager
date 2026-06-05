@@ -12,13 +12,14 @@ namespace AssetsManager.Views
     /// Passive orchestrator for the Viewer module.
     /// Responsibility: Dependency Injection and Peer-to-Peer linking between sub-controls.
     /// </summary>
-    public partial class ViewerWindow : UserControl
+    public partial class ViewerWindow : UserControl, IDisposable
     {
         public ViewerWindowModel ViewModel => _viewModel;
 
         private readonly ViewerWindowModel _viewModel;
         private readonly LogService _logService;
         private readonly TaskCancellationManager _taskCancellationManager;
+        private bool _isCleanedUp;
 
         public ViewerWindow(
             SknLoadingService sknLoadingService,
@@ -61,6 +62,8 @@ namespace AssetsManager.Views
             ViewportControl.Panel = PanelControl;
 
             ChromaSelectionOverlay.ParentPanel = PanelControl;
+
+            Loaded += (s, e) => _isCleanedUp = false;
         }
 
         // Empty-state handlers: thin 1-liners that delegate to the Panel
@@ -70,6 +73,9 @@ namespace AssetsManager.Views
 
         public void CleanupResources()
         {
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
+
             try
             {
                 _taskCancellationManager?.CancelCurrentOperation(false);
@@ -81,6 +87,11 @@ namespace AssetsManager.Views
             {
                 _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
             }
+        }
+
+        public void Dispose()
+        {
+            CleanupResources();
         }
     }
 }

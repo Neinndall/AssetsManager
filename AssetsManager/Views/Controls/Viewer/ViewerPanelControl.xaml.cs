@@ -20,7 +20,7 @@ using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ViewerPanelControl : UserControl
+    public partial class ViewerPanelControl : UserControl, IDisposable
     {
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
@@ -44,6 +44,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
         private AnimationModel _currentlyPlayingAnimation;
+        private bool _isCleanedUp;
 
         public ViewerPanelControl()
         {
@@ -61,6 +62,7 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdateInspectorInfo();
 
             Unloaded += OnPanelUnloaded;
+            Loaded += (s, e) => _isCleanedUp = false;
         }
 
         private void OnLoadedModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -111,6 +113,13 @@ namespace AssetsManager.Views.Controls.Viewer
             else if (e.PropertyName == nameof(ViewerPanelModel.SelectedModelParts))
             {
                 UpdateHeroStats();
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsChromaGalleryVisible))
+            {
+                if (!_viewModel.IsChromaGalleryVisible)
+                {
+                    ChromaGallery?.ViewModel?.Reset();
+                }
             }
         }
 
@@ -203,6 +212,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void Cleanup()
         {
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
+
             try
             {
                 // Symmetric unsubscription: detach every handler we registered in the
@@ -227,15 +239,43 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        public void Dispose()
+        {
+            Cleanup();
+        }
+
+        private void SafeDisposeModel(SceneModel model)
+        {
+            if (model == null) return;
+            model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+
+            // Dispose animations that are not shared with any OTHER loaded model
+            foreach (var anim in model.Animations)
+            {
+                bool isShared = _viewModel.LoadedModels.Any(m => m != model && m.Animations.Any(a => a.AnimationAsset == anim.AnimationAsset));
+                if (!isShared)
+                {
+                    anim.Dispose();
+                }
+            }
+            model.Dispose();
+        }
+
         public void ResetScene()
         {
+            // Dispose all loaded animations
+            foreach (var animModel in _viewModel.AnimationModels)
+            {
+                animModel.Dispose();
+            }
+            _viewModel.AnimationModels.Clear();
+
             // 1. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _viewModel.LoadedModels)
             {
                 if (model != null)
                 {
-                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-                    model.Dispose();
+                    SafeDisposeModel(model);
                 }
             }
             _viewModel.LoadedModels.Clear();
@@ -243,7 +283,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentlyPlayingAnimation = null;
 
             _viewModel.SelectedModelParts = null; // MVVM Cleanup
-            _viewModel.AnimationModels.Clear();
             _viewModel.SelectedModel = null;
 
             // Reset search states for clean re-entry
@@ -269,6 +308,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
                 _viewModel.LoadedModels.Remove(modelToDelete);
+                SafeDisposeModel(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
                 if (_viewModel.LoadedModels.Count == 0)
@@ -303,6 +343,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _viewModel.SelectedAnimation = null;
                 }
+
+                // 3. Dispose the asset!
+                animationToDelete.Dispose();
             }
         }
 
@@ -669,7 +712,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 foreach (var model in _viewModel.LoadedModels)
                 {
-                    model?.Dispose();
+                    SafeDisposeModel(model);
                 }
                 _viewModel.LoadedModels.Clear();
                 _viewModel.LoadedModels.Add(newModel);

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    public class AnimationModel : INotifyPropertyChanged
+    public class AnimationModel : INotifyPropertyChanged, IDisposable
     {
         public AnimationData AnimationData { get; }
 
@@ -103,6 +103,11 @@ namespace AssetsManager.Views.Models.Viewer
         {
             AnimationData = animationData;
             TotalDuration = animationData.AnimationAsset.Duration;
+        }
+
+        public void Dispose()
+        {
+            AnimationData?.Dispose();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

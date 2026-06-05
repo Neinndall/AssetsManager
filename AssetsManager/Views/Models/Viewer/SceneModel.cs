@@ -227,6 +227,16 @@ namespace AssetsManager.Views.Models.Viewer
             // 3. Destruir partes individuales y limpiar colecciones
             if (_parts != null)
             {
+                // Find all unique shared textures dictionaries to clear them (Point 8)
+                var uniqueTextureDicts = new List<Dictionary<string, System.Windows.Media.Imaging.BitmapSource>>();
+                foreach (var part in _parts)
+                {
+                    if (part.AllTextures != null && !uniqueTextureDicts.Contains(part.AllTextures))
+                    {
+                        uniqueTextureDicts.Add(part.AllTextures);
+                    }
+                }
+
                 _parts.CollectionChanged -= Parts_CollectionChanged;
                 foreach (var part in _parts)
                 {
@@ -234,6 +244,11 @@ namespace AssetsManager.Views.Models.Viewer
                     part.Dispose();
                 }
                 _parts.Clear();
+
+                foreach (var dict in uniqueTextureDicts)
+                {
+                    dict.Clear();
+                }
             }
             Animations?.Clear();
 
@@ -249,11 +264,24 @@ namespace AssetsManager.Views.Models.Viewer
             Skeleton = null;
             RootVisual = null;
 
-            // 6. Limpiar eventos y estados
+            // 6. Limpiar eventos y estados (Point 9)
             IsAnimationPaused = false;
             AnimationTime = 0;
-            PropertyChanged = null;
-            MeshVisibilityChanged = null;
+            
+            if (PropertyChanged != null)
+            {
+                foreach (var d in PropertyChanged.GetInvocationList())
+                {
+                    PropertyChanged -= (PropertyChangedEventHandler)d;
+                }
+            }
+            if (MeshVisibilityChanged != null)
+            {
+                foreach (var d in MeshVisibilityChanged.GetInvocationList())
+                {
+                    MeshVisibilityChanged -= (Action<ModelPart>)d;
+                }
+            }
         }
     }
 }

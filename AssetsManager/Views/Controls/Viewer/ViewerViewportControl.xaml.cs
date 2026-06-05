@@ -23,7 +23,7 @@ using System.Windows.Threading;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ViewerViewportControl : UserControl
+    public partial class ViewerViewportControl : UserControl, IDisposable
     {
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -46,6 +46,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
+        private bool _isCleanedUp;
 
         // Environment references
         private ModelVisual3D _skyVisual;
@@ -91,6 +92,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
+            _isCleanedUp = false;
             // Self-healing: only create the camera controller and animation player
             // here. The window must not instantiate them too — see ViewerWindow notes.
             _animationPlayer = new AnimationPlayer(LogService);
@@ -146,6 +148,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void Cleanup()
         {
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
             try
             {
                 // 1. Desuscribir eventos
@@ -183,6 +187,11 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LogService?.LogError(ex, "Error during ViewerViewportControl.Cleanup");
             }
+        }
+
+        public void Dispose()
+        {
+            Cleanup();
         }
 
         public void SetAnimation(AnimationModel animationModel)
@@ -322,6 +331,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (Viewport.Children.Contains(model.RootVisual))
                     Viewport.Children.Remove(model.RootVisual);
+                model.PropertyChanged -= Model_PropertyChanged;
                 model.Dispose();
             }
             _loadedModels.Clear();

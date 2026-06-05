@@ -92,6 +92,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 ParentPanel.ViewModel.IsChromaGalleryVisible = false;
             }
+            _viewModel?.Reset();
         }
     }
 }

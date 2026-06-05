@@ -140,6 +140,15 @@ namespace AssetsManager.Views.Models.Viewer
             StatusText = $"Error: {message}";
         }
 
+        public void Reset()
+        {
+            AvailableSkins.Clear();
+            SelectedSkin = null;
+            ModelPath = null;
+            StatusText = "Ready to scan.";
+            IsLoading = false;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {

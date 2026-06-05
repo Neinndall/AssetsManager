@@ -35,19 +35,22 @@ namespace AssetsManager.Views.Models.Viewer
         private SceneModel _selectedModel;
         private AnimationModel _selectedAnimation;
 
+        private List<SceneModel> _filteredModelsList = new();
+        private List<AnimationModel> _filteredAnimationsList = new();
+
         public ViewerPanelModel()
         {
             _loadedModels.CollectionChanged += (_, __) =>
             {
                 OnPropertyChanged(nameof(HasLoadedModels));
                 OnPropertyChanged(nameof(HasMultipleModels));
-                OnPropertyChanged(nameof(FilteredModels));
+                UpdateFilteredModels();
             };
             _animationModels.CollectionChanged += (_, __) =>
             {
                 OnPropertyChanged(nameof(HasAnimations));
                 OnPropertyChanged(nameof(HasMultipleAnimations));
-                OnPropertyChanged(nameof(FilteredAnimations));
+                UpdateFilteredAnimations();
             };
         }
 
@@ -199,7 +202,7 @@ namespace AssetsManager.Views.Models.Viewer
                     _modelsSearchText = v;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(HasModelsSearchText));
-                    OnPropertyChanged(nameof(FilteredModels));
+                    UpdateFilteredModels();
                 }
             }
         }
@@ -215,7 +218,7 @@ namespace AssetsManager.Views.Models.Viewer
                     _animationsSearchText = v;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(HasAnimationsSearchText));
-                    OnPropertyChanged(nameof(FilteredAnimations));
+                    UpdateFilteredAnimations();
                 }
             }
         }
@@ -223,26 +226,38 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasModelsSearchText => !string.IsNullOrWhiteSpace(_modelsSearchText);
         public bool HasAnimationsSearchText => !string.IsNullOrWhiteSpace(_animationsSearchText);
 
-        public IEnumerable<SceneModel> FilteredModels
+        public IEnumerable<SceneModel> FilteredModels => _filteredModelsList;
+
+        public IEnumerable<AnimationModel> FilteredAnimations => _filteredAnimationsList;
+
+        private void UpdateFilteredModels()
         {
-            get
+            if (string.IsNullOrWhiteSpace(_modelsSearchText))
             {
-                if (string.IsNullOrWhiteSpace(_modelsSearchText)) return _loadedModels;
-                return _loadedModels.Where(m =>
-                    m != null && m.Name != null &&
-                    m.Name.IndexOf(_modelsSearchText, StringComparison.OrdinalIgnoreCase) >= 0);
+                _filteredModelsList = _loadedModels.ToList();
             }
+            else
+            {
+                _filteredModelsList = _loadedModels.Where(m =>
+                    m != null && m.Name != null &&
+                    m.Name.IndexOf(_modelsSearchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            }
+            OnPropertyChanged(nameof(FilteredModels));
         }
 
-        public IEnumerable<AnimationModel> FilteredAnimations
+        private void UpdateFilteredAnimations()
         {
-            get
+            if (string.IsNullOrWhiteSpace(_animationsSearchText))
             {
-                if (string.IsNullOrWhiteSpace(_animationsSearchText)) return _animationModels;
-                return _animationModels.Where(a =>
-                    a != null && a.Name != null &&
-                    a.Name.IndexOf(_animationsSearchText, StringComparison.OrdinalIgnoreCase) >= 0);
+                _filteredAnimationsList = _animationModels.ToList();
             }
+            else
+            {
+                _filteredAnimationsList = _animationModels.Where(a =>
+                    a != null && a.Name != null &&
+                    a.Name.IndexOf(_animationsSearchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            }
+            OnPropertyChanged(nameof(FilteredAnimations));
         }
 
         public int MeshPartCount => _selectedModelParts?.Count ?? 0;

@@ -54,6 +54,7 @@ namespace AssetsManager.Services.Viewer
             _cachedBlendIndices = null;
             _cachedBlendWeights = null;
             _skinnedVertices = null;
+            _currentPose.Clear();
         }
 
         private void EnsureBuffers(RigResource skeleton, SkinnedMesh skin, string modelName)
@@ -61,7 +62,7 @@ namespace AssetsManager.Services.Viewer
             if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationPlayer));
 
             int jointCount = skeleton.Joints.Count;
-            if (_boneTransforms == null || _boneTransforms.Length != jointCount)
+            if (_boneTransforms == null || _boneTransforms.Length != jointCount || _lastModelName != modelName)
             {
                 _boneTransforms = new Matrix4x4[jointCount];
                 _finalBoneTransforms = new Matrix4x4[jointCount];
