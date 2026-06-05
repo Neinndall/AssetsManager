@@ -104,7 +104,6 @@ namespace AssetsManager.Services.Viewer
                         BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
                         if (loadedTex != null)
                         {
-                            loadedTex.Freeze();
                             string textureKey = Path.GetFileName(texPath).Split('.')[0];
                             if (!loadedTextures.ContainsKey(textureKey))
                                 loadedTextures[textureKey] = loadedTex;
