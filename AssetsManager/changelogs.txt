@@ -114,7 +114,6 @@ Improvements
   - Viewer / Animation memory is now released immediately when deleting an animation, removing a model, or closing the viewer.
   - Viewer / Chroma preview thumbnails are released as soon as the gallery is closed, no longer waiting for the next scan.
   - Viewer / Filtered models and animations lists now use cached results, keeping the panel responsive while typing in the search box.
-  - Core / Utility Layer Performance: optimized processing of nameless assets, search filters, and configuration to be faster and use less memory, especially in large comparisons and explorations.
 
 Bug Fixes
   - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
@@ -157,9 +156,6 @@ Bug Fixes
      - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
    - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
    - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
-  - Comparator / File Type Detection: restored automatic extension assignment for images (PNG, JPG), audio banks (BNK), and 3D assets in nameless hash files, fixing the issue where some files appeared without an extension in comparison results.
-  - Monitor / History Self-Heal: when a historical archive is detected as already archived but its physical folder is missing, the system now removes the orphan reference and creates a fresh snapshot automatically.
-  - Comparator / Modified Count Fidelity: comparison history now shows the same Modified count as the live comparison. Audio-bank support files (.bin) that are independently categorized as New/Modified/Removed/Renamed are no longer removed from the top-level list during packaging; they remain counted in their category while still being linked as a dependency of the parent audio bank for self-contained backups.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

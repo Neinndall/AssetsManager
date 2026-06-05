@@ -26,6 +26,12 @@ namespace AssetsManager.Views.Models.Wad
         public string OldPath { get; set; }
         public string NewPath { get; set; }
         public string SourceWadFile { get; set; }
+
+        // Transient audit field populated during comparison when the diff is an
+        // audio bank. Holds a human-readable summary of HIRC changes (e.g.
+        // "Events: 142 → 143 (+1), WEMs: 87 → 88 (+1)"). Not serialized to the
+        // JSON index — used solely for the post-comparison audit log.
+        public string HircDiffSummary { get; set; }
     }
 
     public class AssociatedDependency

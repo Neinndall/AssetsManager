@@ -24,7 +24,9 @@ namespace AssetsManager.Services.Comparator
         private int _totalChunksGlobal;
         private int _completedChunksGlobal;
 
-        public WadComparatorService(HashResolverService hashResolverService, LogService logService)
+        public WadComparatorService(
+            HashResolverService hashResolverService,
+            LogService logService)
         {
             _hashResolverService = hashResolverService;
             _logService = logService;
@@ -327,6 +329,6 @@ namespace AssetsManager.Services.Comparator
                 NotifyComparisonProgressChanged(completed, statusMsg, true, null);
             }
         }
-
     }
 }
+

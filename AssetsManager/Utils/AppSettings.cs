@@ -44,6 +44,11 @@ namespace AssetsManager.Utils
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
         public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
 
+        // Diagnostic: writes a per-file audit log after each comparison so the
+        // user can verify that the New/Modified/Removed/Renamed classification
+        // is correct (Checksum + size + compression per file).
+        public bool VerboseComparisonLog { get; set; } = true;
+
         // New structure for monitored assets (Local WADs/Plugins)
         public List<MonitoredAsset> MonitoredAssets { get; set; }
         public List<HistoryEntry> DiffHistory { get; set; }
