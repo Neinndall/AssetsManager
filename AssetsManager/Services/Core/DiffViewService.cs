@@ -55,7 +55,7 @@ namespace AssetsManager.Services.Core
             if (diff == null) return;
 
             var pathForCheck = diff.NewPath ?? diff.OldPath;
-            if (!IsDiffSupported(pathForCheck))
+            if (!SupportedFileTypes.IsDiffSupported(pathForCheck))
             {
                 _customMessageBoxService.ShowInfo("Info", "This file type cannot be displayed in the difference viewer.", owner);
                 return;
@@ -65,7 +65,7 @@ namespace AssetsManager.Services.Core
 
             await RunWithLoadingAsync(owner, async loadingWindow =>
             {
-                if (SupportedFileTypes.Images.Contains(extension) || SupportedFileTypes.Textures.Contains(extension))
+                if (SupportedFileTypes.IsImage(pathForCheck))
                 {
                     await HandleImageDiffAsync(diff, oldPbePath, newPbePath, owner, extension, loadingWindow);
                 }
@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Core
                     if (!diffs.All(d => SupportedFileTypes.IsImage(d.NewPath ?? d.OldPath)))
                     {
                         loadingWindow.Close();
-                        _customMessageBoxService.ShowError("Error", "Batch comparison only supports files of the same category (all Images or all Text/Data).", owner);
+                        _customMessageBoxService.ShowError("Error", "Batch comparison only supports files of the same category (all Images).", owner);
                         return;
                     }
 
@@ -111,16 +111,17 @@ namespace AssetsManager.Services.Core
                         var diff = diffs[i];
                         loadingWindow.SetBatchIndex(i + 1, diffs.Count);
                         loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
-                        var (dataType, oldD, newD, _, _) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                        var (_, oldData, newData, _, _) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                        
                         loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
                         var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
-                        var oldImg = TextureUtils.LoadTexture((byte[])oldD, ext);
-                        var newImg = TextureUtils.LoadTexture((byte[])newD, ext);
-                        preparedImages.Add((oldImg, newImg, diff.OldPath, diff.NewPath));
+                        var oldImage = TextureUtils.LoadTexture((byte[])oldData, ext);
+                        var newImage = TextureUtils.LoadTexture((byte[])newData, ext);
+                        preparedImages.Add((oldImage, newImage, diff.OldPath, diff.NewPath));
+                        
                         loadingWindow.SetState(DiffLoadingState.BatchFileReady);
                     }
 
-                    // Force a render pass to ensure progress bar paints 100% before displaying the new window
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
                     var imageDiffWindow = new ImageDiffWindow();
@@ -131,10 +132,7 @@ namespace AssetsManager.Services.Core
                 }
                 else
                 {
-                    if (diffs.Any(d => {
-                        var p = d.NewPath ?? d.OldPath;
-                        return SupportedFileTypes.IsImage(p) || SupportedFileTypes.AudioBank.Contains(Path.GetExtension(p).ToLowerInvariant());
-                    }))
+                    if (diffs.Any(d => SupportedFileTypes.IsImage(d.NewPath ?? d.OldPath)))
                     {
                         loadingWindow.Close();
                         _customMessageBoxService.ShowError("Error", "Batch comparison only supports files of the same category (all Text/Data).", owner);
@@ -147,68 +145,58 @@ namespace AssetsManager.Services.Core
                         var diff = diffs[i];
                         loadingWindow.SetBatchIndex(i + 1, diffs.Count);
                         loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
-                        var (dataType, oldD, newD, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                        var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                        
                         loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
-                        var (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldD, (byte[])newD);
+                        string oldText, newText;
+                        if (Path.GetExtension(diff.Path).ToLowerInvariant() == ".bnk")
+                        {
+                            (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, loadingWindow);
+                        }
+                        else
+                        {
+                            (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
+                        }
                         preparedData.Add((oldText, newText, oldPath ?? diff.OldPath, newPath ?? diff.NewPath));
+                        
                         loadingWindow.SetState(DiffLoadingState.BatchFileReady);
                     }
 
-                    // Force a render pass to ensure progress bar paints 100% before displaying the new window
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
                     var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                     diffWindow.Owner = owner;
                     diffWindow.LoadingWindow = loadingWindow;
                     await diffWindow.LoadAndDisplayPreloadedBatchAsync(preparedData, startIndex);
-
                     diffWindow.ShowDialog();
                 }
             }, "Batch WAD diff");
         }
 
+        // Semantic audio bank comparison with sibling resolution (.wpk, .bin).
         private async Task HandleParsedAudioBankDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow, string sourceJsonPath)
         {
+            byte[] oldData = null;
+            byte[] newData = null;
+            string oldPath = null;
+            string newPath = null;
+
             try
             {
                 loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData);
-                var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                var result = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+                oldData = (byte[])result.OldData;
+                newData = (byte[])result.NewData;
+                oldPath = result.OldPath;
+                newPath = result.NewPath;
 
-                if (oldData is not byte[] oldBnk || newData is not byte[] newBnkBytes)
+                if (oldData == null || newData == null)
                 {
-                    await ShowTextComparisonInternal((byte[])oldData, (byte[])newData, "bnk", oldPath, newPath, owner, loadingWindow);
+                    await ShowTextComparisonInternal(oldData, newData, "bnk", oldPath, newPath, owner, loadingWindow);
                     return;
                 }
 
-                string backupRoot = !string.IsNullOrEmpty(sourceJsonPath) ? Path.GetDirectoryName(sourceJsonPath) : null;
-                List<AudioEventNode> oldNodes, newNodes;
-
-                if (string.IsNullOrEmpty(backupRoot))
-                {
-                    loadingWindow.SetState(DiffLoadingState.ParsingAudioHierarchy);
-                    (oldNodes, newNodes) = await _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldBnk, newBnkBytes);
-                }
-                else
-                {
-                    loadingWindow.SetState(DiffLoadingState.LinkingAudio);
-                    (oldNodes, newNodes) = await _audioBankLinkerService.ResolveArchivedAudioBankDiffAsync(diff, backupRoot, oldBnk, newBnkBytes);
-                }
-
-                if (oldNodes == null || newNodes == null)
-                {
-                    await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
-                    return;
-                }
-
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
-
-                var settings = new JsonSerializerOptions
-                {
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    WriteIndented = true
-                };
-                string oldJson = JsonSerializer.Serialize(oldNodes, settings);
-                string newJson = JsonSerializer.Serialize(newNodes, settings);
+                var (oldJson, newJson) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, oldData, newData, sourceJsonPath, loadingWindow);
 
                 if (oldJson == newJson)
                 {
@@ -217,6 +205,7 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
+                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
@@ -228,8 +217,7 @@ namespace AssetsManager.Services.Core
                 try
                 {
                     loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
-                    var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-                    await ShowTextComparisonInternal((byte[])oldData, (byte[])newData, "bnk", oldPath, newPath, owner, loadingWindow);
+                    await ShowTextComparisonInternal(oldData, newData, "bnk", oldPath, newPath, owner, loadingWindow);
                 }
                 catch
                 {
@@ -239,11 +227,30 @@ namespace AssetsManager.Services.Core
             }
         }
 
+        private async Task<(string oldJson, string newJson)> ProcessAudioBankDataAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, byte[] oldData, byte[] newData, string sourceJsonPath, LoadingDiffWindow loadingWindow = null)
+        {
+            string backupRoot = !string.IsNullOrEmpty(sourceJsonPath) ? Path.GetDirectoryName(sourceJsonPath) : null;
+            List<AudioEventNode> oldNodes, newNodes;
+
+            if (string.IsNullOrEmpty(backupRoot))
+            {
+                loadingWindow?.SetState(DiffLoadingState.ParsingAudioHierarchy);
+                (oldNodes, newNodes) = await _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldData, newData);
+            }
+            else
+            {
+                loadingWindow?.SetState(DiffLoadingState.LinkingAudio);
+                (oldNodes, newNodes) = await _audioBankLinkerService.ResolveArchivedAudioBankDiffAsync(diff, backupRoot, oldData, newData);
+            }
+
+            var settings = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true };
+            return (JsonSerializer.Serialize(oldNodes, settings), JsonSerializer.Serialize(newNodes, settings));
+        }
+
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
         {
             loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData);
             var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-            
             await ShowTextComparisonInternal((byte[])oldData, (byte[])newData, dataType, oldPath, newPath, owner, loadingWindow);
         }
 
@@ -251,7 +258,6 @@ namespace AssetsManager.Services.Core
         {
             loadingWindow.SetState(DiffLoadingState.AcquiringTextureData);
             var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-
             await ShowImageComparisonInternal((byte[])oldData, (byte[])newData, oldPath, newPath, extension, owner, loadingWindow);
         }
 
@@ -271,7 +277,6 @@ namespace AssetsManager.Services.Core
             var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
             diffWindow.Owner = owner;
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath, loadingWindow);
-
             diffWindow.ShowDialog();
         }
 
@@ -303,19 +308,16 @@ namespace AssetsManager.Services.Core
 
             await RunWithLoadingAsync(owner, async loadingWindow =>
             {
+                loadingWindow.SetState(DiffLoadingState.ReadingLocalFiles);
                 if (isImage)
                 {
-                    loadingWindow.SetState(DiffLoadingState.ReadingLocalFiles);
                     byte[] oldData = File.Exists(oldFilePath) ? await File.ReadAllBytesAsync(oldFilePath) : null;
                     byte[] newData = File.Exists(newFilePath) ? await File.ReadAllBytesAsync(newFilePath) : null;
-
                     await ShowImageComparisonInternal(oldData, newData, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath), extension, owner, loadingWindow);
                 }
                 else
                 {
-                    loadingWindow.SetState(DiffLoadingState.ReadingLocalFiles);
                     var (dataType, oldData, newData) = await _wadContentProvider.GetFileDiffDataAsync(oldFilePath, newFilePath);
-                    
                     await ShowTextComparisonInternal((byte[])oldData, (byte[])newData, dataType, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath), owner, loadingWindow);
                 }
             }, "File diff");
@@ -325,31 +327,11 @@ namespace AssetsManager.Services.Core
         {
             var oldTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, oldData);
             var newTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, newData);
-
             await Task.WhenAll(oldTextTask, newTextTask);
-
             return (await oldTextTask, await newTextTask);
         }
 
-        private bool IsDiffSupported(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath)) return false;
-
-            string extension = Path.GetExtension(filePath).ToLowerInvariant();
-
-            return SupportedFileTypes.Images.Contains(extension) ||
-                   SupportedFileTypes.Textures.Contains(extension) ||
-                   SupportedFileTypes.Json.Contains(extension) ||
-                   SupportedFileTypes.JavaScript.Contains(extension) ||
-                   SupportedFileTypes.Css.Contains(extension) ||
-                   SupportedFileTypes.Bin.Contains(extension) ||
-                   SupportedFileTypes.StringTable.Contains(extension) ||
-                   SupportedFileTypes.Troybin.Contains(extension) ||
-                   SupportedFileTypes.Preload.Contains(extension) ||
-                   extension == ".bnk" ||
-                   SupportedFileTypes.PlainText.Contains(extension);
-        }
-
+        // Centraliza el ciclo de vida de la ventana de carga
         private async Task RunWithLoadingAsync(Window owner, Func<LoadingDiffWindow, Task> body, string operationLabel)
         {
             var loadingWindow = new LoadingDiffWindow { Owner = owner };

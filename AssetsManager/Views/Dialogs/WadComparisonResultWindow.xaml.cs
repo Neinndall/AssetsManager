@@ -238,8 +238,11 @@ namespace AssetsManager.Views.Dialogs
         {
             if (diffs == null || diffs.Count == 0) return;
             
-            // Filter only modified items that are NOT audio data containers
-            var validDiffs = diffs.Where(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path)).ToList();
+            // Permitimos MODIFICADOS que sean TEXTO o AUDIO BANKS semánticos (events.bnk)
+            // Filtramos contenedores de datos puros (_audio.bnk / .wpk)
+            var validDiffs = diffs.Where(d => d.Type == ChunkDiffType.Modified && 
+                                           (SupportedFileTypes.IsText(d.Path) || SupportedFileTypes.IsAudioBank(d.Path)) &&
+                                           !SupportedFileTypes.IsAudioDataContainer(d.Path)).ToList();
             
             if (validDiffs.Count > 1)
             {

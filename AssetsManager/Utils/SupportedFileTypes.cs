@@ -42,5 +42,35 @@ namespace AssetsManager.Utils
             string extension = Path.GetExtension(fileName);
             return Images.Contains(extension) || Textures.Contains(extension);
         }
+
+        public static bool IsAudioBank(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = Path.GetExtension(fileName);
+            return AudioBank.Contains(extension);
+        }
+
+        public static bool IsText(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = Path.GetExtension(fileName).ToLowerInvariant();
+            return Json.Contains(extension) ||
+                   JavaScript.Contains(extension) ||
+                   Css.Contains(extension) ||
+                   Bin.Contains(extension) ||
+                   StringTable.Contains(extension) ||
+                   Troybin.Contains(extension) ||
+                   Preload.Contains(extension) ||
+                   PlainText.Contains(extension) ||
+                   Lua.Contains(extension);
+        }
+
+        public static bool IsDiffSupported(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = Path.GetExtension(fileName).ToLowerInvariant();
+
+            return IsImage(fileName) || IsText(fileName) || extension == ".bnk";
+        }
     }
 }
