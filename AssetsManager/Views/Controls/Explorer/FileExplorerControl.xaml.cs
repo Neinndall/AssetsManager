@@ -771,7 +771,9 @@ namespace AssetsManager.Views.Controls.Explorer
                     newPbePath = null;
                 }
 
-                await DiffViewService.ShowWadDiffAsync(nodesWithDiff[0].ChunkDiff, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
+                var diffToShow = nodesWithDiff[0].ChunkDiff;
+                LogService.Log($"[DIAG_SHOW] About to call ShowWadDiffAsync for: '{diffToShow.NewPath ?? diffToShow.OldPath}', Deps count = {diffToShow.Dependencies?.Count ?? 0}, SourceWadFile='{diffToShow.SourceWadFile}', diffToShow instance id = {diffToShow.GetHashCode()}, node.ChunkDiff instance id = {nodesWithDiff[0].ChunkDiff.GetHashCode()}");
+                await DiffViewService.ShowWadDiffAsync(diffToShow, oldPbePath, newPbePath, Window.GetWindow(this), _viewModel.IsBackupMode ? _backupJsonPath : null);
             }
         }
 

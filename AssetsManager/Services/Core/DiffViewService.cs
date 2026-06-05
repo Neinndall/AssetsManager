@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Core
         private readonly WadDiffProvider _wadDiffProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
+        private static int s_audioBankDiffInvocation = 0;
         private readonly JsonFormatterService _jsonFormatterService;
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
@@ -210,10 +211,12 @@ namespace AssetsManager.Services.Core
                 _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] Computed backupRoot='{backupRoot}' (isNull={string.IsNullOrEmpty(backupRoot)})");
                 if (string.IsNullOrEmpty(backupRoot))
                 {
-                    _logService.Log($"[HANDLE_PARSED_AUDIO_BANK_DIFF] *** DIRECT COMPARISON MODE — delegating LIVE resolution to AudioBankLinkerService ***");
+                    int inv = ++s_audioBankDiffInvocation;
+                    _logService.Log($"[HELPER_VS_INLINE] #{inv} === LIVE BRANCH — will use TryShowParsedAudioBankDiffAsync helper ===");
                     bool liveOk = await TryShowParsedAudioBankDiffAsync(
                         () => _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldBnk, newBnkBytes),
                         oldPath, newPath, owner, loadingWindow);
+                    _logService.Log($"[HELPER_VS_INLINE] #{inv} === LIVE BRANCH END — helper returned {liveOk} ===");
                     if (!liveOk)
                     {
                         await ShowTextComparisonInternal(oldBnk, newBnkBytes, "bnk", oldPath, newPath, owner, loadingWindow);
@@ -326,6 +329,8 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
+                int invBackup = ++s_audioBankDiffInvocation;
+                _logService.Log($"[HELPER_VS_INLINE] #{invBackup} === BACKUP BRANCH — INLINE show window (NOT using helper) ===");
                 loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
 
                 var settings = new JsonSerializerOptions
@@ -348,6 +353,7 @@ namespace AssetsManager.Services.Core
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
                 diffWindow.ShowDialog();
                 owner?.Activate();
+                _logService.Log($"[HELPER_VS_INLINE] #{invBackup} === BACKUP BRANCH END ===");
             }
             catch (Exception ex)
             {
@@ -409,6 +415,7 @@ namespace AssetsManager.Services.Core
         {
             try
             {
+                _logService.Log($"[HELPER_VS_INLINE] === HELPER BODY ENTRY for invocation #{s_audioBankDiffInvocation} ===");
                 loadingWindow.SetState(DiffLoadingState.ParsingAudioHierarchy);
                 var (oldNodes, newNodes) = await resolveNodesAsync();
                 if (oldNodes == null || newNodes == null)
