@@ -71,8 +71,18 @@ namespace AssetsManager.Services.Monitor
                 if (existingReferenceId != null)
                 {
                     string archivePath = Path.Combine(_directoriesCreator.WadComparisonSavePath, existingReferenceId);
-                    _logService.LogInteractiveInfo("Comparison already archived as", archivePath, $"{existingReferenceId}.");
-                    return new ArchiveResult(true, existingReferenceId);
+
+                    if (Directory.Exists(archivePath))
+                    {
+                        _logService.LogInteractiveInfo("Comparison already archived as", archivePath, $"{existingReferenceId}.");
+                        return new ArchiveResult(true, existingReferenceId);
+                    }
+
+                    // Orphan reference: the index still points to a previous archive
+                    // whose physical folder was removed from disk. Clean up the stale
+                    // entry and fall through to package a fresh snapshot below.
+                    _logService.LogWarning($"Previous archive '{existingReferenceId}' is missing from disk. Removing the orphan reference and creating a fresh snapshot.");
+                    RemoveOrphanEntry(comparisonKey, existingReferenceId);
                 }
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
@@ -111,6 +121,32 @@ namespace AssetsManager.Services.Monitor
                                      && !string.IsNullOrEmpty(h.NewFilePath)
                                      && ResolveEntryKey(h) == comparisonKey)
                 ?.ReferenceId;
+        }
+
+        // Removes a history entry whose physical archive folder is missing from
+        // disk. Called from EnsureArchivedAsync when a dedup hit resolves to a
+        // ghost reference. The SemaphoreSlim in the caller guarantees we don't
+        // race with concurrent reads/writes on DiffHistory. Persistence is
+        // deferred to the RegisterInHistory call that follows, which performs
+        // a single Save() with both the removal and the new entry in one write.
+        private void RemoveOrphanEntry(string comparisonKey, string referenceId)
+        {
+            try
+            {
+                var orphan = _appSettings.DiffHistory
+                    .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
+                                         && h.ReferenceId == referenceId
+                                         && ResolveEntryKey(h) == comparisonKey);
+
+                if (orphan != null)
+                {
+                    _appSettings.DiffHistory.Remove(orphan);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to remove orphan history reference '{referenceId}'.");
+            }
         }
 
         private void RegisterInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version, string comparisonKey)
