@@ -28,6 +28,7 @@ namespace AssetsManager.Services.Audio
         private readonly TreeUIManager _treeUIManager;
         private readonly HashResolverService _hashResolverService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private readonly AudioBankService _audioBankService;
 
         public AudioBankLinkerService(
             WadContentProvider wadContentProvider,
@@ -35,7 +36,8 @@ namespace AssetsManager.Services.Audio
             LogService logService,
             TreeUIManager treeUIManager,
             HashResolverService hashResolverService,
-            WadNodeLoaderService wadNodeLoaderService)
+            WadNodeLoaderService wadNodeLoaderService,
+            AudioBankService audioBankService)
         {
             _wadContentProvider = wadContentProvider;
             _wadSearchBoxService = wadSearchBoxService;
@@ -43,303 +45,10 @@ namespace AssetsManager.Services.Audio
             _treeUIManager = treeUIManager;
             _hashResolverService = hashResolverService;
             _wadNodeLoaderService = wadNodeLoaderService;
+            _audioBankService = audioBankService;
         }
 
-        public async Task<LinkedAudioBank> LinkAudioBankForDiffAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
-        {
-            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Linking audio bank for diff view. Node: '{clickedNode.Name}', Path: '{clickedNode.VirtualPath}', PreferOld: {preferOld}, BackupRootDir: '{backupRootDir}'");
-
-            if (string.IsNullOrEmpty(basePath) && clickedNode.ChunkDiff == null && string.IsNullOrEmpty(backupRootDir))
-            {
-                _logService.LogWarning($"[LinkAudioBankForDiffAsync] Base path is null, ChunkDiff is null, and backupRootDir is null. Cannot proceed. Node: {clickedNode.Name}");
-                return null;
-            }
-
-            byte[] binData = null;
-            FileSystemNodeModel binNode = null;
-            string baseName = GetBaseName(clickedNode.Name);
-            BinType binType = BinType.Unknown;
-
-            FileSystemNodeModel wpkNode = null;
-            FileSystemNodeModel audioBnkNode = null;
-            FileSystemNodeModel eventsBnkNode = null;
-
-            // 1. BACKUP MODE: STRICTLY use backup data (JSON and chunks)
-            if (backupRootDir != null)
-            {
-                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP MODE] STRICT resolution via JSON index.");
-                eventsBnkNode = clickedNode; // CRITICAL: Always assign events node first
-                
-                if (clickedNode.ChunkDiff != null)
-                {
-                    string backupJsonPath = Path.Combine(backupRootDir, "wadcomparison.json");
-                    if (File.Exists(backupJsonPath))
-                    {
-                        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
-                        string jsonContent = await File.ReadAllTextAsync(backupJsonPath);
-                        var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
-
-                        // Resolve BIN metadata
-                        var strategy = GetBinFileSearchStrategy(clickedNode);
-                        if (strategy != null)
-                        {
-                            binType = strategy.Type;
-                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Strategy identified: {strategy.Type}, Path: '{strategy.BinPath}'");
-
-                            // DEEP SEARCH for the BIN in the whole JSON structure
-                            SerializableChunkDiff binDiff = null;
-
-                            // A. Check top-level diffs first (Modified, New, etc.)
-                            binDiff = comparisonData?.Diffs.FirstOrDefault(d => 
-                                string.Equals(d.NewPath, strategy.BinPath, StringComparison.OrdinalIgnoreCase) || 
-                                string.Equals(d.OldPath, strategy.BinPath, StringComparison.OrdinalIgnoreCase));
-
-                            // B. Check the clicked node's DIRECT dependencies
-                            if (binDiff == null && clickedNode.ChunkDiff.Dependencies != null)
-                            {
-                                var depMatch = clickedNode.ChunkDiff.Dependencies.FirstOrDefault(d => string.Equals(d.Path, strategy.BinPath, StringComparison.OrdinalIgnoreCase));
-                                if (depMatch != null)
-                                {
-                                    binDiff = new SerializableChunkDiff
-                                    {
-                                        Type = depMatch.Type ?? ChunkDiffType.Dependency,
-                                        OldPath = depMatch.Path, NewPath = depMatch.Path,
-                                        SourceWadFile = depMatch.SourceWad,
-                                        OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
-                                        OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
-                                    };
-                                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in direct Dependencies.");
-                                }
-                            }
-
-                            // C. Check ALL dependencies of ALL files in the JSON (Last resort)
-                            if (binDiff == null && comparisonData?.Diffs != null)
-                            {
-                                foreach (var d in comparisonData.Diffs)
-                                {
-                                    if (d.Dependencies != null)
-                                    {
-                                        var depMatch = d.Dependencies.FirstOrDefault(dep => string.Equals(dep.Path, strategy.BinPath, StringComparison.OrdinalIgnoreCase));
-                                        if (depMatch != null)
-                                        {
-                                            binDiff = new SerializableChunkDiff
-                                            {
-                                                Type = depMatch.Type ?? ChunkDiffType.Dependency,
-                                                OldPath = depMatch.Path, NewPath = depMatch.Path,
-                                                SourceWadFile = depMatch.SourceWad,
-                                                OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
-                                                OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
-                                            };
-                                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found BIN in indirect dependencies.");
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (binDiff != null)
-                            {
-                                bool useOld = preferOld || binDiff.Type == ChunkDiffType.Removed;
-                                ulong hashForPath = useOld ? binDiff.OldPathHash : binDiff.NewPathHash;
-                                string chunkDir = useOld ? "old" : "new";
-
-                                binNode = new FileSystemNodeModel(Path.GetFileName(strategy.BinPath), false, strategy.BinPath, binDiff.SourceWadFile)
-                                {
-                                    ChunkDiff = binDiff,
-                                    BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, binDiff.SourceWadFile, $"{hashForPath:X16}.chunk"),
-                                    Type = NodeType.SoundBank
-                                };
-                                binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] BinData loaded: {binData?.Length ?? 0} bytes.");
-                            }
-                        }
-
-                        // Resolve SIBLINGS (same directory)
-                        string directoryPath = Path.GetDirectoryName(clickedNode.VirtualPath).Replace('\\', '/');
-                        var siblings = comparisonData?.Diffs.Where(d =>
-                            (d.NewPath != null && Path.GetDirectoryName(d.NewPath).Replace('\\', '/') == directoryPath) ||
-                            (d.OldPath != null && Path.GetDirectoryName(d.OldPath).Replace('\\', '/') == directoryPath))
-                            .ToList() ?? new List<SerializableChunkDiff>();
-
-                        // FIX: Also check in Dependencies of the clicked node
-                        if (clickedNode.ChunkDiff.Dependencies != null)
-                        {
-                            foreach (var dep in clickedNode.ChunkDiff.Dependencies)
-                            {
-                                if (Path.GetDirectoryName(dep.Path).Replace('\\', '/') == directoryPath)
-                                {
-                                    var depDiff = new SerializableChunkDiff
-                                    {
-                                        Type = dep.Type ?? ChunkDiffType.Dependency,
-                                        OldPath = dep.Path, NewPath = dep.Path,
-                                        SourceWadFile = dep.SourceWad,
-                                        OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash,
-                                        OldCompressionType = dep.CompressionType, NewCompressionType = dep.CompressionType
-                                    };
-                                    siblings.Add(depDiff);
-                                }
-                            }
-                        }
-
-                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Found {siblings.Count} siblings. Searching containers...");
-                        
-                        var wpkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.wpk", StringComparison.OrdinalIgnoreCase))
-                                   ?? siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + ".wpk", StringComparison.OrdinalIgnoreCase));
-                        
-                        var audioBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.bnk", StringComparison.OrdinalIgnoreCase))
-                                        ?? siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + ".bnk", StringComparison.OrdinalIgnoreCase) 
-                                                                     && !(d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase));
-
-                        Func<SerializableChunkDiff, FileSystemNodeModel> createNode = (diff) =>
-                        {
-                            if (diff == null) return null;
-                            bool useOld = preferOld || diff.Type == ChunkDiffType.Removed;
-                            ulong hashForPath = useOld ? diff.OldPathHash : diff.NewPathHash;
-                            string chunkDir = useOld ? "old" : "new";
-                            string fPath = useOld ? diff.OldPath : diff.NewPath;
-
-                            return new FileSystemNodeModel(Path.GetFileName(fPath), false, fPath, diff.SourceWadFile)
-                            {
-                                ChunkDiff = diff,
-                                BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hashForPath:X16}.chunk"),
-                                Type = NodeType.SoundBank
-                            };
-                        };
-
-                        wpkNode = createNode(wpkDiff);
-                        audioBnkNode = createNode(audioBnkDiff);
-                        eventsBnkNode = clickedNode;
-
-                        // NEW: Master Events Bank Fallback for Regional Locales
-                        // Detect regionality: Champion.Locale.wad.client (length >= 4) and not en_US
-                        string sourceWad = clickedNode.ChunkDiff.SourceWadFile.ToLower();
-                        var wadParts = Path.GetFileName(sourceWad).Split('.');
-                        bool isRegionalWad = wadParts.Length >= 4 && !sourceWad.Contains(".en_us.");
-
-                        if (isRegionalWad)
-                        {
-                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Regional WAD detected: '{sourceWad}'. Searching for Master Events Bank in en_US counterpart using direct path...");
-                            
-                            // Use the EXACT same path (Riot usually shares en_us paths across all locales)
-                            string targetPath = clickedNode.VirtualPath;
-                            
-                            var masterDiff = comparisonData?.Diffs.FirstOrDefault(d => 
-                                (string.Equals(d.NewPath, targetPath, StringComparison.OrdinalIgnoreCase) || 
-                                 string.Equals(d.OldPath, targetPath, StringComparison.OrdinalIgnoreCase)) &&
-                                d.SourceWadFile.EndsWith(".en_US.wad.client", StringComparison.OrdinalIgnoreCase));
-
-                            if (masterDiff == null && comparisonData?.Diffs != null)
-                            {
-                                foreach (var d in comparisonData.Diffs)
-                                {
-                                    if (d.Dependencies != null)
-                                    {
-                                        var depMatch = d.Dependencies.FirstOrDefault(dep => 
-                                            string.Equals(dep.Path, targetPath, StringComparison.OrdinalIgnoreCase) && 
-                                            dep.SourceWad.EndsWith(".en_US.wad.client", StringComparison.OrdinalIgnoreCase));
-
-                                        if (depMatch != null)
-                                        {
-                                            masterDiff = new SerializableChunkDiff
-                                            {
-                                                Type = depMatch.Type ?? ChunkDiffType.Dependency,
-                                                OldPath = depMatch.Path, NewPath = depMatch.Path,
-                                                SourceWadFile = depMatch.SourceWad,
-                                                OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
-                                                OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
-                                            };
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (masterDiff != null)
-                            {
-                                var masterNode = createNode(masterDiff);
-                                if (masterNode != null)
-                                {
-                                    _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Successfully linked Master Events Bank (Exact Path) from en_US WAD.");
-                                    eventsBnkNode = masterNode; 
-                                }
-                            }
-                        }
-
-                        _logService.LogDebug($"[LinkAudioBankForDiffAsync] [BACKUP] Siblings resolved: WPK={(wpkNode != null)}, AudioBNK={(audioBnkNode != null)}");
-                    }
-                }
-            }
-            // 2. LIVE MODE
-            else
-            {
-                _logService.LogDebug($"[LinkAudioBankForDiffAsync] [LIVE MODE] Resolving via strategies and physical WADs.");
-                var strategy = GetBinFileSearchStrategy(clickedNode);
-                if (strategy != null)
-                {
-                    binType = strategy.Type;
-                    string targetWadVirtualPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
-                    
-                    if (File.Exists(targetWadVirtualPath))
-                    {
-                        var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadVirtualPath);
-                        binNode = FindNodeByPath(wadContent, strategy.BinPath);
-                        if (binNode != null)
-                        {
-                            binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
-                            _logService.LogDebug($"[LinkAudioBankForDiffAsync] [LIVE] Loaded .bin data from live WAD. Size: {binData?.Length ?? 0} bytes.");
-                        }
-
-                        // Siblings
-                        string sourceWadVirtualPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
-                        if (string.Equals(targetWadVirtualPath, sourceWadVirtualPath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
-                            audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
-                            eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
-                        }
-                    }
-                }
-
-                if (eventsBnkNode == null)
-                {
-                    var siblingsResult = await FindSiblingFilesFromWadsAsync(clickedNode, basePath, preferOld, null);
-                    wpkNode = wpkNode ?? siblingsResult.WpkNode;
-                    audioBnkNode = audioBnkNode ?? siblingsResult.AudioBnkNode;
-                    eventsBnkNode = siblingsResult.EventsBnkNode;
-                }
-            }
-
-            _logService.LogDebug($"[LinkAudioBankForDiffAsync] Final results - BinData: {binData != null}, WpkNode: {wpkNode != null}, AudioBnkNode: {audioBnkNode != null}, EventsBnkNode: {eventsBnkNode != null}");
-
-            return new LinkedAudioBank
-            {
-                WpkNode = wpkNode,
-                AudioBnkNode = audioBnkNode,
-                EventsBnkNode = eventsBnkNode,
-                BinData = binData,
-                BaseName = baseName,
-                BinType = binType
-            };
-        }
-
-        private string ResolveTargetWadPath(FileSystemNodeModel clickedNode, string basePath, string targetWadName)
-        {
-            if (clickedNode.ChunkDiff == null || string.IsNullOrEmpty(basePath)) return null;
-
-            string sourceWadRelativePath = clickedNode.ChunkDiff.SourceWadFile;
-            string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
-
-            if (string.Equals(sourceWadFileName, targetWadName, StringComparison.OrdinalIgnoreCase))
-                return Path.Combine(basePath, sourceWadRelativePath);
-            
-            string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
-            string potentialPath = Path.Combine(basePath, sourceWadDirectory, targetWadName);
-            if (File.Exists(potentialPath)) return potentialPath;
-
-            return Path.Combine(basePath, targetWadName);
-        }
-
-        public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
+        public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
             bool isBackupMode = clickedNode.ChunkDiff != null;
             string modeLabel = isBackupMode ? "BACKUP" : "LIVE";
@@ -387,93 +96,6 @@ namespace AssetsManager.Services.Audio
                     BaseName = baseName,
                     BinType = binType
                 };
-            }
-        }
-
-        private async Task<(FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode)> FindSiblingFilesFromWadsAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
-        {
-            string baseName = GetBaseName(clickedNode.Name);
-
-            if (backupRootDir != null || basePath == null)
-            {
-                if (clickedNode.ChunkDiff != null)
-                {
-                    if (backupRootDir == null && !string.IsNullOrEmpty(clickedNode.BackupChunkPath))
-                    {
-                        string chunkPath = clickedNode.BackupChunkPath;
-                        int wadChunksIndex = chunkPath.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
-                        if (wadChunksIndex != -1) backupRootDir = chunkPath.Substring(0, wadChunksIndex);
-                        else backupRootDir = Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
-                    }
-
-                    if (backupRootDir != null)
-                    {
-                        string backupJsonPath = Path.Combine(backupRootDir, "wadcomparison.json");
-                        if (File.Exists(backupJsonPath))
-                        {
-                            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
-                            string jsonContent = await File.ReadAllTextAsync(backupJsonPath);
-                            var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
-
-                            string directoryPath = Path.GetDirectoryName(clickedNode.VirtualPath).Replace('\\', '/');
-                            var siblings = comparisonData?.Diffs.Where(d =>
-                                (d.NewPath != null && Path.GetDirectoryName(d.NewPath).Replace('\\', '/') == directoryPath) ||
-                                (d.OldPath != null && Path.GetDirectoryName(d.OldPath).Replace('\\', '/') == directoryPath))
-                                .ToList();
-
-                            // FIX: Also check in Dependencies of the clicked node
-                            if (clickedNode.ChunkDiff.Dependencies != null)
-                            {
-                                foreach (var dep in clickedNode.ChunkDiff.Dependencies)
-                                {
-                                    if (Path.GetDirectoryName(dep.Path).Replace('\\', '/') == directoryPath)
-                                    {
-                                        var depDiff = new SerializableChunkDiff
-                                        {
-                                            Type = dep.Type ?? ChunkDiffType.Dependency,
-                                            OldPath = dep.Path, NewPath = dep.Path,
-                                            SourceWadFile = dep.SourceWad,
-                                            OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash,
-                                            OldCompressionType = dep.CompressionType, NewCompressionType = dep.CompressionType
-                                        };
-                                        siblings.Add(depDiff);
-                                    }
-                                }
-                            }
-
-                            if (siblings != null)
-                            {
-                                var wpkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.wpk", StringComparison.OrdinalIgnoreCase));
-                                var audioBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_audio.bnk", StringComparison.OrdinalIgnoreCase));
-                                var eventsBnkDiff = siblings.FirstOrDefault(d => (d.NewPath ?? d.OldPath).EndsWith(baseName + "_events.bnk", StringComparison.OrdinalIgnoreCase));
-
-                                Func<SerializableChunkDiff, FileSystemNodeModel> createNode = (diff) =>
-                                {
-                                    if (diff == null) return null;
-                                    bool useOld = preferOld || diff.Type == ChunkDiffType.Removed;
-                                    ulong hashForPath = useOld ? diff.OldPathHash : diff.NewPathHash;
-                                    string chunkDir = useOld ? "old" : "new";
-                                    string fPath = useOld ? diff.OldPath : diff.NewPath;
-
-                                    return new FileSystemNodeModel(Path.GetFileName(fPath), false, fPath, diff.SourceWadFile)
-                                    {
-                                        ChunkDiff = diff,
-                                        BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hashForPath:X16}.chunk"),
-                                        Type = NodeType.SoundBank
-                                    };
-                                };
-
-                                return (createNode(wpkDiff), createNode(audioBnkDiff), createNode(eventsBnkDiff));
-                            }
-                        }
-                    }
-                }
-                return (null, null, null);
-            }
-            else
-            {
-                string wadPath = Path.Combine(basePath, clickedNode.ChunkDiff.SourceWadFile);
-                return await FindSiblingFilesFromWadsInternalAsync(clickedNode, wadPath, baseName);
             }
         }
 
@@ -690,6 +312,8 @@ namespace AssetsManager.Services.Audio
             string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
             if (string.IsNullOrEmpty(pathForStrategy)) return deps;
 
+            _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS] Input: pathForStrategy='{pathForStrategy}', SourceWadFile='{audioBankDiff.SourceWadFile}'");
+
             // 1. .bin sibling (5 strategies)
             var binStrategy = GetBinFileSearchStrategy(pathForStrategy, audioBankDiff.SourceWadFile);
             if (binStrategy != null)
@@ -700,6 +324,9 @@ namespace AssetsManager.Services.Audio
                 string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
                 string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
 
+                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Bin strategy: BinPath='{binVirtualPath}', TargetWadName='{binStrategy.TargetWadName}'");
+                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   sourceWadRelativePath='{sourceWadRelativePath}', sourceWadDirectory='{sourceWadDirectory}', sourceWadFileName='{sourceWadFileName}'");
+
                 if (string.Equals(sourceWadFileName, binStrategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
                 {
                     targetWadRelativePath = sourceWadRelativePath;
@@ -709,6 +336,8 @@ namespace AssetsManager.Services.Audio
                     targetWadRelativePath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
                 }
 
+                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Final bin dep: Path='{binVirtualPath}', SourceWad='{targetWadRelativePath}'");
+
                 deps.Add(new AudioDependencyInfo
                 {
                     Path = binVirtualPath,
@@ -717,97 +346,21 @@ namespace AssetsManager.Services.Audio
                     Type = AudioDependencyType.Bin
                 });
             }
-
-            // 2. Sibling audio banks
-            deps.AddRange(GetAudioBankSiblings(pathForStrategy, audioBankDiff.SourceWadFile));
-            return deps;
-        }
-
-        private async Task<(FileSystemNodeModel BinNode, string BaseName, BinType Type)> FindAssociatedBinFileFromWadsAsync(FileSystemNodeModel clickedNode, string basePath, bool preferOld = false, string backupRootDir = null)
-        {
-            string baseName = GetBaseName(clickedNode.Name);
-            var strategy = GetBinFileSearchStrategy(clickedNode);
-            if (strategy == null) return (null, baseName, BinType.Unknown);
-
-            if (backupRootDir != null || basePath == null)
-            {
-                if (clickedNode.ChunkDiff != null)
-                {
-                    if (backupRootDir == null && !string.IsNullOrEmpty(clickedNode.BackupChunkPath))
-                    {
-                        string chunkPath = clickedNode.BackupChunkPath;
-                        int wadChunksIndex = chunkPath.IndexOf("wad_chunks", StringComparison.OrdinalIgnoreCase);
-                        if (wadChunksIndex != -1) backupRootDir = chunkPath.Substring(0, wadChunksIndex);
-                        else backupRootDir = Path.GetDirectoryName(Path.GetDirectoryName(chunkPath));
-                    }
-
-                    if (backupRootDir != null)
-                    {
-                        string backupJsonPath = Path.Combine(backupRootDir, "wadcomparison.json");
-                        if (File.Exists(backupJsonPath))
-                        {
-                            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } };
-                            string jsonContent = await File.ReadAllTextAsync(backupJsonPath);
-                            var comparisonData = JsonSerializer.Deserialize<WadComparisonData>(jsonContent, options);
-
-                            // SEARCH DEEP in JSON
-                            SerializableChunkDiff binDiff = comparisonData?.Diffs.FirstOrDefault(d => 
-                                string.Equals(d.NewPath, strategy.BinPath, StringComparison.OrdinalIgnoreCase) || 
-                                string.Equals(d.OldPath, strategy.BinPath, StringComparison.OrdinalIgnoreCase));
-
-                            if (binDiff == null && comparisonData?.Diffs != null)
-                            {
-                                foreach (var d in comparisonData.Diffs)
-                                {
-                                    if (d.Dependencies != null)
-                                    {
-                                        var depMatch = d.Dependencies.FirstOrDefault(dep => string.Equals(dep.Path, strategy.BinPath, StringComparison.OrdinalIgnoreCase));
-                                        if (depMatch != null)
-                                        {
-                                            binDiff = new SerializableChunkDiff
-                                            {
-                                                Type = depMatch.Type ?? ChunkDiffType.Dependency,
-                                                OldPath = depMatch.Path, NewPath = depMatch.Path,
-                                                SourceWadFile = depMatch.SourceWad,
-                                                OldPathHash = depMatch.OldPathHash, NewPathHash = depMatch.NewPathHash,
-                                                OldCompressionType = depMatch.CompressionType, NewCompressionType = depMatch.CompressionType
-                                            };
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (binDiff != null)
-                            {
-                                bool useOld = preferOld || binDiff.Type == ChunkDiffType.Removed;
-                                ulong hashForPath = useOld ? binDiff.OldPathHash : binDiff.NewPathHash;
-                                string chunkDir = useOld ? "old" : "new";
-                                var binNode = new FileSystemNodeModel(Path.GetFileName(strategy.BinPath), false, strategy.BinPath, binDiff.SourceWadFile)
-                                {
-                                    ChunkDiff = binDiff,
-                                    BackupChunkPath = Path.Combine(backupRootDir, "wad_chunks", chunkDir, binDiff.SourceWadFile, $"{hashForPath:X16}.chunk")
-                                };
-                                return (binNode, baseName, strategy.Type);
-                            }
-                        }
-                    }
-                }
-                return (null, baseName, strategy.Type);
-            }
             else
             {
-                string targetWadVirtualPath = ResolveTargetWadPath(clickedNode, basePath, strategy.TargetWadName);
-                if (File.Exists(targetWadVirtualPath))
-                {
-                    var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadVirtualPath);
-                    var binNode = FindNodeByPath(wadContent, strategy.BinPath);
-                    if (binNode != null) return (binNode, baseName, strategy.Type);
-                }
-                return (null, baseName, strategy.Type);
+                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   No bin strategy found.");
             }
-        }
 
+            // 2. Sibling audio banks
+            var siblings = GetAudioBankSiblings(pathForStrategy, audioBankDiff.SourceWadFile);
+            _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]   Siblings count: {siblings.Count}");
+            foreach (var s in siblings)
+            {
+                _logService.Log($"[RESOLVE_AUDIO_BANK_DEPS]     Sibling: Path='{s.Path}', SourceWad='{s.SourceWad}', Type={s.Type}");
+            }
+            deps.AddRange(siblings);
+            return deps;
+        }
 
         private (FileSystemNodeModel WpkNode, FileSystemNodeModel AudioBnkNode, FileSystemNodeModel EventsBnkNode) FindSiblingFilesByName(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
@@ -909,6 +462,161 @@ namespace AssetsManager.Services.Audio
             if (name.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
             if (name.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase)) return name.Substring(0, name.Length - 4);
             return name;
+        }
+
+        // LIVE mode entry point for direct (non-archived) comparison: opens the
+        // local source/target WADs from the user-supplied PBE paths, resolves
+        // the audio bank siblings (audio.bnk / .wpk / .bin) and feeds the
+        // resulting bytes to AudioBankService.ParseAudioBank for both sides.
+        // Returns the parsed audio event trees ready for JSON serialization
+        // and side-by-side comparison. Throws on unrecoverable I/O errors so
+        // the caller can fall back to the raw JSON view.
+        public async Task<(List<AudioEventNode> OldNodes, List<AudioEventNode> NewNodes)> ResolveLiveAudioBankDiffAsync(
+            SerializableChunkDiff diff, string oldPbePath, string newPbePath,
+            byte[] oldClickedBnk, byte[] newClickedBnk)
+        {
+            string sourceWadRelativePath = diff.SourceWadFile;
+            string fileName = Path.GetFileName(diff.NewPath ?? diff.OldPath);
+            string baseName = Path.GetFileNameWithoutExtension(fileName);
+            if (baseName.EndsWith("_events", StringComparison.OrdinalIgnoreCase))
+                baseName = baseName.Substring(0, baseName.Length - "_events".Length);
+            bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
+
+            string pathForStrategy = diff.NewPath ?? diff.OldPath;
+            var binStrategy = GetBinFileSearchStrategy(pathForStrategy, sourceWadRelativePath);
+
+            _logService.Log($"[LIVE_AUDIO_BANK_DIFF] baseName='{baseName}', clickedIsEventsBnk={clickedIsEventsBnk}, binStrategy={(binStrategy != null ? binStrategy.ToString() : "null")}");
+
+            byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
+            byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
+
+            if (!string.IsNullOrEmpty(oldPbePath))
+            {
+                (oldEventsBnk, oldAudioBnk, oldWpk, oldBin) = await ReadAudioBankSiblingsFromLocalWadAsync(
+                    oldPbePath, sourceWadRelativePath, baseName, binStrategy);
+            }
+            if (!string.IsNullOrEmpty(newPbePath))
+            {
+                (newEventsBnk, newAudioBnk, newWpk, newBin) = await ReadAudioBankSiblingsFromLocalWadAsync(
+                    newPbePath, sourceWadRelativePath, baseName, binStrategy);
+            }
+
+            if (clickedIsEventsBnk)
+            {
+                oldEventsBnk = oldEventsBnk ?? oldClickedBnk;
+                newEventsBnk = newEventsBnk ?? newClickedBnk;
+            }
+            else
+            {
+                oldAudioBnk = oldAudioBnk ?? oldClickedBnk;
+                newAudioBnk = newAudioBnk ?? newClickedBnk;
+            }
+
+            if (oldEventsBnk == null && oldAudioBnk == null && newEventsBnk == null && newAudioBnk == null)
+            {
+                _logService.Log($"[LIVE_AUDIO_BANK_DIFF] No audio bank bytes resolved on either side. Caller will fall back to raw view.");
+                return (null, null);
+            }
+
+            var oldNodes = _audioBankService.ParseAudioBank(
+                wpkData: oldWpk,
+                audioBnkData: oldAudioBnk,
+                eventsData: oldEventsBnk,
+                binData: oldBin,
+                baseName: baseName,
+                binType: binStrategy?.Type ?? BinType.Unknown);
+
+            var newNodes = _audioBankService.ParseAudioBank(
+                wpkData: newWpk,
+                audioBnkData: newAudioBnk,
+                eventsData: newEventsBnk,
+                binData: newBin,
+                baseName: baseName,
+                binType: binStrategy?.Type ?? BinType.Unknown);
+
+            return (oldNodes, newNodes);
+        }
+
+        // Opens `basePath/sourceWadRelativePath`, resolves the audio bank
+        // siblings (events.bnk / audio.bnk / audio.wpk) by name, and the .bin
+        // from the target WAD identified by the 5-strategy resolver. Returns
+        // nulls when a sibling is absent (callers fall back to the clicked
+        // file's bytes).
+        private async Task<(byte[] eventsBnk, byte[] audioBnk, byte[] wpk, byte[] bin)> ReadAudioBankSiblingsFromLocalWadAsync(
+            string basePath, string sourceWadRelativePath, string baseName, BinFileStrategy binStrategy)
+        {
+            byte[] eventsBnk = null, audioBnk = null, wpk = null, bin = null;
+
+            string sourceWadFullPath = Path.Combine(basePath, sourceWadRelativePath);
+            if (!File.Exists(sourceWadFullPath))
+            {
+                _logService.Log($"[LIVE_AUDIO_BANK_DIFF] Source WAD not found: '{sourceWadFullPath}'");
+                return (eventsBnk, audioBnk, wpk, bin);
+            }
+
+            try
+            {
+                var wadContent = await _wadNodeLoaderService.LoadWadContentAsync(sourceWadFullPath);
+                var wpkNode = FindNodeByName(wadContent, baseName + "_audio.wpk");
+                var audioBnkNode = FindNodeByName(wadContent, baseName + "_audio.bnk");
+                var eventsBnkNode = FindNodeByName(wadContent, baseName + "_events.bnk");
+
+                if (wpkNode != null) wpk = await _wadContentProvider.GetVirtualFileBytesAsync(wpkNode);
+                if (audioBnkNode != null) audioBnk = await _wadContentProvider.GetVirtualFileBytesAsync(audioBnkNode);
+                if (eventsBnkNode != null) eventsBnk = await _wadContentProvider.GetVirtualFileBytesAsync(eventsBnkNode);
+
+                _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': eventsBnk={(eventsBnk?.Length ?? 0)}B, audioBnk={(audioBnk?.Length ?? 0)}B, wpk={(wpk?.Length ?? 0)}B");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"[LIVE_AUDIO_BANK_DIFF] Failed reading source WAD: '{sourceWadFullPath}'");
+            }
+
+            if (binStrategy != null)
+            {
+                string sourceWadDirectory = Path.GetDirectoryName(sourceWadRelativePath);
+                string sourceWadFileName = Path.GetFileName(sourceWadRelativePath);
+                string targetWadRelativePath;
+                if (string.Equals(sourceWadFileName, binStrategy.TargetWadName, StringComparison.OrdinalIgnoreCase))
+                {
+                    targetWadRelativePath = sourceWadRelativePath;
+                }
+                else
+                {
+                    targetWadRelativePath = string.IsNullOrEmpty(sourceWadDirectory)
+                        ? binStrategy.TargetWadName
+                        : Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
+                }
+
+                string targetWadFullPath = Path.Combine(basePath, targetWadRelativePath);
+                if (File.Exists(targetWadFullPath))
+                {
+                    try
+                    {
+                        var targetWadContent = await _wadNodeLoaderService.LoadWadContentAsync(targetWadFullPath);
+                        var binNode = FindNodeByPath(targetWadContent, binStrategy.BinPath);
+                        if (binNode != null)
+                        {
+                            bin = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
+                            _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': bin={(bin?.Length ?? 0)}B (from '{targetWadRelativePath}')");
+                        }
+                        else
+                        {
+                            _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': .bin node '{binStrategy.BinPath}' NOT FOUND in '{targetWadRelativePath}'");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"[LIVE_AUDIO_BANK_DIFF] Failed reading target WAD for .bin: '{targetWadFullPath}'");
+                    }
+                }
+                else
+                {
+                    _logService.Log($"[LIVE_AUDIO_BANK_DIFF]   Side '{basePath}': target WAD '{targetWadRelativePath}' not found on disk.");
+                }
+            }
+
+            return (eventsBnk, audioBnk, wpk, bin);
         }
 
         private void FindAllNodesByNameRecursive(IEnumerable<FileSystemNodeModel> nodes, List<string> namesToFind, List<FileSystemNodeModel> foundNodes)

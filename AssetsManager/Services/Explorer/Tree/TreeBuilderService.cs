@@ -96,7 +96,7 @@ namespace AssetsManager.Services.Explorer.Tree
 
         public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
-            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath, newLolPath, oldLolPath);
+            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service
