@@ -89,15 +89,33 @@ namespace AssetsManager.Views.Dialogs
         {
             Loaded -= ImageDiffWindow_Loaded;
 
-            // 0. Visual Satisfaction: Show the bar as 100% ready while we do the final internal rendering
-            if (LoadingWindow != null)
+            // [PROGRESS] Only report granular updates if NOT in batch mode
+            bool reportProgress = !IsBatchMode && LoadingWindow != null;
+
+            if (reportProgress)
             {
-                LoadingWindow.SetState(DiffLoadingState.Ready);
+                LoadingWindow.SetState(DiffLoadingState.GeneratingDiffMap); // 85%
             }
 
             // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
             // Using Render priority for images as they are faster to draw than heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+            if (reportProgress)
+            {
+                LoadingWindow.SetState(DiffLoadingState.RenderingUI); // 95%
+            }
+
+            if (reportProgress)
+            {
+                LoadingWindow.SetState(DiffLoadingState.Finalizing); // 98%
+            }
+
+            // 0. Visual Satisfaction: Show the bar as 100% ready
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.SetState(DiffLoadingState.Ready); // 100%
+            }
 
             // 2. Smooth Handover: Take focus first, then close loader
             this.Activate();

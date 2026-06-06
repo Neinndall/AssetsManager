@@ -58,7 +58,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
         public LoadingDiffModel()
         {
-            Reset(); // Initialize with defaults
+            ApplyInitialDefaults(); // Initialize with defaults
         }
 
         public void SetBatchIndex(int currentFile, int totalFiles)
@@ -72,8 +72,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             switch (state)
             {
                 case DiffLoadingState.Idle:
-                    Description = "Please wait while the differences are being calculated...";
-                    ProgressValue = 0;
+                    ApplyInitialDefaults();
                     break;
 
                 // TEXT PROCESS
@@ -100,12 +99,16 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
                 // IMAGE PROCESS
                 case DiffLoadingState.AcquiringTextureData:
-                    Description = "Acquiring texture data...";
+                    Description = "Acquiring texture data from WADs...";
                     ProgressValue = 40;
                     break;
                 case DiffLoadingState.DecodingTextures:
                     Description = "Decoding texture surfaces...";
-                    ProgressValue = 95;
+                    ProgressValue = 70;
+                    break;
+                case DiffLoadingState.GeneratingDiffMap:
+                    Description = "Generating visual difference map...";
+                    ProgressValue = 85;
                     break;
 
                 // AUDIO PROCESS
@@ -115,11 +118,11 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
-                    ProgressValue = 55;
+                    ProgressValue = 50;
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
-                    ProgressValue = 90;
+                    ProgressValue = 75;
                     break;
 
                 case DiffLoadingState.Finalizing:
@@ -163,7 +166,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        public void Reset()
+        public void ApplyInitialDefaults()
         {
             Title = "Processing Files";
             Description = "Please wait while the differences are being calculated...";

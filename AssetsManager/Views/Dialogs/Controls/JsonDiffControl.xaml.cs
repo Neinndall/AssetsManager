@@ -228,24 +228,27 @@ namespace AssetsManager.Views.Dialogs.Controls
                 // Build metrics using the most efficient way (Raw blocks)
                 ViewModel.UpdateMetrics(oldText, newText);
                 
-                if (ParentWindow is JsonDiffWindow jdw && jdw.LoadingWindow != null)
+                // [PROGRESS] Only report granular updates if NOT in batch mode to avoid bar jumps
+                bool reportProgress = !ViewModel.IsBatchMode && ParentWindow is JsonDiffWindow jdw && jdw.LoadingWindow != null;
+
+                if (reportProgress)
                 {
-                    jdw.LoadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 }
 
                 await Task.Run(() => UpdateChangeCounts());
 
-                if (ParentWindow is JsonDiffWindow jdw2 && jdw2.LoadingWindow != null)
+                if (reportProgress)
                 {
-                    jdw2.LoadingWindow.SetState(DiffLoadingState.RenderingUI);
+                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.RenderingUI);
                 }
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden
                 await UpdateDiffView();
 
-                if (ParentWindow is JsonDiffWindow jdw3 && jdw3.LoadingWindow != null)
+                if (reportProgress)
                 {
-                    jdw3.LoadingWindow.SetState(DiffLoadingState.Finalizing);
+                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.Finalizing);
                 }
             }
             catch (Exception ex)
