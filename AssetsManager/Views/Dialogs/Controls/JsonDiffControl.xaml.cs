@@ -245,11 +245,6 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden
                 await UpdateDiffView();
-
-                if (reportProgress)
-                {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.Ready); // 100% REACHED BEFORE OPENING
-                }
             }
             catch (Exception ex)
             {
