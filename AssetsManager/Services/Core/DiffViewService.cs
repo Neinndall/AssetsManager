@@ -218,6 +218,9 @@ namespace AssetsManager.Services.Core
                 diffWindow.Owner = owner;
                 diffWindow.LoadingWindow = loadingWindow;
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath);
+
+                // [PROGRESS] 100% Reached before opening window
+                loadingWindow.SetState(DiffLoadingState.Ready);
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -230,7 +233,7 @@ namespace AssetsManager.Services.Core
                 }
                 catch
                 {
-                    loadingWindow.Close();
+                    if (loadingWindow != null && loadingWindow.IsVisible) loadingWindow.Close();
                     _customMessageBoxService.ShowError("Error", "Failed to prepare audio bank diff.", owner);
                 }
             }
@@ -286,6 +289,9 @@ namespace AssetsManager.Services.Core
             diffWindow.Owner = owner;
             diffWindow.LoadingWindow = loadingWindow;
             await diffWindow.LoadAndDisplayDiffAsync(oldText, newText, oldPath, newPath);
+
+            // [PROGRESS] 100% Reached before opening window
+            loadingWindow.SetState(DiffLoadingState.Ready);
             diffWindow.ShowDialog();
         }
 
