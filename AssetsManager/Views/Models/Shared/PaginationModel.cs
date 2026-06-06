@@ -22,6 +22,7 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _currentPage, value))
                 {
+                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
@@ -35,6 +36,7 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _pageSize, value))
                 {
+                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
