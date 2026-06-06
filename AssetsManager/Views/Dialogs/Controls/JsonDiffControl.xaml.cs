@@ -207,7 +207,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             DiffNavigationPanel?.UpdateViewportGuide();
         }
 
-        public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName)
+        public async Task LoadAndDisplayDiffAsync(string oldText, string newText, string oldFileName, string newFileName, Action<DiffLoadingState> onProgress = null)
         {
             try
             {
@@ -229,18 +229,18 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ViewModel.UpdateMetrics(oldText, newText);
                 
                 // [PROGRESS] Only report granular updates if NOT in batch mode to avoid bar jumps
-                bool reportProgress = !ViewModel.IsBatchMode && ParentWindow is JsonDiffWindow jdw && jdw.LoadingWindow != null;
+                bool reportProgress = !ViewModel.IsBatchMode && onProgress != null;
 
                 if (reportProgress)
                 {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+                    onProgress(DiffLoadingState.CalculatingDifferences);
                 }
 
                 await Task.Run(() => UpdateChangeCounts());
 
                 if (reportProgress)
                 {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.RenderingUI);
+                    onProgress(DiffLoadingState.RenderingUI);
                 }
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden
@@ -248,7 +248,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 if (reportProgress)
                 {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.Finalizing);
+                    onProgress(DiffLoadingState.Ready); // 100% REACHED BEFORE OPENING
                 }
             }
             catch (Exception ex)
@@ -289,7 +289,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private void JumpToDeletion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Deleted);
         private void JumpToModification_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Modified);
 
-        public async Task LoadAndDisplayPreloadedBatchAsync(List<(string oldText, string newText, string oldPath, string newPath)> items, int startIndex)
+        public async Task LoadAndDisplayPreloadedBatchAsync(List<(string oldText, string newText, string oldPath, string newPath)> items, int startIndex, Action<DiffLoadingState> onProgress = null)
         {
             ViewModel.PreloadedData = items;
 
@@ -297,16 +297,16 @@ namespace AssetsManager.Views.Dialogs.Controls
             ViewModel.TotalFilesCount = items.Count;
             ViewModel.CurrentFileIndex = startIndex + 1;
 
-            await LoadCurrentBatchItemAsync();
+            await LoadCurrentBatchItemAsync(onProgress);
         }
 
-        private async Task LoadCurrentBatchItemAsync()
+        private async Task LoadCurrentBatchItemAsync(Action<DiffLoadingState> onProgress = null)
         {
             if (ViewModel.PreloadedData == null || ViewModel.PreloadedData.Count == 0) return;
 
             var currentItem = ViewModel.PreloadedData[ViewModel.CurrentFileIndex - 1];
 
-            await LoadAndDisplayDiffAsync(currentItem.oldText, currentItem.newText, currentItem.oldPath, currentItem.newPath);
+            await LoadAndDisplayDiffAsync(currentItem.oldText, currentItem.newText, currentItem.oldPath, currentItem.newPath, onProgress);
             FocusFirstDifference();
             RefreshGuidePosition();
         }

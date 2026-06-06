@@ -10,12 +10,14 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageDiffWindow : HudWindow
     {
-        public LoadingDiffWindow LoadingWindow { get; set; }
+        private readonly LogService _logService;
+        private Action _onReadyCallback;
 
         // Batch Mode Properties
         public static readonly DependencyProperty IsBatchModeProperty =
@@ -53,15 +55,16 @@ namespace AssetsManager.Views.Dialogs
         private double _currentZoom = 1.0;
         private WriteableBitmap _diffMap;
 
-        public ImageDiffWindow() : this(null, null, null, null)
+        public ImageDiffWindow(LogService logService = null) : this(null, null, null, null, logService)
         {
         }
 
-        public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
+        public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName, LogService logService = null)
         {
             InitializeComponent();
+            _logService = logService;
 
-            // Smooth Handover: Handled via Loaded event if LoadingWindow is set
+            // Smooth Handover: Handled via Loaded event
             Loaded += ImageDiffWindow_Loaded;
 
             SetImageData(oldImage, newImage, oldFileName, newFileName);
@@ -85,47 +88,24 @@ namespace AssetsManager.Views.Dialogs
             UpdateUIMode();
         }
 
+        public void SetHandoverCallbacks(Action onReady, Action<DiffLoadingState> onProgress = null)
+        {
+            _onReadyCallback = onReady;
+        }
+
         private async void ImageDiffWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= ImageDiffWindow_Loaded;
-
-            // [PROGRESS] Only report granular updates if NOT in batch mode
-            bool reportProgress = !IsBatchMode && LoadingWindow != null;
-
-            if (reportProgress)
-            {
-                LoadingWindow.SetState(DiffLoadingState.GeneratingDiffMap); // 85%
-            }
 
             // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
             // Using Render priority for images as they are faster to draw than heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-            if (reportProgress)
-            {
-                LoadingWindow.SetState(DiffLoadingState.RenderingUI); // 95%
-            }
-
-            if (reportProgress)
-            {
-                LoadingWindow.SetState(DiffLoadingState.Finalizing); // 98%
-            }
-
-            // 0. Visual Satisfaction: Show the bar as 100% ready
-            if (LoadingWindow != null)
-            {
-                LoadingWindow.SetState(DiffLoadingState.Ready); // 100%
-            }
-
-            // 2. Smooth Handover: Take focus first, then close loader
+            // 2. Smooth Handover: Take focus first, then signal service to close loader
             this.Activate();
             this.Focus();
 
-            if (LoadingWindow != null)
-            {
-                LoadingWindow.Close();
-                LoadingWindow = null;
-            }
+            _onReadyCallback?.Invoke();
         }
 
         private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)
