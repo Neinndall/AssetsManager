@@ -16,6 +16,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         CalculatingDifferences,
         RenderingUI,
         DecodingTextures,
+        GeneratingDiffMap,
         Finalizing,
         Ready,
         BatchLoadingFile,
