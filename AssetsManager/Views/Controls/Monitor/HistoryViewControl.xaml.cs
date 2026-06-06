@@ -44,7 +44,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
 
-                _viewModel.LoadHistory(AppSettings.DiffHistory);
+                RefreshHistory();
             }
         }
 
@@ -58,19 +58,37 @@ namespace AssetsManager.Views.Controls.Monitor
             // Clear history from memory when not in use
             if (ViewModel != null)
             {
-                ViewModel.Paginator.SetFullList(null);
+                ViewModel.ComparisonsPaginator.SetFullList(null);
+                ViewModel.WatcherPaginator.SetFullList(null);
+                ViewModel.DifferencesPaginator.SetFullList(null);
             }
         }
 
         private void OnConfigurationSaved(object sender, EventArgs e)
         {
-            _ = Dispatcher.InvokeAsync(() =>
+            _ = Dispatcher.InvokeAsync(() => RefreshHistory());
+        }
+
+        private void RefreshHistory()
+        {
+            if (AppSettings != null)
             {
-                if (AppSettings != null)
-                {
-                    _viewModel.LoadHistory(AppSettings.DiffHistory);
-                }
-            });
+                string filter = txtSearch.Text.Trim().ToLower();
+                var entries = AppSettings.DiffHistory
+                    .Where(e => string.IsNullOrEmpty(filter) || 
+                                (e.FileName != null && e.FileName.ToLower().Contains(filter)) ||
+                                (e.DisplayName != null && e.DisplayName.ToLower().Contains(filter)) ||
+                                (e.Version != null && e.Version.ToLower().Contains(filter)) ||
+                                (e.ReferenceId != null && e.ReferenceId.ToLower().Contains(filter)))
+                    .OrderByDescending(e => e.Timestamp);
+
+                _viewModel.LoadHistory(entries);
+            }
+        }
+
+        private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshHistory();
         }
 
         private void btnEditName_Click(object sender, RoutedEventArgs e)
@@ -98,7 +116,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void btnViewDiff_Click(object sender, RoutedEventArgs e)
         {
-            var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry ?? DiffHistoryListView.SelectedItem as HistoryEntry;
+            // Resolve entry from button's DataContext
+            var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry;
 
             if (selectedEntry != null)
             {
@@ -130,50 +149,45 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void btnRemoveSelected_Click(object sender, RoutedEventArgs e)
         {
+            // In segmented mode, we use the specific entry from the button that was clicked
             var entryToRemove = (sender as FrameworkElement)?.DataContext as HistoryEntry;
-            var itemsToRemove = entryToRemove != null
-                ? new List<HistoryEntry> { entryToRemove }
-                : DiffHistoryListView.SelectedItems.Cast<HistoryEntry>().ToList();
 
-            if (itemsToRemove.Count > 0)
+            if (entryToRemove != null)
             {
-                string message = itemsToRemove.Count == 1
-                    ? $"Are you sure you want to delete the history entry for '{itemsToRemove.First().FileName}' from {itemsToRemove.First().Timestamp}? This will delete the backup files and cannot be undone."
-                    : $"Are you sure you want to delete the {itemsToRemove.Count} selected history entries? This will delete their backup files and cannot be undone.";
+                string message = $"Are you sure you want to delete the history entry for '{entryToRemove.FileName}' from {entryToRemove.Timestamp}? This will delete the backup files and cannot be undone.";
 
                 if (CustomMessageBoxService.ShowYesNo("Remove Backup", message, Window.GetWindow(this)) == true)
                 {
                     try
                     {
-                        foreach (var selectedEntry in itemsToRemove)
+                        if (entryToRemove.Type == HistoryEntryType.WadArchive)
                         {
-                            if (selectedEntry.Type == HistoryEntryType.WadArchive)
-                            {
-                                ComparisonHistoryService.DeleteComparison(selectedEntry);
-                            }
-                            else
-                            {
-                                // Manual cleanup for legacy FileDiffs
-                                string historyDirectoryPath = Path.GetDirectoryName(selectedEntry.OldFilePath);
-                                if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
-                                {
-                                    Directory.Delete(historyDirectoryPath, true);
-                                }
-                                AppSettings.DiffHistory.Remove(selectedEntry);
-                                AppSettings.Save();
-                            }
+                            ComparisonHistoryService.DeleteComparison(entryToRemove);
                         }
+                        else
+                        {
+                            // Manual cleanup for legacy FileDiffs
+                            string historyDirectoryPath = Path.GetDirectoryName(entryToRemove.OldFilePath);
+                            if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
+                            {
+                                Directory.Delete(historyDirectoryPath, true);
+                            }
+                            AppSettings.DiffHistory.Remove(entryToRemove);
+                            AppSettings.Save();
+                        }
+                        
+                        RefreshHistory();
                     }
                     catch (Exception ex)
                     {
-                        LogService.LogError(ex, "Error deleting history entries.");
-                        CustomMessageBoxService.ShowError("Error", "Could not delete one or more history entries.", Window.GetWindow(this));
+                        LogService.LogError(ex, "Error deleting history entry.");
+                        CustomMessageBoxService.ShowError("Error", "Could not delete the history entry.", Window.GetWindow(this));
                     }
                 }
             }
             else
             {
-                CustomMessageBoxService.ShowInfo("Information", "Please select one or more history entries to delete.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
+                CustomMessageBoxService.ShowInfo("Information", "Please click the delete button on the entry you want to remove.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
             }
         }
     }

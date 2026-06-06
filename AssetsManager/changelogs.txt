@@ -1,35 +1,4 @@
 AssetsManager - League of Legends | v4.0.1.0
-  - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
-  - Viewer / Removing and re-adding a model is now instant.
-  - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.
-  - Viewer / Model loading dialogs are now unified in a single flow.
-  - Viewer / Cleanup is more reliable when closing models.
-  - Viewer / Animation time label updates less frequently for smoother playback.
-  - Viewer / Chroma gallery now uses lighter thumbnails to reduce memory usage.
-  - Viewer / Loading a new model cancels any pending load to free memory faster.
-  - Viewer / Moving models is smoother: position, rotation and scale no longer cause hitches.
-  - Viewer / Animation memory is fully released when switching models.
-  - Viewer / Disposed model textures no longer affect other visible models.
-  - Viewer / Eliminated duplicate auto-rotation rendering for better performance.
-    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
-    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
-  - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
-  - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.
-  - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
-  - Explorer / Fixed image files incorrectly triggering dual view when selected from search filter results.
-  - Explorer / Fixed false error logs on normal debounce cancellation during rapid typing.
-  - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
-    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
-  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
-  - Diff Viewer / Smoother loading-to-result transition: the loading card is handed over atomically to the result window (no more flash of the closing loading card while the new window is appearing), and the entire loading lifecycle (show / progress / hide) is now centralized in a single orchestrator in DiffViewService for consistency across all diff entry points.
-  - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
-  - Diff Viewer / Implemented Zero-Gap Handover: the difference window now activates before closing the loader, eliminating flickering and focus drops between windows.
-  - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
-  - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
-  - Core / Unified Loading Lifecycle: centralized all difference viewing logic into a single robust runner, ensuring consistent error handling and reliable cleanup of loading windows.
-    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
-    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
-AssetsManager - League of Legends | v4.0.1.0
 
 MEDIUM UPDATE
 
@@ -56,6 +25,34 @@ New Features
   - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
 
 Improvements
+  - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
+  - Viewer / Removing and re-adding a model is now instant.
+  - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.
+  - Viewer / Model loading dialogs are now unified in a single flow.
+  - Viewer / Cleanup is more reliable when closing models.
+  - Viewer / Animation time label updates less frequently for smoother playback.
+  - Viewer / Chroma gallery now uses lighter thumbnails to reduce memory usage.
+  - Viewer / Loading a new model cancels any pending load to free memory faster.
+  - Viewer / Moving models is smoother: position, rotation and scale no longer cause hitches.
+  - Viewer / Animation memory is fully released when switching models.
+  - Viewer / Disposed model textures no longer affect other visible models.
+  - Viewer / Eliminated duplicate auto-rotation rendering for better performance.
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+  - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
+  - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.
+  - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
+  - Explorer / Fixed image files incorrectly triggering dual view when selected from search filter results.
+  - Explorer / Fixed false error logs on normal debounce cancellation during rapid typing.
+  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
+  - Diff Viewer / Smoother loading-to-result transition: the loading card is handed over atomically to the result window (no more flash of the closing loading card while the new window is appearing), and the entire loading lifecycle (show / progress / hide) is now centralized in a single orchestrator in DiffViewService for consistency across all diff entry points.
+  - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
+  - Diff Viewer / Implemented Zero-Gap Handover: the difference window now activates before closing the loader, eliminating flickering and focus drops between windows.
+  - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
+  - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
+  - Core / Unified Loading Lifecycle: centralized all difference viewing logic into a single robust runner, ensuring consistent error handling and reliable cleanup of loading windows.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
   - Viewer / Scroll wheel now always drives the main panel: scrolling over the mesh list, pose controls, or animation list no longer gets trapped by inner lists.
   - Viewer / Animation player stays pinned just above the bottom dock for instant access to playback controls without scrolling.
   - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.
@@ -124,6 +121,8 @@ Improvements
   - Monitor / Pagination: added first and last page buttons for instant navigation across all paginated views.
 
 Bug Fixes
+  - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
+    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
   - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".
   - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.

@@ -80,8 +80,7 @@ namespace AssetsManager.Views.Controls.Monitor
                             u.AssetPath.ToLower().Contains(filter))
                 .ToList();
 
-            ViewModel.MonitoredAssets.ReplaceRange(filtered);
-            MonitoredAssetsListView.ItemsSource = ViewModel.MonitoredAssets;
+            ViewModel.Paginator.SetFullList(filtered);
         }
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)

@@ -1,8 +1,7 @@
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows.Media;
-using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Models.Shared;
 
 namespace AssetsManager.Views.Models.Monitor
 {
@@ -11,20 +10,14 @@ namespace AssetsManager.Views.Models.Monitor
     /// </summary>
     public class AssetWatcherModel : INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private ObservableRangeCollection<MonitoredAsset> _monitoredAssets;
+        public PaginationModel<MonitoredAsset> Paginator { get; }
         private bool _isBusy;
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public AssetWatcherModel()
         {
-            MonitoredAssets = new ObservableRangeCollection<MonitoredAsset>();
-        }
-
-        public ObservableRangeCollection<MonitoredAsset> MonitoredAssets
-        {
-            get => _monitoredAssets;
-            set { _monitoredAssets = value; OnPropertyChanged(); }
+            Paginator = new PaginationModel<MonitoredAsset> { PageSize = 5 };
         }
 
         public bool IsBusy
