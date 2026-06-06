@@ -443,16 +443,6 @@ namespace AssetsManager.Views.Controls.Monitor
             };
         }
 
-        private void PreviousPage_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel?.Paginator.PreviousPage();
-        }
-
-        private void NextPage_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel?.Paginator.NextPage();
-        }
-
         private async void RequestsMythicShop_Click(object sender, RoutedEventArgs e)
         {
             if (LogService != null) LogService.Log("Starting mythic shop fetch process...");

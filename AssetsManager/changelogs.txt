@@ -21,6 +21,12 @@ AssetsManager - League of Legends | v4.0.1.0
   - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
     * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
   - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
+  - Diff Viewer / Smoother loading-to-result transition: the loading card is handed over atomically to the result window (no more flash of the closing loading card while the new window is appearing), and the entire loading lifecycle (show / progress / hide) is now centralized in a single orchestrator in DiffViewService for consistency across all diff entry points.
+  - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
+  - Diff Viewer / Implemented Zero-Gap Handover: the difference window now activates before closing the loader, eliminating flickering and focus drops between windows.
+  - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
+  - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
+  - Core / Unified Loading Lifecycle: centralized all difference viewing logic into a single robust runner, ensuring consistent error handling and reliable cleanup of loading windows.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
 AssetsManager - League of Legends | v4.0.1.0
@@ -115,6 +121,7 @@ Improvements
   - Viewer / Animation memory is now released immediately when deleting an animation, removing a model, or closing the viewer.
   - Viewer / Chroma preview thumbnails are released as soon as the gallery is closed, no longer waiting for the next scan.
   - Viewer / Filtered models and animations lists now use cached results, keeping the panel responsive while typing in the search box.
+  - Monitor / Pagination: added first and last page buttons for instant navigation across all paginated views.
 
 Bug Fixes
   - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".
@@ -158,6 +165,7 @@ Bug Fixes
      - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
    - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
    - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
+  - Monitor / Pagination: fixed total page count failing to refresh in the version manager when switching between League Client and Game Client tabs.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

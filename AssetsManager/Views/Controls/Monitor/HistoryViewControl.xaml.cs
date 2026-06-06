@@ -131,7 +131,7 @@ namespace AssetsManager.Views.Controls.Monitor
         private void btnRemoveSelected_Click(object sender, RoutedEventArgs e)
         {
             var entryToRemove = (sender as FrameworkElement)?.DataContext as HistoryEntry;
-            var itemsToRemove = entryToRemove != null 
+            var itemsToRemove = entryToRemove != null
                 ? new List<HistoryEntry> { entryToRemove }
                 : DiffHistoryListView.SelectedItems.Cast<HistoryEntry>().ToList();
 
@@ -175,16 +175,6 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 CustomMessageBoxService.ShowInfo("Information", "Please select one or more history entries to delete.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
             }
-        }
-
-        private void PrevPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.Paginator.PreviousPage();
-        }
-
-        private void NextPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.Paginator.NextPage();
         }
     }
 }

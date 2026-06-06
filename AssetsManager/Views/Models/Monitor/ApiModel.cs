@@ -101,16 +101,6 @@ namespace AssetsManager.Views.Models.Monitor
             Paginator.SetFullList(items);
         }
 
-        public void NextPage()
-        {
-            Paginator.NextPage();
-        }
-
-        public void PreviousPage()
-        {
-            Paginator.PreviousPage();
-        }
-
         public void Update(AppSettings appSettings)
         {
             _apiSettings = appSettings?.ApiSettings;
