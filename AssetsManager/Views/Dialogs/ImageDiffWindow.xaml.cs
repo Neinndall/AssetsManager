@@ -16,8 +16,8 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageDiffWindow : HudWindow
     {
+        public LoadingDiffWindow LoadingWindow { get; set; }
         private readonly LogService _logService;
-        private Action _onReadyCallback;
 
         // Batch Mode Properties
         public static readonly DependencyProperty IsBatchModeProperty =
@@ -88,11 +88,6 @@ namespace AssetsManager.Views.Dialogs
             UpdateUIMode();
         }
 
-        public void SetHandoverCallbacks(Action onReady, Action<DiffLoadingState> onProgress = null)
-        {
-            _onReadyCallback = onReady;
-        }
-
         private async void ImageDiffWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= ImageDiffWindow_Loaded;
@@ -101,11 +96,15 @@ namespace AssetsManager.Views.Dialogs
             // Using Render priority for images as they are faster to draw than heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-            // 2. Smooth Handover: Take focus first, then signal service to close loader
+            // 2. Smooth Handover: Take focus first, then close loader
             this.Activate();
             this.Focus();
 
-            _onReadyCallback?.Invoke();
+            if (LoadingWindow != null)
+            {
+                LoadingWindow.Close();
+                LoadingWindow = null;
+            }
         }
 
         private void ImageDiffWindow_PreviewKeyDown(object sender, KeyEventArgs e)
