@@ -22,10 +22,6 @@ namespace AssetsManager.Views.Dialogs
             JsonDiffControl.JsonFormatterService = jsonFormatterService;
             JsonDiffControl.ParentWindow = this;
 
-            // [PLAN B] Start invisible to prevent visual jump and transparency gaps on massive files.
-            // If you uncomment this, also uncomment the Visibility.Visible line in JsonDiffWindow_Loaded.
-            // Visibility = Visibility.Hidden;
-
             Loaded += JsonDiffWindow_Loaded;
             Closed += OnWindowClosed;
         }
@@ -42,7 +38,7 @@ namespace AssetsManager.Views.Dialogs
             // 0. Visual Satisfaction: Show the bar as 100% ready while we do the final internal rendering
             if (LoadingWindow != null)
             {
-                LoadingWindow.SetState(DiffLoadingState.Ready);
+                LoadingWindow.SetState(DiffLoadingState.Ready); // 100%
             }
 
             // 1. Scroll to the first difference
@@ -50,7 +46,7 @@ namespace AssetsManager.Views.Dialogs
 
             // 2. IMPORTANT: Wait for the UI to process the initial rendering of the heavy text
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-						
+
             // 3. Smooth Handover: Take focus first, then close loader
             this.Activate();
             this.Focus();

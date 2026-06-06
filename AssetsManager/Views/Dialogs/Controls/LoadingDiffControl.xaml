@@ -68,7 +68,7 @@
                                  Background="{StaticResource SidebarBackground}"
                                  Foreground="{StaticResource AccentBrush}"
                                  BorderThickness="0"
-                                 Style="{StaticResource InstantProgressBar}"/>
+                                 Style="{StaticResource ModernProgressBar}"/>
                 </Grid>
             </StackPanel>
         </Border>

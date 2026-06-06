@@ -151,7 +151,7 @@ namespace AssetsManager.Services.Core
                         string oldText, newText;
                         if (Path.GetExtension(diff.Path).ToLowerInvariant() == ".bnk")
                         {
-                            (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, loadingWindow);
+                            (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, null);
                         }
                         else
                         {
@@ -183,12 +183,14 @@ namespace AssetsManager.Services.Core
 
             try
             {
-                loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData);
+                loadingWindow.SetState(DiffLoadingState.AcquiringBinaryData); // 20%
                 var result = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
                 oldData = (byte[])result.OldData;
                 newData = (byte[])result.NewData;
                 oldPath = result.OldPath;
                 newPath = result.NewPath;
+                
+                loadingWindow.SetProgress(30); // Binary data acquired
 
                 if (oldData == null || newData == null)
                 {
@@ -205,7 +207,7 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences); // 85%
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);

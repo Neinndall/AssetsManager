@@ -61,9 +61,6 @@ namespace AssetsManager.Views.Dialogs
         {
             InitializeComponent();
 
-            // Start invisible to prevent visual jump. Uncomment this and Visibility.Visible in Loaded if needed.
-            // Visibility = Visibility.Hidden;
-
             // Smooth Handover: Handled via Loaded event if LoadingWindow is set
             Loaded += ImageDiffWindow_Loaded;
 

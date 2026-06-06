@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         ParsingTextContent,
         ParsingAudioHierarchy,
         CalculatingDifferences,
+        RenderingUI,
         DecodingTextures,
         Finalizing,
         Ready,
@@ -24,10 +25,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
     public class LoadingDiffModel : INotifyPropertyChanged
     {
-        private string _title = "Processing Files";
-        private string _description = "Please wait while the differences are being calculated...";
-        private double _progressValue = 0;
-        private bool _isBusy = false;
+        private string _title;
+        private string _description;
+        private double _progressValue;
+        private bool _isBusy;
         private int _currentBatchFile;
         private int _totalBatchFiles;
 
@@ -55,6 +56,11 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _isBusy = value; OnPropertyChanged(); }
         }
 
+        public LoadingDiffModel()
+        {
+            Reset(); // Initialize with defaults
+        }
+
         public void SetBatchIndex(int currentFile, int totalFiles)
         {
             _currentBatchFile = currentFile;
@@ -80,11 +86,15 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ProgressValue = 30;
                     break;
                 case DiffLoadingState.ParsingTextContent:
-                    Description = "Parsing and formatting content...";
-                    ProgressValue = 60;
+                    Description = "Formatting and beautifying content...";
+                    ProgressValue = 55;
                     break;
                 case DiffLoadingState.CalculatingDifferences:
-                    Description = "Calculating differences...";
+                    Description = "Analyzing line-by-line differences...";
+                    ProgressValue = 80;
+                    break;
+                case DiffLoadingState.RenderingUI:
+                    Description = "Preparing visual editor...";
                     ProgressValue = 95;
                     break;
 
@@ -101,11 +111,11 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                 // AUDIO PROCESS
                 case DiffLoadingState.LinkingAudio:
                     Description = "Linking audio bank dependencies...";
-                    ProgressValue = 20;
+                    ProgressValue = 35;
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
-                    ProgressValue = 50;
+                    ProgressValue = 55;
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
@@ -118,7 +128,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
 
                 case DiffLoadingState.Ready:
-                    Description = "Done! Displaying results...";
+                    Description = "Ready! Displaying results...";
                     ProgressValue = 100;
                     break;
 
@@ -159,6 +169,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             Description = "Please wait while the differences are being calculated...";
             ProgressValue = 0;
             IsBusy = false;
+            _currentBatchFile = 0;
+            _totalBatchFiles = 0;
         }
     }
 }
