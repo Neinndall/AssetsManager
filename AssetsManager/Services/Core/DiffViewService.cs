@@ -207,7 +207,7 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences); // 85%
+                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences); // 80%
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 await diffWindow.LoadAndDisplayDiffAsync(oldJson, newJson, oldPath, newPath, loadingWindow);
