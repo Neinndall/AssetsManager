@@ -76,7 +76,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ApplyInitialDefaults();
                     break;
 
-                // TEXT PROCESS
+                // TEXT PROCESS (Progression: 20 → 45 → 70 → 90 → 100)
                 case DiffLoadingState.AcquiringBinaryData:
                     Description = "Acquiring binary data from WADs...";
                     ProgressValue = 20;
@@ -87,35 +87,35 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
                 case DiffLoadingState.ParsingTextContent:
                     Description = "Formatting and beautifying content...";
-                    ProgressValue = 55;
+                    ProgressValue = 45;
                     break;
                 case DiffLoadingState.CalculatingDifferences:
                     Description = "Analyzing line-by-line differences...";
-                    ProgressValue = 80;
+                    ProgressValue = 70;
                     break;
                 case DiffLoadingState.RenderingUI:
                     Description = "Preparing visual editor...";
-                    ProgressValue = 95;
+                    ProgressValue = 90;
                     break;
 
-                // IMAGE PROCESS
+                // IMAGE PROCESS (Progression: 25 → 60 → 85 → 100)
                 case DiffLoadingState.AcquiringTextureData:
                     Description = "Acquiring texture data from WADs...";
-                    ProgressValue = 40;
+                    ProgressValue = 25;
                     break;
                 case DiffLoadingState.DecodingTextures:
                     Description = "Decoding texture surfaces...";
-                    ProgressValue = 70;
+                    ProgressValue = 60;
                     break;
                 case DiffLoadingState.GeneratingDiffMap:
                     Description = "Generating visual difference map...";
                     ProgressValue = 85;
                     break;
 
-                // AUDIO PROCESS
+                // AUDIO PROCESS (Progression: 20 → 45/55 → 80 → 100)
                 case DiffLoadingState.LinkingAudio:
                     Description = "Linking audio bank dependencies...";
-                    ProgressValue = 35;
+                    ProgressValue = 45;
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
@@ -123,12 +123,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
-                    ProgressValue = 75;
+                    ProgressValue = 55;
                     break;
 
                 case DiffLoadingState.Finalizing:
                     Description = "Finalizing data structure...";
-                    ProgressValue = 98;
+                    ProgressValue = 95;
                     break;
 
                 case DiffLoadingState.Ready:

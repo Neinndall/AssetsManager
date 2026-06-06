@@ -195,8 +195,6 @@ namespace AssetsManager.Services.Core
                 newData = (byte[])result.NewData;
                 oldPath = result.OldPath;
                 newPath = result.NewPath;
-                
-                loadingWindow.SetProgress(30);
 
                 if (oldData == null || newData == null)
                 {
@@ -301,13 +299,12 @@ namespace AssetsManager.Services.Core
             var oldImage = TextureUtils.LoadTexture(oldData, extension);
             var newImage = TextureUtils.LoadTexture(newData, extension);
 
-            // [PROGRESS] 100% Reached before opening window
-            loadingWindow.SetState(DiffLoadingState.Ready);
-
+            loadingWindow.SetState(DiffLoadingState.RenderingUI);
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;
             
+            loadingWindow.SetState(DiffLoadingState.Ready);
             imageDiffWindow.ShowDialog();
         }
 
