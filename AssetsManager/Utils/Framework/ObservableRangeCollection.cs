@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Windows.Data;
 
 namespace AssetsManager.Utils.Framework
 {
@@ -27,8 +28,9 @@ namespace AssetsManager.Utils.Framework
             var list = new List<T>(collection);
             if (list.Count == 0) return;
 
-            _isSuppressingNotification = true;
             int startIndex = Count;
+
+            _isSuppressingNotification = true;
             try
             {
                 foreach (var item in list)
@@ -43,6 +45,15 @@ namespace AssetsManager.Utils.Framework
 
             OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
             OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+
+            // ListCollectionView (TreeView/ListView) does not support range Add operations.
+            // Detect binding and fallback to Reset to prevent NotSupportedException.
+            var view = CollectionViewSource.GetDefaultView(this);
+            if (view is ListCollectionView)
+            {
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                return;
+            }
 
             const int BatchSize = 500;
             for (int i = 0; i < list.Count; i += BatchSize)

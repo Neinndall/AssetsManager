@@ -129,6 +129,7 @@ Bug Fixes
   - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.
   - Explorer / Search filtering no longer logs false error messages when the user types rapidly (cancellation is now handled as expected behavior).
   - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
+  - Explorer / Fixed crash when expanding audio banks (.wpk/.bnk) in the file tree.
   - Fixed focus loss and unexpected minimization when closing comparison or settings windows.
   - Implemented image support for the difference viewer in Asset Watcher and History modules.
   - Ensured the application correctly activates and gains focus on startup.
