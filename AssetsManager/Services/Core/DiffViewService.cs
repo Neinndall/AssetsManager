@@ -123,7 +123,7 @@ namespace AssetsManager.Services.Core
                     }
 
                     // [PROGRESS] 100% Reached before opening batch window
-                    loadingWindow.SetState(DiffLoadingState.Ready);
+                    await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
@@ -166,7 +166,7 @@ namespace AssetsManager.Services.Core
                     }
 
                     // [PROGRESS] 100% Reached before opening batch window
-                    loadingWindow.SetState(DiffLoadingState.Ready);
+                    await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
@@ -211,7 +211,6 @@ namespace AssetsManager.Services.Core
                     return;
                 }
 
-                loadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
                 diffWindow.Owner = owner;
                 diffWindow.LoadingWindow = loadingWindow;
@@ -219,6 +218,7 @@ namespace AssetsManager.Services.Core
 
                 // [PROGRESS] 100% Reached before opening window
                 loadingWindow.SetState(DiffLoadingState.Ready);
+                await Task.Delay(350);
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -229,8 +229,9 @@ namespace AssetsManager.Services.Core
                     loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
                     await ShowTextComparisonInternal(oldData, newData, "bnk", oldPath, newPath, owner, loadingWindow);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logService.LogError(ex, "Audio bank fallback failed");
                     if (loadingWindow != null && loadingWindow.IsVisible) loadingWindow.Close();
                     _customMessageBoxService.ShowError("Error", "Failed to prepare audio bank diff.", owner);
                 }
@@ -290,6 +291,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             loadingWindow.SetState(DiffLoadingState.Ready);
+            await Task.Delay(350);
             diffWindow.ShowDialog();
         }
 
@@ -304,7 +306,9 @@ namespace AssetsManager.Services.Core
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;
             
+            // [PROGRESS] 100% Reached before opening window
             loadingWindow.SetState(DiffLoadingState.Ready);
+            await Task.Delay(350);
             imageDiffWindow.ShowDialog();
         }
 

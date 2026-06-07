@@ -48,6 +48,9 @@ Improvements
   - Diff Viewer / Smoother loading-to-result transition: the loading card is handed over atomically to the result window (no more flash of the closing loading card while the new window is appearing), and the entire loading lifecycle (show / progress / hide) is now centralized in a single orchestrator in DiffViewService for consistency across all diff entry points.
   - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
   - Diff Viewer / Implemented Zero-Gap Handover: the difference window now activates before closing the loader, eliminating flickering and focus drops between windows.
+  - Diff Viewer / Progress bar now visually completes to 100% before showing results, providing clear feedback that processing is finished.
+  - Diff Viewer / Batch comparisons no longer show duplicate 100% indicators, creating a cleaner loading experience.
+  - Explorer / Fixed crash when expanding audio banks (.bnk/.wpk) in the file tree.
   - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
   - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
   - Core / Unified Loading Lifecycle: centralized all difference viewing logic into a single robust runner, ensuring consistent error handling and reliable cleanup of loading windows.
