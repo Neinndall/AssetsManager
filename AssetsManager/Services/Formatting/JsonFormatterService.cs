@@ -12,16 +12,36 @@ namespace AssetsManager.Services.Formatting
     {
         public (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
         {
-            var lines = new List<string>();
-            var lineTypes = new List<ChangeType>();
-
+            var lineTypes = new List<ChangeType>(paneModel.Lines.Count);
+            
+            // Estimate capacity: line length + 2 (\r\n) per line
+            int estimatedLength = 0;
             foreach (var line in paneModel.Lines)
             {
-                lines.Add(line.Type == ChangeType.Imaginary ? "" : line.Text ?? "");
                 lineTypes.Add(line.Type);
+                if (line.Type != ChangeType.Imaginary && line.Text != null)
+                {
+                    estimatedLength += line.Text.Length + 2;
+                }
+                else
+                {
+                    estimatedLength += 2;
+                }
             }
 
-            return (string.Join("\r\n", lines), lineTypes);
+            var sb = new System.Text.StringBuilder(estimatedLength);
+            foreach (var line in paneModel.Lines)
+            {
+                sb.AppendLine(line.Type == ChangeType.Imaginary ? string.Empty : (line.Text ?? string.Empty));
+            }
+
+            // Remove trailing \r\n added by the last AppendLine if any
+            if (sb.Length >= 2)
+            {
+                sb.Length -= 2;
+            }
+
+            return (sb.ToString(), lineTypes);
         }
 
         public Task<string> FormatJsonAsync(object jsonInput)

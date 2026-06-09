@@ -343,10 +343,11 @@ namespace AssetsManager.Services.Core
 
         private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, byte[] oldData, byte[] newData)
         {
-            var oldTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, oldData);
-            var newTextTask = _contentFormatterService.GetFormattedStringAsync(dataType, newData);
-            await Task.WhenAll(oldTextTask, newTextTask);
-            return (await oldTextTask, await newTextTask);
+            // Run sequentially to optimize peak memory. Parsing two massive files concurrently (e.g. 33MB .bin files) 
+            // creates two massive object graphs in RAM simultaneously, causing LOH fragmentation and OOM exceptions.
+            string oldText = await _contentFormatterService.GetFormattedStringAsync(dataType, oldData);
+            string newText = await _contentFormatterService.GetFormattedStringAsync(dataType, newData);
+            return (oldText, newText);
         }
 
         // Centraliza el ciclo de vida de la ventana de carga

@@ -12,6 +12,7 @@ using System.Xml;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
+using DiffPlex.Chunkers;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
@@ -32,12 +33,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         private DiffPaneModel _unifiedModel;
         private string _oldText;
         private string _newText;
-
+        
         // Cache to prevent flickering
         private TextDocument _cachedOldDoc;
         private TextDocument _cachedNewDoc;
         private bool _isSyncing;
         private int _lastAbsoluteLine = 1;
+
+        // Safety Threshold: 1MB. Above this, we disable word-level diffing as the O(Words) complexity 
+        // causes the 6GB+ RAM spikes on files like map22.bin (33MB -> 300MB JSON).
+        private const int MaxWordDiffSize = 1024 * 1024; 
         #endregion
 
         #region Properties
@@ -195,6 +200,11 @@ namespace AssetsManager.Views.Dialogs.Controls
             _cachedNewDoc = null;
             _originalDiffModel = null;
             _unifiedModel = null;
+            _oldText = null;
+            _newText = null;
+
+            // Force garbage collection of massive LOH objects immediately
+            GC.Collect(2, GCCollectionMode.Forced, blocking: false);
         }
 
         public void FocusFirstDifference()
@@ -211,6 +221,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             try
             {
+
                 _oldText = oldText;
                 _newText = newText;
                 OldFileNameLabel.Text = oldFileName;
@@ -221,6 +232,13 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _cachedNewDoc = null;
                 _originalDiffModel = null;
                 _unifiedModel = null;
+
+                // Performance Guard: Force disable WordLevelDiff for massive files
+                long totalLength = (_oldText?.Length ?? 0) + (_newText?.Length ?? 0);
+                if (totalLength > MaxWordDiffSize)
+                {
+                    ViewModel.IsWordLevelDiff = false;
+                }
 
                 // Detection: Is this the first time the asset is being tracked?
                 ViewModel.IsInitialComparison = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(newText);
@@ -260,26 +278,218 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ViewModel.InsertionsCount = 0;
                 ViewModel.DeletionsCount = 0;
                 ViewModel.ModificationsCount = 0;
+                
+                _originalDiffModel = new SideBySideDiffModel();
+                _unifiedModel = new DiffPaneModel();
+                
+                if (!string.IsNullOrEmpty(_newText))
+                {
+                    var lines = _newText.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        var text = lines[i];
+                        _originalDiffModel.OldText.Lines.Add(new DiffPiece { Type = ChangeType.Imaginary, Position = null });
+                        _originalDiffModel.NewText.Lines.Add(new DiffPiece { Text = text, Type = ChangeType.Inserted, Position = i + 1 });
+                        _unifiedModel.Lines.Add(new DiffPiece { Text = text, Type = ChangeType.Inserted, Position = i + 1 });
+                    }
+                    ViewModel.InsertionsCount = lines.Length;
+                }
+                
+                _oldText = null;
+                _newText = null;
                 return;
             }
 
-            _originalDiffModel = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
-
-            int ins = 0, del = 0, oldMod = 0, newMod = 0;
-            foreach (var line in _originalDiffModel.NewText.Lines)
+            long totalLength = (_oldText?.Length ?? 0) + (_newText?.Length ?? 0);
+            
+            // FAST LINEAR DIFFER: For massive files > 2MB.
+            // DiffPlex's Myers algorithm creates an Edit Graph matrix that explodes memory to 8GB+ on scattered changes.
+            // This custom greedy algorithm guarantees strict O(N) memory usage and O(N) CPU time.
+            if (totalLength > 2 * 1024 * 1024)
             {
-                if (line.Type == ChangeType.Inserted) ins++;
-                else if (line.Type == ChangeType.Modified) newMod++;
+                BuildFastLinearDiffModel(ViewModel.IsInlineMode ? false : true, ViewModel.IsInlineMode ? true : false);
             }
-            foreach (var line in _originalDiffModel.OldText.Lines)
+            else
             {
-                if (line.Type == ChangeType.Deleted) del++;
-                else if (line.Type == ChangeType.Modified) oldMod++;
+                var differ = new Differ();
+                if (ViewModel.IsInlineMode)
+                {
+                    _unifiedModel = new InlineDiffBuilder(differ).BuildDiffModel(_oldText, _newText);
+                    
+                    int ins = 0, del = 0;
+                    foreach (var line in _unifiedModel.Lines)
+                    {
+                        if (line.Type == ChangeType.Inserted) ins++;
+                        else if (line.Type == ChangeType.Deleted) del++;
+                    }
+                    ViewModel.InsertionsCount = ins;
+                    ViewModel.DeletionsCount = del;
+                    ViewModel.ModificationsCount = 0;
+                }
+                else
+                {
+                    var wordChunker = ViewModel.IsWordLevelDiff ? (IChunker)new WordChunker() : new NoOpWordChunker();
+                    var sideBySideBuilder = new SideBySideDiffBuilder(differ, new LineChunker(), wordChunker);
+                    _originalDiffModel = sideBySideBuilder.BuildDiffModel(_oldText, _newText, ignoreWhitespace: true);
+
+                    int ins = 0, del = 0, oldMod = 0, newMod = 0;
+                    foreach (var line in _originalDiffModel.NewText.Lines)
+                    {
+                        if (line.Type == ChangeType.Inserted) ins++;
+                        else if (line.Type == ChangeType.Modified) newMod++;
+                    }
+                    foreach (var line in _originalDiffModel.OldText.Lines)
+                    {
+                        if (line.Type == ChangeType.Deleted) del++;
+                        else if (line.Type == ChangeType.Modified) oldMod++;
+                    }
+
+                    ViewModel.InsertionsCount = ins;
+                    ViewModel.DeletionsCount = del;
+                    ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
+                }
+            }
+        }
+
+        private void BuildFastLinearDiffModel(bool buildSideBySide = true, bool buildInline = true)
+        {
+            if (buildSideBySide && _originalDiffModel == null)
+            {
+                _originalDiffModel = new SideBySideDiffModel();
+            }
+            if (buildInline && _unifiedModel == null)
+            {
+                _unifiedModel = new DiffPaneModel();
+            }
+
+            var oldLines = _oldText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None) ?? Array.Empty<string>();
+            var newLines = _newText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None) ?? Array.Empty<string>();
+
+            int o = 0, n = 0;
+            int lookahead = 100;
+            int ins = 0, del = 0, mod = 0;
+
+            while (o < oldLines.Length && n < newLines.Length)
+            {
+                if (oldLines[o] == newLines[n])
+                {
+                    var lineText = oldLines[o];
+                    if (buildSideBySide)
+                    {
+                        _originalDiffModel.OldText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Unchanged, Position = o + 1 });
+                        _originalDiffModel.NewText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Unchanged, Position = n + 1 });
+                    }
+                    if (buildInline)
+                    {
+                        _unifiedModel.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Unchanged, Position = n + 1 });
+                    }
+                    o++; n++;
+                    continue;
+                }
+
+                bool foundMatch = false;
+
+                // Look ahead in newLines for oldLines[o] (Insertion check)
+                for (int i = 1; i < lookahead && n + i < newLines.Length; i++)
+                {
+                    if (oldLines[o] == newLines[n + i])
+                    {
+                        for (int j = 0; j < i; j++)
+                        {
+                            var lineText = newLines[n];
+                            if (buildSideBySide)
+                            {
+                                _originalDiffModel.OldText.Lines.Add(new DiffPiece { Type = ChangeType.Imaginary, Position = null });
+                                _originalDiffModel.NewText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Inserted, Position = n + 1 });
+                            }
+                            if (buildInline)
+                            {
+                                _unifiedModel.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Inserted, Position = n + 1 });
+                            }
+                            n++; ins++;
+                        }
+                        foundMatch = true;
+                        break;
+                    }
+                }
+
+                if (foundMatch) continue;
+
+                // Look ahead in oldLines for newLines[n] (Deletion check)
+                for (int i = 1; i < lookahead && o + i < oldLines.Length; i++)
+                {
+                    if (oldLines[o + i] == newLines[n])
+                    {
+                        for (int j = 0; j < i; j++)
+                        {
+                            var lineText = oldLines[o];
+                            if (buildSideBySide)
+                            {
+                                _originalDiffModel.OldText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Deleted, Position = o + 1 });
+                                _originalDiffModel.NewText.Lines.Add(new DiffPiece { Type = ChangeType.Imaginary, Position = null });
+                            }
+                            if (buildInline)
+                            {
+                                _unifiedModel.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Deleted, Position = o + 1 });
+                            }
+                            o++; del++;
+                        }
+                        foundMatch = true;
+                        break;
+                    }
+                }
+
+                if (foundMatch) continue;
+
+                // If no match found within lookahead, mark as modified
+                var oldTextLine = oldLines[o];
+                var newTextLine = newLines[n];
+                if (buildSideBySide)
+                {
+                    _originalDiffModel.OldText.Lines.Add(new DiffPiece { Text = oldTextLine, Type = ChangeType.Modified, Position = o + 1 });
+                    _originalDiffModel.NewText.Lines.Add(new DiffPiece { Text = newTextLine, Type = ChangeType.Modified, Position = n + 1 });
+                }
+                if (buildInline)
+                {
+                    _unifiedModel.Lines.Add(new DiffPiece { Text = oldTextLine, Type = ChangeType.Deleted, Position = o + 1 });
+                    _unifiedModel.Lines.Add(new DiffPiece { Text = newTextLine, Type = ChangeType.Inserted, Position = n + 1 });
+                }
+                o++; n++; mod++;
+            }
+
+            // Process remaining lines
+            while (o < oldLines.Length)
+            {
+                var lineText = oldLines[o];
+                if (buildSideBySide)
+                {
+                    _originalDiffModel.OldText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Deleted, Position = o + 1 });
+                    _originalDiffModel.NewText.Lines.Add(new DiffPiece { Type = ChangeType.Imaginary, Position = null });
+                }
+                if (buildInline)
+                {
+                    _unifiedModel.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Deleted, Position = o + 1 });
+                }
+                o++; del++;
+            }
+            while (n < newLines.Length)
+            {
+                var lineText = newLines[n];
+                if (buildSideBySide)
+                {
+                    _originalDiffModel.OldText.Lines.Add(new DiffPiece { Type = ChangeType.Imaginary, Position = null });
+                    _originalDiffModel.NewText.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Inserted, Position = n + 1 });
+                }
+                if (buildInline)
+                {
+                    _unifiedModel.Lines.Add(new DiffPiece { Text = lineText, Type = ChangeType.Inserted, Position = n + 1 });
+                }
+                n++; ins++;
             }
 
             ViewModel.InsertionsCount = ins;
             ViewModel.DeletionsCount = del;
-            ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
+            ViewModel.ModificationsCount = mod;
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
@@ -333,7 +543,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_unifiedModel == null)
             {
-                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText));
+                long totalLength = (_oldText?.Length ?? 0) + (_newText?.Length ?? 0);
+                if (totalLength > 2 * 1024 * 1024)
+                {
+                    BuildFastLinearDiffModel(false, true);
+                }
+                else
+                {
+                    var differ = new Differ();
+                    _unifiedModel = await Task.Run(() => new InlineDiffBuilder(differ).BuildDiffModel(_oldText, _newText));
+                }
             }
 
             var linesToShow = _unifiedModel.Lines;
@@ -372,7 +591,17 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null)
             {
-                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false));
+                long totalLength = (_oldText?.Length ?? 0) + (_newText?.Length ?? 0);
+                if (totalLength > 2 * 1024 * 1024)
+                {
+                    BuildFastLinearDiffModel(true, false);
+                }
+                else
+                {
+                    var differ = new Differ();
+                    var wordChunker = ViewModel.IsWordLevelDiff ? (IChunker)new WordChunker() : new NoOpWordChunker();
+                    _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(differ, new LineChunker(), wordChunker).BuildDiffModel(_oldText, _newText, ignoreWhitespace: true));
+                }
             }
 
             var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
@@ -785,6 +1014,14 @@ namespace AssetsManager.Views.Dialogs.Controls
             if (!ViewModel.IsInitialComparison)
             {
                 NewJsonContent.TextArea.TextView.BackgroundRenderers.Add(new DiffBackgroundRenderer(diffModel, ViewModel.IsWordLevelDiff, false));
+            }
+        }
+
+        private class NoOpWordChunker : IChunker
+        {
+            public IReadOnlyList<string> Chunk(string text)
+            {
+                return new[] { text };
             }
         }
         #endregion
