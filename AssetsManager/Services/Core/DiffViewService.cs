@@ -115,8 +115,8 @@ namespace AssetsManager.Services.Core
                         
                         loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
                         var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
-                        var oldImage = TextureUtils.LoadTexture((byte[])oldData, ext);
-                        var newImage = TextureUtils.LoadTexture((byte[])newData, ext);
+                        var oldImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])oldData, ext));
+                        var newImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])newData, ext));
                         preparedImages.Add((oldImage, newImage, diff.OldPath, diff.NewPath));
                         
                         loadingWindow.SetState(DiffLoadingState.BatchFileReady);
@@ -229,9 +229,8 @@ namespace AssetsManager.Services.Core
                     loadingWindow.SetState(DiffLoadingState.ParsingTextContent);
                     await ShowTextComparisonInternal(oldData, newData, "bnk", oldPath, newPath, owner, loadingWindow);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    _logService.LogError(ex, "Audio bank fallback failed");
                     if (loadingWindow != null && loadingWindow.IsVisible) loadingWindow.Close();
                     _customMessageBoxService.ShowError("Error", "Failed to prepare audio bank diff.", owner);
                 }
@@ -255,7 +254,9 @@ namespace AssetsManager.Services.Core
             }
 
             var settings = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true };
-            return (JsonSerializer.Serialize(oldNodes, settings), JsonSerializer.Serialize(newNodes, settings));
+            var oldJson = await Task.Run(() => JsonSerializer.Serialize(oldNodes, settings));
+            var newJson = await Task.Run(() => JsonSerializer.Serialize(newNodes, settings));
+            return (oldJson, newJson);
         }
 
         private async Task HandleTextDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
@@ -298,8 +299,8 @@ namespace AssetsManager.Services.Core
         private async Task ShowImageComparisonInternal(byte[] oldData, byte[] newData, string oldPath, string newPath, string extension, Window owner, LoadingDiffWindow loadingWindow)
         {
             loadingWindow.SetState(DiffLoadingState.DecodingTextures);
-            var oldImage = TextureUtils.LoadTexture(oldData, extension);
-            var newImage = TextureUtils.LoadTexture(newData, extension);
+            var oldImage = await Task.Run(() => TextureUtils.LoadTexture(oldData, extension));
+            var newImage = await Task.Run(() => TextureUtils.LoadTexture(newData, extension));
 
             loadingWindow.SetState(DiffLoadingState.RenderingUI);
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
