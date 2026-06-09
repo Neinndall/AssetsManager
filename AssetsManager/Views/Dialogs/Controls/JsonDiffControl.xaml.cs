@@ -236,7 +236,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                     ParentWindow.LoadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
                 }
 
-                await Task.Run(() => UpdateChangeCounts());
+                await Task.Run(() => BuildModelAndCounts());
 
                 if (reportProgress)
                 {
@@ -253,7 +253,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void UpdateChangeCounts()
+        private void BuildModelAndCounts()
         {
             if (ViewModel.IsInitialComparison)
             {
@@ -263,21 +263,23 @@ namespace AssetsManager.Views.Dialogs.Controls
                 return;
             }
 
-            // FAST TRACK: Use raw diff blocks to count changes (O(Blocks) instead of O(Lines))
-            // DiffPlex 1.9.0 handles hashing internally for performance.
-            var diffResult = _differ.CreateDiffs(_oldText, _newText, false, false, new DiffPlex.Chunkers.LineChunker());
-            
-            int ins = 0, del = 0, mod = 0;
-            foreach (var block in diffResult.DiffBlocks)
+            _originalDiffModel = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
+
+            int ins = 0, del = 0, oldMod = 0, newMod = 0;
+            foreach (var line in _originalDiffModel.NewText.Lines)
             {
-                if (block.DeleteCountA > 0 && block.InsertCountB > 0) mod += Math.Max(block.DeleteCountA, block.InsertCountB);
-                else if (block.InsertCountB > 0) ins += block.InsertCountB;
-                else if (block.DeleteCountA > 0) del += block.DeleteCountA;
+                if (line.Type == ChangeType.Inserted) ins++;
+                else if (line.Type == ChangeType.Modified) newMod++;
+            }
+            foreach (var line in _originalDiffModel.OldText.Lines)
+            {
+                if (line.Type == ChangeType.Deleted) del++;
+                else if (line.Type == ChangeType.Modified) oldMod++;
             }
 
             ViewModel.InsertionsCount = ins;
             ViewModel.DeletionsCount = del;
-            ViewModel.ModificationsCount = mod;
+            ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);

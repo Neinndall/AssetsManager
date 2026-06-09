@@ -15,9 +15,6 @@ namespace AssetsManager.Views.Helpers
         private readonly SolidColorBrush _removedBrush;
         private readonly SolidColorBrush _addedBrush;
         private readonly SolidColorBrush _modifiedBrush;
-        private readonly SolidColorBrush _removedOpacityBrush;
-        private readonly SolidColorBrush _addedOpacityBrush;
-        private readonly SolidColorBrush _modifiedOpacityBrush;
 
         public DiffBackgroundRenderer(SideBySideDiffModel diffModel, bool isWordLevel, bool isOldEditor)
         {
@@ -25,25 +22,12 @@ namespace AssetsManager.Views.Helpers
             _isWordLevel = isWordLevel;
             _isOldEditor = isOldEditor;
 
-            // Cache brushes for performance
             _addedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffTextBackgroundAdded"));
             _removedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffTextBackgroundRemoved"));
             _modifiedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffTextBackgroundModified"));
             _addedBrush.Freeze();
             _removedBrush.Freeze();
             _modifiedBrush.Freeze();
-
-            _addedOpacityBrush = _addedBrush.Clone();
-            _addedOpacityBrush.Opacity = 1.0;
-            _addedOpacityBrush.Freeze();
-
-            _removedOpacityBrush = _removedBrush.Clone();
-            _removedOpacityBrush.Opacity = 1.0;
-            _removedOpacityBrush.Freeze();
-
-            _modifiedOpacityBrush = _modifiedBrush.Clone();
-            _modifiedOpacityBrush.Opacity = 1.0;
-            _modifiedOpacityBrush.Freeze();
         }
 
         public KnownLayer Layer => KnownLayer.Background;
@@ -71,7 +55,7 @@ namespace AssetsManager.Views.Helpers
 
                 if (_isWordLevel && diffLine.Type != ChangeType.Unchanged)
                 {
-                    var wordHighlightBrush = GetBrushForChangeType(diffLine.Type, useOpacity: true);
+                    var wordHighlightBrush = GetBrushForChangeType(diffLine.Type);
                     if (wordHighlightBrush == null) continue;
 
                     if (diffLine.SubPieces != null)
@@ -102,19 +86,8 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-        private SolidColorBrush GetBrushForChangeType(ChangeType changeType, bool useOpacity = false)
+        private SolidColorBrush GetBrushForChangeType(ChangeType changeType)
         {
-            if (useOpacity)
-            {
-                return changeType switch
-                {
-                    ChangeType.Inserted => _addedOpacityBrush,
-                    ChangeType.Deleted => _removedOpacityBrush,
-                    ChangeType.Modified => _modifiedOpacityBrush,
-                    _ => null
-                };
-            }
-
             return changeType switch
             {
                 ChangeType.Inserted => _addedBrush,
