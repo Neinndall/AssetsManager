@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Dialogs.Controls
     {
         #region Fields
         private static readonly IDiffer _differ = new Differ();
+        private static IHighlightingDefinition _jsonHighlighting;
         private SideBySideDiffModel _originalDiffModel;
         private DiffPaneModel _unifiedModel;
         private string _oldText;
@@ -68,20 +69,27 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             try
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                var resourceName = Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith("JsonSyntaxHighlighting.xshd"));
-
-                if (resourceName != null)
+                if (_jsonHighlighting == null)
                 {
-                    using var stream = assembly.GetManifestResourceStream(resourceName);
-                    if (stream != null)
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var resourceName = Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith("JsonSyntaxHighlighting.xshd"));
+
+                    if (resourceName != null)
                     {
-                        using var reader = XmlReader.Create(stream);
-                        var jsonHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                        OldJsonContent.SyntaxHighlighting = jsonHighlighting;
-                        NewJsonContent.SyntaxHighlighting = jsonHighlighting;
-                        UnifiedDiffEditor.SyntaxHighlighting = jsonHighlighting;
+                        using var stream = assembly.GetManifestResourceStream(resourceName);
+                        if (stream != null)
+                        {
+                            using var reader = XmlReader.Create(stream);
+                            _jsonHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                        }
                     }
+                }
+
+                if (_jsonHighlighting != null)
+                {
+                    OldJsonContent.SyntaxHighlighting = _jsonHighlighting;
+                    NewJsonContent.SyntaxHighlighting = _jsonHighlighting;
+                    UnifiedDiffEditor.SyntaxHighlighting = _jsonHighlighting;
                 }
             }
             catch
