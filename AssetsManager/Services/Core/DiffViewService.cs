@@ -248,7 +248,7 @@ namespace AssetsManager.Services.Core
 
             if (string.IsNullOrEmpty(backupRoot))
             {
-                if (loadingWindow != null) await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.ParsingAudioHierarchy);
+                if (loadingWindow != null) await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.LinkingAudio);
                 (oldNodes, newNodes) = await _audioBankLinkerService.ResolveLiveAudioBankDiffAsync(diff, oldPbePath, newPbePath, oldData, newData);
             }
             else
@@ -256,6 +256,9 @@ namespace AssetsManager.Services.Core
                 if (loadingWindow != null) await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.LinkingAudio);
                 (oldNodes, newNodes) = await _audioBankLinkerService.ResolveArchivedAudioBankDiffAsync(diff, backupRoot, oldData, newData);
             }
+
+            if (loadingWindow != null) await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.AcquiringAudioComponents);
+            if (loadingWindow != null) await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.ParsingAudioHierarchy);
 
             var settings = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, WriteIndented = true };
             var oldJson = await Task.Run(() => JsonSerializer.Serialize(oldNodes, settings));
@@ -306,7 +309,7 @@ namespace AssetsManager.Services.Core
             var oldImage = await Task.Run(() => TextureUtils.LoadTexture(oldData, extension));
             var newImage = await Task.Run(() => TextureUtils.LoadTexture(newData, extension));
 
-            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.RenderingUI);
+            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.GeneratingDiffMap);
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;
@@ -365,6 +368,12 @@ namespace AssetsManager.Services.Core
         {
             var loadingWindow = new LoadingDiffWindow { Owner = owner };
             loadingWindow.Show();
+            
+            // Wait until the window is fully initialized, visible, and has loaded the UI components.
+            await loadingWindow.LoadTask;
+            // Yield control to let the UI thread render the initial 0% state on screen.
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
             try
             {
                 await body(loadingWindow);

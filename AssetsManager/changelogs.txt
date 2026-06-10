@@ -126,6 +126,7 @@ Improvements
   - Monitor / Pagination: added first and last page buttons for instant navigation across all paginated views.
 
 Bug Fixes
+  - Diff Viewer / Fixed loading window status and progress bar transitions, ensuring that early rendering states (such as loading and parsing) are not desynchronized or skipped, and the progress bar completes to 100% smoothly across all file categories (text, image, audio, batch).
   - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
     * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
   - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".

@@ -9,6 +9,9 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class LoadingDiffWindow : Window
     {
+        private readonly TaskCompletionSource<bool> _loadTcs = new TaskCompletionSource<bool>();
+        public Task LoadTask => _loadTcs.Task;
+
         public LoadingDiffWindow()
         {
             InitializeComponent();
@@ -35,8 +38,14 @@ namespace AssetsManager.Views.Dialogs
         {
             SetState(state);
             await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-            // Give a tiny time slice for the UI thread to redraw
-            await Task.Delay(50);
+            
+            // Adaptive Delay: Longer delay for individual files to guarantee readability (150ms).
+            // Shorter delay for batch files (50ms) to ensure high throughput.
+            bool isBatchState = state == DiffLoadingState.BatchLoadingFile || 
+                               state == DiffLoadingState.BatchFormattingFile || 
+                               state == DiffLoadingState.BatchFileReady;
+            int delay = isBatchState ? 50 : 150;
+            await Task.Delay(delay);
         }
 
         public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
@@ -51,6 +60,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 Owner.Effect = new BlurEffect { Radius = 5 };
             }
+            _loadTcs.TrySetResult(true);
         }
 
         private void OnClosing(object sender, CancelEventArgs e)

@@ -115,18 +115,18 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ProgressValue = 85;
                     break;
 
-                // AUDIO PROCESS (Progression: 20 → 45/55 → 80 → 100)
+                // AUDIO PROCESS (Progression: 20 → 40/55 → 80 → 100)
                 case DiffLoadingState.LinkingAudio:
                     Description = "Linking audio bank dependencies...";
-                    ProgressValue = 45;
+                    ProgressValue = 40;
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
-                    ProgressValue = 50;
+                    ProgressValue = 60;
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
-                    ProgressValue = 55;
+                    ProgressValue = 80;
                     break;
 
                 case DiffLoadingState.Finalizing:
