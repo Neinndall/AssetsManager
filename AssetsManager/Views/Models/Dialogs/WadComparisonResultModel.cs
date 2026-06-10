@@ -90,9 +90,14 @@ namespace AssetsManager.Views.Models.Dialogs
             get
             {
                 if (SelectedNodes.Count > 1)
-                    return SelectedNodes.Any(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path));
+                {
+                    return SelectedNodes.All(d => SupportedFileTypes.IsImage(d.Path)) || 
+                           SelectedNodes.Any(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path));
+                }
 
-                return (SelectedItem?.Type == ChunkDiffType.Modified) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Path);
+                return SelectedItem != null && 
+                       (SupportedFileTypes.IsImage(SelectedItem.Path) || 
+                        (SelectedItem.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(SelectedItem.Path)));
             }
         }
 

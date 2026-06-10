@@ -72,5 +72,11 @@ namespace AssetsManager.Utils
 
             return IsImage(fileName) || IsText(fileName) || extension == ".bnk";
         }
+
+        public static bool IsNonImageDiffable(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            return (IsText(fileName) || IsAudioBank(fileName)) && !IsAudioDataContainer(fileName);
+        }
     }
 }

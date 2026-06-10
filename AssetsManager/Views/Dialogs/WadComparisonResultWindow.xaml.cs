@@ -237,12 +237,13 @@ namespace AssetsManager.Views.Dialogs
         public async void HandleBatchViewDifferencesRequest(List<SerializableChunkDiff> diffs)
         {
             if (diffs == null || diffs.Count == 0) return;
+
+            // Check if they are all images
+            bool isImageBatch = diffs.All(d => SupportedFileTypes.IsImage(d.Path));
             
-            // Permitimos MODIFICADOS que sean TEXTO o AUDIO BANKS semánticos (events.bnk)
-            // Filtramos contenedores de datos puros (_audio.bnk / .wpk)
-            var validDiffs = diffs.Where(d => d.Type == ChunkDiffType.Modified && 
-                                           (SupportedFileTypes.IsText(d.Path) || SupportedFileTypes.IsAudioBank(d.Path)) &&
-                                           !SupportedFileTypes.IsAudioDataContainer(d.Path)).ToList();
+            var validDiffs = isImageBatch
+                ? diffs.ToList()
+                : diffs.Where(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path)).ToList();
             
             if (validDiffs.Count > 1)
             {

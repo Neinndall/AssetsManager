@@ -171,6 +171,7 @@ Bug Fixes
    - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
    - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
   - Monitor / Pagination: fixed total page count failing to refresh in the version manager when switching between League Client and Game Client tabs.
+  - Diff Viewer / Fixed batch image comparisons (multiple selected images) failing to launch when clicking "View selected differences" in the results explorer.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
