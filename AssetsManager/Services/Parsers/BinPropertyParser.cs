@@ -451,6 +451,7 @@ namespace AssetsManager.Services.Parsers
                 switch (itemType)
                 {
                     case BinPropertyType.Bool:
+                    case BinPropertyType.BitBool:
                         sb.Append(br.ReadByte() != 0 ? "true" : "false");
                         break;
                     case BinPropertyType.I8:
@@ -479,30 +480,7 @@ namespace AssetsManager.Services.Parsers
                         break;
                     case BinPropertyType.F32:
                         float f = br.ReadSingle();
-                        if (float.IsFinite(f))
-                        {
-                            sb.Append(f.ToString("0.####", CultureInfo.InvariantCulture));
-                        }
-                        else
-                        {
-                            sb.Append(JsonSerializer.Serialize(f.ToString(CultureInfo.InvariantCulture)));
-                        }
-                        break;
-                    case BinPropertyType.Hash:
-                        sb.Append(JsonSerializer.Serialize(resolve(br.ReadUInt32())));
-                        break;
-                    case BinPropertyType.ObjectLink:
-                        sb.Append(JsonSerializer.Serialize(resolve(br.ReadUInt32())));
-                        break;
-                    case BinPropertyType.WadChunkLink:
-                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveHash(br.ReadUInt64())));
-                        break;
-                    case BinPropertyType.BitBool:
-                        sb.Append(br.ReadByte() != 0 ? "true" : "false");
-                        break;
-                    case BinPropertyType.String:
-                        ushort strLen = br.ReadUInt16();
-                        sb.Append(JsonSerializer.Serialize(Encoding.UTF8.GetString(br.ReadBytes(strLen))));
+                        sb.Append(float.IsFinite(f) ? f.ToString("0.####", CultureInfo.InvariantCulture) : JsonSerializer.Serialize(f.ToString(CultureInfo.InvariantCulture)));
                         break;
                     default:
                         sb.Append("null");
@@ -523,71 +501,19 @@ namespace AssetsManager.Services.Parsers
                 if (!first) sb.Append(",");
                 first = false;
 
-                if (p == null)
-                {
-                    sb.Append("null");
-                    continue;
-                }
-
-                switch (p.Type)
-                {
-                    case BinPropertyType.Bool:
-                        sb.Append(((BinTreeBool)p).Value ? "true" : "false");
-                        break;
-                    case BinPropertyType.BitBool:
-                        sb.Append(((BinTreeBitBool)p).Value ? "true" : "false");
-                        break;
-                    case BinPropertyType.I8:
-                        sb.Append(((BinTreeI8)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.U8:
-                        sb.Append(((BinTreeU8)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.I16:
-                        sb.Append(((BinTreeI16)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.U16:
-                        sb.Append(((BinTreeU16)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.I32:
-                        sb.Append(((BinTreeI32)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.U32:
-                        sb.Append(((BinTreeU32)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.I64:
-                        sb.Append(((BinTreeI64)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.U64:
-                        sb.Append(((BinTreeU64)p).Value.ToString(CultureInfo.InvariantCulture));
-                        break;
-                    case BinPropertyType.F32:
-                        float f = ((BinTreeF32)p).Value;
-                        if (float.IsFinite(f))
-                        {
-                            sb.Append(f.ToString("0.####", CultureInfo.InvariantCulture));
-                        }
-                        else
-                        {
-                            sb.Append(JsonSerializer.Serialize(f.ToString(CultureInfo.InvariantCulture)));
-                        }
-                        break;
-                    case BinPropertyType.String:
-                        sb.Append(JsonSerializer.Serialize(((BinTreeString)p).Value));
-                        break;
-                    case BinPropertyType.Hash:
-                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveBinHashGeneral(((BinTreeHash)p).Value)));
-                        break;
-                    case BinPropertyType.ObjectLink:
-                        sb.Append(JsonSerializer.Serialize(resolve(((BinTreeObjectLink)p).Value)));
-                        break;
-                    case BinPropertyType.WadChunkLink:
-                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveHash(((BinTreeWadChunkLink)p).Value)));
-                        break;
-                    default:
-                        sb.Append("null");
-                        break;
-                }
+                if (p == null) sb.Append("null");
+                else if (p is BinTreeBool b) sb.Append(b.Value ? "true" : "false");
+                else if (p is BinTreeBitBool bb) sb.Append(bb.Value ? "true" : "false");
+                else if (p is BinTreeF32 f) sb.Append(float.IsFinite(f.Value) ? f.Value.ToString("0.####", CultureInfo.InvariantCulture) : JsonSerializer.Serialize(f.Value.ToString(CultureInfo.InvariantCulture)));
+                else if (p is BinTreeI8 i8) sb.Append(i8.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeU8 u8) sb.Append(u8.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeI16 i16) sb.Append(i16.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeU16 u16) sb.Append(u16.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeI32 i32) sb.Append(i32.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeU32 u32) sb.Append(u32.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeI64 i64) sb.Append(i64.Value.ToString(CultureInfo.InvariantCulture));
+                else if (p is BinTreeU64 u64) sb.Append(u64.Value.ToString(CultureInfo.InvariantCulture));
+                else sb.Append("null");
             }
             sb.Append("]");
             writer.WriteRawValue(sb.ToString());
