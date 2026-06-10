@@ -12,6 +12,8 @@ namespace AssetsManager.Views.Helpers
         private HelixViewport3D _viewport;
         private bool _isRotating;
         private System.Windows.Point _lastMousePosition;
+        private double _accumulatedDeltaX;
+        private double _accumulatedDeltaY;
         
         // Smooth Zoom and Transition variables
         private Point3D _targetPosition;
@@ -99,33 +101,54 @@ namespace AssetsManager.Views.Helpers
 
         private void OnRendering(object sender, EventArgs e)
         {
-            if (!_isTransitioning || _viewport?.Camera is not ProjectionCamera camera) return;
+            if (_viewport?.Camera is not ProjectionCamera camera) return;
 
-            // Interpolate Position
-            var currentPos = camera.Position;
-            var newPos = currentPos + (_targetPosition - currentPos) * SmoothFactor;
-            camera.Position = newPos;
-
-            // Interpolate LookDirection
-            var currentLook = camera.LookDirection;
-            var newLook = currentLook + (_targetLookDirection - currentLook) * SmoothFactor;
-            camera.LookDirection = newLook;
-
-            // Interpolate UpDirection
-            var currentUp = camera.UpDirection;
-            var newUp = currentUp + (_targetUpDirection - currentUp) * SmoothFactor;
-            camera.UpDirection = newUp;
-
-            // Stop updating if we are close enough to the target
-            bool posReached = (newPos - _targetPosition).Length < TransitionThreshold;
-            bool lookReached = (newLook - _targetLookDirection).Length < TransitionThreshold;
-
-            if (posReached && lookReached)
+            // 1. Apply accumulated manual rotation from mouse drag once per frame
+            if (Math.Abs(_accumulatedDeltaX) > 0.001 || Math.Abs(_accumulatedDeltaY) > 0.001)
             {
-                camera.Position = _targetPosition;
-                camera.LookDirection = _targetLookDirection;
-                camera.UpDirection = _targetUpDirection;
-                _isTransitioning = false;
+                double sensitivity = 0.5;
+                var delta3D = new Vector3D(-_accumulatedDeltaX * sensitivity, _accumulatedDeltaY * sensitivity, 0);
+                Rotate(delta3D);
+
+                // Reset accumulation
+                _accumulatedDeltaX = 0;
+                _accumulatedDeltaY = 0;
+
+                // Sync transition targets with current camera parameters
+                _targetPosition = camera.Position;
+                _targetLookDirection = camera.LookDirection;
+                _targetUpDirection = camera.UpDirection;
+            }
+
+            // 2. Interpolate smooth camera movements (Transitions / Reset / Zoom)
+            if (_isTransitioning)
+            {
+                // Interpolate Position
+                var currentPos = camera.Position;
+                var newPos = currentPos + (_targetPosition - currentPos) * SmoothFactor;
+                camera.Position = newPos;
+
+                // Interpolate LookDirection
+                var currentLook = camera.LookDirection;
+                var newLook = currentLook + (_targetLookDirection - currentLook) * SmoothFactor;
+                camera.LookDirection = newLook;
+
+                // Interpolate UpDirection
+                var currentUp = camera.UpDirection;
+                var newUp = currentUp + (_targetUpDirection - currentUp) * SmoothFactor;
+                camera.UpDirection = newUp;
+
+                // Stop updating if we are close enough to the target
+                bool posReached = (newPos - _targetPosition).Length < TransitionThreshold;
+                bool lookReached = (newLook - _targetLookDirection).Length < TransitionThreshold;
+
+                if (posReached && lookReached)
+                {
+                    camera.Position = _targetPosition;
+                    camera.LookDirection = _targetLookDirection;
+                    camera.UpDirection = _targetUpDirection;
+                    _isTransitioning = false;
+                }
             }
         }
 
@@ -160,21 +183,14 @@ namespace AssetsManager.Views.Helpers
             if (_isRotating && e.LeftButton == MouseButtonState.Pressed)
             {
                 var currentMousePosition = e.GetPosition(_viewport);
-                var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
-
-                double sensitivity = 0.5;
-                var delta3D = new Vector3D(-delta.X * sensitivity, delta.Y * sensitivity, 0);
-                Rotate(delta3D);
-
+                
+                _accumulatedDeltaX += currentMousePosition.X - _lastMousePosition.X;
+                _accumulatedDeltaY += currentMousePosition.Y - _lastMousePosition.Y;
+                
                 _lastMousePosition = currentMousePosition;
                 
-                // Update target position/dirs after rotation to sync
-                if (_viewport.Camera is ProjectionCamera camera)
-                {
-                    _targetPosition = camera.Position;
-                    _targetLookDirection = camera.LookDirection;
-                    _targetUpDirection = camera.UpDirection;
-                }
+                // Stop active transitions when user starts interacting
+                _isTransitioning = false;
             }
         }
 
