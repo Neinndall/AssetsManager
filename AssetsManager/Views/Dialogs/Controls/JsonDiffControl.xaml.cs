@@ -195,6 +195,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             _cachedNewDoc = null;
             _originalDiffModel = null;
             _unifiedModel = null;
+            _oldText = null;
+            _newText = null;
+
         }
 
         public void FocusFirstDifference()
@@ -270,16 +273,21 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 if (line.Type == ChangeType.Inserted) ins++;
                 else if (line.Type == ChangeType.Modified) newMod++;
+
+                if (line.Type == ChangeType.Unchanged) line.Text = null;
             }
             foreach (var line in _originalDiffModel.OldText.Lines)
             {
                 if (line.Type == ChangeType.Deleted) del++;
                 else if (line.Type == ChangeType.Modified) oldMod++;
+
+                if (line.Type == ChangeType.Unchanged) line.Text = null;
             }
 
             ViewModel.InsertionsCount = ins;
             ViewModel.DeletionsCount = del;
             ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
+
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
@@ -333,7 +341,15 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_unifiedModel == null)
             {
-                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText));
+                _unifiedModel = await Task.Run(() => 
+                {
+                    var m = new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText);
+                    foreach (var line in m.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    return m;
+                });
             }
 
             var linesToShow = _unifiedModel.Lines;
@@ -350,7 +366,20 @@ namespace AssetsManager.Views.Dialogs.Controls
                 }).ToList();
             }
 
-            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
+            string[] newLinesArr = null;
+            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => 
+            {
+                if (l.Text != null) return l.Text;
+                if (l.Position.HasValue && l.Position.Value > 0)
+                {
+                    newLinesArr ??= _newText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    if (newLinesArr != null && l.Position.Value <= newLinesArr.Length)
+                    {
+                        return newLinesArr[l.Position.Value - 1];
+                    }
+                }
+                return string.Empty;
+            }));
 
             if (UnifiedDiffEditor.Document == null || UnifiedDiffEditor.Document.TextLength != combinedText.Length || UnifiedDiffEditor.Text != combinedText)
             {
@@ -372,7 +401,19 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null)
             {
-                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false));
+                _originalDiffModel = await Task.Run(() => 
+                {
+                    var m = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
+                    foreach (var line in m.OldText.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    foreach (var line in m.NewText.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    return m;
+                });
             }
 
             var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
@@ -391,8 +432,10 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 var (normalizedOld, normalizedNew) = await Task.Run(() =>
                 {
-                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
-                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
+                    string[] oldLinesArr = _oldText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    string[] newLinesArr = _newText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText, oldLinesArr);
+                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText, newLinesArr);
                     return (nOld, nNew);
                 });
 

@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Formatting
 {
     public class JsonFormatterService
     {
-        public string NormalizeTextForAlignment(DiffPaneModel paneModel)
+        public string NormalizeTextForAlignment(DiffPaneModel paneModel, string[] fallbackLines = null)
         {
             if (paneModel == null || paneModel.Lines.Count == 0) return string.Empty;
 
@@ -18,7 +18,7 @@ namespace AssetsManager.Services.Formatting
             int estimatedLength = 0;
             foreach (var line in paneModel.Lines)
             {
-                estimatedLength += (line.Text?.Length ?? 0) + 2;
+                estimatedLength += (line.Text?.Length ?? (fallbackLines != null && line.Position.HasValue && line.Position.Value > 0 && line.Position.Value <= fallbackLines.Length ? fallbackLines[line.Position.Value - 1].Length : 0)) + 2;
             }
 
             var sb = new System.Text.StringBuilder(estimatedLength);
@@ -30,7 +30,12 @@ namespace AssetsManager.Services.Formatting
                 }
                 else
                 {
-                    sb.AppendLine(line.Text ?? string.Empty);
+                    string text = line.Text;
+                    if (text == null && fallbackLines != null && line.Position.HasValue && line.Position.Value > 0 && line.Position.Value <= fallbackLines.Length)
+                    {
+                        text = fallbackLines[line.Position.Value - 1];
+                    }
+                    sb.AppendLine(text ?? string.Empty);
                 }
             }
 

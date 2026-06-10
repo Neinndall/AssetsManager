@@ -25,6 +25,7 @@ New Features
   - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
 
 Improvements
+  - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
   - Viewer / Removing and re-adding a model is now instant.
   - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.

@@ -8,6 +8,7 @@ using System.Globalization;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using AssetsManager.Services.Hashes;
+using System.Text.Encodings.Web;
 
 namespace AssetsManager.Services.Parsers
 {
@@ -61,7 +62,11 @@ namespace AssetsManager.Services.Parsers
 
             long objectsOffset = binStream.Position;
             
-            var options = new JsonWriterOptions { Indented = false };
+            var options = new JsonWriterOptions 
+            { 
+                Indented = true, 
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+            };
 
             // Attempt 1: Modern Mode
             try
@@ -265,7 +270,11 @@ namespace AssetsManager.Services.Parsers
 
         private void WriteBinTreeAsJsonInternal(Stream outputStream, BinTree binTree)
         {
-            var options = new JsonWriterOptions { Indented = false };
+            var options = new JsonWriterOptions 
+            { 
+                Indented = true, 
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
+            };
             using var writer = new Utf8JsonWriter(outputStream, options);
 
             var resolutionCache = new Dictionary<uint, string>();

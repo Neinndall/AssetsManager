@@ -183,11 +183,8 @@ namespace AssetsManager.Services.Formatting
                 } 
                 
                 jsonStream.Position = 0;
-                using var reader = new StreamReader(jsonStream);
-                string compactJson = await reader.ReadToEndAsync();
-                
-                // Redirigir al servicio de formato para indentación y escape unicode
-                return await _jsonFormatterService.FormatJsonAsync(compactJson);
+                using var reader = new StreamReader(jsonStream, Encoding.UTF8);
+                return await reader.ReadToEndAsync();
             }
             catch (Exception ex)
             {
