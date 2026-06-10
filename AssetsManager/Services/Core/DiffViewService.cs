@@ -109,7 +109,7 @@ namespace AssetsManager.Services.Core
                     for (int i = 0; i < diffs.Count; i++)
                     {
                         var diff = diffs[i];
-                        loadingWindow.SetBatchIndex(i + 1, diffs.Count);
+                        loadingWindow.SetBatchIndex(i + 1, diffs.Count, "texture");
                         loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
                         var (_, oldData, newData, _, _) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
                         
@@ -123,6 +123,7 @@ namespace AssetsManager.Services.Core
                     }
 
                     // [PROGRESS] 100% Reached before opening batch window
+                    loadingWindow.SetState(DiffLoadingState.Ready);
                     await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
@@ -146,13 +147,15 @@ namespace AssetsManager.Services.Core
                     for (int i = 0; i < diffs.Count; i++)
                     {
                         var diff = diffs[i];
-                        loadingWindow.SetBatchIndex(i + 1, diffs.Count);
+                        string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
+                        string fileType = ext == ".bnk" ? "audio bank" : "file";
+                        loadingWindow.SetBatchIndex(i + 1, diffs.Count, fileType);
                         loadingWindow.SetState(DiffLoadingState.BatchLoadingFile);
                         var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
                         
                         loadingWindow.SetState(DiffLoadingState.BatchFormattingFile);
                         string oldText, newText;
-                        if (Path.GetExtension(diff.Path).ToLowerInvariant() == ".bnk")
+                        if (ext == ".bnk")
                         {
                             (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, null);
                         }
@@ -166,6 +169,7 @@ namespace AssetsManager.Services.Core
                     }
 
                     // [PROGRESS] 100% Reached before opening batch window
+                    loadingWindow.SetState(DiffLoadingState.Ready);
                     await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);

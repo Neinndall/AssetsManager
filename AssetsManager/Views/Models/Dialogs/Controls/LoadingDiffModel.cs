@@ -62,10 +62,13 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             ApplyInitialDefaults(); // Initialize with defaults
         }
 
-        public void SetBatchIndex(int currentFile, int totalFiles)
+        private string _batchFileType = "file";
+
+        public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
         {
             _currentBatchFile = currentFile;
             _totalBatchFiles = totalFiles;
+            _batchFileType = fileType ?? "file";
         }
 
         public void SetState(DiffLoadingState state)
@@ -140,21 +143,23 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                 case DiffLoadingState.BatchLoadingFile:
                 {
                     var share = 100.0 / _totalBatchFiles;
-                    Description = $"Loading file {_currentBatchFile} of {_totalBatchFiles}...";
+                    Description = $"Loading {_batchFileType} {_currentBatchFile} of {_totalBatchFiles}...";
                     ProgressValue = (_currentBatchFile - 1) * share + share * 0.15;
                     break;
                 }
                 case DiffLoadingState.BatchFormattingFile:
                 {
                     var share = 100.0 / _totalBatchFiles;
-                    Description = $"Formatting file {_currentBatchFile} of {_totalBatchFiles}...";
+                    var action = _batchFileType == "texture" ? "Decoding" : (_batchFileType == "audio bank" ? "Parsing" : "Formatting");
+                    Description = $"{action} {_batchFileType} {_currentBatchFile} of {_totalBatchFiles}...";
                     ProgressValue = (_currentBatchFile - 1) * share + share * 0.55;
                     break;
                 }
                 case DiffLoadingState.BatchFileReady:
                 {
                     var share = 100.0 / _totalBatchFiles;
-                    Description = $"File {_currentBatchFile} of {_totalBatchFiles} ready.";
+                    var capitalizedFileType = char.ToUpper(_batchFileType[0]) + _batchFileType.Substring(1);
+                    Description = $"{capitalizedFileType} {_currentBatchFile} of {_totalBatchFiles} ready.";
                     ProgressValue = _currentBatchFile * share;
                     break;
                 }

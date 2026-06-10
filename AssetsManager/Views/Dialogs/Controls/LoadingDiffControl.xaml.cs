@@ -46,9 +46,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             _viewModel.SetState(state);
         }
 
-        public void SetBatchIndex(int currentFile, int totalFiles)
+        public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
         {
-            _viewModel.SetBatchIndex(currentFile, totalFiles);
+            _viewModel.SetBatchIndex(currentFile, totalFiles, fileType);
         }
     }
 }
