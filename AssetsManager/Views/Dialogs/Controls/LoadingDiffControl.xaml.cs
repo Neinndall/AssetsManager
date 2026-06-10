@@ -22,7 +22,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (show)
             {
-                _viewModel.ApplyInitialDefaults();
                 _viewModel.IsBusy = true;
             }
             else

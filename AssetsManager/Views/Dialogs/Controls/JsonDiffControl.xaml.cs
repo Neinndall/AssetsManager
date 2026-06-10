@@ -244,14 +244,14 @@ namespace AssetsManager.Views.Dialogs.Controls
 
                 if (reportProgress)
                 {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.CalculatingDifferences);
+                    await ParentWindow.LoadingWindow.SetStateAndRenderAsync(DiffLoadingState.CalculatingDifferences);
                 }
 
                 await Task.Run(() => BuildModelAndCounts());
 
                 if (reportProgress)
                 {
-                    ParentWindow.LoadingWindow.SetState(DiffLoadingState.RenderingUI);
+                    await ParentWindow.LoadingWindow.SetStateAndRenderAsync(DiffLoadingState.RenderingUI);
                 }
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden

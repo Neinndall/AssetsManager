@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Views.Dialogs
@@ -27,6 +29,14 @@ namespace AssetsManager.Views.Dialogs
         public void SetState(DiffLoadingState state)
         {
             LoadingControl.SetState(state);
+        }
+
+        public async Task SetStateAndRenderAsync(DiffLoadingState state)
+        {
+            SetState(state);
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            // Give a tiny time slice for the UI thread to redraw
+            await Task.Delay(50);
         }
 
         public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
