@@ -198,9 +198,16 @@ namespace AssetsManager.Services.Parsers
                     if (useLegacyType && itemType >= (BinPropertyType)128) itemType = (BinPropertyType)(itemTypeByte & 0x7F);
                     br.ReadUInt32(); // container size
                     uint itemCount = br.ReadUInt32();
-                    writer.WriteStartArray();
-                    for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolve, useLegacyType);
-                    writer.WriteEndArray();
+                    if (IsPrimitiveType(itemType))
+                    {
+                        WritePrimitiveContainerStreaming(writer, br, itemType, itemCount, resolve);
+                    }
+                    else
+                    {
+                        writer.WriteStartArray();
+                        for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolve, useLegacyType);
+                        writer.WriteEndArray();
+                    }
                     break;
                 case BinPropertyType.Struct:
                 case BinPropertyType.Embedded:
@@ -348,9 +355,26 @@ namespace AssetsManager.Services.Parsers
                 case BinPropertyType.WadChunkLink: writer.WriteStringValue(_hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
-                    writer.WriteStartArray();
-                    foreach (var p in ((BinTreeContainer)prop).Elements) WritePropertyValueInternal(writer, p, resolve);
-                    writer.WriteEndArray();
+                    var container = (BinTreeContainer)prop;
+                    bool allPrimitive = true;
+                    foreach (var p in container.Elements)
+                    {
+                        if (p != null && !IsPrimitiveType(p.Type))
+                        {
+                            allPrimitive = false;
+                            break;
+                        }
+                    }
+                    if (allPrimitive)
+                    {
+                        WritePrimitiveContainerFallback(writer, container, resolve);
+                    }
+                    else
+                    {
+                        writer.WriteStartArray();
+                        foreach (var p in container.Elements) WritePropertyValueInternal(writer, p, resolve);
+                        writer.WriteEndArray();
+                    }
                     break;
                 case BinPropertyType.Struct:
                 case BinPropertyType.Embedded:
@@ -394,6 +418,180 @@ namespace AssetsManager.Services.Parsers
         #endregion
 
         #region Helpers
+
+        private bool IsPrimitiveType(BinPropertyType type)
+        {
+            switch (type)
+            {
+                case BinPropertyType.Bool:
+                case BinPropertyType.I8:
+                case BinPropertyType.U8:
+                case BinPropertyType.I16:
+                case BinPropertyType.U16:
+                case BinPropertyType.I32:
+                case BinPropertyType.U32:
+                case BinPropertyType.I64:
+                case BinPropertyType.U64:
+                case BinPropertyType.F32:
+                case BinPropertyType.BitBool:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private void WritePrimitiveContainerStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType itemType, uint itemCount, Func<uint, string> resolve)
+        {
+            var sb = new StringBuilder();
+            sb.Append("[");
+            for (uint i = 0; i < itemCount; i++)
+            {
+                if (i > 0) sb.Append(",");
+
+                switch (itemType)
+                {
+                    case BinPropertyType.Bool:
+                        sb.Append(br.ReadByte() != 0 ? "true" : "false");
+                        break;
+                    case BinPropertyType.I8:
+                        sb.Append(br.ReadSByte().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U8:
+                        sb.Append(br.ReadByte().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I16:
+                        sb.Append(br.ReadInt16().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U16:
+                        sb.Append(br.ReadUInt16().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I32:
+                        sb.Append(br.ReadInt32().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U32:
+                        sb.Append(br.ReadUInt32().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I64:
+                        sb.Append(br.ReadInt64().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U64:
+                        sb.Append(br.ReadUInt64().ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.F32:
+                        float f = br.ReadSingle();
+                        if (float.IsFinite(f))
+                        {
+                            sb.Append(f.ToString("0.####", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            sb.Append(JsonSerializer.Serialize(f.ToString(CultureInfo.InvariantCulture)));
+                        }
+                        break;
+                    case BinPropertyType.Hash:
+                        sb.Append(JsonSerializer.Serialize(resolve(br.ReadUInt32())));
+                        break;
+                    case BinPropertyType.ObjectLink:
+                        sb.Append(JsonSerializer.Serialize(resolve(br.ReadUInt32())));
+                        break;
+                    case BinPropertyType.WadChunkLink:
+                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveHash(br.ReadUInt64())));
+                        break;
+                    case BinPropertyType.BitBool:
+                        sb.Append(br.ReadByte() != 0 ? "true" : "false");
+                        break;
+                    case BinPropertyType.String:
+                        ushort strLen = br.ReadUInt16();
+                        sb.Append(JsonSerializer.Serialize(Encoding.UTF8.GetString(br.ReadBytes(strLen))));
+                        break;
+                    default:
+                        sb.Append("null");
+                        break;
+                }
+            }
+            sb.Append("]");
+            writer.WriteRawValue(sb.ToString());
+        }
+
+        private void WritePrimitiveContainerFallback(Utf8JsonWriter writer, BinTreeContainer container, Func<uint, string> resolve)
+        {
+            var sb = new StringBuilder();
+            sb.Append("[");
+            bool first = true;
+            foreach (var p in container.Elements)
+            {
+                if (!first) sb.Append(",");
+                first = false;
+
+                if (p == null)
+                {
+                    sb.Append("null");
+                    continue;
+                }
+
+                switch (p.Type)
+                {
+                    case BinPropertyType.Bool:
+                        sb.Append(((BinTreeBool)p).Value ? "true" : "false");
+                        break;
+                    case BinPropertyType.BitBool:
+                        sb.Append(((BinTreeBitBool)p).Value ? "true" : "false");
+                        break;
+                    case BinPropertyType.I8:
+                        sb.Append(((BinTreeI8)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U8:
+                        sb.Append(((BinTreeU8)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I16:
+                        sb.Append(((BinTreeI16)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U16:
+                        sb.Append(((BinTreeU16)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I32:
+                        sb.Append(((BinTreeI32)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U32:
+                        sb.Append(((BinTreeU32)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.I64:
+                        sb.Append(((BinTreeI64)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.U64:
+                        sb.Append(((BinTreeU64)p).Value.ToString(CultureInfo.InvariantCulture));
+                        break;
+                    case BinPropertyType.F32:
+                        float f = ((BinTreeF32)p).Value;
+                        if (float.IsFinite(f))
+                        {
+                            sb.Append(f.ToString("0.####", CultureInfo.InvariantCulture));
+                        }
+                        else
+                        {
+                            sb.Append(JsonSerializer.Serialize(f.ToString(CultureInfo.InvariantCulture)));
+                        }
+                        break;
+                    case BinPropertyType.String:
+                        sb.Append(JsonSerializer.Serialize(((BinTreeString)p).Value));
+                        break;
+                    case BinPropertyType.Hash:
+                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveBinHashGeneral(((BinTreeHash)p).Value)));
+                        break;
+                    case BinPropertyType.ObjectLink:
+                        sb.Append(JsonSerializer.Serialize(resolve(((BinTreeObjectLink)p).Value)));
+                        break;
+                    case BinPropertyType.WadChunkLink:
+                        sb.Append(JsonSerializer.Serialize(_hashResolver.ResolveHash(((BinTreeWadChunkLink)p).Value)));
+                        break;
+                    default:
+                        sb.Append("null");
+                        break;
+                }
+            }
+            sb.Append("]");
+            writer.WriteRawValue(sb.ToString());
+        }
 
         private void WriteSafeNumber(Utf8JsonWriter writer, float value)
         {
