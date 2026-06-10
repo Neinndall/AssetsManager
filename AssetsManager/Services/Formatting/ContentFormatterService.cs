@@ -23,6 +23,7 @@ namespace AssetsManager.Services.Formatting
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
         private readonly BinParser _binParser;
+        private readonly BinPropertyParser _binPropertyParser;
         private readonly TroybinParser _troybinParser;
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
@@ -37,6 +38,7 @@ namespace AssetsManager.Services.Formatting
             WadContentProvider wadContentProvider, 
             JsonFormatterService jsonFormatterService,
             BinParser binParser,
+            BinPropertyParser binPropertyParser,
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
@@ -50,6 +52,7 @@ namespace AssetsManager.Services.Formatting
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
             _binParser = binParser;
+            _binPropertyParser = binPropertyParser;
             _troybinParser = troybinParser;
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
@@ -172,13 +175,19 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                using var binStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
-                var binTree = new BinTree(binStream);
-                await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binTree);
+                using (var binStream = new MemoryStream(data))
+                {
+                    // Llamar al orquestador BinParser
+                    await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binStream);
+                } 
+                
                 jsonStream.Position = 0;
                 using var reader = new StreamReader(jsonStream);
-                return await reader.ReadToEndAsync();
+                string compactJson = await reader.ReadToEndAsync();
+                
+                // Redirigir al servicio de formato para indentación y escape unicode
+                return await _jsonFormatterService.FormatJsonAsync(compactJson);
             }
             catch (Exception ex)
             {

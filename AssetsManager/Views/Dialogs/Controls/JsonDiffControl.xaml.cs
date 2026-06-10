@@ -396,8 +396,8 @@ namespace AssetsManager.Views.Dialogs.Controls
                     return (nOld, nNew);
                 });
 
-                _cachedOldDoc = new TextDocument(normalizedOld.Text);
-                _cachedNewDoc = new TextDocument(normalizedNew.Text);
+                _cachedOldDoc = new TextDocument(normalizedOld);
+                _cachedNewDoc = new TextDocument(normalizedNew);
                 OldJsonContent.Document = _cachedOldDoc;
                 NewJsonContent.Document = _cachedNewDoc;
                 

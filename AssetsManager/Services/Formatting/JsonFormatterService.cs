@@ -10,38 +10,36 @@ namespace AssetsManager.Services.Formatting
 {
     public class JsonFormatterService
     {
-        public (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
+        public string NormalizeTextForAlignment(DiffPaneModel paneModel)
         {
-            var lineTypes = new List<ChangeType>(paneModel.Lines.Count);
-            
-            // Estimate capacity: line length + 2 (\r\n) per line
+            if (paneModel == null || paneModel.Lines.Count == 0) return string.Empty;
+
+            // Estimate capacity to reduce StringBuilder reallocations
             int estimatedLength = 0;
             foreach (var line in paneModel.Lines)
             {
-                lineTypes.Add(line.Type);
-                if (line.Type != ChangeType.Imaginary && line.Text != null)
-                {
-                    estimatedLength += line.Text.Length + 2;
-                }
-                else
-                {
-                    estimatedLength += 2;
-                }
+                estimatedLength += (line.Text?.Length ?? 0) + 2;
             }
 
             var sb = new System.Text.StringBuilder(estimatedLength);
             foreach (var line in paneModel.Lines)
             {
-                sb.AppendLine(line.Type == ChangeType.Imaginary ? string.Empty : (line.Text ?? string.Empty));
+                if (line.Type == ChangeType.Imaginary)
+                {
+                    sb.AppendLine(string.Empty);
+                }
+                else
+                {
+                    sb.AppendLine(line.Text ?? string.Empty);
+                }
             }
 
-            // Remove trailing \r\n added by the last AppendLine if any
             if (sb.Length >= 2)
             {
                 sb.Length -= 2;
             }
 
-            return (sb.ToString(), lineTypes);
+            return sb.ToString();
         }
 
         public Task<string> FormatJsonAsync(object jsonInput)
