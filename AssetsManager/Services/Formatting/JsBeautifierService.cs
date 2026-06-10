@@ -81,8 +81,6 @@ namespace AssetsManager.Services.Formatting
 
         private string QuickFormat(string code)
         {
-            // Este algoritmo camina una sola vez por el string (O(n))
-            // Es lo que permite que JSTool sea tan rápido
             var sb = new StringBuilder(code.Length + 1024);
             int indent = 0;
             bool inString = false;
@@ -92,7 +90,88 @@ namespace AssetsManager.Services.Formatting
             {
                 char c = code[i];
 
-                // Manejo básico de strings para no romper nada dentro de comillas
+                // 1. Skip single line comments
+                if (c == '/' && i + 1 < code.Length && code[i + 1] == '/')
+                {
+                    while (i < code.Length && code[i] != '\n' && code[i] != '\r')
+                    {
+                        sb.Append(code[i]);
+                        i++;
+                    }
+                    if (i < code.Length) sb.Append(code[i]);
+                    continue;
+                }
+
+                // 2. Skip multi-line comments
+                if (c == '/' && i + 1 < code.Length && code[i + 1] == '*')
+                {
+                    sb.Append("/*");
+                    i += 2;
+                    while (i < code.Length - 1 && !(code[i] == '*' && code[i + 1] == '/'))
+                    {
+                        sb.Append(code[i]);
+                        i++;
+                    }
+                    if (i < code.Length) sb.Append(code[i]);
+                    if (i + 1 < code.Length) sb.Append(code[i + 1]);
+                    i++;
+                    continue;
+                }
+
+                // 3. Skip regular expression literals (e.g. /regex/)
+                if (c == '/' && !inString)
+                {
+                    char lastChar = '\0';
+                    for (int j = sb.Length - 1; j >= 0; j--)
+                    {
+                        if (!char.IsWhiteSpace(sb[j]))
+                        {
+                            lastChar = sb[j];
+                            break;
+                        }
+                    }
+
+                    bool isRegex = lastChar == '\0' || lastChar == '=' || lastChar == '(' || lastChar == '[' || 
+                                   lastChar == ',' || lastChar == ':' || lastChar == '?' || lastChar == '&' || 
+                                   lastChar == '|' || lastChar == '!' || lastChar == '{' || lastChar == '}' || 
+                                   lastChar == ';' || lastChar == '\n';
+
+                    if (isRegex)
+                    {
+                        sb.Append(c);
+                        i++;
+                        bool inRegexCharClass = false;
+                        while (i < code.Length)
+                        {
+                            char rc = code[i];
+                            sb.Append(rc);
+                            if (rc == '\\')
+                            {
+                                if (i + 1 < code.Length)
+                                {
+                                    sb.Append(code[i + 1]);
+                                    i++;
+                                }
+                            }
+                            else if (rc == '[')
+                            {
+                                inRegexCharClass = true;
+                            }
+                            else if (rc == ']')
+                            {
+                                inRegexCharClass = false;
+                            }
+                            else if (rc == '/' && !inRegexCharClass)
+                            {
+                                break;
+                            }
+                            i++;
+                        }
+                        continue;
+                    }
+                }
+
+                // 4. Basic string literal handling
                 if ((c == '"' || c == '\'' || c == '`') && (i == 0 || code[i - 1] != '\\'))
                 {
                     if (!inString) { inString = true; stringChar = c; }
@@ -103,18 +182,15 @@ namespace AssetsManager.Services.Formatting
 
                 if (inString) { sb.Append(c); continue; }
 
-                // Lógica de formateo estilo JSTool
                 switch (c)
                 {
                     case '{':
-                    case '[':
                         sb.Append(c);
                         sb.Append('\n');
                         indent++;
                         AppendIndent(sb, indent);
                         break;
                     case '}':
-                    case ']':
                         indent = Math.Max(0, indent - 1);
                         if (sb.Length > 0 && sb[sb.Length - 1] != '\n') sb.Append('\n');
                         AppendIndent(sb, indent);
@@ -127,16 +203,13 @@ namespace AssetsManager.Services.Formatting
                         break;
                     case ',':
                         sb.Append(c);
-                        sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        sb.Append(' ');
                         break;
                     case '\n':
                     case '\r':
                     case '\t':
-                        // Saltamos espacios en blanco originales para poner los nuestros
                         break;
                     case ' ':
-                        // Solo añadimos espacio si no es al principio de la línea
                         if (sb.Length > 0 && sb[sb.Length - 1] != '\n' && sb[sb.Length - 1] != ' ')
                             sb.Append(c);
                         break;
