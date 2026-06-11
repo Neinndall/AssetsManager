@@ -57,7 +57,7 @@ namespace AssetsManager.Services.Core
             var pathForCheck = diff.NewPath ?? diff.OldPath;
             if (!SupportedFileTypes.IsDiffSupported(pathForCheck))
             {
-                _customMessageBoxService.ShowInfo("Info", "This file type cannot be displayed in the difference viewer.", owner);
+                _customMessageBoxService.ShowInfo("Information", "This file type cannot be displayed in the difference viewer.", owner);
                 return;
             }
 
@@ -200,7 +200,7 @@ namespace AssetsManager.Services.Core
                 oldPath = result.OldPath;
                 newPath = result.NewPath;
 
-                if (oldData == null || newData == null)
+                if (oldData == null && newData == null)
                 {
                     await ShowTextComparisonInternal(oldData, newData, "bnk", oldPath, newPath, owner, loadingWindow);
                     return;
