@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using AssetsManager.Services.Core;
+using NUglify;
+using NUglify.JavaScript;
 
 namespace AssetsManager.Services.Formatting
 {
@@ -11,7 +13,6 @@ namespace AssetsManager.Services.Formatting
     {
         private readonly LogService _logService;
         private const string INDENT = "    ";
-        private const int MAX_SIZE_FOR_FORMATTING = 3 * 1024 * 1024; // 3MB
 
         public JsBeautifierService(LogService logService)
         {
@@ -22,9 +23,6 @@ namespace AssetsManager.Services.Formatting
         {
             if (string.IsNullOrWhiteSpace(jsContent)) return string.Empty;
 
-            // Si es un archivo masivo, no lo formateamos para evitar que AvalonEdit mate la app
-            if (jsContent.Length > MAX_SIZE_FOR_FORMATTING) return jsContent;
-
             // Ejecutamos en segundo plano para que la UI nunca se congele
             return await Task.Run(() => BeautifyInternal(jsContent));
         }
@@ -34,13 +32,55 @@ namespace AssetsManager.Services.Formatting
             try
             {
                 // PASO 1: ¿Es un objeto de datos? (Lo más común en LoL)
-                // Si detectamos que es un "var x = { ... };", usamos el motor JSON
-                if (TryFormatAsData(jsContent, out string dataFormatted))
+                // Evitamos deserializar JSONs extremadamente masivos para no agotar la RAM
+                if (jsContent.Length < 30 * 1024 * 1024)
                 {
-                    return dataFormatted;
+                    if (TryFormatAsData(jsContent, out string dataFormatted))
+                    {
+                        return dataFormatted;
+                    }
                 }
 
-                // PASO 2: Formateador lineal de alto rendimiento (Estilo JSTool)
+                // PASO 2: Intentar formatear de manera profesional con NUglify (AST Beautifier)
+                // Aumentamos el límite a 30MB para procesar incluso los bundles de JS más gigantes de Riot en segundo plano
+                if (jsContent.Length < 30 * 1024 * 1024)
+                {
+                    try
+                    {
+                        var settings = new CodeSettings
+                        {
+                            OutputMode = OutputMode.MultipleLines,
+                            Indent = "    ",
+                            MinifyCode = false
+                        };
+
+                        var result = Uglify.Js(jsContent, settings);
+                        if (!string.IsNullOrWhiteSpace(result.Code))
+                        {
+                            if (result.HasErrors)
+                            {
+                                _logService.LogWarning($"[JS BEAUTIFIER] NUglify parser reported issues, but output code was generated.");
+                            }
+                            else
+                            {
+                                _logService.LogDebug($"[JS BEAUTIFIER] Successfully beautified JS using NUglify.");
+                            }
+                            return result.Code;
+                        }
+                        else
+                        {
+                            _logService.LogWarning($"[JS BEAUTIFIER] NUglify output code was empty. Falling back to QuickFormat.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"[JS BEAUTIFIER] NUglify failed: {ex.Message}. Falling back to QuickFormat.");
+                    }
+                }
+
+                // PASO 3: Formateador lineal de alto rendimiento (Failsafe)
+                // Imprescindible para archivos minificados masivos. Si devolvemos una 
+                // única línea gigante, AvalonEdit la trunca y el comparador Diff colapsa.
                 return QuickFormat(jsContent);
             }
             catch
@@ -74,7 +114,9 @@ namespace AssetsManager.Services.Formatting
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Beautifier: TryFormatAsData failed, falling back to QuickFormat.");
+                // Es completamente normal que esto falle si el .js contiene funciones reales o lógica JS 
+                // en lugar de puro JSON. Por eso usamos LogWarning en lugar de LogError.
+                _logService.LogWarning($"Beautifier: TryFormatAsData fallback. Not a pure JSON object. ({ex.Message})");
             }
             return false;
         }
@@ -85,10 +127,22 @@ namespace AssetsManager.Services.Formatting
             int indent = 0;
             bool inString = false;
             char stringChar = '\0';
+            int currentLineLength = 0;
 
             for (int i = 0; i < code.Length; i++)
             {
                 char c = code[i];
+
+                // Failsafe: Evitar que CUALQUIER línea supere los 5000 caracteres.
+                // Si el lexer se desincroniza (ej. comillas dentro de regex complejas),
+                // esto garantiza que AvalonEdit jamás crasheará por OOM al intentar
+                // renderizar una línea infinita.
+                if (currentLineLength > 5000)
+                {
+                    sb.Append('\n');
+                    currentLineLength = 0;
+                    inString = false; // Resetear estado por si se quedó atascado
+                }
 
                 // 1. Skip single line comments
                 if (c == '/' && i + 1 < code.Length && code[i + 1] == '/')
@@ -96,9 +150,14 @@ namespace AssetsManager.Services.Formatting
                     while (i < code.Length && code[i] != '\n' && code[i] != '\r')
                     {
                         sb.Append(code[i]);
+                        currentLineLength++;
                         i++;
                     }
-                    if (i < code.Length) sb.Append(code[i]);
+                    if (i < code.Length) 
+                    {
+                        sb.Append(code[i]);
+                        currentLineLength = 0;
+                    }
                     continue;
                 }
 
@@ -106,14 +165,17 @@ namespace AssetsManager.Services.Formatting
                 if (c == '/' && i + 1 < code.Length && code[i + 1] == '*')
                 {
                     sb.Append("/*");
+                    currentLineLength += 2;
                     i += 2;
                     while (i < code.Length - 1 && !(code[i] == '*' && code[i + 1] == '/'))
                     {
-                        sb.Append(code[i]);
+                        char mc = code[i];
+                        sb.Append(mc);
+                        if (mc == '\n') currentLineLength = 0; else currentLineLength++;
                         i++;
                     }
-                    if (i < code.Length) sb.Append(code[i]);
-                    if (i + 1 < code.Length) sb.Append(code[i + 1]);
+                    if (i < code.Length) { sb.Append(code[i]); currentLineLength++; }
+                    if (i + 1 < code.Length) { sb.Append(code[i + 1]); currentLineLength++; }
                     i++;
                     continue;
                 }
@@ -134,22 +196,26 @@ namespace AssetsManager.Services.Formatting
                     bool isRegex = lastChar == '\0' || lastChar == '=' || lastChar == '(' || lastChar == '[' || 
                                    lastChar == ',' || lastChar == ':' || lastChar == '?' || lastChar == '&' || 
                                    lastChar == '|' || lastChar == '!' || lastChar == '{' || lastChar == '}' || 
-                                   lastChar == ';' || lastChar == '\n';
+                                   lastChar == ';' || lastChar == '\n' || lastChar == 'n'; // 'n' for return
 
                     if (isRegex)
                     {
                         sb.Append(c);
+                        currentLineLength++;
                         i++;
                         bool inRegexCharClass = false;
                         while (i < code.Length)
                         {
                             char rc = code[i];
                             sb.Append(rc);
+                            if (rc == '\n') currentLineLength = 0; else currentLineLength++;
+                            
                             if (rc == '\\')
                             {
                                 if (i + 1 < code.Length)
                                 {
                                     sb.Append(code[i + 1]);
+                                    currentLineLength++;
                                     i++;
                                 }
                             }
@@ -172,49 +238,80 @@ namespace AssetsManager.Services.Formatting
                 }
 
                 // 4. Basic string literal handling
-                if ((c == '"' || c == '\'' || c == '`') && (i == 0 || code[i - 1] != '\\'))
+                if (c == '"' || c == '\'' || c == '`')
                 {
-                    if (!inString) { inString = true; stringChar = c; }
-                    else if (c == stringChar) inString = false;
+                    int backslashCount = 0;
+                    int tempIndex = i - 1;
+                    while (tempIndex >= 0 && code[tempIndex] == '\\')
+                    {
+                        backslashCount++;
+                        tempIndex--;
+                    }
+
+                    if (backslashCount % 2 == 0) // No está escapada
+                    {
+                        if (!inString) { inString = true; stringChar = c; }
+                        else if (c == stringChar) inString = false;
+                    }
+                    
                     sb.Append(c);
+                    currentLineLength++;
                     continue;
                 }
 
-                if (inString) { sb.Append(c); continue; }
+                if (inString) 
+                { 
+                    sb.Append(c); 
+                    if (c == '\n') currentLineLength = 0; else currentLineLength++;
+                    continue; 
+                }
 
                 switch (c)
                 {
                     case '{':
                         sb.Append(c);
                         sb.Append('\n');
+                        currentLineLength = 0;
                         indent++;
-                        AppendIndent(sb, indent);
+                        AppendIndent(sb, indent, ref currentLineLength);
                         break;
                     case '}':
                         indent = Math.Max(0, indent - 1);
-                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n') sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n') 
+                        {
+                            sb.Append('\n');
+                            currentLineLength = 0;
+                        }
+                        AppendIndent(sb, indent, ref currentLineLength);
                         sb.Append(c);
+                        currentLineLength++;
                         break;
                     case ';':
                         sb.Append(c);
                         sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        currentLineLength = 0;
+                        AppendIndent(sb, indent, ref currentLineLength);
                         break;
                     case ',':
                         sb.Append(c);
                         sb.Append(' ');
+                        currentLineLength += 2;
                         break;
                     case '\n':
                     case '\r':
                     case '\t':
+                        // Ignore original whitespace when outside strings
                         break;
                     case ' ':
                         if (sb.Length > 0 && sb[sb.Length - 1] != '\n' && sb[sb.Length - 1] != ' ')
+                        {
                             sb.Append(c);
+                            currentLineLength++;
+                        }
                         break;
                     default:
                         sb.Append(c);
+                        currentLineLength++;
                         break;
                 }
             }
@@ -222,9 +319,13 @@ namespace AssetsManager.Services.Formatting
             return sb.ToString().Trim();
         }
 
-        private void AppendIndent(StringBuilder sb, int count)
+        private void AppendIndent(StringBuilder sb, int count, ref int currentLineLength)
         {
-            for (int i = 0; i < count; i++) sb.Append(INDENT);
+            for (int i = 0; i < count; i++) 
+            {
+                sb.Append(INDENT);
+                currentLineLength += INDENT.Length;
+            }
         }
     }
 }
