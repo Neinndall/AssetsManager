@@ -86,6 +86,8 @@ namespace AssetsManager.Views.Controls.Monitor
 
             await Task.Run(() =>
             {
+                if (!Directory.Exists(DirectoriesCreator.ApiCachePath)) return;
+
                 var files = Directory.GetFiles(DirectoriesCreator.ApiCachePath, "*_progression.json");
                 var passNames = files.Select(f => {
                     string name = Path.GetFileName(f).Replace("_progression.json", "");
