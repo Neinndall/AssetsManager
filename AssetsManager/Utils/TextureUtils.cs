@@ -244,47 +244,17 @@ namespace AssetsManager.Utils
                     {
                         using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
                         {
-                            if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
-                            {
-                                imageSharp.Mutate(x => x.Resize(new ResizeOptions
-                                {
-                                    Size = new Size(maxWidth.Value, maxWidth.Value),
-                                    Mode = ResizeMode.Max
-                                }));
-                            }
-
-                            // OPTIMIZACIÓN: Usamos ArrayPool para evitar picos de RAM y GC.
-                            // Restauramos la conversión a Bgra32 para compatibilidad total con WPF (Colores correctos).
-                            using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
-                            {
-                                int bufferSize = bgraImage.Width * bgraImage.Height * 4;
-                                byte[] pixelBuffer = ArrayPool<byte>.Shared.Rent(bufferSize);
-                                
-                                try
-                                {
-                                    bgraImage.CopyPixelDataTo(pixelBuffer);
-
-                                    int stride = bgraImage.Width * 4;
-                                    var bitmapSource = BitmapSource.Create(
-                                        bgraImage.Width, 
-                                        bgraImage.Height, 
-                                        96, 96, 
-                                        PixelFormats.Bgra32, 
-                                        null, 
-                                        pixelBuffer, 
-                                        stride);
-
-                                    bitmapSource.Freeze();
-                                    return bitmapSource;
-                                }
-                                finally
-                                {
-                                    ArrayPool<byte>.Shared.Return(pixelBuffer);
-                                }
-                            }
+                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth);
                         }
                     }
                     return null;
+                }
+                else if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+                {
+                    using (Image<Rgba32> imageSharp = Image.Load<Rgba32>(textureStream))
+                    {
+                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth);
+                    }
                 }
                 else
                 {
@@ -304,6 +274,48 @@ namespace AssetsManager.Utils
             catch (Exception)
             {
                 return null;
+            }
+        }
+
+        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth)
+        {
+            if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
+            {
+                imageSharp.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Size = new Size(maxWidth.Value, maxWidth.Value),
+                    Mode = ResizeMode.Max
+                }));
+            }
+
+            // OPTIMIZACIÓN: Usamos ArrayPool para evitar picos de RAM y GC.
+            // Restauramos la conversión a Bgra32 para compatibilidad total con WPF (Colores correctos).
+            using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
+            {
+                int bufferSize = bgraImage.Width * bgraImage.Height * 4;
+                byte[] pixelBuffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+                
+                try
+                {
+                    bgraImage.CopyPixelDataTo(pixelBuffer);
+
+                    int stride = bgraImage.Width * 4;
+                    var bitmapSource = BitmapSource.Create(
+                        bgraImage.Width, 
+                        bgraImage.Height, 
+                        96, 96, 
+                        PixelFormats.Bgra32, 
+                        null, 
+                        pixelBuffer, 
+                        stride);
+
+                    bitmapSource.Freeze();
+                    return bitmapSource;
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(pixelBuffer);
+                }
             }
         }
 

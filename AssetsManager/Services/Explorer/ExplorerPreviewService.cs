@@ -255,8 +255,8 @@ namespace AssetsManager.Services.Explorer
             // Aseguramos la creacion de la carpeta necesaria
             _directoriesCreator.CreateDirectory(_directoriesCreator.TempPreviewPath);
 
-            if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
-            else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }
+            if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
             else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
             else if (SupportedFileTypes.Media.Contains(extension))
             {
@@ -277,7 +277,7 @@ namespace AssetsManager.Services.Explorer
                     await ShowAudioVideoPreviewAsync(data, extension, node.Name);
                 }
             }
-            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension) || SupportedFileTypes.Lua.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.IsText(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
         }
 
@@ -290,7 +290,7 @@ namespace AssetsManager.Services.Explorer
 
                 IHighlightingDefinition syntaxHighlighting = null;
 
-                if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "preload" || dataType == "luabin64" || dataType == "js")
+                if (SupportedFileTypes.UsesJsonHighlighting(extension))
                 {
                     // Los CSS y JS de League se visualizan con nuestro coloreado personalizado
                     syntaxHighlighting = GetJsonHighlighting();
@@ -518,12 +518,12 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.Image, bitmap);
         }
 
-        private async Task ShowTexturePreviewAsync(byte[] data)
+        private async Task ShowTexturePreviewAsync(byte[] data, string extension)
         {
             var bitmapSource = await Task.Run(() =>
             {
                 using var stream = new MemoryStream(data);
-                return TextureUtils.LoadTexture(stream, ".tex"); // Extension doesn't matter much here as LoadTexture handles it
+                return TextureUtils.LoadTexture(stream, extension);
             });
 
             if (bitmapSource != null)
@@ -532,7 +532,7 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                await ShowUnsupportedPreviewAsync(".tex/.dds");
+                await ShowUnsupportedPreviewAsync(extension);
             }
         }
 

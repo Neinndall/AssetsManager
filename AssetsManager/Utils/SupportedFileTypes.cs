@@ -6,12 +6,12 @@ namespace AssetsManager.Utils
 {
     public static class SupportedFileTypes
     {
-        public static readonly HashSet<string> Images = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp" };
+        public static readonly HashSet<string> Images = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".gif", ".ico", ".tga" };
         public static readonly HashSet<string> Textures = new(StringComparer.OrdinalIgnoreCase) { ".dds", ".tex" };
         public static readonly HashSet<string> VectorImages = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
         public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3" };
         public static readonly HashSet<string> AudioBank = new(StringComparer.OrdinalIgnoreCase) { ".wpk", ".bnk" };
-        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb" };
+        public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm", ".mapgeo" };
         public static readonly HashSet<string> Json = new(StringComparer.OrdinalIgnoreCase) { ".json" };
         public static readonly HashSet<string> JavaScript = new(StringComparer.OrdinalIgnoreCase) { ".js" };
         public static readonly HashSet<string> Css = new(StringComparer.OrdinalIgnoreCase) { ".css" };
@@ -21,6 +21,7 @@ namespace AssetsManager.Utils
         public static readonly HashSet<string> Preload = new(StringComparer.OrdinalIgnoreCase) { ".preload" };
         public static readonly HashSet<string> PlainText = new(StringComparer.OrdinalIgnoreCase) { ".txt", ".xml", ".ini", ".log", ".info" };
         public static readonly HashSet<string> Lua = new(StringComparer.OrdinalIgnoreCase) { ".luabin64" };
+        public static readonly HashSet<string> Html = new(StringComparer.OrdinalIgnoreCase) { ".html" };
 
         public static bool IsExpandableAudioBank(string fileName)
         {
@@ -76,7 +77,8 @@ namespace AssetsManager.Utils
                    Troybin.Contains(extension) ||
                    Preload.Contains(extension) ||
                    PlainText.Contains(extension) ||
-                   Lua.Contains(extension);
+                   Lua.Contains(extension) ||
+                   Html.Contains(extension);
         }
 
         public static bool IsDiffSupported(string fileName)
@@ -91,6 +93,22 @@ namespace AssetsManager.Utils
         {
             if (string.IsNullOrEmpty(fileName)) return false;
             return (IsText(fileName) || IsAudioBank(fileName)) && !IsAudioDataContainer(fileName);
+        }
+
+        public static bool UsesJsonHighlighting(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = PathUtils.GetNormalizedExtension(fileName);
+            return Json.Contains(extension) ||
+                   JavaScript.Contains(extension) ||
+                   Css.Contains(extension) ||
+                   Bin.Contains(extension) ||
+                   StringTable.Contains(extension) ||
+                   Troybin.Contains(extension) ||
+                   Preload.Contains(extension) ||
+                   Lua.Contains(extension) ||
+                   Html.Contains(extension) ||
+                   extension == ".xml";
         }
     }
 }
