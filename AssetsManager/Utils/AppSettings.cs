@@ -89,7 +89,7 @@ namespace AssetsManager.Utils
                 if (!File.Exists(ConfigFilePath))
                 {
                     var defaultSettings = GetDefaultSettings();
-                    SaveSettings(defaultSettings);
+                    SaveSettingsInternal(defaultSettings);
                     return defaultSettings;
                 }
 
@@ -101,7 +101,7 @@ namespace AssetsManager.Utils
 
                 if (needsResave)
                 {
-                    SaveSettings(settings);
+                    SaveSettingsInternal(settings);
                 }
 
                 settings.MonitoredAssets ??= new List<MonitoredAsset>();
@@ -129,7 +129,7 @@ namespace AssetsManager.Utils
 
                 if (needsResave)
                 {
-                    SaveSettings(settings);
+                    SaveSettingsInternal(settings);
                 }
 
                 return settings;
@@ -201,8 +201,7 @@ namespace AssetsManager.Utils
             _saveSemaphore.Wait();
             try
             {
-                var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-                File.WriteAllText(ConfigFilePath, json);
+                SaveSettingsInternal(settings);
             }
             finally
             {
@@ -210,18 +209,29 @@ namespace AssetsManager.Utils
             }
         }
 
+        private static void SaveSettingsInternal(AppSettings settings)
+        {
+            var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+            File.WriteAllText(ConfigFilePath, json);
+        }
+
         public static async Task SaveSettingsAsync(AppSettings settings)
         {
             await _saveSemaphore.WaitAsync();
             try
             {
-                var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
-                await File.WriteAllTextAsync(ConfigFilePath, json);
+                await SaveSettingsInternalAsync(settings);
             }
             finally
             {
                 _saveSemaphore.Release();
             }
+        }
+
+        private static async Task SaveSettingsInternalAsync(AppSettings settings)
+        {
+            var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+            await File.WriteAllTextAsync(ConfigFilePath, json);
         }
 
         public void ResetToDefaults()
