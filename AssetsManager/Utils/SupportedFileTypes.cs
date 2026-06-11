@@ -25,7 +25,7 @@ namespace AssetsManager.Utils
         public static bool IsExpandableAudioBank(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            string extension = Path.GetExtension(fileName);
+            string extension = PathUtils.GetNormalizedExtension(fileName);
             return AudioBank.Contains(extension) && fileName.Contains("_audio", StringComparison.OrdinalIgnoreCase);
         }
 
@@ -39,21 +39,35 @@ namespace AssetsManager.Utils
         public static bool IsImage(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            string extension = Path.GetExtension(fileName);
-            return Images.Contains(extension) || Textures.Contains(extension);
+            string extension = PathUtils.GetNormalizedExtension(fileName);
+            return Images.Contains(extension) || Textures.Contains(extension) || VectorImages.Contains(extension);
+        }
+
+        public static bool IsAudio(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = PathUtils.GetNormalizedExtension(fileName);
+            return AudioBank.Contains(extension) || Media.Contains(extension);
+        }
+
+        public static bool Is3D(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return false;
+            string extension = PathUtils.GetNormalizedExtension(fileName);
+            return Viewer3D.Contains(extension);
         }
 
         public static bool IsAudioBank(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            string extension = Path.GetExtension(fileName);
+            string extension = PathUtils.GetNormalizedExtension(fileName);
             return AudioBank.Contains(extension);
         }
 
         public static bool IsText(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            string extension = Path.GetExtension(fileName).ToLowerInvariant();
+            string extension = PathUtils.GetNormalizedExtension(fileName);
             return Json.Contains(extension) ||
                    JavaScript.Contains(extension) ||
                    Css.Contains(extension) ||
@@ -68,7 +82,7 @@ namespace AssetsManager.Utils
         public static bool IsDiffSupported(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            string extension = Path.GetExtension(fileName).ToLowerInvariant();
+            string extension = PathUtils.GetNormalizedExtension(fileName);
 
             return IsImage(fileName) || IsText(fileName) || extension == ".bnk";
         }

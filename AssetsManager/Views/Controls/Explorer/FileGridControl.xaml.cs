@@ -117,10 +117,10 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 return type switch
                 {
-                    "Images" => SupportedFileTypes.Images.Contains(item.Node.Extension) || SupportedFileTypes.Textures.Contains(item.Node.Extension) || SupportedFileTypes.VectorImages.Contains(item.Node.Extension),
-                    "Audio" => SupportedFileTypes.AudioBank.Contains(item.Node.Extension) || SupportedFileTypes.Media.Contains(item.Node.Extension),
-                    "3D" => SupportedFileTypes.Viewer3D.Contains(item.Node.Extension),
-                    "Data" => SupportedFileTypes.Bin.Contains(item.Node.Extension) || SupportedFileTypes.Json.Contains(item.Node.Extension) || SupportedFileTypes.StringTable.Contains(item.Node.Extension) || SupportedFileTypes.PlainText.Contains(item.Node.Extension) || SupportedFileTypes.Css.Contains(item.Node.Extension) || SupportedFileTypes.JavaScript.Contains(item.Node.Extension) || SupportedFileTypes.Troybin.Contains(item.Node.Extension) || SupportedFileTypes.Preload.Contains(item.Node.Extension),
+                    "Images" => SupportedFileTypes.IsImage(item.Node.Extension),
+                    "Audio" => SupportedFileTypes.IsAudio(item.Node.Extension),
+                    "3D" => SupportedFileTypes.Is3D(item.Node.Extension),
+                    "Data" => SupportedFileTypes.IsText(item.Node.Extension),
                     _ => true
                 };
             }).ToList();

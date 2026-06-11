@@ -28,6 +28,7 @@ Improvements
   - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
   - Explorer / JS Formatting & Highlighting: Integrated Jsbeautifier for cleaner, professional-grade JavaScript file formatting and enabled syntax highlighting for JS files of any size without crashes.
+  - Architecture / Centralized File Type Checks: Refactored type-checking logic across grid, previewer, and tab views into unified helper methods in SupportedFileTypes, and moved file extension normalization to PathUtils to consolidate path utilities.
   - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
   - Viewer / Fixed severe camera freezing and stuttering during drag rotation by properly capturing and releasing the mouse pointer across window bounds.
   - Viewer / Fixed camera pivot instability when zooming by dynamically adjusting the LookDirection magnitude to keep the orbit target perfectly stationary.

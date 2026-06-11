@@ -352,9 +352,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.IsWelcomeVisible = false;
 
                 // Selective hide: Only hide unsupported if the new file is NOT an image
-                bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                               SupportedFileTypes.Textures.Contains(node.Extension) || 
-                               SupportedFileTypes.VectorImages.Contains(node.Extension);
+                bool isImage = SupportedFileTypes.IsImage(node.Extension);
                 
                 if (!isImage)
                 {

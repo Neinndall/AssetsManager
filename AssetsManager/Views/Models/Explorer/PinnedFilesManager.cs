@@ -38,9 +38,7 @@ namespace AssetsManager.Views.Models.Explorer
             if (node == null) return;
 
             // Determine category
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
+            bool isImage = SupportedFileTypes.IsImage(node.Extension);
 
             // 1. If it's an explicit pin, find the current pin for this node and fix it
             if (isExplicitPin)
@@ -64,9 +62,7 @@ namespace AssetsManager.Views.Models.Explorer
             var recyclablePin = PinnedFiles.FirstOrDefault(p => {
                 if (p.IsPinned) return false; // Pinned tabs are never recycled
                 
-                bool pIsImage = SupportedFileTypes.Images.Contains(p.Node.Extension) || 
-                                SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
-                                SupportedFileTypes.VectorImages.Contains(p.Node.Extension);
+                bool pIsImage = SupportedFileTypes.IsImage(p.Node.Extension);
                 return pIsImage == isImage;
             });
 

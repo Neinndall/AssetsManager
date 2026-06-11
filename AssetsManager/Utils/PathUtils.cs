@@ -342,5 +342,19 @@ namespace AssetsManager.Utils
 
             return $"{normalizedVersion}|{normalizedOld}|{normalizedNew}";
         }
+
+        /// <summary>
+        /// Gets a normalized lowercase extension from a path, file name, or directly from an extension.
+        /// Handles edge cases where path is already a clean extension (e.g. ".json").
+        /// </summary>
+        public static string GetNormalizedExtension(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            if (path.StartsWith(".") && !path.Contains("/") && !path.Contains("\\"))
+            {
+                return path.ToLowerInvariant();
+            }
+            return Path.GetExtension(path).ToLowerInvariant();
+        }
     }
 }

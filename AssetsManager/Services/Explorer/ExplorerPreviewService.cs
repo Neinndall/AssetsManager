@@ -676,11 +676,7 @@ namespace AssetsManager.Services.Explorer
             if (node == null) return Previewer.None;
             string extension = node.Extension.ToLowerInvariant();
             
-            bool isImage = SupportedFileTypes.Images.Contains(extension) || 
-                           SupportedFileTypes.Textures.Contains(extension) || 
-                           SupportedFileTypes.VectorImages.Contains(extension);
-                           
-            if (isImage)
+            if (SupportedFileTypes.IsImage(extension))
             {
                 return Previewer.Image;
             }
@@ -690,15 +686,7 @@ namespace AssetsManager.Services.Explorer
                 return Previewer.WebView;
             }
             
-            if (SupportedFileTypes.Json.Contains(extension) || 
-                SupportedFileTypes.JavaScript.Contains(extension) || 
-                SupportedFileTypes.Css.Contains(extension) || 
-                SupportedFileTypes.Bin.Contains(extension) || 
-                SupportedFileTypes.Troybin.Contains(extension) || 
-                SupportedFileTypes.StringTable.Contains(extension) || 
-                SupportedFileTypes.Preload.Contains(extension) || 
-                SupportedFileTypes.PlainText.Contains(extension) || 
-                SupportedFileTypes.Lua.Contains(extension))
+            if (SupportedFileTypes.IsText(extension))
             {
                 return Previewer.AvalonEdit;
             }
@@ -708,7 +696,7 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0)
         {
-            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension) && !SupportedFileTypes.VectorImages.Contains(node.Extension)))
+            if (node == null || !SupportedFileTypes.IsImage(node.Extension))
             {
                 return null;
             }
