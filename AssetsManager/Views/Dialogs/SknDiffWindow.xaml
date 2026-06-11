@@ -1,0 +1,180 @@
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.SknDiffWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+                xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
+                mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+                HeaderTitle="3D Mesh Analyzer" 
+                HeaderIcon="CubeOutline"
+                Height="850" Width="1200"
+                MinWidth="800" MinHeight="600"
+                WindowStartupLocation="CenterOwner"
+                Style="{StaticResource HudWindowStyle}">
+
+    <Grid Background="{StaticResource SidebarBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Professional Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main Viewports -->
+            <RowDefinition Height="Auto"/> <!-- Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Professional Toolbar Area -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Title/Status -->
+                    <ColumnDefinition Width="*"/>    <!-- Metrics -->
+                    <ColumnDefinition Width="Auto"/> <!-- Tools -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Title -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="GEOMETRIC DIFF" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Topology &amp; Vertex Validation" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                </StackPanel>
+
+                <!-- Center: Metrics Badges -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Vertices Delta -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="VectorPoint" Width="14" Height="14" Foreground="{StaticResource AccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="VERTICES:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="VertexDeltaLabel" Text="0" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentBlue}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Faces Delta -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="12,6" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <icons:MaterialIcon Kind="TriangleOutline" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="FACES:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="FaceDeltaLabel" Text="0" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Right: Tools -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Ghost Mode Toggle -->
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
+                            <ToggleButton x:Name="GhostModeToggle"
+                                          IsChecked="False"
+                                          Click="GhostModeToggle_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Ghost / X-Ray Mode">
+                                <icons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18"/>
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="CAM" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
+                            <Button Click="ResetCameras_Click" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Width="30" Height="30"
+                                    ToolTip="Reset Both Cameras">
+                                <icons:MaterialIcon Kind="HomeOutline" Width="18" Height="18"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 2. Main Viewports Area -->
+        <Grid Grid.Row="1" Margin="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Old Version Viewport -->
+            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <Border Padding="12,12,12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                    <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Border>
+                    <viewer:ViewerViewportControl Grid.Row="1" x:Name="OldViewport" Margin="0"/>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ShowsPreview="False"/>
+
+            <!-- New Version Viewport -->
+            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <Border Padding="12,12,12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                    <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Border>
+                    <viewer:ViewerViewportControl Grid.Row="1" x:Name="NewViewport" Margin="0"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 3. Footer -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="24,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal">
+                <icons:MaterialIcon Kind="Palette" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
+                <TextBlock Text="LEGEND:" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                
+                <Border Background="DodgerBlue" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                <TextBlock Text="Modified Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                <Border Background="Green" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                <TextBlock Text="New Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                <Border Background="Red" CornerRadius="3" Width="10" Height="10" Margin="0,0,6,0"/>
+                <TextBlock Text="Removed Part" FontSize="10" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,24,0"/>
+
+                <icons:MaterialIcon Kind="Sync" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.7"/>
+                <TextBlock Text="Cameras are synchronized" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</base:HudWindow>

@@ -17,6 +17,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Audio;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Audio;
 
@@ -31,6 +32,7 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
+        private readonly Services.Hashes.HashResolverService _hashResolverService;
 
         public DiffViewService(
             IServiceProvider serviceProvider,
@@ -39,7 +41,8 @@ namespace AssetsManager.Services.Core
             CustomMessageBoxService customMessageBoxService,
             LogService logService,
             AudioBankService audioBankService,
-            AudioBankLinkerService audioBankLinkerService)
+            AudioBankLinkerService audioBankLinkerService,
+            Services.Hashes.HashResolverService hashResolverService)
         {
             _serviceProvider = serviceProvider;
             _contentFormatterService = contentFormatterService;
@@ -48,6 +51,7 @@ namespace AssetsManager.Services.Core
             _logService = logService;
             _audioBankService = audioBankService;
             _audioBankLinkerService = audioBankLinkerService;
+            _hashResolverService = hashResolverService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -72,6 +76,10 @@ namespace AssetsManager.Services.Core
                 else if (extension == ".bnk")
                 {
                     await HandleParsedAudioBankDiffAsync(diff, oldPbePath, newPbePath, owner, loadingWindow, sourceJsonPath);
+                }
+                else if (extension == ".skn")
+                {
+                    await HandleSknDiffAsync(diff, oldPbePath, newPbePath, owner, loadingWindow);
                 }
                 else
                 {
@@ -318,6 +326,28 @@ namespace AssetsManager.Services.Core
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
             await Task.Delay(450);
             imageDiffWindow.ShowDialog();
+        }
+
+        private async Task HandleSknDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
+        {
+            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.AcquiringBinaryData);
+            var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+            
+            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Parsing3DModel);
+            var sknLoadingService = _serviceProvider.GetRequiredService<SknLoadingService>();
+            var sknDiffWindow = new SknDiffWindow(sknLoadingService, _logService);
+            sknDiffWindow.Owner = owner;
+            sknDiffWindow.LoadingWindow = loadingWindow;
+
+            await sknDiffWindow.LoadAndDisplayDiffAsync((byte[])oldData, (byte[])newData, oldPath, newPath);
+
+            // [PROGRESS] 100% Reached before opening window
+            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
+            await Task.Delay(450);
+            
+            // Close loading window before ShowDialog to prevent it from staying open (ShowDialog is blocking)
+            loadingWindow.Close();
+            sknDiffWindow.ShowDialog();
         }
 
         public async Task ShowFileDiffAsync(string oldFilePath, string newFilePath, Window owner)

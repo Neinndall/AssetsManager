@@ -17,6 +17,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         RenderingUI,
         DecodingTextures,
         GeneratingDiffMap,
+        Parsing3DModel,
         Finalizing,
         Ready,
         BatchLoadingFile,
@@ -113,6 +114,11 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                 case DiffLoadingState.GeneratingDiffMap:
                     Description = "Generating visual difference map...";
                     ProgressValue = 85;
+                    break;
+
+                case DiffLoadingState.Parsing3DModel:
+                    Description = "Reconstructing 3D geometric surfaces...";
+                    ProgressValue = 75;
                     break;
 
                 // AUDIO PROCESS (Progression: 20 → 35 → 50 → 65)

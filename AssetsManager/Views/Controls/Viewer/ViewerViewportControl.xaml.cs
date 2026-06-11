@@ -364,6 +364,15 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
+        public void ClearModels()
+        {
+            var modelsToClear = _loadedModels.ToList();
+            foreach (var model in modelsToClear)
+            {
+                RemoveModel(model);
+            }
+        }
+
         public void RemoveModel(SceneModel model)
         {
             if (model == _activeSceneModel)

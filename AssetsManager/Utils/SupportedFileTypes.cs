@@ -86,13 +86,14 @@ namespace AssetsManager.Utils
             if (string.IsNullOrEmpty(fileName)) return false;
             string extension = PathUtils.GetNormalizedExtension(fileName);
 
-            return IsImage(fileName) || IsText(fileName) || extension == ".bnk";
+            return IsImage(fileName) || IsText(fileName) || extension == ".bnk" || extension == ".skn";
         }
 
         public static bool IsNonImageDiffable(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;
-            return (IsText(fileName) || IsAudioBank(fileName)) && !IsAudioDataContainer(fileName);
+            string extension = PathUtils.GetNormalizedExtension(fileName);
+            return (IsText(fileName) || IsAudioBank(fileName) || extension == ".skn") && !IsAudioDataContainer(fileName);
         }
 
         public static bool UsesJsonHighlighting(string fileName)
