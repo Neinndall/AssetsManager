@@ -627,3 +627,12 @@ Bug Fixes
     * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+  - Textures / TGA Support & Comparison
+    * Fixed a critical FileFormatException when previewing or comparing .tga files by implementing a native TGA decoder using SixLabors.ImageSharp.
+    * Enabled full "View Differences" (VIEW DIFF) support for TGA textures in WAD comparisons.
+  - Explorer & Comparator / Unified Categorization
+    * Replaced hardcoded extension checks in the WAD comparison tree with unified SupportedFileTypes helpers, ensuring newer formats (.mapgeo, .html, .tga) are correctly grouped.
+  - Explorer / HTML Support & Clean Type Definitions
+    * Restored full text previewing and custom League syntax highlighting for .html files.
+    * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
+
