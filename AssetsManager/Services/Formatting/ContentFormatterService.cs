@@ -124,19 +124,15 @@ namespace AssetsManager.Services.Formatting
                     try
                     {
                         var jsText = Encoding.UTF8.GetString(data);
-                        _logService.LogDebug($"[DEBUG JS] Raw byte length: {data.Length}, String length before format: {jsText.Length}");
                         
                         // Fix for AvalonEdit: Null bytes (\0) truncate the WPF text renderer. 
                         // Riot files sometimes have trailing or hidden null bytes.
                         if (jsText.Contains('\0'))
                         {
-                            int count = jsText.Length - jsText.Replace("\0", "").Length;
-                            _logService.LogDebug($"[DEBUG JS] Found {count} null bytes (\\0). Removing them to prevent UI truncation.");
                             jsText = jsText.Replace("\0", "");
                         }
 
                         formattedContent = await _jsBeautifierService.BeautifyAsync(jsText);
-                        _logService.LogDebug($"[DEBUG JS] String length after BeautifyAsync: {formattedContent.Length}");
                     }
                     catch (Exception ex)
                     {
@@ -156,7 +152,6 @@ namespace AssetsManager.Services.Formatting
                     break;
             }
             
-            _logService.LogDebug($"[DEBUG TEXT] Final text content length being sent to AvalonEdit: {formattedContent.Length}");
             return formattedContent;
         }
 

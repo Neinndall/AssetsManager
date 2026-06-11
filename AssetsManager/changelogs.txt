@@ -27,6 +27,7 @@ New Features
 Improvements
   - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
+  - Explorer / JS Formatting & Highlighting: Integrated Jsbeautifier for cleaner, professional-grade JavaScript file formatting and enabled syntax highlighting for JS files of any size without crashes.
   - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
   - Viewer / Fixed severe camera freezing and stuttering during drag rotation by properly capturing and releasing the mouse pointer across window bounds.
   - Viewer / Fixed camera pivot instability when zooming by dynamically adjusting the LookDirection magnitude to keep the orbit target perfectly stationary.
@@ -138,6 +139,7 @@ Bug Fixes
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
   - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.
   - Explorer / Search filtering no longer logs false error messages when the user types rapidly (cancellation is now handled as expected behavior).
+  - Explorer / Fixed UI crashes and layout issues when formatting or viewing very large minified JavaScript files.
   - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
   - Explorer / Fixed crash when expanding audio banks (.wpk/.bnk) in the file tree.
   - Fixed focus loss and unexpected minimization when closing comparison or settings windows.

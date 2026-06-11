@@ -290,21 +290,10 @@ namespace AssetsManager.Services.Explorer
 
                 IHighlightingDefinition syntaxHighlighting = null;
 
-                // Desactivar el coloreado de sintaxis solo si el archivo es obscenamente gigante (> 50MB) para prevenir demoras.
-                // Dado que todos los archivos (incluyendo JS y JSON) ahora se formatean profesionalmente antes de visualizarse,
-                // ya no existen líneas colapsadas interminables. Por lo tanto, no hay riesgo de Catastrophic Backtracking en AvalonEdit.
-                if (textContent.Length < 50 * 1024 * 1024)
+                if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "preload" || dataType == "luabin64" || dataType == "js")
                 {
-                    if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "preload" || dataType == "luabin64" || dataType == "js")
-                    {
-                        // Los CSS y JS de League se visualizan con nuestro coloreado personalizado
-                        syntaxHighlighting = GetJsonHighlighting();
-                        _logService.LogDebug($"[DEBUG PREVIEW] Applying custom syntax highlighting definition.");
-                    }
-                }
-                else
-                {
-                    _logService.LogWarning($"[DEBUG PREVIEW] Syntax highlighting disabled. File is too large ({textContent.Length} bytes).");
+                    // Los CSS y JS de League se visualizan con nuestro coloreado personalizado
+                    syntaxHighlighting = GetJsonHighlighting();
                 }
 
                 await SetPreviewerAsync(Previewer.AvalonEdit, (textContent, syntaxHighlighting));

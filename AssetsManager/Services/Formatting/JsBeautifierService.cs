@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using AssetsManager.Services.Core;
-using NUglify;
-using NUglify.JavaScript;
+using Jsbeautifier;
 
 namespace AssetsManager.Services.Formatting
 {
@@ -32,50 +31,37 @@ namespace AssetsManager.Services.Formatting
             try
             {
                 // PASO 1: ¿Es un objeto de datos? (Lo más común en LoL)
-                // Evitamos deserializar JSONs extremadamente masivos para no agotar la RAM
-                if (jsContent.Length < 30 * 1024 * 1024)
+                if (TryFormatAsData(jsContent, out string dataFormatted))
                 {
-                    if (TryFormatAsData(jsContent, out string dataFormatted))
-                    {
-                        return dataFormatted;
-                    }
+                    return dataFormatted;
                 }
 
-                // PASO 2: Intentar formatear de manera profesional con NUglify (AST Beautifier)
-                // Aumentamos el límite a 30MB para procesar incluso los bundles de JS más gigantes de Riot en segundo plano
-                if (jsContent.Length < 30 * 1024 * 1024)
+                // PASO 2: Intentar formatear de manera profesional con Jsbeautifier (C# Port de js-beautify)
+                try
                 {
-                    try
+                    var options = new BeautifierOptions
                     {
-                        var settings = new CodeSettings
-                        {
-                            OutputMode = OutputMode.MultipleLines,
-                            Indent = "    ",
-                            MinifyCode = false
-                        };
+                        IndentSize = 4,
+                        IndentChar = ' ',
+                        KeepArrayIndentation = true,
+                        KeepFunctionIndentation = false,
+                        BraceStyle = BraceStyle.Collapse
+                    };
 
-                        var result = Uglify.Js(jsContent, settings);
-                        if (!string.IsNullOrWhiteSpace(result.Code))
-                        {
-                            if (result.HasErrors)
-                            {
-                                _logService.LogWarning($"[JS BEAUTIFIER] NUglify parser reported issues, but output code was generated.");
-                            }
-                            else
-                            {
-                                _logService.LogDebug($"[JS BEAUTIFIER] Successfully beautified JS using NUglify.");
-                            }
-                            return result.Code;
-                        }
-                        else
-                        {
-                            _logService.LogWarning($"[JS BEAUTIFIER] NUglify output code was empty. Falling back to QuickFormat.");
-                        }
-                    }
-                    catch (Exception ex)
+                    var beautifier = new Beautifier(options);
+                    string formatted = beautifier.Beautify(jsContent);
+                    if (!string.IsNullOrWhiteSpace(formatted))
                     {
-                        _logService.LogWarning($"[JS BEAUTIFIER] NUglify failed: {ex.Message}. Falling back to QuickFormat.");
+                        return formatted;
                     }
+                    else
+                    {
+                        _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier returned empty output. Falling back to QuickFormat.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier failed: {ex.Message}. Falling back to QuickFormat.");
                 }
 
                 // PASO 3: Formateador lineal de alto rendimiento (Failsafe)
@@ -112,11 +98,10 @@ namespace AssetsManager.Services.Formatting
                     return true;
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 // Es completamente normal que esto falle si el .js contiene funciones reales o lógica JS 
-                // en lugar de puro JSON. Por eso usamos LogWarning en lugar de LogError.
-                _logService.LogWarning($"Beautifier: TryFormatAsData fallback. Not a pure JSON object. ({ex.Message})");
+                // en lugar de puro JSON.
             }
             return false;
         }
