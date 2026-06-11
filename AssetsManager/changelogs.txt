@@ -25,6 +25,9 @@ New Features
   - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
 
 Improvements
+  - History / Renamed the "Individuals" tab to "WadFile" and "Sync Backups" to "Sync History" for better clarity and consistency.
+  - Diff Viewer / The visual difference viewer is now fully enabled for newly created audio banks, displaying proper event names instead of raw code.
+  - Diff Viewer / Progress bar animation is now strictly forward-moving, fixing a visual jump backwards when switching from audio loading to text analysis.
   - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
   - Explorer / JS Formatting & Highlighting: Integrated Jsbeautifier for cleaner, professional-grade JavaScript file formatting and enabled syntax highlighting for JS files of any size without crashes.
@@ -48,6 +51,10 @@ Improvements
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
   - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
+
+Bug Fixes
+  - Comparator / Fixed an issue where single WadFile comparisons would save the game version as "null" in the history index.
+  - History / Fixed a bug where deleting a WadFile entry from the history UI would not delete its physical backup folder from the disk.
   - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.
   - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
   - Explorer / Fixed image files incorrectly triggering dual view when selected from search filter results.
