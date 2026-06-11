@@ -228,11 +228,19 @@ namespace AssetsManager.Services.Viewer
 
             foreach (var data in submeshDataList)
             {
+                var positionsCol = new Point3DCollection(data.Positions);
+                var indicesCol = new Int32Collection(data.TriangleIndices);
+                var texCoordsCol = new PointCollection(data.TextureCoordinates);
+
+                if (positionsCol.CanFreeze) positionsCol.Freeze();
+                if (indicesCol.CanFreeze) indicesCol.Freeze();
+                if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
+
                 var meshGeometry = new MeshGeometry3D
                 {
-                    Positions = new Point3DCollection(data.Positions),
-                    TriangleIndices = new Int32Collection(data.TriangleIndices),
-                    TextureCoordinates = new PointCollection(data.TextureCoordinates)
+                    Positions = positionsCol,
+                    TriangleIndices = indicesCol,
+                    TextureCoordinates = texCoordsCol
                 };
 
                 string textureNameKey = string.IsNullOrEmpty(data.TexturePath) ? null : Path.GetFileNameWithoutExtension(data.TexturePath);

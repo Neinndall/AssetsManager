@@ -171,11 +171,19 @@ namespace AssetsManager.Services.Viewer
                 var sceneModel = new SceneModel { Name = modelName };
                 foreach (var data in dataList)
                 {
+                    var positionsCol = new Point3DCollection(data.Positions);
+                    var texCoordsCol = new PointCollection(data.TextureCoordinates);
+                    var indicesCol = new Int32Collection(data.TriangleIndices);
+
+                    if (positionsCol.CanFreeze) positionsCol.Freeze();
+                    if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
+                    if (indicesCol.CanFreeze) indicesCol.Freeze();
+
                     MeshGeometry3D meshGeometry = new MeshGeometry3D
                     {
-                        Positions = new Point3DCollection(data.Positions),
-                        TextureCoordinates = new PointCollection(data.TextureCoordinates),
-                        TriangleIndices = new Int32Collection(data.TriangleIndices)
+                        Positions = positionsCol,
+                        TextureCoordinates = texCoordsCol,
+                        TriangleIndices = indicesCol
                     };
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(Colors.White)));

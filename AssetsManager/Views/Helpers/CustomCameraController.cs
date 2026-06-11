@@ -140,6 +140,7 @@ namespace AssetsManager.Views.Helpers
                 _isRotating = true;
                 _lastMousePosition = e.GetPosition(_viewport);
                 _viewport.Cursor = System.Windows.Input.Cursors.SizeAll;
+                _viewport.CaptureMouse();
                 
                 // Stop transitions if user starts interacting
                 _isTransitioning = false;
@@ -150,8 +151,12 @@ namespace AssetsManager.Views.Helpers
         {
             if (e.LeftButton == MouseButtonState.Released)
             {
-                _isRotating = false;
-                _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
+                if (_isRotating)
+                {
+                    _isRotating = false;
+                    _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
+                    _viewport.ReleaseMouseCapture();
+                }
             }
         }
 
@@ -206,8 +211,18 @@ namespace AssetsManager.Views.Helpers
                 _isTransitioning = true;
             }
 
-            // Increment the target position
-            _targetPosition += lookDir * delta * ZoomSensitivity * speedMultiplier;
+            // Calculate the zoom shift vector
+            var shift = lookDir * delta * ZoomSensitivity * speedMultiplier;
+
+            // Ensure we don't zoom past the target point (which would invert the camera)
+            if (Vector3D.DotProduct(camera.LookDirection - shift, lookDir) > 0.1)
+            {
+                // Increment the target position
+                _targetPosition += shift;
+                
+                // To keep the orbit target stationary while zooming, subtract the shift from LookDirection
+                _targetLookDirection -= shift;
+            }
         }
 
         private void Rotate(Vector3D delta)

@@ -28,6 +28,10 @@ Improvements
   - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
   - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
+  - Viewer / Fixed severe camera freezing and stuttering during drag rotation by properly capturing and releasing the mouse pointer across window bounds.
+  - Viewer / Fixed camera pivot instability when zooming by dynamically adjusting the LookDirection magnitude to keep the orbit target perfectly stationary.
+  - Viewer / Extreme Render Optimization: applied WPF `.Freeze()` to all dynamically generated `Point3DCollection` structures in `AnimationPlayer`, eliminating thousands of per-frame change events and achieving perfectly smooth 60 FPS animations.
+  - Viewer / Base Geometry Optimization: implemented `.Freeze()` on all static indices and UV coordinate collections during SKN, SCO, and Map Geometry loading to drastically reduce RAM usage and UI tracking overhead.
   - Viewer / Removing and re-adding a model is now instant.
   - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.
   - Viewer / Model loading dialogs are now unified in a single flow.

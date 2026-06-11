@@ -175,28 +175,27 @@ namespace AssetsManager.Services.Viewer
                     var range = skin.Ranges[i];
                     var geometry = (MeshGeometry3D)part.Geometry.Geometry;
 
-                    // Update existing Point3DCollection to minimize garbage
-                    var posCollection = geometry.Positions;
-                    if (posCollection == null || posCollection.Count != range.VertexCount)
-                    {
-                        posCollection = new Point3DCollection(range.VertexCount);
-                        geometry.Positions = posCollection;
-                    }
+                    // Updating Point3DCollection by index fires a Changed event for EVERY element in WPF,
+                    // which causes severe stuttering. It's much faster to create a new collection 
+                    // and assign it once, triggering only a single dependency property invalidation.
+                    var posCollection = new Point3DCollection(range.VertexCount);
 
-                    // For best WPF performance, we update the collection in place
-                    // Using a freezing strategy or batched update
                     for (int j = 0; j < range.VertexCount; j++)
                     {
                         var vertexIndex = range.StartVertex + j;
                         var skinnedPos = _skinnedVertices[vertexIndex];
-                        
-                        // If collection was already built, we can just replace points
-                        // Point3D is a struct, this is quite efficient
-                        if (j < posCollection.Count)
-                            posCollection[j] = new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z);
-                        else
-                            posCollection.Add(new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z));
+                        posCollection.Add(new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z));
                     }
+                    
+                    // FREEZE the collection before assigning. This tells WPF we will never modify
+                    // this specific collection instance again. It removes all event handler overhead 
+                    // and allows WPF to optimize the memory in the render thread.
+                    if (posCollection.CanFreeze)
+                    {
+                        posCollection.Freeze();
+                    }
+                    
+                    geometry.Positions = posCollection;
                 }
             }
             catch (Exception ex)
