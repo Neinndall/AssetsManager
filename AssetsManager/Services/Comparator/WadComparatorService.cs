@@ -136,44 +136,60 @@ namespace AssetsManager.Services.Comparator
 
                 // Two-phase approach with bounded memory:
                 //   Phase 1: read just the WAD header (8-274 bytes) to count chunks - NO WadFile instances.
-                //   Phase 2: open each WAD pair, diff, and dispose immediately.
+                //   Phase 2: open each WAD, diff, and dispose immediately.
                 // Result: only 2 WadFile instances alive at any time, regardless of total file count.
                 await Task.Run(() =>
                 {
                     var searchPatterns = new[] { "*.wad.client", "*.wad" };
-                    var files = searchPatterns
+                    
+                    var oldFiles = searchPatterns
                         .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
+                        .Select(f => Path.GetRelativePath(oldDir, f))
+                        .ToList();
+
+                    var newFiles = Directory.Exists(newDir)
+                        ? searchPatterns
+                            .SelectMany(pattern => Directory.GetFiles(newDir, pattern, SearchOption.AllDirectories))
+                            .Select(f => Path.GetRelativePath(newDir, f))
+                            .ToList()
+                        : new List<string>();
+
+                    var allRelativePaths = oldFiles.Union(newFiles, StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(p => p)
                         .ToList();
 
                     int total = 0;
-                    var validPaths = new List<(string OldPath, string NewPath, string RelativePath)>();
+                    var validPaths = new List<(string OldPath, string NewPath, string RelativePath, bool HasOld, bool HasNew)>();
 
-                    foreach (var oldWadFile in files)
+                    foreach (var relativePath in allRelativePaths)
                     {
                         if (cancellationToken.IsCancellationRequested) break;
 
-                        var relativePath = Path.GetRelativePath(oldDir, oldWadFile);
-                        var newWadFileFullPath = Path.Combine(newDir, relativePath);
-                        if (!File.Exists(newWadFileFullPath)) continue;
+                        var oldWadFile = Path.Combine(oldDir, relativePath);
+                        var newWadFile = Path.Combine(newDir, relativePath);
+                        bool hasOld = File.Exists(oldWadFile);
+                        bool hasNew = File.Exists(newWadFile);
 
-                        int oldCount = WadChunkUtils.ReadWadChunkCount(oldWadFile);
-                        int newCount = WadChunkUtils.ReadWadChunkCount(newWadFileFullPath);
+                        if (!hasOld && !hasNew) continue;
+
+                        int oldCount = hasOld ? WadChunkUtils.ReadWadChunkCount(oldWadFile) : 0;
+                        int newCount = hasNew ? WadChunkUtils.ReadWadChunkCount(newWadFile) : 0;
 
                         // Fallback: if header read fails, try a full open to salvage the count
-                        if (oldCount < 0 || newCount < 0)
+                        if ((hasOld && oldCount < 0) || (hasNew && newCount < 0))
                         {
                             try
                             {
-                                using var probeOld = new WadFile(oldWadFile);
-                                using var probeNew = new WadFile(newWadFileFullPath);
-                                oldCount = probeOld.Chunks.Count;
-                                newCount = probeNew.Chunks.Count;
+                                using var probeOld = hasOld ? new WadFile(oldWadFile) : null;
+                                using var probeNew = hasNew ? new WadFile(newWadFile) : null;
+                                oldCount = probeOld != null ? probeOld.Chunks.Count : 0;
+                                newCount = probeNew != null ? probeNew.Chunks.Count : 0;
                             }
                             catch { continue; /* Skip corrupt WADs */ }
                         }
 
-                        total += oldCount + newCount;
-                        validPaths.Add((oldWadFile, newWadFileFullPath, relativePath));
+                        total += (hasOld ? oldCount : 0) + (hasNew ? newCount : 0);
+                        validPaths.Add((hasOld ? oldWadFile : null, hasNew ? newWadFile : null, relativePath, hasOld, hasNew));
                     }
 
                     _totalChunksGlobal = total;
@@ -190,10 +206,35 @@ namespace AssetsManager.Services.Comparator
 
                         try
                         {
-                            using var oldWad = new WadFile(file.OldPath);
-                            using var newWad = new WadFile(file.NewPath);
-                            var diffs = CollectDiffsInternal(oldWad, newWad, file.RelativePath, sessionCache, cancellationToken, statusMsg);
-                            allDiffs.AddRange(diffs);
+                            if (file.HasOld && file.HasNew)
+                            {
+                                using var oldWad = new WadFile(file.OldPath);
+                                using var newWad = new WadFile(file.NewPath);
+                                var diffs = CollectDiffsInternal(oldWad, newWad, file.RelativePath, sessionCache, cancellationToken, statusMsg);
+                                allDiffs.AddRange(diffs);
+                            }
+                            else if (file.HasNew) // WAD Completamente Nuevo
+                            {
+                                using var newWad = new WadFile(file.NewPath);
+                                foreach (var newChunk in newWad.Chunks.Values)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    var newPath = ResolveNameOptimized(newChunk.PathHash, newChunk, newWad, sessionCache);
+                                    allDiffs.Add(new ChunkDiff { Type = ChunkDiffType.New, NewChunk = newChunk, NewPath = newPath, SourceWadFile = file.RelativePath });
+                                    ReportProgress(statusMsg);
+                                }
+                            }
+                            else if (file.HasOld) // WAD Completamente Eliminado
+                            {
+                                using var oldWad = new WadFile(file.OldPath);
+                                foreach (var oldChunk in oldWad.Chunks.Values)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    var oldPath = ResolveNameOptimized(oldChunk.PathHash, oldChunk, oldWad, sessionCache);
+                                    allDiffs.Add(new ChunkDiff { Type = ChunkDiffType.Removed, OldChunk = oldChunk, OldPath = oldPath, SourceWadFile = file.RelativePath });
+                                    ReportProgress(statusMsg);
+                                }
+                            }
                         }
                         catch { /* Skip corrupt WADs */ }
                     }
