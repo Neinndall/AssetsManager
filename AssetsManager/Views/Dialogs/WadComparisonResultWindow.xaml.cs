@@ -35,10 +35,12 @@ namespace AssetsManager.Views.Dialogs
         private readonly AppSettings _appSettings;
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
+        private readonly BackupManager _backupManager;
 
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath;
+        private string _version;
 
         private readonly WadComparisonResultModel _viewModel;
 
@@ -52,7 +54,8 @@ namespace AssetsManager.Views.Dialogs
             HashResolverService hashResolverService,
             AppSettings appSettings,
             WadContentProvider wadContentProvider,
-            VersionService versionService)
+            VersionService versionService,
+            BackupManager backupManager)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -68,6 +71,7 @@ namespace AssetsManager.Views.Dialogs
             _appSettings = appSettings;
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
+            _backupManager = backupManager;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
@@ -143,10 +147,11 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath)
+        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
+            _version = version;
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -162,12 +167,13 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
         }
 
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null)
         {
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
+            _version = version;
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
@@ -333,7 +339,14 @@ namespace AssetsManager.Views.Dialogs
             {
                 _logService.Log("Starting comparison backup and asset packaging...");
                 string displayName = ResolveComparisonDisplayName();
-                string version = await _versionService.GetGameVersionAsync(_newPbePath);
+                
+                // Use stored version if available, fallback to dynamic detection if missing
+                string version = _version;
+                if (string.IsNullOrEmpty(version))
+                {
+                    string root = _backupManager.GetGameRoot(_newPbePath);
+                    version = await _versionService.GetGameVersionAsync(root ?? _newPbePath);
+                }
 
                 var result = await _comparisonHistoryService.EnsureArchivedAsync(
                     _serializableDiffs, _oldPbePath, _newPbePath, version, displayName);

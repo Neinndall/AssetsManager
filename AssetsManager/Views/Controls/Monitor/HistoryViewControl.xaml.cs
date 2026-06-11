@@ -91,6 +91,28 @@ namespace AssetsManager.Views.Controls.Monitor
             RefreshHistory();
         }
 
+        private async void btnSyncBackups_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                int recoveredCount = await ComparisonHistoryService.SyncOrphanedArchivesAsync();
+                
+                if (recoveredCount > 0)
+                {
+                    LogService.LogSuccess($"Successfully synchronized {recoveredCount} orphaned history entry(s).");
+                }
+                else
+                {
+                    LogService.Log("No orphaned history entries found to synchronize.");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error synchronizing history.");
+                CustomMessageBoxService.ShowError("Error", "Could not synchronize history.", Window.GetWindow(this));
+            }
+        }
+
         private void btnEditName_Click(object sender, RoutedEventArgs e)
         {
             var selectedEntry = (sender as FrameworkElement)?.DataContext as HistoryEntry;
@@ -121,7 +143,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             if (selectedEntry != null)
             {
-                if (selectedEntry.Type == HistoryEntryType.WadArchive)
+                if (selectedEntry.Type == HistoryEntryType.WadArchive || selectedEntry.Type == HistoryEntryType.WadFile)
                 {
                     var (data, path) = await ComparisonHistoryService.LoadComparisonAsync(selectedEntry.ReferenceId);
                     if (data != null)
@@ -160,13 +182,13 @@ namespace AssetsManager.Views.Controls.Monitor
                 {
                     try
                     {
-                        if (entryToRemove.Type == HistoryEntryType.WadArchive)
+                        if (entryToRemove.Type == HistoryEntryType.WadArchive || entryToRemove.Type == HistoryEntryType.WadFile)
                         {
                             ComparisonHistoryService.DeleteComparison(entryToRemove);
                         }
                         else
                         {
-                            // Manual cleanup for legacy FileDiffs
+                            // Manual cleanup for legacy FileDiffs (like Watcher updates or others)
                             string historyDirectoryPath = Path.GetDirectoryName(entryToRemove.OldFilePath);
                             if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
                             {

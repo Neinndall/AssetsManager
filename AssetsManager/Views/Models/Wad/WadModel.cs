@@ -147,6 +147,7 @@ namespace AssetsManager.Views.Models.Wad
     {
         public string OldLolPath { get; set; }
         public string NewLolPath { get; set; }
+        public string Version { get; set; }
         public List<SerializableChunkDiff> Diffs { get; set; }
     }
 }

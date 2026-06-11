@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Comparator
 
         public event Action<int> ComparisonStarted;
         public event Action<int, string, bool, string> ComparisonProgressChanged;
-        public event Action<List<ChunkDiff>, string, string> ComparisonCompleted;
+        public event Action<List<ChunkDiff>, string, string, string> ComparisonCompleted;
 
         private int _totalChunksGlobal;
         private int _completedChunksGlobal;
@@ -42,12 +42,12 @@ namespace AssetsManager.Services.Comparator
             ComparisonProgressChanged?.Invoke(completedFiles, currentWadFile, isSuccess, errorMessage);
         }
 
-        public void NotifyComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath)
+        public void NotifyComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version)
         {
-            ComparisonCompleted?.Invoke(allDiffs, oldPbePath, newPbePath);
+            ComparisonCompleted?.Invoke(allDiffs, oldPbePath, newPbePath, version);
         }
 
-        public async Task CompareSingleWadAsync(string oldWadFile, string newWadFile, CancellationToken cancellationToken)
+        public async Task CompareSingleWadAsync(string oldWadFile, string newWadFile, string version, CancellationToken cancellationToken)
         {
             List<ChunkDiff> allDiffs = new List<ChunkDiff>();
             string oldDir = Path.GetDirectoryName(oldWadFile);
@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Comparator
             }
             finally
             {
-                NotifyComparisonCompleted(allDiffs, oldDir, newDir);
+                NotifyComparisonCompleted(allDiffs, oldWadFile, newWadFile, version);
                 if (allDiffs != null)
                 {
                     if (allDiffs.Count == 0)
@@ -120,7 +120,7 @@ namespace AssetsManager.Services.Comparator
             }
         }
 
-        public async Task CompareWadsAsync(string oldDir, string newDir, CancellationToken cancellationToken)
+        public async Task CompareWadsAsync(string oldDir, string newDir, string version, CancellationToken cancellationToken)
         {
             List<ChunkDiff> allDiffs = new List<ChunkDiff>();
 
@@ -129,7 +129,7 @@ namespace AssetsManager.Services.Comparator
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _logService.Log("Starting WADs comparison...");
-                
+
                 NotifyComparisonStarted(0);
 
                 var sessionCache = new Dictionary<ulong, string>();
@@ -141,7 +141,7 @@ namespace AssetsManager.Services.Comparator
                 await Task.Run(() =>
                 {
                     var searchPatterns = new[] { "*.wad.client", "*.wad" };
-                    
+
                     var oldFiles = searchPatterns
                         .SelectMany(pattern => Directory.GetFiles(oldDir, pattern, SearchOption.AllDirectories))
                         .Select(f => Path.GetRelativePath(oldDir, f))
@@ -251,7 +251,7 @@ namespace AssetsManager.Services.Comparator
             }
             finally
             {
-                NotifyComparisonCompleted(allDiffs, oldDir, newDir);
+                NotifyComparisonCompleted(allDiffs, oldDir, newDir, version);
                 if (allDiffs != null)
                 {
                     if (allDiffs.Count == 0)

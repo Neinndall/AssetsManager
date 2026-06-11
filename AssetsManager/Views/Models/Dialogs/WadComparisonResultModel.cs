@@ -92,12 +92,12 @@ namespace AssetsManager.Views.Models.Dialogs
                 if (SelectedNodes.Count > 1)
                 {
                     return SelectedNodes.All(d => SupportedFileTypes.IsImage(d.Path)) || 
-                           SelectedNodes.Any(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path));
+                           SelectedNodes.Any(d => (d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.New) && SupportedFileTypes.IsNonImageDiffable(d.Path));
                 }
 
                 return SelectedItem != null && 
                        (SupportedFileTypes.IsImage(SelectedItem.Path) || 
-                        (SelectedItem.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(SelectedItem.Path)));
+                        ((SelectedItem.Type == ChunkDiffType.Modified || SelectedItem.Type == ChunkDiffType.New) && SupportedFileTypes.IsNonImageDiffable(SelectedItem.Path)));
             }
         }
 

@@ -233,7 +233,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
         }
 
-        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath) => await FinishOperation();
+        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version) => await FinishOperation();
 
         // --- Extraction ---
 

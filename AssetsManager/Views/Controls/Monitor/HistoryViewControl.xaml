@@ -21,9 +21,15 @@
             <RowDefinition Height="*"/>    <!-- 2. Content Lists -->
         </Grid.RowDefinitions>
 
-        <!-- 0. SEARCH & INFO HEADER (Bento Style) -->
+        <!-- 0. ACTIONS & SEARCH ROW (Balanced Proportions) -->
         <Grid Grid.Row="0" Margin="0,0,0,24">
-            <Border Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Height="90">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>    <!-- Search Card (Flexible) -->
+                <ColumnDefinition Width="160"/>  <!-- Sync Button (Slimmer) -->
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Search Card -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
                 <Grid Margin="20,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -39,7 +45,7 @@
                     <!-- Text -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock Text="History Explorer" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                        <TextBlock Text="Audit and restore previous comparisons, watcher updates and individual files" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        <TextBlock Text="Audit and restore comparisons, watchers and WadFiles" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
                     </StackPanel>
 
                     <!-- Search Input -->
@@ -64,6 +70,22 @@
                     </Border>
                 </Grid>
             </Border>
+
+            <!-- RIGHT: Sync History -->
+            <Button Grid.Column="1" 
+                    Click="btnSyncBackups_Click" 
+                    Style="{StaticResource SelectionCardButtonStyle}" 
+                    Margin="0" 
+                    Height="90" 
+                    Padding="0" 
+                    HorizontalContentAlignment="Stretch" 
+                    VerticalContentAlignment="Stretch">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Sync" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Sync History" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Import missing folders" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
         </Grid>
 
         <!-- 1. TABS & PAGINATION HEADER (Floating Style) -->
@@ -83,7 +105,7 @@
                     <RadioButton Content="Watcher" 
                                  IsChecked="{Binding SelectedTabIndex, Converter={StaticResource EqualityConverter}, ConverterParameter=1, Mode=TwoWay}" 
                                  GroupName="HistoryTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="110"/>
-                    <RadioButton Content="Individuals" 
+                    <RadioButton Content="WadFile" 
                                  IsChecked="{Binding SelectedTabIndex, Converter={StaticResource EqualityConverter}, ConverterParameter=2, Mode=TwoWay}" 
                                  GroupName="HistoryTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="110"/>
                 </StackPanel>
@@ -133,7 +155,7 @@
                                 <Style TargetType="Border">
                                     <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                        <DataTrigger Binding="{Binding Type}" Value="WadFile">
                                             <Setter Property="BorderBrush" Value="{StaticResource AccentOrange}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
@@ -160,7 +182,7 @@
                                             <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                             <Setter Property="Kind" Value="DatabaseOutline"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
+                                                <DataTrigger Binding="{Binding Type}" Value="WadFile">
                                                     <Setter Property="Kind" Value="FileCompare"/>
                                                     <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
                                                 </DataTrigger>
@@ -188,8 +210,8 @@
                                                 <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
                                                     <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Watcher | {0}'}"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
-                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}Difference | {0}'}"/>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadFile">
+                                                    <Setter Property="Text" Value="{Binding DisplayName, StringFormat='{}WadFile | {0}'}"/>
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding DisplayName}" Value="{x:Null}">
                                                     <Setter Property="Text" Value="{Binding FileName}"/>
@@ -249,8 +271,8 @@
                                                 <DataTrigger Binding="{Binding Type}" Value="WatcherUpdate">
                                                     <Setter Property="ToolTip" Value="Rename Watcher"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding Type}" Value="IndividualFile">
-                                                    <Setter Property="ToolTip" Value="Rename Difference"/>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadFile">
+                                                    <Setter Property="ToolTip" Value="Rename WadFile"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

@@ -227,8 +227,16 @@ namespace AssetsManager.Services.Monitor
             return successCount > 0;
         }
 
-        public async Task<string> GetGameVersionAsync(string rootDirectory)
+        public async Task<string> GetGameVersionAsync(string path)
         {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            string rootDirectory = path;
+            if (File.Exists(path))
+            {
+                rootDirectory = Path.GetDirectoryName(path);
+            }
+
             if (string.IsNullOrEmpty(rootDirectory) || !Directory.Exists(rootDirectory)) return null;
 
             try
@@ -246,7 +254,7 @@ namespace AssetsManager.Services.Monitor
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Error reading version from {rootDirectory}");
+                _logService.LogError(ex, $"Error reading version from {path}");
             }
             return null;
         }

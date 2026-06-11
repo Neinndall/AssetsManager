@@ -166,7 +166,7 @@ namespace AssetsManager.Services.Comparator
             return finalDiffs;
         }
 
-        public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath)
+        public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath, string version = null)
         {
             // Use the centralized directory creator to prepare the structure
             _directoriesCreator.PrepareComparisonDirectory(destinationPath);
@@ -183,6 +183,7 @@ namespace AssetsManager.Services.Comparator
             {
                 OldLolPath = oldPbePath,
                 NewLolPath = newPbePath,
+                Version = version,
                 Diffs = leanDiffs
             };
 

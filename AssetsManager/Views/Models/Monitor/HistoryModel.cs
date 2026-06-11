@@ -58,7 +58,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             ComparisonsPaginator.SetFullList(entries.Where(e => e.Type == HistoryEntryType.WadArchive));
             WatcherPaginator.SetFullList(entries.Where(e => e.Type == HistoryEntryType.WatcherUpdate));
-            DifferencesPaginator.SetFullList(entries.Where(e => e.Type == HistoryEntryType.IndividualFile));
+            DifferencesPaginator.SetFullList(entries.Where(e => e.Type == HistoryEntryType.WadFile));
         }
 
         protected void OnPropertyChanged(string propertyName)

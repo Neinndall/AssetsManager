@@ -25,18 +25,20 @@ namespace AssetsManager.Services.Monitor
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
+        private readonly BackupManager _backupManager;
 
         private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public event Action<MonitoredAsset> AssetUpdated;
 
-        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider, VersionService versionService)
+        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider, VersionService versionService, BackupManager backupManager)
         {
             _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
+            _backupManager = backupManager;
         }
 
         public async Task<(bool Added, string DuplicateAssetPath)> AddAssetAsync(
@@ -72,8 +74,8 @@ namespace AssetsManager.Services.Monitor
                 currentVersion = await _versionService.GetGameVersionAsync(versionDetectionPath);
                 if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
                 {
-                    string wadDir = Path.GetDirectoryName(wadPhysicalPath);
-                    currentVersion = await _versionService.GetGameVersionAsync(wadDir);
+                    string root = _backupManager.GetGameRoot(wadPhysicalPath);
+                    currentVersion = await _versionService.GetGameVersionAsync(root ?? Path.GetDirectoryName(wadPhysicalPath));
                 }
             }
             catch (Exception ex)

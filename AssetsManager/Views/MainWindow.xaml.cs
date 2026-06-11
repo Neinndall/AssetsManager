@@ -60,6 +60,7 @@ namespace AssetsManager.Views
         private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
+        private string _extractionVersion;
         private List<SerializableChunkDiff> _diffsForExtraction;
 
         private GridLength _lastLogHeight = new GridLength(180);
@@ -235,7 +236,7 @@ namespace AssetsManager.Views
                 _progressUIManager.OnExtractionCompleted();
                 if (_isExtractingAfterComparison)
                 {
-                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath);
+                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion);
                     _isExtractingAfterComparison = false; // Reset flag
                 }
             });
@@ -247,7 +248,7 @@ namespace AssetsManager.Views
             await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
         }
         
-        private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath)
+        private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath, string version)
         {
             if (allDiffs == null) return;
 
@@ -273,8 +274,7 @@ namespace AssetsManager.Views
             if (_appSettings.SaveWadComparisonHistory)
             {
                 string displayName = ResolveComparisonDisplayName(serializableDiffs, newLolPath);
-                string version = await _versionService.GetGameVersionAsync(newLolPath);
-
+                
                 _ = Task.Run(async () =>
                 {
                     try
@@ -300,6 +300,7 @@ namespace AssetsManager.Views
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldLolPath;
                 _extractionNewLolPath = newLolPath;
+                _extractionVersion = version;
 
                 Dispatcher.Invoke(StartExtractionAsync);
             }
@@ -307,7 +308,7 @@ namespace AssetsManager.Views
             {
                 Dispatcher.Invoke(() =>
                 {
-                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath);
+                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath, version);
                 });
             }
         }
@@ -316,16 +317,16 @@ namespace AssetsManager.Views
         {
             var uniqueWads = diffs.Select(d => d.SourceWadFile).Distinct().ToList();
 
-            if (uniqueWads.Count == 1) return Path.GetFileName(uniqueWads[0]).Split('.')[0];
+            if (uniqueWads.Count == 1) return Path.GetFileName(uniqueWads[0]);
 
             string folderName = Path.GetFileName(newPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             return string.IsNullOrEmpty(folderName) ? "Root" : folderName;
         }
 
-        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath)
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath);
+            resultWindow.Initialize(diffs, oldPath, newPath, version);
             resultWindow.Owner = this;
             resultWindow.Show();
         }

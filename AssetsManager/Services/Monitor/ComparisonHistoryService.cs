@@ -86,7 +86,7 @@ namespace AssetsManager.Services.Monitor
                 }
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath);
+                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version);
 
                 RegisterInHistory(folderInfo.FolderName, displayName, oldPbePath, newPbePath, version, comparisonKey);
                 _logService.LogSuccess("Comparison history saved successfully.");
@@ -116,7 +116,7 @@ namespace AssetsManager.Services.Monitor
         private string FindExistingReferenceId(string comparisonKey)
         {
             return _appSettings.DiffHistory
-                .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
+                .FirstOrDefault(h => (h.Type == HistoryEntryType.WadArchive || h.Type == HistoryEntryType.WadFile)
                                      && !string.IsNullOrEmpty(h.OldFilePath)
                                      && !string.IsNullOrEmpty(h.NewFilePath)
                                      && ResolveEntryKey(h) == comparisonKey)
@@ -134,7 +134,7 @@ namespace AssetsManager.Services.Monitor
             try
             {
                 var orphan = _appSettings.DiffHistory
-                    .FirstOrDefault(h => h.Type == HistoryEntryType.WadArchive
+                    .FirstOrDefault(h => (h.Type == HistoryEntryType.WadArchive || h.Type == HistoryEntryType.WadFile)
                                          && h.ReferenceId == referenceId
                                          && ResolveEntryKey(h) == comparisonKey);
 
@@ -151,6 +151,15 @@ namespace AssetsManager.Services.Monitor
 
         private void RegisterInHistory(string folderName, string comparisonDisplayName, string oldPbePath, string newPbePath, string version, string comparisonKey)
         {
+            var entryType = HistoryEntryType.WadArchive;
+            
+            // Detect Individual WAD mode by path
+            if (newPbePath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) || 
+                newPbePath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+            {
+                entryType = HistoryEntryType.WadFile;
+            }
+
             var entry = new HistoryEntry
             {
                 FileName = comparisonDisplayName,
@@ -159,7 +168,7 @@ namespace AssetsManager.Services.Monitor
                 OldFilePath = oldPbePath,
                 NewFilePath = newPbePath,
                 Timestamp = DateTime.Now,
-                Type = HistoryEntryType.WadArchive,
+                Type = entryType,
                 ReferenceId = folderName,
                 ComparisonKey = comparisonKey
             };
@@ -197,11 +206,124 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
+        public async Task<int> SyncOrphanedArchivesAsync()
+        {
+            int recoveredCount = 0;
+            
+            try
+            {
+                if (!Directory.Exists(_directoriesCreator.WadComparisonSavePath))
+                {
+                    return 0;
+                }
+
+                var existingReferenceIds = new HashSet<string>(
+                    _appSettings.DiffHistory
+                        .Where(h => (h.Type == HistoryEntryType.WadArchive || h.Type == HistoryEntryType.WadFile) && !string.IsNullOrEmpty(h.ReferenceId))
+                        .Select(h => h.ReferenceId),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+                var archiveDirs = Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath);
+
+                bool changesMade = false;
+
+                foreach (var dir in archiveDirs)
+                {
+                    string folderName = Path.GetFileName(dir);
+
+                    if (!existingReferenceIds.Contains(folderName))
+                    {
+                        var (data, indexFilePath) = await LoadComparisonAsync(folderName);
+                        
+                        if (data != null)
+                        {
+                            // Try to parse timestamp from folder name (e.g., comparison_27052026_153000)
+                            DateTime timestamp = Directory.GetCreationTime(dir);
+                            if (folderName.StartsWith("comparison_") && folderName.Length >= 26)
+                            {
+                                string dateStr = folderName.Substring(11, 15);
+                                if (DateTime.TryParseExact(dateStr, "ddMMyyyy_HHmmss", null, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+                                {
+                                    timestamp = parsedDate;
+                                }
+                            }
+
+                            string oldPath = data.OldLolPath ?? "Unknown Path";
+                            string newPath = data.NewLolPath ?? "Unknown Path";
+                            
+                            string version = data.Version;
+                            if (string.IsNullOrEmpty(version))
+                            {
+                                version = "Unknown Version";
+                            }
+
+                            string comparisonKey = PathUtils.BuildComparisonKey(version, oldPath, newPath);
+
+                            // Determine DisplayName based on the path
+                            string displayName = "Recovered Comparison";
+                            
+                            // Check if it's an individual WAD file comparison
+                            var entryType = HistoryEntryType.WadArchive;
+                            if (newPath.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) || newPath.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayName = Path.GetFileName(newPath);
+                                entryType = HistoryEntryType.WadFile;
+                            }
+                            else if (newPath.Contains("League of Legends (PBE)", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayName = "League of Legends (PBE)";
+                            }
+                            else if (newPath.Contains("League of Legends", StringComparison.OrdinalIgnoreCase))
+                            {
+                                displayName = "League of Legends";
+                            }
+
+                            var entry = new HistoryEntry
+                            {
+                                FileName = displayName,
+                                DisplayName = displayName,
+                                Version = version,
+                                OldFilePath = oldPath,
+                                NewFilePath = newPath,
+                                Timestamp = timestamp,
+                                Type = entryType,
+                                ReferenceId = folderName,
+                                ComparisonKey = comparisonKey
+                            };
+
+                            _appSettings.DiffHistory.Add(entry);
+                            changesMade = true;
+                            recoveredCount++;
+                        }
+                    }
+                }
+
+                if (changesMade)
+                {
+                    // Sort by timestamp descending
+                    var sortedHistory = _appSettings.DiffHistory.OrderByDescending(h => h.Timestamp).ToList();
+                    _appSettings.DiffHistory.Clear();
+                    foreach (var h in sortedHistory)
+                    {
+                        _appSettings.DiffHistory.Add(h);
+                    }
+                    _appSettings.Save();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to synchronize orphaned archives.");
+            }
+
+            return recoveredCount;
+        }
+
         public void DeleteComparison(HistoryEntry entry)
         {
             try
             {
-                if (entry.Type == HistoryEntryType.WadArchive && !string.IsNullOrEmpty(entry.ReferenceId))
+                if ((entry.Type == HistoryEntryType.WadArchive || entry.Type == HistoryEntryType.WadFile) && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
                     string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);
                     if (Directory.Exists(historyDir))

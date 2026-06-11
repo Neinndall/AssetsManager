@@ -335,8 +335,8 @@ namespace AssetsManager.Views.Controls.Comparator
                     CustomMessageBoxService.ShowWarning("Warning", msg, Window.GetWindow(this));
                     return;
                 }
-                if (ViewModel.IsDirectoryMode) await WadComparatorService.CompareWadsAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
-                else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
+                if (ViewModel.IsDirectoryMode) await WadComparatorService.CompareWadsAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
+                else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
             }
             catch (OperationCanceledException) { LogService.LogWarning("WAD comparison cancelled."); }
             catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this)); }
