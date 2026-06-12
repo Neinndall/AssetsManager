@@ -531,45 +531,24 @@ namespace AssetsManager.Views.Controls.Viewer
             Vector3D lookDirection;
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
 
-            // Dynamically calculate camera view based on loaded model's bounding box
-            if (_activeSceneModel?.Parts?.Count > 0)
+            if (TryGetModelBounds(out var center, out var maxDim))
             {
-                var bounds = Rect3D.Empty;
-                foreach (var part in _activeSceneModel.Parts)
+                double distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
+                if (distance < 50) distance = 250;
+
+                position = new Point3D(center.X, center.Y + distance * 0.15, center.Z + distance);
+                lookDirection = center - position;
+
+                if (smooth)
                 {
-                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
-                    {
-                        bounds.Union(mesh.Bounds);
-                    }
+                    _cameraController?.FlyTo(position, lookDirection, upDirection);
                 }
-
-                if (!bounds.IsEmpty)
+                else
                 {
-                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
-                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
-                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
-                    var targetPoint = new Point3D(centerX, centerY, centerZ);
-
-                    double maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
-                    if (maxDim <= 0) maxDim = 150; // Fallback height
-
-                    double distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
-                    if (distance < 50) distance = 250; // Minimum distance fallback
-
-                    position = new Point3D(centerX, centerY + distance * 0.15, centerZ + distance);
-                    lookDirection = targetPoint - position;
-
-                    if (smooth)
-                    {
-                        _cameraController?.FlyTo(position, lookDirection, upDirection);
-                    }
-                    else
-                    {
-                        _cameraController?.SnapTo(position, lookDirection, upDirection);
-                    }
-                    _viewModel.FieldOfView = 45;
-                    return;
+                    _cameraController?.SnapTo(position, lookDirection, upDirection);
                 }
+                _viewModel.FieldOfView = 45;
+                return;
             }
 
             // Fallback coordinates
@@ -599,30 +578,11 @@ namespace AssetsManager.Views.Controls.Viewer
             Point3D targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             double distance = 300.00;
 
-            if (_activeSceneModel?.Parts?.Count > 0)
+            if (TryGetModelBounds(out var center, out var maxDim))
             {
-                var bounds = Rect3D.Empty;
-                foreach (var part in _activeSceneModel.Parts)
-                {
-                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
-                    {
-                        bounds.Union(mesh.Bounds);
-                    }
-                }
-
-                if (!bounds.IsEmpty)
-                {
-                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
-                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
-                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
-                    targetPoint = new Point3D(centerX, centerY, centerZ);
-
-                    double maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
-                    if (maxDim <= 0) maxDim = 150;
-
-                    distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.8) * maxDim;
-                    if (distance < 50) distance = 250;
-                }
+                targetPoint = center;
+                distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.8) * maxDim;
+                if (distance < 50) distance = 250;
             }
 
             Vector3D lookDirection;
@@ -662,6 +622,38 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _cameraController.FlyTo(cameraPosition, lookDirection, upDirection);
+        }
+
+        private bool TryGetModelBounds(out Point3D center, out double maxDim)
+        {
+            center = new Point3D();
+            maxDim = 0;
+
+            if (_activeSceneModel?.Parts?.Count > 0)
+            {
+                var bounds = Rect3D.Empty;
+                foreach (var part in _activeSceneModel.Parts)
+                {
+                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
+                    {
+                        bounds.Union(mesh.Bounds);
+                    }
+                }
+
+                if (!bounds.IsEmpty)
+                {
+                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
+                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
+                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    center = new Point3D(centerX, centerY, centerZ);
+
+                    maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
+                    if (maxDim <= 0) maxDim = 150;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void UpdateFieldOfView()

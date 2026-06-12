@@ -107,34 +107,30 @@ namespace AssetsManager.Services.Core
                         return;
                     }
 
-                    var preparedImages = new List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)>();
-                    for (int i = 0; i < diffs.Count; i++)
-                    {
-                        var diff = diffs[i];
-                        loadingWindow.SetBatchIndex(i + 1, diffs.Count, "texture");
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchLoadingFile);
-                        var (_, oldData, newData, _, _) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-                        
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFormattingFile);
-                        var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
-                        var oldImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])oldData, ext));
-                        var newImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])newData, ext));
-                        preparedImages.Add((oldImage, newImage, diff.OldPath, diff.NewPath));
-                        
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFileReady);
-                    }
-
-                    // [PROGRESS] 100% Reached before opening batch window
-                    await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                    await Task.Delay(350);
-
-                    await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
-                    var imageDiffWindow = new ImageDiffWindow();
-                    imageDiffWindow.Owner = owner;
-                    imageDiffWindow.LoadingWindow = loadingWindow;
-                    imageDiffWindow.LoadAndDisplayPreloadedBatchAsync(preparedImages, startIndex);
-                    imageDiffWindow.ShowDialog();
+                    await ProcessBatchInternalAsync(
+                        diffs,
+                        startIndex,
+                        oldPbePath,
+                        newPbePath,
+                        owner,
+                        loadingWindow,
+                        "texture",
+                        async (diff, dataType, oldData, newData, oldPath, newPath) =>
+                        {
+                            var ext = Path.GetExtension(diff.NewPath ?? diff.OldPath).ToLowerInvariant();
+                            var oldImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])oldData, ext));
+                            var newImage = await Task.Run(() => TextureUtils.LoadTexture((byte[])newData, ext));
+                            return (oldImage, newImage, oldPath ?? diff.OldPath, newPath ?? diff.NewPath);
+                        },
+                        preparedImages =>
+                        {
+                            var imageDiffWindow = new ImageDiffWindow();
+                            imageDiffWindow.Owner = owner;
+                            imageDiffWindow.LoadingWindow = loadingWindow;
+                            imageDiffWindow.LoadAndDisplayPreloadedBatchAsync(preparedImages, startIndex);
+                            imageDiffWindow.ShowDialog();
+                            return Task.CompletedTask;
+                        });
                 }
                 else
                 {
@@ -145,42 +141,36 @@ namespace AssetsManager.Services.Core
                         return;
                     }
 
-                    var preparedData = new List<(string oldText, string newText, string oldPath, string newPath)>();
-                    for (int i = 0; i < diffs.Count; i++)
-                    {
-                        var diff = diffs[i];
-                        string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
-                        string fileType = ext == ".bnk" ? "audio bank" : "file";
-                        loadingWindow.SetBatchIndex(i + 1, diffs.Count, fileType);
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchLoadingFile);
-                        var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-                        
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFormattingFile);
-                        string oldText, newText;
-                        if (ext == ".bnk")
+                    await ProcessBatchInternalAsync(
+                        diffs,
+                        startIndex,
+                        oldPbePath,
+                        newPbePath,
+                        owner,
+                        loadingWindow,
+                        null,
+                        async (diff, dataType, oldData, newData, oldPath, newPath) =>
                         {
-                            (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, null);
-                        }
-                        else
+                            string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
+                            string oldText, newText;
+                            if (ext == ".bnk")
+                            {
+                                (oldText, newText) = await ProcessAudioBankDataAsync(diff, oldPbePath, newPbePath, (byte[])oldData, (byte[])newData, sourceJsonPath, null);
+                            }
+                            else
+                            {
+                                (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
+                            }
+                            return (oldText, newText, oldPath ?? diff.OldPath, newPath ?? diff.NewPath);
+                        },
+                        async preparedData =>
                         {
-                            (oldText, newText) = await ProcessDataAsync(dataType, (byte[])oldData, (byte[])newData);
-                        }
-                        preparedData.Add((oldText, newText, oldPath ?? diff.OldPath, newPath ?? diff.NewPath));
-                        
-                        await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFileReady);
-                    }
-
-                    // [PROGRESS] 100% Reached before opening batch window
-                    await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                    await Task.Delay(350);
-
-                    await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
-
-                    var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
-                    diffWindow.Owner = owner;
-                    diffWindow.LoadingWindow = loadingWindow;
-                    await diffWindow.LoadAndDisplayPreloadedBatchAsync(preparedData, startIndex);
-                    diffWindow.ShowDialog();
+                            var diffWindow = _serviceProvider.GetRequiredService<JsonDiffWindow>();
+                            diffWindow.Owner = owner;
+                            diffWindow.LoadingWindow = loadingWindow;
+                            await diffWindow.LoadAndDisplayPreloadedBatchAsync(preparedData, startIndex);
+                            diffWindow.ShowDialog();
+                        });
                 }
             }, "Batch WAD diff");
         }
@@ -418,6 +408,44 @@ namespace AssetsManager.Services.Core
                 _logService.LogError(ex, $"Error during {operationLabel}");
                 _customMessageBoxService.ShowError("Comparison Error", $"An unexpected error occurred while preparing the file for comparison. Details: {ex.Message}", owner);
             }
+        }
+
+        private async Task ProcessBatchInternalAsync<TResult>(
+            List<SerializableChunkDiff> diffs,
+            int startIndex,
+            string oldPbePath,
+            string newPbePath,
+            Window owner,
+            LoadingDiffWindow loadingWindow,
+            string fileTypeLabel,
+            Func<SerializableChunkDiff, string, object, object, string, string, Task<TResult>> processItemFunc,
+            Func<List<TResult>, Task> showWindowAction)
+        {
+            var preparedItems = new List<TResult>();
+            for (int i = 0; i < diffs.Count; i++)
+            {
+                var diff = diffs[i];
+                string ext = Path.GetExtension(diff.Path ?? diff.NewPath ?? diff.OldPath).ToLowerInvariant();
+                string currentFileType = fileTypeLabel ?? (ext == ".bnk" ? "audio bank" : "file");
+
+                loadingWindow.SetBatchIndex(i + 1, diffs.Count, currentFileType);
+                await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchLoadingFile);
+                var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+
+                await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFormattingFile);
+                var item = await processItemFunc(diff, dataType, oldData, newData, oldPath, newPath);
+                preparedItems.Add(item);
+
+                await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.BatchFileReady);
+            }
+
+            // [PROGRESS] 100% Reached before opening batch window
+            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
+            await Task.Delay(350);
+
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+
+            await showWindowAction(preparedItems);
         }
     }
 }
