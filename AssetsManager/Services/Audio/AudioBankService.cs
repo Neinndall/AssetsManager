@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.IO.Hashing;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -71,7 +72,48 @@ namespace AssetsManager.Services.Audio
             // Find any sounds that were not linked to an event and group them under "Unknown".
             AddUnknownSoundsNode(eventNodes, allWems);
 
+            // ADDITION: Add a technical summary node to detect changes in hidden parameters (volume, pitch, etc.)
+            AddTechnicalSummaryNode(eventNodes, eventsData, audioBnkData);
+
             return eventNodes;
+        }
+
+        private void AddTechnicalSummaryNode(List<AudioEventNode> eventNodes, byte[] eventsData, byte[] audioBnkData)
+        {
+            var techNode = new AudioEventNode 
+            { 
+                Name = "[BNK Technical Summary]",
+                TechnicalInfo = new AudioTechnicalMetadata()
+            };
+
+            ulong combinedHash = 0;
+
+            if (eventsData != null)
+            {
+                using var stream = new MemoryStream(eventsData);
+                var bnk = BnkParser.Parse(stream, _logService);
+                if (bnk?.Hirc != null)
+                {
+                    techNode.TechnicalInfo.ObjectCount += bnk.Hirc.Objects.Count;
+                    techNode.TechnicalInfo.TotalSize += eventsData.Length;
+                }
+                combinedHash ^= XxHash64.HashToUInt64(eventsData);
+            }
+            
+            if (audioBnkData != null)
+            {
+                using var stream = new MemoryStream(audioBnkData);
+                var bnk = BnkParser.Parse(stream, _logService);
+                if (bnk?.Hirc != null)
+                {
+                    techNode.TechnicalInfo.ObjectCount += bnk.Hirc.Objects.Count;
+                    techNode.TechnicalInfo.TotalSize += audioBnkData.Length;
+                }
+                combinedHash ^= XxHash64.HashToUInt64(audioBnkData);
+            }
+
+            techNode.TechnicalInfo.Checksum = combinedHash.ToString("X16");
+            eventNodes.Insert(0, techNode);
         }
 
         public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName, BinType binType)

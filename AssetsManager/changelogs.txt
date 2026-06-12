@@ -62,6 +62,7 @@ Improvements
   - Diff Viewer / Zero-Gap Loading Handover: The loading card is handed over atomically to the result window (activating before closing the loader) to eliminate flickering and focus drops. The entire loading lifecycle is now centralized in a single orchestrator, ensuring the progress bar completes smoothly to 100% across all diff entry points (including 3D models).
 
 Bug Fixes
+  - Diff Viewer / Fixed a "No differences found" issue in audio banks by adding a Technical Summary node that detects hidden internal parameter changes.
   - Comparator / Fixed an issue where single WadFile comparisons would save the game version as "null" in the history index.
   - History / Fixed a bug where deleting a WadFile entry from the history UI would not delete its physical backup folder from the disk.
   - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.

@@ -12,6 +12,16 @@ namespace AssetsManager.Views.Models.Audio
     {
         public List<AudioContainerNode> Containers { get; set; } = new List<AudioContainerNode>();
         public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
+        
+        // Technical metadata to detect changes in hidden parameters
+        public AudioTechnicalMetadata TechnicalInfo { get; set; }
+    }
+
+    public class AudioTechnicalMetadata
+    {
+        public int ObjectCount { get; set; }
+        public long TotalSize { get; set; }
+        public string Checksum { get; set; }
     }
 
     public class AudioContainerNode : AudioBankNode
