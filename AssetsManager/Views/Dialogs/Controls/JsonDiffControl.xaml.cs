@@ -236,9 +236,9 @@ namespace AssetsManager.Views.Dialogs.Controls
                 // Detection: Is this the first time the asset is being tracked?
                 ViewModel.IsInitialComparison = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(newText);
 
-                // Build metrics using the most efficient way (Raw blocks)
+                // Build metrics (Sizes)
                 ViewModel.UpdateMetrics(oldText, newText);
-                
+
                 // [PROGRESS] Only report granular updates if NOT in batch mode to avoid bar jumps
                 bool reportProgress = !ViewModel.IsBatchMode && ParentWindow != null && ParentWindow.LoadingWindow != null;
 
@@ -247,7 +247,8 @@ namespace AssetsManager.Views.Dialogs.Controls
                     await ParentWindow.LoadingWindow.SetStateAndRenderAsync(DiffLoadingState.CalculatingDifferences);
                 }
 
-                await Task.Run(() => BuildModelAndCounts());
+                // Calculate metrics (Ins/Del/Mod) - We need to do this once
+                await Task.Run(() => CalculateMetrics());
 
                 if (reportProgress)
                 {
@@ -264,7 +265,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void BuildModelAndCounts()
+        private void CalculateMetrics()
         {
             if (ViewModel.IsInitialComparison)
             {
@@ -274,28 +275,36 @@ namespace AssetsManager.Views.Dialogs.Controls
                 return;
             }
 
-            _originalDiffModel = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
-
-            int ins = 0, del = 0, oldMod = 0, newMod = 0;
-            foreach (var line in _originalDiffModel.NewText.Lines)
+            // We use SideBySideDiffBuilder as the "Source of Truth" for metrics.
+            // It's efficient because we'll reuse this model if the user stays in SBS mode.
+            var m = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
+            
+            int realIns = 0, realDel = 0, oldMod = 0, newMod = 0;
+            foreach (var line in m.NewText.Lines)
             {
-                if (line.Type == ChangeType.Inserted) ins++;
+                if (line.Type == ChangeType.Inserted) realIns++;
                 else if (line.Type == ChangeType.Modified) newMod++;
-
-                if (line.Type == ChangeType.Unchanged) line.Text = null;
             }
-            foreach (var line in _originalDiffModel.OldText.Lines)
+            foreach (var line in m.OldText.Lines)
             {
-                if (line.Type == ChangeType.Deleted) del++;
+                if (line.Type == ChangeType.Deleted) realDel++;
                 else if (line.Type == ChangeType.Modified) oldMod++;
-
-                if (line.Type == ChangeType.Unchanged) line.Text = null;
             }
 
-            ViewModel.InsertionsCount = ins;
-            ViewModel.DeletionsCount = del;
+            ViewModel.InsertionsCount = realIns;
+            ViewModel.DeletionsCount = realDel;
             ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
 
+            // MEMORY OPTIMIZATION: Discard unchanged text immediately to free RAM.
+            // We do this for BOTH sides of the model.
+            foreach (var line in m.OldText.Lines) if (line.Type == ChangeType.Unchanged) line.Text = null;
+            foreach (var line in m.NewText.Lines) if (line.Type == ChangeType.Unchanged) line.Text = null;
+
+            // If we are already in SideBySide mode, let's keep this model to avoid double calculation!
+            if (!ViewModel.IsInlineMode)
+            {
+                _originalDiffModel = m;
+            }
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
@@ -352,6 +361,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _unifiedModel = await Task.Run(() => 
                 {
                     var m = new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText);
+                    // MEMORY OPTIMIZATION: Discard unchanged text from model as we'll pull it from NEW source array if needed
                     foreach (var line in m.Lines)
                     {
                         if (line.Type == ChangeType.Unchanged) line.Text = null;
@@ -412,6 +422,7 @@ namespace AssetsManager.Views.Dialogs.Controls
                 _originalDiffModel = await Task.Run(() => 
                 {
                     var m = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
+                    // MEMORY OPTIMIZATION: Discard unchanged text from model
                     foreach (var line in m.OldText.Lines)
                     {
                         if (line.Type == ChangeType.Unchanged) line.Text = null;
