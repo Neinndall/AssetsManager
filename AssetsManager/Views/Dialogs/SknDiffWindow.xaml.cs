@@ -30,6 +30,8 @@ namespace AssetsManager.Views.Dialogs
         private SceneModel _newScene;
         private readonly List<MeshPartDiffItem> _partItems = new();
         private readonly List<ModelVisual3D> _diffOverlays = new();
+        private readonly Dictionary<string, MeshGeometry3D> _addedGeometryCache = new();
+        private readonly Dictionary<string, MeshGeometry3D> _removedGeometryCache = new();
 
         private EventHandler _oldCameraChangedHandler;
         private EventHandler _newCameraChangedHandler;
@@ -119,6 +121,8 @@ namespace AssetsManager.Views.Dialogs
             // Clear lists and scenes
             _partItems.Clear();
             _diffOverlays.Clear();
+            _addedGeometryCache.Clear();
+            _removedGeometryCache.Clear();
             if (_oldScene != null)
             {
                 _oldScene.Dispose();
@@ -182,6 +186,8 @@ namespace AssetsManager.Views.Dialogs
 
             OldViewport.ClearModels();
             NewViewport.ClearModels();
+            _addedGeometryCache.Clear();
+            _removedGeometryCache.Clear();
 
             if (oldData != null)
             {
@@ -235,6 +241,7 @@ namespace AssetsManager.Views.Dialogs
             VertexDeltaLabel.Text = $"{newVertices} ({(newVertices - oldVertices):+0;-0;0})";
             FaceDeltaLabel.Text = $"{newIndices / 3} ({((newIndices - oldIndices) / 3):+0;-0;0})";
 
+            PrecalculateGeometryDiffs();
             UpdateVisualHighlighting();
         }
 
@@ -275,125 +282,45 @@ namespace AssetsManager.Views.Dialogs
                     HighlightPart(newPart, Colors.DodgerBlue, isGhostMode ? 0.6 : 1.0);
                     HighlightPart(oldPart, Colors.DodgerBlue, isGhostMode ? 0.6 : 1.0);
 
-                    // Pre-calculate and extract newly added/deleted geometry pieces inside the modified part (e.g. piercings)
-                    var newMesh = newPart.Geometry.Geometry as MeshGeometry3D;
-                    var oldMesh = oldPart.Geometry.Geometry as MeshGeometry3D;
-                    if (newMesh != null && oldMesh != null)
+                    // Check cache for newly added geometry pieces inside this modified part (e.g. piercings)
+                    if (_addedGeometryCache.TryGetValue(newPart.Name, out var addedMesh))
                     {
-                        // 1. Detect added triangles (New geometry inside modified mesh)
-                        var oldPoints = new HashSet<string>();
-                        foreach (var pos in oldMesh.Positions)
+                        var greenBrush = new SolidColorBrush(Colors.Green) { Opacity = 1.0 };
+                        greenBrush.Freeze();
+                        var greenMaterial = new MaterialGroup();
+                        greenMaterial.Children.Add(new DiffuseMaterial(greenBrush));
+                        greenMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
+                        greenMaterial.Freeze();
+
+                        var addedModel = new GeometryModel3D(addedMesh, greenMaterial) { BackMaterial = greenMaterial };
+                        var addedVisual = new ModelVisual3D { Content = addedModel };
+
+                        NewViewport.Viewport3D.Children.Add(addedVisual);
+                        _diffOverlays.Add(addedVisual);
+
+                        if (isCombined)
                         {
-                            oldPoints.Add($"{(pos.X):F1}_{(pos.Y):F1}_{(pos.Z):F1}");
+                            var combinedAddedVisual = new ModelVisual3D { Content = addedModel };
+                            OldViewport.Viewport3D.Children.Add(combinedAddedVisual);
+                            _diffOverlays.Add(combinedAddedVisual);
                         }
+                    }
 
-                        var addedMesh = new MeshGeometry3D();
-                        var addedMap = new Dictionary<int, int>();
+                    // Check cache for newly deleted geometry pieces inside this modified part
+                    if (_removedGeometryCache.TryGetValue(newPart.Name, out var removedMesh))
+                    {
+                        var redBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.8 };
+                        redBrush.Freeze();
+                        var redMaterial = new MaterialGroup();
+                        redMaterial.Children.Add(new DiffuseMaterial(redBrush));
+                        redMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
+                        redMaterial.Freeze();
 
-                        for (int i = 0; i < newMesh.TriangleIndices.Count; i += 3)
-                        {
-                            int i1 = newMesh.TriangleIndices[i];
-                            int i2 = newMesh.TriangleIndices[i + 1];
-                            int i3 = newMesh.TriangleIndices[i + 2];
+                        var removedModel = new GeometryModel3D(removedMesh, redMaterial) { BackMaterial = redMaterial };
+                        var removedVisual = new ModelVisual3D { Content = removedModel };
 
-                            var p1 = newMesh.Positions[i1];
-                            var p2 = newMesh.Positions[i2];
-                            var p3 = newMesh.Positions[i3];
-
-                            string k1 = $"{(p1.X):F1}_{(p1.Y):F1}_{(p1.Z):F1}";
-                            string k2 = $"{(p2.X):F1}_{(p2.Y):F1}_{(p2.Z):F1}";
-                            string k3 = $"{(p3.X):F1}_{(p3.Y):F1}_{(p3.Z):F1}";
-
-                            bool isNew = !oldPoints.Contains(k1) || !oldPoints.Contains(k2) || !oldPoints.Contains(k3);
-                            if (isNew)
-                            {
-                                int n1 = GetOrCreateVertex(i1, p1, newMesh, addedMesh, addedMap);
-                                int n2 = GetOrCreateVertex(i2, p2, newMesh, addedMesh, addedMap);
-                                int n3 = GetOrCreateVertex(i3, p3, newMesh, addedMesh, addedMap);
-
-                                addedMesh.TriangleIndices.Add(n1);
-                                addedMesh.TriangleIndices.Add(n2);
-                                addedMesh.TriangleIndices.Add(n3);
-                            }
-                        }
-
-                        if (addedMesh.TriangleIndices.Count > 0)
-                        {
-                            addedMesh.Freeze();
-                            var greenBrush = new SolidColorBrush(Colors.Green) { Opacity = 1.0 };
-                            greenBrush.Freeze();
-                            var greenMaterial = new MaterialGroup();
-                            greenMaterial.Children.Add(new DiffuseMaterial(greenBrush));
-                            greenMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
-                            greenMaterial.Freeze();
-
-                            var addedModel = new GeometryModel3D(addedMesh, greenMaterial) { BackMaterial = greenMaterial };
-                            var addedVisual = new ModelVisual3D { Content = addedModel };
-
-                            NewViewport.Viewport3D.Children.Add(addedVisual);
-                            _diffOverlays.Add(addedVisual);
-
-                            if (isCombined)
-                            {
-                                var combinedAddedVisual = new ModelVisual3D { Content = addedModel };
-                                OldViewport.Viewport3D.Children.Add(combinedAddedVisual);
-                                _diffOverlays.Add(combinedAddedVisual);
-                            }
-                        }
-
-                        // 2. Detect removed triangles (Deleted geometry inside modified mesh)
-                        var newPoints = new HashSet<string>();
-                        foreach (var pos in newMesh.Positions)
-                        {
-                            newPoints.Add($"{(pos.X):F1}_{(pos.Y):F1}_{(pos.Z):F1}");
-                        }
-
-                        var removedMesh = new MeshGeometry3D();
-                        var removedMap = new Dictionary<int, int>();
-
-                        for (int i = 0; i < oldMesh.TriangleIndices.Count; i += 3)
-                        {
-                            int i1 = oldMesh.TriangleIndices[i];
-                            int i2 = oldMesh.TriangleIndices[i + 1];
-                            int i3 = oldMesh.TriangleIndices[i + 2];
-
-                            var p1 = oldMesh.Positions[i1];
-                            var p2 = oldMesh.Positions[i2];
-                            var p3 = oldMesh.Positions[i3];
-
-                            string k1 = $"{(p1.X):F1}_{(p1.Y):F1}_{(p1.Z):F1}";
-                            string k2 = $"{(p2.X):F1}_{(p2.Y):F1}_{(p2.Z):F1}";
-                            string k3 = $"{(p3.X):F1}_{(p3.Y):F1}_{(p3.Z):F1}";
-
-                            bool isDeleted = !newPoints.Contains(k1) || !newPoints.Contains(k2) || !newPoints.Contains(k3);
-                            if (isDeleted)
-                            {
-                                int n1 = GetOrCreateVertex(i1, p1, oldMesh, removedMesh, removedMap);
-                                int n2 = GetOrCreateVertex(i2, p2, oldMesh, removedMesh, removedMap);
-                                int n3 = GetOrCreateVertex(i3, p3, oldMesh, removedMesh, removedMap);
-
-                                removedMesh.TriangleIndices.Add(n1);
-                                removedMesh.TriangleIndices.Add(n2);
-                                removedMesh.TriangleIndices.Add(n3);
-                            }
-                        }
-
-                        if (removedMesh.TriangleIndices.Count > 0)
-                        {
-                            removedMesh.Freeze();
-                            var redBrush = new SolidColorBrush(Colors.Red) { Opacity = 0.8 };
-                            redBrush.Freeze();
-                            var redMaterial = new MaterialGroup();
-                            redMaterial.Children.Add(new DiffuseMaterial(redBrush));
-                            redMaterial.Children.Add(new SpecularMaterial(Brushes.White, 40.0));
-                            redMaterial.Freeze();
-
-                            var removedModel = new GeometryModel3D(removedMesh, redMaterial) { BackMaterial = redMaterial };
-                            var removedVisual = new ModelVisual3D { Content = removedModel };
-
-                            OldViewport.Viewport3D.Children.Add(removedVisual);
-                            _diffOverlays.Add(removedVisual);
-                        }
+                        OldViewport.Viewport3D.Children.Add(removedVisual);
+                        _diffOverlays.Add(removedVisual);
                     }
                 }
                 else
@@ -762,6 +689,137 @@ namespace AssetsManager.Views.Dialogs
 
             map[origIdx] = idx;
             return idx;
+        }
+
+        private void PrecalculateGeometryDiffs()
+        {
+            _addedGeometryCache.Clear();
+            _removedGeometryCache.Clear();
+
+            if (_oldScene == null || _newScene == null) return;
+
+            foreach (var newPart in _newScene.Parts)
+            {
+                var oldPart = _oldScene.Parts.FirstOrDefault(p => p.Name == newPart.Name);
+                if (oldPart == null || ArePartsEqual(oldPart, newPart)) continue;
+
+                var newMesh = newPart.Geometry?.Geometry as MeshGeometry3D;
+                var oldMesh = oldPart.Geometry?.Geometry as MeshGeometry3D;
+                if (newMesh == null || oldMesh == null) continue;
+
+                // 1. Detect added triangles (New geometry inside modified mesh)
+                var oldPoints = new HashSet<VertexKey>();
+                foreach (var pos in oldMesh.Positions)
+                {
+                    oldPoints.Add(new VertexKey(pos));
+                }
+
+                var addedMesh = new MeshGeometry3D();
+                var addedMap = new Dictionary<int, int>();
+
+                for (int i = 0; i < newMesh.TriangleIndices.Count; i += 3)
+                {
+                    int i1 = newMesh.TriangleIndices[i];
+                    int i2 = newMesh.TriangleIndices[i + 1];
+                    int i3 = newMesh.TriangleIndices[i + 2];
+
+                    var p1 = newMesh.Positions[i1];
+                    var p2 = newMesh.Positions[i2];
+                    var p3 = newMesh.Positions[i3];
+
+                    bool isNew = !oldPoints.Contains(new VertexKey(p1)) || 
+                                 !oldPoints.Contains(new VertexKey(p2)) || 
+                                 !oldPoints.Contains(new VertexKey(p3));
+
+                    if (isNew)
+                    {
+                        int n1 = GetOrCreateVertex(i1, p1, newMesh, addedMesh, addedMap);
+                        int n2 = GetOrCreateVertex(i2, p2, newMesh, addedMesh, addedMap);
+                        int n3 = GetOrCreateVertex(i3, p3, newMesh, addedMesh, addedMap);
+
+                        addedMesh.TriangleIndices.Add(n1);
+                        addedMesh.TriangleIndices.Add(n2);
+                        addedMesh.TriangleIndices.Add(n3);
+                    }
+                }
+
+                if (addedMesh.TriangleIndices.Count > 0)
+                {
+                    addedMesh.Freeze();
+                    _addedGeometryCache[newPart.Name] = addedMesh;
+                }
+
+                // 2. Detect removed triangles (Deleted geometry inside modified mesh)
+                var newPoints = new HashSet<VertexKey>();
+                foreach (var pos in newMesh.Positions)
+                {
+                    newPoints.Add(new VertexKey(pos));
+                }
+
+                var removedMesh = new MeshGeometry3D();
+                var removedMap = new Dictionary<int, int>();
+
+                for (int i = 0; i < oldMesh.TriangleIndices.Count; i += 3)
+                {
+                    int i1 = oldMesh.TriangleIndices[i];
+                    int i2 = oldMesh.TriangleIndices[i + 1];
+                    int i3 = oldMesh.TriangleIndices[i + 2];
+
+                    var p1 = oldMesh.Positions[i1];
+                    var p2 = oldMesh.Positions[i2];
+                    var p3 = oldMesh.Positions[i3];
+
+                    bool isDeleted = !newPoints.Contains(new VertexKey(p1)) || 
+                                     !newPoints.Contains(new VertexKey(p2)) || 
+                                     !newPoints.Contains(new VertexKey(p3));
+
+                    if (isDeleted)
+                    {
+                        int n1 = GetOrCreateVertex(i1, p1, oldMesh, removedMesh, removedMap);
+                        int n2 = GetOrCreateVertex(i2, p2, oldMesh, removedMesh, removedMap);
+                        int n3 = GetOrCreateVertex(i3, p3, oldMesh, removedMesh, removedMap);
+
+                        removedMesh.TriangleIndices.Add(n1);
+                        removedMesh.TriangleIndices.Add(n2);
+                        removedMesh.TriangleIndices.Add(n3);
+                    }
+                }
+
+                if (removedMesh.TriangleIndices.Count > 0)
+                {
+                    removedMesh.Freeze();
+                    _removedGeometryCache[newPart.Name] = removedMesh;
+                }
+            }
+        }
+
+        private struct VertexKey : IEquatable<VertexKey>
+        {
+            public readonly int X;
+            public readonly int Y;
+            public readonly int Z;
+
+            public VertexKey(Point3D point)
+            {
+                X = (int)Math.Round(point.X * 10.0);
+                Y = (int)Math.Round(point.Y * 10.0);
+                Z = (int)Math.Round(point.Z * 10.0);
+            }
+
+            public bool Equals(VertexKey other)
+            {
+                return X == other.X && Y == other.Y && Z == other.Z;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is VertexKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(X, Y, Z);
+            }
         }
     }
 
