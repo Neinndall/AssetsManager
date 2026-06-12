@@ -707,90 +707,62 @@ namespace AssetsManager.Views.Dialogs
                 var oldMesh = oldPart.Geometry?.Geometry as MeshGeometry3D;
                 if (newMesh == null || oldMesh == null) continue;
 
-                // 1. Detect added triangles (New geometry inside modified mesh)
-                var oldPoints = new HashSet<VertexKey>();
-                foreach (var pos in oldMesh.Positions)
-                {
-                    oldPoints.Add(new VertexKey(pos));
-                }
-
-                var addedMesh = new MeshGeometry3D();
-                var addedMap = new Dictionary<int, int>();
-
-                for (int i = 0; i < newMesh.TriangleIndices.Count; i += 3)
-                {
-                    int i1 = newMesh.TriangleIndices[i];
-                    int i2 = newMesh.TriangleIndices[i + 1];
-                    int i3 = newMesh.TriangleIndices[i + 2];
-
-                    var p1 = newMesh.Positions[i1];
-                    var p2 = newMesh.Positions[i2];
-                    var p3 = newMesh.Positions[i3];
-
-                    bool isNew = !oldPoints.Contains(new VertexKey(p1)) || 
-                                 !oldPoints.Contains(new VertexKey(p2)) || 
-                                 !oldPoints.Contains(new VertexKey(p3));
-
-                    if (isNew)
-                    {
-                        int n1 = GetOrCreateVertex(i1, p1, newMesh, addedMesh, addedMap);
-                        int n2 = GetOrCreateVertex(i2, p2, newMesh, addedMesh, addedMap);
-                        int n3 = GetOrCreateVertex(i3, p3, newMesh, addedMesh, addedMap);
-
-                        addedMesh.TriangleIndices.Add(n1);
-                        addedMesh.TriangleIndices.Add(n2);
-                        addedMesh.TriangleIndices.Add(n3);
-                    }
-                }
-
-                if (addedMesh.TriangleIndices.Count > 0)
+                // 1. Detect added triangles (Old -> New)
+                var addedMesh = ExtractDifferenceMesh(oldMesh, newMesh);
+                if (addedMesh != null)
                 {
                     addedMesh.Freeze();
                     _addedGeometryCache[newPart.Name] = addedMesh;
                 }
 
-                // 2. Detect removed triangles (Deleted geometry inside modified mesh)
-                var newPoints = new HashSet<VertexKey>();
-                foreach (var pos in newMesh.Positions)
-                {
-                    newPoints.Add(new VertexKey(pos));
-                }
-
-                var removedMesh = new MeshGeometry3D();
-                var removedMap = new Dictionary<int, int>();
-
-                for (int i = 0; i < oldMesh.TriangleIndices.Count; i += 3)
-                {
-                    int i1 = oldMesh.TriangleIndices[i];
-                    int i2 = oldMesh.TriangleIndices[i + 1];
-                    int i3 = oldMesh.TriangleIndices[i + 2];
-
-                    var p1 = oldMesh.Positions[i1];
-                    var p2 = oldMesh.Positions[i2];
-                    var p3 = oldMesh.Positions[i3];
-
-                    bool isDeleted = !newPoints.Contains(new VertexKey(p1)) || 
-                                     !newPoints.Contains(new VertexKey(p2)) || 
-                                     !newPoints.Contains(new VertexKey(p3));
-
-                    if (isDeleted)
-                    {
-                        int n1 = GetOrCreateVertex(i1, p1, oldMesh, removedMesh, removedMap);
-                        int n2 = GetOrCreateVertex(i2, p2, oldMesh, removedMesh, removedMap);
-                        int n3 = GetOrCreateVertex(i3, p3, oldMesh, removedMesh, removedMap);
-
-                        removedMesh.TriangleIndices.Add(n1);
-                        removedMesh.TriangleIndices.Add(n2);
-                        removedMesh.TriangleIndices.Add(n3);
-                    }
-                }
-
-                if (removedMesh.TriangleIndices.Count > 0)
+                // 2. Detect removed triangles (New -> Old)
+                var removedMesh = ExtractDifferenceMesh(newMesh, oldMesh);
+                if (removedMesh != null)
                 {
                     removedMesh.Freeze();
                     _removedGeometryCache[newPart.Name] = removedMesh;
                 }
             }
+        }
+
+        private MeshGeometry3D ExtractDifferenceMesh(MeshGeometry3D sourceMesh, MeshGeometry3D targetMesh)
+        {
+            var sourcePoints = new HashSet<VertexKey>();
+            foreach (var pos in sourceMesh.Positions)
+            {
+                sourcePoints.Add(new VertexKey(pos));
+            }
+
+            var diffMesh = new MeshGeometry3D();
+            var diffMap = new Dictionary<int, int>();
+
+            for (int i = 0; i < targetMesh.TriangleIndices.Count; i += 3)
+            {
+                int i1 = targetMesh.TriangleIndices[i];
+                int i2 = targetMesh.TriangleIndices[i + 1];
+                int i3 = targetMesh.TriangleIndices[i + 2];
+
+                var p1 = targetMesh.Positions[i1];
+                var p2 = targetMesh.Positions[i2];
+                var p3 = targetMesh.Positions[i3];
+
+                bool isDiff = !sourcePoints.Contains(new VertexKey(p1)) || 
+                              !sourcePoints.Contains(new VertexKey(p2)) || 
+                              !sourcePoints.Contains(new VertexKey(p3));
+
+                if (isDiff)
+                {
+                    int n1 = GetOrCreateVertex(i1, p1, targetMesh, diffMesh, diffMap);
+                    int n2 = GetOrCreateVertex(i2, p2, targetMesh, diffMesh, diffMap);
+                    int n3 = GetOrCreateVertex(i3, p3, targetMesh, diffMesh, diffMap);
+
+                    diffMesh.TriangleIndices.Add(n1);
+                    diffMesh.TriangleIndices.Add(n2);
+                    diffMesh.TriangleIndices.Add(n3);
+                }
+            }
+
+            return diffMesh.TriangleIndices.Count > 0 ? diffMesh : null;
         }
 
         private struct VertexKey : IEquatable<VertexKey>
