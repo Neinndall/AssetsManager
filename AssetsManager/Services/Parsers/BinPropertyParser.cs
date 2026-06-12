@@ -420,7 +420,7 @@ namespace AssetsManager.Services.Parsers
             sb.Append("[");
             for (uint i = 0; i < itemCount; i++)
             {
-                if (i > 0) sb.Append(",");
+                if (i > 0) sb.Append(", ");
 
                 switch (itemType)
                 {
@@ -472,7 +472,7 @@ namespace AssetsManager.Services.Parsers
             bool first = true;
             foreach (var p in container.Elements)
             {
-                if (!first) sb.Append(",");
+                if (!first) sb.Append(", ");
                 first = false;
 
                 if (p == null) sb.Append("null");

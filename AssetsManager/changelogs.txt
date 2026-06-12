@@ -27,10 +27,12 @@ New Features
   - Diff Viewer / Interactive Mesh Visibility Overlay: Added a floating, draggable panel for Mesh Parts overlay to allow flexible placement and unobstructed view of the 3D models.
 
 Improvements
+  - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 99% and preventing OOM spikes during parsing.
+  - Diff Viewer / Implemented Lazy Loading for comparison models, calculating Side-by-Side or Inline views only when they are actually visible.
+  - Diff Viewer / Memory Trimming: significantly reduced RAM footprint in large text diffs by discarding redundant source text after change detection.
+  - Diff Viewer / GPU Stability: implemented resource freezing for navigation markers and guide pens to eliminate GPU usage spikes during scroll.
+  - Core / Fixed a critical misalignment in the .bin property parser that caused catastrophic memory allocations in files containing optional values.
   - History / Renamed the "Individuals" tab to "WadFile" and "Sync Backups" to "Sync History" for better clarity and consistency.
-  - Diff Viewer / The visual difference viewer is now fully enabled for newly created audio banks, displaying proper event names instead of raw code.
-  - Diff Viewer / Progress bar animation is now strictly forward-moving, fixing a visual jump backwards when switching from audio loading to text analysis.
-  - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 50% and preventing OOM spikes during parsing.
   - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
   - Explorer / JS Formatting & Highlighting: Integrated Jsbeautifier for cleaner, professional-grade JavaScript file formatting and enabled syntax highlighting for JS files of any size without crashes.
   - Architecture / Centralized File Type Checks: Refactored type-checking logic across grid, previewer, and tab views into unified helper methods in SupportedFileTypes, and moved file extension normalization to PathUtils to consolidate path utilities.
