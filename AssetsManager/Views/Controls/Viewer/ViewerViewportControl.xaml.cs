@@ -532,17 +532,14 @@ namespace AssetsManager.Views.Controls.Viewer
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
 
             // Dynamically calculate camera view based on loaded model's bounding box
-            if (_activeSceneModel != null && _activeSceneModel.Parts != null && _activeSceneModel.Parts.Count > 0)
+            if (_activeSceneModel?.Parts?.Count > 0)
             {
                 var bounds = Rect3D.Empty;
                 foreach (var part in _activeSceneModel.Parts)
                 {
                     if (part.Geometry?.Geometry is MeshGeometry3D mesh)
                     {
-                        foreach (var pos in mesh.Positions)
-                        {
-                            bounds.Union(pos);
-                        }
+                        bounds.Union(mesh.Bounds);
                     }
                 }
 
@@ -598,22 +595,21 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
 
             // Compute dynamic target center and distance if model is available
-            Point3D targetPoint = new Point3D(0, 90.00, 0);
+            double baselineY = Panel?.ViewModel?.IsMapMode == true || IsDiffMode ? 0 : 2000;
+            Point3D targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             double distance = 300.00;
 
-            if (_activeSceneModel != null && _activeSceneModel.Parts != null && _activeSceneModel.Parts.Count > 0)
+            if (_activeSceneModel?.Parts?.Count > 0)
             {
                 var bounds = Rect3D.Empty;
                 foreach (var part in _activeSceneModel.Parts)
                 {
                     if (part.Geometry?.Geometry is MeshGeometry3D mesh)
                     {
-                        foreach (var pos in mesh.Positions)
-                        {
-                            bounds.Union(pos);
-                        }
+                        bounds.Union(mesh.Bounds);
                     }
                 }
+
                 if (!bounds.IsEmpty)
                 {
                     double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
@@ -623,21 +619,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
                     double maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
                     if (maxDim <= 0) maxDim = 150;
-                    
-                    bool isMap = Panel?.ViewModel?.IsMapMode == true;
-                    distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
+
+                    distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.8) * maxDim;
                     if (distance < 50) distance = 250;
                 }
-                else
-                {
-                    double baselineY = Panel?.ViewModel?.IsMapMode == true ? 0 : (IsDiffMode ? 0 : 2000);
-                    targetPoint = new Point3D(0, 90.00 + baselineY, 0);
-                }
-            }
-            else
-            {
-                double baselineY = Panel?.ViewModel?.IsMapMode == true ? 0 : (IsDiffMode ? 0 : 2000);
-                targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             }
 
             Vector3D lookDirection;
