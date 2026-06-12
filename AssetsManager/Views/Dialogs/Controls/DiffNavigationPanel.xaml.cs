@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public int CurrentLine { get; set; }
 
         private readonly SolidColorBrush _backgroundPanelBrush, _addedBrush, _removedBrush, _modifiedBrush, _imaginaryBrush, _viewportBrush;
+        private readonly Pen _viewportPen;
         private DrawingVisual _oldViewportGuide, _newViewportGuide;
 
         public DiffNavigationPanel()
@@ -45,6 +46,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             _modifiedBrush.Freeze();
             _imaginaryBrush.Freeze();
             _viewportBrush.Freeze();
+
+            _viewportPen = new Pen(_viewportBrush, 1);
+            _viewportPen.Freeze();
 
             this.Unloaded += DiffNavigationPanel_Unloaded;
         }
@@ -230,7 +234,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             using (var dc = guide.RenderOpen())
             {
-                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
+                dc.DrawRectangle(null, _viewportPen, new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
                 dc.DrawRectangle(_viewportBrush, null, new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
             }
         }
@@ -388,7 +392,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             using (var dc = guide.RenderOpen())
             {
-                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
+                dc.DrawRectangle(null, _viewportPen, new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
                 dc.DrawRectangle(_viewportBrush, null, new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
             }
         }
