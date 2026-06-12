@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -135,35 +136,48 @@ namespace AssetsManager.Services.Parsers
 
                 // The rest of the stream is the data block
                 long dataOffset = reader.BaseStream.Position;
-                byte[] data = reader.ReadBytes((int)(reader.BaseStream.Length - dataOffset));
-
-                foreach (var (offset, hash) in entryInfos)
+                int dataLength = (int)(reader.BaseStream.Length - dataOffset);
+                byte[] data = ArrayPool<byte>.Shared.Rent(dataLength);
+                try
                 {
-                    long relativeOffset = (long)offset;
-
-                    if (relativeOffset < 0 || relativeOffset >= data.Length)
+                    int bytesRead = 0;
+                    while (bytesRead < dataLength)
                     {
-                        // Invalid offset, skip this entry
-                        continue;
+                        int r = reader.Read(data, bytesRead, dataLength - bytesRead);
+                        if (r == 0) break;
+                        bytesRead += r;
                     }
 
-                    if (hasTrenc && data[relativeOffset] == 0xFF)
+                    foreach (var (offset, hash) in entryInfos)
                     {
-                        int size = BitConverter.ToUInt16(data, (int)relativeOffset + 1);
-                        byte[] base64Data = new byte[size];
-                        Array.Copy(data, (int)relativeOffset + 3, base64Data, 0, size);
-                        entries[hash] = Convert.ToBase64String(base64Data);
-                    }
-                    else
-                    {
-                        int end = Array.IndexOf(data, (byte)0, (int)relativeOffset);
-                        if (end == -1)
+                        long relativeOffset = (long)offset;
+
+                        if (relativeOffset < 0 || relativeOffset >= dataLength)
                         {
-                            end = data.Length;
+                            // Invalid offset, skip this entry
+                            continue;
                         }
-                        string text = Encoding.UTF8.GetString(data, (int)relativeOffset, end - (int)relativeOffset);
-                        entries[hash] = text;
+
+                        if (hasTrenc && data[relativeOffset] == 0xFF)
+                        {
+                            int size = BitConverter.ToUInt16(data, (int)relativeOffset + 1);
+                            entries[hash] = Convert.ToBase64String(data, (int)relativeOffset + 3, size);
+                        }
+                        else
+                        {
+                            int end = Array.IndexOf(data, (byte)0, (int)relativeOffset, dataLength - (int)relativeOffset);
+                            if (end == -1)
+                            {
+                                end = dataLength;
+                            }
+                            string text = Encoding.UTF8.GetString(data, (int)relativeOffset, end - (int)relativeOffset);
+                            entries[hash] = text;
+                        }
                     }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(data);
                 }
             }
             return (entries, hashBits, version);

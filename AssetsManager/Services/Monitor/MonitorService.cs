@@ -42,7 +42,10 @@ namespace AssetsManager.Services.Monitor
 
         public void Dispose()
         {
-            _assetWatcherService.AssetUpdated -= OnAssetUpdated;
+            if (_assetWatcherService != null)
+            {
+                _assetWatcherService.AssetUpdated -= OnAssetUpdated;
+            }
         }
 
         public void LoadMonitoredAssets()
@@ -314,7 +317,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task CheckAssetsAsync(List<TrackedAsset> assetsToCheck, AssetCategory category, CancellationToken cancellationToken)
         {
-            Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.Checking);
+            await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             CategoryCheckStarted?.Invoke(category);
             try
             {
@@ -349,11 +352,18 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
+                _ = Task.Run(async () =>
                 {
-                    category.Status = CategoryStatus.CompletedSuccess;
-                    await Task.Delay(3000);
-                    category.Status = CategoryStatus.Idle;
+                    try
+                    {
+                        await Task.Delay(3000);
+                        await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to reset category status after delay.");
+                    }
                 });
             }
         }
@@ -371,7 +381,7 @@ namespace AssetsManager.Services.Monitor
 
         private async Task<bool> _CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
         {
-            Application.Current.Dispatcher.Invoke(() => category.Status = CategoryStatus.Checking);
+            await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             try
             {
                 CategoryCheckStarted?.Invoke(category);
@@ -416,11 +426,18 @@ namespace AssetsManager.Services.Monitor
             }
             finally
             {
-                await Application.Current.Dispatcher.InvokeAsync(async () =>
+                await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.CompletedSuccess);
+                _ = Task.Run(async () =>
                 {
-                    category.Status = CategoryStatus.CompletedSuccess;
-                    await Task.Delay(3000);
-                    category.Status = CategoryStatus.Idle;
+                    try
+                    {
+                        await Task.Delay(3000);
+                        await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Idle);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to reset category status after delay.");
+                    }
                 });
             }
         }

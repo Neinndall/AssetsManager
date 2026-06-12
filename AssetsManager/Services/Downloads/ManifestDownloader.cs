@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.IO;
@@ -27,8 +28,6 @@ public class ManifestDownloader
     
     // Pools de recursos reutilizables
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
-    private readonly ConcurrentBag<byte[]> _skipBufferPool = new ConcurrentBag<byte[]>();
-    private readonly ConcurrentBag<byte[]> _compBufferPool = new ConcurrentBag<byte[]>();
 
     public event Action<string, string, int, int> ProgressChanged;
 
@@ -41,8 +40,6 @@ public class ManifestDownloader
         
         // Inicializar pools
         for (int i = 0; i < 4; i++) _decompressorPool.Push(new Decompressor());
-        for (int i = 0; i < 16; i++) _skipBufferPool.Add(new byte[64 * 1024]);
-        for (int i = 0; i < 16; i++) _compBufferPool.Add(new byte[256 * 1024]);
     }
 
     private class ChunkDownloadTask
@@ -320,31 +317,40 @@ public class ManifestDownloader
                             long gap = (long)t.Chunk.ChunkId == 0 ? 0 : (long)t.Chunk.BundleOffset - currentStreamPos; 
                             if (gap > 0)
                             {
-                                byte[] skipBuf = _skipBufferPool.TryTake(out var b) ? b : new byte[64 * 1024];
-                                long skipped = 0;
-                                while (skipped < gap)
+                                int skipSize = 64 * 1024;
+                                byte[] skipBuf = ArrayPool<byte>.Shared.Rent(skipSize);
+                                try
                                 {
-                                    int read = await responseStream.ReadAsync(skipBuf, 0, (int)Math.Min(gap - skipped, skipBuf.Length), cancellationToken);
-                                    if (read == 0) break;
-                                    skipped += read;
+                                    long skipped = 0;
+                                    while (skipped < gap)
+                                    {
+                                        int read = await responseStream.ReadAsync(skipBuf, 0, (int)Math.Min(gap - skipped, skipSize), cancellationToken);
+                                        if (read == 0) break;
+                                        skipped += read;
+                                    }
+                                    Interlocked.Add(ref wastedBytes, skipped);
                                 }
-                                Interlocked.Add(ref wastedBytes, skipped);
-                                _skipBufferPool.Add(skipBuf);
+                                finally
+                                {
+                                    ArrayPool<byte>.Shared.Return(skipBuf);
+                                }
                             }
 
-                            byte[] comp = new byte[t.Chunk.CompressedSize];
+                            byte[] comp = ArrayPool<byte>.Shared.Rent((int)t.Chunk.CompressedSize);
                             int tRead = 0;
-                            while (tRead < (int)t.Chunk.CompressedSize)
+                            try
                             {
-                                int r = await responseStream.ReadAsync(comp, tRead, (int)t.Chunk.CompressedSize - tRead, cancellationToken);
-                                if (r == 0) break;
-                                tRead += r;
-                            }
-                            Interlocked.Add(ref totalDownloaded, tRead + (gap > 0 ? gap : 0));
-                            currentStreamPos = (long)t.Chunk.BundleOffset + tRead;
+                                while (tRead < (int)t.Chunk.CompressedSize)
+                                {
+                                    int r = await responseStream.ReadAsync(comp, tRead, (int)t.Chunk.CompressedSize - tRead, cancellationToken);
+                                    if (r == 0) break;
+                                    tRead += r;
+                                }
+                                Interlocked.Add(ref totalDownloaded, tRead + (gap > 0 ? gap : 0));
+                                currentStreamPos = (long)t.Chunk.BundleOffset + tRead;
 
-                            await cpuSem.WaitAsync(cancellationToken);
-                            try {
+                                await cpuSem.WaitAsync(cancellationToken);
+                                try {
                                 cancellationToken.ThrowIfCancellationRequested();
                                 if (!_decompressorPool.TryPop(out var decompressor)) decompressor = new Decompressor();
                                 try {
@@ -395,11 +401,12 @@ public class ManifestDownloader
                                     }
                                 } finally { _decompressorPool.Push(decompressor); }
                             } finally { cpuSem.Release(); }
+                            } finally { ArrayPool<byte>.Shared.Return(comp); }
                         }
                     }
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { _logService.LogWarning($"Bundle {bundleEntry.Key:X16} error: {ex.Message}"); }
+                catch (Exception ex) { _logService.LogError(ex, $"Bundle {bundleEntry.Key:X16} processing error"); }
                 finally { netSem.Release(); }
             });
             await Task.WhenAll(tasks);

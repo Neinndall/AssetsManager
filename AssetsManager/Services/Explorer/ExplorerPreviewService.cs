@@ -3,6 +3,7 @@ using System.Xml;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Windows;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -39,31 +40,33 @@ namespace AssetsManager.Services.Explorer
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadDiffProvider _wadDiffProvider;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
+        private readonly DiffViewService _diffViewService;
+
+        private bool _isGridActive;
 
         public ExplorerPreviewService(
             LogService logService, 
             DirectoriesCreator directoriesCreator, 
-            WadDiffProvider wadDiffProvider, 
             ContentFormatterService contentFormatterService, 
             AudioConversionService audioConversionService, 
             WadContentProvider wadContentProvider,
             SvgParser svgParser,
-            NarrativeMetadataService narrativeMetadataService)
+            NarrativeMetadataService narrativeMetadataService,
+            DiffViewService diffViewService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _wadDiffProvider = wadDiffProvider;
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
             _svgParser = svgParser;
             _narrativeMetadataService = narrativeMetadataService;
+            _diffViewService = diffViewService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -82,6 +85,7 @@ namespace AssetsManager.Services.Explorer
                 // If we've already started browsing files, we DON'T reset. 
                 if (_viewModel.HasEverPreviewedAFile)
                 {
+                    _isGridActive = true;
                     return;
                 }
 
@@ -104,8 +108,23 @@ namespace AssetsManager.Services.Explorer
                 if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer) return;
             }
 
-            // Step 1: Tell the ViewModel to prepare the correct slot (Image or Content)
-            _viewModel.PrepareSlotForFile(node);
+            // Step 1: Prepare the correct slot (Image or Content)
+            PrepareSlotForFile(node);
+
+            // Step 1b: If transitioning from grid/folder view, hide old content immediately.
+            // The grid was showing and the preview content is stale — reset visibility
+            // so the new file appears cleanly without flashing old content.
+            // For file→file transitions, old content stays as a placeholder during I/O.
+            if (_isGridActive)
+            {
+                _isGridActive = false;
+                if (!isImage)
+                {
+                    _viewModel.IsContentVisible = true;
+                }
+                _viewModel.IsTextVisible = false;
+                _viewModel.IsWebVisible = false;
+            }
 
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
             // We only update/clear metadata if the current node is an image. 
@@ -124,9 +143,9 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                _textEditorPreview.Clear();
-                // Note: WebView cleanup is handled inside SetPreviewerAsync 
-                // when the new media is ready to be injected.
+                // Keep old content visible until new data is ready in SetPreviewerAsync.
+                // This prevents both the blank ContentPanel flash (Dual View collapsing)
+                // and the empty TextEditor flash during async I/O + parsing.
                 _currentContentNode = node;
             }
 
@@ -165,6 +184,47 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.StatusPanel);
         }
 
+        public void PrepareSlotForFile(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            _viewModel.IsWelcomeVisible = false;
+            _viewModel.HasEverPreviewedAFile = true;
+
+            bool isImage = node.Extension != null &&
+                (SupportedFileTypes.Images.Contains(node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+
+            if (isImage)
+            {
+                _viewModel.IsImageUnsupportedVisible = false;
+            }
+            else
+            {
+                _viewModel.IsUnsupportedVisible = false;
+                _viewModel.IsContentVisible = true;
+            }
+        }
+
+        public void CloseSlotByCategory(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            bool isImage = node.Extension != null &&
+                (SupportedFileTypes.Images.Contains(node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+
+            bool hasMoreOfSameCategory = _viewModel.PinnedFilesManager.PinnedFiles.Any(p =>
+                p.Node != node &&
+                (SupportedFileTypes.Images.Contains(p.Node.Extension) ||
+                 SupportedFileTypes.Textures.Contains(p.Node.Extension) ||
+                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
+
+            _viewModel.UnloadSlotByCategory(isImage, hasMoreOfSameCategory);
+        }
+
         private async Task PreviewRealFile(FileSystemNodeModel node)
         {
             if (!File.Exists(node.VirtualPath))
@@ -195,8 +255,8 @@ namespace AssetsManager.Services.Explorer
             // Aseguramos la creacion de la carpeta necesaria
             _directoriesCreator.CreateDirectory(_directoriesCreator.TempPreviewPath);
 
-            if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
-            else if (SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data); }
+            if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension); }
+            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
             else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
             else if (SupportedFileTypes.Media.Contains(extension))
             {
@@ -217,7 +277,7 @@ namespace AssetsManager.Services.Explorer
                     await ShowAudioVideoPreviewAsync(data, extension, node.Name);
                 }
             }
-            else if (SupportedFileTypes.Json.Contains(extension) || SupportedFileTypes.JavaScript.Contains(extension) || SupportedFileTypes.Css.Contains(extension) || SupportedFileTypes.Bin.Contains(extension) || SupportedFileTypes.Troybin.Contains(extension) || SupportedFileTypes.StringTable.Contains(extension) || SupportedFileTypes.Preload.Contains(extension) || SupportedFileTypes.PlainText.Contains(extension) || SupportedFileTypes.Lua.Contains(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
+            else if (SupportedFileTypes.IsText(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
             else { await ShowUnsupportedPreviewAsync(extension); }
         }
 
@@ -229,12 +289,10 @@ namespace AssetsManager.Services.Explorer
                 string textContent = await _contentFormatterService.GetFormattedStringAsync(dataType, data);
 
                 IHighlightingDefinition syntaxHighlighting = null;
-                if (dataType == "json" || dataType == "bin" || dataType == "troybin" || dataType == "css" || dataType == "stringtable" || dataType == "js" || dataType == "preload")
+
+                if (SupportedFileTypes.UsesJsonHighlighting(extension))
                 {
-                    syntaxHighlighting = GetJsonHighlighting();
-                }
-                else if (dataType == "luabin64")
-                {
+                    // Los CSS y JS de League se visualizan con nuestro coloreado personalizado
                     syntaxHighlighting = GetJsonHighlighting();
                 }
 
@@ -285,8 +343,7 @@ namespace AssetsManager.Services.Explorer
                         _viewModel.IsImageVisible = true;
                         _activeImagePreviewer = Previewer.Image;
 
-                        // Clear "Unsupported" error status if active, so the valid image is shown full screen
-                        if (_viewModel.IsUnsupportedVisible)
+                        if (_viewModel.IsUnsupportedVisible && !_viewModel.IsContentVisible)
                         {
                             _viewModel.IsUnsupportedVisible = false;
                             _viewModel.IsContentVisible = false;
@@ -302,6 +359,7 @@ namespace AssetsManager.Services.Explorer
                         if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
 
                         await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = false;
                         _viewModel.IsWebVisible = true;
                         _activeContentPreviewer = Previewer.WebView;
@@ -313,6 +371,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
+                        _viewModel.IsContentVisible = true;
                         _viewModel.IsWebVisible = false;
                         _viewModel.IsTextVisible = true;
                         _textEditorPreview.Focus();
@@ -411,7 +470,7 @@ namespace AssetsManager.Services.Explorer
                     webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
                     if (shouldAutoplay)
                     {
-                        webView.Dispatcher.Invoke(async () =>
+                        _ = webView.Dispatcher.InvokeAsync(async () =>
                         {
                             try
                             {
@@ -459,12 +518,12 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.Image, bitmap);
         }
 
-        private async Task ShowTexturePreviewAsync(byte[] data)
+        private async Task ShowTexturePreviewAsync(byte[] data, string extension)
         {
             var bitmapSource = await Task.Run(() =>
             {
                 using var stream = new MemoryStream(data);
-                return TextureUtils.LoadTexture(stream, ".tex"); // Extension doesn't matter much here as LoadTexture handles it
+                return TextureUtils.LoadTexture(stream, extension);
             });
 
             if (bitmapSource != null)
@@ -473,7 +532,7 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                await ShowUnsupportedPreviewAsync(".tex/.dds");
+                await ShowUnsupportedPreviewAsync(extension);
             }
         }
 
@@ -617,11 +676,7 @@ namespace AssetsManager.Services.Explorer
             if (node == null) return Previewer.None;
             string extension = node.Extension.ToLowerInvariant();
             
-            bool isImage = SupportedFileTypes.Images.Contains(extension) || 
-                           SupportedFileTypes.Textures.Contains(extension) || 
-                           SupportedFileTypes.VectorImages.Contains(extension);
-                           
-            if (isImage)
+            if (SupportedFileTypes.IsImage(extension))
             {
                 return Previewer.Image;
             }
@@ -631,15 +686,7 @@ namespace AssetsManager.Services.Explorer
                 return Previewer.WebView;
             }
             
-            if (SupportedFileTypes.Json.Contains(extension) || 
-                SupportedFileTypes.JavaScript.Contains(extension) || 
-                SupportedFileTypes.Css.Contains(extension) || 
-                SupportedFileTypes.Bin.Contains(extension) || 
-                SupportedFileTypes.Troybin.Contains(extension) || 
-                SupportedFileTypes.StringTable.Contains(extension) || 
-                SupportedFileTypes.Preload.Contains(extension) || 
-                SupportedFileTypes.PlainText.Contains(extension) || 
-                SupportedFileTypes.Lua.Contains(extension))
+            if (SupportedFileTypes.IsText(extension))
             {
                 return Previewer.AvalonEdit;
             }
@@ -649,7 +696,7 @@ namespace AssetsManager.Services.Explorer
 
         public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0)
         {
-            if (node == null || (!SupportedFileTypes.Images.Contains(node.Extension) && !SupportedFileTypes.Textures.Contains(node.Extension) && !SupportedFileTypes.VectorImages.Contains(node.Extension)))
+            if (node == null || !SupportedFileTypes.IsImage(node.Extension))
             {
                 return null;
             }
@@ -698,6 +745,11 @@ namespace AssetsManager.Services.Explorer
             }
 
             return null;
+        }
+
+        public async Task ShowFileDiffAsync(string oldPath, string newPath, Window owner)
+        {
+            await _diffViewService.ShowFileDiffAsync(oldPath, newPath, owner);
         }
     }
 }

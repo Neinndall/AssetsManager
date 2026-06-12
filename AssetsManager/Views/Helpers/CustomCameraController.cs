@@ -11,6 +11,7 @@ namespace AssetsManager.Views.Helpers
     {
         private HelixViewport3D _viewport;
         private bool _isRotating;
+        private bool _isPanning;
         private System.Windows.Point _lastMousePosition;
         
         // Smooth Zoom and Transition variables
@@ -40,6 +41,7 @@ namespace AssetsManager.Views.Helpers
                 _targetPosition = camera.Position;
                 _targetLookDirection = camera.LookDirection;
                 _targetUpDirection = camera.UpDirection;
+                camera.Changed += OnCameraChanged;
             }
         }
 
@@ -48,11 +50,26 @@ namespace AssetsManager.Views.Helpers
             if (_viewport != null)
             {
                 CompositionTarget.Rendering -= OnRendering;
+                if (_viewport.Camera != null)
+                {
+                    _viewport.Camera.Changed -= OnCameraChanged;
+                }
                 _viewport.PreviewMouseDown -= OnPreviewMouseDown;
                 _viewport.MouseUp -= OnMouseUp;
                 _viewport.MouseMove -= OnMouseMove;
                 _viewport.MouseWheel -= OnMouseWheel;
                 _viewport = null;
+            }
+        }
+
+        private void OnCameraChanged(object sender, EventArgs e)
+        {
+            // Update targets when camera changes externally (e.g. Helix panning/reset)
+            if (!_isTransitioning && _viewport?.Camera is ProjectionCamera camera)
+            {
+                _targetPosition = camera.Position;
+                _targetLookDirection = camera.LookDirection;
+                _targetUpDirection = camera.UpDirection;
             }
         }
 
@@ -135,14 +152,23 @@ namespace AssetsManager.Views.Helpers
             {
                 e.Handled = true;
             }
+
+            // Stop transitions if user starts interacting with any mouse gesture (like panning or zooming or rotation)
+            _isTransitioning = false;
+
             if (e.LeftButton == MouseButtonState.Pressed)
             {
                 _isRotating = true;
                 _lastMousePosition = e.GetPosition(_viewport);
                 _viewport.Cursor = System.Windows.Input.Cursors.SizeAll;
-                
-                // Stop transitions if user starts interacting
-                _isTransitioning = false;
+                _viewport.CaptureMouse();
+            }
+            else if (e.RightButton == MouseButtonState.Pressed)
+            {
+                _isPanning = true;
+                _lastMousePosition = e.GetPosition(_viewport);
+                _viewport.Cursor = System.Windows.Input.Cursors.Hand;
+                _viewport.CaptureMouse();
             }
         }
 
@@ -150,8 +176,21 @@ namespace AssetsManager.Views.Helpers
         {
             if (e.LeftButton == MouseButtonState.Released)
             {
-                _isRotating = false;
-                _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
+                if (_isRotating)
+                {
+                    _isRotating = false;
+                    _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
+                    _viewport.ReleaseMouseCapture();
+                }
+            }
+            if (e.RightButton == MouseButtonState.Released)
+            {
+                if (_isPanning)
+                {
+                    _isPanning = false;
+                    _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
+                    _viewport.ReleaseMouseCapture();
+                }
             }
         }
 
@@ -169,6 +208,23 @@ namespace AssetsManager.Views.Helpers
                 _lastMousePosition = currentMousePosition;
                 
                 // Update target position/dirs after rotation to sync
+                if (_viewport.Camera is ProjectionCamera camera)
+                {
+                    _targetPosition = camera.Position;
+                    _targetLookDirection = camera.LookDirection;
+                    _targetUpDirection = camera.UpDirection;
+                }
+            }
+            else if (_isPanning && e.RightButton == MouseButtonState.Pressed)
+            {
+                var currentMousePosition = e.GetPosition(_viewport);
+                var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
+
+                Pan(delta);
+
+                _lastMousePosition = currentMousePosition;
+
+                // Update target position/dirs after panning to sync
                 if (_viewport.Camera is ProjectionCamera camera)
                 {
                     _targetPosition = camera.Position;
@@ -206,8 +262,18 @@ namespace AssetsManager.Views.Helpers
                 _isTransitioning = true;
             }
 
-            // Increment the target position
-            _targetPosition += lookDir * delta * ZoomSensitivity * speedMultiplier;
+            // Calculate the zoom shift vector
+            var shift = lookDir * delta * ZoomSensitivity * speedMultiplier;
+
+            // Ensure we don't zoom past the target point (which would invert the camera)
+            if (Vector3D.DotProduct(camera.LookDirection - shift, lookDir) > 0.1)
+            {
+                // Increment the target position
+                _targetPosition += shift;
+                
+                // To keep the orbit target stationary while zooming, subtract the shift from LookDirection
+                _targetLookDirection -= shift;
+            }
         }
 
         private void Rotate(Vector3D delta)
@@ -230,6 +296,29 @@ namespace AssetsManager.Views.Helpers
             camera.Position = newPosition;
             camera.LookDirection = newLookDirection;
             camera.UpDirection = newUpDirection;
+        }
+
+        private void Pan(System.Windows.Point delta)
+        {
+            var camera = _viewport.Camera as ProjectionCamera;
+            if (camera == null) return;
+
+            var lookDir = camera.LookDirection;
+            var upDir = camera.UpDirection;
+
+            var rightDir = Vector3D.CrossProduct(lookDir, upDir);
+            rightDir.Normalize();
+
+            var orthoUp = Vector3D.CrossProduct(rightDir, lookDir);
+            orthoUp.Normalize();
+
+            // Panning sensitivity scales naturally with camera target distance
+            double distance = lookDir.Length;
+            double sensitivity = distance * 0.0012;
+
+            var translation = rightDir * (-delta.X * sensitivity) + orthoUp * (delta.Y * sensitivity);
+
+            camera.Position += translation;
         }
     }
 }

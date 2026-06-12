@@ -80,9 +80,6 @@ namespace AssetsManager.Services.Explorer
 
                 if (isSortingEnabled)
                 {
-                    var folderCache = new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
-                    folderCache[""] = wadNode;
-
                     // PATHS MODE: Maintain original folder structure
                     foreach (var file in wadGroup)
                     {
@@ -93,7 +90,9 @@ namespace AssetsManager.Services.Explorer
                         string statusPrefix = GetStatusPrefix(file.Type);
                         string prefixedPath = $"{statusPrefix}/{file.Path}";
 
-                        var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status, folderCache: folderCache);
+                        var node = AddNodeToVirtualTree(wadNode, prefixedPath, wadGroup.Key, file.NewPathHash, status);
+                        if (node == null) continue;
+
                         node.ChunkDiff = file;
                         node.BackupChunkPath = chunkPath;
                         if (file.Type == ChunkDiffType.Renamed)
@@ -112,8 +111,16 @@ namespace AssetsManager.Services.Explorer
                                     string depStatusPrefix = GetStatusPrefix(depType);
                                     string depPrefixedPath = $"{depStatusPrefix}/{dep.Path}";
 
-                                    var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, dep.SourceWad, dep.NewPathHash, depStatus, folderCache: folderCache);
-                                    
+                                    var depNode = AddNodeToVirtualTree(wadNode, depPrefixedPath, dep.SourceWad, dep.NewPathHash, depStatus);
+                                    if (depNode == null) continue;
+
+                                    // CRITICAL: If this node already has a ChunkDiff (e.g., it was already
+                                    // created as a top-level main file in the wadGroup), preserve it.
+                                    // The main file's diff carries the full Dependencies list; the dep
+                                    // representation does not. Overwriting it would break audio bank diff
+                                    // resolution which relies on diff.Dependencies.
+                                    if (depNode.ChunkDiff != null) continue;
+
                                     depNode.ChunkDiff = new SerializableChunkDiff
                                     {
                                         Type = depType,
@@ -350,19 +357,15 @@ namespace AssetsManager.Services.Explorer
         }
 
         /// <summary>
-        /// Ensures all children of a node are loaded, primarily used for lazy loading WAD files.
+        /// Ensures all children of a node are loaded.
         /// </summary>
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
-            {
-                node.Children.Clear();
-            }
-
             if (node.Type == NodeType.WadFile)
             {
+                onMountingProgress?.Invoke(node.Name);
                 var children = await LoadChildrenAsync(node, cancellationToken);
                 node.Children.AddRange(children);
                 return;
@@ -373,12 +376,18 @@ namespace AssetsManager.Services.Explorer
                 try
                 {
                     var directories = Directory.GetDirectories(node.VirtualPath);
-                    var childDirs = directories.OrderBy(d => d).Select(dir => new FileSystemNodeModel(dir) { Parent = node }).ToList();
+                    var childDirs = new List<FileSystemNodeModel>();
+                    foreach (var dir in directories.OrderBy(d => d))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var dirNode = new FileSystemNodeModel(dir) { Parent = node };
+                        childDirs.Add(dirNode);
+                    }
                     node.Children.AddRange(childDirs);
                     
                     foreach(var childNode in childDirs)
                     {
-                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     }
 
                     var files = Directory.GetFiles(node.VirtualPath);
@@ -402,6 +411,7 @@ namespace AssetsManager.Services.Explorer
 
                         if (keepFile)
                         {
+                            onScanningProgress?.Invoke(Path.GetFileName(file));
                             var childNode = new FileSystemNodeModel(file) { Parent = node };
                             childFiles.Add(childNode);
                         }
@@ -410,7 +420,7 @@ namespace AssetsManager.Services.Explorer
                     node.Children.AddRange(childFiles);
                     foreach(var childNode in childFiles)
                     {
-                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken);
+                        await EnsureAllChildrenLoadedAsync(childNode, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     }
                 }
                 catch (UnauthorizedAccessException)
@@ -435,9 +445,6 @@ namespace AssetsManager.Services.Explorer
                 {
                     using (var wadFile = new WadFile(pathToWad))
                     {
-                        var folderCache = new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
-                        folderCache[""] = rootVirtualNode;
-
                         foreach (var chunk in wadFile.Chunks.Values)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -461,7 +468,7 @@ namespace AssetsManager.Services.Explorer
                                 }
                             }
 
-                            AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash, folderCache: folderCache);
+                            AddNodeToVirtualTree(rootVirtualNode, virtualPath, pathToWad, chunk.PathHash);
                         }
                     }
                 }
@@ -478,9 +485,12 @@ namespace AssetsManager.Services.Explorer
                 PostProcessAudioNodes(rootVirtualNode);
 
                 // IMPORTANT: Ensure first-level virtual nodes point to the real WAD node as parent
-                foreach (var child in rootVirtualNode.Children)
+                if (rootVirtualNode.Children != null)
                 {
-                    child.Parent = wadNode;
+                    foreach (var child in rootVirtualNode.Children)
+                    {
+                        child.Parent = wadNode;
+                    }
                 }
 
                 return rootVirtualNode.Children;
@@ -505,8 +515,6 @@ namespace AssetsManager.Services.Explorer
                     {
                         // Create a virtual root to build the tree structure
                         var virtualRoot = new FileSystemNodeModel("Root", true, "", wadPath);
-                        var folderCache = new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
-                        folderCache[""] = virtualRoot;
 
                         foreach (var chunk in wadFile.Chunks.Values)
                         {
@@ -516,13 +524,16 @@ namespace AssetsManager.Services.Explorer
                                 virtualPath = chunk.PathHash.ToString("x16"); // Just the hash as the name
                             }
 
-                            AddNodeToVirtualTree(virtualRoot, virtualPath, wadPath, chunk.PathHash, folderCache: folderCache);
+                            AddNodeToVirtualTree(virtualRoot, virtualPath, wadPath, chunk.PathHash);
                         }
 
                         // Return the top-level nodes (folders/files at root of virtual path)
-                        foreach (var child in virtualRoot.Children)
+                        if (virtualRoot.Children != null)
                         {
-                            resultNodes.Add(child);
+                            foreach (var child in virtualRoot.Children)
+                            {
+                                resultNodes.Add(child);
+                            }
                         }
                     }
                 }
@@ -536,7 +547,7 @@ namespace AssetsManager.Services.Explorer
             return nodes;
         }
 
-        private FileSystemNodeModel AddNodeToVirtualTree(FileSystemNodeModel root, string virtualPath, string wadPath, ulong chunkHash, DiffStatus status = DiffStatus.Unchanged, Dictionary<string, FileSystemNodeModel> folderCache = null)
+        private FileSystemNodeModel AddNodeToVirtualTree(FileSystemNodeModel root, string virtualPath, string wadPath, ulong chunkHash, DiffStatus status = DiffStatus.Unchanged)
         {
             string normalizedPath = virtualPath.Replace('\\', '/');
             int lastSlash = normalizedPath.LastIndexOf('/');
@@ -549,48 +560,33 @@ namespace AssetsManager.Services.Explorer
             else
             {
                 string folderPath = normalizedPath.Substring(0, lastSlash);
+                string[] parts = folderPath.Split('/');
+                parentNode = root;
+                string currentAccPath = "";
                 
-                // Si tenemos caché, la búsqueda es O(1)
-                if (folderCache != null && folderCache.TryGetValue(folderPath, out parentNode))
+                for (int i = 0; i < parts.Length; i++)
                 {
-                    // Carpeta encontrada en caché
-                }
-                else
-                {
-                    // Búsqueda o construcción manual (fallback o inicialización)
-                    string[] parts = folderPath.Split('/');
-                    parentNode = root;
-                    string currentAccPath = "";
+                    currentAccPath = i == 0 ? parts[i] : $"{currentAccPath}/{parts[i]}";
                     
-                    for (int i = 0; i < parts.Length; i++)
+                    // Si el padre no tiene hijos inicializados o es nulo, no podemos continuar
+                    if (parentNode == null || parentNode.Children == null) return null;
+
+                    var subDir = parentNode.Children.FirstOrDefault(c => c.Name.Equals(parts[i], StringComparison.OrdinalIgnoreCase) && c.Type == NodeType.VirtualDirectory);
+                    
+                    if (subDir == null)
                     {
-                        currentAccPath = i == 0 ? parts[i] : $"{currentAccPath}/{parts[i]}";
-                        
-                        FileSystemNodeModel subDir = null;
-                        if (folderCache != null && folderCache.TryGetValue(currentAccPath, out subDir))
+                        subDir = new FileSystemNodeModel(parts[i], true, currentAccPath, wadPath)
                         {
-                            parentNode = subDir;
-                            continue;
-                        }
-
-                        // Si no está en caché, buscamos en los hijos actuales (lento, solo la primera vez)
-                        subDir = parentNode.Children.FirstOrDefault(c => c.Name.Equals(parts[i], StringComparison.OrdinalIgnoreCase) && c.Type == NodeType.VirtualDirectory);
-                        
-                        if (subDir == null)
-                        {
-                            subDir = new FileSystemNodeModel(parts[i], true, currentAccPath, wadPath)
-                            {
-                                Status = status,
-                                Parent = parentNode
-                            };
-                            parentNode.Children.Add(subDir);
-                        }
-
-                        if (folderCache != null) folderCache[currentAccPath] = subDir;
-                        parentNode = subDir;
+                            Status = status,
+                            Parent = parentNode
+                        };
+                        parentNode.Children.Add(subDir);
                     }
+                    parentNode = subDir;
                 }
             }
+
+            if (parentNode == null || parentNode.Children == null) return null;
 
             string fileName = lastSlash == -1 ? normalizedPath : normalizedPath.Substring(lastSlash + 1);
 
@@ -607,9 +603,7 @@ namespace AssetsManager.Services.Explorer
                 Parent = parentNode
             };
 
-            // OPTIMIZATION: If the node has a real hierarchical parent, we can discard the stored string
-            // as the dynamic VirtualPath getter will reconstruct it on demand.
-            // Safety check: && parentNode.Type != NodeType.WadFile (Removed for RAM optimization, the getter handles it)
+            // OPTIMIZATION: Discard full path to save RAM, dynamic getter will reconstruct it
             if (parentNode != null && !parentNode.IsGroupingFolder)
             {
                 fileNode.VirtualPath = null;
@@ -619,10 +613,11 @@ namespace AssetsManager.Services.Explorer
             return fileNode;
         }
 
+
         /// <summary>
         /// Loads a physical directory into the tree structure.
         /// </summary>
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> LoadDirectoryAsync(string rootPath, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath))
             {
@@ -637,7 +632,7 @@ namespace AssetsManager.Services.Explorer
                 if (rootNode.Children != null)
                 {
                     rootNode.Children.Clear();
-                    AddNodeToRealTree(rootNode, rootPath, cancellationToken);
+                    AddNodeToRealTree(rootNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                     return rootNode.Children;
                 }
 
@@ -645,23 +640,25 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
-        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken)
+        private void AddNodeToRealTree(FileSystemNodeModel parentNode, string path, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var directory in Directory.EnumerateDirectories(path).OrderBy(d => d))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                onMountingProgress?.Invoke(Path.GetFileName(directory));
                 var dirNode = new FileSystemNodeModel(directory);
                 dirNode.Children.Clear();
                 dirNode.Parent = parentNode;
                 parentNode.Children.Add(dirNode);
-                AddNodeToRealTree(dirNode, directory, cancellationToken);
+                AddNodeToRealTree(dirNode, directory, cancellationToken, onScanningProgress, onMountingProgress);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var file in Directory.EnumerateFiles(path).OrderBy(f => f))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                onScanningProgress?.Invoke(Path.GetFileName(file));
                 var fileNode = new FileSystemNodeModel(file);
                 fileNode.Parent = parentNode;
                 parentNode.Children.Add(fileNode);

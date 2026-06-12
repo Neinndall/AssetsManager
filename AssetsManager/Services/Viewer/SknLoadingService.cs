@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -31,7 +32,7 @@ namespace AssetsManager.Services.Viewer
         }
 
         // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
-        public SceneModel LoadModel(string filePath, string textureDirectoryPath)
+        public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath)
         {
             try
             {
@@ -45,7 +46,7 @@ namespace AssetsManager.Services.Viewer
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
             }
             catch (Exception ex)
             {
@@ -55,7 +56,7 @@ namespace AssetsManager.Services.Viewer
         }
 
         // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
-        public SceneModel LoadModel(string filePath)
+        public async Task<SceneModel> LoadModel(string filePath)
         {
             try
             {
@@ -71,7 +72,7 @@ namespace AssetsManager.Services.Viewer
                 var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                return CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
             }
             catch (Exception ex)
             {
@@ -107,66 +108,90 @@ namespace AssetsManager.Services.Viewer
             return loadedTextures;
         }
 
-        private SceneModel CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
+        private async Task<SceneModel> CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
-            return Application.Current.Dispatcher.Invoke(() =>
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+
+            string defaultTextureKey = loadedTextures.Keys
+                .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(k => k.Length)
+                .FirstOrDefault();
+
+            string skinName = modelName.Split('.')[0];
+
+            // Move geometry processing to background thread
+            var dataList = await Task.Run(() =>
             {
-                _logService.LogDebug("--- Displaying Model ---");
-                _logService.LogDebug($"Available texture keys: {string.Join(", ", loadedTextures.Keys)}");
-
-                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
-                var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
-
-                string defaultTextureKey = loadedTextures.Keys
-                    .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(k => k.Length)
-                    .FirstOrDefault();
-
-                string skinName = modelName.Split('.')[0];
-                var parts = new List<ModelPart>();
+                var list = new List<SubmeshData>();
+                var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
+                var positions = vertexAccessor.AsVector3Array().ToArray();
+                var texCoordAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
+                var texCoords = texCoordAccessor.AsVector2Array().ToArray();
+                var indices = skinnedMesh.Indices;
 
                 foreach (var rangeObj in skinnedMesh.Ranges)
                 {
                     string materialName = rangeObj.Material.TrimEnd('\0');
-                    MeshGeometry3D meshGeometry = new MeshGeometry3D();
 
-                    var positions = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                     var subPositions = new Point3D[rangeObj.VertexCount];
                     for (int i = 0; i < rangeObj.VertexCount; i++)
                     {
                         var p = positions[rangeObj.StartVertex + i];
                         subPositions[i] = new Point3D(p.X, p.Y, p.Z);
                     }
-                    meshGeometry.Positions = new Point3DCollection(subPositions);
 
-                    Int32Collection triangleIndices = new Int32Collection();
-                    var indices = skinnedMesh.Indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
-                    foreach (var index in indices)
+                    var triangleIndices = new int[rangeObj.IndexCount];
+                    var subIndices = indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
+                    for (int i = 0; i < rangeObj.IndexCount; i++)
                     {
-                        triangleIndices.Add((int)index - rangeObj.StartVertex);
+                        triangleIndices[i] = (int)subIndices[i] - rangeObj.StartVertex;
                     }
-                    meshGeometry.TriangleIndices = triangleIndices;
 
-                    var texCoords = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name).AsVector2Array();
                     var subTexCoords = new System.Windows.Point[rangeObj.VertexCount];
                     for (int i = 0; i < rangeObj.VertexCount; i++)
                     {
                         var uv = texCoords[rangeObj.StartVertex + i];
                         subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
                     }
-                    meshGeometry.TextureCoordinates = new PointCollection(subTexCoords);
 
                     string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
+                    list.Add(new SubmeshData(materialName, subPositions, triangleIndices, subTexCoords, initialMatchingKey));
+                }
+                return list;
+            });
+
+            return await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
+                _logService.LogDebug("--- Displaying Model ---");
+                var parts = new List<ModelPart>();
+
+                foreach (var data in dataList)
+                {
+                    var positionsCol = new Point3DCollection(data.Positions);
+                    var indicesCol = new Int32Collection(data.TriangleIndices);
+                    var texCoordsCol = new PointCollection(data.TextureCoordinates);
+
+                    if (positionsCol.CanFreeze) positionsCol.Freeze();
+                    if (indicesCol.CanFreeze) indicesCol.Freeze();
+                    if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
+
+                    MeshGeometry3D meshGeometry = new MeshGeometry3D
+                    {
+                        Positions = positionsCol,
+                        TriangleIndices = indicesCol,
+                        TextureCoordinates = texCoordsCol
+                    };
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
                     var modelPart = new ModelPart
                     {
-                        Name = string.IsNullOrEmpty(materialName) ? "Default" : materialName,
+                        Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
                         Visual = new ModelVisual3D(),
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
-                        SelectedTextureName = initialMatchingKey,
+                        SelectedTextureName = data.TexturePath,
                         Geometry = geometryModel
                     };
 
@@ -182,5 +207,7 @@ namespace AssetsManager.Services.Viewer
                 return sceneModel;
             });
         }
+
+        private record SubmeshData(string MaterialName, Point3D[] Positions, int[] TriangleIndices, System.Windows.Point[] TextureCoordinates, string TexturePath);
     }
 }

@@ -107,7 +107,9 @@ namespace AssetsManager
       services.AddSingleton<JsonFormatterService>();
       services.AddSingleton<ContentFormatterService>();
       services.AddSingleton<AudioConversionService>();
+      services.AddSingleton<BinPropertyParser>();
       services.AddSingleton<BinParser>();
+
       services.AddSingleton<TroybinParser>();
       services.AddSingleton<PreloadParser>();
       services.AddSingleton<StringTableParser>();
@@ -151,7 +153,6 @@ namespace AssetsManager
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
-      services.AddSingleton<WadDiffProvider>();
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 
@@ -229,6 +230,8 @@ namespace AssetsManager
 
       var mainWindow = ServiceProvider.GetRequiredService<MainWindow>();
       mainWindow.Show();
+      mainWindow.Activate();
+      mainWindow.Focus();
     }
 
     private void SetupGlobalExceptionHandling(LogService logService, CustomMessageBoxService customMessageBoxService)

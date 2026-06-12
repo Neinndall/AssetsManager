@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
@@ -37,7 +38,6 @@ namespace AssetsManager.Views.Controls.Explorer
         private FileSystemNodeModel _currentFolderNode;
         private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
         private string _currentSearchFilter = string.Empty;
-        private CancellationTokenSource _thumbnailCts;
 
         public FilePreviewerControl()
         {
@@ -154,13 +154,15 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         await ExplorerPreviewService.ResetPreviewAsync();
 
-                        if (ViewModel.IsGridMode && _currentFolderNode != null)
+                        if (_currentFolderNode != null)
                         {
                             UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                            FileExplorer?.SelectNode(_currentFolderNode);
                         }
                         else
                         {
                             _currentNode = null;
+                            UpdateBreadcrumbs(null);
                         }
                     }
                     return;
@@ -173,6 +175,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.RenamedDiffDetails = selectedPin.Node?.ChunkDiff;
 
                 UpdateBreadcrumbs(selectedPin.Node);
+                FileExplorer?.SelectNode(selectedPin.Node);
 
                 // Important: Always call the service with the LATEST node from the pin
                 await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
@@ -191,10 +194,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
             {
-                // 1. First check the category logic to see if panels should hide
-                ViewModel.ClosePanelByCategory(vm.Node);
-                
-                // 2. Unpin the file. The manager will automatically select the previous tab if this was the active one.
+                ExplorerPreviewService.CloseSlotByCategory(vm.Node);
                 ViewModel.PinnedFilesManager.UnpinFile(vm);
             }
         }
@@ -236,10 +236,6 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             try
             {
-                _thumbnailCts?.Cancel();
-                _thumbnailCts?.Dispose();
-                _thumbnailCts = null;
-
                 await ExplorerPreviewService.ResetPreviewAsync();
                 
                 if (ViewModel.PinnedFilesManager != null)
@@ -356,9 +352,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 ViewModel.IsWelcomeVisible = false;
 
                 // Selective hide: Only hide unsupported if the new file is NOT an image
-                bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                               SupportedFileTypes.Textures.Contains(node.Extension) || 
-                               SupportedFileTypes.VectorImages.Contains(node.Extension);
+                bool isImage = SupportedFileTypes.IsImage(node.Extension);
                 
                 if (!isImage)
                 {
@@ -372,56 +366,16 @@ namespace AssetsManager.Views.Controls.Explorer
             if (folderNode == null) return;
 
             // Defer execution to avoid issues with current mouse events in the ListBox
-            _ = Dispatcher.BeginInvoke(new Action(() =>
+            Dispatcher.InvokeAsync(() =>
             {
                 var gridItems = new ObservableRangeCollection<FileGridViewModel>(
                     (!string.IsNullOrEmpty(_currentSearchFilter)
                         ? folderNode.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
                         : folderNode.Children)
-                    .Select(n => new FileGridViewModel(n)));
+                    .Select(n => new FileGridViewModel(n, node => ExplorerPreviewService.GetImagePreviewAsync(node, 256))));
 
                 FileGridControl.ItemsSource = gridItems;
-
-                // Sequential Loading Queue with Cancellation
-                _thumbnailCts?.Cancel();
-                _thumbnailCts = new CancellationTokenSource();
-                _ = LoadThumbnailsQueueAsync(gridItems, _thumbnailCts.Token);
-            }), System.Windows.Threading.DispatcherPriority.Background);
-        }
-
-        private async Task LoadThumbnailsQueueAsync(ObservableRangeCollection<FileGridViewModel> items, CancellationToken ct)
-        {
-            if (items == null || !items.Any()) return;
-
-            foreach (var vm in items)
-            {
-                if (ct.IsCancellationRequested) return;
-
-                try
-                {
-                    if (SupportedFileTypes.Images.Contains(vm.Node.Extension) ||
-                        SupportedFileTypes.Textures.Contains(vm.Node.Extension) ||
-                        SupportedFileTypes.VectorImages.Contains(vm.Node.Extension))
-                    {
-                        await LoadImagePreviewAsync(vm);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogService.LogDebug($"Failed to load grid thumbnail for {vm.Node.Name}: {ex.Message}");
-                }
-            }
-        }
-        private async Task LoadImagePreviewAsync(FileGridViewModel vm)
-        {
-            if (vm.ImagePreview != null) return;
-
-            // Aplicamos el estándar de 256px para optimizar la RAM en el GridView
-            var image = await ExplorerPreviewService.GetImagePreviewAsync(vm.Node, 256);
-            if (image != null)
-            {
-                vm.ImagePreview = image;
-            }
+            }, DispatcherPriority.Background);
         }
 
         public void HandleNodeClicked(FileSystemNodeModel node)

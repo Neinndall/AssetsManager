@@ -69,8 +69,22 @@ namespace AssetsManager.Views.Controls.Explorer
             if (_isUpdatingItemsSource) return;
 
             // Sync selection state to ViewModels for multi-select consistency
-            foreach (FileGridViewModel item in e.RemovedItems) item.IsSelected = false;
-            foreach (FileGridViewModel item in e.AddedItems) item.IsSelected = true;
+            foreach (FileGridViewModel item in e.RemovedItems)
+            {
+                item.IsSelected = false;
+                item.IsMultiSelected = false;
+            }
+            foreach (FileGridViewModel item in e.AddedItems)
+            {
+                item.IsSelected = true;
+            }
+
+            // Sync IsMultiSelected if multiple items are selected OR if the user is using CTRL to select
+            bool isMulti = FileGridListBox.SelectedItems.Count > 1 || SelectionBehavior.IsMultiSelectIntent();
+            foreach (FileGridViewModel item in DisplayItems)
+            {
+                item.IsMultiSelected = isMulti && FileGridListBox.SelectedItems.Contains(item);
+            }
 
             if (ViewModel != null)
             {
@@ -103,10 +117,10 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 return type switch
                 {
-                    "Images" => SupportedFileTypes.Images.Contains(item.Node.Extension) || SupportedFileTypes.Textures.Contains(item.Node.Extension) || SupportedFileTypes.VectorImages.Contains(item.Node.Extension),
-                    "Audio" => SupportedFileTypes.AudioBank.Contains(item.Node.Extension) || SupportedFileTypes.Media.Contains(item.Node.Extension),
-                    "3D" => SupportedFileTypes.Viewer3D.Contains(item.Node.Extension),
-                    "Data" => SupportedFileTypes.Bin.Contains(item.Node.Extension) || SupportedFileTypes.Json.Contains(item.Node.Extension) || SupportedFileTypes.StringTable.Contains(item.Node.Extension) || SupportedFileTypes.PlainText.Contains(item.Node.Extension) || SupportedFileTypes.Css.Contains(item.Node.Extension) || SupportedFileTypes.JavaScript.Contains(item.Node.Extension) || SupportedFileTypes.Troybin.Contains(item.Node.Extension) || SupportedFileTypes.Preload.Contains(item.Node.Extension),
+                    "Images" => SupportedFileTypes.IsImage(item.Node.Extension),
+                    "Audio" => SupportedFileTypes.IsAudio(item.Node.Extension),
+                    "3D" => SupportedFileTypes.Is3D(item.Node.Extension),
+                    "Data" => SupportedFileTypes.IsText(item.Node.Extension),
                     _ => true
                 };
             }).ToList();

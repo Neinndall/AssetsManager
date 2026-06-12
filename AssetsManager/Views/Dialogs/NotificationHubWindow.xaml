@@ -11,9 +11,10 @@
                 HeaderIcon="BellOutline"
                 Height="500" Width="400"
                 WindowStartupLocation="CenterOwner"
-                Style="{StaticResource HudWindowStyle}"
+                ResizeMode="NoResize"
+                ShowMinimizeButton="False"
                 ShowMaximizeButton="False"
-                ResizeMode="NoResize">
+                Style="{StaticResource HudWindowStyle}">
 
     <Window.Resources>
         <!-- DataTemplate for Notifications -->
@@ -95,14 +96,13 @@
 
                         <!-- 4. Close Action (Centered vertically in the whole card) -->
                         <Grid Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Margin="16,0,0,0">
-                            <Button Style="{StaticResource TransparentIconButton}" 
-                                    Width="24" Height="24" 
+                            <Button x:Name="CloseNotifyBtn"
+                                    Style="{StaticResource SmallCloseButtonStyle}" 
                                     HorizontalAlignment="Right"
                                     VerticalAlignment="Center"
                                     Click="RemoveNotification_Click"
-                                    ToolTip="Dismiss">
-                                <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Opacity="0.4"/>
-                            </Button>
+                                    ToolTip="Dismiss"
+                                    Visibility="Collapsed"/>
                         </Grid>
                     </Grid>
                 </Border>
@@ -144,6 +144,7 @@
                 
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter TargetName="NotificationBackground" Property="Background" Value="{StaticResource HoverColor}"/>
+                    <Setter TargetName="CloseNotifyBtn" Property="Visibility" Value="Visible"/>
                 </Trigger>
             </DataTemplate.Triggers>
         </DataTemplate>

@@ -19,12 +19,15 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isSelectedNodeContainer;
 
         private SerializableChunkDiff _renamedDiffDetails;
+        private bool _isRenamedInfoVisible;
+        private bool _isRenamedInfoVisibleComputed;
         public SerializableChunkDiff RenamedDiffDetails
         {
             get => _renamedDiffDetails;
             set 
             { 
                 _renamedDiffDetails = value; 
+                _isRenamedInfoVisibleComputed = false;
                 OnPropertyChanged(); 
                 OnPropertyChanged(nameof(IsRenamedInfoVisible));
             }
@@ -39,7 +42,18 @@ namespace AssetsManager.Views.Models.Explorer
 
         public bool IsNarrativeMetadataVisible => NarrativeMetadata != null;
 
-        public bool IsRenamedInfoVisible => RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+        public bool IsRenamedInfoVisible
+        {
+            get
+            {
+                if (!_isRenamedInfoVisibleComputed)
+                {
+                    _isRenamedInfoVisibleComputed = true;
+                    _isRenamedInfoVisible = RenamedDiffDetails != null && RenamedDiffDetails.Type == ChunkDiffType.Renamed && !string.IsNullOrEmpty(RenamedDiffDetails.OldPath) && RenamedDiffDetails.OldPath != RenamedDiffDetails.NewPath;
+                }
+                return _isRenamedInfoVisible;
+            }
+        }
 
         public bool AreTabsVisible => PinnedFilesManager.PinnedFiles.Count > 0;
 
@@ -239,47 +253,8 @@ namespace AssetsManager.Views.Models.Explorer
             set { _canScrollRight = value; OnPropertyChanged(); }
         }
 
-        public void PrepareSlotForFile(FileSystemNodeModel node)
+        public void UnloadSlotByCategory(bool isImage, bool hasMoreOfSameCategory)
         {
-            if (node == null) return;
-
-            // Step 1: Always hide Welcome panel when any file is about to be shown
-            IsWelcomeVisible = false;
-            HasEverPreviewedAFile = true;
-
-            // Step 2: Determine category and handle slot visibility
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
-
-            if (isImage)
-            {
-                IsImageUnsupportedVisible = false; // Start clean for images
-            }
-            else
-            {
-                // Only hide Unsupported status if we are loading something into the Content slot
-                IsUnsupportedVisible = false;
-                IsContentVisible = true;
-            }
-        }
-
-        public void ClosePanelByCategory(FileSystemNodeModel node)
-        {
-            if (node == null) return;
-
-            bool isImage = SupportedFileTypes.Images.Contains(node.Extension) || 
-                           SupportedFileTypes.Textures.Contains(node.Extension) || 
-                           SupportedFileTypes.VectorImages.Contains(node.Extension);
-
-            // Check if there are other pinned files of the same category remaining
-            // (excluding the one being closed right now)
-            bool hasMoreOfSameCategory = PinnedFilesManager.PinnedFiles.Any(p => 
-                p.Node != node && 
-                (SupportedFileTypes.Images.Contains(p.Node.Extension) || 
-                 SupportedFileTypes.Textures.Contains(p.Node.Extension) || 
-                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
-
             if (!hasMoreOfSameCategory)
             {
                 if (isImage)
@@ -296,7 +271,6 @@ namespace AssetsManager.Views.Models.Explorer
                 }
             }
 
-            // If absolutely nothing is visible after closing AND no tabs are left, we show Welcome again
             if (!IsImageVisible && !IsContentVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
             {
                 HasEverPreviewedAFile = false;

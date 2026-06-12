@@ -14,17 +14,28 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         ParsingTextContent,
         ParsingAudioHierarchy,
         CalculatingDifferences,
+        RenderingUI,
         DecodingTextures,
+        GeneratingDiffMap,
+        Parsing3DModel,
+        ParsingOldModel,
+        ParsingNewModel,
+        Comparing3DGeometry,
         Finalizing,
-        Ready
+        Ready,
+        BatchLoadingFile,
+        BatchFormattingFile,
+        BatchFileReady
     }
 
     public class LoadingDiffModel : INotifyPropertyChanged
     {
-        private string _title = "Processing Files";
-        private string _description = "Please wait while the differences are being calculated...";
-        private double _progressValue = 0;
-        private bool _isBusy = false;
+        private string _title;
+        private string _description;
+        private double _progressValue;
+        private bool _isBusy;
+        private int _currentBatchFile;
+        private int _totalBatchFiles;
 
         public string Title
         {
@@ -50,16 +61,29 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             set { _isBusy = value; OnPropertyChanged(); }
         }
 
+        public LoadingDiffModel()
+        {
+            ApplyInitialDefaults(); // Initialize with defaults
+        }
+
+        private string _batchFileType = "file";
+
+        public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
+        {
+            _currentBatchFile = currentFile;
+            _totalBatchFiles = totalFiles;
+            _batchFileType = fileType ?? "file";
+        }
+
         public void SetState(DiffLoadingState state)
         {
             switch (state)
             {
                 case DiffLoadingState.Idle:
-                    Description = "Please wait while the differences are being calculated...";
-                    ProgressValue = 0;
+                    ApplyInitialDefaults();
                     break;
 
-                // TEXT PROCESS
+                // TEXT PROCESS (Progression: 20 → 45 → 70 → 90 → 100)
                 case DiffLoadingState.AcquiringBinaryData:
                     Description = "Acquiring binary data from WADs...";
                     ProgressValue = 20;
@@ -69,28 +93,54 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ProgressValue = 30;
                     break;
                 case DiffLoadingState.ParsingTextContent:
-                    Description = "Parsing and formatting content...";
-                    ProgressValue = 60;
+                    Description = "Formatting and beautifying content...";
+                    ProgressValue = 45;
                     break;
                 case DiffLoadingState.CalculatingDifferences:
-                    Description = "Calculating differences...";
-                    ProgressValue = 95;
+                    Description = "Analyzing line-by-line differences...";
+                    ProgressValue = 70;
+                    break;
+                case DiffLoadingState.RenderingUI:
+                    Description = "Preparing visual editor...";
+                    ProgressValue = 90;
                     break;
 
-                // IMAGE PROCESS
+                // IMAGE PROCESS (Progression: 25 → 60 → 85 → 100)
                 case DiffLoadingState.AcquiringTextureData:
-                    Description = "Acquiring texture data...";
-                    ProgressValue = 40;
+                    Description = "Acquiring texture data from WADs...";
+                    ProgressValue = 25;
                     break;
                 case DiffLoadingState.DecodingTextures:
                     Description = "Decoding texture surfaces...";
-                    ProgressValue = 95;
+                    ProgressValue = 60;
+                    break;
+                case DiffLoadingState.GeneratingDiffMap:
+                    Description = "Generating visual difference map...";
+                    ProgressValue = 85;
                     break;
 
-                // AUDIO PROCESS
+								// SKN PROCESS ()
+                case DiffLoadingState.Parsing3DModel:
+                    Description = "Reconstructing 3D geometric surfaces...";
+                    ProgressValue = 40;
+                    break;
+                case DiffLoadingState.ParsingOldModel:
+                    Description = "Parsing baseline 3D mesh...";
+                    ProgressValue = 55;
+                    break;
+                case DiffLoadingState.ParsingNewModel:
+                    Description = "Parsing modified 3D mesh...";
+                    ProgressValue = 70;
+                    break;
+                case DiffLoadingState.Comparing3DGeometry:
+                    Description = "Analyzing 3D geometric differences...";
+                    ProgressValue = 85;
+                    break;
+
+                // AUDIO PROCESS (Progression: 20 → 35 → 50 → 65)
                 case DiffLoadingState.LinkingAudio:
                     Description = "Linking audio bank dependencies...";
-                    ProgressValue = 20;
+                    ProgressValue = 35;
                     break;
                 case DiffLoadingState.AcquiringAudioComponents:
                     Description = "Acquiring binary components...";
@@ -98,18 +148,43 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     break;
                 case DiffLoadingState.ParsingAudioHierarchy:
                     Description = "Parsing audio hierarchy...";
-                    ProgressValue = 90;
+                    ProgressValue = 65;
                     break;
 
                 case DiffLoadingState.Finalizing:
                     Description = "Finalizing data structure...";
-                    ProgressValue = 98;
+                    ProgressValue = 95;
                     break;
 
                 case DiffLoadingState.Ready:
-                    Description = "Done! Displaying results...";
+                    Description = "Ready! Displaying results...";
                     ProgressValue = 100;
                     break;
+
+                // BATCH STATES
+                case DiffLoadingState.BatchLoadingFile:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    Description = $"Loading {_batchFileType} {_currentBatchFile} of {_totalBatchFiles}...";
+                    ProgressValue = (_currentBatchFile - 1) * share + share * 0.15;
+                    break;
+                }
+                case DiffLoadingState.BatchFormattingFile:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    var action = _batchFileType == "texture" ? "Decoding" : (_batchFileType == "audio bank" ? "Parsing" : "Formatting");
+                    Description = $"{action} {_batchFileType} {_currentBatchFile} of {_totalBatchFiles}...";
+                    ProgressValue = (_currentBatchFile - 1) * share + share * 0.55;
+                    break;
+                }
+                case DiffLoadingState.BatchFileReady:
+                {
+                    var share = 100.0 / _totalBatchFiles;
+                    var capitalizedFileType = char.ToUpper(_batchFileType[0]) + _batchFileType.Substring(1);
+                    Description = $"{capitalizedFileType} {_currentBatchFile} of {_totalBatchFiles} ready.";
+                    ProgressValue = _currentBatchFile * share;
+                    break;
+                }
             }
         }
 
@@ -119,12 +194,14 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        public void Reset()
+        public void ApplyInitialDefaults()
         {
             Title = "Processing Files";
-            Description = "Please wait while the differences are being calculated...";
+            Description = "Initializing comparison...";
             ProgressValue = 0;
             IsBusy = false;
+            _currentBatchFile = 0;
+            _totalBatchFiles = 0;
         }
     }
 }

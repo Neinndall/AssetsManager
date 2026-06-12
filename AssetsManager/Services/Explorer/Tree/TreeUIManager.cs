@@ -17,37 +17,56 @@ namespace AssetsManager.Services.Explorer.Tree
             var path = FindNodePath(rootNodes, node);
             if (path == null) return;
 
-            if (focusNode) treeView.Focus();
-            treeView.UpdateLayout();
+            // Use Input priority to ensure it responds fast to search clearing/user actions
+            treeView.Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                if (focusNode) treeView.Focus();
 
-            // Start async navigation to handle virtualization properly
-            _ = NavigatePathAsync(treeView, path, node, focusNode);
+                // Start async navigation to handle virtualization properly
+                await NavigatePathAsync(treeView, path, node, focusNode);
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
         private async Task NavigatePathAsync(ItemsControl container, List<FileSystemNodeModel> path, FileSystemNodeModel target, bool focus)
         {
+            // Fast-path: if target is already selected and all ancestors are expanded,
+            // we do not need to do any heavy scrolling or retries. Just ensure focus/view if possible.
+            bool isAlreadyPrepared = path.All(n => n == target || n.IsExpanded);
+            if (target.IsSelected && isAlreadyPrepared)
+            {
+                var finalContainer = GetGeneratedContainerForPath(container, path);
+                if (finalContainer != null)
+                {
+                    if (focus) finalContainer.Focus();
+                    finalContainer.BringIntoView();
+                    return;
+                }
+            }
+
             ItemsControl currentContainer = container;
 
             for (int i = 0; i < path.Count; i++)
             {
                 var node = path[i];
-                node.IsExpanded = true;
+                
+                // Ensure expansion
+                if (node != target && !node.IsExpanded) node.IsExpanded = true;
                 if (node == target) node.IsSelected = true;
 
                 TreeViewItem itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
 
                 if (itemContainer == null)
                 {
-                    // Virtualization fix: search for the panel and force scroll to index
+                    // Virtualization fix: scroll to it so the container is generated
                     var vsp = FindVisualChild<VirtualizingStackPanel>(currentContainer);
                     if (vsp != null)
                     {
                         int index = currentContainer.Items.IndexOf(node);
                         if (index >= 0) vsp.BringIndexIntoViewPublic(index);
                     }
-                    
-                    await Task.Delay(30); // Give time for virtualization to render
-                    currentContainer.UpdateLayout();
+
+                    // A single tiny wait is usually enough for the ItemContainerGenerator to catch up
+                    await Task.Delay(25);
                     itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
                 }
 
@@ -60,30 +79,55 @@ namespace AssetsManager.Services.Explorer.Tree
                         if (focus) itemContainer.Focus();
                         return;
                     }
-                    itemContainer.IsExpanded = true;
+                    
+                    if (!itemContainer.IsExpanded) itemContainer.IsExpanded = true;
                     currentContainer = itemContainer;
+                }
+                else
+                {
+                    break;
                 }
             }
         }
 
+        private TreeViewItem GetGeneratedContainerForPath(ItemsControl currentContainer, List<FileSystemNodeModel> path)
+        {
+            foreach (var node in path)
+            {
+                if (currentContainer == null) return null;
+                var itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
+                if (itemContainer == null) return null;
+                currentContainer = itemContainer;
+            }
+            return currentContainer as TreeViewItem;
+        }
+
         public List<FileSystemNodeModel> FindNodePath(IEnumerable<FileSystemNodeModel> nodes, FileSystemNodeModel nodeToFind)
         {
-            if (nodes == null) return null;
-            foreach (var n in nodes)
+            if (nodeToFind == null) return null;
+            
+            var path = new List<FileSystemNodeModel>();
+            var current = nodeToFind;
+            
+            while (current != null)
             {
-                if (n == nodeToFind) return new List<FileSystemNodeModel> { n };
-                var path = FindNodePath(n.Children, nodeToFind);
-                if (path != null) { path.Insert(0, n); return path; }
+                path.Insert(0, current);
+                current = current.Parent;
             }
-            return null;
+            
+            return path;
         }
 
         public void CollapseAll(FileSystemNodeModel node)
         {
             if (node == null) return;
             node.IsExpanded = false;
-            foreach (var child in node.Children ?? Enumerable.Empty<FileSystemNodeModel>()) 
-                CollapseAll(child);
+            var children = node.LoadedChildren;
+            if (children != null)
+            {
+                foreach (var child in children)
+                    CollapseAll(child);
+            }
         }
 
         public TreeViewItem SafeVisualUpwardSearch(DependencyObject source)
@@ -100,17 +144,13 @@ namespace AssetsManager.Services.Explorer.Tree
 
             if (selected.Count > 0)
             {
-                // Si hay multi-selección, aseguramos que el ítem principal (SelectedItem) 
-                // también esté en la lista si no lo estaba ya.
                 if (currentSelectedItem != null && !selected.Contains(currentSelectedItem))
                 {
-                    // Lo insertamos al principio para que sea el "líder" de la selección
                     selected.Insert(0, currentSelectedItem);
                 }
                 return selected;
             }
 
-            // Si no hay multi-selección, devolvemos solo el seleccionado actual
             return currentSelectedItem != null ? new List<FileSystemNodeModel> { currentSelectedItem } : new List<FileSystemNodeModel>();
         }
 
@@ -120,7 +160,8 @@ namespace AssetsManager.Services.Explorer.Tree
             foreach (var node in nodes)
             {
                 if (node.IsMultiSelected) result.Add(node);
-                FindMultiSelectedNodes(node.Children, result);
+                var children = node.LoadedChildren;
+                if (children != null) FindMultiSelectedNodes(children, result);
             }
         }
 

@@ -219,11 +219,11 @@ namespace AssetsManager.Services.Downloads
 
         private bool UpdateHashSizeIfDifferent(
             Dictionary<string, long> serverSizes,
-            Dictionary<string, long> localSizes,
+            IDictionary<string, long> localSizes,
             string filename)
         {
             long serverSize = serverSizes.GetValueOrDefault(filename, 0);
-            long localSize = localSizes.GetValueOrDefault(filename, 0);
+            long localSize = localSizes.TryGetValue(filename, out var size) ? size : 0;
 
             // Only sync if server has a LARGER file (more hashes).
             // If server is smaller or equal, we assume we are up to date or have a better local version.

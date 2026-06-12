@@ -96,7 +96,7 @@
                       Style="{StaticResource ModernTreeView}"
                       Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TreeView.Resources>
-                    <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding Children}">
+                    <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNodeModel}" ItemsSource="{Binding VisibleChildren}">
                         <Grid Margin="0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />

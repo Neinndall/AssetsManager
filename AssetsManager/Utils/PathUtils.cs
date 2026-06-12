@@ -17,9 +17,8 @@ namespace AssetsManager.Utils
 
             string normalizedUrl = url.ToLowerInvariant();
 
-            // 1. Eliminamos todo hasta el primer "assets/" (que suele ser /lol-game-data/assets/)
-            // Esto nos deja con la ruta relativa dentro de la raíz de datos del cliente.
-            string basePath = Regex.Replace(normalizedUrl, @"^.*?assets/", "");
+            int assetsIndex = normalizedUrl.IndexOf("assets/", StringComparison.Ordinal);
+            string basePath = assetsIndex >= 0 ? normalizedUrl.Substring(assetsIndex + 7) : normalizedUrl;
 
             // La raíz virtual /lol-game-data/assets/ mapea directamente a plugins/rcp-be-lol-game-data/global/default/
             // No debemos forzar un segmento "assets/" adicional ya que muchas rutas (como v1/...) están en la raíz.
@@ -43,10 +42,61 @@ namespace AssetsManager.Utils
             return name;
         }
 
+        /// <summary>
+        /// Cleans technical Riot suffixes from a Pass Event name.
+        /// e.g. "2026_Season2_Act2_Pass_reward_track" -> "2026 Season 2 Act 2"
+        /// </summary>
+        public static string CleanPassName(string name, bool forUI = false)
+        {
+            if (string.IsNullOrEmpty(name)) return "Unknown_Pass";
+
+            string clean = name.Replace("_Pass_reward_track", "")
+                               .Replace("_reward_track", "")
+                               .Replace("_Pass", "");
+
+            if (forUI)
+            {
+                return clean.Replace("_", " ").Trim();
+            }
+
+            return clean;
+        }
+
+        private static readonly System.Collections.Generic.HashSet<char> InvalidFileNameChars = 
+            new System.Collections.Generic.HashSet<char>(Path.GetInvalidFileNameChars());
+
         public static string SanitizeName(string name)
         {
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sanitized = new string(name.Where(c => !invalidChars.Contains(c)).ToArray()).Trim();
+            if (string.IsNullOrEmpty(name)) return string.Empty;
+
+            bool hasInvalid = false;
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (InvalidFileNameChars.Contains(name[i]))
+                {
+                    hasInvalid = true;
+                    break;
+                }
+            }
+
+            string sanitized;
+            if (!hasInvalid)
+            {
+                sanitized = name.Trim();
+            }
+            else
+            {
+                var sb = new System.Text.StringBuilder(name.Length);
+                for (int i = 0; i < name.Length; i++)
+                {
+                    char c = name[i];
+                    if (!InvalidFileNameChars.Contains(c))
+                    {
+                        sb.Append(c);
+                    }
+                }
+                sanitized = sb.ToString().Trim();
+            }
 
             const int MaxLength = 240; // A bit less than 255 to be safe.
             if (sanitized.Length > MaxLength)
@@ -174,6 +224,28 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Strips trailing audio-related extensions and suffixes (e.g. "_events.bnk", "_audio.bnk", ".wpk") 
+        /// from a file name to obtain the common base name.
+        /// </summary>
+        public static string StripBankSuffix(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return fileName;
+
+            if (fileName.EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 11);
+            if (fileName.EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 10);
+            if (fileName.EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 10);
+            if (fileName.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 4);
+            if (fileName.EndsWith(".wpk", StringComparison.OrdinalIgnoreCase))
+                return fileName.Substring(0, fileName.Length - 4);
+
+            return fileName;
+        }
+
+        /// <summary>
         /// Robust check to see if a path is the same or a sub-path of another.
         /// </summary>
         public static bool IsSameOrSubPath(string root, string sub)
@@ -216,6 +288,7 @@ namespace AssetsManager.Utils
 
         /// <summary>
         /// Normalizes a path by replacing backslashes with forward slashes and converting to lowercase.
+        /// Intended for internal WAD virtual paths (e.g. "plugins/rcp-be-lol-game-data/...").
         /// </summary>
         public static string NormalizePath(string path)
         {
@@ -224,11 +297,64 @@ namespace AssetsManager.Utils
         }
 
         /// <summary>
+        /// Normalizes a physical file system path (e.g. "C:\Riot Games\League of Legends").
+        /// Resolves "." / ".." segments, mixed separators, redundant slashes and the long-path
+        /// prefix via <see cref="Path.GetFullPath"/> (which on Windows returns the canonical
+        /// "\" separator), then lowercases and trims trailing separators so two equivalent
+        /// installation paths always produce the same key.
+        /// </summary>
+        public static string NormalizePhysicalPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+            try
+            {
+                string absolute = Path.GetFullPath(path);
+                return absolute.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                               .ToLowerInvariant();
+            }
+            catch
+            {
+                return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                             .ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
         /// Converts a physical or mixed path into a clean virtual path for WAD lookups.
         /// </summary>
         public static string ToVirtualPath(string path)
         {
             return NormalizePath(path).TrimStart('/');
+        }
+
+        /// <summary>
+        /// Builds the canonical identity key used to deduplicate WAD comparisons:
+        /// normalized Version + OldPath + NewPath. Returns null if paths are missing.
+        /// </summary>
+        public static string BuildComparisonKey(string version, string oldPath, string newPath)
+        {
+            if (string.IsNullOrWhiteSpace(oldPath) || string.IsNullOrWhiteSpace(newPath)) return null;
+
+            string normalizedVersion = string.IsNullOrWhiteSpace(version) ? "unknown" : version.Trim().ToLowerInvariant();
+            string normalizedOld = NormalizePhysicalPath(oldPath);
+            string normalizedNew = NormalizePhysicalPath(newPath);
+
+            return $"{normalizedVersion}|{normalizedOld}|{normalizedNew}";
+        }
+
+        /// <summary>
+        /// Gets a normalized lowercase extension from a path, file name, or directly from an extension.
+        /// Handles edge cases where path is already a clean extension (e.g. ".json").
+        /// </summary>
+        public static string GetNormalizedExtension(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            if (path.StartsWith(".") && !path.Contains("/") && !path.Contains("\\"))
+            {
+                return path.ToLowerInvariant();
+            }
+            return Path.GetExtension(path).ToLowerInvariant();
         }
     }
 }

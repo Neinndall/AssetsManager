@@ -12,6 +12,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Settings;
 
@@ -24,18 +25,79 @@ namespace AssetsManager.Services.Monitor
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
+        private readonly BackupManager _backupManager;
 
         private static readonly FieldInfo _checksumField = typeof(WadChunk).GetField("_checksum", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public event Action<MonitoredAsset> AssetUpdated;
 
-        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider, VersionService versionService)
+        public AssetWatcherService(AppSettings appSettings, LogService logService, DirectoriesCreator directoriesCreator, WadContentProvider wadContentProvider, VersionService versionService, BackupManager backupManager)
         {
             _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
+            _backupManager = backupManager;
+        }
+
+        public async Task<(bool Added, string DuplicateAssetPath)> AddAssetAsync(
+            FileSystemNodeModel node,
+            List<FileSystemNodeModel> nodePath,
+            string baseDirectoryForRelativePath,
+            string versionDetectionPath)
+        {
+            var validNodes = nodePath.Where(n => n.Name != "Loading...").ToList();
+
+            AssetSourceType sourceType = AssetSourceType.Game;
+            if (validNodes[0].Name.Contains("Plugins", StringComparison.OrdinalIgnoreCase))
+                sourceType = AssetSourceType.Plugins;
+
+            var wadNode = validNodes.FirstOrDefault(n => n.Type == NodeType.WadFile);
+            if (wadNode == null) return (false, null);
+
+            int wadIdx = validNodes.IndexOf(wadNode);
+            string internalPath = string.Join("/", validNodes.Skip(wadIdx + 1).Select(n => n.Name));
+            string logicalPath = $"{(sourceType == AssetSourceType.Plugins ? "Plugins" : "Game")}/{wadNode.Name}/{internalPath}";
+
+            if (_appSettings.MonitoredAssets.Any(a => a.AssetPath == logicalPath))
+                return (false, logicalPath);
+
+            string wadPhysicalPath = node.SourceWadPath;
+            string wadRelativePath = wadPhysicalPath;
+            if (!string.IsNullOrEmpty(baseDirectoryForRelativePath) && wadPhysicalPath.StartsWith(baseDirectoryForRelativePath, StringComparison.OrdinalIgnoreCase))
+                wadRelativePath = wadPhysicalPath.Substring(baseDirectoryForRelativePath.Length).TrimStart('/', '\\');
+
+            string currentVersion = null;
+            try
+            {
+                currentVersion = await _versionService.GetGameVersionAsync(versionDetectionPath);
+                if (string.IsNullOrEmpty(currentVersion) && !string.IsNullOrEmpty(wadPhysicalPath))
+                {
+                    string root = _backupManager.GetGameRoot(wadPhysicalPath);
+                    currentVersion = await _versionService.GetGameVersionAsync(root ?? Path.GetDirectoryName(wadPhysicalPath));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Watcher: Could not detect game version for asset: {node.Name}");
+            }
+
+            var newAsset = new MonitoredAsset
+            {
+                Alias = node.Name,
+                AssetPath = logicalPath,
+                WadName = wadRelativePath,
+                InternalPath = internalPath,
+                SourceType = sourceType,
+                Version = currentVersion,
+                LastKnownHash = node.SourceChunkPathHash != 0 ? node.SourceChunkPathHash : 0
+            };
+
+            _appSettings.MonitoredAssets.Add(newAsset);
+            AppSettings.SaveSettings(_appSettings);
+
+            return (true, null);
         }
 
         public async Task<(bool anyUpdated, List<string> updatedAssetNames)> CheckAssetsAsync(IEnumerable<MonitoredAsset> assets, bool silent = false)
@@ -57,7 +119,7 @@ namespace AssetsManager.Services.Monitor
                 try
                 {
                     // Don't overwrite pending check or updated status if we are already in that state in UI
-                    Application.Current.Dispatcher.Invoke(() =>
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         if (asset.Status != AssetStatus.Updated)
                         {
@@ -74,7 +136,7 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's an absolute path that really doesn't exist
                             _logService.LogWarning($"WAD file not found at path: {asset.WadName}");
-                            Application.Current.Dispatcher.Invoke(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -88,7 +150,7 @@ namespace AssetsManager.Services.Monitor
                                 _logService.LogWarning("Some monitored assets have relative paths but PBE Client Directory is not configured in Settings.");
                                 baseDirWarningLogged = true;
                             }
-                            Application.Current.Dispatcher.Invoke(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Pending;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("TextMuted");
@@ -98,7 +160,7 @@ namespace AssetsManager.Services.Monitor
                         {
                             // It's a relative path, we have a base dir, but still couldn't find the file
                             _logService.LogWarning($"Asset WAD not found in game directory: {asset.WadName}");
-                            Application.Current.Dispatcher.Invoke(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 asset.Status = AssetStatus.Error;
                                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -114,7 +176,7 @@ namespace AssetsManager.Services.Monitor
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {
                         _logService.LogWarning($"Asset '{asset.InternalPath}' not found inside WAD '{asset.WadName}'");
-                        Application.Current.Dispatcher.Invoke(() =>
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             asset.Status = AssetStatus.Error;
                             asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -142,7 +204,7 @@ namespace AssetsManager.Services.Monitor
                         // No changes found in this check. 
                         // CRITICAL: Only set to UpToDate if it wasn't already marked as Updated 
                         // (prevents auto-resetting before user sees it)
-                        Application.Current.Dispatcher.Invoke(() =>
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
                         {
                             if (!asset.HasChanges)
                             {
@@ -161,7 +223,7 @@ namespace AssetsManager.Services.Monitor
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error checking asset: {asset.AssetPath}");
-                    Application.Current.Dispatcher.Invoke(() =>
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
                     {
                         asset.Status = AssetStatus.Error;
                         asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentRed");
@@ -205,7 +267,10 @@ namespace AssetsManager.Services.Monitor
                     currentVersion = await _versionService.GetGameVersionAsync(_appSettings.LolPbeDirectory) ?? currentVersion;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Could not update asset version from PBE for {asset.Alias}");
+            }
 
             if (!isInitial)
             {
@@ -265,7 +330,7 @@ namespace AssetsManager.Services.Monitor
                 }
             }
 
-            Application.Current.Dispatcher.Invoke(() =>
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 asset.Version = currentVersion;
                 asset.LastKnownHash = checksum;
@@ -321,7 +386,10 @@ namespace AssetsManager.Services.Monitor
                     return foundFiles[0];
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Deep search for WAD '{fileName}' failed in '{baseDir}'");
+            }
 
             return null;
         }

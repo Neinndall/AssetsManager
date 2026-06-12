@@ -13,7 +13,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs;
@@ -28,39 +27,35 @@ namespace AssetsManager.Views.Dialogs
         private List<SerializableChunkDiff> _serializableDiffs;
         private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
-        private readonly DirectoriesCreator _directoriesCreator;
         private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
-        private readonly WadDiffProvider _wadDiffProvider;
-        private readonly WadPackagingService _wadPackagingService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private readonly DiffViewService _diffViewService;
         private readonly HashResolverService _hashResolverService;
         private readonly AppSettings _appSettings;
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
+        private readonly BackupManager _backupManager;
 
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath;
-        private string _assignedFolderName;
+        private string _version;
 
         private readonly WadComparisonResultModel _viewModel;
 
         public WadComparisonResultWindow(
-            IServiceProvider serviceProvider, 
-            CustomMessageBoxService customMessageBoxService, 
-            DirectoriesCreator directoriesCreator, 
-            AssetDownloader assetDownloaderService, 
-            LogService logService, 
-            WadDiffProvider wadDiffProvider, 
-            WadPackagingService wadPackagingService, 
+            IServiceProvider serviceProvider,
+            CustomMessageBoxService customMessageBoxService,
+            AssetDownloader assetDownloaderService,
+            LogService logService,
             ComparisonHistoryService comparisonHistoryService,
-            DiffViewService diffViewService, 
-            HashResolverService hashResolverService, 
+            DiffViewService diffViewService,
+            HashResolverService hashResolverService,
             AppSettings appSettings,
             WadContentProvider wadContentProvider,
-            VersionService versionService)
+            VersionService versionService,
+            BackupManager backupManager)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
@@ -68,17 +63,15 @@ namespace AssetsManager.Views.Dialogs
 
             _serviceProvider = serviceProvider;
             _customMessageBoxService = customMessageBoxService;
-            _directoriesCreator = directoriesCreator;
             _assetDownloaderService = assetDownloaderService;
             _logService = logService;
-            _wadDiffProvider = wadDiffProvider;
-            _wadPackagingService = wadPackagingService;
             _comparisonHistoryService = comparisonHistoryService;
             _diffViewService = diffViewService;
             _hashResolverService = hashResolverService;
             _appSettings = appSettings;
             _wadContentProvider = wadContentProvider;
             _versionService = versionService;
+            _backupManager = backupManager;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
@@ -123,7 +116,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
         {
-            Dispatcher.Invoke(() => ApplyFilters());
+            Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
         public void ApplyFilters()
@@ -154,11 +147,11 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string assignedFolderName = null)
+        public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
-            _assignedFolderName = assignedFolderName;
+            _version = version;
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -174,19 +167,20 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
         }
 
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string assignedFolderName = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null)
         {
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
-            _assignedFolderName = assignedFolderName;
+            _version = version;
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
+
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
@@ -249,9 +243,13 @@ namespace AssetsManager.Views.Dialogs
         public async void HandleBatchViewDifferencesRequest(List<SerializableChunkDiff> diffs)
         {
             if (diffs == null || diffs.Count == 0) return;
+
+            // Check if they are all images
+            bool isImageBatch = diffs.All(d => SupportedFileTypes.IsImage(d.Path));
             
-            // Filter only modified items that are NOT audio data containers
-            var validDiffs = diffs.Where(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path)).ToList();
+            var validDiffs = isImageBatch
+                ? diffs.ToList()
+                : diffs.Where(d => d.Type == ChunkDiffType.Modified && SupportedFileTypes.IsNonImageDiffable(d.Path)).ToList();
             
             if (validDiffs.Count > 1)
             {
@@ -280,65 +278,33 @@ namespace AssetsManager.Views.Dialogs
         private void TryResolveHashes()
         {
             string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
-            var wadFileCache = new Dictionary<string, WadFile>();
-            try
+            
+            foreach (var diff in _serializableDiffs)
             {
-                foreach (var diff in _serializableDiffs)
+                if (backupRoot != null)
                 {
-                    if (backupRoot != null)
-                    {
-                        diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
-                    }
+                    diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
+                }
 
-                    if (diff.OldPathHash != 0)
-                    {
-                        string resolvedPath = _hashResolverService.ResolveHash(diff.OldPathHash);
-                        bool isUnresolved = resolvedPath == diff.OldPathHash.ToString("x16");
-                        if ((isUnresolved || !Path.HasExtension(resolvedPath)) && diff.Type != ChunkDiffType.New)
-                        {
-                            string wadPath = Path.Combine(_oldPbePath, diff.SourceWadFile);
-                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile) && File.Exists(wadPath))
-                                wadFileCache[wadPath] = wadFile = new WadFile(wadPath);
+                // Optimization: Skip if already has a readable name. Only attempt if empty or a raw hex hash.
+                if (diff.OldPathHash != 0 && (string.IsNullOrEmpty(diff.OldPath) || IsHexHash(diff.OldPath)))
+                {
+                    string resolved = _hashResolverService.ResolveHash(diff.OldPathHash);
+                    if (resolved != null) diff.OldPath = resolved;
+                }
 
-                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.OldPathHash, out var chunk))
-                            {
-                                using var stream = wadFile.OpenChunk(chunk);
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                string extension = FileTypeDetector.GuessExtension(new Span<byte>(buffer, 0, bytesRead));
-                                if (!string.IsNullOrEmpty(extension)) resolvedPath += "." + extension;
-                            }
-                        }
-                        diff.OldPath = resolvedPath;
-                    }
-
-                    if (diff.NewPathHash != 0)
-                    {
-                        string resolvedPath = _hashResolverService.ResolveHash(diff.NewPathHash);
-                        bool isUnresolved = resolvedPath == diff.NewPathHash.ToString("x16");
-                        if ((isUnresolved || !Path.HasExtension(resolvedPath)) && diff.Type != ChunkDiffType.Removed)
-                        {
-                            string wadPath = Path.Combine(_newPbePath, diff.SourceWadFile);
-                            if (!wadFileCache.TryGetValue(wadPath, out var wadFile) && File.Exists(wadPath))
-                                wadFileCache[wadPath] = wadFile = new WadFile(wadPath);
-
-                            if (wadFile != null && wadFile.Chunks.TryGetValue(diff.NewPathHash, out var chunk))
-                            {
-                                using var stream = wadFile.OpenChunk(chunk);
-                                var buffer = new byte[256];
-                                var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                                string extension = FileTypeDetector.GuessExtension(new Span<byte>(buffer, 0, bytesRead));
-                                if (!string.IsNullOrEmpty(extension)) resolvedPath += "." + extension;
-                            }
-                        }
-                        diff.NewPath = resolvedPath;
-                    }
+                if (diff.NewPathHash != 0 && (string.IsNullOrEmpty(diff.NewPath) || IsHexHash(diff.NewPath)))
+                {
+                    string resolved = _hashResolverService.ResolveHash(diff.NewPathHash);
+                    if (resolved != null) diff.NewPath = resolved;
                 }
             }
-            finally
-            {
-                foreach (var wadFile in wadFileCache.Values) wadFile.Dispose();
-            }
+        }
+
+        private bool IsHexHash(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return path.Length == 16 && System.Text.RegularExpressions.Regex.IsMatch(path, @"^[0-9a-fA-F]+$");
         }
 
         private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
@@ -371,35 +337,48 @@ namespace AssetsManager.Views.Dialogs
         {
             try
             {
-                if (!string.IsNullOrEmpty(_assignedFolderName))
-                {
-                    _customMessageBoxService.ShowSuccess("Already Saved", $"This comparison is already stored in your history:\n{_assignedFolderName}", this);
-                    return;
-                }
-
                 _logService.Log("Starting comparison backup and asset packaging...");
-                string displayName = "Unknown";
-                var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
-
-                if (uniqueWads.Count == 1) displayName = Path.GetFileName(uniqueWads[0]).Split('.')[0];
-                else if (!string.IsNullOrEmpty(_newPbePath)) 
+                string displayName = ResolveComparisonDisplayName();
+                
+                // Use stored version if available, fallback to dynamic detection if missing
+                string version = _version;
+                if (string.IsNullOrEmpty(version))
                 {
-                    displayName = Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+                    string root = _backupManager.GetGameRoot(_newPbePath);
+                    version = await _versionService.GetGameVersionAsync(root ?? _newPbePath);
                 }
 
-                string version = await _versionService.GetGameVersionAsync(_newPbePath);
+                var result = await _comparisonHistoryService.EnsureArchivedAsync(
+                    _serializableDiffs, _oldPbePath, _newPbePath, version, displayName);
 
-                var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(_serializableDiffs, _oldPbePath, _newPbePath, folderInfo.PhysicalPath);
-                _comparisonHistoryService.RegisterComparisonInHistory(folderInfo.FolderName, displayName, _oldPbePath, _newPbePath, version);
-                _assignedFolderName = folderInfo.FolderName;
-                _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
+                if (result.AlreadyArchived)
+                {
+                    _customMessageBoxService.ShowSuccess("Already Saved", $"This comparison is already stored in your history:\n{result.ReferenceId}", this);
+                }
+                else
+                {
+                    _customMessageBoxService.ShowSuccess("Success", "Results and associated WAD files saved successfully.", this);
+                }
             }
             catch (Exception ex)
             {
                 _customMessageBoxService.ShowError("Error", $"Failed to save results: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to save comparison results.");
             }
+        }
+
+        private string ResolveComparisonDisplayName()
+        {
+            var uniqueWads = _serializableDiffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+            if (uniqueWads.Count == 1) return Path.GetFileName(uniqueWads[0]).Split('.')[0];
+
+            if (!string.IsNullOrEmpty(_newPbePath))
+            {
+                return Path.GetFileName(_newPbePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? "Root";
+            }
+
+            return "Unknown";
         }
 
         private async void ReloadHashesButton_Click(object sender, RoutedEventArgs e)

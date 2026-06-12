@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Services.Manifests;
@@ -11,12 +12,14 @@ namespace AssetsManager.Services.Manifests;
 public class RmanApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly LogService _logService;
     private const string GameVersionsUrl = "https://sieve.services.riotcdn.net/api/v1/products/lol/version-sets/PBE1?q[platform]=windows";
     private const string ClientConfigUrl = "https://clientconfig.rpg.riotgames.com/api/v1/config/public?namespace=keystone.products.league_of_legends.patchlines";
 
-    public RmanApiService(HttpClient httpClient)
+    public RmanApiService(HttpClient httpClient, LogService logService)
     {
         _httpClient = httpClient;
+        _logService = logService;
     }
 
     public async Task<List<RiotVersionInfo>> FetchVersionsAsync()
@@ -49,7 +52,10 @@ public class RmanApiService
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logService.LogError(ex, "Failed to fetch client configurations from Riot Client Config API.");
+        }
 
         // 2. Fetch Client Configurations (Plugins/LCU)
         try 
@@ -75,7 +81,10 @@ public class RmanApiService
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logService.LogError(ex, "Failed to fetch client configurations from Riot Client Config API.");
+        }
 
         return versions;
     }

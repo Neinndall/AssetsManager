@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices; // Added for CallerMemberName
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
@@ -68,7 +69,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
     }
 
-    public class WadGroupViewModel : INotifyPropertyChanged
+    public class WadGroupViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
@@ -90,11 +91,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
         public string WadName { get; set; }
         public int DiffCount { get; set; }
-        public string WadNameWithCount => $"{WadName} ({DiffCount})";
+        private string _wadNameWithCount;
+        public string WadNameWithCount => _wadNameWithCount ?? (_wadNameWithCount = $"{WadName} ({DiffCount})");
         public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; } = new ObservableRangeCollection<DiffTypeGroupViewModel>();
     }
 
-    public class DiffTypeGroupViewModel : INotifyPropertyChanged
+    public class DiffTypeGroupViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
@@ -116,7 +118,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
         public ChunkDiffType Type { get; set; }
         public int DiffCount { get; set; }
-        public string TypeNameWithCount => $"{Type} ({DiffCount})";
+        private string _typeNameWithCount;
+        public string TypeNameWithCount => _typeNameWithCount ?? (_typeNameWithCount = $"{Type} ({DiffCount})");
         public ObservableRangeCollection<SerializableChunkDiff> Diffs { get; set; } = new ObservableRangeCollection<SerializableChunkDiff>();
     }
 
@@ -126,7 +129,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int Count { get; set; }
         public double Percentage { get; set; }
         public long TotalSizeChange { get; set; }
-        public string SizeChangeText => (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(TotalSizeChange));
+        private string _sizeChangeText;
+        public string SizeChangeText => _sizeChangeText ?? (_sizeChangeText = (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(TotalSizeChange)));
     }
 
     public class TopImpactFile
@@ -137,7 +141,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ulong OldSize { get; set; }
         public ulong NewSize { get; set; }
         public long SizeDiff { get; set; }
-        public string SizeDiffText => (SizeDiff >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(SizeDiff));
+        private string _sizeDiffText;
+        public string SizeDiffText => _sizeDiffText ?? (_sizeDiffText = (SizeDiff >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(SizeDiff)));
     }
 
     public class AffectedArea

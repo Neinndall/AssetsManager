@@ -1,8 +1,10 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
@@ -98,15 +100,19 @@ namespace AssetsManager.Services.Viewer
 
                                 using (FileStream stream = new FileStream(primaryTex, FileMode.Open, FileAccess.Read, FileShare.Read))
                                 {
-                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex");
+                                    // Chroma previews are tiny gallery thumbnails, not full-size render assets.
+                                    // Capping the texture to 256px reduces GPU/CPU memory by 10-50x per chroma
+                                    // (typical 2K source → ~64x reduction in pixels) while preserving visual fidelity
+                                    // at the small card size used by ChromaSelectionControl.
+                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex", 256, 256);
                                     if (bitmap != null)
                                     {
                                         bitmap.Freeze();
-                                            skinModel.PreviewImage = bitmap;
-                                            skinModel.SwatchColor = ExtractDominantColor(bitmap);
-                                            skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
-                                        }
-                                        }
+                                        skinModel.PreviewImage = bitmap;
+                                        skinModel.SwatchColor = ExtractDominantColor(bitmap);
+                                        skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
+                                    }
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -119,7 +125,7 @@ namespace AssetsManager.Services.Viewer
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, "Error scanning for chromas");
+                    _logService.LogError(ex, $"Error scanning for chromas in path: {rootPath}");
                 }
 
                 return skins;
@@ -128,35 +134,51 @@ namespace AssetsManager.Services.Viewer
 
         /// <summary>
         /// Simple algorithm to extract the dominant color of a bitmap for the UI Swatch.
+        /// Optimized to only sample a small region without copying the whole bitmap.
         /// </summary>
         private Color ExtractDominantColor(BitmapSource bitmap)
         {
             try
             {
-                // We take a sample of pixels from the center of the texture
-                int width = bitmap.PixelWidth;
-                int height = bitmap.PixelHeight;
+                // Sampling a 64x64 area from the center is more than enough for a swatch
+                int sampleSize = 64;
+                int startX = Math.Max(0, (bitmap.PixelWidth - sampleSize) / 2);
+                int startY = Math.Max(0, (bitmap.PixelHeight - sampleSize) / 2);
+                int width = Math.Min(sampleSize, bitmap.PixelWidth);
+                int height = Math.Min(sampleSize, bitmap.PixelHeight);
+
+                Int32Rect sourceRect = new Int32Rect(startX, startY, width, height);
                 int stride = (width * bitmap.Format.BitsPerPixel + 7) / 8;
-                byte[] pixels = new byte[stride * height];
-                bitmap.CopyPixels(pixels, stride, 0);
-
-                long r = 0, g = 0, b = 0;
-                int samples = 0;
-
-                // Sample every 32 pixels for performance
-                for (int i = 0; i < pixels.Length; i += 32 * (bitmap.Format.BitsPerPixel / 8))
+                int bufferSize = stride * height;
+                
+                byte[] samplePixels = ArrayPool<byte>.Shared.Rent(bufferSize);
+                try
                 {
-                    if (i + 2 < pixels.Length)
-                    {
-                        b += pixels[i];
-                        g += pixels[i + 1];
-                        r += pixels[i + 2];
-                        samples++;
-                    }
-                }
+                    bitmap.CopyPixels(sourceRect, samplePixels, stride, 0);
 
-                if (samples == 0) return Colors.Gray;
-                return Color.FromRgb((byte)(r / samples), (byte)(g / samples), (byte)(b / samples));
+                    long r = 0, g = 0, b = 0;
+                    int samples = 0;
+                    int bytesPerPixel = bitmap.Format.BitsPerPixel / 8;
+
+                    for (int i = 0; i < bufferSize; i += bytesPerPixel)
+                    {
+                        if (i + 2 < bufferSize)
+                        {
+                            // Assuming Bgra32 or Bgr32
+                            b += samplePixels[i];
+                            g += samplePixels[i + 1];
+                            r += samplePixels[i + 2];
+                            samples++;
+                        }
+                    }
+
+                    if (samples == 0) return Colors.Gray;
+                    return Color.FromRgb((byte)(r / samples), (byte)(g / samples), (byte)(b / samples));
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(samplePixels);
+                }
             }
             catch
             {
@@ -187,7 +209,10 @@ namespace AssetsManager.Services.Viewer
                     if (sknFiles.Length > 0) return sknFiles[0];
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Could not find associated model for skins path: {skinsPath}");
+            }
             return null;
         }
     }

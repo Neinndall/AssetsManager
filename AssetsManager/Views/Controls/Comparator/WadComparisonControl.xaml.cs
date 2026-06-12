@@ -68,13 +68,30 @@ namespace AssetsManager.Views.Controls.Comparator
             });
         }
 
+        private void SetPathWithSync(bool isBase, string path)
+        {
+            if (ViewModel == null) return;
+
+            var match = ViewModel.AvailableBackups.FirstOrDefault(b => string.Equals(b.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (isBase)
+            {
+                if (match != null) ViewModel.SelectedBaseBackup = match;
+                else ViewModel.OldDirectoryPath = path;
+            }
+            else
+            {
+                if (match != null) ViewModel.SelectedTargetBackup = match;
+                else ViewModel.NewDirectoryPath = path;
+            }
+        }
+
         private async Task InitializeDefaultPathsAsync()
         {
             if (ViewModel == null || AppSettings == null || VersionService == null) return;
             string defaultPath = GetPreferredInitialDirectory();
             if (!string.IsNullOrEmpty(defaultPath))
             {
-                ViewModel.NewDirectoryPath = defaultPath;
+                SetPathWithSync(false, defaultPath);
                 await ViewModel.UpdateMetadataFromPathAsync(false, defaultPath, VersionService, BackupManager);
 
                 // --- DIRECTORY AUTO-SYNC ---
@@ -113,6 +130,10 @@ namespace AssetsManager.Views.Controls.Comparator
                 var backups = await BackupManager.GetBackupsAsync();
                 ViewModel.AvailableBackups.Clear();
                 foreach (var backup in backups) { ViewModel.AvailableBackups.Add(backup); }
+
+                // Re-sync selections after collection update to ensure reference matching
+                if (!string.IsNullOrEmpty(ViewModel.NewDirectoryPath)) SetPathWithSync(false, ViewModel.NewDirectoryPath);
+                if (!string.IsNullOrEmpty(ViewModel.OldDirectoryPath)) SetPathWithSync(true, ViewModel.OldDirectoryPath);
             }
             catch (Exception ex) { LogService.LogError(ex, "Error loading backups."); }
         }
@@ -159,8 +180,9 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.OldDirectoryPath = folderBrowserDialog.FileName;
-                    await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldDirectoryPath, VersionService, BackupManager);
+                    string oldPath = folderBrowserDialog.FileName;
+                    SetPathWithSync(true, oldPath);
+                    await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
                 }
             }
         }
@@ -173,7 +195,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     string newPath = folderBrowserDialog.FileName;
-                    ViewModel.NewDirectoryPath = newPath;
+                    SetPathWithSync(false, newPath);
                     await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
 
                     // --- DIRECTORY AUTO-SYNC ---
@@ -313,8 +335,8 @@ namespace AssetsManager.Views.Controls.Comparator
                     CustomMessageBoxService.ShowWarning("Warning", msg, Window.GetWindow(this));
                     return;
                 }
-                if (ViewModel.IsDirectoryMode) await WadComparatorService.CompareWadsAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
-                else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, cancellationToken);
+                if (ViewModel.IsDirectoryMode) await WadComparatorService.CompareWadsAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
+                else await WadComparatorService.CompareSingleWadAsync(ViewModel.BaseSourcePath, ViewModel.TargetSourcePath, ViewModel.TargetVersion, cancellationToken);
             }
             catch (OperationCanceledException) { LogService.LogWarning("WAD comparison cancelled."); }
             catch (Exception ex) { LogService.LogError(ex, "Comparison error."); CustomMessageBoxService.ShowError("Error", ex.Message, Window.GetWindow(this)); }

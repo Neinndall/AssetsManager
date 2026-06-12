@@ -2,12 +2,11 @@ using System;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using AssetsManager.Views.Models.Viewer;
 using System.Collections.Generic;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    public class AnimationModel : INotifyPropertyChanged
+    public class AnimationModel : INotifyPropertyChanged, IDisposable
     {
         public AnimationData AnimationData { get; }
 
@@ -26,16 +25,37 @@ namespace AssetsManager.Views.Models.Viewer
             {
                 if (SetField(ref _currentTime, value))
                 {
-                    OnPropertyChanged(nameof(ProgressText));
+                    // Throttle ProgressText notifications: only fire when the
+                    // display value would actually change at 0.1s precision.
+                    // At 60fps the setter is called 60 times/s; notifying
+                    // PropertyChanged for a 4-decimal string wastes CPU
+                    // rebuilding a label that the user cannot visually read
+                    // at that resolution.
+                    double displaySeconds = Math.Round(Math.Max(0, Math.Min(value, TotalDuration)), 1);
+                    if (displaySeconds != _lastNotifiedDisplaySeconds)
+                    {
+                        _lastNotifiedDisplaySeconds = displaySeconds;
+                        _cachedProgressText = null;
+                        OnPropertyChanged(nameof(ProgressText));
+                    }
                 }
             }
         }
+        private double _lastNotifiedDisplaySeconds = -1;
 
         private double _totalDuration;
         public double TotalDuration
         {
             get => _totalDuration;
-            set => SetField(ref _totalDuration, value);
+            set
+            {
+                if (SetField(ref _totalDuration, value))
+                {
+                    _cachedProgressText = null;
+                    _lastNotifiedDisplaySeconds = -1;
+                    OnPropertyChanged(nameof(ProgressText));
+                }
+            }
         }
 
         private double _speed = 1.0;
@@ -45,32 +65,34 @@ namespace AssetsManager.Views.Models.Viewer
             set => SetField(ref _speed, value);
         }
 
+        private string _cachedProgressText;
         public string ProgressText
         {
             get
             {
+                if (_cachedProgressText != null) return _cachedProgressText;
+
                 try
                 {
-                    // Use the comprehensive checks from the "robust" version
                     if (double.IsNaN(TotalDuration) || double.IsInfinity(TotalDuration) || TotalDuration <= 0 ||
                         double.IsNaN(CurrentTime) || double.IsInfinity(CurrentTime))
                     {
-                        return "--:-- / --:--";
+                        _cachedProgressText = "--:-- / --:--";
+                        return _cachedProgressText;
                     }
 
-                    // Clamp CurrentTime to be within the valid duration
                     var clampedCurrentTime = Math.Max(0, Math.Min(CurrentTime, TotalDuration));
 
-                    // Use a simpler format "ss.ffff" with an invariant culture to force "." as separator
                     var totalStr = TotalDuration.ToString("0.0000", CultureInfo.InvariantCulture);
                     var currentStr = clampedCurrentTime.ToString("0.0000", CultureInfo.InvariantCulture);
 
-                    return $"{currentStr} / {totalStr}";
+                    _cachedProgressText = $"{currentStr} / {totalStr}";
+                    return _cachedProgressText;
                 }
                 catch (Exception)
                 {
-                    // This catch is still a good safeguard, just in case.
-                    return "Error";
+                    _cachedProgressText = "Error";
+                    return _cachedProgressText;
                 }
             }
         }
@@ -81,6 +103,11 @@ namespace AssetsManager.Views.Models.Viewer
         {
             AnimationData = animationData;
             TotalDuration = animationData.AnimationAsset.Duration;
+        }
+
+        public void Dispose()
+        {
+            AnimationData?.Dispose();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

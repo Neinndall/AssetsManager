@@ -5,7 +5,6 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Threading;
-using System.Linq;
 using LeagueToolkit.Toolkit;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -149,6 +148,38 @@ namespace AssetsManager.Services.Explorer
 
         #region Export Orchestration
 
+        public async Task<int> ExportNodesAsync(
+            List<FileSystemNodeModel> nodes,
+            string destinationPath,
+            WadExportMode mode,
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            string currentRootPath,
+            CancellationToken cancellationToken,
+            Action<int, int, string> onProgress = null,
+            Action<string> onFileSaved = null)
+        {
+            int totalFiles = await CalculateTotalAsync(nodes, rootNodes, currentRootPath, mode, cancellationToken);
+            onProgress?.Invoke(0, totalFiles, null);
+
+            int processedCount = 0;
+            bool forceSmart = mode == WadExportMode.Smart;
+            foreach (var node in nodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                await ExportAsync(node, destinationPath, mode, rootNodes, currentRootPath, cancellationToken,
+                    (path) =>
+                    {
+                        processedCount++;
+                        string fileName = Path.GetFileName(path);
+                        onProgress?.Invoke(processedCount, totalFiles, fileName);
+                        onFileSaved?.Invoke(path);
+                    }, forceSmart);
+            }
+
+            return processedCount;
+        }
+
         public async Task ExportAsync(FileSystemNodeModel node, string destinationPath, WadExportMode mode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback = null, bool forceSmart = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -267,13 +298,9 @@ namespace AssetsManager.Services.Explorer
 
             if (fileBytes == null) return;
 
+            // NOTE: Extension guessing is now handled exclusively by WadNodeLoaderService
+            // during the tree population phase, so node.Name is already correct.
             string fileName = node.Name;
-            if (string.IsNullOrEmpty(Path.GetExtension(fileName)))
-            {
-                string guessedExtension = FileTypeDetector.GuessExtension(fileBytes);
-                if (!string.IsNullOrEmpty(guessedExtension)) fileName = $"{fileName}.{guessedExtension}";
-            }
-
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
             await File.WriteAllBytesAsync(filePath, fileBytes, cancellationToken);
             onFileSavedCallback?.Invoke(filePath);
@@ -422,15 +449,6 @@ namespace AssetsManager.Services.Explorer
             else
                 audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
 
-            // OPTIMIZACIÓN: Parseamos el WPK una sola vez para todo el banco en lugar de hacerlo por cada sonido.
-            Dictionary<uint, AssetsManager.Views.Models.WpkWem> wpkMetadata = null;
-            if (wpkData != null)
-            {
-                using var wpkStream = new MemoryStream(wpkData);
-                var wpk = WpkParser.Parse(wpkStream, _logService);
-                wpkMetadata = wpk?.Wems?.ToDictionary(w => w.Id);
-            }
-
             foreach (var eventNode in audioTree)
             {
                 string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
@@ -439,10 +457,10 @@ namespace AssetsManager.Services.Explorer
                 foreach (var soundNode in eventNode.Sounds)
                 {
                     byte[] wemData = null;
-                    if (wpkMetadata != null && wpkMetadata.TryGetValue(soundNode.Id, out var wem))
+                    if (soundNode.Source == AudioSourceType.Wpk && wpkData != null)
                     {
                         // Extracción directa (O(1) en memoria)
-                        wemData = wpkData.AsSpan((int)wem.Offset, (int)wem.Size).ToArray();
+                        wemData = wpkData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
                     }
                     else if (audioBnkFileData != null)
                     {

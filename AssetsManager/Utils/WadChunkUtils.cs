@@ -4,6 +4,7 @@ using System.IO.Compression;
 using LeagueToolkit.Core.Wad;
 using ZstdSharp;
 using System.Threading;
+using System.Runtime.InteropServices;
 
 namespace AssetsManager.Utils
 {
@@ -23,16 +24,16 @@ namespace AssetsManager.Utils
             {
                 case WadChunkCompression.ZstdChunked:
                 case WadChunkCompression.Zstd:
-                    // Fix: Unwrap may return a Span<byte>, so we convert it to ToArray() if needed to match the byte[] return type.
                     return _zstdDecompressor.Value.Unwrap(compressedData).ToArray();
 
                 case WadChunkCompression.GZip:
-                    // Para GZip, convertimos el Span a array (necesario para MemoryStream)
-                    using (var compressedStream = new MemoryStream(compressedData.ToArray()))
-                    using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
                     using (var decompressedStream = new MemoryStream())
                     {
-                        gzipStream.CopyTo(decompressedStream);
+                        using (var compressedStream = new MemoryStream(compressedData.ToArray(), writable: false))
+                        using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+                        {
+                            gzipStream.CopyTo(decompressedStream);
+                        }
                         return decompressedStream.ToArray();
                     }
 
@@ -41,8 +42,52 @@ namespace AssetsManager.Utils
             }
         }
 
-        // Sobrecarga para mantener compatibilidad con byte[]
+        public static byte[] DecompressChunk(ReadOnlyMemory<byte> compressedData, WadChunkCompression? compressionType)
+        {
+            if (compressionType == null || compressionType == WadChunkCompression.None)
+            {
+                return compressedData.ToArray();
+            }
+
+            switch (compressionType)
+            {
+                case WadChunkCompression.ZstdChunked:
+                case WadChunkCompression.Zstd:
+                    return _zstdDecompressor.Value.Unwrap(compressedData.Span).ToArray();
+
+                case WadChunkCompression.GZip:
+                    using (var decompressedStream = new MemoryStream())
+                    {
+                        Stream compressedStream;
+                        if (MemoryMarshal.TryGetArray(compressedData, out var segment))
+                        {
+                            compressedStream = new MemoryStream(segment.Array, segment.Offset, segment.Count, writable: false);
+                        }
+                        else
+                        {
+                            compressedStream = new MemoryStream(compressedData.ToArray(), writable: false);
+                        }
+
+                        using (compressedStream)
+                        using (var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+                        {
+                            gzipStream.CopyTo(decompressedStream);
+                        }
+                        return decompressedStream.ToArray();
+                    }
+
+                default:
+                    throw new NotSupportedException($"Compression type {compressionType} is not supported for decompression.");
+            }
+        }
+
         public static byte[] DecompressChunk(byte[] compressedData, WadChunkCompression? compressionType)
-            => DecompressChunk(compressedData.AsSpan(), compressionType);
+            => DecompressChunk(compressedData.AsMemory(), compressionType);
+
+        // Reads the WAD file header to extract the chunk count without instantiating WadFile.
+        // Delegates to LeagueToolkit's WadFile.GetChunkCount - single source of truth for the
+        // WAD format. Kept as a wrapper to preserve call sites and to allow future fallback logic
+        // if the library API ever changes.
+        public static int ReadWadChunkCount(string wadFilePath) => WadFile.GetChunkCount(wadFilePath);
     }
 }

@@ -86,14 +86,31 @@ namespace AssetsManager.Services.Viewer
 
             var processingResult = await Task.Run(() =>
             {
+                // Pre-resolve material lookup for performance
+                var resolvedMaterials = new Dictionary<string, BinTreeObject>(StringComparer.OrdinalIgnoreCase);
+                if (materialsBin != null)
+                {
+                    foreach (var kvp in materialsBin.Objects)
+                    {
+                        string resolvedName = _hashResolverService.ResolveBinHashGeneral(kvp.Key);
+                        if (!resolvedMaterials.ContainsKey(resolvedName))
+                        {
+                            resolvedMaterials[resolvedName] = kvp.Value;
+                        }
+                    }
+                }
+
                 var dataList = new List<SubmeshData>();
                 foreach (var mesh in mapGeometry.Meshes)
                 {
+                    var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
+                    var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
+                    bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
+
                     foreach (var submesh in mesh.Submeshes)
                     {
                         string materialName = submesh.Material.TrimEnd('\0');
 
-                        var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                         var subPositions = new Point3D[submesh.VertexCount];
                         for (int i = 0; i < submesh.VertexCount; i++)
                         {
@@ -108,9 +125,8 @@ namespace AssetsManager.Services.Viewer
                             triangleIndices[i] = (int)indices[i] - submesh.MinVertex;
                         }
 
-                        var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
                         var subTexCoords = new Point[submesh.VertexCount];
-                        if (texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616)
+                        if (isPacked1616)
                         {
                             var texCoords = texCoordAccessor.AsXyF16Array();
                             for (int i = 0; i < submesh.VertexCount; i++)
@@ -130,43 +146,36 @@ namespace AssetsManager.Services.Viewer
                         }
 
                         string fullTexturePath = null;
-                        if (materialsBin != null)
+                        if (resolvedMaterials.TryGetValue(materialName, out var materialObject))
                         {
-                            var foundMaterialKvp = materialsBin.Objects.FirstOrDefault(kvp =>
-                                _hashResolverService.ResolveBinHashGeneral(kvp.Key).Equals(materialName, StringComparison.OrdinalIgnoreCase)
+                            var samplerValuesKvp = materialObject.Properties.FirstOrDefault(propKvp =>
+                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
                             );
 
-                            if (foundMaterialKvp.Value != null)
+                            if (samplerValuesKvp.Value is BinTreeContainer samplerValuesContainer && samplerValuesContainer.Elements.Any())
                             {
-                                var samplerValuesKvp = foundMaterialKvp.Value.Properties.FirstOrDefault(propKvp =>
-                                    _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
-                                );
-
-                                if (samplerValuesKvp.Value is BinTreeContainer samplerValuesContainer && samplerValuesContainer.Elements.Any())
+                                foreach (var samplerElement in samplerValuesContainer.Elements)
                                 {
-                                    foreach (var samplerElement in samplerValuesContainer.Elements)
+                                    if (samplerElement is BinTreeStruct samplerObject)
                                     {
-                                        if (samplerElement is BinTreeStruct samplerObject)
+                                        var textureNamePropKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
+                                            _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
+                                        );
+
+                                        if (textureNamePropKvp.Value is BinTreeString textureNameString &&
+                                            (textureNameString.Value.Equals("Diffuse_Texture", StringComparison.OrdinalIgnoreCase) ||
+                                             textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase) ||
+                                             textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase) ||
+                                             textureNameString.Value.Equals("NoiseTexture", StringComparison.OrdinalIgnoreCase)))
                                         {
-                                            var textureNamePropKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
+                                            var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
+                                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
                                             );
 
-                                            if (textureNamePropKvp.Value is BinTreeString textureNameString &&
-                                                (textureNameString.Value.Equals("Diffuse_Texture", StringComparison.OrdinalIgnoreCase) ||
-                                                 textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase) ||
-                                                 textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase) ||
-                                                 textureNameString.Value.Equals("NoiseTexture", StringComparison.OrdinalIgnoreCase)))
+                                            if (texturePathKvp.Value is BinTreeString tps && !string.IsNullOrEmpty(tps.Value))
                                             {
-                                                var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                                    _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
-                                                );
-
-                                                if (texturePathKvp.Value is BinTreeString tps && !string.IsNullOrEmpty(tps.Value))
-                                                {
-                                                    fullTexturePath = tps.Value;
-                                                    break;
-                                                }
+                                                fullTexturePath = tps.Value;
+                                                break;
                                             }
                                         }
                                     }
@@ -219,11 +228,19 @@ namespace AssetsManager.Services.Viewer
 
             foreach (var data in submeshDataList)
             {
+                var positionsCol = new Point3DCollection(data.Positions);
+                var indicesCol = new Int32Collection(data.TriangleIndices);
+                var texCoordsCol = new PointCollection(data.TextureCoordinates);
+
+                if (positionsCol.CanFreeze) positionsCol.Freeze();
+                if (indicesCol.CanFreeze) indicesCol.Freeze();
+                if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
+
                 var meshGeometry = new MeshGeometry3D
                 {
-                    Positions = new Point3DCollection(data.Positions),
-                    TriangleIndices = new Int32Collection(data.TriangleIndices),
-                    TextureCoordinates = new PointCollection(data.TextureCoordinates)
+                    Positions = positionsCol,
+                    TriangleIndices = indicesCol,
+                    TextureCoordinates = texCoordsCol
                 };
 
                 string textureNameKey = string.IsNullOrEmpty(data.TexturePath) ? null : Path.GetFileNameWithoutExtension(data.TexturePath);

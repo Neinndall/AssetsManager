@@ -132,7 +132,7 @@
     <!-- Smooth Progress Animation: Interpolates the Value property for a professional feel -->
     <Storyboard x:Key="SmoothProgressAnimation">
         <DoubleAnimation Storyboard.TargetProperty="Value" 
-                         Duration="0:0:0.5" 
+                         Duration="0:0:0.3" 
                          DecelerationRatio="0.5">
             <DoubleAnimation.EasingFunction>
                 <CubicEase EasingMode="EaseOut"/>

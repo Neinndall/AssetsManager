@@ -137,7 +137,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="320" MinWidth="280" MaxWidth="450"/>
+                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Column 0: Viewport -->

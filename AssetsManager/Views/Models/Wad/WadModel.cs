@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.Json.Serialization;
 using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Wad
 {
@@ -25,6 +26,12 @@ namespace AssetsManager.Views.Models.Wad
         public string OldPath { get; set; }
         public string NewPath { get; set; }
         public string SourceWadFile { get; set; }
+
+        // Transient audit field populated during comparison when the diff is an
+        // audio bank. Holds a human-readable summary of HIRC changes (e.g.
+        // "Events: 142 → 143 (+1), WEMs: 87 → 88 (+1)"). Not serialized to the
+        // JSON index — used solely for the post-comparison audit log.
+        public string HircDiffSummary { get; set; }
     }
 
     public class AssociatedDependency
@@ -38,7 +45,7 @@ namespace AssetsManager.Views.Models.Wad
         public bool WasTopLevelDiff { get; set; }
     }
 
-    public class SerializableChunkDiff : INotifyPropertyChanged
+    public class SerializableChunkDiff : INotifyPropertyChanged, IMultiSelectable
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
@@ -111,8 +118,7 @@ namespace AssetsManager.Views.Models.Wad
 
                 if (diff == 0)
                 {
-                    if (Type == ChunkDiffType.Modified || Type == ChunkDiffType.Renamed) return "±0 B";
-                    return "0 B";
+                    return (Type == ChunkDiffType.Modified || Type == ChunkDiffType.Renamed) ? "±0 B" : "0 B";
                 }
                 
                 return (diff > 0 ? "+" : "-") + FormatUtils.FormatSize(Math.Abs(diff));
@@ -141,6 +147,7 @@ namespace AssetsManager.Views.Models.Wad
     {
         public string OldLolPath { get; set; }
         public string NewLolPath { get; set; }
+        public string Version { get; set; }
         public List<SerializableChunkDiff> Diffs { get; set; }
     }
 }

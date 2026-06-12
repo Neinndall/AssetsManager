@@ -21,7 +21,7 @@ namespace AssetsManager.Views.Controls
 
         public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
         {
-            Dispatcher.Invoke(() =>
+            Dispatcher.InvokeAsync(() =>
             {
                 _viewModel.ShowNotification(show, message);
             });

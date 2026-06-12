@@ -12,24 +12,29 @@ using AssetsManager.Views.Dialogs;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Explorer;
 
 namespace AssetsManager.Services.Explorer
 {
     public class ImageMergerService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly LogService _logService;
+        private readonly WadContentProvider _wadContentProvider;
         private ImageMergerWindow _activeWindow;
 
         public ObservableRangeCollection<ImageMergerItem> Items { get; } = new ObservableRangeCollection<ImageMergerItem>();
 
-        public ImageMergerService(IServiceProvider serviceProvider)
+        public ImageMergerService(IServiceProvider serviceProvider, LogService logService, WadContentProvider wadContentProvider)
         {
             _serviceProvider = serviceProvider;
+            _logService = logService;
+            _wadContentProvider = wadContentProvider;
         }
 
         public void AddItem(ImageMergerItem item)
         {
-            Application.Current.Dispatcher.Invoke(() => {
+            Application.Current.Dispatcher.InvokeAsync(() => {
                 if (!Items.Any(i => i.Path == item.Path))
                 {
                     Items.Add(item);
@@ -38,6 +43,61 @@ namespace AssetsManager.Services.Explorer
                 // Always show the window even if the item was already present
                 ShowWindow();
             });
+        }
+
+        public async Task<bool> AddNodeAsync(FileSystemNodeModel node)
+        {
+            if (!(SupportedFileTypes.Images.Contains(node.Extension) || SupportedFileTypes.Textures.Contains(node.Extension)) ||
+                !(node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile))
+                return false;
+
+            try
+            {
+                byte[] data = null;
+                if (node.Type == NodeType.VirtualFile)
+                    data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                else if (node.Type == NodeType.RealFile)
+                    data = await File.ReadAllBytesAsync(node.VirtualPath);
+
+                if (data == null) return false;
+
+                BitmapSource bitmap = null;
+                if (SupportedFileTypes.Textures.Contains(node.Extension))
+                {
+                    using (var stream = new MemoryStream(data))
+                        bitmap = TextureUtils.LoadTexture(stream, node.Extension);
+                }
+                else
+                {
+                    using (var stream = new MemoryStream(data))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = stream;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        bitmap = bmp;
+                    }
+                }
+
+                if (bitmap != null)
+                {
+                    AddItem(new ImageMergerItem
+                    {
+                        Name = node.Name,
+                        Path = node.VirtualPath ?? node.Name,
+                        Image = bitmap
+                    });
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to add image '{node.Name}' to merger.");
+            }
+
+            return false;
         }
 
         public async Task AddImagesFromDialogAsync()
@@ -80,7 +140,10 @@ namespace AssetsManager.Services.Explorer
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, $"Failed to add image to merger from file: {filePath}");
+                    }
                 }
             }
         }
@@ -180,7 +243,7 @@ namespace AssetsManager.Services.Explorer
 
         public void ShowWindow()
         {
-            Application.Current.Dispatcher.Invoke(() => {
+            Application.Current.Dispatcher.InvokeAsync(() => {
                 if (_activeWindow != null && _activeWindow.IsLoaded)
                 {
                     // Ensure the window is visible and focused

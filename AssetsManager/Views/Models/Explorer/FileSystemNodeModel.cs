@@ -5,8 +5,10 @@ using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Windows.Media;
+using System.Threading.Tasks;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Wad;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -14,7 +16,7 @@ namespace AssetsManager.Views.Models.Explorer
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
-    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable
+    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, IMultiSelectable
     {
         private static readonly Dictionary<string, string> _wadPathPool = new(StringComparer.OrdinalIgnoreCase);
 
@@ -31,10 +33,14 @@ namespace AssetsManager.Views.Models.Explorer
                     if (Type == NodeType.VirtualFile || Type == NodeType.VirtualDirectory || Type == NodeType.WemFile || Type == NodeType.AudioEvent || Type == NodeType.SoundBank)
                     {
                         if (Parent == null || Parent.Type == NodeType.WadFile || Parent.Type == NodeType.RealDirectory)
-                            return Name;
-
-                        var parentPath = Parent.VirtualPath;
-                        return string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                        {
+                            _virtualPath = Name;
+                        }
+                        else
+                        {
+                            var parentPath = Parent.VirtualPath;
+                            _virtualPath = string.IsNullOrEmpty(parentPath) ? Name : $"{parentPath}/{Name}";
+                        }
                     }
                 }
                 return _virtualPath;
@@ -78,6 +84,9 @@ namespace AssetsManager.Views.Models.Explorer
             set => _children = value;
         }
 
+        public ObservableRangeCollection<FileSystemNodeModel> LoadedChildren => _children;
+        public bool HasLoadedChildren => _children != null && _children.Count > 0;
+
         public static bool CanHaveChildren(NodeType type)
         {
             return type == NodeType.RealDirectory || 
@@ -113,22 +122,15 @@ namespace AssetsManager.Views.Models.Explorer
         public string BackupChunkPath { get; set; } // Only for nodes from a backup
         public ulong SourceChunkPathHash { get; set; } // Only for VirtualFile
 
-        private string _extension;
         public string Extension
         {
             get
             {
-                if (_extension == null)
-                {
-                    if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
-                        _extension = "";
-                    else
-                    {
-                        string path = VirtualPath;
-                        _extension = string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
-                    }
-                }
-                return _extension;
+                if (Type == NodeType.RealDirectory || Type == NodeType.VirtualDirectory)
+                    return "";
+
+                string path = VirtualPath;
+                return string.IsNullOrEmpty(path) ? "" : Path.GetExtension(path).ToLowerInvariant();
             }
         }
         public bool IsGroupingFolder { get; set; }
@@ -139,6 +141,7 @@ namespace AssetsManager.Views.Models.Explorer
             {
                 if (Type == NodeType.WadFile)
                 {
+                    if (string.IsNullOrEmpty(Name)) return string.Empty;
                     string lowerName = Name.ToLowerInvariant();
                     if (lowerName.EndsWith(".wad.client"))
                     {
@@ -158,6 +161,7 @@ namespace AssetsManager.Views.Models.Explorer
             get
             {
                 var name = DisplayName;
+                if (string.IsNullOrEmpty(name)) return string.Empty;
 
                 int parenthesisIndex = name.LastIndexOf(" (");
                 if (parenthesisIndex > 0)
@@ -165,10 +169,21 @@ namespace AssetsManager.Views.Models.Explorer
                     string potentialNumber = name.Substring(parenthesisIndex + 2);
                     if (potentialNumber.Length > 1 && potentialNumber.EndsWith(")") && int.TryParse(potentialNumber.Substring(0, potentialNumber.Length - 1), out _))
                     {
-                        name = name.Substring(0, parenthesisIndex).Trim();
+                        return name.Substring(0, parenthesisIndex).Trim();
                     }
                 }
                 return name;
+            }
+        }
+
+        private ObservableRangeCollection<FileSystemNodeModel> _visibleChildren;
+        public ObservableRangeCollection<FileSystemNodeModel> VisibleChildren
+        {
+            get => _visibleChildren ?? Children;
+            set
+            {
+                _visibleChildren = value;
+                OnPropertyChanged(nameof(VisibleChildren));
             }
         }
 
@@ -293,7 +308,6 @@ namespace AssetsManager.Views.Models.Explorer
             if (Directory.Exists(path))
             {
                 Type = NodeType.RealDirectory;
-                Children.Add(new FileSystemNodeModel()); // Add dummy child
             }
             else
             {
@@ -301,7 +315,6 @@ namespace AssetsManager.Views.Models.Explorer
                 if (lowerPath.EndsWith(".wad") || lowerPath.EndsWith(".wad.client"))
                 {
                     Type = NodeType.WadFile;
-                    Children.Add(new FileSystemNodeModel()); // Add dummy child
                 }
                 else if (lowerPath.EndsWith(".wpk") || lowerPath.EndsWith(".bnk"))
                 {
@@ -341,7 +354,7 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        // Internal constructor for the dummy node
+        // Internal constructor for the dummy node (Keep for SoundBanks if they still use it)
         internal FileSystemNodeModel()
         {
             Name = "Loading...";
@@ -391,6 +404,7 @@ namespace AssetsManager.Views.Models.Explorer
             Name = null;
 
             // Desuscribir todos los eventos
+            Parent = null;
             PropertyChanged = null;
         }
     }

@@ -1,8 +1,11 @@
 using System;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using Material3D = System.Windows.Media.Media3D.Material;
 
 namespace AssetsManager.Views.Helpers
@@ -10,6 +13,29 @@ namespace AssetsManager.Views.Helpers
     public static class SceneElements
     {
         public const double GroundLevel = 2000;
+        public const int SceneTextureMaxSize = 2048;
+
+        public static BitmapSource LoadSceneTexture(string path, LogService logService)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
+                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), SceneTextureMaxSize);
+                }
+                else
+                {
+                    using (Stream resourceStream = Application.GetResourceStream(new Uri(path)).Stream)
+                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), SceneTextureMaxSize);
+                }
+            }
+            catch (Exception ex)
+            {
+                logService.LogError(ex, $"Failed to load scene texture: {path}");
+                return null;
+            }
+        }
 
         public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
         {

@@ -1,10 +1,8 @@
 using System;
-using System.Linq;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows.Media.Media3D;
 using System.Windows.Media.Imaging;
-using System.Collections.ObjectModel;
-using System.Windows.Media;
 using System.Collections.Generic;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -18,28 +16,13 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isVisible = true;
         public bool IsVisible
         {
-            get { return _isVisible; }
+            get => _isVisible;
             set
             {
-                if (_isVisible != value)
-                {
-                    _isVisible = value;
-                    if (Visual != null)
-                    {
-                        if (_isVisible)
-                        {
-                            if (Visual.Content == null)
-                            {
-                                Visual.Content = Geometry;
-                            }
-                        }
-                        else
-                        {
-                            Visual.Content = null;
-                        }
-                    }
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsVisible)));
-                }
+                if (_isVisible == value) return;
+                _isVisible = value;
+                UpdateVisualContent();
+                OnPropertyChanged();
             }
         }
 
@@ -48,7 +31,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public Dictionary<string, BitmapSource> AllTextures
         {
-            get { return _allTextures; }
+            get => _allTextures;
             set
             {
                 _allTextures = value;
@@ -69,19 +52,28 @@ namespace AssetsManager.Views.Models.Viewer
         private string _selectedTextureName;
         public string SelectedTextureName
         {
-            get { return _selectedTextureName; }
+            get => _selectedTextureName;
             set
             {
-                if (_selectedTextureName != value)
-                {
-                    _selectedTextureName = value;
-                    TextureUtils.UpdateMaterial(this);
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedTextureName)));
-                }
+                if (_selectedTextureName == value) return;
+                _selectedTextureName = value;
+                TextureUtils.UpdateMaterial(this);
+                OnPropertyChanged();
             }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void UpdateVisualContent()
+        {
+            if (Visual == null) return;
+            Visual.Content = _isVisible ? Geometry : null;
+        }
 
         public void Dispose()
         {
@@ -95,15 +87,21 @@ namespace AssetsManager.Views.Models.Viewer
             if (Geometry != null)
             {
                 Geometry.Material = null;
+                Geometry.BackMaterial = null;
                 Geometry.Geometry = null;
                 Geometry = null;
             }
 
-            AllTextures?.Clear();
-            AllTextures = null;
+            // AllTextures is SHARED across all ModelParts of the same model
+            // (Skn/Sco/MapGeo services assign the same dictionary instance to every part).
+            // Calling Clear() or nulling the property here would destroy textures for
+            // sibling parts that are still alive in the viewport.
+            // We only release the local reference; the GC will reclaim the dictionary
+            // when the last ModelPart referencing it is disposed.
+            _allTextures = null;
+
             AvailableTextureNames?.Clear();
 
-            // Desuscribir todos los eventos
             PropertyChanged = null;
         }
     }

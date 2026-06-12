@@ -7,15 +7,17 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
-using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Views.Dialogs
 {
     public partial class ImageDiffWindow : HudWindow
     {
         public LoadingDiffWindow LoadingWindow { get; set; }
+        private readonly LogService _logService;
 
         // Batch Mode Properties
         public static readonly DependencyProperty IsBatchModeProperty =
@@ -45,10 +47,7 @@ namespace AssetsManager.Views.Dialogs
             set => SetValue(TotalFilesCountProperty, value);
         }
 
-        private List<SerializableChunkDiff> _batchItems;
-        private string _oldPbePath;
-        private string _newPbePath;
-        private Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> _loadDataFunc;
+        private List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> _preloadedImages;
 
         private bool _isInitialized = false;
         private Point _lastMousePosition;
@@ -56,15 +55,16 @@ namespace AssetsManager.Views.Dialogs
         private double _currentZoom = 1.0;
         private WriteableBitmap _diffMap;
 
-        public ImageDiffWindow() : this(null, null, null, null)
+        public ImageDiffWindow(LogService logService = null) : this(null, null, null, null, logService)
         {
         }
 
-        public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName)
+        public ImageDiffWindow(BitmapSource oldImage, BitmapSource newImage, string oldFileName, string newFileName, LogService logService = null)
         {
             InitializeComponent();
-            
-            // Smooth Handover: Handled via Loaded event if LoadingWindow is set
+            _logService = logService;
+
+            // Smooth Handover: Handled via Loaded event
             Loaded += ImageDiffWindow_Loaded;
 
             SetImageData(oldImage, newImage, oldFileName, newFileName);
@@ -92,20 +92,14 @@ namespace AssetsManager.Views.Dialogs
         {
             Loaded -= ImageDiffWindow_Loaded;
 
-            // 0. Visual Satisfaction: Show the bar as 100% ready while we do the final internal rendering
-            if (LoadingWindow != null)
-            {
-                LoadingWindow.SetState(DiffLoadingState.Ready);
-            }
-
             // 1. IMPORTANT: Wait for the UI to process the initial rendering (especially for high-res textures)
             // Using Render priority for images as they are faster to draw than heavy text
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
-            // 2. Now make the window visible and bring to front
-            this.Visibility = Visibility.Visible;
+            // 2. Smooth Handover: Take focus first, then close loader
+            this.Activate();
+            this.Focus();
 
-            // 3. Smooth Handover: Close loading window now that we are visible
             if (LoadingWindow != null)
             {
                 LoadingWindow.Close();
@@ -150,58 +144,43 @@ namespace AssetsManager.Views.Dialogs
 
         private bool diffBtn_IsChecked() => DiffBtn?.IsChecked == true;
 
-        public async Task LoadAndDisplayBatchDiffAsync(
-            List<SerializableChunkDiff> items,
-            int startIndex,
-            string oldPbePath,
-            string newPbePath,
-            Func<SerializableChunkDiff, string, string, Task<(BitmapSource oldImage, BitmapSource newImage)>> loadDataFunc,
-            LoadingDiffWindow loadingWindow = null)
+        public void LoadAndDisplayPreloadedBatchAsync(
+            List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> items,
+            int startIndex)
         {
-            LoadingWindow = loadingWindow; // Take custody of the loading window
-            _batchItems = items;
-            _oldPbePath = oldPbePath;
-            _newPbePath = newPbePath;
-            _loadDataFunc = loadDataFunc;
+            _preloadedImages = items;
 
             IsBatchMode = true;
             TotalFilesCount = items.Count;
             CurrentFileIndex = startIndex + 1;
 
-            await LoadCurrentBatchItemAsync();
+            LoadCurrentBatchItem();
         }
 
-        private async Task LoadCurrentBatchItemAsync()
+        private void LoadCurrentBatchItem()
         {
-            if (_batchItems == null || _batchItems.Count == 0 || _loadDataFunc == null) return;
+            if (_preloadedImages == null || _preloadedImages.Count == 0) return;
 
-            var currentItem = _batchItems[CurrentFileIndex - 1];
+            var currentItem = _preloadedImages[CurrentFileIndex - 1];
 
-            // Show a loading indicator or similar if needed
-            var (oldImage, newImage) = await _loadDataFunc(currentItem, _oldPbePath, _newPbePath);
-
-            SetImageData(oldImage, newImage, currentItem.OldPath, currentItem.NewPath);
-            
-            // Reset zoom/pan when changing file? (Optional)
-            // _currentZoom = 1.0;
-            // ApplyTransform(scale: 1.0, deltaX: -OldTranslate.X, deltaY: -OldTranslate.Y);
+            SetImageData(currentItem.oldImage, currentItem.newImage, currentItem.oldPath, currentItem.newPath);
         }
 
-        private async void BtnPrevFile_Click(object sender, RoutedEventArgs e)
+        private void BtnPrevFile_Click(object sender, RoutedEventArgs e)
         {
             if (CurrentFileIndex > 1)
             {
                 CurrentFileIndex--;
-                await LoadCurrentBatchItemAsync();
+                LoadCurrentBatchItem();
             }
         }
 
-        private async void BtnNextFile_Click(object sender, RoutedEventArgs e)
+        private void BtnNextFile_Click(object sender, RoutedEventArgs e)
         {
             if (CurrentFileIndex < TotalFilesCount)
             {
                 CurrentFileIndex++;
-                await LoadCurrentBatchItemAsync();
+                LoadCurrentBatchItem();
             }
         }
 
@@ -351,7 +330,7 @@ namespace AssetsManager.Views.Dialogs
             else if (SliderBtn.IsChecked == true)
             {
                 // Force layout update and then update the effect
-                this.Dispatcher.BeginInvoke(new Action(() => UpdateSliderEffect()), System.Windows.Threading.DispatcherPriority.Loaded);
+                this.Dispatcher.InvokeAsync(() => UpdateSliderEffect(), DispatcherPriority.Loaded);
             }
         }
 

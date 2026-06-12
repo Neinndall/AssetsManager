@@ -21,7 +21,7 @@ namespace AssetsManager.Views.Dialogs
         {
             if (!CheckAccess())
             {
-                Dispatcher.Invoke(() => SetProgress(percentage, message));
+                Dispatcher.InvokeAsync(() => SetProgress(percentage, message));
                 return;
             }
 

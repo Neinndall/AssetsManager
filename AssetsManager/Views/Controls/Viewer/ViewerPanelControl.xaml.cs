@@ -2,9 +2,12 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Utils;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
@@ -12,11 +15,12 @@ using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Controls.Shared;
 using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ViewerPanelControl : UserControl
+    public partial class ViewerPanelControl : UserControl, IDisposable
     {
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
@@ -30,17 +34,17 @@ namespace AssetsManager.Views.Controls.Viewer
         public ChromaScannerService ChromaScannerService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public TaskCancellationManager TaskCancellationManager { get; set; }
 
         // Peer Controls (Direct communication)
+        public ViewerWindowModel WindowViewModel { get; set; }
         public ViewerViewportControl Viewport { get; set; }
         public ChromaSelectionControl ChromaGallery { get; set; }
-
-        public event Action<Visibility> EmptyStateVisibilityChanged;
-        public event Action<Visibility> MainContentVisibilityChanged;
 
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
         private AnimationModel _currentlyPlayingAnimation;
+        private bool _isCleanedUp;
 
         public ViewerPanelControl()
         {
@@ -49,60 +53,79 @@ namespace AssetsManager.Views.Controls.Viewer
 
             InitializeComponent();
 
-            _viewModel.MainContentRequested += () => 
-            {
-                EmptyStateVisibilityChanged?.Invoke(Visibility.Collapsed);
-                MainContentVisibilityChanged?.Invoke(Visibility.Visible);
-            };
+            _viewModel.LoadedModels.CollectionChanged += OnLoadedModelsCollectionChanged;
+            _viewModel.AnimationModels.CollectionChanged += OnAnimationModelsCollectionChanged;
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-            _viewModel.EmptyStateRequested += () => 
-            {
-                MainContentVisibilityChanged?.Invoke(Visibility.Collapsed);
-                EmptyStateVisibilityChanged?.Invoke(Visibility.Visible);
-            };
+            UpdateHeroStats();
+            UpdateHeroSubtitle();
+            UpdateInspectorInfo();
 
-            _viewModel.LoadedModels.CollectionChanged += (s, e) =>
-            {
-                if (e.NewItems != null)
-                {
-                    foreach (SceneModel model in e.NewItems)
-                    {
-                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                        model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
-                    }
-                }
-                if (e.OldItems != null)
-                {
-                    foreach (SceneModel model in e.OldItems)
-                    {
-                        model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
-                    }
-                }
-            };
+            Unloaded += OnPanelUnloaded;
+            Loaded += (s, e) => _isCleanedUp = false;
+        }
 
-            _viewModel.PropertyChanged += (s, e) =>
+        private void OnLoadedModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
             {
-                if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
+                foreach (SceneModel model in e.NewItems)
                 {
-                    HandleSelectedModelChanged();
+                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                    model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
                 }
-                else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
+            }
+            if (e.OldItems != null)
+            {
+                foreach (SceneModel model in e.OldItems)
                 {
-                    if (_viewModel.IsAnimationSyncEnabled)
-                    {
-                        SyncLoadingForAllModels();
-                    }
+                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
                 }
-                else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
-                {
-                    foreach (var model in _viewModel.LoadedModels)
-                    {
-                        model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
-                    }
-                }
-            };
+            }
+            UpdateHeroStats();
+        }
 
-            Unloaded += (s, e) => Cleanup();
+        private void OnAnimationModelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateHeroStats();
+        }
+
+        private void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
+            {
+                HandleSelectedModelChanged();
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
+            {
+                if (_viewModel.IsAnimationSyncEnabled)
+                {
+                    SyncLoadingForAllModels();
+                }
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsMeshSyncEnabled))
+            {
+                foreach (var model in _viewModel.LoadedModels)
+                {
+                    model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                }
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.SelectedModelParts))
+            {
+                UpdateHeroStats();
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsChromaGalleryVisible))
+            {
+                if (!_viewModel.IsChromaGalleryVisible)
+                {
+                    ChromaGallery?.ViewModel?.Reset();
+                }
+            }
+        }
+
+        private void OnPanelUnloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
         }
 
         private void HandleMeshVisibilityChanged(ModelPart sourcePart)
@@ -189,23 +212,84 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void Cleanup()
         {
-            ResetScene();
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
+
+            try
+            {
+                // Symmetric unsubscription: detach every handler we registered in the
+                // constructor so the panel can be garbage-collected without leaking
+                // references to the ViewModel singleton.
+                _viewModel.LoadedModels.CollectionChanged -= OnLoadedModelsCollectionChanged;
+                _viewModel.AnimationModels.CollectionChanged -= OnAnimationModelsCollectionChanged;
+                _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+                // Also detach MeshVisibilityChanged from any model still in the list,
+                // in case Cleanup is called before ResetScene.
+                foreach (var model in _viewModel.LoadedModels)
+                {
+                    model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                }
+
+                ResetScene();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Error during ViewerPanelControl.Cleanup");
+            }
+        }
+
+        public void Dispose()
+        {
+            Cleanup();
+        }
+
+        private void SafeDisposeModel(SceneModel model)
+        {
+            if (model == null) return;
+            model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+
+            // Dispose animations that are not shared with any OTHER loaded model
+            foreach (var anim in model.Animations)
+            {
+                bool isShared = _viewModel.LoadedModels.Any(m => m != model && m.Animations.Any(a => a.AnimationAsset == anim.AnimationAsset));
+                if (!isShared)
+                {
+                    anim.Dispose();
+                }
+            }
+            model.Dispose();
         }
 
         public void ResetScene()
         {
+            // Dispose all loaded animations
+            foreach (var animModel in _viewModel.AnimationModels)
+            {
+                animModel.Dispose();
+            }
+            _viewModel.AnimationModels.Clear();
+
             // 1. CRÍTICO: Liberar recursos de TODOS los modelos
             foreach (var model in _viewModel.LoadedModels)
             {
-                model?.Dispose();
+                if (model != null)
+                {
+                    SafeDisposeModel(model);
+                }
             }
             _viewModel.LoadedModels.Clear();
 
             _currentlyPlayingAnimation = null;
 
             _viewModel.SelectedModelParts = null; // MVVM Cleanup
-            _viewModel.AnimationModels.Clear();
             _viewModel.SelectedModel = null;
+
+            // Reset search states for clean re-entry
+            _viewModel.ModelsSearchText = string.Empty;
+            _viewModel.AnimationsSearchText = string.Empty;
+            if (ModelsSearchBox != null) ModelsSearchBox.Text = string.Empty;
+            if (AnimationsSearchBox != null) AnimationsSearchBox.Text = string.Empty;
 
             LoadModelButton.IsEnabled = true;
             LoadChromaModelButton.IsEnabled = true;
@@ -215,14 +299,16 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LoadAnimationButton.IsEnabled = true;
             }
+
+            UpdateHeroStats();
         }
 
         private void DeleteModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
-                modelToDelete?.Dispose();
                 _viewModel.LoadedModels.Remove(modelToDelete);
+                SafeDisposeModel(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
                 if (_viewModel.LoadedModels.Count == 0)
@@ -257,46 +343,87 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _viewModel.SelectedAnimation = null;
                 }
+
+                // 3. Dispose the asset!
+                animationToDelete.Dispose();
             }
         }
+
+        private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.SelectedModel == null) return;
+
+            // DataContext of the toggle is the SelectedAnimation (inherited from the panel Border).
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
+            {
+                _currentlyPlayingAnimation.IsPlaying = false;
+            }
+
+            _currentlyPlayingAnimation = animationModel;
+
+            if (animationModel.IsPlaying)
+            {
+                // Was playing -> Pause
+                animationModel.IsPlaying = false;
+                Viewport?.TogglePauseResume(animationModel);
+            }
+            else
+            {
+                // Was paused/stopped -> Play
+                animationModel.IsPlaying = true;
+                Viewport?.SetAnimation(animationModel);
+            }
+        }
+
+        private void StopButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            // Toggle pause/resume at current time (NO reset to 0).
+            // The Viewport's TogglePauseResume updates IsAnimationPaused and notifies
+            // the panel via SetAnimationPlayingState, which keeps the binding in sync.
+            Viewport?.TogglePauseResume(animationModel);
+        }
+
+        private void CloseAnimationPlayer_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not AnimationModel animationModel) return;
+
+            // Stop playback if currently playing
+            if (animationModel.IsPlaying)
+            {
+                animationModel.IsPlaying = false;
+                Viewport?.TogglePauseResume(animationModel);
+            }
+
+            if (_currentlyPlayingAnimation == animationModel)
+            {
+                _currentlyPlayingAnimation = null;
+            }
+
+            // Clear the selection to hide the player (preserves the animation in the list)
+            _viewModel.SelectedAnimation = null;
+        }
+
+        private void TextureThumbnail_Click(object sender, RoutedEventArgs e) { /* removed: see textures ComboBox */ }
 
         private async void LoadModelButton_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMode == ViewerType.Skn)
             {
-                var openFileDialog = new CommonOpenFileDialog
-                {
-                    Filters = { 
-                        new CommonFileDialogFilter("SKN files", "*.skn"), 
-                        new CommonFileDialogFilter("SCO/SCB files", "*.sco;*.scb"),
-                        new CommonFileDialogFilter("All files", "*.*") 
-                    },
-                    Title = "Select a model file"
-                };
-
-                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    await ProcessModelLoading(openFileDialog.FileName, null, false);
-                }
+                await OpenSknModel();
             }
             else
             {
-                Viewport?.HandleMapGeometryLoadRequest();
+                await OpenMapGeometry();
             }
         }
 
         private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
         {
-            var folderBrowserDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select the skins folder of the character"
-            };
-
-            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
-            }
+            OpenChromaFolder();
         }
 
         /// <summary>
@@ -379,23 +506,42 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentMode = ViewerType.Skn;
             ViewModel.IsMapMode = false;
 
+            // Start a new cancellable operation. If another load is already in flight
+            // (rapid clicks, double-load) it will be cancelled and its result dropped.
+            var cancellationToken = TaskCancellationManager != null
+                ? TaskCancellationManager.PrepareNewOperation()
+                : System.Threading.CancellationToken.None;
+
             SceneModel newModel = null;
             string extension = Path.GetExtension(modelPath).ToLowerInvariant();
 
-            if (extension == ".sco" || extension == ".scb")
+            try
             {
-                newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath));
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(texturePath))
+                if (extension == ".sco" || extension == ".scb")
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath));
+                    newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath), cancellationToken);
                 }
                 else
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath));
+                    if (string.IsNullOrEmpty(texturePath))
+                    {
+                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
+                    }
+                    else
+                    {
+                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
+                    }
                 }
+            }
+            catch (System.OperationCanceledException)
+            {
+                LogService?.LogDebug("Model loading cancelled before completion.");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                newModel = null;
             }
 
             if (newModel != null)
@@ -414,7 +560,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    Viewport?.HandleSceneSetupRequest();
+                    Viewport?.SetupScene(false);
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
@@ -520,24 +666,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.SelectedModel == null)
-            {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
-                return;
-            }
-
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
-            {
-                if (_currentlyPlayingAnimation != null && _currentlyPlayingAnimation != animationModel)
-                {
-                    _currentlyPlayingAnimation.IsPlaying = false;
-                }
-
-                _currentlyPlayingAnimation = animationModel;
-                _currentlyPlayingAnimation.IsPlaying = true;
-
-                Viewport?.SetAnimation(animationModel);
-            }
+            // Legacy handler kept for compatibility; playback now lives in the
+            // Mini Player (PlayPauseButton_Click / StopButton_Click).
         }
 
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
@@ -545,19 +675,36 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentMode = ViewerType.MapGeometry;
             ViewModel.IsMapMode = true;
 
+            var cancellationToken = TaskCancellationManager != null
+                ? TaskCancellationManager.PrepareNewOperation()
+                : System.Threading.CancellationToken.None;
+
             SceneModel newModel;
-            if (!string.IsNullOrEmpty(materialsPath))
+            try
             {
-                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                if (!string.IsNullOrEmpty(materialsPath))
+                {
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                }
+                else
+                {
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                }
             }
-            else
+            catch (System.OperationCanceledException)
             {
-                newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                LogService?.LogDebug("Map geometry loading cancelled before completion.");
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                newModel = null;
             }
 
             if (newModel != null)
             {
-                Viewport?.HandleSceneSetupRequest();
+                Viewport?.SetupScene(true);
                 ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
@@ -565,21 +712,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 foreach (var model in _viewModel.LoadedModels)
                 {
-                    model?.Dispose();
+                    SafeDisposeModel(model);
                 }
                 _viewModel.LoadedModels.Clear();
                 _viewModel.LoadedModels.Add(newModel);
 
                 Viewport?.SnapCamera();
                 LoadModelButton.IsEnabled = false;
-            }
-        }
-
-        private void StopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel)
-            {
-                Viewport?.TogglePauseResume(animationModel);
             }
         }
 
@@ -613,7 +752,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void AnimationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (AnimationsListBox.SelectedItem is AnimationModel animationModel && _isSliderDragging)
+            // Use the slider's DataContext (inherited from the panel Border = SelectedAnimation)
+            // so seek works correctly even when the animation is unselected in the list.
+            if ((sender as FrameworkElement)?.DataContext is AnimationModel && _isSliderDragging)
             {
                 Viewport?.SeekAnimation(TimeSpan.FromSeconds(e.NewValue));
             }
@@ -641,11 +782,55 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
         }
 
-        public void ApplyAutoRotation(double angle)
+        // DIALOG METHODS (moved from ViewerWindow for passive orchestrator pattern)
+        public async Task OpenSknModel()
         {
-            if (_viewModel.SelectedModel != null)
+            var openFileDialog = new CommonOpenFileDialog
             {
-                _viewModel.SelectedModel.RotationY = (_viewModel.SelectedModel.RotationY + angle) % 360;
+                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), new CommonFileDialogFilter("All Files", "*.*") },
+                Title = "Select a model file"
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                var extension = Path.GetExtension(openFileDialog.FileName).ToLower();
+                if (extension == ".skl") LoadSkeleton(openFileDialog.FileName);
+                else await LoadInitialModel(openFileDialog.FileName);
+            }
+        }
+
+        public void OpenChromaFolder()
+        {
+            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the 'skins' folder" };
+
+            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
+            }
+        }
+
+        public async Task OpenMapGeometry()
+        {
+            var openMapGeoDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo") }, Title = "Select a mapgeo file" };
+
+            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                string mapGeoPath = openMapGeoDialog.FileName;
+                string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
+
+                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select map root" };
+                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    if (WindowViewModel != null)
+                    {
+                        WindowViewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
+                        WindowViewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
+                        WindowViewModel.IsLoadingVisible = true;
+                    }
+                    await LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
+                    if (WindowViewModel != null)
+                        WindowViewModel.IsLoadingVisible = false;
+                }
             }
         }
 
@@ -665,6 +850,93 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.ViewportViewModel.FieldOfView = 45;
                 _viewModel.ViewportViewModel.IsTransparentBg = false;
                 _viewModel.ViewportViewModel.ShowSkybox = true;
+            }
+        }
+
+        // ===== Control Deck navigation handlers =====
+
+        private void ExpandAllToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is ToggleButton toggle)
+            {
+                _viewModel.SetAllSectionsExpanded(toggle.IsChecked == true);
+            }
+        }
+
+        private void ModelsSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is SearchBoxControl searchBox)
+            {
+                _viewModel.ModelsSearchText = searchBox.Text;
+            }
+        }
+
+        private void AnimationsSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is SearchBoxControl searchBox)
+            {
+                _viewModel.AnimationsSearchText = searchBox.Text;
+            }
+        }
+
+        private void ResetAllTransforms_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.SelectedModel == null) return;
+            if (PositionXLock.IsChecked == false) _viewModel.SelectedModel.PositionX = 0;
+            if (PositionYLock.IsChecked == false) _viewModel.SelectedModel.PositionY = SceneElements.GroundLevel;
+            if (PositionZLock.IsChecked == false) _viewModel.SelectedModel.PositionZ = 0;
+            if (RotationXLock.IsChecked == false) _viewModel.SelectedModel.RotationX = 0;
+            if (RotationYLock.IsChecked == false) _viewModel.SelectedModel.RotationY = 0;
+            if (RotationZLock.IsChecked == false) _viewModel.SelectedModel.RotationZ = 0;
+            if (ScaleLock.IsChecked == false) _viewModel.SelectedModel.Scale = 1;
+        }
+
+        private void TabScene_Checked(object sender, RoutedEventArgs e) => UpdateHeroSubtitle();
+        private void TabEnvironment_Checked(object sender, RoutedEventArgs e) => UpdateHeroSubtitle();
+        private void TabMeshes_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabTransform_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabAnimations_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+
+        // ===== Hero & Inspector update helpers =====
+
+        private void UpdateHeroStats()
+        {
+            if (HeroModelsCountText != null)
+                HeroModelsCountText.Text = _viewModel.LoadedModels.Count.ToString();
+            if (HeroAnimsCountText != null)
+                HeroAnimsCountText.Text = _viewModel.AnimationModels.Count.ToString();
+            if (HeroMeshesCountText != null)
+                HeroMeshesCountText.Text = _viewModel.MeshPartCount.ToString();
+            if (ModelsCounterText != null)
+                ModelsCounterText.Text = _viewModel.LoadedModels.Count.ToString();
+        }
+
+        private void UpdateHeroSubtitle()
+        {
+            if (HeroSubtitleText == null) return;
+            HeroSubtitleText.Text = TabEnvironment != null && TabEnvironment.IsChecked == true
+                ? "Studio Environment"
+                : "Scene Editor";
+        }
+
+        private void UpdateInspectorInfo()
+        {
+            if (InspectorCounterText == null) return;
+
+            if (TabMeshes != null && TabMeshes.IsChecked == true)
+            {
+                InspectorCounterText.Text = "M";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Textures & meshes";
+            }
+            else if (TabTransform != null && TabTransform.IsChecked == true)
+            {
+                InspectorCounterText.Text = "T";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Transform & rotation";
+            }
+            else if (TabAnimations != null && TabAnimations.IsChecked == true)
+            {
+                InspectorCounterText.Text = "A";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
             }
         }
     }

@@ -67,7 +67,7 @@ namespace AssetsManager.Views.Dialogs
 
         private void OnConfigurationSaved(object sender, EventArgs e)
         {
-            Dispatcher.Invoke(LoadPacks);
+            Dispatcher.InvokeAsync(LoadPacks);
         }
 
         private void LoadPacks()

@@ -8,7 +8,22 @@ using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Shared
 {
-    public class PaginationModel<T> : INotifyPropertyChanged
+    public interface IPaginationModel : INotifyPropertyChanged
+    {
+        int CurrentPage { get; set; }
+        int TotalPages { get; }
+        string PageInfo { get; }
+        bool CanGoToFirstPage { get; }
+        bool CanGoToLastPage { get; }
+        bool CanGoToPreviousPage { get; }
+        bool CanGoToNextPage { get; }
+        void GoToFirstPage();
+        void GoToLastPage();
+        void PreviousPage();
+        void NextPage();
+    }
+
+    public class PaginationModel<T> : IPaginationModel
     {
         private List<T> _fullList = new List<T>();
 
@@ -22,6 +37,7 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _currentPage, value))
                 {
+                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
@@ -35,6 +51,7 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _pageSize, value))
                 {
+                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
@@ -48,8 +65,11 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _totalPages, value))
                 {
+                    _pageInfo = null;
                     OnPropertyChanged(nameof(CanGoToNextPage));
                     OnPropertyChanged(nameof(CanGoToPreviousPage));
+                    OnPropertyChanged(nameof(CanGoToFirstPage));
+                    OnPropertyChanged(nameof(CanGoToLastPage));
                     OnPropertyChanged(nameof(PageInfo));
                 }
             }
@@ -57,7 +77,10 @@ namespace AssetsManager.Views.Models.Shared
 
         public bool CanGoToPreviousPage => CurrentPage > 1;
         public bool CanGoToNextPage => CurrentPage < TotalPages;
-        public string PageInfo => $"Page {CurrentPage} / {TotalPages}";
+        public bool CanGoToFirstPage => CurrentPage > 1;
+        public bool CanGoToLastPage => CurrentPage < TotalPages;
+        private string _pageInfo;
+        public string PageInfo => _pageInfo ??= $"{CurrentPage} / {TotalPages}";
 
         public void SetFullList(IEnumerable<T> fullList)
         {
@@ -89,6 +112,8 @@ namespace AssetsManager.Views.Models.Shared
 
             OnPropertyChanged(nameof(CanGoToNextPage));
             OnPropertyChanged(nameof(CanGoToPreviousPage));
+            OnPropertyChanged(nameof(CanGoToFirstPage));
+            OnPropertyChanged(nameof(CanGoToLastPage));
             OnPropertyChanged(nameof(PageInfo));
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(TotalPages));
@@ -107,6 +132,22 @@ namespace AssetsManager.Views.Models.Shared
             if (CanGoToPreviousPage)
             {
                 CurrentPage--;
+            }
+        }
+
+        public void GoToFirstPage()
+        {
+            if (CanGoToFirstPage)
+            {
+                CurrentPage = 1;
+            }
+        }
+
+        public void GoToLastPage()
+        {
+            if (CanGoToLastPage)
+            {
+                CurrentPage = TotalPages;
             }
         }
 

@@ -1,208 +1,97 @@
 using System;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Media3D;
-using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
-using AssetsManager.Views.Helpers;
-using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
-using System.Threading.Tasks;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views
 {
     /// <summary>
-    /// Passive Container for the Viewer Module.
-    /// Responsibility: Dependency Injection and initial Peer-to-Peer linking.
+    /// Passive orchestrator for the Viewer module.
+    /// Responsibility: Dependency Injection and Peer-to-Peer linking between sub-controls.
     /// </summary>
-    public partial class ViewerWindow : UserControl
+    public partial class ViewerWindow : UserControl, IDisposable
     {
-        private readonly ViewerWindowModel _viewModel;
         public ViewerWindowModel ViewModel => _viewModel;
 
-        private readonly SknLoadingService _sknLoadingService;
-        private readonly ScoLoadingService _scoLoadingService;
-        private readonly MapGeometryLoadingService _mapGeometryLoadingService;
-        private readonly ChromaScannerService _chromaScannerService;
+        private readonly ViewerWindowModel _viewModel;
         private readonly LogService _logService;
-        private readonly CustomMessageBoxService _customMessageBoxService;
-        private readonly CustomCameraController _cameraController;
-        private readonly AppSettings _appSettings;
-
-        private bool _isMapGeometry = false;
-        private ModelVisual3D _groundVisual;
-        private ModelVisual3D _skyVisual;
+        private readonly TaskCancellationManager _taskCancellationManager;
+        private bool _isCleanedUp;
 
         public ViewerWindow(
-            SknLoadingService sknLoadingService, 
-            ScoLoadingService scoLoadingService, 
-            MapGeometryLoadingService mapGeometryLoadingService, 
+            SknLoadingService sknLoadingService,
+            ScoLoadingService scoLoadingService,
+            MapGeometryLoadingService mapGeometryLoadingService,
             ChromaScannerService chromaScannerService,
-            LogService logService, 
-            CustomMessageBoxService customMessageBoxService, 
-            AppSettings appSettings)
+            LogService logService,
+            CustomMessageBoxService customMessageBoxService,
+            AppSettings appSettings,
+            TaskCancellationManager taskCancellationManager)
         {
             InitializeComponent();
-            
+
             _viewModel = new ViewerWindowModel();
             DataContext = _viewModel;
 
-            _sknLoadingService = sknLoadingService;
-            _scoLoadingService = scoLoadingService;
-            _mapGeometryLoadingService = mapGeometryLoadingService;
-            _chromaScannerService = chromaScannerService;
             _logService = logService;
-            _customMessageBoxService = customMessageBoxService;
-            _appSettings = appSettings;
-            
-            _cameraController = new CustomCameraController(ViewportControl.Viewport);
+            _taskCancellationManager = taskCancellationManager;
 
-            // 1. Service Injection (Peer-to-Peer Support)
+            // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
-            
-            PanelControl.SknLoadingService = _sknLoadingService;
-            PanelControl.ScoLoadingService = _scoLoadingService;
-            PanelControl.MapGeometryLoadingService = _mapGeometryLoadingService;
-            PanelControl.ChromaScannerService = _chromaScannerService;
+            ViewportControl.AppSettings = appSettings;
+
+            PanelControl.SknLoadingService = sknLoadingService;
+            PanelControl.ScoLoadingService = scoLoadingService;
+            PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
+            PanelControl.ChromaScannerService = chromaScannerService;
             PanelControl.LogService = _logService;
-            PanelControl.CustomMessageBoxService = _customMessageBoxService;
+            PanelControl.CustomMessageBoxService = customMessageBoxService;
+            PanelControl.TaskCancellationManager = _taskCancellationManager;
+            PanelControl.WindowViewModel = _viewModel;
 
-            ChromaSelectionOverlay.ScannerService = _chromaScannerService;
+            ChromaSelectionOverlay.ScannerService = chromaScannerService;
 
+            // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
             PanelControl.ViewModel.ViewportViewModel = ViewportControl.ViewModel;
             PanelControl.ChromaGallery = ChromaSelectionOverlay;
-            
+
             ViewportControl.Panel = PanelControl;
-            
+
             ChromaSelectionOverlay.ParentPanel = PanelControl;
 
-            // 3. Subscription to direct UI state events (Standard pattern)
-            ViewportControl.SceneSetupRequested += SetupScene;
-            ViewportControl.MapGeometryLoadRequested += OnMapGeometryLoadRequested;
+            Loaded += (s, e) => _isCleanedUp = false;
         }
 
-        private void OnMapGeometryLoadRequested() => OpenGeometryFile_Click(null, null);
-
-        public void ShowLoading(string title, string description)
-        {
-            _viewModel.LoadingTitle = title;
-            _viewModel.LoadingDescription = description;
-            _viewModel.IsLoadingVisible = true;
-        }
-
-        public void HideLoading()
-        {
-            _viewModel.IsLoadingVisible = false;
-        }
+        // Empty-state handlers: thin 1-liners that delegate to the Panel
+        private async void OpenFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenSknModel();
+        private void OpenChromaFile_Click(object sender, RoutedEventArgs e) => PanelControl.OpenChromaFolder();
+        private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenMapGeometry();
 
         public void CleanupResources()
         {
-            _cameraController?.Dispose();
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
 
-            if (ViewportControl != null)
-            {
-                ViewportControl.SceneSetupRequested -= SetupScene;
-                ViewportControl.MapGeometryLoadRequested -= OnMapGeometryLoadRequested;
-                ViewportControl.Cleanup();
-            }
-
-            if (_groundVisual != null && ViewportControl != null) ViewportControl.Viewport.Children.Remove(_groundVisual);
-            if (_skyVisual != null && ViewportControl != null) ViewportControl.Viewport.Children.Remove(_skyVisual);
-
-            PanelControl?.Cleanup();
-        }
-
-        private void SetupScene()
-        {
-            if (_isMapGeometry) return;
-
-            if (_groundVisual != null && ViewportControl.Viewport.Children.Contains(_groundVisual))
-                ViewportControl.Viewport.Children.Remove(_groundVisual);
-            
-            if (_skyVisual != null && ViewportControl.Viewport.Children.Contains(_skyVisual))
-                ViewportControl.Viewport.Children.Remove(_skyVisual);
-
-            _groundVisual = SceneElements.CreateGroundPlane(path => LoadSceneTexture(path), _logService.LogError, _appSettings.CustomFloorTexturePath);
-            _skyVisual = SceneElements.CreateSidePlanes(path => LoadSceneTexture(path), _logService.LogError);
-
-            ViewportControl.Viewport.Children.Add(_groundVisual);
-            ViewportControl.Viewport.Children.Add(_skyVisual);
-            
-            ViewportControl.RegisterEnvironment(_skyVisual, _groundVisual);
-        }
-
-        private BitmapSource LoadSceneTexture(string path)
-        {
             try
             {
-                if (File.Exists(path))
-                {
-                    using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
-                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), 2048);
-                }
-                else
-                {
-                    using (Stream resourceStream = Application.GetResourceStream(new Uri(path)).Stream)
-                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), 2048);
-                }
+                _taskCancellationManager?.CancelCurrentOperation(false);
+
+                ViewportControl?.Cleanup();
+                PanelControl?.Cleanup();
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to load scene texture: {path}");
-                return null;
+                _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
             }
         }
 
-        private async void OpenFile_Click(object sender, RoutedEventArgs e)
+        public void Dispose()
         {
-            _isMapGeometry = false;
-            var openFileDialog = new CommonOpenFileDialog
-            {
-                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), new CommonFileDialogFilter("All Files", "*.*") },
-                Title = "Select a model file"
-            };
-
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                var extension = Path.GetExtension(openFileDialog.FileName).ToLower();
-                if (extension == ".skl") PanelControl.LoadSkeleton(openFileDialog.FileName);
-                else await PanelControl.LoadInitialModel(openFileDialog.FileName);
-            }
-        }
-
-        private void OpenChromaFile_Click(object sender, RoutedEventArgs e)
-        {
-            _isMapGeometry = false;
-            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the 'skins' folder" };
-
-            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                PanelControl.HandleChromaGalleryRequest(folderBrowserDialog.FileName);
-            }
-        }
-
-        private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e)
-        {
-            _isMapGeometry = true;
-            var openMapGeoDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo") }, Title = "Select a mapgeo file" };
-
-            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
-            {
-                string mapGeoPath = openMapGeoDialog.FileName;
-                string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
-
-                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select map root" };
-                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ShowLoading("Loading MapGeometry...", "Processing geometry and textures.");
-                    await PanelControl.LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
-                    HideLoading();
-                }
-            }
+            CleanupResources();
         }
     }
 }

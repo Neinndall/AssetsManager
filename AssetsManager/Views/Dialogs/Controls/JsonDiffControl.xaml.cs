@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Dialogs.Controls
     {
         #region Fields
         private static readonly IDiffer _differ = new Differ();
+        private static IHighlightingDefinition _jsonHighlighting;
         private SideBySideDiffModel _originalDiffModel;
         private DiffPaneModel _unifiedModel;
         private string _oldText;
@@ -68,20 +69,27 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             try
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                var resourceName = Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith("JsonSyntaxHighlighting.xshd"));
-
-                if (resourceName != null)
+                if (_jsonHighlighting == null)
                 {
-                    using var stream = assembly.GetManifestResourceStream(resourceName);
-                    if (stream != null)
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var resourceName = Array.Find(assembly.GetManifestResourceNames(), name => name.EndsWith("JsonSyntaxHighlighting.xshd"));
+
+                    if (resourceName != null)
                     {
-                        using var reader = XmlReader.Create(stream);
-                        var jsonHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
-                        OldJsonContent.SyntaxHighlighting = jsonHighlighting;
-                        NewJsonContent.SyntaxHighlighting = jsonHighlighting;
-                        UnifiedDiffEditor.SyntaxHighlighting = jsonHighlighting;
+                        using var stream = assembly.GetManifestResourceStream(resourceName);
+                        if (stream != null)
+                        {
+                            using var reader = XmlReader.Create(stream);
+                            _jsonHighlighting = HighlightingLoader.Load(reader, HighlightingManager.Instance);
+                        }
                     }
+                }
+
+                if (_jsonHighlighting != null)
+                {
+                    OldJsonContent.SyntaxHighlighting = _jsonHighlighting;
+                    NewJsonContent.SyntaxHighlighting = _jsonHighlighting;
+                    UnifiedDiffEditor.SyntaxHighlighting = _jsonHighlighting;
                 }
             }
             catch
@@ -195,6 +203,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             _cachedNewDoc = null;
             _originalDiffModel = null;
             _unifiedModel = null;
+            _oldText = null;
+            _newText = null;
+
         }
 
         public void FocusFirstDifference()
@@ -225,9 +236,24 @@ namespace AssetsManager.Views.Dialogs.Controls
                 // Detection: Is this the first time the asset is being tracked?
                 ViewModel.IsInitialComparison = string.IsNullOrEmpty(oldText) && !string.IsNullOrEmpty(newText);
 
-                // Build metrics using the most efficient way (Raw blocks)
+                // Build metrics (Sizes)
                 ViewModel.UpdateMetrics(oldText, newText);
-                await Task.Run(() => UpdateChangeCounts());
+
+                // [PROGRESS] Only report granular updates if NOT in batch mode to avoid bar jumps
+                bool reportProgress = !ViewModel.IsBatchMode && ParentWindow != null && ParentWindow.LoadingWindow != null;
+
+                if (reportProgress)
+                {
+                    await ParentWindow.LoadingWindow.SetStateAndRenderAsync(DiffLoadingState.CalculatingDifferences);
+                }
+
+                // Calculate metrics (Ins/Del/Mod) - We need to do this once
+                await Task.Run(() => CalculateMetrics());
+
+                if (reportProgress)
+                {
+                    await ParentWindow.LoadingWindow.SetStateAndRenderAsync(DiffLoadingState.RenderingUI);
+                }
 
                 // IMPORTANT: We do the UI update, but the Window is still Hidden
                 await UpdateDiffView();
@@ -239,7 +265,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             }
         }
 
-        private void UpdateChangeCounts()
+        private void CalculateMetrics()
         {
             if (ViewModel.IsInitialComparison)
             {
@@ -249,38 +275,45 @@ namespace AssetsManager.Views.Dialogs.Controls
                 return;
             }
 
-            // FAST TRACK: Use raw diff blocks to count changes (O(Blocks) instead of O(Lines))
-            // DiffPlex 1.9.0 handles hashing internally for performance.
-            var diffResult = _differ.CreateDiffs(_oldText, _newText, false, false, new DiffPlex.Chunkers.LineChunker());
+            // We use SideBySideDiffBuilder as the "Source of Truth" for metrics.
+            // It's efficient because we'll reuse this model if the user stays in SBS mode.
+            var m = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
             
-            int ins = 0, del = 0, mod = 0;
-            foreach (var block in diffResult.DiffBlocks)
+            int realIns = 0, realDel = 0, oldMod = 0, newMod = 0;
+            foreach (var line in m.NewText.Lines)
             {
-                if (block.DeleteCountA > 0 && block.InsertCountB > 0) mod += Math.Max(block.DeleteCountA, block.InsertCountB);
-                else if (block.InsertCountB > 0) ins += block.InsertCountB;
-                else if (block.DeleteCountA > 0) del += block.DeleteCountA;
+                if (line.Type == ChangeType.Inserted) realIns++;
+                else if (line.Type == ChangeType.Modified) newMod++;
+            }
+            foreach (var line in m.OldText.Lines)
+            {
+                if (line.Type == ChangeType.Deleted) realDel++;
+                else if (line.Type == ChangeType.Modified) oldMod++;
             }
 
-            ViewModel.InsertionsCount = ins;
-            ViewModel.DeletionsCount = del;
-            ViewModel.ModificationsCount = mod;
+            ViewModel.InsertionsCount = realIns;
+            ViewModel.DeletionsCount = realDel;
+            ViewModel.ModificationsCount = Math.Max(oldMod, newMod);
+
+            // MEMORY OPTIMIZATION: Discard unchanged text immediately to free RAM.
+            // We do this for BOTH sides of the model.
+            foreach (var line in m.OldText.Lines) if (line.Type == ChangeType.Unchanged) line.Text = null;
+            foreach (var line in m.NewText.Lines) if (line.Type == ChangeType.Unchanged) line.Text = null;
+
+            // If we are already in SideBySide mode, let's keep this model to avoid double calculation!
+            if (!ViewModel.IsInlineMode)
+            {
+                _originalDiffModel = m;
+            }
         }
 
         private void JumpToInsertion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Inserted);
         private void JumpToDeletion_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Deleted);
         private void JumpToModification_Click(object sender, System.Windows.Input.MouseButtonEventArgs e) => DiffNavigationPanel?.NavigateToFirstChangeByType(ChangeType.Modified);
 
-        public async Task LoadAndDisplayBatchDiffAsync(
-            List<AssetsManager.Views.Models.Wad.SerializableChunkDiff> items,
-            int startIndex,
-            string oldPbePath,
-            string newPbePath,
-            Func<AssetsManager.Views.Models.Wad.SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> loadDataFunc)
+        public async Task LoadAndDisplayPreloadedBatchAsync(List<(string oldText, string newText, string oldPath, string newPath)> items, int startIndex)
         {
-            ViewModel.BatchItems = items;
-            ViewModel.OldPbePath = oldPbePath;
-            ViewModel.NewPbePath = newPbePath;
-            ViewModel.LoadDataFunc = loadDataFunc;
+            ViewModel.PreloadedData = items;
 
             ViewModel.IsBatchMode = true;
             ViewModel.TotalFilesCount = items.Count;
@@ -291,13 +324,11 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private async Task LoadCurrentBatchItemAsync()
         {
-            if (ViewModel.BatchItems == null || ViewModel.BatchItems.Count == 0 || ViewModel.LoadDataFunc == null) return;
+            if (ViewModel.PreloadedData == null || ViewModel.PreloadedData.Count == 0) return;
 
-            var currentItem = ViewModel.BatchItems[ViewModel.CurrentFileIndex - 1];
+            var currentItem = ViewModel.PreloadedData[ViewModel.CurrentFileIndex - 1];
 
-            var (oldText, newText) = await ViewModel.LoadDataFunc(currentItem, ViewModel.OldPbePath, ViewModel.NewPbePath);
-
-            await LoadAndDisplayDiffAsync(oldText, newText, currentItem.OldPath, currentItem.NewPath);
+            await LoadAndDisplayDiffAsync(currentItem.oldText, currentItem.newText, currentItem.oldPath, currentItem.newPath);
             FocusFirstDifference();
             RefreshGuidePosition();
         }
@@ -327,7 +358,16 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_unifiedModel == null)
             {
-                _unifiedModel = await Task.Run(() => new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText));
+                _unifiedModel = await Task.Run(() => 
+                {
+                    var m = new InlineDiffBuilder(_differ).BuildDiffModel(_oldText, _newText);
+                    // MEMORY OPTIMIZATION: Discard unchanged text from model as we'll pull it from NEW source array if needed
+                    foreach (var line in m.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    return m;
+                });
             }
 
             var linesToShow = _unifiedModel.Lines;
@@ -344,7 +384,20 @@ namespace AssetsManager.Views.Dialogs.Controls
                 }).ToList();
             }
 
-            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => l.Text));
+            string[] newLinesArr = null;
+            string combinedText = string.Join(Environment.NewLine, linesToShow.Select(l => 
+            {
+                if (l.Text != null) return l.Text;
+                if (l.Position.HasValue && l.Position.Value > 0)
+                {
+                    newLinesArr ??= _newText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    if (newLinesArr != null && l.Position.Value <= newLinesArr.Length)
+                    {
+                        return newLinesArr[l.Position.Value - 1];
+                    }
+                }
+                return string.Empty;
+            }));
 
             if (UnifiedDiffEditor.Document == null || UnifiedDiffEditor.Document.TextLength != combinedText.Length || UnifiedDiffEditor.Text != combinedText)
             {
@@ -366,7 +419,20 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null)
             {
-                _originalDiffModel = await Task.Run(() => new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false));
+                _originalDiffModel = await Task.Run(() => 
+                {
+                    var m = new SideBySideDiffBuilder(_differ).BuildDiffModel(_oldText, _newText, false);
+                    // MEMORY OPTIMIZATION: Discard unchanged text from model
+                    foreach (var line in m.OldText.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    foreach (var line in m.NewText.Lines)
+                    {
+                        if (line.Type == ChangeType.Unchanged) line.Text = null;
+                    }
+                    return m;
+                });
             }
 
             var modelToShow = ViewModel.HideUnchangedLines ? FilterDiffModel(_originalDiffModel) : _originalDiffModel;
@@ -385,13 +451,15 @@ namespace AssetsManager.Views.Dialogs.Controls
             {
                 var (normalizedOld, normalizedNew) = await Task.Run(() =>
                 {
-                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText);
-                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText);
+                    string[] oldLinesArr = _oldText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    string[] newLinesArr = _newText?.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                    var nOld = JsonFormatterService.NormalizeTextForAlignment(modelToShow.OldText, oldLinesArr);
+                    var nNew = JsonFormatterService.NormalizeTextForAlignment(modelToShow.NewText, newLinesArr);
                     return (nOld, nNew);
                 });
 
-                _cachedOldDoc = new TextDocument(normalizedOld.Text);
-                _cachedNewDoc = new TextDocument(normalizedNew.Text);
+                _cachedOldDoc = new TextDocument(normalizedOld);
+                _cachedNewDoc = new TextDocument(normalizedNew);
                 OldJsonContent.Document = _cachedOldDoc;
                 NewJsonContent.Document = _cachedNewDoc;
                 
@@ -441,14 +509,14 @@ namespace AssetsManager.Views.Dialogs.Controls
             PreviousDiffButton_Click(null, null);
         }
 
-        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
-        {
-            BtnNextFile_Click(null, null);
-        }
-
         private void PreviousFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
         {
             BtnPrevFile_Click(null, null);
+        }
+
+        private void NextFile_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e)
+        {
+            BtnNextFile_Click(null, null);
         }
         #endregion
 

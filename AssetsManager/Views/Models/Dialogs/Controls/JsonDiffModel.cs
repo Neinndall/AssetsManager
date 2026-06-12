@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
@@ -127,22 +126,20 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int CurrentFileIndex
         {
             get => _currentFileIndex;
-            set { _currentFileIndex = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
+            set { _currentFileIndex = value; _totalFilesCountString = null; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
 
         public int TotalFilesCount
         {
             get => _totalFilesCount;
-            set { _totalFilesCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
+            set { _totalFilesCount = value; _totalFilesCountString = null; OnPropertyChanged(); OnPropertyChanged(nameof(TotalFilesCountString)); }
         }
 
-        public string TotalFilesCountString => $"{_currentFileIndex} / {_totalFilesCount}";
+        private string _totalFilesCountString;
+        public string TotalFilesCountString => _totalFilesCountString ??= $"{_currentFileIndex} / {_totalFilesCount}";
 
-        // Playlist data
-        public List<SerializableChunkDiff> BatchItems { get; set; }
-        public string OldPbePath { get; set; }
-        public string NewPbePath { get; set; }
-        public Func<SerializableChunkDiff, string, string, Task<(string oldText, string newText)>> LoadDataFunc { get; set; }
+        // Preloaded batch data
+        public List<(string oldText, string newText, string oldPath, string newPath)> PreloadedData { get; set; }
 
         public void UpdateMetrics(string oldText, string newText)
         {

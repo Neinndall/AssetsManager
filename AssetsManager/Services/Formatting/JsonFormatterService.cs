@@ -3,25 +3,47 @@ using System.Collections.Generic;
 using DiffPlex.DiffBuilder.Model;
 using System.Threading.Tasks;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Encodings.Web; // Needed for JavaScriptEncoder
 
 namespace AssetsManager.Services.Formatting
 {
     public class JsonFormatterService
     {
-        public (string Text, List<ChangeType> LineTypes) NormalizeTextForAlignment(DiffPaneModel paneModel)
+        public string NormalizeTextForAlignment(DiffPaneModel paneModel, string[] fallbackLines = null)
         {
-            var lines = new List<string>();
-            var lineTypes = new List<ChangeType>();
+            if (paneModel == null || paneModel.Lines.Count == 0) return string.Empty;
 
+            // Estimate capacity to reduce StringBuilder reallocations
+            int estimatedLength = 0;
             foreach (var line in paneModel.Lines)
             {
-                lines.Add(line.Type == ChangeType.Imaginary ? "" : line.Text ?? "");
-                lineTypes.Add(line.Type);
+                estimatedLength += (line.Text?.Length ?? (fallbackLines != null && line.Position.HasValue && line.Position.Value > 0 && line.Position.Value <= fallbackLines.Length ? fallbackLines[line.Position.Value - 1].Length : 0)) + 2;
             }
 
-            return (string.Join("\r\n", lines), lineTypes);
+            var sb = new System.Text.StringBuilder(estimatedLength);
+            foreach (var line in paneModel.Lines)
+            {
+                if (line.Type == ChangeType.Imaginary)
+                {
+                    sb.AppendLine(string.Empty);
+                }
+                else
+                {
+                    string text = line.Text;
+                    if (text == null && fallbackLines != null && line.Position.HasValue && line.Position.Value > 0 && line.Position.Value <= fallbackLines.Length)
+                    {
+                        text = fallbackLines[line.Position.Value - 1];
+                    }
+                    sb.AppendLine(text ?? string.Empty);
+                }
+            }
+
+            if (sb.Length >= 2)
+            {
+                sb.Length -= 2;
+            }
+
+            return sb.ToString();
         }
 
         public Task<string> FormatJsonAsync(object jsonInput)
@@ -36,7 +58,6 @@ namespace AssetsManager.Services.Formatting
 
             var localOptions = options ?? new JsonSerializerOptions();
             localOptions.WriteIndented = true;
-            // Ensure Unicode characters are unescaped for readability in the UI
             localOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 
             return Task.Run(() =>
@@ -45,8 +66,10 @@ namespace AssetsManager.Services.Formatting
                 {
                     if (jsonInput is string jsonString)
                     {
-                        var parsedJson = JsonNode.Parse(jsonString);
-                        return parsedJson.ToJsonString(localOptions);
+                        using var doc = JsonDocument.Parse(jsonString);
+                        // Highly optimized: Serialize utilizes internal ArrayPool<byte> to format 
+                        // the JsonDocument without allocating intermediate buffers or growing memory.
+                        return JsonSerializer.Serialize(doc, localOptions);
                     }
                     else
                     {

@@ -2,7 +2,7 @@ namespace AssetsManager.Views.Models.Monitor
 {
     public enum HistoryEntryType
     {
-        IndividualFile,
+        WadFile,
         WadArchive,
         WatcherUpdate
     }
@@ -15,7 +15,8 @@ namespace AssetsManager.Views.Models.Monitor
         public string OldFilePath { get; set; }
         public string NewFilePath { get; set; }
         public System.DateTime Timestamp { get; set; }
-        public HistoryEntryType Type { get; set; } = HistoryEntryType.IndividualFile;
+        public HistoryEntryType Type { get; set; } = HistoryEntryType.WadFile;
         public string ReferenceId { get; set; }
+        public string ComparisonKey { get; set; } // Identity fingerprint: Version + OldPath + NewPath (normalized)
     }
 }

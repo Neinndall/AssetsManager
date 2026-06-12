@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         public int CurrentLine { get; set; }
 
         private readonly SolidColorBrush _backgroundPanelBrush, _addedBrush, _removedBrush, _modifiedBrush, _imaginaryBrush, _viewportBrush;
+        private readonly Pen _viewportPen;
         private DrawingVisual _oldViewportGuide, _newViewportGuide;
 
         public DiffNavigationPanel()
@@ -45,6 +46,9 @@ namespace AssetsManager.Views.Dialogs.Controls
             _modifiedBrush.Freeze();
             _imaginaryBrush.Freeze();
             _viewportBrush.Freeze();
+
+            _viewportPen = new Pen(_viewportBrush, 1);
+            _viewportPen.Freeze();
 
             this.Unloaded += DiffNavigationPanel_Unloaded;
         }
@@ -141,16 +145,22 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             if (_originalDiffModel == null) return;
 
-            DrawMapMarkers(OldDiffMapHost, _originalDiffModel.OldText);
-            DrawMapMarkers(NewDiffMapHost, _originalDiffModel.NewText);
-            
-            _oldViewportGuide = null;
-            _newViewportGuide = null;
+            // FIX: Defer drawing until the layout is fully calculated so ActualHeight is > 0.
+            // This prevents the map from being invisible upon initial load.
+            Dispatcher.InvokeAsync(() => 
+            {
+                DrawMapMarkers(OldDiffMapHost, _originalDiffModel.OldText);
+                DrawMapMarkers(NewDiffMapHost, _originalDiffModel.NewText);
+                
+                _oldViewportGuide = null;
+                _newViewportGuide = null;
+                UpdateViewportGuide();
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void DrawMapMarkers(VisualHost host, DiffPaneModel pane)
         {
-            if (host == null || host.ActualWidth <= 0 || host.ActualHeight <= 0) return;
+            if (host == null || host.ActualWidth <= 0 || host.ActualHeight <= 0 || pane.Lines.Count == 0) return;
             host.ClearVisuals();
 
             // Initial comparison: Don't draw markers as there are no semantic changes
@@ -159,43 +169,40 @@ namespace AssetsManager.Views.Dialogs.Controls
             var backgroundVisual = new DrawingVisual();
             using (var dc = backgroundVisual.RenderOpen())
             {
-                if (pane.Lines.Count > 0)
+                double ratio = host.ActualHeight / pane.Lines.Count;
+                int i = 0;
+                while (i < pane.Lines.Count)
                 {
-                    double ratio = host.ActualHeight / pane.Lines.Count;
-                    int i = 0;
-                    while (i < pane.Lines.Count)
+                    var line = pane.Lines[i];
+                    if (line.Type == ChangeType.Unchanged || line.Type == ChangeType.Imaginary)
                     {
-                        var line = pane.Lines[i];
-                        if (line.Type == ChangeType.Unchanged)
-                        {
-                            i++;
-                            continue;
-                        }
+                        i++;
+                        continue;
+                    }
 
-                        // Start of a change block
-                        var currentType = line.Type;
-                        int start = i;
-                        
-                        // Group contiguous lines of the same type
-                        while (i < pane.Lines.Count && pane.Lines[i].Type == currentType)
-                        {
-                            i++;
-                        }
+                    // Start of a change block
+                    var currentType = line.Type;
+                    int start = i;
+                    
+                    // Group contiguous lines of the same type (O(N) operation that results in very few drawing calls)
+                    while (i < pane.Lines.Count && pane.Lines[i].Type == currentType)
+                    {
+                        i++;
+                    }
 
-                        Brush brush = currentType switch
-                        {
-                            ChangeType.Inserted => _addedBrush,
-                            ChangeType.Deleted => _removedBrush,
-                            ChangeType.Modified => _modifiedBrush,
-                            ChangeType.Imaginary => _imaginaryBrush,
-                            _ => null
-                        };
+                    Brush brush = currentType switch
+                    {
+                        ChangeType.Inserted => _addedBrush,
+                        ChangeType.Deleted => _removedBrush,
+                        ChangeType.Modified => _modifiedBrush,
+                        _ => null
+                    };
 
-                        if (brush != null)
-                        {
-                            int count = i - start;
-                            dc.DrawRectangle(brush, null, new Rect(0, start * ratio, host.ActualWidth, Math.Max(1, count * ratio)));
-                        }
+                    if (brush != null)
+                    {
+                        int count = i - start;
+                        // Minimum 1.5px height to ensure it's visible on high-res monitors
+                        dc.DrawRectangle(brush, null, new Rect(0, start * ratio, host.ActualWidth, Math.Max(1.5, count * ratio)));
                     }
                 }
             }
@@ -227,7 +234,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             using (var dc = guide.RenderOpen())
             {
-                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
+                dc.DrawRectangle(null, _viewportPen, new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
                 dc.DrawRectangle(_viewportBrush, null, new Rect(0, topLines * ratio, host.ActualWidth, Math.Max(visibleLines * ratio, 2)));
             }
         }
@@ -385,7 +392,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
             using (var dc = guide.RenderOpen())
             {
-                dc.DrawRectangle(null, new Pen(_viewportBrush, 1), new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
+                dc.DrawRectangle(null, _viewportPen, new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
                 dc.DrawRectangle(_viewportBrush, null, new Rect(0, top, host.ActualWidth, Math.Max(height, 2)));
             }
         }

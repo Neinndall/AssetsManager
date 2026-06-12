@@ -63,7 +63,93 @@
                                  Style="{StaticResource AnimatedSearchBoxStyle}" 
                                  Tag="{Binding IsSearchVisible}"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Margin="0,0,4,0"/>
+                                 Margin="0,0,4,0"
+                                 GotFocus="SearchTextBox_GotFocus"
+                                 LostFocus="SearchTextBox_LostFocus"
+                                 TextChanged="SearchTextBox_TextChanged"
+                                 PreviewKeyDown="SearchTextBox_PreviewKeyDown"
+                                 PreviewMouseLeftButtonDown="SearchTextBox_PreviewMouseLeftButtonDown"/>
+                        <Popup x:Name="SearchHistoryPopup"
+                               PlacementTarget="{Binding ElementName=SearchTextBox}"
+                               Placement="Bottom"
+                               StaysOpen="True"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade"
+                               MinWidth="220">
+                            <Border Style="{StaticResource SearchHistoryPopupBorderStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- Header -->
+                                    <Grid Grid.Row="0" Margin="6,4,6,6">
+                                        <TextBlock Text="RECENT SEARCHES"
+                                                   FontSize="9"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource TextSecondary}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button x:Name="ClearHistoryButton"
+                                                Content="Clear"
+                                                FontSize="9"
+                                                HorizontalAlignment="Right"
+                                                Cursor="Hand"
+                                                Click="ClearHistoryButton_Click"
+                                                Focusable="False"
+                                                Style="{StaticResource SmallTextButtonStyle}"/>
+                                    </Grid>
+                                    
+                                    <!-- List -->
+                                    <ListBox Grid.Row="1"
+                                             x:Name="SearchHistoryListBox"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             MaxHeight="200"
+                                             ItemsSource="{Binding SearchHistory}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             SelectionChanged="SearchHistoryListBox_SelectionChanged"
+                                             ItemContainerStyle="{StaticResource SearchHistoryListBoxItemStyle}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Height="24">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <materialIcons:MaterialIcon Kind="History" 
+                                                                                Width="12" Height="12" 
+                                                                                Foreground="{StaticResource TextSecondary}" 
+                                                                                VerticalAlignment="Center" 
+                                                                                Margin="2,0,6,0"/>
+                                                    <TextBlock Grid.Column="1" 
+                                                               Text="{Binding}" 
+                                                               Foreground="{StaticResource TextPrimary}" 
+                                                               FontSize="11" 
+                                                               VerticalAlignment="Center" 
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <!-- Delete item button -->
+                                                    <Button Grid.Column="2"
+                                                            Click="DeleteHistoryItem_Click"
+                                                            Tag="{Binding}"
+                                                            Visibility="Collapsed"
+                                                            x:Name="DelBtn"
+                                                            Focusable="False"
+                                                            Cursor="Hand"
+                                                            Style="{StaticResource SmallCloseButtonStyle}"/>
+                                                </Grid>
+                                                <DataTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="DelBtn" Property="Visibility" Value="Visible"/>
+                                                    </Trigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+                        </Popup>
                     </Grid>
                 </StackPanel>
             </Border>

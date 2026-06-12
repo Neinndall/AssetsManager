@@ -12,6 +12,16 @@ namespace AssetsManager.Views.Models.Audio
     {
         public List<AudioContainerNode> Containers { get; set; } = new List<AudioContainerNode>();
         public List<WemFileNode> Sounds { get; set; } = new List<WemFileNode>();
+        
+        // Technical metadata to detect changes in hidden parameters
+        public AudioTechnicalMetadata TechnicalInfo { get; set; }
+    }
+
+    public class AudioTechnicalMetadata
+    {
+        public int ObjectCount { get; set; }
+        public long TotalSize { get; set; }
+        public string Checksum { get; set; }
     }
 
     public class AudioContainerNode : AudioBankNode
@@ -28,6 +38,27 @@ namespace AssetsManager.Views.Models.Audio
     }
 
     public enum BinType { Champion, Map, Companion, Unknown }
+
+    // Describes the .bin file that backs an audio bank (e.g. a skin's root.bin
+    // for a champion, common.bin for a map). Used by AudioBankLinkerService
+    // and any consumer that needs to locate the matching .bin without touching
+    // the disk.
+    public record BinFileStrategy(string BinPath, string TargetWadName, BinType Type);
+
+    // Kind of file a dependency refers to inside the bank family.
+    public enum AudioDependencyType { Bin, EventsBnk, AudioBnk, AudioWpk }
+
+    // Lightweight DTO describing a single dependency of an audio bank
+    // (the .bin sibling, the _events.bnk / _audio.bnk / _audio.wpk companions).
+    // Path hash is pre-computed for convenience so consumers do not need to
+    // import the hashing layer.
+    public class AudioDependencyInfo
+    {
+        public string Path { get; set; }
+        public string SourceWad { get; set; }
+        public ulong PathHash { get; set; }
+        public AudioDependencyType Type { get; set; }
+    }
 
     public class LinkedAudioBank
     {

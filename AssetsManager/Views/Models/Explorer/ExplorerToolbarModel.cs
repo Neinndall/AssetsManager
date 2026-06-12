@@ -1,8 +1,12 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Views.Controls.Explorer;
+using AssetsManager.Utils;
 using Material.Icons;
+using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -23,6 +27,13 @@ namespace AssetsManager.Views.Models.Explorer
         private string _currentClientName;
         private Brush _currentClientBrush;
         private MaterialIconKind _currentClientIcon;
+        private ObservableRangeCollection<string> _searchHistory = new();
+
+        public ObservableRangeCollection<string> SearchHistory
+        {
+            get => _searchHistory;
+            set { if (_searchHistory != value) { _searchHistory = value; OnPropertyChanged(); } }
+        }
 
         public string CurrentClientName
         {

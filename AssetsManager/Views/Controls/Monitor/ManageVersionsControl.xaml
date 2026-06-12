@@ -1,11 +1,12 @@
 <UserControl x:Class="AssetsManager.Views.Controls.Monitor.ManageVersionsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
+             xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             mc:Ignorable="d" 
+             mc:Ignorable="d"
              d:DesignHeight="800" d:DesignWidth="1000">
 
     <Grid Margin="0,10,0,0">
@@ -100,63 +101,13 @@
 
             <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140"/>
-                    <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140"/>
+                    <RadioButton x:Name="TabClient" Content="League Client" IsChecked="True" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140" Checked="TabClient_Checked"/>
+                    <RadioButton x:Name="TabGame" Content="Game Client" GroupName="VersionTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="140" Checked="TabGame_Checked"/>
                 </StackPanel>
             </Border>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsChecked, ElementName=TabClient}" Value="True"/>
-                                        <Condition Binding="{Binding LeagueClientPaginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <TextBlock Text="{Binding LeagueClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </Border>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLeagueClientPage_Click" IsEnabled="{Binding LeagueClientPaginator.CanGoToNextPage}" Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsChecked, ElementName=TabGame}" Value="True"/>
-                                        <Condition Binding="{Binding LoLGameClientPaginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </MultiDataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="PrevLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToPreviousPage}" Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="ChevronLeft" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
-                    <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,4" Margin="8,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <TextBlock Text="{Binding LoLGameClientPaginator.PageInfo}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </Border>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="NextLoLGameClientPage_Click" IsEnabled="{Binding LoLGameClientPaginator.CanGoToNextPage}" Width="28" Height="28">
-                        <materialIcons:MaterialIcon Kind="ChevronRight" Width="18" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
-                </StackPanel>
+                <shared:PaginationControl Paginator="{Binding Paginator}"/>
             </StackPanel>
         </Grid>
 

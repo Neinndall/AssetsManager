@@ -23,6 +23,7 @@ namespace AssetsManager.Services.Formatting
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
         private readonly BinParser _binParser;
+        private readonly BinPropertyParser _binPropertyParser;
         private readonly TroybinParser _troybinParser;
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
@@ -37,6 +38,7 @@ namespace AssetsManager.Services.Formatting
             WadContentProvider wadContentProvider, 
             JsonFormatterService jsonFormatterService,
             BinParser binParser,
+            BinPropertyParser binPropertyParser,
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
@@ -50,6 +52,7 @@ namespace AssetsManager.Services.Formatting
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
             _binParser = binParser;
+            _binPropertyParser = binPropertyParser;
             _troybinParser = troybinParser;
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
@@ -121,12 +124,20 @@ namespace AssetsManager.Services.Formatting
                     try
                     {
                         var jsText = Encoding.UTF8.GetString(data);
+                        
+                        // Fix for AvalonEdit: Null bytes (\0) truncate the WPF text renderer. 
+                        // Riot files sometimes have trailing or hidden null bytes.
+                        if (jsText.Contains('\0'))
+                        {
+                            jsText = jsText.Replace("\0", "");
+                        }
+
                         formattedContent = await _jsBeautifierService.BeautifyAsync(jsText);
                     }
                     catch (Exception ex)
                     {
                         _logService.LogWarning($"JS Beautifier failed: {ex.Message}");
-                        formattedContent = Encoding.UTF8.GetString(data);
+                        formattedContent = Encoding.UTF8.GetString(data).Replace("\0", "");
                     }
                     break;
                 case "bnk":
@@ -137,9 +148,10 @@ namespace AssetsManager.Services.Formatting
                     break;
                 case "text":
                 default:
-                    formattedContent = Encoding.UTF8.GetString(data);
+                    formattedContent = Encoding.UTF8.GetString(data).Replace("\0", "");
                     break;
             }
+            
             return formattedContent;
         }
 
@@ -172,12 +184,15 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                using var binStream = new MemoryStream(data);
                 using var jsonStream = new MemoryStream();
-                var binTree = new BinTree(binStream);
-                await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binTree);
+                using (var binStream = new MemoryStream(data))
+                {
+                    // Llamar al orquestador BinParser
+                    await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binStream);
+                } 
+                
                 jsonStream.Position = 0;
-                using var reader = new StreamReader(jsonStream);
+                using var reader = new StreamReader(jsonStream, Encoding.UTF8);
                 return await reader.ReadToEndAsync();
             }
             catch (Exception ex)

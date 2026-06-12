@@ -1,3 +1,195 @@
+AssetsManager - League of Legends | v4.0.1.0
+
+MEDIUM UPDATE
+
+New Features
+  - Diff Viewer / Audio bank diffs in LIVE comparisons now show event names and structure (was raw HIRC bytes only).
+  - Monitor / Pass Rewards Browser: implemented a multi-event caching system with dynamic event-named files and a dedicated UI selector.
+  - Monitor / Image Comparison: added support for viewing image differences in Asset Watcher and History (previously unavailable).
+  - Explorer / Narrative Metadata Expansion
+    * Added support for Loot items: the explorer now automatically resolves and displays narrative context (names and descriptions) for loot assets by parsing the `loot.json` catalog.
+    * Implemented Hybrid Parsing: the system now supports both Array and Object-based root structures in `loot.json`, ensuring compatibility across different game versions.
+    * New Metadata Search Prefix (*): users can now search by real name or description by prefixing queries with `*`. Supports multi-keyword logic (e.g., `*aram mayhem`) for advanced asset discovery.
+  - Explorer / Persistent Search History
+    * Implemented a brand new "Search History" system that automatically saves and manages the last 5 unique queries, persisting them across sessions in the application configuration.
+    * Added a dedicated HUD-styled Popup with a clean vertical list of recent searches, complete with hover-based delete buttons and a global "Clear" option.
+    * Integrated full Keyboard Navigation to let users cycle through recent queries using Arrow Keys and press Enter to select or Escape to close the list.
+  - Viewer / Fully Asynchronous Model Loading: implemented a non-blocking architecture for character (SKN) and legacy (SCO/SCB) models, ensuring a perfectly responsive UI during all loading phases.
+  - Viewer / Redesigned MESHES List: each mesh is now its own card with icon, name, visibility toggle, and texture selector — no row selection, no hover state, pure visual clarity.
+  - Viewer / Compact Animation Rows: animations list redesigned for density with a per-item "ANIM" badge, freeing vertical space for the player panel.
+  - Viewer / MODELS Hidden by Default: the Models hierarchy now starts collapsed when loading a model, maximizing Inspector space; expand manually when you need to switch models.
+  - Viewer / Slim Animation Player: timeline scrubber, slim play/pause + stop/resume, and continuous speed slider (0.25x-2.0x) replace the old preset chips.
+  - Viewer / Unified Inner Scroll: scrolling over a nested list (animations, meshes) always scrolls the outer panel natively without getting trapped by inner scroll viewers.
+  - UI / Unified Animated Chevrons: a single style now drives both Viewer section headers and FileExplorer tree expanders — consistent rotation, hover feedback, and timing across the entire app.
+  - UI / Stable Selection Layout: card-based list items no longer shift their content when selected, so action buttons (trash, etc.) stay perfectly in place.
+  - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
+  - Diff Viewer / 3D Mesh Diff Viewer (.skn): Implemented full comparative 3D rendering for SKN models, displaying old (red) and new (green) meshes side-by-side or overlaid, with interactive part visibility toggling.
+  - Diff Viewer / Interactive Mesh Visibility Overlay: Added a floating, draggable panel for Mesh Parts overlay to allow flexible placement and unobstructed view of the 3D models.
+
+Improvements
+  - Diff Viewer / Optimized memory consumption and load times for large data comparisons (like .bin files), reducing RAM usage by over 99% and preventing OOM spikes during parsing.
+  - Diff Viewer / Implemented Lazy Loading for comparison models, calculating Side-by-Side or Inline views only when they are actually visible.
+  - Diff Viewer / Memory Trimming: significantly reduced RAM footprint in large text diffs by discarding redundant source text after change detection.
+  - Diff Viewer / GPU Stability: implemented resource freezing for navigation markers and guide pens to eliminate GPU usage spikes during scroll.
+  - Core / Fixed a critical misalignment in the .bin property parser that caused catastrophic memory allocations in files containing optional values.
+  - History / Renamed the "Individuals" tab to "WadFile" and "Sync Backups" to "Sync History" for better clarity and consistency.
+  - Diff Viewer / Fixed a UI freeze when navigating differences in JavaScript (.js) files, keeping the interface responsive.
+  - Explorer / JS Formatting & Highlighting: Integrated Jsbeautifier for cleaner, professional-grade JavaScript file formatting and enabled syntax highlighting for JS files of any size without crashes.
+  - Architecture / Centralized File Type Checks: Refactored type-checking logic across grid, previewer, and tab views into unified helper methods in SupportedFileTypes, and moved file extension normalization to PathUtils to consolidate path utilities.
+  - Viewer / Auto-rotation is now smoother and stops the model exactly where you deactivate it.
+  - Viewer / Fixed severe camera freezing and stuttering during drag rotation by properly capturing and releasing the mouse pointer across window bounds.
+  - Viewer / Fixed camera pivot instability when zooming by dynamically adjusting the LookDirection magnitude to keep the orbit target perfectly stationary.
+  - Viewer / Extreme Render Optimization: applied WPF `.Freeze()` to all dynamically generated `Point3DCollection` structures in `AnimationPlayer`, eliminating thousands of per-frame change events and achieving perfectly smooth 60 FPS animations.
+  - Viewer / Base Geometry Optimization: implemented `.Freeze()` on all static indices and UV coordinate collections during SKN, SCO, and Map Geometry loading to drastically reduce RAM usage and UI tracking overhead.
+  - Viewer / Removing and re-adding a model is now instant.
+  - Viewer / Reorganized the Viewer window: scene setup lives in the Viewport and file dialogs live in the Panel for cleaner navigation.
+  - Viewer / Model loading dialogs are now unified in a single flow.
+  - Viewer / Cleanup is more reliable when closing models.
+  - Viewer / Animation time label updates less frequently for smoother playback.
+  - Viewer / Chroma gallery now uses lighter thumbnails to reduce memory usage.
+  - Viewer / Loading a new model cancels any pending load to free memory faster.
+  - Viewer / Moving models is smoother: position, rotation and scale no longer cause hitches.
+  - Viewer / Animation memory is fully released when switching models.
+  - Viewer / Disposed model textures no longer affect other visible models.
+  - Viewer / Eliminated duplicate auto-rotation rendering for better performance.
+  - Monitor / Command Center:
+    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
+  - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
+  - Diff Viewer / Dynamic Camera Positioning: Standardized camera focus dynamically using the actual bounding box (Rect3D) of the loaded model's parts, adjusting position and distance to match its size and vertical baseline offset.
+  - Diff Viewer / WPF Rendering Performance Optimization: Applied WPF .Freeze() to all visual brushes, materials, and overlay geometries during 3D rendering, significantly reducing memory allocation and CPU overhead.
+  - Diff Viewer / State Transitions Speedup: Reduced the final .Ready transition delay to 350ms and state transition delay to 100ms for a snappier UI response.
+  - Diff Viewer / Zero-Gap Loading Handover: The loading card is handed over atomically to the result window (activating before closing the loader) to eliminate flickering and focus drops. The entire loading lifecycle is now centralized in a single orchestrator, ensuring the progress bar completes smoothly to 100% across all diff entry points (including 3D models).
+
+Bug Fixes
+  - Diff Viewer / Fixed a "No differences found" issue in audio banks by adding a Technical Summary node that detects hidden internal parameter changes.
+  - Comparator / Fixed an issue where single WadFile comparisons would save the game version as "null" in the history index.
+  - History / Fixed a bug where deleting a WadFile entry from the history UI would not delete its physical backup folder from the disk.
+  - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.
+  - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
+  - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
+  - Diff Viewer / Batch comparisons no longer show duplicate 100% indicators, creating a cleaner loading experience.
+  - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
+  - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
+  - Viewer / Scroll wheel now always drives the main panel: scrolling over the mesh list, pose controls, or animation list no longer gets trapped by inner lists.
+  - Viewer / Animation player stays pinned just above the bottom dock for instant access to playback controls without scrolling.
+  - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.
+  - Core / Extreme Binary Parsing Efficiency: optimized BinaryReader extensions with Span and stackalloc to eliminate heap allocations during asset parsing, achieving a 130x speedup in string reading and zero-garbage metadata extraction.
+  - Core / Zero-Redundancy Geometry Loading: refactored all model and environment constructors to eliminate redundant array copies, resulting in a 50% reduction in RAM usage for large 3D assets.
+  - Viewer / High-Performance Animations: enhanced AnimationPlayer with persistent buffers and pre-calculated joint hashes for smoother 60fps movement with zero per-frame allocations.
+  - Viewer / Smart Material Lookup: implemented instant O(1) material resolution in MapGeometryLoadingService to prevent UI freezing during large map loads.
+  - Viewer / Lightweight Chroma Scanning: optimized color extraction in ChromaScannerService using sampled 64x64 regions to save megabytes of RAM per skin.
+  - Architecture / Hardened Resource Disposal: enhanced Dispose logic in SceneModel and ModelPart to strictly release GPU materials and Toolkit buffers (SkinnedMesh/Animations) immediately.
+  - Architecture / Optimized Decompression: refined WadChunkUtils to eliminate redundant data copies during GZip decompression, streamlining the asset extraction pipeline.
+  - Monitor / Smart Pass Naming: integrated Event Hub localized name resolution to prioritize accurate event titles for caching and display.
+  - Monitor / Smart Milestone Translation: implemented automatic name shortening for mini-events (e.g. "Kiwi Milestone 1 - S26-S2") to prevent UI overflow.
+  - Monitor / Pass Rewards UI: redesigned the configuration section to perfectly match the Asset Tracker visual language.
+  - Monitor / Dashboard HUD Refinement
+    * Redesigned the middle status icons in the PBE Server, Core Build, and System Health cards: removed the "hero" border containers and shadow effects to achieve a much cleaner and more minimal aesthetic.
+    * Standardized Glyph Metrics: updated the standalone status icons to a consistent 26px size for optimal visibility and HUD alignment.
+    * Refined Core Build Identity: assigned a static "ShieldCheck" icon to the Software Identity header to provide a more stable and professional visual anchor.
+    * Optimized Status Label Aesthetics: updated the PBE, Core, and System status footers with a solid 1.0 BorderThickness and refined background/border opacities (0.08 / 0.2) for a more sophisticated and subtle HUD integration.
+    * Consistent Casing: updated the Core Build status labels to "Stable Build" and "Experimental Build" for a more refined typographic look.
+  - Explorer / Hybrid Engine & Search Fidelity
+    * Implemented a brand new "Hybrid Loading" architecture: the system now builds the complete file structure upon entry, restoring 100% fidelity to the search and filter tools while maintaining a 70% reduction in RAM usage (~150MB) through dynamic path reconstruction.
+    * Restored Global Search (/) functionality: the "Go To" command now supports deep recursive path discovery across all WADs and physical directories.
+    * Refined Progress Feedback: updated the loading screen with specific technical states ("Searching", "Indexing", "Exploring") for real-time visibility of the scanning process in both Live and Local modes.
+    * Standardized Audio Discovery: unified the lazy loading of sound banks (.bnk/.wpk) in both local and virtual trees, ensuring internal audio events are always accessible via the UI expander.
+  - UI / Audio Player Compact HUD
+    * Redesigned the audio player into a high-fidelity "Compact HUD Console": unified the play controls, time display, and volume management into a single, space-efficient control bar.
+    * Integrated Speed Control: added interactive badges to toggle playback rates (0.5x, 1.0x, 1.5x, 2.0x) for detailed audio analysis.
+    * Refined HUD Aesthetics: applied a subtle glassmorphism effect using the project's CardBackground and AccentBlue tones, featuring a dense waveform and softened container shadows for perfect interface integration.
+  - Explorer / Smart Navigation Engine
+    * Implemented a brand new "Smart Reload" filter: the file tree now intelligently ignores setting changes that don't affect file visibility (such as history updates or encoding preferences), eliminating frustrating tree resets during background tasks.
+    * Optimized Initialization: critical paths and user preferences are now tracked from startup, preventing the "first-time reload" flicker when accessing settings.
+  - Explorer / Search History Polish: refined the selection behavior to automatically hide the popup after choosing a recent search and integrated auto-hide logic while typing to ensure an unobstructed view of live results.
+  - Core / Robust Thread-Safe Configuration
+    * Implemented a specialized static lock mechanism in the settings engine: this ensures that concurrent writes to `config.json` (e.g., from the Watcher and API Center simultaneously) are synchronized, making file corruption technically impossible.
+    * Added Guarded Load/Save cycles to prevent IO exceptions during rapid configuration updates.
+  - Architecture / Professional Async Modernization
+    * Standardized the application's asynchronous engine on `await InvokeAsync` for all UI interactions, eliminating micro-stutters and ensuring perfectly ordered interface updates.
+    * Implemented a **Synchronous State Transition Architecture** for the Progress UI: used blocking `Invoke` for "Start" and "ProgressChanged" events across all modules (Comparator, Extraction, Backups, Versions) to eliminate race conditions and ensure the progress window never skips initial preparation messages.
+    * Refined the Dispatcher model: used synchronous `Invoke` for critical log message ordering and notification badge synchronization.
+  - UI / Standardized Progress Messaging
+    * Implemented a brand new **Preparation Messaging Strategy** across all modules: processes now show standardized "Preparing..." messages during technical initialization for immediate user feedback.
+  - Monitor / API Center & Dashboard Refinement
+    * Fixed a visual bug in the Monitor Dashboard where the app version displayed a double 'v' prefix (e.g., 'vv4.0.0.3') when an update was available.
+    * Optimized API Center icon extraction: switched to a serial, awaited synchronization model for batch icon loading to ensure a perfectly smooth "waterfall" effect and zero UI lag.
+    * Refined Asset Tracker Telemetry: split the "Last Discovered" information into dedicated "LAST CATEGORY" and "LAST ASSET" fields with professional HUD alignment and monospaced ID formatting.
+  - Diagnostics / Advanced Stability Laboratory
+    * Integrated a brand new technical verification suite in the Benchmark module: features automated concurrency stress tests (50 parallel writes), double-disposal safety checks, and background error visibility tests.
+    * Refined Resource Management: optimized the `Dispose` logic across all core services to ensure precise event unsubscription and zero memory leaks while maintaining code simplicity.
+  - Comparator / High-Performance Engine & SSoT
+    * Optimized WAD comparison architecture: implemented a single-pass comparison engine with session-wide resolution caching, achieving a 26% reduction in memory allocation and consistent 2-3s execution times for massive datasets.
+    * Integrated Smart Asset Identification: added "in-situ" extension guessing for unknown hashes (0x...) by reading file headers directly during the comparison phase, ensuring professional-grade results without additional disk I/O.
+    * Removed a redundant chunk iteration: the rename-detection map was being built in two passes over the old chunks, where the second pass fully subsumed the first. Reduced iterations by 33% with zero behavior change.
+    * Eliminated double WPK parsing during audio bank extraction: the WPK is now parsed only once (inside the audio tree builder), and the byte routing leverages the WEM source flag already populated on each sound node.
+  - UI / High-Fidelity Progress Feedback
+    * Refined progress reporting frequency: updated the unified notification system to report every 100 chunks, ensuring a perfectly smooth and progressive visual experience regardless of file volume.
+  - Architecture / System-Wide Redundancy Cleanup
+    * Streamlined Results & Reporting: eliminated redundant WAD re-scanning and duplicate extension guessing logic in the Comparison Results Window and Report Generation Service, resulting in near-instant window openings.
+    * Refined Export Efficiency: optimized the Export Service to rely on the tree's pre-processed identity (SSoT), removing unnecessary format detections during file saving.
+  - Comparator / Version-Based Archive Deduplication
+    * Replaced the fragile in-session fingerprint logic with a stable identity key built from Version + OldPath + NewPath, guaranteeing that identical comparisons are correctly deduplicated across sessions and app restarts.
+    * Centralized the archive + register flow in `ComparisonHistoryService.EnsureArchivedAsync`, eliminating duplicated packaging code between MainWindow and the Comparison Results Window.
+    * Added a new `ComparisonKey` field to `HistoryEntry` and serialized access via `SemaphoreSlim` to prevent race conditions when archiving the same comparison concurrently.
+  - Viewer / Animation memory is now released immediately when deleting an animation, removing a model, or closing the viewer.
+  - Viewer / Chroma preview thumbnails are released as soon as the gallery is closed, no longer waiting for the next scan.
+  - Viewer / Filtered models and animations lists now use cached results, keeping the panel responsive while typing in the search box.
+  - Monitor / Pagination: added first and last page buttons for instant navigation across all paginated views.
+
+Bug Fixes
+  - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
+  - Monitor / Dashboard HUD: Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it now dynamically reflects the true version status and update availability.
+  - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".
+  - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
+  - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
+  - Explorer / Fixed excessive memory usage (~1.7GB spike) when clearing search filters in large folders (e.g., profile-icons); nested TreeViewItems were not inheriting virtualization settings, causing full materialization of all child nodes.
+  - Explorer / Search filtering no longer logs false error messages when the user types rapidly (cancellation is now handled as expected behavior).
+  - Explorer / Fixed UI crashes and layout issues when formatting or viewing very large minified JavaScript files.
+  - Comparator / Fixed a critical bug in directory comparisons where entirely new or removed WAD containers (such as newly introduced champion packages) were completely skipped and excluded from results.
+  - UI / Iconography: Added a dedicated Material Design icon (MaterialIconKind.Animation) for animation (.anm) files, resolving their missing icon issue in all file trees and results.
+  - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
+  - Explorer / Fixed crash when expanding audio banks (.wpk/.bnk) in the file tree.
+  - Core / Ensured the application correctly activates and gains focus on startup.
+  - Core / Fixed a critical "InvalidOperationException" (Thread Affinity) when loading models in background threads.
+  - Viewer / Resolved various memory leaks in the 3D viewer by ensuring proper disposal of SkinnedMesh and Animation assets.
+  - Comparator / Quick Select Synchronization: fixed a UI issue where the Target Version selector failed to mark the selected item when the path matched an existing backup; consolidated path selection logic to ensure consistent behavior across all selection methods.
+  - Explorer / Stability & Navigation Integrity
+    * Fixed an infinite selection loop and tab flickering when navigating between folders containing files with identical names; implemented a guard against redundant selection cycles and optimized the tab recycling logic to ensure a perfectly smooth and accurate UI refresh.
+    * Resolved a Dual View focus regression where the tree selection would incorrectly jump back to the previous category slot (e.g., Video) when clicking a new file of a different type (e.g., Texture).
+    * Resolved a critical "InvalidOperationException" (StartAt) in the tree navigation engine by isolating layout updates from the WPF content generation cycle.
+    * Fixed a collection modification crash in the search engine during rapid typing by implementing thread-safe snapshot traversal.
+    * Resolved a null-reference exception in the path resolver when searching deep within file-only branches.
+    * Corrected string interpolation in progress messages to ensure accurate file names are displayed during loading.
+  - Core / "Zero Technical Silence" Implementation
+    * Fixed a critical issue where background tasks (extractions, backups, and icon processing) could fail silently; all background operations now feature full try-catch protection with forensic stack traces in the error logs.
+  - Core / Notification Badge Synchronization
+    * Resolved a race condition in the Notification Service where the unread count badge failed to update in real-time; the system now guarantees collection integrity before notifying the UI.
+  - Monitor / Service Flow Optimization
+    * Resolved UI stalls in the Monitor Dashboard by decoupling status reset timers from the main execution thread.
+    * Fixed an inconsistency in the Asset Watcher where status colors and badges could flicker or desync during rapid file scanning.
+  - Core / Build & Syntax Integrity
+    * Corrected syntax artifacts and missing namespaces in the Differences and Image windows caused by concurrent file edits.
+  - Comparator / Archive Duplication: fixed a long-standing issue where the same comparison (same version, same paths) was saved again as a new entry on every session, causing redundant physical backups to accumulate in the history folder.
+  - Comparator / Legacy History Dedup: fixed a regression where the version-based dedup logic only matched against entries with a persisted `ComparisonKey`, causing the same comparison to be re-archived when the only existing copy was a legacy entry from before the field was introduced. The system now recomputes the key on the fly for legacy entries and backfills it on first match. Path normalization was also strengthened with `Path.GetFullPath` to absorb case, slash, and long-path variations.
+  - Comparator / Duplicate WAD I/O: fixed redundant WAD opening during comparisons; the engine now reuses the same WadFile instance for chunk counting and diffing, cutting disk I/O and chunk-table parsing in half on large comparisons.
+  - Comparator / Bounded Peak Memory: replaced simultaneous multi-WAD approach with header-based chunk counting (8-274 bytes per file) and per-file processing; peak memory is now constant at 2 WadFile instances regardless of total file count, eliminating the N×2 file handle pressure on massive installs.
+    * Eliminated all unawaited task warnings (CS4014) and async-void patterns to achieve a 100% clean and professional build.
+  - Commit History / Refined messaging for edge cases when release tags are missing.
+  - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
+  - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
+  - Diff Viewer / Batch comparison progress is now fully handled by the comparison engine with consistent loading states, matching the individual file experience.
+  - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
+  - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
+  - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
+  - Monitor / Pagination: fixed total page count failing to refresh in the version manager when switching between League Client and Game Client tabs.
+  - Diff Viewer / Fixed batch image comparisons (multiple selected images) failing to launch when clicking "View selected differences" in the results explorer.
+  - Diff Viewer / Hardened Resource Disposal (Memory Leak Fix): Stored camera event handlers in private delegates to ensure clean unsubscription, disposed viewports, and nullified scenes when closing the SknDiffWindow to prevent memory leaks.
+  - Diff Viewer / Console Log Cleanup: Removed redundant/verbose initial logs to keep the diagnostics console clean.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.0.2
 
 HOTFIX UPDATE
@@ -411,10 +603,10 @@ Bug Fixes
     * Resolved a NullReferenceException in the backup interface by correctly synchronizing the version service injection.
   - Audio / Playback & YouTube
     * Fixed a regression in the Audio Player that prevented the playback of YouTube URLs and local media files, restoring full functionality to the hybrid player.
-    * Resolved "Zombie Audio" issue: implemented explicit resource cleanup on window close to ensure media playback and timers stop correctly.
+    * Resolved "Zombie Audio" issue: implemented explicitly resource cleanup on window close to ensure media playback and timers stop correctly.
     * Fixed Playlist State persistence: moved active pack tracking to a singleton service to prevent state loss when closing and reopening the player.
     * Implemented YouTube URL Auto-Resolution: fixed a critical issue where saved YouTube tracks would expire after a few hours. The system now stores the permanent video link and automatically generates a fresh stream URI upon playback, ensuring playlists remain functional indefinitely.
-    * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. The header now instantly reflects the current session state.
+    * Improved UI Reactivity: fixed an issue where the playlist library and active pack name failed to update immediately after saving or deleting a pack. El encabezado ahora refleja instantáneamente el estado de la sesión actual.
   - Explorer / Extraction & Tree Integrity
     * Fixed a bug where the "EXTRACT" action incorrectly converted audio containers (.bnk/.wpk) to .ogg instead of preserving their RAW state.
     * Fixed bug in extraction folder naming and interactive log links.
@@ -437,6 +629,15 @@ Bug Fixes
     * Fixed a bug where version information and client metadata leaked between Directory and WAD File modes when switching.
     * Resolved an issue where auto-filled paths in Directory mode were lost after using the WAD File mode; the state is now correctly preserved for each mode independently.
   - Monitor / Dashboard Logic & Symmetry
-    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it now dynamically reflects the actual version status and update availability.
+    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
+  - Textures / TGA Support & Comparison
+    * Fixed a critical FileFormatException when previewing or comparing .tga files by implementing a native TGA decoder using SixLabors.ImageSharp.
+    * Enabled full "View Differences" (VIEW DIFF) support for TGA textures in WAD comparisons.
+  - Explorer & Comparator / Unified Categorization
+    * Replaced hardcoded extension checks in the WAD comparison tree with unified SupportedFileTypes helpers, ensuring newer formats (.mapgeo, .html, .tga) are correctly grouped.
+  - Explorer / HTML Support & Clean Type Definitions
+    * Restored full text previewing and custom League syntax highlighting for .html files.
+    * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
+

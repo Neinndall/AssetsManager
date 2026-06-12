@@ -120,11 +120,18 @@ namespace AssetsManager.Views.Models.Monitor
             set { _assetTrackerCategoriesCount = value; OnPropertyChanged(); }
         }
 
-        private string _lastDiscoveredAssetName = "None";
-        public string LastDiscoveredAssetName
+        private string _lastDiscoveredCategory = "None";
+        public string LastDiscoveredCategory
         {
-            get => _lastDiscoveredAssetName;
-            set { _lastDiscoveredAssetName = value; OnPropertyChanged(); }
+            get => _lastDiscoveredCategory;
+            set { _lastDiscoveredCategory = value; OnPropertyChanged(); }
+        }
+
+        private string _lastDiscoveredAssetId = "N/A";
+        public string LastDiscoveredAssetId
+        {
+            get => _lastDiscoveredAssetId;
+            set { _lastDiscoveredAssetId = value; OnPropertyChanged(); }
         }
 
         // --- System / Hashes ---
@@ -156,7 +163,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         public string BuildType => ApplicationInfos.BuildType;
         public string BuildChannel => ApplicationInfos.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
-        public string BuildSha => ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
+        private static string _cachedBuildSha;
+        public string BuildSha => _cachedBuildSha ??= ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
 
         private Brush _appVersionColor;
         public Brush AppVersionColor
@@ -233,14 +241,8 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void UpdateAppVersionFooter()
         {
-            if (AppVersionText != null && AppVersionText.Contains("available!"))
-            {
-                AppVersionFooterText = "Channel: Update Available";
-            }
-            else
-            {
-                AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}";
-            }
+            string shaPart = BuildSha != null && BuildSha != "N/A" ? $" · {BuildSha}" : string.Empty;
+            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}{shaPart}";
         }
 
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
@@ -262,7 +264,7 @@ namespace AssetsManager.Views.Models.Monitor
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))
             {
-                AppVersionText = $"v{_updateCheckService.AvailableVersion} available!";
+                AppVersionText = $"{_updateCheckService.AvailableVersion} available!";
                 AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Unified Orange
                 AppVersionIconKind = MaterialIconKind.CloudDownload;
             }
@@ -402,7 +404,7 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (e.PropertyName == nameof(MonitoredAsset.HasChanges) || e.PropertyName == nameof(MonitoredAsset.LastUpdated))
             {
-                Application.Current.Dispatcher.Invoke(RefreshFileWatcherData);
+                Application.Current.Dispatcher.InvokeAsync(RefreshFileWatcherData);
             }
         }
 
@@ -490,11 +492,13 @@ namespace AssetsManager.Views.Models.Monitor
 
             if (lastActiveCategory != null)
             {
-                LastDiscoveredAssetName = $"{lastActiveCategory.Name} #{lastActiveCategory.FoundUrls.Max()}";
+                LastDiscoveredCategory = lastActiveCategory.Name;
+                LastDiscoveredAssetId = lastActiveCategory.FoundUrls.Max().ToString();
             }
             else
             {
-                LastDiscoveredAssetName = "None";
+                LastDiscoveredCategory = "None";
+                LastDiscoveredAssetId = "N/A";
             }
 
             if (_monitorService.AssetCategories.All(c => c.Status == CategoryStatus.Idle || c.Status == CategoryStatus.CompletedSuccess))
@@ -525,9 +529,9 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    AppVersionText = $"v{latestVersion} available!";
+                    AppVersionText = $"{latestVersion} available!";
                     AppVersionColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F39C12")); // Orange
                     AppVersionIconKind = MaterialIconKind.CloudDownload;
                     UpdateAppVersionFooter();
@@ -539,7 +543,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnCategoryCheckCompleted(AssetCategory category)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 bool anyOtherChecking = _monitorService.AssetCategories
                     .Where(c => c != category)
@@ -556,7 +560,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnCategoryCheckStarted(AssetCategory category)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 AssetTrackerStatus = $"Category: {category.Name} - Checking...";
             });
@@ -564,7 +568,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnPbeStatusChecked()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 RefreshPbeData();
                 PbeLastCheck = DateTime.Now.ToString("HH:mm");
@@ -573,7 +577,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnHashSyncStarted()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 HashesStatus = "Updating...";
                 UpdateSystemHealthFooter();
@@ -582,7 +586,7 @@ namespace AssetsManager.Views.Models.Monitor
 
         private void OnHashSyncCompleted()
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 HashesStatus = "Synced";
                 UpdateSystemHealthFooter();

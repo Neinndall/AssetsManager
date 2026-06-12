@@ -124,6 +124,16 @@ namespace AssetsManager.Views.Controls.Monitor
             await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
         }
 
+        private void TabClient_Checked(object sender, RoutedEventArgs e)
+        {
+            _viewModel?.SetActiveTab(false);
+        }
+
+        private void TabGame_Checked(object sender, RoutedEventArgs e)
+        {
+            _viewModel?.SetActiveTab(true);
+        }
+
         private void ListViewItem_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (!(sender is ListViewItem item) || !(item.DataContext is VersionFileInfo clickedVersion)) return;
@@ -201,26 +211,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 _viewModel.LeagueClientPaginator.SetFullList(_viewModel.AllLeagueClientVersions);
                 _viewModel.LoLGameClientPaginator.SetFullList(_viewModel.AllLoLGameClientVersions);
             }
-        }
-
-        private void PrevLeagueClientPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.LeagueClientPaginator.PreviousPage();
-        }
-
-        private void NextLeagueClientPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.LeagueClientPaginator.NextPage();
-        }
-
-        private void PrevLoLGameClientPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.LoLGameClientPaginator.PreviousPage();
-        }
-
-        private void NextLoLGameClientPage_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.LoLGameClientPaginator.NextPage();
         }
     }
 }

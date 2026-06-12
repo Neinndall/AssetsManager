@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using System.Windows.Media;
-using BCnEncoder.Shared;
 using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Core.Wad;
@@ -79,6 +78,31 @@ namespace AssetsManager.Services.Explorer
             });
         }
 
+        // Obtiene los bytes descomprimidos de un chunk guardado en el backup.
+        public async Task<byte[]> GetBackupChunkBytesAsync(string backupRoot, string sourceWad, ulong hash, WadChunkCompression? compressionType, bool isOld, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrEmpty(backupRoot) || hash == 0) return null;
+
+                string chunkDir = isOld ? "old" : "new";
+                string chunkPath = Path.Combine(backupRoot, "wad_chunks", chunkDir, sourceWad ?? string.Empty, $"{hash:X16}.chunk");
+                if (!File.Exists(chunkPath)) return null;
+
+                return await Task.Run(() =>
+                {
+                    byte[] compressedData = File.ReadAllBytes(chunkPath);
+                    return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
+                }, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logService.LogError(ex, $"Failed to get backup chunk bytes: {sourceWad}/{hash:X16}");
+                return null;
+            }
+        }
+
         // Obtiene los bytes descomprimidos de un fichero virtual sin guardarlo, para usar en previsualizaciones.
         public async Task<byte[]> GetVirtualFileBytesAsync(FileSystemNodeModel fileNode, CancellationToken cancellationToken = default)
         {
@@ -119,20 +143,12 @@ namespace AssetsManager.Services.Explorer
 
                 if (!string.IsNullOrEmpty(diff.BackupChunkPath))
                 {
-                    // MODO BACKUP
+                    // MODO BACKUP: Delegamos en el método centralizado
                     string root = GetBackupRoot(diff.BackupChunkPath);
-                    string chunkDir = isOld ? "old" : "new";
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
-                    string chunkPath = Path.Combine(root, "wad_chunks", chunkDir, diff.SourceWadFile, $"{hash:X16}.chunk");
+                    var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
 
-                    if (!File.Exists(chunkPath)) return null;
-
-                    return await Task.Run(() =>
-                    {
-                        byte[] compressedData = File.ReadAllBytes(chunkPath);
-                        var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
-                        return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
-                    }, cancellationToken);
+                    return await GetBackupChunkBytesAsync(root, diff.SourceWadFile, hash, compressionType, isOld, cancellationToken);
                 }
 
                 // MODO LIVE
@@ -150,6 +166,39 @@ namespace AssetsManager.Services.Explorer
                 _logService.LogError(ex, $"Failed to get bytes for diff: {diff.Path}");
                 return null;
             }
+        }
+
+        // Obtiene los bytes de ambos lados de un diff (Old y New) de forma eficiente.
+        public async Task<(string DataType, byte[] OldData, byte[] NewData, string OldPath, string NewPath)> GetFullDiffDataAsync(SerializableChunkDiff diff, string oldLolPath, string newLolPath, CancellationToken cancellationToken = default)
+        {
+            string extension = Path.GetExtension(diff.Path).ToLowerInvariant();
+            string dataType = extension.TrimStart('.');
+
+            var oldDataTask = GetDiffSideBytesAsync(diff, oldLolPath, true, cancellationToken);
+            var newDataTask = GetDiffSideBytesAsync(diff, newLolPath, false, cancellationToken);
+
+            await Task.WhenAll(oldDataTask, newDataTask);
+
+            byte[] oldData = await oldDataTask;
+            byte[] newData = await newDataTask;
+
+            // Verificación de integridad básica según el tipo de cambio
+            if (oldData == null && diff.Type != ChunkDiffType.New) return (null, null, null, null, null);
+            if (newData == null && diff.Type != ChunkDiffType.Removed) return (null, null, null, null, null);
+
+            return (dataType, oldData, newData, diff.OldPath, diff.NewPath);
+        }
+
+        // Obtiene los bytes de dos archivos locales para comparación.
+        public async Task<(string DataType, byte[] OldData, byte[] NewData)> GetFileDiffDataAsync(string oldFilePath, string newFilePath)
+        {
+            string extension = Path.GetExtension(newFilePath ?? oldFilePath).ToLowerInvariant();
+            string dataType = extension.TrimStart('.');
+
+            byte[] oldData = File.Exists(oldFilePath) ? await File.ReadAllBytesAsync(oldFilePath) : null;
+            byte[] newData = File.Exists(newFilePath) ? await File.ReadAllBytesAsync(newFilePath) : null;
+
+            return (dataType, oldData, newData);
         }
 
         private string GetBackupRoot(string chunkPath)

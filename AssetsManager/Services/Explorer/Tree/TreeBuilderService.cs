@@ -42,7 +42,7 @@ namespace AssetsManager.Services.Explorer.Tree
             _audioBankService = audioBankService;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildWadTreeAsync(string rootPath, CancellationToken cancellationToken, PreferredDirectory preferredDirectory = PreferredDirectory.All, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
             var rootNodes = new ObservableRangeCollection<FileSystemNodeModel>();
 
@@ -54,7 +54,7 @@ namespace AssetsManager.Services.Explorer.Tree
                     cancellationToken.ThrowIfCancellationRequested();
                     var gameNode = new FileSystemNodeModel(gamePath);
                     rootNodes.Add(gameNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(gameNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                 }
             }
 
@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Explorer.Tree
                     cancellationToken.ThrowIfCancellationRequested();
                     var pluginsNode = new FileSystemNodeModel(pluginsPath);
                     rootNodes.Add(pluginsNode);
-                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken);
+                    await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(pluginsNode, rootPath, cancellationToken, onScanningProgress, onMountingProgress);
                 }
             }
 
@@ -82,9 +82,9 @@ namespace AssetsManager.Services.Explorer.Tree
             return rootNodes;
         }
 
-        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken)
+        public async Task<ObservableRangeCollection<FileSystemNodeModel>> BuildDirectoryTreeAsync(string rootPath, CancellationToken cancellationToken, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
-            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken);
+            var nodes = await _wadNodeLoaderService.LoadDirectoryAsync(rootPath, cancellationToken, onScanningProgress, onMountingProgress);
             return new ObservableRangeCollection<FileSystemNodeModel>(nodes);
         }
 
@@ -96,16 +96,21 @@ namespace AssetsManager.Services.Explorer.Tree
 
         public async Task ExpandAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, string newLolPath = null, string oldLolPath = null)
         {
-            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath, newLolPath, oldLolPath);
+            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(clickedNode, rootNodes, currentRootPath);
             if (linkedBank == null)
             {
                 return; // Errors are logged by the service
             }
 
-            // Read other file data from the WAD.
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+            // Read other file data from the WAD in parallel (3 independent I/O operations).
+            var eventsTask = linkedBank.EventsBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : Task.FromResult<byte[]>(null);
+            var wpkTask = linkedBank.WpkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : Task.FromResult<byte[]>(null);
+            var audioBnkTask = linkedBank.AudioBnkNode != null ? _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : Task.FromResult<byte[]>(null);
+
+            await Task.WhenAll(eventsTask, wpkTask, audioBnkTask);
+            var eventsData = eventsTask.Result;
+            byte[] wpkData = wpkTask.Result;
+            byte[] audioBnkFileData = audioBnkTask.Result;
 
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)
@@ -194,9 +199,9 @@ namespace AssetsManager.Services.Explorer.Tree
             });
         }
 
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default)
+        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
         {
-            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken);
+            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
         }
 
         private bool PruneEmptyDirectories(FileSystemNodeModel node)

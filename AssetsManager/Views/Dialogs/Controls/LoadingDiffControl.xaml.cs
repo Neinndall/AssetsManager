@@ -22,7 +22,6 @@ namespace AssetsManager.Views.Dialogs.Controls
             Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (show)
             {
-                _viewModel.Reset();
                 _viewModel.IsBusy = true;
             }
             else
@@ -44,6 +43,11 @@ namespace AssetsManager.Views.Dialogs.Controls
         public void SetState(DiffLoadingState state)
         {
             _viewModel.SetState(state);
+        }
+
+        public void SetBatchIndex(int currentFile, int totalFiles, string fileType = "file")
+        {
+            _viewModel.SetBatchIndex(currentFile, totalFiles, fileType);
         }
     }
 }

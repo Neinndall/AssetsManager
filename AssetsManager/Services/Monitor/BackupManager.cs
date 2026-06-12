@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Monitor
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogWarning($"Could not count files for progress: {ex.Message}");
+                        _logService.LogError(ex, $"Could not count files for progress in {sourceLolPath}");
                     }
 
                     // Update UI with the real total discovered
@@ -79,12 +79,13 @@ namespace AssetsManager.Services.Monitor
                     // Clean up partially created backup if cancelled
                     if (Directory.Exists(destinationBackupPath))
                     {
-                        try { Directory.Delete(destinationBackupPath, true); } catch { }
+                        try { Directory.Delete(destinationBackupPath, true); } 
+                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"AssetsManager.Services.Monitor.BackupManager.CreateLolPbeDirectoryBackupAsync Exception for source: {sourceLolPath}, destination: {destinationBackupPath}");
+                    _logService.LogError(ex, $"Backup failed for source: {sourceLolPath}");
                     BackupCompleted?.Invoke(this, false);
                     throw; 
                 }
@@ -115,7 +116,7 @@ namespace AssetsManager.Services.Monitor
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogWarning($"Could not count files for cloning progress: {ex.Message}");
+                        _logService.LogError(ex, $"Could not count files for cloning progress: {sourceBackupPath}");
                     }
 
                     BackupStarted?.Invoke(this, totalFiles);
@@ -132,7 +133,8 @@ namespace AssetsManager.Services.Monitor
                     BackupCompleted?.Invoke(this, false);
                     if (Directory.Exists(destinationBackupPath))
                     {
-                        try { Directory.Delete(destinationBackupPath, true); } catch { }
+                        try { Directory.Delete(destinationBackupPath, true); } 
+                        catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
                     }
                 }
                 catch (Exception ex)
@@ -217,7 +219,7 @@ namespace AssetsManager.Services.Monitor
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogWarning($"Error scanning directory {parentDir}: {ex.Message}");
+                    _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
                 }
             }
 
@@ -328,7 +330,7 @@ namespace AssetsManager.Services.Monitor
             }
             catch (Exception ex)
             {
-                _logService.LogWarning($"Unable to calculate size for {path}: {ex.Message}");
+                _logService.LogError(ex, $"Unable to calculate size for {path}");
             }
             
             return size;

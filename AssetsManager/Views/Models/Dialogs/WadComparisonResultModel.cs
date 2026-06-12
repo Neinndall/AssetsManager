@@ -90,9 +90,14 @@ namespace AssetsManager.Views.Models.Dialogs
             get
             {
                 if (SelectedNodes.Count > 1)
-                    return SelectedNodes.Any(d => d.Type == ChunkDiffType.Modified && !SupportedFileTypes.IsAudioDataContainer(d.Path));
+                {
+                    return SelectedNodes.All(d => SupportedFileTypes.IsImage(d.Path)) || 
+                           SelectedNodes.Any(d => (d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.New) && SupportedFileTypes.IsNonImageDiffable(d.Path));
+                }
 
-                return (SelectedItem?.Type == ChunkDiffType.Modified) && !SupportedFileTypes.IsAudioDataContainer(SelectedItem?.Path);
+                return SelectedItem != null && 
+                       (SupportedFileTypes.IsImage(SelectedItem.Path) || 
+                        ((SelectedItem.Type == ChunkDiffType.Modified || SelectedItem.Type == ChunkDiffType.New) && SupportedFileTypes.IsNonImageDiffable(SelectedItem.Path)));
             }
         }
 
@@ -246,13 +251,12 @@ namespace AssetsManager.Views.Models.Dialogs
 
             foreach (var diff in diffs)
             {
-                string ext = System.IO.Path.GetExtension(diff.Path).ToLower();
                 string cat = "Other";
                 
-                if (ext == ".wem" || ext == ".bnk" || ext == ".wpk") cat = "Audio";
-                else if (ext == ".dds" || ext == ".png" || ext == ".tex" || ext == ".tga") cat = "Images";
-                else if (ext == ".skn" || ext == ".skl" || ext == ".anm" || ext == ".sco" || ext == ".scb") cat = "Models/3D";
-                else if (ext == ".bin" || ext == ".json" || ext == ".txt" || ext == ".stringtable") cat = "Data/Bin";
+                if (SupportedFileTypes.IsAudio(diff.Path)) cat = "Audio";
+                else if (SupportedFileTypes.IsImage(diff.Path)) cat = "Images";
+                else if (SupportedFileTypes.Is3D(diff.Path)) cat = "Models/3D";
+                else if (SupportedFileTypes.IsText(diff.Path)) cat = "Data/Bin";
 
                 long sizeChange = (long)(diff.NewUncompressedSize ?? 0) - (long)(diff.OldUncompressedSize ?? 0);
                 if (diff.Type == ChunkDiffType.New) sizeChange = (long)(diff.NewUncompressedSize ?? 0);

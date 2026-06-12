@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Helpers;
 
 namespace AssetsManager.Views.Models.Explorer
 {
@@ -24,6 +25,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_selectedCount != value)
                 {
                     _selectedCount = value;
+                    _selectedCountDisplay = null;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(IsActionBarVisible));
                     OnPropertyChanged(nameof(SelectedCountDisplay));
@@ -32,7 +34,8 @@ namespace AssetsManager.Views.Models.Explorer
         }
 
         public bool IsActionBarVisible => SelectedCount > 1;
-        public string SelectedCountDisplay => $"{SelectedCount} items selected";
+        private string _selectedCountDisplay;
+        public string SelectedCountDisplay => _selectedCountDisplay ??= $"{SelectedCount} items selected";
 
         private string _currentFilter = "All";
         public string CurrentFilter
@@ -50,15 +53,17 @@ namespace AssetsManager.Views.Models.Explorer
     /// <summary>
     /// Model for each individual item in the Grid
     /// </summary>
-    public class FileGridViewModel : INotifyPropertyChanged
+    public class FileGridViewModel : INotifyPropertyChanged, IMultiSelectable
     {
         public FileSystemNodeModel Node { get; private set; }
 
         public bool IsFolder => Node.Type == NodeType.VirtualDirectory || Node.Type == NodeType.RealDirectory || Node.Type == NodeType.WadFile || Node.Type == NodeType.SoundBank || Node.Type == NodeType.AudioEvent;
 
-        public string FileExtensionDisplay => IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper());
+        private string _fileExtensionDisplay;
+        public string FileExtensionDisplay => _fileExtensionDisplay ?? (_fileExtensionDisplay = IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper()));
 
-        public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
+        private string _displayNameShort;
+        public string DisplayNameShort => _displayNameShort ?? (_displayNameShort = PathUtils.TruncateForDisplay(Node.DisplayName, 50));
 
         private string _subfolderCount;
         public string SubfolderCount => _subfolderCount ?? (_subfolderCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
@@ -85,10 +90,34 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_isSelected != value) { _isSelected = value; OnPropertyChanged(nameof(IsSelected)); } }
         }
 
+        public bool IsMultiSelected
+        {
+            get => Node.IsMultiSelected;
+            set
+            {
+                if (Node.IsMultiSelected != value)
+                {
+                    Node.IsMultiSelected = value;
+                    OnPropertyChanged(nameof(IsMultiSelected));
+                }
+            }
+        }
+
+        private readonly System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> _imageLoader;
+        private bool _isImageLoading = false;
+
         private ImageSource _imagePreview;
         public ImageSource ImagePreview
         {
-            get { return _imagePreview; }
+            get
+            {
+                if (_imagePreview == null && !_isImageLoading && _imageLoader != null)
+                {
+                    _isImageLoading = true;
+                    _ = LoadPreviewAsync();
+                }
+                return _imagePreview;
+            }
             set
             {
                 if (_imagePreview != value)
@@ -99,9 +128,39 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        public FileGridViewModel(FileSystemNodeModel node)
+        private async System.Threading.Tasks.Task LoadPreviewAsync()
+        {
+            try
+            {
+                var image = await _imageLoader(Node);
+                if (image != null)
+                {
+                    ImagePreview = image;
+                }
+            }
+            catch
+            {
+                // Ignore loader errors silently
+            }
+        }
+
+        public FileGridViewModel(FileSystemNodeModel node, System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> imageLoader = null)
         {
             Node = node;
+            _imageLoader = imageLoader;
+
+            if (Node != null)
+            {
+                PropertyChangedEventManager.AddHandler(Node, Node_PropertyChanged, nameof(FileSystemNodeModel.IsMultiSelected));
+            }
+        }
+
+        private void Node_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FileSystemNodeModel.IsMultiSelected))
+            {
+                OnPropertyChanged(nameof(IsMultiSelected));
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

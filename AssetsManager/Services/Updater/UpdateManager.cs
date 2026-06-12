@@ -95,7 +95,7 @@ namespace AssetsManager.Services.Updater
                         else
                         {
                             UpdateProgressWindow progressWindow = null;
-                            Application.Current.Dispatcher.Invoke(() =>
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
                             {
                                 progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
                                 progressWindow.Show();
@@ -104,7 +104,7 @@ namespace AssetsManager.Services.Updater
 
                             string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
 
-                            progressWindow.Dispatcher.Invoke(() =>
+                            await progressWindow.Dispatcher.InvokeAsync(() =>
                             {
                                 progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
                             });
@@ -130,7 +130,7 @@ namespace AssetsManager.Services.Updater
                                             if (totalBytes > 0)
                                             {
                                                 int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
-                                                progressWindow.Dispatcher.Invoke(() =>
+                                                await progressWindow.Dispatcher.InvokeAsync(() =>
                                                 {
                                                     progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
                                                 });
@@ -140,7 +140,7 @@ namespace AssetsManager.Services.Updater
                                 }
                                 await Task.Delay(1200);
 
-                                progressWindow.Dispatcher.Invoke(() => { progressWindow.Close(); });
+                                await progressWindow.Dispatcher.InvokeAsync(() => { progressWindow.Close(); });
                             }
                         }
 
@@ -186,7 +186,7 @@ namespace AssetsManager.Services.Updater
                 string downloadPath = Path.Combine(_directoriesCreator.UpdateCachePath, fileName);
 
                 UpdateProgressWindow progressWindow = null;
-                Application.Current.Dispatcher.Invoke(() =>
+                await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     progressWindow = _serviceProvider.GetRequiredService<UpdateProgressWindow>();
                     if (owner != null) progressWindow.Owner = owner;
@@ -196,7 +196,7 @@ namespace AssetsManager.Services.Updater
 
                 string downloadSize = $"{(totalBytes / 1024.0 / 1024.0):0.00} MB";
 
-                progressWindow.Dispatcher.Invoke(() =>
+                await progressWindow.Dispatcher.InvokeAsync(() =>
                 {
                     progressWindow.SetProgress(0, $"Downloading {downloadSize}...");
                 });
@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Updater
                                 if (totalBytes > 0)
                                 {
                                     int progressPercentage = (int)((bytesDownloaded * 100.0) / totalBytes);
-                                    progressWindow.Dispatcher.Invoke(() =>
+                                    await progressWindow.Dispatcher.InvokeAsync(() =>
                                     {
                                         progressWindow.SetProgress(progressPercentage, $"Downloading... {(bytesDownloaded / 1024.0 / 1024.0):0.00} MB / {downloadSize}");
                                     });
@@ -231,7 +231,7 @@ namespace AssetsManager.Services.Updater
                     }
                 }
 
-                progressWindow.Dispatcher.Invoke(() => progressWindow.Close());
+                await progressWindow.Dispatcher.InvokeAsync(() => progressWindow.Close());
 
                 var dialog = _serviceProvider.GetRequiredService<UpdateModeDialog>();
                 dialog.Owner = owner;

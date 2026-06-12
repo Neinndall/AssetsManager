@@ -12,6 +12,19 @@ namespace AssetsManager.Views.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            // 1. Case: Direct Brush (apply opacity from parameter)
+            if (value is SolidColorBrush brush)
+            {
+                if (parameter != null && double.TryParse(parameter.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double opacity))
+                {
+                    var newBrush = brush.Clone();
+                    newBrush.Opacity = opacity;
+                    return newBrush;
+                }
+                return brush;
+            }
+
+            // 2. Case: Boolean (standard behavior)
             return (value is bool boolValue && boolValue) ? TrueBrush : FalseBrush;
         }
 

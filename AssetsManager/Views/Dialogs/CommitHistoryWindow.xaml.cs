@@ -72,7 +72,7 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to synchronize QA updates");
+                _logService.LogError(ex, "Failed to load commit history.");
                 _viewModel.StatusMessage = "Synchronization failed";
             }
             finally

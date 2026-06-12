@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
@@ -25,6 +26,17 @@ namespace AssetsManager.Views.Models.Versions
         public PaginationModel<VersionFileInfo> LeagueClientPaginator { get; }
         public PaginationModel<VersionFileInfo> LoLGameClientPaginator { get; }
 
+        private IPaginationModel _paginator;
+        public IPaginationModel Paginator
+        {
+            get => _paginator;
+            private set
+            {
+                _paginator = value;
+                OnPropertyChanged();
+            }
+        }
+
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
 
         public ManageVersions(VersionService versionService, LogService logService)
@@ -38,6 +50,8 @@ namespace AssetsManager.Views.Models.Versions
             LeagueClientPaginator = new PaginationModel<VersionFileInfo>();
             LoLGameClientPaginator = new PaginationModel<VersionFileInfo>();
 
+            _paginator = LeagueClientPaginator;
+
             AvailableLocales = new ObservableCollection<LocaleOption>
             {
                 new LocaleOption { Code = "es_ES", IsSelected = false },
@@ -45,6 +59,11 @@ namespace AssetsManager.Views.Models.Versions
                 new LocaleOption { Code = "en_US", IsSelected = false },
                 new LocaleOption { Code = "tr_TR", IsSelected = false }
             };
+        }
+
+        public void SetActiveTab(bool isGame)
+        {
+            Paginator = isGame ? (IPaginationModel)LoLGameClientPaginator : (IPaginationModel)LeagueClientPaginator;
         }
 
         public async Task LoadVersionFilesAsync()
@@ -62,7 +81,7 @@ namespace AssetsManager.Views.Models.Versions
             }
         }
 
-        protected void OnPropertyChanged(string propertyName)
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

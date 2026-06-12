@@ -40,11 +40,11 @@ namespace AssetsManager.Views.Controls.Shared
 
         public void FocusInput()
         {
-            Dispatcher.BeginInvoke(new Action(() =>
+            Dispatcher.InvokeAsync(() =>
             {
                 Keyboard.Focus(SearchTextBox);
                 SearchTextBox.SelectAll();
-            }), DispatcherPriority.Input);
+            }, DispatcherPriority.Input);
         }
 
         private void NextButton_Click(object sender, RoutedEventArgs e)

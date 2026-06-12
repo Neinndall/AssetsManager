@@ -27,6 +27,7 @@ namespace AssetsManager.Views.Models.Explorer
         private bool _isEmptyState;
         private bool _isNoResultsFound;
         private bool _hasFavorites;
+        private ExplorerLoadingState _currentState;
         private string _loadingStatus = "Loading assets...";
         private string _loadingOperation = "LOADING";
         private string _loadingDetail = "Preparing the file explorer";
@@ -124,18 +125,24 @@ namespace AssetsManager.Views.Models.Explorer
             set
             {
                 _selectedNodes = value;
+                _viewChangesHeader = null;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ViewChangesHeader));
                 OnPropertyChanged(nameof(CanViewChanges));
             }
         }
 
+        private string _viewChangesHeader;
         public string ViewChangesHeader 
         {
             get
             {
-                int diffableCount = SelectedNodes.Count(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency && !SupportedFileTypes.IsAudioDataContainer(n.Name));
-                return diffableCount > 1 ? "View Selected Differences" : "View Differences";
+                if (_viewChangesHeader == null)
+                {
+                    int diffableCount = SelectedNodes.Count(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency && !SupportedFileTypes.IsAudioDataContainer(n.Name));
+                    _viewChangesHeader = diffableCount > 1 ? "View Selected Differences" : "View Differences";
+                }
+                return _viewChangesHeader;
             }
         }
 
@@ -210,8 +217,10 @@ namespace AssetsManager.Views.Models.Explorer
             set { if (_isSelectDirectoryActionVisible != value) { _isSelectDirectoryActionVisible = value; OnPropertyChanged(); } }
         }
 
-        public void SetLoadingState(ExplorerLoadingState state)
+        public void SetLoadingState(ExplorerLoadingState state, string fileName = null, bool isDirectory = false)
         {
+            _currentState = state; // Track current state
+
             if (state == ExplorerLoadingState.None)
             {
                 IsBusy = false;
@@ -227,6 +236,8 @@ namespace AssetsManager.Views.Models.Explorer
             IsTreeReady = false;
             IsEmptyState = false;
 
+            string context = Toolbar.CurrentClientName?.ToLowerInvariant() ?? "assets";
+
             switch (state)
             {
                 case ExplorerLoadingState.LoadingHashes:
@@ -236,13 +247,27 @@ namespace AssetsManager.Views.Models.Explorer
                     break;
                 case ExplorerLoadingState.LoadingWads:
                     LoadingStatus = "Loading WAD Files";
-                    LoadingOperation = "WAD EXPLORER";
-                    LoadingDetail = "Scanning files from the directory...";
+                    LoadingOperation = "EXPLORER";
+                    if (fileName != null)
+                    {
+                        LoadingDetail = isDirectory ? $"Indexing {fileName}..." : $"Scanning {context} directories...";
+                    }
+                    else
+                    {
+                        LoadingDetail = $"Locating WAD files in {context}...";
+                    }
                     break;
                 case ExplorerLoadingState.ExploringDirectory:
-                    LoadingStatus = "Exploring Directory";
-                    LoadingOperation = "DIRECTORY";
-                    LoadingDetail = "Scanning files from the directory...";
+                    LoadingStatus = "Exploring Local Assets";
+                    LoadingOperation = "EXPLORER";
+                    if (fileName != null)
+                    {
+                        LoadingDetail = isDirectory ? $"Entering {fileName}..." : $"Scanning {context} assets...";
+                    }
+                    else
+                    {
+                        LoadingDetail = $"Exploring local assets in {context}...";
+                    }
                     break;
                 case ExplorerLoadingState.LoadingResults:
                     LoadingStatus = "Loading Results";
@@ -255,6 +280,16 @@ namespace AssetsManager.Views.Models.Explorer
                     LoadingDetail = "Initializing components...";
                     break;
             }
+        }
+
+        public void UpdateScanningProgress(string fileName)
+        {
+            SetLoadingState(_currentState, fileName, false);
+        }
+
+        public void UpdateMountingProgress(string dirName)
+        {
+            SetLoadingState(_currentState, dirName, true);
         }
 
         public string LoadingOperation

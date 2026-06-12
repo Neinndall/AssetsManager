@@ -3,20 +3,24 @@ using System.Text;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using AssetsManager.Services.Core;
+using Jsbeautifier;
 
 namespace AssetsManager.Services.Formatting
 {
     public sealed class JsBeautifierService
     {
+        private readonly LogService _logService;
         private const string INDENT = "    ";
-        private const int MAX_SIZE_FOR_FORMATTING = 3 * 1024 * 1024; // 3MB
+
+        public JsBeautifierService(LogService logService)
+        {
+            _logService = logService;
+        }
 
         public async Task<string> BeautifyAsync(string jsContent)
         {
             if (string.IsNullOrWhiteSpace(jsContent)) return string.Empty;
-
-            // Si es un archivo masivo, no lo formateamos para evitar que AvalonEdit mate la app
-            if (jsContent.Length > MAX_SIZE_FOR_FORMATTING) return jsContent;
 
             // Ejecutamos en segundo plano para que la UI nunca se congele
             return await Task.Run(() => BeautifyInternal(jsContent));
@@ -27,13 +31,42 @@ namespace AssetsManager.Services.Formatting
             try
             {
                 // PASO 1: ¿Es un objeto de datos? (Lo más común en LoL)
-                // Si detectamos que es un "var x = { ... };", usamos el motor JSON
                 if (TryFormatAsData(jsContent, out string dataFormatted))
                 {
                     return dataFormatted;
                 }
 
-                // PASO 2: Formateador lineal de alto rendimiento (Estilo JSTool)
+                // PASO 2: Intentar formatear de manera profesional con Jsbeautifier (C# Port de js-beautify)
+                try
+                {
+                    var options = new BeautifierOptions
+                    {
+                        IndentSize = 4,
+                        IndentChar = ' ',
+                        KeepArrayIndentation = true,
+                        KeepFunctionIndentation = false,
+                        BraceStyle = BraceStyle.Collapse
+                    };
+
+                    var beautifier = new Beautifier(options);
+                    string formatted = beautifier.Beautify(jsContent);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                    {
+                        return formatted;
+                    }
+                    else
+                    {
+                        _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier returned empty output. Falling back to QuickFormat.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier failed: {ex.Message}. Falling back to QuickFormat.");
+                }
+
+                // PASO 3: Formateador lineal de alto rendimiento (Failsafe)
+                // Imprescindible para archivos minificados masivos. Si devolvemos una 
+                // única línea gigante, AvalonEdit la trunca y el comparador Diff colapsa.
                 return QuickFormat(jsContent);
             }
             catch
@@ -65,73 +98,205 @@ namespace AssetsManager.Services.Formatting
                     return true;
                 }
             }
-            catch { }
+            catch
+            {
+                // Es completamente normal que esto falle si el .js contiene funciones reales o lógica JS 
+                // en lugar de puro JSON.
+            }
             return false;
         }
 
         private string QuickFormat(string code)
         {
-            // Este algoritmo camina una sola vez por el string (O(n))
-            // Es lo que permite que JSTool sea tan rápido
             var sb = new StringBuilder(code.Length + 1024);
             int indent = 0;
             bool inString = false;
             char stringChar = '\0';
+            int currentLineLength = 0;
 
             for (int i = 0; i < code.Length; i++)
             {
                 char c = code[i];
 
-                // Manejo básico de strings para no romper nada dentro de comillas
-                if ((c == '"' || c == '\'' || c == '`') && (i == 0 || code[i - 1] != '\\'))
+                // Failsafe: Evitar que CUALQUIER línea supere los 5000 caracteres.
+                // Si el lexer se desincroniza (ej. comillas dentro de regex complejas),
+                // esto garantiza que AvalonEdit jamás crasheará por OOM al intentar
+                // renderizar una línea infinita.
+                if (currentLineLength > 5000)
                 {
-                    if (!inString) { inString = true; stringChar = c; }
-                    else if (c == stringChar) inString = false;
-                    sb.Append(c);
+                    sb.Append('\n');
+                    currentLineLength = 0;
+                    inString = false; // Resetear estado por si se quedó atascado
+                }
+
+                // 1. Skip single line comments
+                if (c == '/' && i + 1 < code.Length && code[i + 1] == '/')
+                {
+                    while (i < code.Length && code[i] != '\n' && code[i] != '\r')
+                    {
+                        sb.Append(code[i]);
+                        currentLineLength++;
+                        i++;
+                    }
+                    if (i < code.Length) 
+                    {
+                        sb.Append(code[i]);
+                        currentLineLength = 0;
+                    }
                     continue;
                 }
 
-                if (inString) { sb.Append(c); continue; }
+                // 2. Skip multi-line comments
+                if (c == '/' && i + 1 < code.Length && code[i + 1] == '*')
+                {
+                    sb.Append("/*");
+                    currentLineLength += 2;
+                    i += 2;
+                    while (i < code.Length - 1 && !(code[i] == '*' && code[i + 1] == '/'))
+                    {
+                        char mc = code[i];
+                        sb.Append(mc);
+                        if (mc == '\n') currentLineLength = 0; else currentLineLength++;
+                        i++;
+                    }
+                    if (i < code.Length) { sb.Append(code[i]); currentLineLength++; }
+                    if (i + 1 < code.Length) { sb.Append(code[i + 1]); currentLineLength++; }
+                    i++;
+                    continue;
+                }
 
-                // Lógica de formateo estilo JSTool
+                // 3. Skip regular expression literals (e.g. /regex/)
+                if (c == '/' && !inString)
+                {
+                    char lastChar = '\0';
+                    for (int j = sb.Length - 1; j >= 0; j--)
+                    {
+                        if (!char.IsWhiteSpace(sb[j]))
+                        {
+                            lastChar = sb[j];
+                            break;
+                        }
+                    }
+
+                    bool isRegex = lastChar == '\0' || lastChar == '=' || lastChar == '(' || lastChar == '[' || 
+                                   lastChar == ',' || lastChar == ':' || lastChar == '?' || lastChar == '&' || 
+                                   lastChar == '|' || lastChar == '!' || lastChar == '{' || lastChar == '}' || 
+                                   lastChar == ';' || lastChar == '\n' || lastChar == 'n'; // 'n' for return
+
+                    if (isRegex)
+                    {
+                        sb.Append(c);
+                        currentLineLength++;
+                        i++;
+                        bool inRegexCharClass = false;
+                        while (i < code.Length)
+                        {
+                            char rc = code[i];
+                            sb.Append(rc);
+                            if (rc == '\n') currentLineLength = 0; else currentLineLength++;
+                            
+                            if (rc == '\\')
+                            {
+                                if (i + 1 < code.Length)
+                                {
+                                    sb.Append(code[i + 1]);
+                                    currentLineLength++;
+                                    i++;
+                                }
+                            }
+                            else if (rc == '[')
+                            {
+                                inRegexCharClass = true;
+                            }
+                            else if (rc == ']')
+                            {
+                                inRegexCharClass = false;
+                            }
+                            else if (rc == '/' && !inRegexCharClass)
+                            {
+                                break;
+                            }
+                            i++;
+                        }
+                        continue;
+                    }
+                }
+
+                // 4. Basic string literal handling
+                if (c == '"' || c == '\'' || c == '`')
+                {
+                    int backslashCount = 0;
+                    int tempIndex = i - 1;
+                    while (tempIndex >= 0 && code[tempIndex] == '\\')
+                    {
+                        backslashCount++;
+                        tempIndex--;
+                    }
+
+                    if (backslashCount % 2 == 0) // No está escapada
+                    {
+                        if (!inString) { inString = true; stringChar = c; }
+                        else if (c == stringChar) inString = false;
+                    }
+                    
+                    sb.Append(c);
+                    currentLineLength++;
+                    continue;
+                }
+
+                if (inString) 
+                { 
+                    sb.Append(c); 
+                    if (c == '\n') currentLineLength = 0; else currentLineLength++;
+                    continue; 
+                }
+
                 switch (c)
                 {
                     case '{':
-                    case '[':
                         sb.Append(c);
                         sb.Append('\n');
+                        currentLineLength = 0;
                         indent++;
-                        AppendIndent(sb, indent);
+                        AppendIndent(sb, indent, ref currentLineLength);
                         break;
                     case '}':
-                    case ']':
                         indent = Math.Max(0, indent - 1);
-                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n') sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n') 
+                        {
+                            sb.Append('\n');
+                            currentLineLength = 0;
+                        }
+                        AppendIndent(sb, indent, ref currentLineLength);
                         sb.Append(c);
+                        currentLineLength++;
                         break;
                     case ';':
                         sb.Append(c);
                         sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        currentLineLength = 0;
+                        AppendIndent(sb, indent, ref currentLineLength);
                         break;
                     case ',':
                         sb.Append(c);
-                        sb.Append('\n');
-                        AppendIndent(sb, indent);
+                        sb.Append(' ');
+                        currentLineLength += 2;
                         break;
                     case '\n':
                     case '\r':
                     case '\t':
-                        // Saltamos espacios en blanco originales para poner los nuestros
+                        // Ignore original whitespace when outside strings
                         break;
                     case ' ':
-                        // Solo añadimos espacio si no es al principio de la línea
                         if (sb.Length > 0 && sb[sb.Length - 1] != '\n' && sb[sb.Length - 1] != ' ')
+                        {
                             sb.Append(c);
+                            currentLineLength++;
+                        }
                         break;
                     default:
                         sb.Append(c);
+                        currentLineLength++;
                         break;
                 }
             }
@@ -139,9 +304,13 @@ namespace AssetsManager.Services.Formatting
             return sb.ToString().Trim();
         }
 
-        private void AppendIndent(StringBuilder sb, int count)
+        private void AppendIndent(StringBuilder sb, int count, ref int currentLineLength)
         {
-            for (int i = 0; i < count; i++) sb.Append(INDENT);
+            for (int i = 0; i < count; i++) 
+            {
+                sb.Append(INDENT);
+                currentLineLength += INDENT.Length;
+            }
         }
     }
 }

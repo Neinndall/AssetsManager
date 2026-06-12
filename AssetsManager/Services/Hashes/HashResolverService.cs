@@ -125,8 +125,11 @@ namespace AssetsManager.Services.Hashes
         public Task LoadBinHashesAsync() { LoadBinHashes(); return Task.CompletedTask; }
         public Task LoadRstHashesAsync() { LoadRstHashes(); return Task.CompletedTask; }
 
-        public Dictionary<ulong, string> RstXxh3Hashes => GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh3")));
-        public Dictionary<ulong, string> RstXxh64Hashes => GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh64")));
+        private Dictionary<ulong, string> _cachedRstXxh3Hashes;
+        private Dictionary<ulong, string> _cachedRstXxh64Hashes;
+
+        public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh3")));
+        public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh64")));
 
         private Dictionary<ulong, string> GetCacheDictionary(BinaryHashCache cache)
         {
