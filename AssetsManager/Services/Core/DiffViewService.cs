@@ -30,9 +30,7 @@ namespace AssetsManager.Services.Core
         private readonly WadContentProvider _wadContentProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly LogService _logService;
-        private readonly AudioBankService _audioBankService;
         private readonly AudioBankLinkerService _audioBankLinkerService;
-        private readonly Services.Hashes.HashResolverService _hashResolverService;
 
         public DiffViewService(
             IServiceProvider serviceProvider,
@@ -40,18 +38,14 @@ namespace AssetsManager.Services.Core
             WadContentProvider wadContentProvider,
             CustomMessageBoxService customMessageBoxService,
             LogService logService,
-            AudioBankService audioBankService,
-            AudioBankLinkerService audioBankLinkerService,
-            Services.Hashes.HashResolverService hashResolverService)
+            AudioBankLinkerService audioBankLinkerService)
         {
             _serviceProvider = serviceProvider;
             _contentFormatterService = contentFormatterService;
             _wadContentProvider = wadContentProvider;
             _customMessageBoxService = customMessageBoxService;
             _logService = logService;
-            _audioBankService = audioBankService;
             _audioBankLinkerService = audioBankLinkerService;
-            _hashResolverService = hashResolverService;
         }
 
         public async Task ShowWadDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, string sourceJsonPath = null)
@@ -132,7 +126,7 @@ namespace AssetsManager.Services.Core
 
                     // [PROGRESS] 100% Reached before opening batch window
                     await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                    await Task.Delay(450);
+                    await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
@@ -178,7 +172,7 @@ namespace AssetsManager.Services.Core
 
                     // [PROGRESS] 100% Reached before opening batch window
                     await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                    await Task.Delay(450);
+                    await Task.Delay(350);
 
                     await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
 
@@ -230,7 +224,7 @@ namespace AssetsManager.Services.Core
 
                 // [PROGRESS] 100% Reached before opening window
                 await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-                await Task.Delay(450);
+                await Task.Delay(350);
                 diffWindow.ShowDialog();
             }
             catch (Exception ex)
@@ -307,7 +301,7 @@ namespace AssetsManager.Services.Core
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(450);
+            await Task.Delay(350);
             diffWindow.ShowDialog();
         }
 
@@ -324,26 +318,30 @@ namespace AssetsManager.Services.Core
             
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(450);
+            await Task.Delay(350);
             imageDiffWindow.ShowDialog();
         }
 
         private async Task HandleSknDiffAsync(SerializableChunkDiff diff, string oldPbePath, string newPbePath, Window owner, LoadingDiffWindow loadingWindow)
         {
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.AcquiringBinaryData);
-            var (dataType, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
-            
+            var (_, oldData, newData, oldPath, newPath) = await _wadContentProvider.GetFullDiffDataAsync(diff, oldPbePath, newPbePath);
+            await HandleSknDiffInternalAsync((byte[])oldData, (byte[])newData, oldPath, newPath, owner, loadingWindow);
+        }
+
+        private async Task HandleSknDiffInternalAsync(byte[] oldData, byte[] newData, string oldPath, string newPath, Window owner, LoadingDiffWindow loadingWindow)
+        {
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Parsing3DModel);
             var sknLoadingService = _serviceProvider.GetRequiredService<SknLoadingService>();
             var sknDiffWindow = new SknDiffWindow(sknLoadingService, _logService);
             sknDiffWindow.Owner = owner;
             sknDiffWindow.LoadingWindow = loadingWindow;
 
-            await sknDiffWindow.LoadAndDisplayDiffAsync((byte[])oldData, (byte[])newData, oldPath, newPath);
+            await sknDiffWindow.LoadAndDisplayDiffAsync(oldData, newData, oldPath, newPath, loadingWindow);
 
             // [PROGRESS] 100% Reached before opening window
             await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.Ready);
-            await Task.Delay(450);
+            await Task.Delay(350);
             
             // Close loading window before ShowDialog to prevent it from staying open (ShowDialog is blocking)
             loadingWindow.Close();
@@ -369,6 +367,12 @@ namespace AssetsManager.Services.Core
                     byte[] oldData = File.Exists(oldFilePath) ? await File.ReadAllBytesAsync(oldFilePath) : null;
                     byte[] newData = File.Exists(newFilePath) ? await File.ReadAllBytesAsync(newFilePath) : null;
                     await ShowImageComparisonInternal(oldData, newData, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath), extension, owner, loadingWindow);
+                }
+                else if (extension == ".skn")
+                {
+                    byte[] oldData = File.Exists(oldFilePath) ? await File.ReadAllBytesAsync(oldFilePath) : null;
+                    byte[] newData = File.Exists(newFilePath) ? await File.ReadAllBytesAsync(newFilePath) : null;
+                    await HandleSknDiffInternalAsync(oldData, newData, Path.GetFileName(oldFilePath), Path.GetFileName(newFilePath), owner, loadingWindow);
                 }
                 else
                 {

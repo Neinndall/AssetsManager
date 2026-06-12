@@ -18,6 +18,9 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         DecodingTextures,
         GeneratingDiffMap,
         Parsing3DModel,
+        ParsingOldModel,
+        ParsingNewModel,
+        Comparing3DGeometry,
         Finalizing,
         Ready,
         BatchLoadingFile,
@@ -116,9 +119,22 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ProgressValue = 85;
                     break;
 
+								// SKN PROCESS ()
                 case DiffLoadingState.Parsing3DModel:
                     Description = "Reconstructing 3D geometric surfaces...";
-                    ProgressValue = 75;
+                    ProgressValue = 40;
+                    break;
+                case DiffLoadingState.ParsingOldModel:
+                    Description = "Parsing baseline 3D mesh...";
+                    ProgressValue = 55;
+                    break;
+                case DiffLoadingState.ParsingNewModel:
+                    Description = "Parsing modified 3D mesh...";
+                    ProgressValue = 70;
+                    break;
+                case DiffLoadingState.Comparing3DGeometry:
+                    Description = "Analyzing 3D geometric differences...";
+                    ProgressValue = 85;
                     break;
 
                 // AUDIO PROCESS (Progression: 20 → 35 → 50 → 65)
@@ -181,7 +197,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public void ApplyInitialDefaults()
         {
             Title = "Processing Files";
-            Description = "Please wait while the differences are being calculated...";
+            Description = "Initializing comparison...";
             ProgressValue = 0;
             IsBusy = false;
             _currentBatchFile = 0;

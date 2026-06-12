@@ -44,7 +44,7 @@ namespace AssetsManager.Views.Dialogs
             bool isBatchState = state == DiffLoadingState.BatchLoadingFile || 
                                state == DiffLoadingState.BatchFormattingFile || 
                                state == DiffLoadingState.BatchFileReady;
-            int delay = isBatchState ? 50 : 150;
+            int delay = isBatchState ? 50 : 100;
             await Task.Delay(delay);
         }
 

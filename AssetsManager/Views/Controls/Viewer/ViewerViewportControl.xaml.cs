@@ -63,6 +63,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
+
+            UpdateToolbarVisibility();
         }
 
         private void OnViewportViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -522,13 +524,64 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetCamera(bool smooth = true)
         {
-            var position = new Point3D(0.00, 2386.00, 670.00);
-            var lookDirection = new Vector3D(0.00, -250.00, -650.00);
-            var upDirection = new Vector3D(0.00, 1.00, 0.00);
+            bool isMap = Panel?.ViewModel?.IsMapMode == true;
+            double baselineY = isMap ? 0 : (IsDiffMode ? 0 : 2000);
+            
+            Point3D position;
+            Vector3D lookDirection;
+            Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
+
+            // Dynamically calculate camera view based on loaded model's bounding box
+            if (_activeSceneModel != null && _activeSceneModel.Parts != null && _activeSceneModel.Parts.Count > 0)
+            {
+                var bounds = Rect3D.Empty;
+                foreach (var part in _activeSceneModel.Parts)
+                {
+                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
+                    {
+                        foreach (var pos in mesh.Positions)
+                        {
+                            bounds.Union(pos);
+                        }
+                    }
+                }
+
+                if (!bounds.IsEmpty)
+                {
+                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
+                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
+                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    var targetPoint = new Point3D(centerX, centerY, centerZ);
+
+                    double maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
+                    if (maxDim <= 0) maxDim = 150; // Fallback height
+
+                    double distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
+                    if (distance < 50) distance = 250; // Minimum distance fallback
+
+                    position = new Point3D(centerX, centerY + distance * 0.15, centerZ + distance);
+                    lookDirection = targetPoint - position;
+
+                    if (smooth)
+                    {
+                        _cameraController?.FlyTo(position, lookDirection, upDirection);
+                    }
+                    else
+                    {
+                        _cameraController?.SnapTo(position, lookDirection, upDirection);
+                    }
+                    _viewModel.FieldOfView = 45;
+                    return;
+                }
+            }
+
+            // Fallback coordinates
+            position = isMap ? new Point3D(0.00, 2386.00, 670.00) : new Point3D(0.00, 130.00 + baselineY, 280.00);
+            lookDirection = isMap ? new Vector3D(0.00, -250.00, -650.00) : new Vector3D(0.00, -40.00, -280.00);
 
             if (smooth)
             {
-                _cameraController?.Reset();
+                _cameraController?.FlyTo(position, lookDirection, upDirection);
             }
             else
             {
@@ -544,27 +597,86 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
 
+            // Compute dynamic target center and distance if model is available
+            Point3D targetPoint = new Point3D(0, 90.00, 0);
+            double distance = 300.00;
+
+            if (_activeSceneModel != null && _activeSceneModel.Parts != null && _activeSceneModel.Parts.Count > 0)
+            {
+                var bounds = Rect3D.Empty;
+                foreach (var part in _activeSceneModel.Parts)
+                {
+                    if (part.Geometry?.Geometry is MeshGeometry3D mesh)
+                    {
+                        foreach (var pos in mesh.Positions)
+                        {
+                            bounds.Union(pos);
+                        }
+                    }
+                }
+                if (!bounds.IsEmpty)
+                {
+                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
+                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
+                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    targetPoint = new Point3D(centerX, centerY, centerZ);
+
+                    double maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
+                    if (maxDim <= 0) maxDim = 150;
+                    
+                    bool isMap = Panel?.ViewModel?.IsMapMode == true;
+                    distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
+                    if (distance < 50) distance = 250;
+                }
+                else
+                {
+                    double baselineY = Panel?.ViewModel?.IsMapMode == true ? 0 : (IsDiffMode ? 0 : 2000);
+                    targetPoint = new Point3D(0, 90.00 + baselineY, 0);
+                }
+            }
+            else
+            {
+                double baselineY = Panel?.ViewModel?.IsMapMode == true ? 0 : (IsDiffMode ? 0 : 2000);
+                targetPoint = new Point3D(0, 90.00 + baselineY, 0);
+            }
+
+            Vector3D lookDirection;
+            Point3D cameraPosition;
+            Vector3D upDirection = new Vector3D(0, 1, 0);
+
             switch (viewType)
             {
                 case "Front":
-                    _cameraController.FlyTo(new Point3D(0.00, 2386.00, 670.00), new Vector3D(0.00, -250.00, -650.00), new Vector3D(0.00, 1.00, 0.00));
+                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y, targetPoint.Z + distance);
+                    lookDirection = new Vector3D(0, 0, -distance);
                     break;
                 case "Back":
-                    _cameraController.FlyTo(new Point3D(11.53, 2363.16, -638.23), new Vector3D(-11.53, -227.16, 658.23), new Vector3D(0.00, 1.00, -0.03));
+                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y, targetPoint.Z - distance);
+                    lookDirection = new Vector3D(0, 0, distance);
                     break;
                 case "Left":
-                    _cameraController.FlyTo(new Point3D(-662.09, 2351.64, 8.41), new Vector3D(662.09, -215.64, 11.59), new Vector3D(-0.05, 1.00, -0.00));
+                    cameraPosition = new Point3D(targetPoint.X - distance, targetPoint.Y, targetPoint.Z);
+                    lookDirection = new Vector3D(distance, 0, 0);
                     break;
                 case "Right":
-                    _cameraController.FlyTo(new Point3D(650.00, 2386.00, 20.00), new Vector3D(-650.00, -250.00, 0.00), new Vector3D(0.00, 1.00, 0.00));
+                    cameraPosition = new Point3D(targetPoint.X + distance, targetPoint.Y, targetPoint.Z);
+                    lookDirection = new Vector3D(-distance, 0, 0);
                     break;
                 case "Top":
-                    _cameraController.FlyTo(new Point3D(-1.43, 3658.20, 492.32), new Vector3D(-3.18, -675.83, -168.06), new Vector3D(0.00, 0.57, -0.82));
+                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y + distance, targetPoint.Z);
+                    lookDirection = new Vector3D(0, -distance, 0);
+                    upDirection = new Vector3D(0, 0, -1);
                     break;
                 case "Bottom":
-                    _cameraController.FlyTo(new Point3D(3.62, 647.67, -135.37), new Vector3D(-0.74, 692.65, 72.33), new Vector3D(0.00, -0.45, 0.89));
+                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y - distance, targetPoint.Z);
+                    lookDirection = new Vector3D(0, distance, 0);
+                    upDirection = new Vector3D(0, 0, 1);
                     break;
+                default:
+                    return;
             }
+
+            _cameraController.FlyTo(cameraPosition, lookDirection, upDirection);
         }
 
         private void UpdateFieldOfView()
@@ -724,9 +836,113 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        // --- Diff Mode support ---
+        public static readonly DependencyProperty IsDiffModeProperty =
+            DependencyProperty.Register(
+                nameof(IsDiffMode),
+                typeof(bool),
+                typeof(ViewerViewportControl),
+                new PropertyMetadata(false, OnIsDiffModeChanged));
+
+        public bool IsDiffMode
+        {
+            get => (bool)GetValue(IsDiffModeProperty);
+            set => SetValue(IsDiffModeProperty, value);
+        }
+
+        private static void OnIsDiffModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is ViewerViewportControl control)
+            {
+                control.UpdateToolbarVisibility();
+            }
+        }
+
+        private void UpdateToolbarVisibility()
+        {
+            if (StandardToolbarGroup != null)
+                StandardToolbarGroup.Visibility = IsDiffMode ? Visibility.Collapsed : Visibility.Visible;
+            if (DiffToolbarGroup != null)
+                DiffToolbarGroup.Visibility = IsDiffMode ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public bool IsCombinedModeChecked
+        {
+            get => CombinedModeToggle.IsChecked == true;
+            set => CombinedModeToggle.IsChecked = value;
+        }
+
+        public bool IsAutoRotateChecked
+        {
+            get => AutoRotateToggle.IsChecked == true;
+            set => AutoRotateToggle.IsChecked = value;
+        }
+
+        public bool IsMeshPartsChecked
+        {
+            get => MeshPartsToggle.IsChecked == true;
+            set => MeshPartsToggle.IsChecked = value;
+        }
+
+        public bool IsGhostModeChecked
+        {
+            get => GhostModeToggle.IsChecked == true;
+            set => GhostModeToggle.IsChecked = value;
+        }
+
+        public event EventHandler<bool> CombinedModeToggled;
+        public event EventHandler<bool> AutoRotateToggled;
+        public event EventHandler<bool> MeshPartsToggled;
+        public event EventHandler<bool> GhostModeToggled;
+        public event EventHandler ResetCamerasClicked;
+
+        private void CombinedModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
+            {
+                CombinedModeToggled?.Invoke(this, tb.IsChecked == true);
+            }
+        }
+
+        private void AutoRotateToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
+            {
+                AutoRotateToggled?.Invoke(this, tb.IsChecked == true);
+            }
+        }
+
+        private void MeshPartsToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
+            {
+                MeshPartsToggled?.Invoke(this, tb.IsChecked == true);
+            }
+        }
+
+        private void GhostModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
+            {
+                GhostModeToggled?.Invoke(this, tb.IsChecked == true);
+            }
+        }
+
+        private void ResetCameras_Click(object sender, RoutedEventArgs e)
+        {
+            ResetCamerasClicked?.Invoke(this, EventArgs.Empty);
+        }
+
         private void ResetCameraButton_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            ResetCamera();
+            if (IsDiffMode)
+            {
+                ResetCamerasClicked?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                ResetCamera();
+            }
         }
 
         private void ScreenshotButton_Click(object sender, RoutedEventArgs e)

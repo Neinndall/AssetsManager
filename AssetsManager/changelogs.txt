@@ -23,6 +23,8 @@ New Features
   - UI / Unified Animated Chevrons: a single style now drives both Viewer section headers and FileExplorer tree expanders — consistent rotation, hover feedback, and timing across the entire app.
   - UI / Stable Selection Layout: card-based list items no longer shift their content when selected, so action buttons (trash, etc.) stay perfectly in place.
   - Viewer / Added a close button to the animation player to dismiss it without removing the animation.
+  - Diff Viewer / 3D Mesh Diff Viewer (.skn): Implemented full comparative 3D rendering for SKN models, displaying old (red) and new (green) meshes side-by-side or overlaid, with interactive part visibility toggling.
+  - Diff Viewer / Interactive Mesh Visibility Overlay: Added a floating, draggable panel for Mesh Parts overlay to allow flexible placement and unobstructed view of the 3D models.
 
 Improvements
   - History / Renamed the "Individuals" tab to "WadFile" and "Sync Backups" to "Sync History" for better clarity and consistency.
@@ -48,29 +50,24 @@ Improvements
   - Viewer / Animation memory is fully released when switching models.
   - Viewer / Disposed model textures no longer affect other visible models.
   - Viewer / Eliminated duplicate auto-rotation rendering for better performance.
+  - Monitor / Command Center:
     * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
     * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
   - Explorer / Optimized grid view image preview to load on-demand, resolving high memory consumption in folders with thousands of images.
+  - Diff Viewer / Dynamic Camera Positioning: Standardized camera focus dynamically using the actual bounding box (Rect3D) of the loaded model's parts, adjusting position and distance to match its size and vertical baseline offset.
+  - Diff Viewer / WPF Rendering Performance Optimization: Applied WPF .Freeze() to all visual brushes, materials, and overlay geometries during 3D rendering, significantly reducing memory allocation and CPU overhead.
+  - Diff Viewer / State Transitions Speedup: Reduced the final .Ready transition delay to 350ms and state transition delay to 100ms for a snappier UI response.
+  - Diff Viewer / Zero-Gap Loading Handover: The loading card is handed over atomically to the result window (activating before closing the loader) to eliminate flickering and focus drops. The entire loading lifecycle is now centralized in a single orchestrator, ensuring the progress bar completes smoothly to 100% across all diff entry points (including 3D models).
 
 Bug Fixes
   - Comparator / Fixed an issue where single WadFile comparisons would save the game version as "null" in the history index.
   - History / Fixed a bug where deleting a WadFile entry from the history UI would not delete its physical backup folder from the disk.
   - Explorer / Refactored multi-selection architecture using a unified IMultiSelectable interface and consolidated interaction helpers.
   - Explorer / Removed reflection overhead from tree multi-selection (faster clicks on large trees).
-  - Explorer / Fixed image files incorrectly triggering dual view when selected from search filter results.
-  - Explorer / Fixed false error logs on normal debounce cancellation during rapid typing.
-  - Diff Viewer / Fixed progress bar not advancing when navigating between files in batch comparison mode.
-  - Diff Viewer / Smoother loading-to-result transition: the loading card is handed over atomically to the result window (no more flash of the closing loading card while the new window is appearing), and the entire loading lifecycle (show / progress / hide) is now centralized in a single orchestrator in DiffViewService for consistency across all diff entry points.
   - Diff Viewer / Implemented multi-select support (Batch mode) for audio event banks (events.bnk), allowing semantic comparison of multiple banks in a single session.
-  - Diff Viewer / Implemented Zero-Gap Handover: the difference window now activates before closing the loader, eliminating flickering and focus drops between windows.
-  - Diff Viewer / Progress bar now visually completes to 100% before showing results, providing clear feedback that processing is finished.
   - Diff Viewer / Batch comparisons no longer show duplicate 100% indicators, creating a cleaner loading experience.
-  - Explorer / Fixed crash when expanding audio banks (.bnk/.wpk) in the file tree.
   - UI / Focus Return Guarantee: implemented a global focus recovery system in HudWindow to ensure the focus always returns to the parent window upon closing any dialog.
   - UI / Content-Specific Transition Priorities: optimized window reveal timings using Render priority for images and ApplicationIdle for heavy text files, ensuring zero-gap fluidity.
-  - Core / Unified Loading Lifecycle: centralized all difference viewing logic into a single robust runner, ensuring consistent error handling and reliable cleanup of loading windows.
-    * Isolated System Health diagnostics: removed redundant software update alerts from the SYSTEM HEALTH card to focus exclusively on hash integrity and database health.
-    * Aligned Command Center Telemetry: reordered the status indicators in the main header to perfectly match the physical layout of the Bento cards below (PBE -> CORE -> SYSTEM -> ASSETS), ensuring visual and logical consistency.
   - Viewer / Scroll wheel now always drives the main panel: scrolling over the mesh list, pose controls, or animation list no longer gets trapped by inner lists.
   - Viewer / Animation player stays pinned just above the bottom dock for instant access to playback controls without scrolling.
   - Explorer / Tree Navigation Performance: significantly optimized memory consumption and speed when searching, filtering, or collapsing folders in the file explorer.
@@ -139,9 +136,8 @@ Bug Fixes
   - Monitor / Pagination: added first and last page buttons for instant navigation across all paginated views.
 
 Bug Fixes
-  - Diff Viewer / Fixed loading window status and progress bar transitions, ensuring that early rendering states (such as loading and parsing) are not desynchronized or skipped, and the progress bar completes to 100% smoothly across all file categories (text, image, audio, batch).
   - Explorer / Improved grid view virtualization performance (Recycling + cache 30 items).
-    * Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it ahora refleja dinámicamente el estado real de la versión y la disponibilidad de actualizaciones.
+  - Monitor / Dashboard HUD: Fixed a bug in the CORE BUILD card where the software status was hardcoded to "Up to date"; it now dynamically reflects the true version status and update availability.
   - Diff Viewer / Audio bank diffs for regional WADs in History (e.g., es_ES, es_MX) now display actual event changes instead of "no semantic changes".
   - Viewer / Fixed the animation player appearing at the bottom of the panel after selecting an animation, forcing the user to scroll to reach the controls.
   - Explorer / Fixed image preview incorrectly opening Dual View when selecting a file from search filter results while another image was already displayed.
@@ -152,12 +148,9 @@ Bug Fixes
   - UI / Iconography: Added a dedicated Material Design icon (MaterialIconKind.Animation) for animation (.anm) files, resolving their missing icon issue in all file trees and results.
   - Explorer / Search Performance: fixed a significant delay (1-3s) when clearing filters in massive folders; implemented a prioritized path-restoration engine with background lazy-loading of siblings, achieving instantaneous navigation jumps and smooth UI responsiveness.
   - Explorer / Fixed crash when expanding audio banks (.wpk/.bnk) in the file tree.
-  - Fixed focus loss and unexpected minimization when closing comparison or settings windows.
-  - Implemented image support for the difference viewer in Asset Watcher and History modules.
-  - Ensured the application correctly activates and gains focus on startup.
-  - Fixed a critical "InvalidOperationException" (Thread Affinity) when loading models in background threads.
-  - Resolved various memory leaks in the 3D viewer by ensuring proper disposal of SkinnedMesh and Animation assets.
-  - Fixed multiple compilation errors related to missing namespaces in the new optimized services.
+  - Core / Ensured the application correctly activates and gains focus on startup.
+  - Core / Fixed a critical "InvalidOperationException" (Thread Affinity) when loading models in background threads.
+  - Viewer / Resolved various memory leaks in the 3D viewer by ensuring proper disposal of SkinnedMesh and Animation assets.
   - Comparator / Quick Select Synchronization: fixed a UI issue where the Target Version selector failed to mark the selected item when the path matched an existing backup; consolidated path selection logic to ensure consistent behavior across all selection methods.
   - Explorer / Stability & Navigation Integrity
     * Fixed an infinite selection loop and tab flickering when navigating between folders containing files with identical names; implemented a guard against redundant selection cycles and optimized the tab recycling logic to ensure a perfectly smooth and accurate UI refresh.
@@ -184,11 +177,13 @@ Bug Fixes
   - Monitor / Dashboard UI: fixed experimental build identity and re-positioned commit SHA for better context.
   - Monitor / Pass Rewards: corrected FREE/PASS tier detection logic to accurately support seasonal and mini-event passes.
   - Diff Viewer / Batch comparison progress is now fully handled by the comparison engine with consistent loading states, matching the individual file experience.
-     - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
-   - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
-   - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
+  - Explorer / Fixed visual flash when switching between Grid View and file previews; files now load with a clean, seamless transition.
+  - Explorer / Fixed a Dual View bug where clicking a previewable image after opening an unsupported file (e.g. .skl) would collapse the left panel instead of showing the image on the right.
+  - Viewer / Fixed incorrect animation playback when switching between two models with the same number of joints; the skeleton is now fully refreshed on every model change.
   - Monitor / Pagination: fixed total page count failing to refresh in the version manager when switching between League Client and Game Client tabs.
   - Diff Viewer / Fixed batch image comparisons (multiple selected images) failing to launch when clicking "View selected differences" in the results explorer.
+  - Diff Viewer / Hardened Resource Disposal (Memory Leak Fix): Stored camera event handlers in private delegates to ensure clean unsubscription, disposed viewports, and nullified scenes when closing the SknDiffWindow to prevent memory leaks.
+  - Diff Viewer / Console Log Cleanup: Removed redundant/verbose initial logs to keep the diagnostics console clean.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

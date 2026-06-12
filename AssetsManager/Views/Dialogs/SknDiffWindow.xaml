@@ -21,13 +21,12 @@
             <RowDefinition Height="Auto"/> <!-- Status Bar -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Professional Toolbar Area -->
+        <!-- 1. Professional Title and Metrics Area -->
         <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Title/Status -->
                     <ColumnDefinition Width="*"/>    <!-- Metrics -->
-                    <ColumnDefinition Width="Auto"/> <!-- Tools -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Left: Title -->
@@ -56,105 +55,157 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
-
-                <!-- Right: Tools -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Ghost Mode Toggle -->
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="VIEW" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
-                            <ToggleButton x:Name="GhostModeToggle"
-                                          IsChecked="False"
-                                          Click="GhostModeToggle_Click"
-                                          Style="{StaticResource TransparentIconToggleButton}"
-                                          Width="30" Height="30"
-                                          ToolTip="Toggle Ghost / X-Ray Mode">
-                                <icons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18"/>
-                            </ToggleButton>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="CAM" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
-                            <Button Click="ResetCameras_Click" 
-                                    Style="{StaticResource TransparentIconButton}"
-                                    Width="30" Height="30"
-                                    ToolTip="Reset Both Cameras">
-                                <icons:MaterialIcon Kind="HomeOutline" Width="18" Height="18"/>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
             </Grid>
         </Border>
 
         <!-- 2. Main Viewports Area -->
-        <Grid Grid.Row="1" Margin="24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <Grid Grid.Row="1">
+            <Grid Margin="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <!-- Old Version Viewport -->
-            <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <!-- Old Version Viewport -->
+                <Border Grid.Column="0" x:Name="OldViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Border>
+                        <viewer:ViewerViewportControl Grid.Row="1" x:Name="OldViewport" IsDiffMode="True" Margin="0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Splitter -->
+                <GridSplitter Grid.Column="1" x:Name="ViewportSplitter" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ShowsPreview="False"/>
+
+                <!-- New Version Viewport -->
+                <Border Grid.Column="2" x:Name="NewViewportContainer" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Border>
+                        <viewer:ViewerViewportControl Grid.Row="1" x:Name="NewViewport" IsDiffMode="True" Margin="0"/>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Floating Overlay Control Panel (Mesh Visibility Checklist) -->
+            <Border x:Name="MeshVisibilityPanel" 
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Top" 
+                    Width="280"
+                    MaxHeight="550"
+                    Margin="0,38,38,0"
+                    Background="#E618181B" 
+                    BorderBrush="{StaticResource BorderColor}" 
+                    BorderThickness="1" 
+                    CornerRadius="12"
+                    Padding="14"
+                    Visibility="Collapsed">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="MeshPanelTranslation" X="0" Y="0"/>
+                </Border.RenderTransform>
+                <Border.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="25" ShadowDepth="4" Opacity="0.5"/>
+                </Border.Effect>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                        <Border Padding="12,12,12,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
-                                    <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
-                                </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
-                                    <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </Border>
-                    <viewer:ViewerViewportControl Grid.Row="1" x:Name="OldViewport" Margin="0"/>
-                </Grid>
-            </Border>
-
-            <!-- Splitter -->
-            <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ShowsPreview="False"/>
-
-            <!-- New Version Viewport -->
-            <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
-                <Grid>
-                    <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-                        <Border Padding="12,12,12,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
-                                    <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
-                                </Border>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
-                                    <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </Border>
-                    <viewer:ViewerViewportControl Grid.Row="1" x:Name="NewViewport" Margin="0"/>
+
+                    <!-- Header -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10" Background="Transparent" Cursor="SizeAll"
+                          MouseLeftButtonDown="MeshPanelHeader_MouseLeftButtonDown"
+                          MouseMove="MeshPanelHeader_MouseMove"
+                          MouseLeftButtonUp="MeshPanelHeader_MouseLeftButtonUp">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <icons:MaterialIcon Kind="FormatListBulleted" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="MESH PARTS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Click="CloseMeshPanel_Click" Style="{StaticResource TransparentIconButton}" Width="24" Height="24" ToolTip="Close Panel">
+                            <icons:MaterialIcon Kind="Close" Width="14" Height="14" Foreground="{StaticResource TextMuted}"/>
+                        </Button>
+                    </Grid>
+
+                    <Separator Grid.Row="1" Background="{StaticResource BorderColor}" Margin="0,0,0,10"/>
+
+                    <!-- Scrollable list of Parts -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl x:Name="MeshPartsItemsControl">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{StaticResource CardBackground}" CornerRadius="6"
+                                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                            Margin="0,0,0,4" Padding="8,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Name of the Part -->
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+
+                                            <!-- Visual status badge (New/Mod/Del/Same) -->
+                                            <Border Grid.Column="1" Background="{Binding DiffColorBrush}" CornerRadius="4" Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="{Binding StatusText}"/>
+
+                                            <!-- Checkbox to toggle visibility -->
+                                            <CheckBox Grid.Column="2" IsChecked="{Binding IsVisible, Mode=TwoWay}" Checked="MeshPartVisibility_Changed" Unchecked="MeshPartVisibility_Changed" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Grid>
             </Border>
+
+
         </Grid>
 
         <!-- 3. Footer -->
