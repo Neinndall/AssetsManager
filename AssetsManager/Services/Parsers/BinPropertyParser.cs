@@ -60,43 +60,30 @@ namespace AssetsManager.Services.Parsers
             uint[] objectClasses = new uint[objectCount];
             for (int i = 0; i < objectCount; i++) objectClasses[i] = br.ReadUInt32();
 
-            long objectsOffset = binStream.Position;
-            
             var options = new JsonWriterOptions 
             { 
                 Indented = true, 
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping 
             };
 
-            // Attempt 1: Modern Mode
+            // Attempt 1: Modern Streaming (Ultra-low RAM)
             try
             {
                 using var writer = new Utf8JsonWriter(outputStream, options);
-                RunStreamingLoop(writer, br, objectClasses, false);
+                RunStreamingLoop(writer, br, objectClasses);
             }
             catch
             {
-                // Attempt 2: Legacy Mode Fallback
-                binStream.Position = objectsOffset;
+                // Attempt 2: Ultimate Fallback to Proven BinTree (LeagueToolkit)
+                // This is 100% reliable and matches version 4.0.0.2 behavior.
+                binStream.Position = startPosition;
                 outputStream.SetLength(0);
-                
-                try
-                {
-                    using var writer = new Utf8JsonWriter(outputStream, options);
-                    RunStreamingLoop(writer, br, objectClasses, true);
-                }
-                catch
-                {
-                    // Attempt 3: Ultimate Fallback to Proven BinTree (LeagueToolkit)
-                    binStream.Position = startPosition;
-                    outputStream.SetLength(0);
-                    var binTree = new BinTree(binStream);
-                    WriteBinTreeAsJsonInternal(outputStream, binTree);
-                }
+                var binTree = new BinTree(binStream);
+                WriteBinTreeAsJsonInternal(outputStream, binTree);
             }
         }
 
-        private void RunStreamingLoop(Utf8JsonWriter writer, BinaryReader br, uint[] objectClasses, bool useLegacyType)
+        private void RunStreamingLoop(Utf8JsonWriter writer, BinaryReader br, uint[] objectClasses)
         {
             var resolutionCache = new Dictionary<uint, string>();
             string Resolve(uint hash)
@@ -110,13 +97,13 @@ namespace AssetsManager.Services.Parsers
             writer.WriteStartObject();
             for (int i = 0; i < objectClasses.Length; i++)
             {
-                WriteObjectStreaming(writer, br, objectClasses[i], Resolve, useLegacyType);
+                WriteObjectStreaming(writer, br, objectClasses[i], Resolve);
             }
             writer.WriteEndObject();
             writer.Flush();
         }
 
-        private void WriteObjectStreaming(Utf8JsonWriter writer, BinaryReader br, uint classHash, Func<uint, string> resolve, bool useLegacyType)
+        private void WriteObjectStreaming(Utf8JsonWriter writer, BinaryReader br, uint classHash, Func<uint, string> resolve)
         {
             br.ReadUInt32(); // size
             uint pathHash = br.ReadUInt32();
@@ -129,34 +116,16 @@ namespace AssetsManager.Services.Parsers
             for (int i = 0; i < propertyCount; i++)
             {
                 uint nameHash = br.ReadUInt32();
-                var type = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                var type = (BinPropertyType)br.ReadByte();
 
                 writer.WritePropertyName(resolve(nameHash));
-                WritePropertyContentStreaming(writer, br, type, resolve, useLegacyType);
+                WritePropertyContentStreaming(writer, br, type, resolve);
             }
 
             writer.WriteEndObject();
         }
 
-        private BinPropertyType UnpackType(BinPropertyType type, bool useLegacyType)
-        {
-            if (!useLegacyType) return type;
-
-            byte typeByte = (byte)type;
-            if (typeByte >= (byte)BinPropertyType.WadChunkLink && typeByte < (byte)BinPropertyType.Container)
-            {
-                typeByte -= (byte)BinPropertyType.WadChunkLink;
-                typeByte |= (byte)BinPropertyType.Container;
-            }
-            else if (typeByte >= (byte)BinPropertyType.UnorderedContainer)
-            {
-                typeByte += 1;
-            }
-
-            return (BinPropertyType)typeByte;
-        }
-
-        private void WritePropertyContentStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType type, Func<uint, string> resolve, bool useLegacyType)
+        private void WritePropertyContentStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType type, Func<uint, string> resolve)
         {
             switch (type)
             {
@@ -196,17 +165,17 @@ namespace AssetsManager.Services.Parsers
                 case BinPropertyType.ObjectLink: writer.WriteStringValue(resolve(br.ReadUInt32())); break;
                 case BinPropertyType.BitBool: writer.WriteBooleanValue(br.ReadByte() != 0); break;
                 case BinPropertyType.Optional:
-                    var optType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                    var optType = (BinPropertyType)br.ReadByte();
                     byte hasValue = br.ReadByte();
                     if (hasValue != 0)
                     {
-                        WritePropertyContentStreaming(writer, br, optType, resolve, useLegacyType);
+                        WritePropertyContentStreaming(writer, br, optType, resolve);
                     }
                     else writer.WriteNullValue();
                     break;
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
-                    var itemType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                    var itemType = (BinPropertyType)br.ReadByte();
                     br.ReadUInt32(); // container size
                     uint itemCount = br.ReadUInt32();
                     if (IsPrimitiveType(itemType))
@@ -216,7 +185,7 @@ namespace AssetsManager.Services.Parsers
                     else
                     {
                         writer.WriteStartArray();
-                        for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolve, useLegacyType);
+                        for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolve);
                         writer.WriteEndArray();
                     }
                     break;
@@ -231,23 +200,23 @@ namespace AssetsManager.Services.Parsers
                     for (int i = 0; i < structPropCount; i++)
                     {
                         uint pNameHash = br.ReadUInt32();
-                        var pType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                        var pType = (BinPropertyType)br.ReadByte();
                         writer.WritePropertyName(resolve(pNameHash));
-                        WritePropertyContentStreaming(writer, br, pType, resolve, useLegacyType);
+                        WritePropertyContentStreaming(writer, br, pType, resolve);
                     }
                     writer.WriteEndObject();
                     break;
                 case BinPropertyType.Map:
-                    var kType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
-                    var vType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                    var kType = (BinPropertyType)br.ReadByte();
+                    var vType = (BinPropertyType)br.ReadByte();
                     br.ReadUInt32(); // map size
                     uint mapCount = br.ReadUInt32();
                     writer.WriteStartObject();
                     for (uint i = 0; i < mapCount; i++)
                     {
-                        string keyStr = ReadPropertyAsKeyStringStreaming(br, kType, resolve, useLegacyType);
+                        string keyStr = ReadPropertyAsKeyStringStreaming(br, kType, resolve);
                         writer.WritePropertyName(keyStr);
-                        WritePropertyContentStreaming(writer, br, vType, resolve, useLegacyType);
+                        WritePropertyContentStreaming(writer, br, vType, resolve);
                     }
                     writer.WriteEndObject();
                     break;
@@ -257,7 +226,7 @@ namespace AssetsManager.Services.Parsers
             }
         }
 
-        private string ReadPropertyAsKeyStringStreaming(BinaryReader br, BinPropertyType type, Func<uint, string> resolve, bool useLegacyType)
+        private string ReadPropertyAsKeyStringStreaming(BinaryReader br, BinPropertyType type, Func<uint, string> resolve)
         {
             return type switch
             {
