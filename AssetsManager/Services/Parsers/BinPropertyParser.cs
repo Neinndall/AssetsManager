@@ -129,15 +129,31 @@ namespace AssetsManager.Services.Parsers
             for (int i = 0; i < propertyCount; i++)
             {
                 uint nameHash = br.ReadUInt32();
-                byte typeByte = br.ReadByte();
-                var type = (BinPropertyType)typeByte;
-                if (useLegacyType && type >= (BinPropertyType)128) type = (BinPropertyType)(typeByte & 0x7F);
+                var type = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
 
                 writer.WritePropertyName(resolve(nameHash));
                 WritePropertyContentStreaming(writer, br, type, resolve, useLegacyType);
             }
 
             writer.WriteEndObject();
+        }
+
+        private BinPropertyType UnpackType(BinPropertyType type, bool useLegacyType)
+        {
+            if (!useLegacyType) return type;
+
+            byte typeByte = (byte)type;
+            if (typeByte >= (byte)BinPropertyType.WadChunkLink && typeByte < (byte)BinPropertyType.Container)
+            {
+                typeByte -= (byte)BinPropertyType.WadChunkLink;
+                typeByte |= (byte)BinPropertyType.Container;
+            }
+            else if (typeByte >= (byte)BinPropertyType.UnorderedContainer)
+            {
+                typeByte += 1;
+            }
+
+            return (BinPropertyType)typeByte;
         }
 
         private void WritePropertyContentStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType type, Func<uint, string> resolve, bool useLegacyType)
@@ -180,22 +196,17 @@ namespace AssetsManager.Services.Parsers
                 case BinPropertyType.ObjectLink: writer.WriteStringValue(resolve(br.ReadUInt32())); break;
                 case BinPropertyType.BitBool: writer.WriteBooleanValue(br.ReadByte() != 0); break;
                 case BinPropertyType.Optional:
+                    var optType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
                     byte hasValue = br.ReadByte();
                     if (hasValue != 0)
                     {
-                        uint optNameHash = br.ReadUInt32();
-                        byte optTypeByte = br.ReadByte();
-                        var optType = (BinPropertyType)optTypeByte;
-                        if (useLegacyType && optType >= (BinPropertyType)128) optType = (BinPropertyType)(optTypeByte & 0x7F);
                         WritePropertyContentStreaming(writer, br, optType, resolve, useLegacyType);
                     }
                     else writer.WriteNullValue();
                     break;
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
-                    byte itemTypeByte = br.ReadByte();
-                    var itemType = (BinPropertyType)itemTypeByte;
-                    if (useLegacyType && itemType >= (BinPropertyType)128) itemType = (BinPropertyType)(itemTypeByte & 0x7F);
+                    var itemType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
                     br.ReadUInt32(); // container size
                     uint itemCount = br.ReadUInt32();
                     if (IsPrimitiveType(itemType))
@@ -220,21 +231,15 @@ namespace AssetsManager.Services.Parsers
                     for (int i = 0; i < structPropCount; i++)
                     {
                         uint pNameHash = br.ReadUInt32();
-                        byte pTypeByte = br.ReadByte();
-                        var pType = (BinPropertyType)pTypeByte;
-                        if (useLegacyType && pType >= (BinPropertyType)128) pType = (BinPropertyType)(pTypeByte & 0x7F);
+                        var pType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
                         writer.WritePropertyName(resolve(pNameHash));
                         WritePropertyContentStreaming(writer, br, pType, resolve, useLegacyType);
                     }
                     writer.WriteEndObject();
                     break;
                 case BinPropertyType.Map:
-                    byte kTypeByte = br.ReadByte();
-                    var kType = (BinPropertyType)kTypeByte;
-                    if (useLegacyType && kType >= (BinPropertyType)128) kType = (BinPropertyType)(kTypeByte & 0x7F);
-                    byte vTypeByte = br.ReadByte();
-                    var vType = (BinPropertyType)vTypeByte;
-                    if (useLegacyType && vType >= (BinPropertyType)128) vType = (BinPropertyType)(vTypeByte & 0x7F);
+                    var kType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
+                    var vType = UnpackType((BinPropertyType)br.ReadByte(), useLegacyType);
                     br.ReadUInt32(); // map size
                     uint mapCount = br.ReadUInt32();
                     writer.WriteStartObject();
