@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using DiffPlex.DiffBuilder.Model;
 using System.Threading.Tasks;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Encodings.Web; // Needed for JavaScriptEncoder
 
 namespace AssetsManager.Services.Formatting
@@ -59,7 +58,6 @@ namespace AssetsManager.Services.Formatting
 
             var localOptions = options ?? new JsonSerializerOptions();
             localOptions.WriteIndented = true;
-            // Ensure Unicode characters are unescaped for readability in the UI
             localOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
 
             return Task.Run(() =>
@@ -68,8 +66,10 @@ namespace AssetsManager.Services.Formatting
                 {
                     if (jsonInput is string jsonString)
                     {
-                        var parsedJson = JsonNode.Parse(jsonString);
-                        return parsedJson.ToJsonString(localOptions);
+                        using var doc = JsonDocument.Parse(jsonString);
+                        // Highly optimized: Serialize utilizes internal ArrayPool<byte> to format 
+                        // the JsonDocument without allocating intermediate buffers or growing memory.
+                        return JsonSerializer.Serialize(doc, localOptions);
                     }
                     else
                     {
