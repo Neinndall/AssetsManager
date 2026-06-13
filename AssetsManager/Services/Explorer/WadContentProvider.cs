@@ -148,7 +148,6 @@ namespace AssetsManager.Services.Explorer
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
                     var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
 
-                    _logService.LogDebug($"[DATA DIRECTION] Loading {(isOld ? "OLD" : "NEW")} from BACKUP: {diff.SourceWadFile} (Hash: {hash:x16}) in '{root}'");
                     return await GetBackupChunkBytesAsync(root, diff.SourceWadFile, hash, compressionType, isOld, cancellationToken);
                 }
 
@@ -157,9 +156,6 @@ namespace AssetsManager.Services.Explorer
                 {
                     string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
-                    
-                    _logService.LogDebug($"[DATA DIRECTION] Loading {(isOld ? "OLD" : "NEW")} from LIVE: {diff.SourceWadFile} (Hash: {hash:x16}) in '{lolPath}'");
-                    
                     if (hash != 0) return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
                 }
 

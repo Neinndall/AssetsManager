@@ -326,7 +326,7 @@ namespace AssetsManager.Views
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath, null, version);
+            resultWindow.Initialize(diffs, oldPath, newPath, version);
             resultWindow.Owner = this;
             resultWindow.Show();
         }
