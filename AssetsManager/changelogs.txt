@@ -1,6 +1,17 @@
+AssetsManager - League of Legends | v4.0.1.1
+
+HOTFIX UPDATE
+This hotfix addresses a critical regression in the Comparator module that caused LIVE comparisons to display identical text files and empty images. The issue was traced to a parameter mapping error that incorrectly triggered BACKUP mode during direct comparisons.
+
+Bug Fixes
+  - Comparator / Fixed a critical parameter mismatch in LIVE comparisons that caused failed data retrieval and identical/empty diff results.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.1.0
 
 MEDIUM UPDATE
+This update delivers a major breakthrough in audio bank analysis by introducing a brand new "Technical Integrity" engine. By implementing a dedicated Technical Summary node for all Wwise banks, the system now detects and highlights "invisible" parameter tweaks—such as volume adjustments, pitch shifts, and attenuation curve changes—that were previously ignored by logical parsers. This ensures 100% fidelity between file-size variations and the visual diff viewer. Additionally, this version includes significant optimizations for model loading stability and a refined, non-blocking asynchronous architecture for a smoother engineering experience.
 
 New Features
   - Diff Viewer / Audio bank diffs in LIVE comparisons now show event names and structure (was raw HIRC bytes only).
