@@ -80,9 +80,10 @@ namespace AssetsManager.Services.Audio
 
         private void AddTechnicalSummaryNode(List<AudioEventNode> eventNodes, byte[] eventsData, byte[] audioBnkData)
         {
-            var techNode = new AudioEventNode 
-            { 
+            var techNode = new AudioEventNode
+            {
                 Name = "[BNK Technical Summary]",
+                IsTechnicalNode = true,
                 TechnicalInfo = new AudioTechnicalMetadata()
             };
 

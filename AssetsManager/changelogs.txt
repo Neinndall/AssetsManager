@@ -5,6 +5,7 @@ This hotfix addresses a critical regression in the Comparator module that caused
 
 Bug Fixes
   - Comparator / Fixed a critical parameter mismatch in LIVE comparisons that caused failed data retrieval and identical/empty diff results.
+  - Explorer / Hidden the "[BNK Technical Summary]" node from the audio tree and excluded it from exports to prevent empty folders.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -15,6 +15,7 @@ namespace AssetsManager.Views.Models.Audio
         
         // Technical metadata to detect changes in hidden parameters
         public AudioTechnicalMetadata TechnicalInfo { get; set; }
+        public bool IsTechnicalNode { get; set; }
     }
 
     public class AudioTechnicalMetadata

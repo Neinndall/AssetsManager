@@ -209,6 +209,8 @@ namespace AssetsManager.Services.Explorer
             // 2. Audio Event Handling (Smart Only)
             if (node.Type == NodeType.AudioEvent && mode == WadExportMode.Smart)
             {
+                if (node.IsTechnicalNode) return;
+
                 string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                 _directoriesCreator.CreateDirectory(eventPath);
 
@@ -451,6 +453,8 @@ namespace AssetsManager.Services.Explorer
 
             foreach (var eventNode in audioTree)
             {
+                if (eventNode.IsTechnicalNode) continue;
+
                 string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
                 _directoriesCreator.CreateDirectory(eventPath);
 
