@@ -139,9 +139,9 @@ namespace AssetsManager.Services.Explorer
                 if (!isImage)
                 {
                     _viewModel.IsContentVisible = true;
+                    _viewModel.IsTextVisible = false;
+                    _viewModel.IsWebVisible = false;
                 }
-                _viewModel.IsTextVisible = false;
-                _viewModel.IsWebVisible = false;
             }
 
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
