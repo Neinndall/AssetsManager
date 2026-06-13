@@ -105,7 +105,25 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer) return;
+                if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer)
+                {
+                    if (requiredPreviewer == Previewer.StatusPanel)
+                    {
+                        _viewModel.IsUnsupportedVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    else if (requiredPreviewer == Previewer.AvalonEdit)
+                    {
+                        _viewModel.IsTextVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    else if (requiredPreviewer == Previewer.WebView)
+                    {
+                        _viewModel.IsWebVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    return;
+                }
             }
 
             // Step 1: Prepare the correct slot (Image or Content)
