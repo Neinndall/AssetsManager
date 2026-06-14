@@ -131,8 +131,8 @@ namespace AssetsManager.Services.Core
                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 }
 
-                // Give the user 50ms to visually register the completed progress before closing the window
-                await Task.Delay(50);
+                // Give the user 100ms to visually register the completed progress before closing the window
+                await Task.Delay(100);
             }
 
             _taskCancellationManager.CompleteCurrentOperation();

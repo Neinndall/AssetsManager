@@ -230,13 +230,14 @@ public class ManifestDownloader
         _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
         _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
 
+        // Force the 100% verification frame to paint before switching to Updating.
         if (System.Windows.Application.Current != null)
         {
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.SystemIdle);
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
         }
 
-        // Wait 500ms so the user can see the 100% verification progress bar and the final file count
-        await Task.Delay(500, cancellationToken);
+        // Brief pause so the eye can register the completed Verifying state.
+        await Task.Delay(100, cancellationToken);
 
         if (!filesToPatch.Any()) return 0;
 
@@ -251,16 +252,14 @@ public class ManifestDownloader
         var allTasks = filesToPatchList.SelectMany(f => f.ChunksByBundle.Values.SelectMany(l => l)).ToList();
         int totalChunks = allTasks.Count;
 
-        // Reset progress bar instantly for the start of the Updating phase (0%)
+        // Reset progress bar instantly for the start of the Updating phase (0%).
         ProgressChanged?.Invoke("Updating", $"0 of {filesToPatchList.Count} files: Initializing...", 0, totalChunks);
 
+        // Force the 0% Updating frame to paint before downloads start.
         if (System.Windows.Application.Current != null)
         {
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.SystemIdle);
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
         }
-
-        // Wait 200ms to allow the UI thread to paint the 0% "Initializing..." frame before chunk downloads start
-        await Task.Delay(200, cancellationToken);
 
         var uniqueChunks = allTasks.GroupBy(t => t.Chunk.ChunkId)
                                    .Select(g => new UniqueChunkTask { 
