@@ -16,6 +16,7 @@ New Features
 
 Improvements
   - Explorer / NGrid Data Summary: implemented a JSON-based metadata summary for navigation grids, providing instant visibility into version, bounds, and grid dimensions.
+  - Core / Refactored ProgressUIManager to centrally synchronize completion lifecycles (50ms delay) and prevent empty status details during initialization.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

@@ -474,9 +474,6 @@ public class ManifestDownloader
         _logService.LogDebug($"  • Actual Speed: {actualSpeed:F2} MB/s");
         _logService.LogDebug($"  • Decompressed: {decompressedGB:F2} GB (ratio {compressionRatio:F2}x)");
         
-        // Let the user see the 100% completed state for 500ms before closing the progress window
-        await Task.Delay(500, cancellationToken);
-
         return totalFilesToPatch;
     }
 }

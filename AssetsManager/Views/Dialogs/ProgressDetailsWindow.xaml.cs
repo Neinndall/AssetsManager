@@ -89,7 +89,7 @@ namespace AssetsManager.Views.Dialogs
             else
             {
                 ViewModel.ItemProgressText = $"{completedFiles} of {totalFiles}";
-                ViewModel.CurrentFileName = currentFileName ?? "...";
+                ViewModel.CurrentFileName = string.IsNullOrEmpty(currentFileName) ? "Initializing..." : currentFileName;
             }
 
             string fileSpecificProgress = null;

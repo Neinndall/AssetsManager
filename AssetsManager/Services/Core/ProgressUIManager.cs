@@ -92,6 +92,7 @@ namespace AssetsManager.Services.Core
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                _progressDetailsWindow.Show();
             });
         }
 
@@ -115,11 +116,25 @@ namespace AssetsManager.Services.Core
         }
 
         /// <summary>
-        /// Centralizes logic to finish an operation.
-        /// </summary>
         private async Task FinishOperation()
         {
-            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            bool wasCancelled = _taskCancellationManager.IsCancelling;
+            if (wasCancelled)
+            {
+                await Task.Delay(1500);
+            }
+            else
+            {
+                // Yield control to the UI thread to allow it to render the final progress state (e.g. 207 of 207)
+                if (System.Windows.Application.Current != null)
+                {
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                }
+
+                // Give the user 50ms to visually register the completed progress before closing the window
+                await Task.Delay(50);
+            }
+
             _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
@@ -255,7 +270,8 @@ namespace AssetsManager.Services.Core
 
         public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
-            UpdateOperation($"Extracting {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
+            string detail = string.IsNullOrEmpty(currentFile) ? "Preparing Assets..." : currentFile;
+            UpdateOperation($"Extracting {completedFiles} of {totalFiles} assets: {detail}", completedFiles, totalFiles, currentFile);
         }
 
         public async void OnExtractionCompleted() => await FinishOperation();
@@ -280,7 +296,8 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
-            UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
+            string detail = string.IsNullOrEmpty(currentFile) ? "Preparing Assets..." : currentFile;
+            UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {detail}", completedFiles, totalFiles, currentFile);
         }
 
         public async void OnSavingCompleted() => await FinishOperation();
@@ -309,18 +326,6 @@ namespace AssetsManager.Services.Core
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
-
-            if (data.Success && !wasCancelled)
-            {
-                _owner.Dispatcher.Invoke(() =>
-                {
-                    if (_progressDetailsWindow != null)
-                    {
-                        _progressDetailsWindow.ViewModel.ProgressValue = 100;
-                        _progressDetailsWindow.ViewModel.ItemProgressText = "Complete";
-                    }
-                });
-            }
 
             await FinishOperation();
             
@@ -354,7 +359,8 @@ namespace AssetsManager.Services.Core
 
         public void OnBackupProgressChanged(object sender, (int Processed, int Total, string CurrentFile) data)
         {
-            UpdateOperation($"Backing up {data.Processed} of {data.Total} files: {data.CurrentFile}", data.Processed, data.Total, data.CurrentFile);
+            string detail = string.IsNullOrEmpty(data.CurrentFile) ? "Preparing Backup..." : data.CurrentFile;
+            UpdateOperation($"Backing up {data.Processed} of {data.Total} files: {detail}", data.Processed, data.Total, data.CurrentFile);
         }
 
         public async void OnBackupCompleted(object sender, bool success)
