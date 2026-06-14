@@ -74,7 +74,6 @@ namespace AssetsManager.Services.Monitor
                 }
                 catch (OperationCanceledException)
                 {
-                    _logService.LogWarning("Backup process was cancelled.");
                     BackupCompleted?.Invoke(false);
                     // Clean up partially created backup if cancelled
                     if (Directory.Exists(destinationBackupPath))
@@ -82,6 +81,7 @@ namespace AssetsManager.Services.Monitor
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
                     }
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -129,13 +129,13 @@ namespace AssetsManager.Services.Monitor
                 }
                 catch (OperationCanceledException)
                 {
-                    _logService.LogWarning("Backup cloning was cancelled.");
                     BackupCompleted?.Invoke(false);
                     if (Directory.Exists(destinationBackupPath))
                     {
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
                     }
+                    throw;
                 }
                 catch (Exception ex)
                 {

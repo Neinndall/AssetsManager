@@ -121,6 +121,8 @@ namespace AssetsManager.Services.Core
             bool wasCancelled = _taskCancellationManager.IsCancelling;
             if (wasCancelled)
             {
+                // Set the status bar text to the cancellation message to ensure it is displayed
+                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
                 await Task.Delay(1500);
             }
             else

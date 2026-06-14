@@ -184,7 +184,7 @@ namespace AssetsManager.Services.Downloads
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("Extraction process was cancelled by the user.");
+                throw;
             }
             catch (Exception ex)
             {
@@ -235,7 +235,7 @@ namespace AssetsManager.Services.Downloads
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("Save process was cancelled by the user.");
+                throw;
             }
             catch (Exception ex)
             {
@@ -278,10 +278,28 @@ namespace AssetsManager.Services.Downloads
                         {
                             byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
                             byte[] audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
-                            int soundsCount = _audioBankService.GetSoundCount(wpkData, audioBnkData);
+                            byte[] eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
+
+                            List<AudioEventNode> audioTree;
+                            if (linkedBank.BinData != null)
+                                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                            else
+                                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsData);
+
+                            int soundsCount = 0;
+                            foreach (var eventNode in audioTree)
+                            {
+                                if (eventNode.IsTechnicalNode) continue;
+                                soundsCount += eventNode.Sounds.Count;
+                            }
+
                             count += (soundsCount > 0) ? soundsCount : 1;
                         }
                         else count++;
+                    }
+                    else
+                    {
+                        count++;
                     }
                 }
                 else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)

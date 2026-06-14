@@ -92,8 +92,8 @@ namespace AssetsManager.Services.Comparator
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("WADs comparison process was cancelled.");
                 allDiffs = null;
+                throw;
             }
             catch (Exception ex)
             {
@@ -242,8 +242,8 @@ namespace AssetsManager.Services.Comparator
             }
             catch (OperationCanceledException)
             {
-                _logService.LogWarning("WADs comparison process was cancelled.");
                 allDiffs = null;
+                throw;
             }
             catch (Exception ex)
             {
