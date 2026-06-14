@@ -121,7 +121,6 @@ namespace AssetsManager.Views
 
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
-            _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
             _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
 
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
@@ -250,6 +249,9 @@ namespace AssetsManager.Views
         
         private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath, string version)
         {
+            // Ensure the progress window reaches 100% and closes before any follow-up UI is shown.
+            await _progressUIManager.FinishComparisonAsync();
+
             if (allDiffs == null) return;
 
             var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff

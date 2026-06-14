@@ -248,7 +248,14 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
         }
 
-        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version) => await FinishOperation();
+        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version) => await FinishComparisonAsync();
+
+        /// <summary>
+        /// Closes the comparison progress window after rendering the final 100% state.
+        /// Callers should await this before opening follow-up UI (e.g. results window)
+        /// to guarantee the progress window is fully closed first.
+        /// </summary>
+        public async Task FinishComparisonAsync() => await FinishOperation();
 
         // --- Extraction ---
 
