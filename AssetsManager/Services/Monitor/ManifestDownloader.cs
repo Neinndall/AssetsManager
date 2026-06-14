@@ -29,7 +29,7 @@ public class ManifestDownloader
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
 
     public event Action<string, int, int, string> ProgressChanged;
-    public Func<Task> OnVerifyingCompletedAsync;
+    public event Action VerificationCompleted;
 
     public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator, HashService hashService)
     {
@@ -231,11 +231,8 @@ public class ManifestDownloader
         _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
         _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
 
-        // Notify that verification has completed so the UI can handle the transition delay.
-        if (OnVerifyingCompletedAsync != null)
-        {
-            await OnVerifyingCompletedAsync();
-        }
+        // Notify event subscribers that verification is completed. Any UI transitions/delays will be handled by the UI managers.
+        VerificationCompleted?.Invoke();
 
         if (!filesToPatch.Any()) return 0;
 

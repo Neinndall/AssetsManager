@@ -12,6 +12,7 @@ using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Views.Controls.Explorer;
+using AssetsManager.Services.Downloads;
 
 namespace AssetsManager.Views
 {
@@ -30,7 +31,6 @@ namespace AssetsManager.Views
             TreeUIManager treeUIManager,
             AudioBankService audioBankService,
             AudioBankLinkerService audioBankLinkerService,
-            WadExportService wadExportService,
             WadNodeLoaderService wadNodeLoaderService,
             HashResolverService hashResolverService,
             VersionService versionService,
@@ -40,13 +40,13 @@ namespace AssetsManager.Views
             MonitorService monitorService,
             BackupManager backupManager,
             AssetWatcherService assetWatcherService,
-            ProgressUIManager progressUIManager)
+            ProgressUIManager progressUIManager,
+            ExtractionService extractionService)
         {
             InitializeComponent();
             FileExplorer.LogService = logService;
             FileExplorer.CustomMessageBoxService = customMessageBoxService;
             FileExplorer.WadContentProvider = wadContentProvider;
-            FileExplorer.WadExportService = wadExportService;
             FileExplorer.WadNodeLoaderService = wadNodeLoaderService;
             FileExplorer.WadSearchBoxService = wadSearchBoxService;
             FileExplorer.DiffViewService = diffViewService;
@@ -65,6 +65,7 @@ namespace AssetsManager.Views
             FileExplorer.BackupManager = backupManager;
             FileExplorer.AssetWatcherService = assetWatcherService;
             FileExplorer.ProgressUIManager = progressUIManager;
+            FileExplorer.ExtractionService = extractionService;
 
             FilePreviewer.LogService = logService;
             FilePreviewer.CustomMessageBoxService = customMessageBoxService;

@@ -29,6 +29,7 @@ using AssetsManager.Views.Models.Dialogs;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
 using AssetsManager.Views.Models.Settings;
+using AssetsManager.Services.Downloads;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -49,7 +50,6 @@ namespace AssetsManager.Views.Controls.Explorer
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public WadContentProvider WadContentProvider { get; set; }
-        public WadExportService WadExportService { get; set; }
         public WadSearchBoxService WadSearchBoxService { get; set; }
         public WadNodeLoaderService WadNodeLoaderService { get; set; }
         public DiffViewService DiffViewService { get; set; }
@@ -68,6 +68,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public TaskCancellationManager TaskCancellationManager { get; set; }
         public ImageMergerService ImageMergerService { get; set; }
         public ProgressUIManager ProgressUIManager { get; set; }
+        public ExtractionService ExtractionService { get; set; }
 
         public string NewLolPath { get; set; }
         public string OldLolPath { get; set; }
@@ -539,13 +540,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void TriggerExtractNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
+            if (nodes == null || nodes.Count == 0) return;
             await ExecuteExtractionAsync(nodes);
         }
 
         public async void TriggerSaveNodes(List<FileSystemNodeModel> nodes)
         {
-            if (WadExportService == null || nodes == null || nodes.Count == 0) return;
+            if (nodes == null || nodes.Count == 0) return;
             await ExecuteSaveAsync(nodes);
         }
 
@@ -557,9 +558,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void ExtractSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadExportService == null)
+            if (ExtractionService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Extraction Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -598,17 +599,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    ProgressUIManager?.OnExtractionStarted("Extracting Assets...", 0);
-
-                    Action<int, int, string> progressAction = null;
-                    if (ProgressUIManager != null)
-                    {
-                        progressAction = ProgressUIManager.OnExtractionProgressChanged;
-                    }
-
-                    int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Original,
-                        _viewModel.RootNodes, _currentRootPath, cancellationToken,
-                        progressAction);
+                    await ExtractionService.ExtractNodesAsync(selectedNodes, destinationPath,
+                        _viewModel.RootNodes, _currentRootPath, cancellationToken);
 
                     if (selectedNodes.Count == 1)
                     {
@@ -642,7 +634,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
-                    ProgressUIManager?.OnExtractionCompleted();
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }
@@ -651,9 +642,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SaveSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (WadExportService == null)
+            if (ExtractionService == null)
             {
-                CustomMessageBoxService.ShowError("Error", "Wad Export Service is not available.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "Extraction Service is not available.", Window.GetWindow(this));
                 return;
             }
 
@@ -692,18 +683,9 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    ProgressUIManager?.OnSavingStarted(0);
-
-                    Action<int, int, string> progressAction = null;
-                    if (ProgressUIManager != null)
-                    {
-                        progressAction = ProgressUIManager.OnSavingProgressChanged;
-                    }
-
                     var allSavedFiles = new List<string>();
-                    int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Smart,
+                    await ExtractionService.SaveNodesAsync(selectedNodes, destinationPath,
                         _viewModel.RootNodes, _currentRootPath, cancellationToken,
-                        progressAction,
                         (path) => allSavedFiles.Add(path));
 
                     if (selectedNodes.Count == 1)
@@ -751,7 +733,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
                 finally
                 {
-                    ProgressUIManager?.OnSavingCompleted();
                     ExtractMenuItem.IsEnabled = true;
                     SaveMenuItem.IsEnabled = true;
                 }

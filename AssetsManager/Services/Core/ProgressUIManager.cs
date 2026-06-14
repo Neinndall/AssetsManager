@@ -259,7 +259,7 @@ namespace AssetsManager.Services.Core
 
         // --- Extraction ---
 
-        public void OnExtractionStarted(string message, int totalFiles)
+        public void OnExtractionStarted(int totalFiles)
         {
             _owner.Dispatcher.Invoke(() =>
             {
@@ -317,9 +317,9 @@ namespace AssetsManager.Services.Core
             StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
-        public async Task OnVersionVerifyingCompletedAsync()
+        public async void OnVersionVerificationCompleted()
         {
-            // Pause so the 100% Verifying state is visible before switching to Updating.
+            // Pause so the 100% Verifying state is visible in the UI before switching to Updating.
             await Task.Delay(100);
         }
 

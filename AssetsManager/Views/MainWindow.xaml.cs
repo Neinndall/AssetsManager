@@ -132,10 +132,14 @@ namespace AssetsManager.Views
             _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
             _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
 
+            _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
+            _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;
+            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompleted;
+
             _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
             _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
             _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
-            _versionService.OnVerifyingCompletedAsync = _progressUIManager.OnVersionVerifyingCompletedAsync;
+            _versionService.VerificationCompleted += _progressUIManager.OnVersionVerificationCompleted;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 

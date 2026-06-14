@@ -21,11 +21,7 @@ namespace AssetsManager.Services.Monitor
         public event Action<string> VersionDownloadStarted;
         public event Action<string, int, int, string> VersionDownloadProgressChanged;
         public event Action<string, bool, string> VersionDownloadCompleted;
-
-        public Func<Task> OnVerifyingCompletedAsync
-        {
-            set => _manifestDownloader.OnVerifyingCompletedAsync = value;
-        }
+        public event Action VerificationCompleted;
 
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
@@ -52,6 +48,7 @@ namespace AssetsManager.Services.Monitor
             _riotApiService = riotApiService;
 
             _manifestDownloader.ProgressChanged += OnManifestProgressChanged;
+            _manifestDownloader.VerificationCompleted += () => VerificationCompleted?.Invoke();
         }
 
         private void OnManifestProgressChanged(string taskName, int current, int total, string fileName)
