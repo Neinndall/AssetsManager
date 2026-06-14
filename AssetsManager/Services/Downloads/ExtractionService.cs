@@ -19,9 +19,9 @@ namespace AssetsManager.Services.Downloads
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly WadExportService _wadExportService;
 
-        public event EventHandler<(string message, int totalFiles)> ExtractionStarted;
-        public event EventHandler<(int extractedCount, int totalFiles, string message)> ExtractionProgressChanged;
-        public event EventHandler ExtractionCompleted;
+        public event Action<string, int> ExtractionStarted;
+        public event Action<int, int, string> ExtractionProgressChanged;
+        public event Action ExtractionCompleted;
 
         public ExtractionService(
             AppSettings appSettings,
@@ -45,13 +45,13 @@ namespace AssetsManager.Services.Downloads
             if (!newDiffs.Any())
             {
                 _logService.Log("No new assets to extract from the comparison.");
-                ExtractionCompleted?.Invoke(this, EventArgs.Empty);
+                ExtractionCompleted?.Invoke();
                 return;
             }
 
             int totalFiles = newDiffs.Count;
 
-            ExtractionStarted?.Invoke(this, ("Extraction of new assets started...", totalFiles));
+            ExtractionStarted?.Invoke("Extraction of new assets started...", totalFiles);
 
             // Create a unique destination directory for this extraction session
             string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
@@ -68,7 +68,7 @@ namespace AssetsManager.Services.Downloads
 
                     extractedCount++;
                     string progressMessage = $"{diff.FileName}";
-                    ExtractionProgressChanged?.Invoke(this, (extractedCount, totalFiles, progressMessage));
+                    ExtractionProgressChanged?.Invoke(extractedCount, totalFiles, progressMessage);
 
                     string sourceWadFullPath = Path.Combine(newLolPath, diff.SourceWadFile);
                     var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
@@ -111,7 +111,7 @@ namespace AssetsManager.Services.Downloads
             }
             finally
             {
-                ExtractionCompleted?.Invoke(this, EventArgs.Empty);
+                ExtractionCompleted?.Invoke();
             }
         }
     }

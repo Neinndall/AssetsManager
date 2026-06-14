@@ -598,11 +598,17 @@ namespace AssetsManager.Views.Controls.Explorer
 
                 try
                 {
-                    ProgressUIManager?.OnExtractionStarted(this, ("Extracting Assets...", 0));
+                    ProgressUIManager?.OnExtractionStarted("Extracting Assets...", 0);
+
+                    Action<int, int, string> progressAction = null;
+                    if (ProgressUIManager != null)
+                    {
+                        progressAction = ProgressUIManager.OnExtractionProgressChanged;
+                    }
 
                     int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Original,
                         _viewModel.RootNodes, _currentRootPath, cancellationToken,
-                        (current, total, fileName) => ProgressUIManager?.OnExtractionProgressChanged(current, total, fileName));
+                        progressAction);
 
                     if (selectedNodes.Count == 1)
                     {
@@ -688,10 +694,16 @@ namespace AssetsManager.Views.Controls.Explorer
                 {
                     ProgressUIManager?.OnSavingStarted(0);
 
+                    Action<int, int, string> progressAction = null;
+                    if (ProgressUIManager != null)
+                    {
+                        progressAction = ProgressUIManager.OnSavingProgressChanged;
+                    }
+
                     var allSavedFiles = new List<string>();
                     int processed = await WadExportService.ExportNodesAsync(selectedNodes, destinationPath, WadExportMode.Smart,
                         _viewModel.RootNodes, _currentRootPath, cancellationToken,
-                        (current, total, fileName) => ProgressUIManager?.OnSavingProgressChanged(current, total, fileName),
+                        progressAction,
                         (path) => allSavedFiles.Add(path));
 
                     if (selectedNodes.Count == 1)

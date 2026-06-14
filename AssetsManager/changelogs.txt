@@ -4,6 +4,7 @@ HOTFIX UPDATE
 This hotfix addresses a critical regression in the Comparator module that caused LIVE comparisons to display identical text files and empty images. The issue was traced to a parameter mapping error that incorrectly triggered BACKUP mode during direct comparisons.
 
 Bug Fixes
+  - Comparator / Fixed a timing issue where the comparison results window could open before the progress window had fully closed, now guaranteeing the 100% completion state is visible first.
   - Comparator / Fixed a critical parameter mismatch in LIVE comparisons that caused failed data retrieval and identical/empty diff results.
   - Explorer / Hidden the "[BNK Technical Summary]" node from the audio tree and excluded it from exports to prevent empty folders.
   - Explorer / Fixed a visual bug where the preview panel for unsupported file types (or text/web) would empty itself and go blank after clearing the search box filter.
@@ -16,6 +17,7 @@ New Features
 
 Improvements
   - Explorer / NGrid Data Summary: implemented a JSON-based metadata summary for navigation grids, providing instant visibility into version, bounds, and grid dimensions.
+  - Monitor / Centralized version download progress transitions under ProgressUIManager, ensuring consistent 100% visibility across Verifying and Updating phases.
   - Core / Refactored ProgressUIManager to centrally synchronize completion lifecycles (50ms delay) and prevent empty status details during initialization.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

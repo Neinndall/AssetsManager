@@ -28,7 +28,7 @@ public class ManifestDownloader
     // Pools de recursos reutilizables
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
 
-    public event Action<string, string, int, int> ProgressChanged;
+    public event Action<string, int, int, string> ProgressChanged;
     public Func<Task> OnVerifyingCompletedAsync;
 
     public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator, HashService hashService)
@@ -205,7 +205,7 @@ public class ManifestDownloader
                                 {
                                     lastProgressTime = now;
                                     lastReportedVerify = completed;
-                                    ProgressChanged?.Invoke("Verifying", $"{completed} of {totalToVerify} files: {file.Name}", completed, totalToVerify);
+                                    ProgressChanged?.Invoke("Verifying", completed, totalToVerify, $"{completed} of {totalToVerify} files: {file.Name}");
                                 }
                             }
                         }
@@ -251,7 +251,7 @@ public class ManifestDownloader
         int totalChunks = allTasks.Count;
 
         // Reset progress bar instantly for the start of the Updating phase (0%).
-        ProgressChanged?.Invoke("Updating", $"0 of {filesToPatchList.Count} files: Initializing...", 0, totalChunks);
+        ProgressChanged?.Invoke("Updating", 0, totalChunks, $"0 of {filesToPatchList.Count} files: Initializing...");
 
         // Force the 0% Updating frame to paint before downloads start.
         if (System.Windows.Application.Current != null)
@@ -430,7 +430,7 @@ public class ManifestDownloader
                                                         int doneForFile = totalForFile - pending;
 
                                                         string message = $"{Math.Min(visualFileIndex + 1, totalFilesToPatch)} of {totalFilesToPatch} files: {reportFile.FileInfo.Name}|{doneForFile}/{totalForFile}";
-                                                        ProgressChanged?.Invoke("Updating", message, currentDoneChunks, totalChunks);
+                                                        ProgressChanged?.Invoke("Updating", currentDoneChunks, totalChunks, message);
                                                     }
                                                 }
                                             }
