@@ -131,8 +131,8 @@ namespace AssetsManager.Services.Core
                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 }
 
-                // Give the user 100ms to visually register the completed progress before closing the window
-                await Task.Delay(100);
+                // Give the user 50ms to visually register the completed progress before closing the window
+                await Task.Delay(50);
             }
 
             _taskCancellationManager.CompleteCurrentOperation();
@@ -317,6 +317,25 @@ namespace AssetsManager.Services.Core
             StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
+        public async Task OnVersionVerifyingCompletedAsync()
+        {
+            // Pause so the 100% Verifying state is visible before switching to Updating.
+            await Task.Delay(100);
+
+            // Render the Updating 0% frame after the delay.
+            _owner.Dispatcher.Invoke(() =>
+            {
+                if (_progressDetailsWindow != null)
+                {
+                    _progressDetailsWindow.ViewModel.OperationVerb = "Updating";
+                    _progressDetailsWindow.ViewModel.ProgressValue = 0;
+                    _progressDetailsWindow.ViewModel.ItemProgressText = "0 of 0";
+                    _progressDetailsWindow.ViewModel.CurrentFileName = "Initializing...";
+                }
+            });
+            UpdateStatusBar("Updating 0 of 0 files: Initializing...", 0, 0);
+        }
+
         public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
         {
             _owner.Dispatcher.Invoke(() =>
@@ -333,6 +352,9 @@ namespace AssetsManager.Services.Core
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
+
+            // Extra 50ms pause so Updating reaches 100ms total before closing.
+            await Task.Delay(50);
 
             await FinishOperation();
             

@@ -22,6 +22,11 @@ namespace AssetsManager.Services.Monitor
         public event EventHandler<(string TaskName, int CurrentValue, int TotalValue, string CurrentFile)> VersionDownloadProgressChanged;
         public event EventHandler<(string TaskName, bool Success, string Message)> VersionDownloadCompleted;
 
+        public Func<Task> OnVerifyingCompletedAsync
+        {
+            set => _manifestDownloader.OnVerifyingCompletedAsync = value;
+        }
+
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;

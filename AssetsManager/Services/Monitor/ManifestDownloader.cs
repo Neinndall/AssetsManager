@@ -29,6 +29,7 @@ public class ManifestDownloader
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
 
     public event Action<string, string, int, int> ProgressChanged;
+    public Func<Task> OnVerifyingCompletedAsync;
 
     public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator, HashService hashService)
     {
@@ -230,14 +231,11 @@ public class ManifestDownloader
         _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
         _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
 
-        // Force the 100% verification frame to paint before switching to Updating.
-        if (System.Windows.Application.Current != null)
+        // Notify that verification has completed so the UI can handle the transition delay.
+        if (OnVerifyingCompletedAsync != null)
         {
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Render);
+            await OnVerifyingCompletedAsync();
         }
-
-        // Brief pause so the eye can register the completed Verifying state.
-        await Task.Delay(100, cancellationToken);
 
         if (!filesToPatch.Any()) return 0;
 

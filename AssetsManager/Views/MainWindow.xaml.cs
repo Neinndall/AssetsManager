@@ -134,6 +134,7 @@ namespace AssetsManager.Views
             _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
             _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnVersionDownloadProgressChanged(sender, e);
             _versionService.VersionDownloadCompleted += (sender, e) => _progressUIManager.OnVersionDownloadCompleted(sender, e);
+            _versionService.OnVerifyingCompletedAsync = _progressUIManager.OnVersionVerifyingCompletedAsync;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
