@@ -92,7 +92,6 @@ namespace AssetsManager.Services.Core
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
-                _progressDetailsWindow.Show();
             });
         }
 
