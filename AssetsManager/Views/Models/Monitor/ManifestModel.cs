@@ -19,21 +19,39 @@ public class RmanManifest
     public List<RmanFile> Files { get; set; } = new();
     public List<RmanDirectory> Directories { get; set; } = new();
 
+    private readonly object _lookupLock = new();
     private Dictionary<ulong, RmanChunk> _chunkLookup;
+
+    public void BuildChunkLookup()
+    {
+        lock (_lookupLock)
+        {
+            if (_chunkLookup != null) return;
+
+            int chunkCount = 0;
+            for (int i = 0; i < Bundles.Count; i++) chunkCount += Bundles[i].Chunks.Count;
+
+            var lookup = new Dictionary<ulong, RmanChunk>(chunkCount);
+            for (int i = 0; i < Bundles.Count; i++)
+            {
+                var bundle = Bundles[i];
+                for (int j = 0; j < bundle.Chunks.Count; j++)
+                {
+                    var chunk = bundle.Chunks[j];
+                    lookup[chunk.ChunkId] = chunk;
+                }
+            }
+            _chunkLookup = lookup;
+        }
+    }
+
     public RmanChunk GetChunk(ulong chunkId)
     {
         if (_chunkLookup == null)
         {
-            _chunkLookup = new Dictionary<ulong, RmanChunk>();
-            foreach (var bundle in Bundles)
-            {
-                foreach (var chunk in bundle.Chunks)
-                {
-                    _chunkLookup[chunk.ChunkId] = chunk;
-                }
-            }
+            BuildChunkLookup();
         }
-        return _chunkLookup.ContainsKey(chunkId) ? _chunkLookup[chunkId] : null;
+        return _chunkLookup.TryGetValue(chunkId, out var chunk) ? chunk : null;
     }
 }
 

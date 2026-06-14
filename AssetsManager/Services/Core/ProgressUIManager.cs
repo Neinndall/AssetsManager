@@ -92,6 +92,7 @@ namespace AssetsManager.Services.Core
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                _progressDetailsWindow.Show();
             });
         }
 
@@ -309,6 +310,18 @@ namespace AssetsManager.Services.Core
         public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
+
+            if (data.Success && !wasCancelled)
+            {
+                _owner.Dispatcher.Invoke(() =>
+                {
+                    if (_progressDetailsWindow != null)
+                    {
+                        _progressDetailsWindow.ViewModel.ProgressValue = 100;
+                        _progressDetailsWindow.ViewModel.ItemProgressText = "Complete";
+                    }
+                });
+            }
 
             await FinishOperation();
             

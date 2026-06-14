@@ -9,6 +9,7 @@ Bug Fixes
   - Explorer / Fixed a visual bug where the preview panel for unsupported file types (or text/web) would empty itself and go blank after clearing the search box filter.
   - Explorer / Fixed a focus recovery issue where selecting an already selected file tab/pin during search resets would fail to refresh and restore the file's correct preview visibilities.
   - Explorer / Fixed a Dual View bug where opening an image file after browsing folders would incorrectly hide the left panel's text/web preview.
+  - Monitor / Fixed a visual bug where the client update progress bar could jump backward or freeze during transition phases.
 
 New Features
   - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.

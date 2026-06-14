@@ -7,7 +7,7 @@ using System.Text;
 using AssetsManager.Views.Models.Monitor;
 using ZstdSharp;
 
-namespace AssetsManager.Services.Manifests;
+namespace AssetsManager.Services.Monitor;
 
 public class RmanService
 {
@@ -19,7 +19,7 @@ public class RmanService
 
     public RmanManifest Parse(byte[] data)
     {
-        if (Encoding.ASCII.GetString(data, 0, 4) != "RMAN")
+        if (data.Length < 4 || !data.AsSpan(0, 4).SequenceEqual("RMAN"u8))
             throw new Exception("Invalid RMAN file: Missing magic bytes.");
 
         uint headerSize = BitConverter.ToUInt32(data, 8);
@@ -155,29 +155,43 @@ public class RmanService
             }
 
             ResolveFullPaths(manifest);
+            manifest.BuildChunkLookup();
             return manifest;
         }
 
         private void ResolveFullPaths(RmanManifest manifest)
         {
-            var dirMap = new Dictionary<ulong, RmanDirectory>();
-            foreach (var dir in manifest.Directories)
+            var dirMap = new Dictionary<ulong, RmanDirectory>(manifest.Directories.Count);
+            for (int i = 0; i < manifest.Directories.Count; i++)
             {
+                var dir = manifest.Directories[i];
                 if (dir.DirectoryId != 0) dirMap.TryAdd(dir.DirectoryId, dir);
             }
 
-            foreach (var file in manifest.Files)
+            var resolvedDirs = new Dictionary<ulong, string>(manifest.Directories.Count);
+
+            string GetFullPath(ulong dirId)
             {
-                var pathParts = new List<string> { file.Name };
-                ulong currentDirId = file.DirectoryId;
+                if (dirId == 0) return string.Empty;
+                if (resolvedDirs.TryGetValue(dirId, out var resolvedPath)) return resolvedPath;
 
-                while (currentDirId != 0 && dirMap.TryGetValue(currentDirId, out var dir))
+                if (dirMap.TryGetValue(dirId, out var dir))
                 {
-                    if (!string.IsNullOrEmpty(dir.Name)) pathParts.Insert(0, dir.Name);
-                    currentDirId = dir.ParentId;
+                    var parentPath = GetFullPath(dir.ParentId);
+                    var currentPath = string.IsNullOrEmpty(parentPath)
+                        ? dir.Name
+                        : (string.IsNullOrEmpty(dir.Name) ? parentPath : $"{parentPath}/{dir.Name}");
+                    resolvedDirs[dirId] = currentPath;
+                    return currentPath;
                 }
+                return string.Empty;
+            }
 
-                file.Name = string.Join("/", pathParts);
+            for (int i = 0; i < manifest.Files.Count; i++)
+            {
+                var file = manifest.Files[i];
+                var dirPath = GetFullPath(file.DirectoryId);
+                file.Name = string.IsNullOrEmpty(dirPath) ? file.Name : $"{dirPath}/{file.Name}";
             }
         }
 
@@ -220,12 +234,13 @@ public class RmanService
 
         private List<int> GetVector(int offset)
         {
-            var result = new List<int>();
-            if (offset <= 0 || offset + 4 > _dataLength) return result;
+            if (offset <= 0 || offset + 4 > _dataLength) return new List<int>();
             int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
-            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return result;
+            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return new List<int>();
             uint length = BitConverter.ToUInt32(_data, vectorOffset);
             if (length > 1000000) length = 1000000;
+
+            var result = new List<int>((int)length);
             for (int i = 0; i < (int)length; i++)
             {
                 int itemPos = vectorOffset + 4 + (i * 4);
@@ -237,12 +252,13 @@ public class RmanService
 
         private List<ulong> GetVectorULong(int offset)
         {
-            var result = new List<ulong>();
-            if (offset <= 0 || offset + 4 > _dataLength) return result;
+            if (offset <= 0 || offset + 4 > _dataLength) return new List<ulong>();
             int vectorOffset = offset + BitConverter.ToInt32(_data, offset);
-            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return result;
+            if (vectorOffset < 0 || vectorOffset + 4 > _dataLength) return new List<ulong>();
             uint length = BitConverter.ToUInt32(_data, vectorOffset);
             if (length > 1000000) length = 1000000;
+
+            var result = new List<ulong>((int)length);
             for (int i = 0; i < (int)length; i++)
             {
                 int itemOffset = vectorOffset + 4 + (i * 8);

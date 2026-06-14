@@ -42,12 +42,6 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-        <Style.Triggers>
-            <!-- Animación de suavizado activada por el cambio de valor -->
-            <EventTrigger RoutedEvent="ProgressBar.ValueChanged">
-                <BeginStoryboard Storyboard="{StaticResource SmoothProgressAnimation}"/>
-            </EventTrigger>
-        </Style.Triggers>
     </Style>
 
 </ResourceDictionary>
