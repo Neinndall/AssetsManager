@@ -265,13 +265,13 @@ namespace AssetsManager.Services.Downloads
                 }
                 else if (node.Type == NodeType.SoundBank)
                 {
-                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && (node.Children == null || node.Children.Count == 0)) continue;
+                    if (!SupportedFileTypes.IsExpandableAudioBank(node.Name) || node.Children == null || node.Children.Count == 0) continue;
 
-                    if (node.Children != null && (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading...")))
+                    if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
                     {
                         count += CountSoundsInAudioTree(node.Children);
                     }
-                    else if (SupportedFileTypes.IsExpandableAudioBank(node.Name))
+                    else
                     {
                         var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
                         if (linkedBank != null)
@@ -296,10 +296,6 @@ namespace AssetsManager.Services.Downloads
                             count += (soundsCount > 0) ? soundsCount : 1;
                         }
                         else count++;
-                    }
-                    else
-                    {
-                        count++;
                     }
                 }
                 else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
@@ -556,7 +552,7 @@ namespace AssetsManager.Services.Downloads
 
             var eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
             byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
-            byte[] audioBnkFileData = linkedBank.WpkNode == null && linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
+            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
             
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)

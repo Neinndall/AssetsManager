@@ -4,6 +4,9 @@ HOTFIX UPDATE
 This hotfix addresses a critical regression in the Comparator module that caused LIVE comparisons to display identical text files and empty images. The issue was traced to a parameter mapping error that incorrectly triggered BACKUP mode during direct comparisons.
 
 Bug Fixes
+  - Audio / Fixed a bug where merging events and audio banks created duplicate event nodes (e.g. Play_sfx_...) in the explorer tree.
+  - Audio / Fixed a progress count mismatch in Smart Export (Save) by excluding redundant/secondary banks from the initial total calculation.
+  - Audio / Fixed a silent bug where embedded BNK audio files were not exported if a WPK file was present in the audio family.
   - Comparator / Fixed a timing issue where the comparison results window could open before the progress window had fully closed, now guaranteeing the 100% completion state is visible first.
   - Comparator / Fixed a critical parameter mismatch in LIVE comparisons that caused failed data retrieval and identical/empty diff results.
   - Explorer / Hidden the "[BNK Technical Summary]" node from the audio tree and excluded it from exports to prevent empty folders.
