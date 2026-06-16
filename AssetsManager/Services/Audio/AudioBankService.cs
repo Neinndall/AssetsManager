@@ -225,6 +225,7 @@ namespace AssetsManager.Services.Audio
 
             var hircObjects = new Dictionary<uint, BnkObject>();
             var eventObjects = new List<BnkObject>();
+            var addedEventIds = new HashSet<uint>();
 
             foreach (var bnkData in bnkDatas)
             {
@@ -242,7 +243,10 @@ namespace AssetsManager.Services.Audio
                         // Collect event objects to start traversal from
                         if (obj.Type == BnkObjectType.Event || obj.Type == BnkObjectType.DialogueEvent)
                         {
-                            eventObjects.Add(obj);
+                            if (addedEventIds.Add(obj.Id))
+                            {
+                                eventObjects.Add(obj);
+                            }
                         }
                     }
                 }
