@@ -28,6 +28,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ModelVisual3D Visual { get; set; }
         public GeometryModel3D Geometry { get; set; }
+        public int[] SourceVertexIndices { get; set; }
 
         public Dictionary<string, BitmapSource> AllTextures
         {
@@ -92,15 +93,11 @@ namespace AssetsManager.Views.Models.Viewer
                 Geometry = null;
             }
 
-            // AllTextures is SHARED across all ModelParts of the same model
-            // (Skn/Sco/MapGeo services assign the same dictionary instance to every part).
-            // Calling Clear() or nulling the property here would destroy textures for
-            // sibling parts that are still alive in the viewport.
-            // We only release the local reference; the GC will reclaim the dictionary
-            // when the last ModelPart referencing it is disposed.
+            // Shared texture dictionaries are cleared by the owning SceneModel.
             _allTextures = null;
 
             AvailableTextureNames?.Clear();
+            SourceVertexIndices = null;
 
             PropertyChanged = null;
         }

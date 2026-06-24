@@ -79,14 +79,12 @@ namespace AssetsManager.Services.Viewer
             }
         }
 
-
         private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, string modelName, BinTree materialsBin, string gameDataPath)
         {
             var sceneModel = new SceneModel { Name = modelName };
 
             var processingResult = await Task.Run(() =>
             {
-                // Pre-resolve material lookup for performance
                 var resolvedMaterials = new Dictionary<string, BinTreeObject>(StringComparer.OrdinalIgnoreCase);
                 if (materialsBin != null)
                 {
@@ -201,10 +199,10 @@ namespace AssetsManager.Services.Viewer
                                 {
                                     using (Stream fileStream = File.OpenRead(absoluteFilePath))
                                     {
-                                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(absoluteFilePath), 1024);
+                                        BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(absoluteFilePath), 1024);
                                         if (loadedTex != null)
                                         {
-                                            loadedTex.Freeze(); // Freeze the texture to make it thread-safe
+                                            loadedTex.Freeze();
                                             loadedTextures[textureNameKey] = loadedTex;
                                         }
                                     }

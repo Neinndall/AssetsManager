@@ -1,5 +1,4 @@
-using System;
-using System.Buffers;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,8 +26,8 @@ namespace AssetsManager.Utils
             return NormalizeNameRegex.Replace(name, "");
         }
 
-        private static readonly System.Collections.Generic.HashSet<string> GenericMaterialKeywords = 
-            new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase) 
+        private static readonly HashSet<string> GenericMaterialKeywords =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "body", "face", "head", "hair", "mask", "eyes", "leg" };
 
         private static readonly char[] SeparatorChars = { '_', '-', ' ' };
@@ -72,14 +71,69 @@ namespace AssetsManager.Utils
             list.Add(word.ToLowerInvariant());
         }
 
+        public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
+        {
+            var keys = textureKeys?.ToList() ?? new List<string>();
+            var colorKeys = keys
+                .Where(IsColorTextureCandidate)
+                .OrderByDescending(key => key.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(key => key.Length)
+                .ToList();
+
+            return colorKeys.Count > 0 ? colorKeys : keys;
+        }
+
+        private static bool IsColorTextureCandidate(string textureKey)
+        {
+            if (string.IsNullOrWhiteSpace(textureKey)) return false;
+
+            string key = textureKey.ToLowerInvariant();
+            string padded = "_" + key.Replace('-', '_').Replace(' ', '_') + "_";
+
+            if (padded.Contains("_normal_") ||
+                padded.Contains("_norm_") ||
+                padded.Contains("_n_") ||
+                padded.Contains("_mask_") ||
+                padded.Contains("_masks_") ||
+                padded.Contains("_spec_") ||
+                padded.Contains("_specular_") ||
+                padded.Contains("_rough_") ||
+                padded.Contains("_roughness_") ||
+                padded.Contains("_metal_") ||
+                padded.Contains("_metallic_") ||
+                padded.Contains("_orm_") ||
+                padded.Contains("_ao_") ||
+                padded.Contains("_em_") ||
+                padded.Contains("_emissive_") ||
+                padded.Contains("_glow_"))
+            {
+                return false;
+            }
+
+            return padded.Contains("_tx_cm_") ||
+                   padded.Contains("_cm_") ||
+                   padded.Contains("_diffuse_") ||
+                   padded.Contains("_color_") ||
+                   padded.Contains("_albedo_") ||
+                   padded.Contains("_basecolor_") ||
+                   padded.Contains("_base_color_");
+        }
+
         public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
         {
-            logService.LogDebug($"Finding texture for material: '{materialName}'");
+            var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
+            if (textureKeys.Count == 0)
+            {
+                logService?.LogDebug($"No textures available for material: '{materialName}'");
+                return null;
+            }
 
-            string exactMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
+            logService?.LogDebug($"Finding texture for material: '{materialName}'");
+
+            string exactMatch = textureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
             if (exactMatch != null)
             {
-                logService.LogDebug($"Found texture '{exactMatch}' via exact name match.");
+                logService?.LogDebug($"Found texture '{exactMatch}' via exact name match.");
                 return exactMatch;
             }
 
@@ -94,21 +148,21 @@ namespace AssetsManager.Utils
             if (isGeneric)
             {
                 string mainTextureCandidate = $"{skinName}_tx_cm";
-                string genericMatch = availableTextureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
+                string genericMatch = textureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
                 if (genericMatch != null)
                 {
-                    logService.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
+                    logService?.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
                     return genericMatch;
                 }
             }
 
-            logService.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
+            logService?.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
 
             var materialKeywords = GetKeywords(materialName);
             string bestScoringMatch = null;
             int bestScore = -1; // Initialize with -1 to ensure any valid score is higher
 
-            foreach (string key in availableTextureKeys)
+            foreach (string key in textureKeys)
             {
                 var textureKeywords = GetKeywords(key);
                 string lowerKey = key.ToLowerInvariant();
@@ -171,20 +225,20 @@ namespace AssetsManager.Utils
                 }
             }
 
-            if (bestScoringMatch != null)
+            if (bestScoringMatch != null && bestScore > 0)
             {
-                logService.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
+                logService?.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
                 return bestScoringMatch;
             }
 
-            string propTexture = availableTextureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
+            string propTexture = textureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
             if (propTexture != null)
             {
-                logService.LogDebug($"Keyword matching failed. Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
+                logService?.LogDebug($"Keyword matching failed. Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
                 return propTexture;
             }
 
-            logService.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
+            logService?.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
             return defaultTextureKey;
         }
 
@@ -195,43 +249,46 @@ namespace AssetsManager.Utils
                 modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
             {
                 var materialGroup = new MaterialGroup();
-
-                // Material difuso con la textura
-                var imageBrush = new ImageBrush(texture)
-                {
-                    ViewportUnits = BrushMappingMode.Absolute,
-                    TileMode = TileMode.Tile,
-                    Stretch = Stretch.Fill
-                };
-
-                // Mejora la calidad
-                RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
-                RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
-                RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
-
+                var imageBrush = CreateViewerTextureBrush(texture);
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
-
-                // Reduce el brillo especular (puede causar más aliasing visible)
-                materialGroup.Children.Add(new SpecularMaterial(new SolidColorBrush(Colors.White), 8)); // Era 15, ahora 8
-
-                // Emisivo suave
-                materialGroup.Children.Add(new EmissiveMaterial(new SolidColorBrush(System.Windows.Media.Color.FromArgb(10, 255, 255, 255))));
 
                 modelPart.Geometry.Material = materialGroup;
                 modelPart.Geometry.BackMaterial = materialGroup;
             }
         }
 
-        public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
+        private static ImageBrush CreateViewerTextureBrush(BitmapSource texture)
+        {
+            var imageBrush = new ImageBrush(texture)
+            {
+                Viewport = new System.Windows.Rect(0, 0, 1, 1),
+                ViewportUnits = BrushMappingMode.Absolute,
+                TileMode = TileMode.Tile,
+                Stretch = Stretch.Fill
+            };
+
+            RenderOptions.SetBitmapScalingMode(imageBrush, BitmapScalingMode.HighQuality);
+            RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
+            RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
+
+            return imageBrush;
+        }
+
+        public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null, bool forceOpaque = false)
         {
             if (data == null || data.Length == 0) return null;
             using (var ms = new MemoryStream(data))
             {
-                return LoadTexture(ms, extension, maxWidth, maxHeight);
+                return LoadTexture(ms, extension, maxWidth, maxHeight, forceOpaque);
             }
         }
 
-        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
+        public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
+        {
+            return LoadTexture(textureStream, extension, maxWidth, maxHeight, forceOpaque: true);
+        }
+
+        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null, bool forceOpaque = false)
         {
             try
             {
@@ -244,7 +301,7 @@ namespace AssetsManager.Utils
                     {
                         using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
                         {
-                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth);
+                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight, forceOpaque);
                         }
                     }
                     return null;
@@ -253,7 +310,7 @@ namespace AssetsManager.Utils
                 {
                     using (Image<Rgba32> imageSharp = Image.Load<Rgba32>(textureStream))
                     {
-                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth);
+                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight, forceOpaque);
                     }
                 }
                 else
@@ -266,6 +323,10 @@ namespace AssetsManager.Utils
                     {
                         bitmapImage.DecodePixelWidth = maxWidth.Value;
                     }
+                    if (maxHeight.HasValue)
+                    {
+                        bitmapImage.DecodePixelHeight = maxHeight.Value;
+                    }
                     bitmapImage.EndInit();
                     bitmapImage.Freeze();
                     return bitmapImage;
@@ -277,51 +338,54 @@ namespace AssetsManager.Utils
             }
         }
 
-        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth)
+        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight, bool forceOpaque)
         {
-            if (maxWidth.HasValue && (imageSharp.Width > maxWidth.Value || imageSharp.Height > maxWidth.Value))
+            if ((maxWidth.HasValue && imageSharp.Width > maxWidth.Value) ||
+                (maxHeight.HasValue && imageSharp.Height > maxHeight.Value))
             {
+                int resizeWidth = maxWidth ?? imageSharp.Width;
+                int resizeHeight = maxHeight ?? imageSharp.Height;
                 imageSharp.Mutate(x => x.Resize(new ResizeOptions
                 {
-                    Size = new Size(maxWidth.Value, maxWidth.Value),
+                    Size = new Size(resizeWidth, resizeHeight),
                     Mode = ResizeMode.Max
                 }));
             }
 
-            // OPTIMIZACIÓN: Usamos ArrayPool para evitar picos de RAM y GC.
-            // Restauramos la conversión a Bgra32 para compatibilidad total con WPF (Colores correctos).
+            // Mantener el buffer estable evita que WPF renderice pixeles de un array reutilizado.
             using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
             {
                 int bufferSize = bgraImage.Width * bgraImage.Height * 4;
-                byte[] pixelBuffer = ArrayPool<byte>.Shared.Rent(bufferSize);
-                
-                try
-                {
-                    bgraImage.CopyPixelDataTo(pixelBuffer);
+                byte[] pixelBuffer = new byte[bufferSize];
 
-                    int stride = bgraImage.Width * 4;
-                    var bitmapSource = BitmapSource.Create(
-                        bgraImage.Width, 
-                        bgraImage.Height, 
-                        96, 96, 
-                        PixelFormats.Bgra32, 
-                        null, 
-                        pixelBuffer, 
-                        stride);
+                bgraImage.CopyPixelDataTo(pixelBuffer);
 
-                    bitmapSource.Freeze();
-                    return bitmapSource;
-                }
-                finally
+                int stride = bgraImage.Width * 4;
+                if (forceOpaque)
                 {
-                    ArrayPool<byte>.Shared.Return(pixelBuffer);
+                    for (int i = 3; i < bufferSize; i += 4)
+                    {
+                        pixelBuffer[i] = 255;
+                    }
                 }
+
+                var bitmapSource = BitmapSource.Create(
+                    bgraImage.Width,
+                    bgraImage.Height,
+                    96, 96,
+                    PixelFormats.Bgra32,
+                    null,
+                    pixelBuffer,
+                    stride);
+
+                bitmapSource.Freeze();
+                return bitmapSource;
             }
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
         {
-            return LoadTexture(textureStream, extension, null, null);
+            return LoadTexture(textureStream, extension, null, null, false);
         }
 
         public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)

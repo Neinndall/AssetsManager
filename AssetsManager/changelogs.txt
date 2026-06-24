@@ -1,9 +1,20 @@
 AssetsManager - League of Legends | v4.0.1.1
 
 HOTFIX UPDATE
-This hotfix addresses a critical regression in the Comparator module that caused LIVE comparisons to display identical text files and empty images. The issue was traced to a parameter mapping error that incorrectly triggered BACKUP mode during direct comparisons.
+
+New Features
+  - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.
+
+Improvements
+  - Texture Match Viewer/Heuristic: Improved texture guessing on models
+  - Explorer / NGrid Data Summary: implemented a JSON-based metadata summary for navigation grids, providing instant visibility into version, bounds, and grid dimensions.
+  - Monitor / Centralized version download progress transitions under ProgressUIManager, ensuring consistent 100% visibility across Verifying and Updating phases.
+  - Core / Refactored ProgressUIManager to centrally synchronize completion lifecycles (50ms delay) and prevent empty status details during initialization.
+  - Core / Unified progress reporting: consolidated all Save and Extract operations under ExtractionService and simplified WadExportService to act purely as a raw byte extractor, eliminating redundant services.
+  - Core / Standardized progress event signatures: removed unused message parameters from ExtractionStarted and aligned signatures under ProgressUIManager for cleaner decoupling.
 
 Bug Fixes
+  - Texture Mapping Viewer/Heuristic: Fixed a bug where some textures were not mapping correctly to their meshes.
   - Audio / Fixed a bug where merging events and audio banks created duplicate event nodes (e.g. Play_sfx_...) in the explorer tree.
   - Audio / Fixed a progress count mismatch in Smart Export (Save) by excluding redundant/secondary banks from the initial total calculation.
   - Audio / Fixed a silent bug where embedded BNK audio files were not exported if a WPK file was present in the audio family.
@@ -18,15 +29,6 @@ Bug Fixes
   - Monitor / Fixed a visual bug where the client update progress bar could jump backward or freeze during transition phases.
   - Core / Cleaned up duplicate warning logs when cancelling Save, Extract, Backup, or Comparison operations by centralizing logging logic in the UI layer.
 
-New Features
-  - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.
-
-Improvements
-  - Explorer / NGrid Data Summary: implemented a JSON-based metadata summary for navigation grids, providing instant visibility into version, bounds, and grid dimensions.
-  - Monitor / Centralized version download progress transitions under ProgressUIManager, ensuring consistent 100% visibility across Verifying and Updating phases.
-  - Core / Refactored ProgressUIManager to centrally synchronize completion lifecycles (50ms delay) and prevent empty status details during initialization.
-  - Core / Unified progress reporting: consolidated all Save and Extract operations under ExtractionService and simplified WadExportService to act purely as a raw byte extractor, eliminating redundant services.
-  - Core / Standardized progress event signatures: removed unused message parameters from ExtractionStarted and aligned signatures under ProgressUIManager for cleaner decoupling.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
