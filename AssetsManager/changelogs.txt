@@ -28,9 +28,6 @@ Bug Fixes
   - Explorer / Fixed a visual reset issue during operation cancellation where the status bar would immediately snap to "Ready", bypassing the "Cancelling Task..." state and its 1500ms delay.
   - Monitor / Fixed a visual bug where the client update progress bar could jump backward or freeze during transition phases.
   - Core / Cleaned up duplicate warning logs when cancelling Save, Extract, Backup, or Comparison operations by centralizing logging logic in the UI layer.
-  - Viewer / Fixed transparency depth corruption in 3D viewer where eye meshes sharing a texture with opaque body parts caused rendering voids; combined name-based detection (Eyes* prefix) with UV scan fallback for robust transparent mesh identification.
-
-
 
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

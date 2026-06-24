@@ -115,146 +115,28 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
-        public static void UpdateMaterial(ModelPart modelPart, bool forceAlpha = false)
+        public static void UpdateMaterial(ModelPart modelPart)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
 
-            if (!TryResolveTexture(modelPart.AllTextures, modelPart.SelectedTextureName, out _, out BitmapSource texture))
-                return;
-
-            bool needsAlpha = forceAlpha || MeshUsesTransparentRegion(modelPart, texture);
-            BitmapSource modelTexture = needsAlpha ? texture : MakeOpaqueClone(texture);
-
-            var imageBrush = CreateViewerTextureBrush(modelTexture);
-            var material = new DiffuseMaterial(imageBrush);
-
-            modelPart.Geometry.Material = material;
-            modelPart.Geometry.BackMaterial = material;
-        }
-
-        private static bool MeshUsesTransparentRegion(ModelPart part, BitmapSource texture)
-        {
-            if (texture.Format != PixelFormats.Bgra32 && texture.Format != PixelFormats.Pbgra32)
-                return false;
-
-            if (part.Geometry?.Geometry is not MeshGeometry3D meshGeometry ||
-                meshGeometry.TextureCoordinates is null ||
-                meshGeometry.TextureCoordinates.Count == 0)
+            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
             {
-                return false;
+                string fullKey = modelPart.AllTextures.Keys
+                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
+                if (fullKey != null)
+                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
             }
 
-            double minU = 1d, maxU = 0d, minV = 1d, maxV = 0d;
-            foreach (var uv in meshGeometry.TextureCoordinates)
+            if (texture != null)
             {
-                double u = Math.Max(0d, Math.Min(1d, uv.X));
-                double v = Math.Max(0d, Math.Min(1d, uv.Y));
-                if (u < minU) minU = u;
-                if (u > maxU) maxU = u;
-                if (v < minV) minV = v;
-                if (v > maxV) maxV = v;
+                var materialGroup = new MaterialGroup();
+                var imageBrush = CreateViewerTextureBrush(texture);
+                materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
+
+                modelPart.Geometry.Material = materialGroup;
+                modelPart.Geometry.BackMaterial = materialGroup;
             }
-
-            if (((maxU - minU) * (maxV - minV)) > 0.1d)
-                return false;
-
-            int tw = texture.PixelWidth;
-            int th = texture.PixelHeight;
-            int stride = tw * 4;
-            byte[] pixels = new byte[stride * th];
-            texture.CopyPixels(pixels, stride, 0);
-
-            int px0 = Math.Max(0, Math.Min(tw - 1, (int)(minU * tw)));
-            int py0 = Math.Max(0, Math.Min(th - 1, (int)(minV * th)));
-            int px1 = Math.Max(0, Math.Min(tw - 1, (int)(maxU * tw)));
-            int py1 = Math.Max(0, Math.Min(th - 1, (int)(maxV * th)));
-
-            for (int y = py0; y <= py1; y++)
-            {
-                int rowBase = y * stride;
-                for (int x = px0; x <= px1; x++)
-                {
-                    int alphaOffset = rowBase + (x * 4) + 3;
-                    if (alphaOffset < pixels.Length && pixels[alphaOffset] < byte.MaxValue)
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static bool TryResolveTexture(
-            IReadOnlyDictionary<string, BitmapSource> textures,
-            string textureName,
-            out string resolvedKey,
-            out BitmapSource texture)
-        {
-            resolvedKey = null;
-            texture = null;
-
-            if (textures == null || string.IsNullOrWhiteSpace(textureName))
-                return false;
-
-            if (textures.TryGetValue(textureName, out texture))
-            {
-                resolvedKey = textureName;
-                return true;
-            }
-
-            resolvedKey = textures.Keys
-                .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), textureName, StringComparison.OrdinalIgnoreCase));
-
-            if (resolvedKey == null || !textures.TryGetValue(resolvedKey, out texture))
-            {
-                resolvedKey = null;
-                texture = null;
-                return false;
-            }
-
-            return true;
-        }
-
-        private static BitmapSource MakeOpaqueClone(BitmapSource source)
-        {
-            if (source.Format != PixelFormats.Bgra32)
-                return source;
-
-            int w = source.PixelWidth;
-            int h = source.PixelHeight;
-            int srcStride = w * 4;
-            int srcSize = srcStride * h;
-            byte[] srcPixels = new byte[srcSize];
-            source.CopyPixels(srcPixels, srcStride, 0);
-
-            int dstStride = w * 3;
-            int dstSize = dstStride * h;
-            byte[] dstPixels = new byte[dstSize];
-
-            for (int y = 0; y < h; y++)
-            {
-                int srcRow = y * srcStride;
-                int dstRow = y * dstStride;
-                for (int x = 0; x < w; x++)
-                {
-                    int si = srcRow + x * 4;
-                    int di = dstRow + x * 3;
-                    dstPixels[di] = srcPixels[si];       // B
-                    dstPixels[di + 1] = srcPixels[si + 1]; // G
-                    dstPixels[di + 2] = srcPixels[si + 2]; // R
-                }
-            }
-
-            var result = BitmapSource.Create(
-                w, h,
-                96, 96,
-                PixelFormats.Bgr24,
-                null,
-                dstPixels,
-                dstStride);
-
-            result.Freeze();
-            return result;
         }
 
         private static ImageBrush CreateViewerTextureBrush(BitmapSource texture)
@@ -285,7 +167,7 @@ namespace AssetsManager.Utils
 
         public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
-            return LoadTexture(textureStream, extension, maxWidth, maxHeight, forceOpaque: false);
+            return LoadTexture(textureStream, extension, maxWidth, maxHeight, forceOpaque: true);
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null, bool forceOpaque = false)

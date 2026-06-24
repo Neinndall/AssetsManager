@@ -261,7 +261,7 @@ namespace AssetsManager.Services.Viewer
                 };
 
                 modelPart.Visual.Content = geometryModel;
-                TextureUtils.UpdateMaterial(modelPart, false);
+                TextureUtils.UpdateMaterial(modelPart);
 
                 parts.Add(modelPart);
                 sceneModel.RootVisual.Children.Add(modelPart.Visual);

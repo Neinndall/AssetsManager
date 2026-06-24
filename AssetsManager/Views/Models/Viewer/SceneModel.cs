@@ -28,8 +28,6 @@ namespace AssetsManager.Views.Models.Viewer
         public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
-        public ModelVisual3D TransparentVisual { get; set; }
-
 
         private double _positionX;
         private double _positionY;
@@ -164,8 +162,6 @@ namespace AssetsManager.Views.Models.Viewer
 
             RootVisual = new ModelVisual3D();
             RootVisual.Transform = _userTransformGroup;
-            TransparentVisual = new ModelVisual3D();
-            TransparentVisual.Transform = _userTransformGroup;
 
             UpdateTransform();
 
@@ -223,11 +219,6 @@ namespace AssetsManager.Views.Models.Viewer
                 RootVisual.Transform = null;
                 RootVisual.Children.Clear();
             }
-            if (TransparentVisual != null)
-            {
-                TransparentVisual.Transform = null;
-                TransparentVisual.Children.Clear();
-            }
 
             if (_parts != null)
             {
@@ -264,7 +255,6 @@ namespace AssetsManager.Views.Models.Viewer
             SkinnedMesh = null;
             Skeleton = null;
             RootVisual = null;
-            TransparentVisual = null;
 
             IsAnimationPaused = false;
             AnimationTime = 0;
