@@ -20,16 +20,14 @@ using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
-using LeagueToolkit.Hashing;
+
 
 namespace AssetsManager.Services.Viewer
 {
     public class SknLoadingService
     {
         private readonly LogService _logService;
-        private static readonly uint MaterialOverrideSubmeshHash = 0x1ECB978C;
-        private static readonly uint MaterialOverrideTextureHash = Fnv1a.HashLower("texture");
-        private static readonly uint MaterialOverrideMaterialHash = Fnv1a.HashLower("material");
+
 
         public SknLoadingService(LogService logService)
         {
@@ -285,26 +283,39 @@ namespace AssetsManager.Services.Viewer
             {
                 using var stream = File.OpenRead(skinBinPath);
                 var binTree = new BinTree(stream);
-                var textureKeyList = loadedTextureKeys.ToList();
 
-                foreach (var materialOverride in EnumerateMaterialOverrides(binTree))
+                var materialTextures = BuildMaterialTextureMap(binTree, loadedTextureKeys);
+                if (materialTextures.Count == 0)
                 {
-                    if (string.IsNullOrWhiteSpace(materialOverride.Submesh))
+                    _logService.LogDebug($"Skin material bin has no texture override objects, will use heuristics.");
+                    return overrides;
+                }
+
+                foreach (var obj in binTree.Objects.Values)
+                {
+                    if (obj.ClassHash != 0x9B67E9F6) continue;
+                    if (!obj.Properties.TryGetValue(0x45FF5904, out var rootProp) || rootProp is not BinTreeStruct rootStruct) continue;
+                    if (!rootStruct.Properties.TryGetValue(0x24725910, out var groupsProp) || groupsProp is not BinTreeContainer groups) continue;
+
+                    foreach (var element in groups.Elements)
                     {
-                        continue;
+                        if (element is not BinTreeStruct groupEntry) continue;
+
+                        uint objLink = 0;
+                        string groupName = null;
+                        foreach (var prop in groupEntry.Properties)
+                        {
+                            if (prop.Value is BinTreeObjectLink link) objLink = link.Value;
+                            else if (prop.Value is BinTreeString str) groupName = str.Value;
+                        }
+
+                        if (objLink == 0 || string.IsNullOrWhiteSpace(groupName)) continue;
+                        if (!materialTextures.TryGetValue(objLink, out string textureKey)) continue;
+
+                        string submeshKey = NormalizeMaterialKey(groupName);
+                        overrides[submeshKey] = textureKey;
+                        _logService.LogDebug($"Skin material bin maps material group '{groupName}' to texture '{textureKey}'.");
                     }
-
-                    string submeshKey = NormalizeMaterialKey(materialOverride.Submesh);
-                    string textureKey = FindOverrideTexture(materialOverride.Submesh, submeshKey, textureKeyList);
-
-                    if (string.IsNullOrWhiteSpace(textureKey))
-                    {
-                        _logService.LogDebug($"Skin material bin: no texture match for submesh '{materialOverride.Submesh}', will use heuristics.");
-                        continue;
-                    }
-
-                    overrides[submeshKey] = textureKey;
-                    _logService.LogDebug($"Skin material bin maps submesh '{materialOverride.Submesh}' to texture '{textureKey}'.");
                 }
 
                 _logService.LogDebug($"Loaded {overrides.Count} submesh texture override(s) from '{Path.GetFileName(skinBinPath)}'.");
@@ -317,128 +328,63 @@ namespace AssetsManager.Services.Viewer
             return overrides;
         }
 
-        private static string FindOverrideTexture(string rawName, string normalizedKey, List<string> textureKeys)
+        private Dictionary<uint, string> BuildMaterialTextureMap(BinTree binTree, IEnumerable<string> loadedTextureKeys)
         {
-            string exactMatch = textureKeys.FirstOrDefault(k => k.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase));
-            if (exactMatch != null) return exactMatch;
+            var result = new Dictionary<uint, string>();
+            var textureKeyList = loadedTextureKeys.ToList();
 
-            string root = Regex.Replace(normalizedKey, @"\d+$", string.Empty);
-            if (root.Length > 0 && root != normalizedKey)
+            foreach (var kv in binTree.Objects)
             {
-                string rootMatch = textureKeys.FirstOrDefault(k => k.IndexOf(root, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (rootMatch != null) return rootMatch;
-            }
+                if (kv.Value.ClassHash != 0xFF9D3409) continue;
 
-            string wordMatch = textureKeys.FirstOrDefault(k =>
-            {
-                foreach (string word in rawName.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                if (!kv.Value.Properties.TryGetValue(0x0A6F0EB5, out var texProp) || texProp is not BinTreeContainer texContainer)
+                    continue;
+
+                string diffusePath = null;
+                string fallbackPath = null;
+
+                foreach (var element in texContainer.Elements)
                 {
-                    if (word.Length > 2 && k.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
-                        return true;
+                    if (element is not BinTreeStruct texEntry) continue;
+
+                    string slotName = null;
+                    string texPath = null;
+                    foreach (var prop in texEntry.Properties)
+                    {
+                        if (prop.Value is BinTreeString str)
+                        {
+                            if (slotName == null) slotName = str.Value;
+                            else texPath = str.Value;
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(slotName) || string.IsNullOrWhiteSpace(texPath)) continue;
+
+                    string lowerSlot = slotName.ToLowerInvariant();
+                    if (lowerSlot.Contains("diffuse") || lowerSlot.Contains("color") || lowerSlot.Contains("base"))
+                    {
+                        diffusePath = texPath;
+                        break;
+                    }
+                    fallbackPath ??= texPath;
                 }
-                return false;
-            });
-            if (wordMatch != null) return wordMatch;
 
-            return null;
+                string texPathToUse = diffusePath ?? fallbackPath;
+                if (string.IsNullOrWhiteSpace(texPathToUse)) continue;
+
+                string normalized = NormalizeAndMatchKey(texPathToUse, textureKeyList);
+                if (normalized != null)
+                    result[kv.Key] = normalized;
+            }
+
+            return result;
         }
 
-        private IEnumerable<MaterialOverrideEntry> EnumerateMaterialOverrides(BinTree binTree)
+        private static string NormalizeAndMatchKey(string texPath, List<string> availableKeys)
         {
-            foreach (BinTreeObject treeObject in binTree.Objects.Values)
-            {
-                foreach (BinTreeProperty property in treeObject.Properties.Values)
-                {
-                    foreach (MaterialOverrideEntry entry in EnumerateMaterialOverrides(property))
-                    {
-                        yield return entry;
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<MaterialOverrideEntry> EnumerateMaterialOverrides(BinTreeProperty property)
-        {
-            switch (property)
-            {
-                case BinTreeStruct structure:
-                    MaterialOverrideEntry entry = TryReadMaterialOverride(structure);
-                    if (entry != null)
-                    {
-                        yield return entry;
-                    }
-
-                    foreach (BinTreeProperty child in structure.Properties.Values)
-                    {
-                        foreach (MaterialOverrideEntry childEntry in EnumerateMaterialOverrides(child))
-                        {
-                            yield return childEntry;
-                        }
-                    }
-                    break;
-
-                case BinTreeContainer container:
-                    foreach (BinTreeProperty child in container.Elements)
-                    {
-                        foreach (MaterialOverrideEntry childEntry in EnumerateMaterialOverrides(child))
-                        {
-                            yield return childEntry;
-                        }
-                    }
-                    break;
-
-                case BinTreeMap map:
-                    foreach (var pair in map)
-                    {
-                        foreach (MaterialOverrideEntry childEntry in EnumerateMaterialOverrides(pair.Key))
-                        {
-                            yield return childEntry;
-                        }
-
-                        foreach (MaterialOverrideEntry childEntry in EnumerateMaterialOverrides(pair.Value))
-                        {
-                            yield return childEntry;
-                        }
-                    }
-                    break;
-
-                case BinTreeOptional optional when optional.Value != null:
-                    foreach (MaterialOverrideEntry childEntry in EnumerateMaterialOverrides(optional.Value))
-                    {
-                        yield return childEntry;
-                    }
-                    break;
-            }
-        }
-
-        private MaterialOverrideEntry TryReadMaterialOverride(BinTreeStruct structure)
-        {
-            string submesh = GetStringProperty(structure, MaterialOverrideSubmeshHash);
-            if (string.IsNullOrWhiteSpace(submesh))
-            {
-                return null;
-            }
-
-            string texturePath = GetStringProperty(structure, MaterialOverrideTextureHash);
-            uint materialHash = 0;
-            if (structure.Properties.TryGetValue(MaterialOverrideMaterialHash, out BinTreeProperty materialProperty) &&
-                materialProperty is BinTreeObjectLink materialLink)
-            {
-                materialHash = materialLink.Value;
-            }
-
-            return new MaterialOverrideEntry(submesh, texturePath, materialHash);
-        }
-
-        private static string GetStringProperty(BinTreeStruct structure, uint nameHash)
-        {
-            if (structure.Properties.TryGetValue(nameHash, out BinTreeProperty property) &&
-                property is BinTreeString stringProperty)
-            {
-                return stringProperty.Value;
-            }
-
-            return null;
+            string fileName = Path.GetFileNameWithoutExtension(
+                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar));
+            return availableKeys.FirstOrDefault(k => k.Equals(fileName, StringComparison.OrdinalIgnoreCase));
         }
 
         private static string TryResolveSkinBinPath(string sknPath)
@@ -536,6 +482,5 @@ namespace AssetsManager.Services.Viewer
             int[] SourceVertexIndices,
             string TexturePath);
 
-        private sealed record MaterialOverrideEntry(string Submesh, string TexturePath, uint MaterialHash);
     }
 }
