@@ -156,21 +156,21 @@ namespace AssetsManager.Utils
             return imageBrush;
         }
 
-        public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null, bool forceOpaque = false)
+        public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             if (data == null || data.Length == 0) return null;
             using (var ms = new MemoryStream(data))
             {
-                return LoadTexture(ms, extension, maxWidth, maxHeight, forceOpaque);
+                return LoadTexture(ms, extension, maxWidth, maxHeight);
             }
         }
 
         public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
-            return LoadTexture(textureStream, extension, maxWidth, maxHeight, forceOpaque: true);
+            return LoadTexture(textureStream, extension, maxWidth, maxHeight);
         }
 
-        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null, bool forceOpaque = false)
+        public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
             try
             {
@@ -183,7 +183,7 @@ namespace AssetsManager.Utils
                     {
                         using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
                         {
-                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight, forceOpaque);
+                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
                         }
                     }
                     return null;
@@ -192,7 +192,7 @@ namespace AssetsManager.Utils
                 {
                     using (Image<Rgba32> imageSharp = Image.Load<Rgba32>(textureStream))
                     {
-                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight, forceOpaque);
+                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
                     }
                 }
                 else
@@ -220,7 +220,7 @@ namespace AssetsManager.Utils
             }
         }
 
-        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight, bool forceOpaque)
+        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight)
         {
             if ((maxWidth.HasValue && imageSharp.Width > maxWidth.Value) ||
                 (maxHeight.HasValue && imageSharp.Height > maxHeight.Value))
@@ -243,13 +243,6 @@ namespace AssetsManager.Utils
                 bgraImage.CopyPixelDataTo(pixelBuffer);
 
                 int stride = bgraImage.Width * 4;
-                if (forceOpaque)
-                {
-                    for (int i = 3; i < bufferSize; i += 4)
-                    {
-                        pixelBuffer[i] = 255;
-                    }
-                }
 
                 var bitmapSource = BitmapSource.Create(
                     bgraImage.Width,
@@ -267,7 +260,7 @@ namespace AssetsManager.Utils
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
         {
-            return LoadTexture(textureStream, extension, null, null, false);
+            return LoadTexture(textureStream, extension, null, null);
         }
 
         public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)
