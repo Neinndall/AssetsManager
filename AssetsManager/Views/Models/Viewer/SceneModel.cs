@@ -30,6 +30,7 @@ namespace AssetsManager.Views.Models.Viewer
         public ModelVisual3D RootVisual { get; set; }
         public ModelVisual3D TransparentVisual { get; set; }
 
+
         private double _positionX;
         private double _positionY;
         private double _positionZ;

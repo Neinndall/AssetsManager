@@ -236,18 +236,19 @@ namespace AssetsManager.Services.Viewer
                     };
 
                     modelPart.Visual.Content = geometryModel;
-                    bool isEyeMesh = modelPart.Name.StartsWith("Eyes", StringComparison.OrdinalIgnoreCase);
+                    bool isEyeMesh = data.MaterialName.Contains("Eye", StringComparison.OrdinalIgnoreCase);
                     TextureUtils.UpdateMaterial(modelPart, isEyeMesh);
 
-                    bool needsAlpha = isEyeMesh
-                        || (modelPart.Geometry.Material is DiffuseMaterial dm
-                            && dm.Brush is ImageBrush ib
-                            && ib.ImageSource is BitmapSource bs
-                            && bs.Format == PixelFormats.Bgra32);
+                    var diagTex = modelPart.AllTextures?.FirstOrDefault(kv => PathUtils.TruncateAtDot(kv.Key).Equals(data.TexturePath, StringComparison.OrdinalIgnoreCase)).Value;
+                    string diagFmt = diagTex is not null ? diagTex.Format.ToString() : "null";
+                    int diagW = diagTex?.PixelWidth ?? 0;
+                    int diagH = diagTex?.PixelHeight ?? 0;
+                    bool diagHasAlpha = diagTex is not null && diagTex.Format == System.Windows.Media.PixelFormats.Bgra32;
+                    _logService.Log($"[DIAG] Submesh '{data.MaterialName}' → tex '{data.TexturePath}' [{diagFmt} {diagW}x{diagH}] alphaChannel={diagHasAlpha} eye={isEyeMesh}");
 
                     parts.Add(modelPart);
 
-                    if (needsAlpha)
+                    if (isEyeMesh)
                         sceneModel.TransparentVisual.Children.Add(modelPart.Visual);
                     else
                         sceneModel.RootVisual.Children.Add(modelPart.Visual);

@@ -115,7 +115,7 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
-        public static void UpdateMaterial(ModelPart modelPart, bool forceAlpha = false)
+        public static void UpdateMaterial(ModelPart modelPart, bool useAlpha)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
@@ -128,69 +128,16 @@ namespace AssetsManager.Utils
                     modelPart.AllTextures.TryGetValue(fullKey, out texture);
             }
 
-            if (texture != null)
-            {
-                bool needsAlpha = forceAlpha || MeshUsesTransparentRegion(modelPart, texture);
-                BitmapSource modelTexture = needsAlpha
-                    ? texture
-                    : MakeOpaqueClone(texture);
+            if (texture == null)
+                return;
 
-                var imageBrush = CreateViewerTextureBrush(modelTexture);
-                var material = new DiffuseMaterial(imageBrush);
+            BitmapSource modelTexture = useAlpha ? texture : MakeOpaqueClone(texture);
 
-                modelPart.Geometry.Material = material;
-                modelPart.Geometry.BackMaterial = material;
-            }
-        }
+            var imageBrush = CreateViewerTextureBrush(modelTexture);
+            var material = new DiffuseMaterial(imageBrush);
 
-        private static bool MeshUsesTransparentRegion(ModelPart part, BitmapSource texture)
-        {
-            if (texture.Format != PixelFormats.Bgra32)
-                return false;
-
-            MeshGeometry3D meshGeometry = part.Geometry?.Geometry as MeshGeometry3D;
-            if (meshGeometry?.TextureCoordinates is null || meshGeometry.TextureCoordinates.Count == 0)
-                return false;
-
-            var uvs = meshGeometry.TextureCoordinates;
-            double minU = 1, maxU = 0, minV = 1, maxV = 0;
-            for (int i = 0; i < uvs.Count; i++)
-            {
-                double u = uvs[i].X;
-                double v = uvs[i].Y;
-                if (u < minU) minU = u;
-                if (u > maxU) maxU = u;
-                if (v < minV) minV = v;
-                if (v > maxV) maxV = v;
-            }
-
-            double uvArea = (maxU - minU) * (maxV - minV);
-            if (uvArea > 0.1)
-                return false;
-
-            int tw = texture.PixelWidth;
-            int th = texture.PixelHeight;
-
-            int stride = tw * 4;
-            int size = stride * th;
-            byte[] pixels = new byte[size];
-            texture.CopyPixels(pixels, stride, 0);
-
-            int px0 = (int)(minU * tw); int py0 = (int)(minV * th);
-            int px1 = (int)(maxU * tw); int py1 = (int)(maxV * th);
-
-            for (int y = py0; y <= py1 && y < th; y++)
-            {
-                int rowBase = y * stride;
-                for (int x = px0; x <= px1 && x < tw; x++)
-                {
-                    int offset = rowBase + (x * 4) + 3;
-                    if (offset < pixels.Length && pixels[offset] < byte.MaxValue)
-                        return true;
-                }
-            }
-
-            return false;
+            modelPart.Geometry.Material = material;
+            modelPart.Geometry.BackMaterial = material;
         }
 
         private static BitmapSource MakeOpaqueClone(BitmapSource source)
