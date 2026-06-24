@@ -14,7 +14,6 @@ using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
@@ -28,14 +27,9 @@ namespace AssetsManager.Services.Viewer
     public class SknLoadingService
     {
         private readonly LogService _logService;
-        private static readonly uint MaterialOverrideSubmeshHash = Fnv1a.HashLower("submesh");
+        private static readonly uint MaterialOverrideSubmeshHash = 0x1ECB978C;
         private static readonly uint MaterialOverrideTextureHash = Fnv1a.HashLower("texture");
         private static readonly uint MaterialOverrideMaterialHash = Fnv1a.HashLower("material");
-        private static readonly uint SamplerValuesHash = Fnv1a.HashLower("samplerValues");
-        private static readonly uint TextureNameHash = Fnv1a.HashLower("textureName");
-        private static readonly uint SamplerNameHash = Fnv1a.HashLower("samplerName");
-        private static readonly uint TexturePathHash = Fnv1a.HashLower("texturePath");
-        private static readonly uint StaticMaterialDefHash = Fnv1a.HashLower("StaticMaterialDef");
 
         public SknLoadingService(LogService logService)
         {
@@ -291,32 +285,24 @@ namespace AssetsManager.Services.Viewer
             {
                 using var stream = File.OpenRead(skinBinPath);
                 var binTree = new BinTree(stream);
-                var loadedTextureLookup = loadedTextureKeys
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(NormalizeTextureKey, key => key, StringComparer.OrdinalIgnoreCase);
+                var textureKeyList = loadedTextureKeys.ToList();
 
-                var materialTextureKeys = ResolveStaticMaterialTextures(binTree, loadedTextureLookup);
                 foreach (var materialOverride in EnumerateMaterialOverrides(binTree))
                 {
-                    string textureKey = null;
-                    if (!string.IsNullOrWhiteSpace(materialOverride.TexturePath))
-                    {
-                        loadedTextureLookup.TryGetValue(NormalizeTextureKey(materialOverride.TexturePath), out textureKey);
-                    }
-
-                    if (textureKey == null &&
-                        materialOverride.MaterialHash != 0 &&
-                        materialTextureKeys.TryGetValue(materialOverride.MaterialHash, out string materialTextureKey))
-                    {
-                        textureKey = materialTextureKey;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(materialOverride.Submesh) || string.IsNullOrWhiteSpace(textureKey))
+                    if (string.IsNullOrWhiteSpace(materialOverride.Submesh))
                     {
                         continue;
                     }
 
                     string submeshKey = NormalizeMaterialKey(materialOverride.Submesh);
+                    string textureKey = FindOverrideTexture(materialOverride.Submesh, submeshKey, textureKeyList);
+
+                    if (string.IsNullOrWhiteSpace(textureKey))
+                    {
+                        _logService.LogDebug($"Skin material bin: no texture match for submesh '{materialOverride.Submesh}', will use heuristics.");
+                        continue;
+                    }
+
                     overrides[submeshKey] = textureKey;
                     _logService.LogDebug($"Skin material bin maps submesh '{materialOverride.Submesh}' to texture '{textureKey}'.");
                 }
@@ -331,70 +317,30 @@ namespace AssetsManager.Services.Viewer
             return overrides;
         }
 
-        private Dictionary<uint, string> ResolveStaticMaterialTextures(
-            BinTree binTree,
-            IReadOnlyDictionary<string, string> loadedTextureLookup)
+        private static string FindOverrideTexture(string rawName, string normalizedKey, List<string> textureKeys)
         {
-            var materialTextureKeys = new Dictionary<uint, string>();
+            string exactMatch = textureKeys.FirstOrDefault(k => k.Equals(normalizedKey, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null) return exactMatch;
 
-            foreach (var pair in binTree.Objects)
+            string root = Regex.Replace(normalizedKey, @"\d+$", string.Empty);
+            if (root.Length > 0 && root != normalizedKey)
             {
-                BinTreeObject treeObject = pair.Value;
-                if (treeObject.ClassHash != StaticMaterialDefHash)
-                {
-                    continue;
-                }
-
-                string textureKey = ResolveStaticMaterialTexture(treeObject, loadedTextureLookup);
-                if (!string.IsNullOrWhiteSpace(textureKey))
-                {
-                    materialTextureKeys[treeObject.PathHash] = textureKey;
-                }
+                string rootMatch = textureKeys.FirstOrDefault(k => k.IndexOf(root, StringComparison.OrdinalIgnoreCase) >= 0);
+                if (rootMatch != null) return rootMatch;
             }
 
-            return materialTextureKeys;
-        }
-
-        private string ResolveStaticMaterialTexture(
-            BinTreeObject materialObject,
-            IReadOnlyDictionary<string, string> loadedTextureLookup)
-        {
-            if (!materialObject.Properties.TryGetValue(SamplerValuesHash, out BinTreeProperty samplerValuesProperty) ||
-                samplerValuesProperty is not BinTreeContainer samplerValues)
+            string wordMatch = textureKeys.FirstOrDefault(k =>
             {
-                return null;
-            }
-
-            string fallbackTextureKey = null;
-            foreach (BinTreeProperty samplerProperty in samplerValues.Elements)
-            {
-                if (samplerProperty is not BinTreeStruct sampler)
+                foreach (string word in rawName.Split(new[] { '_', ' ' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    continue;
+                    if (word.Length > 2 && k.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
                 }
+                return false;
+            });
+            if (wordMatch != null) return wordMatch;
 
-                string texturePath = GetStringProperty(sampler, TexturePathHash);
-                if (string.IsNullOrWhiteSpace(texturePath))
-                {
-                    continue;
-                }
-
-                if (!loadedTextureLookup.TryGetValue(NormalizeTextureKey(texturePath), out string textureKey))
-                {
-                    continue;
-                }
-
-                string textureName = GetStringProperty(sampler, TextureNameHash);
-                string samplerName = GetStringProperty(sampler, SamplerNameHash);
-                if (IsDiffuseSampler(textureName) || IsDiffuseSampler(samplerName))
-                {
-                    return textureKey;
-                }
-
-                fallbackTextureKey ??= textureKey;
-            }
-
-            return fallbackTextureKey;
+            return null;
         }
 
         private IEnumerable<MaterialOverrideEntry> EnumerateMaterialOverrides(BinTree binTree)
@@ -495,33 +441,6 @@ namespace AssetsManager.Services.Viewer
             return null;
         }
 
-        private static bool IsDiffuseSampler(string samplerName)
-        {
-            if (string.IsNullOrWhiteSpace(samplerName))
-            {
-                return false;
-            }
-
-            string lower = samplerName.ToLowerInvariant();
-            if (lower.Contains("mask") ||
-                lower.Contains("normal") ||
-                lower.Contains("rough") ||
-                lower.Contains("metal") ||
-                lower.Contains("ao") ||
-                lower.Contains("orm") ||
-                lower.Contains("emissive") ||
-                lower.Contains("emission") ||
-                lower.Contains("glow"))
-            {
-                return false;
-            }
-
-            return lower.Contains("diffuse") ||
-                   lower.Contains("color") ||
-                   lower.Contains("base") ||
-                   lower.Contains("albedo");
-        }
-
         private static string TryResolveSkinBinPath(string sknPath)
         {
             if (string.IsNullOrWhiteSpace(sknPath))
@@ -595,17 +514,6 @@ namespace AssetsManager.Services.Viewer
 
             Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
             return match.Success ? $"skin{int.Parse(match.Groups[1].Value)}.bin" : null;
-        }
-
-        private static string NormalizeTextureKey(string texturePath)
-        {
-            if (string.IsNullOrWhiteSpace(texturePath))
-            {
-                return string.Empty;
-            }
-
-            return Path.GetFileNameWithoutExtension(texturePath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar))
-                .ToLowerInvariant();
         }
 
         private static string NormalizeMaterialKey(string materialName)
