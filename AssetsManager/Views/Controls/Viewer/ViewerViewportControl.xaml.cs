@@ -64,49 +64,7 @@ namespace AssetsManager.Views.Controls.Viewer
             Loaded += OnViewportLoaded;
             Unloaded += OnViewportUnloaded;
 
-            PreviewKeyDown += OnPreviewKeyDown;
-
             UpdateToolbarVisibility();
-        }
-
-        private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            if (e.Key == System.Windows.Input.Key.F12)
-            {
-                CaptureScreenshot();
-                e.Handled = true;
-            }
-        }
-
-        private void CaptureScreenshot()
-        {
-            try
-            {
-                string dir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                    "AssetsManager_Screenshots");
-                Directory.CreateDirectory(dir);
-                string path = Path.Combine(dir, $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-
-                int w = (int)Viewport3D.ActualWidth;
-                int h = (int)Viewport3D.ActualHeight;
-                if (w < 1 || h < 1) return;
-
-                var renderTarget = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-                renderTarget.Render(Viewport3D);
-                renderTarget.Freeze();
-
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(renderTarget));
-                using var fs = new FileStream(path, FileMode.Create);
-                encoder.Save(fs);
-
-                LogService?.LogSuccess($"Screenshot saved to: {path}");
-            }
-            catch (Exception ex)
-            {
-                LogService?.LogError(ex, "Screenshot capture failed");
-            }
         }
 
         private void OnViewportViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)

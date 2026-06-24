@@ -238,10 +238,14 @@ namespace AssetsManager.Services.Viewer
                     modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
-                    bool isEyeMesh = data.MaterialName.Trim().StartsWith("Eyes", StringComparison.OrdinalIgnoreCase);
+                    bool needsAlpha = modelPart.Geometry.Material is DiffuseMaterial dm
+                        && dm.Brush is ImageBrush ib
+                        && ib.ImageSource is BitmapSource bs
+                        && bs.Format == PixelFormats.Bgra32;
+
                     parts.Add(modelPart);
 
-                    if (isEyeMesh)
+                    if (needsAlpha)
                         sceneModel.TransparentVisual.Children.Add(modelPart.Visual);
                     else
                         sceneModel.RootVisual.Children.Add(modelPart.Visual);
