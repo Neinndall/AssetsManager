@@ -60,7 +60,7 @@ namespace AssetsManager.Views.Models.Viewer
                 string normalized = PathUtils.TruncateAtDot(value);
                 if (_selectedTextureName == normalized) return;
                 _selectedTextureName = normalized;
-                TextureUtils.UpdateMaterial(this, this.Name?.Contains("Eye", StringComparison.OrdinalIgnoreCase) == true);
+                TextureUtils.UpdateMaterial(this);
                 OnPropertyChanged();
             }
         }
