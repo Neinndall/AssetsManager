@@ -11,6 +11,8 @@ using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Toolkit;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Collections.Generic;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -34,33 +36,52 @@ namespace AssetsManager.Services.Viewer
 
         // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
         public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath)
-            => await LoadModelInternal(filePath, textureDirectoryPath, "Failed to load model with custom textures");
-
-        // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
-        public async Task<SceneModel> LoadModel(string filePath)
-            => await LoadModelInternal(filePath, Path.GetDirectoryName(filePath), "Failed to load model");
-
-        private async Task<SceneModel> LoadModelInternal(string filePath, string textureDirectoryPath, string failureMessage)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
+                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                if (string.IsNullOrEmpty(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
                 {
-                    _logService.LogError("Could not determine a valid texture directory for the model.");
+                    _logService.LogError("Invalid texture directory provided for chroma model.");
                     return null;
                 }
 
-                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
-                string modelName = Path.GetFileNameWithoutExtension(filePath);
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys);
 
-                _logService.LogDebug($"Loaded model: {modelName}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, modelName, materialTextureOverrides);
+                _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, failureMessage);
+                _logService.LogError(ex, "Failed to load model with custom textures");
+                return null;
+            }
+        }
+
+        // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
+        public async Task<SceneModel> LoadModel(string filePath)
+        {
+            try
+            {
+                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                string modelDirectory = Path.GetDirectoryName(filePath);
+
+                if (string.IsNullOrEmpty(modelDirectory))
+                {
+                    _logService.LogError("Could not determine the model directory.");
+                    return null;
+                }
+
+                var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
+                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys);
+
+                _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to load model");
                 return null;
             }
         }
@@ -215,17 +236,19 @@ namespace AssetsManager.Services.Viewer
                     };
 
                     modelPart.Visual.Content = geometryModel;
-                    TextureUtils.UpdateMaterial(modelPart);
+                    bool isEyeMesh = data.MaterialName.Contains("Eye", StringComparison.OrdinalIgnoreCase);
+                    TextureUtils.UpdateMaterial(modelPart, isEyeMesh);
 
-                    bool needsAlpha =
-                        modelPart.Geometry.Material is DiffuseMaterial dm &&
-                        dm.Brush is ImageBrush ib &&
-                        ib.ImageSource is BitmapSource bs &&
-                        (bs.Format == PixelFormats.Bgra32 || bs.Format == PixelFormats.Pbgra32);
+                    var diagTex = modelPart.AllTextures?.FirstOrDefault(kv => PathUtils.TruncateAtDot(kv.Key).Equals(data.TexturePath, StringComparison.OrdinalIgnoreCase)).Value;
+                    string diagFmt = diagTex is not null ? diagTex.Format.ToString() : "null";
+                    int diagW = diagTex?.PixelWidth ?? 0;
+                    int diagH = diagTex?.PixelHeight ?? 0;
+                    bool diagHasAlpha = diagTex is not null && diagTex.Format == System.Windows.Media.PixelFormats.Bgra32;
+                    _logService.Log($"[DIAG] Submesh '{data.MaterialName}' → tex '{data.TexturePath}' [{diagFmt} {diagW}x{diagH}] alphaChannel={diagHasAlpha} eye={isEyeMesh}");
 
                     parts.Add(modelPart);
 
-                    if (needsAlpha)
+                    if (isEyeMesh)
                         sceneModel.TransparentVisual.Children.Add(modelPart.Visual);
                     else
                         sceneModel.RootVisual.Children.Add(modelPart.Visual);
@@ -383,58 +406,56 @@ namespace AssetsManager.Services.Viewer
                 return null;
             }
 
-            if (!TryGetSkinFolderContext(sknPath, out string championName, out string skinFolder))
+            string fullPath = Path.GetFullPath(sknPath);
+            string normalizedPath = fullPath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string marker = $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}characters{Path.DirectorySeparatorChar}";
+            int markerIndex = normalizedPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex >= 0)
             {
-                return null;
-            }
-
-            string skinBinName = GetSkinBinName(skinFolder);
-            if (string.IsNullOrWhiteSpace(skinBinName))
-            {
-                return null;
-            }
-
-            foreach (string root in EnumerateCandidateRoots(sknPath))
-            {
-                string candidate = Path.Combine(root, "data", "characters", championName, "skins", skinBinName);
-                if (File.Exists(candidate))
+                string rootPath = normalizedPath[..markerIndex];
+                string relativePath = normalizedPath[(markerIndex + marker.Length)..];
+                string[] parts = relativePath.Split(Path.DirectorySeparatorChar);
+                if (parts.Length >= 4 && parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
                 {
-                    return candidate;
+                    string championName = parts[0];
+                    string skinFolder = parts[2];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (!string.IsNullOrWhiteSpace(skinBinName))
+                    {
+                        string resolvedPath = Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
+                        if (File.Exists(resolvedPath)) return resolvedPath;
+                    }
+                }
+            }
+
+            // Fallback: scan upward for a "data/characters" directory
+            string[] pathParts = normalizedPath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < pathParts.Length; i++)
+            {
+                if (!pathParts[i].Equals("characters", StringComparison.OrdinalIgnoreCase)) continue;
+                if (i < 2 || i >= pathParts.Length - 1) continue;
+
+                string championName = pathParts[i - 1];
+                string foundDataDir = string.Join(Path.DirectorySeparatorChar.ToString(), pathParts.Take(i - 1));
+                if (i - 1 > 0) foundDataDir = Path.DirectorySeparatorChar + foundDataDir;
+
+                // Look for "skins" dir in path after "characters/<champ>"
+                for (int j = i + 1; j < pathParts.Length; j++)
+                {
+                    if (!pathParts[j].Equals("skins", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (j + 1 >= pathParts.Length) continue;
+
+                    string skinFolder = pathParts[j + 1];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (string.IsNullOrWhiteSpace(skinBinName)) continue;
+
+                    string candidate = Path.Combine(foundDataDir, "characters", championName, "skins", skinBinName);
+                    if (File.Exists(candidate)) return candidate;
+                    break;
                 }
             }
 
             return null;
-        }
-
-        private static bool TryGetSkinFolderContext(string sknPath, out string championName, out string skinFolder)
-        {
-            championName = null;
-            skinFolder = null;
-
-            DirectoryInfo current = new FileInfo(Path.GetFullPath(sknPath)).Directory;
-            while (current != null)
-            {
-                if (current.Parent?.Name.Equals("skins", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    skinFolder = current.Name;
-                    championName = current.Parent.Parent?.Name;
-                    return !string.IsNullOrWhiteSpace(championName);
-                }
-
-                current = current.Parent;
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<string> EnumerateCandidateRoots(string sknPath)
-        {
-            DirectoryInfo current = new FileInfo(Path.GetFullPath(sknPath)).Directory;
-            while (current != null)
-            {
-                yield return current.FullName;
-                current = current.Parent;
-            }
         }
 
         private static string GetSkinBinName(string skinFolder)

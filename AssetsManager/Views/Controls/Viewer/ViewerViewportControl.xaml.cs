@@ -331,7 +331,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             foreach (var model in _loadedModels)
             {
-                RemoveModelVisuals(model);
+                if (Viewport.Children.Contains(model.RootVisual))
+                    Viewport.Children.Remove(model.RootVisual);
+                if (model.TransparentVisual != null && Viewport.Children.Contains(model.TransparentVisual))
+                    Viewport.Children.Remove(model.TransparentVisual);
                 model.PropertyChanged -= Model_PropertyChanged;
                 model.Dispose();
             }
@@ -355,7 +358,12 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _loadedModels.Add(model);
             if (model.IsVisible)
-                AddModelVisuals(model);
+            {
+                if (!Viewport.Children.Contains(model.RootVisual))
+                    Viewport.Children.Add(model.RootVisual);
+                if (model.TransparentVisual?.Children.Count > 0 && !Viewport.Children.Contains(model.TransparentVisual))
+                    Viewport.Children.Add(model.TransparentVisual);
+            }
 
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
@@ -388,7 +396,14 @@ namespace AssetsManager.Views.Controls.Viewer
 
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
-            RemoveModelVisuals(model);
+            if (Viewport.Children.Contains(model.RootVisual))
+            {
+                Viewport.Children.Remove(model.RootVisual);
+            }
+            if (model.TransparentVisual != null && Viewport.Children.Contains(model.TransparentVisual))
+            {
+                Viewport.Children.Remove(model.TransparentVisual);
+            }
             model.Dispose();
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
@@ -399,35 +414,19 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (model.IsVisible)
                 {
-                    AddModelVisuals(model);
+                    if (!Viewport.Children.Contains(model.RootVisual))
+                        Viewport.Children.Add(model.RootVisual);
+                    if (model.TransparentVisual?.Children.Count > 0 && !Viewport.Children.Contains(model.TransparentVisual))
+                        Viewport.Children.Add(model.TransparentVisual);
                 }
                 else
                 {
-                    RemoveModelVisuals(model);
+                    if (Viewport.Children.Contains(model.RootVisual))
+                        Viewport.Children.Remove(model.RootVisual);
+                    if (model.TransparentVisual != null && Viewport.Children.Contains(model.TransparentVisual))
+                        Viewport.Children.Remove(model.TransparentVisual);
                 }
             }
-        }
-
-        private void AddModelVisuals(SceneModel model)
-        {
-            if (model == null) return;
-
-            if (!Viewport.Children.Contains(model.RootVisual))
-                Viewport.Children.Add(model.RootVisual);
-
-            if (model.TransparentVisual?.Children.Count > 0 && !Viewport.Children.Contains(model.TransparentVisual))
-                Viewport.Children.Add(model.TransparentVisual);
-        }
-
-        private void RemoveModelVisuals(SceneModel model)
-        {
-            if (model == null) return;
-
-            if (Viewport.Children.Contains(model.RootVisual))
-                Viewport.Children.Remove(model.RootVisual);
-
-            if (model.TransparentVisual != null && Viewport.Children.Contains(model.TransparentVisual))
-                Viewport.Children.Remove(model.TransparentVisual);
         }
 
         public void SetActiveModel(SceneModel model)

@@ -115,104 +115,29 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
-        public static void UpdateMaterial(ModelPart modelPart, bool forceAlpha = false)
+        public static void UpdateMaterial(ModelPart modelPart, bool useAlpha)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
 
-            if (!TryResolveTexture(modelPart.AllTextures, modelPart.SelectedTextureName, out _, out BitmapSource texture))
+            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
+            {
+                string fullKey = modelPart.AllTextures.Keys
+                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
+                if (fullKey != null)
+                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
+            }
+
+            if (texture == null)
                 return;
 
-            bool needsAlpha = forceAlpha || MeshUsesTransparentRegion(modelPart, texture);
-            BitmapSource modelTexture = needsAlpha ? texture : MakeOpaqueClone(texture);
+            BitmapSource modelTexture = useAlpha ? texture : MakeOpaqueClone(texture);
 
             var imageBrush = CreateViewerTextureBrush(modelTexture);
             var material = new DiffuseMaterial(imageBrush);
 
             modelPart.Geometry.Material = material;
             modelPart.Geometry.BackMaterial = material;
-        }
-
-        private static bool MeshUsesTransparentRegion(ModelPart part, BitmapSource texture)
-        {
-            if (texture.Format != PixelFormats.Bgra32 && texture.Format != PixelFormats.Pbgra32)
-                return false;
-
-            if (part.Geometry?.Geometry is not MeshGeometry3D meshGeometry ||
-                meshGeometry.TextureCoordinates is null ||
-                meshGeometry.TextureCoordinates.Count == 0)
-            {
-                return false;
-            }
-
-            double minU = 1d, maxU = 0d, minV = 1d, maxV = 0d;
-            foreach (var uv in meshGeometry.TextureCoordinates)
-            {
-                double u = Math.Max(0d, Math.Min(1d, uv.X));
-                double v = Math.Max(0d, Math.Min(1d, uv.Y));
-                if (u < minU) minU = u;
-                if (u > maxU) maxU = u;
-                if (v < minV) minV = v;
-                if (v > maxV) maxV = v;
-            }
-
-            if (((maxU - minU) * (maxV - minV)) > 0.1d)
-                return false;
-
-            int tw = texture.PixelWidth;
-            int th = texture.PixelHeight;
-            int stride = tw * 4;
-            byte[] pixels = new byte[stride * th];
-            texture.CopyPixels(pixels, stride, 0);
-
-            int px0 = Math.Max(0, Math.Min(tw - 1, (int)(minU * tw)));
-            int py0 = Math.Max(0, Math.Min(th - 1, (int)(minV * th)));
-            int px1 = Math.Max(0, Math.Min(tw - 1, (int)(maxU * tw)));
-            int py1 = Math.Max(0, Math.Min(th - 1, (int)(maxV * th)));
-
-            for (int y = py0; y <= py1; y++)
-            {
-                int rowBase = y * stride;
-                for (int x = px0; x <= px1; x++)
-                {
-                    int alphaOffset = rowBase + (x * 4) + 3;
-                    if (alphaOffset < pixels.Length && pixels[alphaOffset] < byte.MaxValue)
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static bool TryResolveTexture(
-            IReadOnlyDictionary<string, BitmapSource> textures,
-            string textureName,
-            out string resolvedKey,
-            out BitmapSource texture)
-        {
-            resolvedKey = null;
-            texture = null;
-
-            if (textures == null || string.IsNullOrWhiteSpace(textureName))
-                return false;
-
-            if (textures.TryGetValue(textureName, out texture))
-            {
-                resolvedKey = textureName;
-                return true;
-            }
-
-            resolvedKey = textures.Keys
-                .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), textureName, StringComparison.OrdinalIgnoreCase));
-
-            if (resolvedKey == null || !textures.TryGetValue(resolvedKey, out texture))
-            {
-                resolvedKey = null;
-                texture = null;
-                return false;
-            }
-
-            return true;
         }
 
         private static BitmapSource MakeOpaqueClone(BitmapSource source)
