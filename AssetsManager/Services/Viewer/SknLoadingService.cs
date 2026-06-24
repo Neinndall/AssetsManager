@@ -238,8 +238,13 @@ namespace AssetsManager.Services.Viewer
                     modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
+                    bool isEyeMesh = data.MaterialName.Trim().StartsWith("Eyes", StringComparison.OrdinalIgnoreCase);
                     parts.Add(modelPart);
-                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
+
+                    if (isEyeMesh)
+                        sceneModel.TransparentVisual.Children.Add(modelPart.Visual);
+                    else
+                        sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
 
                 sceneModel.Parts.AddRange(parts);
