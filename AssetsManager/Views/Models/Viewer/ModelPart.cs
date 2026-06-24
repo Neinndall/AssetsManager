@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Media3D;
 using System.Windows.Media.Imaging;
@@ -38,7 +39,7 @@ namespace AssetsManager.Views.Models.Viewer
                 _allTextures = value;
                 if (_allTextures != null)
                 {
-                    AvailableTextureNames.ReplaceRange(_allTextures.Keys);
+                    AvailableTextureNames.ReplaceRange(_allTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
                 }
                 else
                 {
@@ -56,8 +57,9 @@ namespace AssetsManager.Views.Models.Viewer
             get => _selectedTextureName;
             set
             {
-                if (_selectedTextureName == value) return;
-                _selectedTextureName = value;
+                string normalized = PathUtils.TruncateAtDot(value);
+                if (_selectedTextureName == normalized) return;
+                _selectedTextureName = normalized;
                 TextureUtils.UpdateMaterial(this);
                 OnPropertyChanged();
             }

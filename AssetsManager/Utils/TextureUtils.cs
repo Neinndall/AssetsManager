@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -19,57 +18,9 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        private static readonly Regex NormalizeNameRegex = new Regex(@"(skin|_)(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        private static string NormalizeName(string name)
-        {
-            return NormalizeNameRegex.Replace(name, "");
-        }
-
         private static readonly HashSet<string> GenericMaterialKeywords =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-
-        private static readonly char[] SeparatorChars = { '_', '-', ' ' };
-
-        private static List<string> GetKeywords(string name)
-        {
-            string normalizedName = NormalizeName(name);
-            var parts = normalizedName.Split(SeparatorChars, StringSplitOptions.RemoveEmptyEntries);
-            var keywords = new List<string>();
-
-            foreach (var part in parts)
-            {
-                // PascalCase splitting manually (no regex)
-                int lastStart = 0;
-                for (int i = 1; i < part.Length; i++)
-                {
-                    if (char.IsUpper(part[i]))
-                    {
-                        AddKeyword(keywords, part.Substring(lastStart, i - lastStart));
-                        lastStart = i;
-                    }
-                }
-                if (part.Length > lastStart)
-                {
-                    AddKeyword(keywords, part.Substring(lastStart));
-                }
-            }
-
-            return keywords;
-        }
-
-        private static void AddKeyword(List<string> list, string word)
-        {
-            if (string.IsNullOrEmpty(word)) return;
-            if (word.Equals("mat", StringComparison.OrdinalIgnoreCase) ||
-                word.Equals("tx", StringComparison.OrdinalIgnoreCase) ||
-                word.Equals("cm", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-            list.Add(word.ToLowerInvariant());
-        }
 
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
@@ -88,11 +39,10 @@ namespace AssetsManager.Utils
             if (string.IsNullOrWhiteSpace(textureKey)) return false;
 
             string key = textureKey.ToLowerInvariant();
-            string padded = "_" + key.Replace('-', '_').Replace(' ', '_') + "_";
+            string padded = "_" + key.Replace('-', '_').Replace(' ', '_').Replace('.', '_') + "_";
 
             if (padded.Contains("_normal_") ||
                 padded.Contains("_norm_") ||
-                padded.Contains("_n_") ||
                 padded.Contains("_mask_") ||
                 padded.Contains("_masks_") ||
                 padded.Contains("_spec_") ||
@@ -103,7 +53,6 @@ namespace AssetsManager.Utils
                 padded.Contains("_metallic_") ||
                 padded.Contains("_orm_") ||
                 padded.Contains("_ao_") ||
-                padded.Contains("_em_") ||
                 padded.Contains("_emissive_") ||
                 padded.Contains("_glow_"))
             {
@@ -128,8 +77,6 @@ namespace AssetsManager.Utils
                 return null;
             }
 
-            logService?.LogDebug($"Finding texture for material: '{materialName}'");
-
             string exactMatch = textureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
             if (exactMatch != null)
             {
@@ -147,8 +94,9 @@ namespace AssetsManager.Utils
 
             if (isGeneric)
             {
-                string mainTextureCandidate = $"{skinName}_tx_cm";
-                string genericMatch = textureKeys.FirstOrDefault(key => key.Equals(mainTextureCandidate, StringComparison.OrdinalIgnoreCase));
+                string skinTxCm = $"{skinName}_tx_cm";
+                string genericMatch = textureKeys
+                    .FirstOrDefault(key => key.IndexOf(skinTxCm, StringComparison.OrdinalIgnoreCase) >= 0);
                 if (genericMatch != null)
                 {
                     logService?.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
@@ -156,97 +104,31 @@ namespace AssetsManager.Utils
                 }
             }
 
-            logService?.LogDebug("No exact or generic match found. Trying keyword-based scoring with PascalCase splitting...");
-
-            var materialKeywords = GetKeywords(materialName);
-            string bestScoringMatch = null;
-            int bestScore = -1; // Initialize with -1 to ensure any valid score is higher
-
-            foreach (string key in textureKeys)
-            {
-                var textureKeywords = GetKeywords(key);
-                string lowerKey = key.ToLowerInvariant();
-                int currentScore = 0;
-
-                // Score for exact keyword matches or partial matches
-                foreach (string matKeyword in materialKeywords)
-                {
-                    if (textureKeywords.Contains(matKeyword))
-                    {
-                        currentScore += 2; // Exact keyword match
-                    }
-                    else if (textureKeywords.Any(texKeyword => texKeyword.Contains(matKeyword) || matKeyword.Contains(texKeyword)))
-                    {
-                        currentScore += 1; // Partial keyword match
-                    }
-                }
-
-                // Score for containing the full material name (or parts of it)
-                if (lowerKey.Contains(lowerMaterialName))
-                {
-                    currentScore += 3; // Strong match if texture key contains material name
-                }
-                else if (materialKeywords.Any(mk => lowerKey.Contains(mk)))
-                {
-                    currentScore += 1; // Match if texture key contains any material keyword
-                }
-
-                // Score for _tx_cm suffix (often indicates a main texture)
-                if (lowerKey.Contains("_tx_cm"))
-                {
-                    currentScore += 1;
-                }
-
-                if (currentScore > bestScore)
-                {
-                    bestScore = currentScore;
-                    bestScoringMatch = key;
-                }
-                else if (currentScore == bestScore)
-                {
-                    // Tie-breaking:
-                    // 1. Prefer textures that contain "_tx_cm" if scores are equal
-                    bool bestIsTxCm = bestScoringMatch?.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase) ?? false;
-                    bool currentIsTxCm = lowerKey.Contains("_tx_cm");
-
-                    if (currentIsTxCm && !bestIsTxCm)
-                    {
-                        bestScoringMatch = key;
-                    }
-                    else if (!currentIsTxCm && bestIsTxCm)
-                    {
-                        // Keep bestScoringMatch
-                    }
-                    // 2. If still a tie, prefer the one that is a better substring match (longer common substring)
-                    else if (bestScoringMatch == null || key.Length < bestScoringMatch.Length) // Prefer shorter name
-                    {
-                        bestScoringMatch = key;
-                    }
-                }
-            }
-
-            if (bestScoringMatch != null && bestScore > 0)
-            {
-                logService?.LogDebug($"Found texture '{bestScoringMatch}' with score {bestScore} via keyword matching.");
-                return bestScoringMatch;
-            }
-
             string propTexture = textureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
             if (propTexture != null)
             {
-                logService?.LogDebug($"Keyword matching failed. Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
+                logService?.LogDebug($"Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
                 return propTexture;
             }
 
-            logService?.LogDebug($"No texture found. Falling back to default: '{defaultTextureKey}'");
+            logService?.LogDebug($"No specific match found. Falling back to default: '{defaultTextureKey}'");
             return defaultTextureKey;
         }
 
         public static void UpdateMaterial(ModelPart modelPart)
         {
-            if (modelPart.Geometry != null &&
-                !string.IsNullOrEmpty(modelPart.SelectedTextureName) &&
-                modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
+            if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
+                return;
+
+            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
+            {
+                string fullKey = modelPart.AllTextures.Keys
+                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
+                if (fullKey != null)
+                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
+            }
+
+            if (texture != null)
             {
                 var materialGroup = new MaterialGroup();
                 var imageBrush = CreateViewerTextureBrush(texture);

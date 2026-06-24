@@ -131,16 +131,23 @@ namespace AssetsManager.Services.Viewer
             string modelName,
             IReadOnlyDictionary<string, string> materialTextureOverrides)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+            string skinName = modelName.Split('.')[0];
             var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
 
             string defaultTextureKey = colorTextureKeys
-                .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(k => k.Length)
+                .Where(k => k.IndexOf(skinName, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(k => {
+                    int dotIndex = k.IndexOf('.');
+                    string baseName = dotIndex > 0 ? k.Substring(0, dotIndex) : k;
+                    return baseName.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase);
+                })
+                .OrderBy(k => {
+                    int dotIndex = k.IndexOf('.');
+                    return dotIndex > 0 ? dotIndex : k.Length;
+                })
                 .FirstOrDefault()
                 ?? colorTextureKeys.FirstOrDefault();
-
-            string skinName = modelName.Split('.')[0];
 
             // Move geometry processing to background thread
             var dataList = await Task.Run(() =>
@@ -526,28 +533,52 @@ namespace AssetsManager.Services.Viewer
             string normalizedPath = fullPath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string marker = $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}characters{Path.DirectorySeparatorChar}";
             int markerIndex = normalizedPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (markerIndex < 0)
+            if (markerIndex >= 0)
             {
-                return null;
+                string rootPath = normalizedPath[..markerIndex];
+                string relativePath = normalizedPath[(markerIndex + marker.Length)..];
+                string[] parts = relativePath.Split(Path.DirectorySeparatorChar);
+                if (parts.Length >= 4 && parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
+                {
+                    string championName = parts[0];
+                    string skinFolder = parts[2];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (!string.IsNullOrWhiteSpace(skinBinName))
+                    {
+                        string resolvedPath = Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
+                        if (File.Exists(resolvedPath)) return resolvedPath;
+                    }
+                }
             }
 
-            string rootPath = normalizedPath[..markerIndex];
-            string relativePath = normalizedPath[(markerIndex + marker.Length)..];
-            string[] parts = relativePath.Split(Path.DirectorySeparatorChar);
-            if (parts.Length < 4 || !parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
+            // Fallback: scan upward for a "data/characters" directory
+            string[] pathParts = normalizedPath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < pathParts.Length; i++)
             {
-                return null;
+                if (!pathParts[i].Equals("characters", StringComparison.OrdinalIgnoreCase)) continue;
+                if (i < 2 || i >= pathParts.Length - 1) continue;
+
+                string championName = pathParts[i - 1];
+                string foundDataDir = string.Join(Path.DirectorySeparatorChar.ToString(), pathParts.Take(i - 1));
+                if (i - 1 > 0) foundDataDir = Path.DirectorySeparatorChar + foundDataDir;
+
+                // Look for "skins" dir in path after "characters/<champ>"
+                for (int j = i + 1; j < pathParts.Length; j++)
+                {
+                    if (!pathParts[j].Equals("skins", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (j + 1 >= pathParts.Length) continue;
+
+                    string skinFolder = pathParts[j + 1];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (string.IsNullOrWhiteSpace(skinBinName)) continue;
+
+                    string candidate = Path.Combine(foundDataDir, "characters", championName, "skins", skinBinName);
+                    if (File.Exists(candidate)) return candidate;
+                    break;
+                }
             }
 
-            string championName = parts[0];
-            string skinFolder = parts[2];
-            string skinBinName = GetSkinBinName(skinFolder);
-            if (string.IsNullOrWhiteSpace(skinBinName))
-            {
-                return null;
-            }
-
-            return Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
+            return null;
         }
 
         private static string GetSkinBinName(string skinFolder)

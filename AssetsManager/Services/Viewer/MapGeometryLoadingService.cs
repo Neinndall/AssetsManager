@@ -221,7 +221,7 @@ namespace AssetsManager.Services.Viewer
 
             var submeshDataList = processingResult.SubmeshDataList;
             var loadedTextures = processingResult.LoadedTextures;
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
             var parts = new List<ModelPart>();
 
             foreach (var data in submeshDataList)

@@ -113,7 +113,7 @@ namespace AssetsManager.Services.Viewer
 
         private async Task<SceneModel> CreateSceneModel(StaticMesh staticMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
             var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
             string defaultTextureKey = colorTextureKeys.FirstOrDefault();
 
