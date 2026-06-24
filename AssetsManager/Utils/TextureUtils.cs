@@ -115,7 +115,7 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
-        public static void UpdateMaterial(ModelPart modelPart)
+        public static void UpdateMaterial(ModelPart modelPart, bool forceAlpha = false)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
@@ -130,7 +130,7 @@ namespace AssetsManager.Utils
 
             if (texture != null)
             {
-                bool needsAlpha = MeshUsesTransparentRegion(modelPart, texture);
+                bool needsAlpha = forceAlpha || MeshUsesTransparentRegion(modelPart, texture);
                 BitmapSource modelTexture = needsAlpha
                     ? texture
                     : MakeOpaqueClone(texture);
@@ -165,7 +165,7 @@ namespace AssetsManager.Utils
             }
 
             double uvArea = (maxU - minU) * (maxV - minV);
-            if (uvArea > 0.5)
+            if (uvArea > 0.1)
                 return false;
 
             int tw = texture.PixelWidth;

@@ -236,12 +236,14 @@ namespace AssetsManager.Services.Viewer
                     };
 
                     modelPart.Visual.Content = geometryModel;
-                    TextureUtils.UpdateMaterial(modelPart);
+                    bool isEyeMesh = modelPart.Name.StartsWith("Eyes", StringComparison.OrdinalIgnoreCase);
+                    TextureUtils.UpdateMaterial(modelPart, isEyeMesh);
 
-                    bool needsAlpha = modelPart.Geometry.Material is DiffuseMaterial dm
-                        && dm.Brush is ImageBrush ib
-                        && ib.ImageSource is BitmapSource bs
-                        && bs.Format == PixelFormats.Bgra32;
+                    bool needsAlpha = isEyeMesh
+                        || (modelPart.Geometry.Material is DiffuseMaterial dm
+                            && dm.Brush is ImageBrush ib
+                            && ib.ImageSource is BitmapSource bs
+                            && bs.Format == PixelFormats.Bgra32);
 
                     parts.Add(modelPart);
 
