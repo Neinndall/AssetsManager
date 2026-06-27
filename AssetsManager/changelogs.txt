@@ -15,6 +15,7 @@ Improvements
   - Core / Standardized progress event signatures: removed unused message parameters from ExtractionStarted and aligned signatures under ProgressUIManager for cleaner decoupling.
 
 Bug Fixes
+  - Viewer / Fixed a bug where chroma models failed to auto-assign textures by resolving the correct skin bin configuration based on their texture folder.
   - Monitor / Fixed a UI resetting issue in API Center (Sales, Mythic Shop, Event Pass) by checking for port/password changes before saving settings during LCU connection ticks.
   - Viewer / Fixed a visual bug where semi-transparent meshes (such as eyes or overlays) cut out and erased parts of the underlying character model.
   - Texture Mapping Viewer/Heuristic: Fixed a bug where some textures were not mapping correctly to their meshes.

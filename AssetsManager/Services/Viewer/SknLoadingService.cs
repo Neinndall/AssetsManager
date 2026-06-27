@@ -47,7 +47,7 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
-                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys);
+                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                 return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
@@ -74,7 +74,7 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
-                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys);
+                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, null);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                 return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
@@ -314,10 +314,10 @@ namespace AssetsManager.Services.Viewer
             return TextureUtils.FindBestTextureMatch(materialName, skinName, colorTextureKeys, defaultTextureKey, _logService);
         }
 
-        private Dictionary<string, string> LoadMaterialTextureOverrides(string sknPath, IEnumerable<string> loadedTextureKeys)
+        private Dictionary<string, string> LoadMaterialTextureOverrides(string sknPath, IEnumerable<string> loadedTextureKeys, string textureDirPath)
         {
             var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            string skinBinPath = TryResolveSkinBinPath(sknPath);
+            string skinBinPath = TryResolveSkinBinPath(sknPath, textureDirPath);
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath))
             {
                 _logService.LogDebug($"No skin material bin found for '{Path.GetFileName(sknPath)}'. Texture matching will use heuristics.");
@@ -432,14 +432,15 @@ namespace AssetsManager.Services.Viewer
             return availableKeys.FirstOrDefault(k => k.Equals(fileName, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static string TryResolveSkinBinPath(string sknPath)
+        private static string TryResolveSkinBinPath(string sknPath, string textureDirPath = null)
         {
-            if (string.IsNullOrWhiteSpace(sknPath))
+            string pathForResolution = !string.IsNullOrEmpty(textureDirPath) ? textureDirPath : sknPath;
+            if (string.IsNullOrWhiteSpace(pathForResolution))
             {
                 return null;
             }
 
-            string fullPath = Path.GetFullPath(sknPath);
+            string fullPath = Path.GetFullPath(pathForResolution);
             string normalizedPath = fullPath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
             string marker = $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}characters{Path.DirectorySeparatorChar}";
             int markerIndex = normalizedPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
@@ -448,7 +449,7 @@ namespace AssetsManager.Services.Viewer
                 string rootPath = normalizedPath[..markerIndex];
                 string relativePath = normalizedPath[(markerIndex + marker.Length)..];
                 string[] parts = relativePath.Split(Path.DirectorySeparatorChar);
-                if (parts.Length >= 4 && parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
+                if (parts.Length >= 3 && parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
                 {
                     string championName = parts[0];
                     string skinFolder = parts[2];
