@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -131,7 +131,26 @@ namespace AssetsManager.Utils
             if (texture != null)
             {
                 var materialGroup = new MaterialGroup();
-                var imageBrush = CreateViewerTextureBrush(texture);
+
+                // Force Bgr32 format for opaque parts to prevent WPF from placing them in the transparent rendering pass
+                BitmapSource textureToUse = texture;
+                if (!modelPart.IsTransparent && texture.Format != PixelFormats.Bgr32)
+                {
+                    try
+                    {
+                        textureToUse = new FormatConvertedBitmap(texture, PixelFormats.Bgr32, null, 0);
+                    }
+                    catch
+                    {
+                        textureToUse = texture;
+                    }
+                }
+
+                var imageBrush = CreateViewerTextureBrush(textureToUse);
+                if (modelPart.IsTransparent)
+                {
+                    imageBrush.Opacity = 0.99; // Force WPF to place this in the transparent pass
+                }
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
                 modelPart.Geometry.Material = materialGroup;
@@ -155,6 +174,7 @@ namespace AssetsManager.Utils
 
             return imageBrush;
         }
+
 
         public static BitmapSource LoadTexture(byte[] data, string extension, int? maxWidth = null, int? maxHeight = null)
         {

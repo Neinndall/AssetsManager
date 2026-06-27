@@ -29,6 +29,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public ModelVisual3D Visual { get; set; }
         public GeometryModel3D Geometry { get; set; }
+        public bool IsTransparent { get; set; }
         public int[] SourceVertexIndices { get; set; }
 
         public Dictionary<string, BitmapSource> AllTextures
