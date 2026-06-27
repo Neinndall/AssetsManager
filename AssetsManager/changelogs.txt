@@ -14,6 +14,7 @@ Improvements
   - Core / Standardized progress event signatures: removed unused message parameters from ExtractionStarted and aligned signatures under ProgressUIManager for cleaner decoupling.
 
 Bug Fixes
+  - Monitor / Fixed a UI resetting issue in API Center (Sales, Mythic Shop, Event Pass) by checking for port/password changes before saving settings during LCU connection ticks.
   - Viewer / Fixed a visual bug where semi-transparent meshes (such as eyes or overlays) cut out and erased parts of the underlying character model.
   - Texture Mapping Viewer/Heuristic: Fixed a bug where some textures were not mapping correctly to their meshes.
   - Audio / Fixed a bug where merging events and audio banks created duplicate event nodes (e.g. Play_sfx_...) in the explorer tree.
