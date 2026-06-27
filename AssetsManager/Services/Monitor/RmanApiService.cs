@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Monitor;
 
-namespace AssetsManager.Services.Manifests;
+namespace AssetsManager.Services.Monitor;
 
 public class RmanApiService
 {

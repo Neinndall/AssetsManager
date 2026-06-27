@@ -156,6 +156,7 @@ namespace AssetsManager.Services.Explorer
                 {
                     string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
+                    
                     if (hash != 0) return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
                 }
 

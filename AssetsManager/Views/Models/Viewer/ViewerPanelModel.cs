@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isAnimationSyncEnabled = false;
         private bool _isAnimationPlaybackSyncEnabled = false;
         private bool _isMeshSyncEnabled = false;
+        private bool _isTextureSyncEnabled = false;
         private ViewerViewportModel _viewportViewModel;
 
         // --- Data Collections ---
@@ -71,6 +72,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isMeshSyncEnabled;
             set { if (_isMeshSyncEnabled != value) { _isMeshSyncEnabled = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsTextureSyncEnabled
+        {
+            get => _isTextureSyncEnabled;
+            set { if (_isTextureSyncEnabled != value) { _isTextureSyncEnabled = value; OnPropertyChanged(); } }
         }
 
         public bool IsAnimationSyncEnabled

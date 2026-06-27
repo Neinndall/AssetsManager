@@ -64,6 +64,7 @@ namespace AssetsManager.Views.Models.Explorer
         public DiffStatus Status { get; set; } = DiffStatus.Unchanged;
         public string OldPath { get; set; }
         public SerializableChunkDiff ChunkDiff { get; set; }
+        public bool IsTechnicalNode { get; set; }
         public uint WemId { get; set; } // Only for WemFile
         public uint WemOffset { get; set; } // Only for WemFile from BNK
         public uint WemSize { get; set; } // Only for WemFile from BNK

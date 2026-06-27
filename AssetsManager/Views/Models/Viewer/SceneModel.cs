@@ -29,7 +29,6 @@ namespace AssetsManager.Views.Models.Viewer
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
 
-        // --- Transformation Properties ---
         private double _positionX;
         private double _positionY;
         private double _positionZ;
@@ -117,6 +116,13 @@ namespace AssetsManager.Views.Models.Viewer
             set => SetField(ref _isMeshSyncEnabled, value);
         }
 
+        private bool _isTextureSyncEnabled;
+        public bool IsTextureSyncEnabled
+        {
+            get => _isTextureSyncEnabled;
+            set => SetField(ref _isTextureSyncEnabled, value);
+        }
+
         private bool _areAllPartsVisible = true;
         public bool AreAllPartsVisible
         {
@@ -135,6 +141,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public event PropertyChangedEventHandler PropertyChanged;
         public event Action<ModelPart> MeshVisibilityChanged;
+        public event Action<ModelPart> MeshTextureChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -202,32 +209,37 @@ namespace AssetsManager.Views.Models.Viewer
                 }
                 UpdateMasterVisibility();
             }
+            else if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
+            {
+                if (sender is ModelPart part)
+                {
+                    if (IsTextureSyncEnabled)
+                    {
+                        MeshTextureChanged?.Invoke(part);
+                    }
+                }
+            }
         }
 
         private void UpdateMasterVisibility()
         {
-            // This avoids re-triggering the setter loop
             var allVisible = Parts.All(p => p.IsVisible);
             SetField(ref _areAllPartsVisible, allVisible, nameof(AreAllPartsVisible));
         }
 
         public void Dispose()
         {
-            // 1. Liberar recursos pesados y cerrar buffers (Toolkit)
             CurrentAnimation?.Dispose();
             SkinnedMesh?.Dispose();
 
-            // 2. Limpiar visuales y desconectar de la GPU (WPF)
             if (RootVisual != null)
             {
                 RootVisual.Transform = null;
                 RootVisual.Children.Clear();
             }
 
-            // 3. Destruir partes individuales y limpiar colecciones
             if (_parts != null)
             {
-                // Find all unique shared textures dictionaries to clear them (Point 8)
                 var uniqueTextureDicts = new List<Dictionary<string, System.Windows.Media.Imaging.BitmapSource>>();
                 foreach (var part in _parts)
                 {
@@ -252,19 +264,16 @@ namespace AssetsManager.Views.Models.Viewer
             }
             Animations?.Clear();
 
-            // 4. Detach the auto-rotation transform if the viewport injected it
             if (_userTransformGroup.Children.Contains(_scaleTransform))
             {
                 _userTransformGroup.Children.Clear();
             }
 
-            // 5. Cortar todas las referencias finales
             CurrentAnimation = null;
             SkinnedMesh = null;
             Skeleton = null;
             RootVisual = null;
 
-            // 6. Limpiar eventos y estados (Point 9)
             IsAnimationPaused = false;
             AnimationTime = 0;
             
@@ -280,6 +289,13 @@ namespace AssetsManager.Views.Models.Viewer
                 foreach (var d in MeshVisibilityChanged.GetInvocationList())
                 {
                     MeshVisibilityChanged -= (Action<ModelPart>)d;
+                }
+            }
+            if (MeshTextureChanged != null)
+            {
+                foreach (var d in MeshTextureChanged.GetInvocationList())
+                {
+                    MeshTextureChanged -= (Action<ModelPart>)d;
                 }
             }
         }

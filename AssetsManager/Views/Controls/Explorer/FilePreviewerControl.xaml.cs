@@ -278,7 +278,13 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Select the tab (this will trigger PinnedFilesManager_PropertyChanged which calls the service)
                 if (existingPin != null)
                 {
+                    var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
                     ViewModel.PinnedFilesManager.SelectedFile = existingPin;
+
+                    if (previousSelected == existingPin)
+                    {
+                        await ExplorerPreviewService.ShowPreviewAsync(node);
+                    }
                 }
             }
             else
@@ -298,6 +304,7 @@ namespace AssetsManager.Views.Controls.Explorer
         public void UpdateSelectedNode(FileSystemNodeModel node, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             var previousFolder = _currentFolderNode;
+            var previousNode = _currentNode;
             _currentNode = node;
             _rootNodes = rootNodes;
             ViewModel.HasSelectedNode = node != null;
@@ -346,7 +353,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 FileGridControl.ItemsSource = null; // Clear immediately when resetting or when folder context is null
             }
             
-            if (!isContainer && node != null)
+            if (!isContainer && node != null && node != previousNode)
             {
                 // If it's a file, hide status messages immediately to avoid flickers during load
                 ViewModel.IsWelcomeVisible = false;

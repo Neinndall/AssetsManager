@@ -148,9 +148,12 @@ namespace AssetsManager.Services.Explorer.Tree
                 var eventNodesToAdd = new List<FileSystemNodeModel>();
                 foreach (var eventNode in audioTree)
                 {
+                    if (eventNode.IsTechnicalNode) continue;
+
                     var newEventNode = new FileSystemNodeModel(eventNode.Name, NodeType.AudioEvent)
                     {
-                        Parent = clickedNode
+                        Parent = clickedNode,
+                        IsTechnicalNode = eventNode.IsTechnicalNode
                     };
 
                     var soundNodesToAdd = new List<FileSystemNodeModel>();

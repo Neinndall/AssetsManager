@@ -25,7 +25,6 @@ using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Manifests;
 using AssetsManager.Services.Parsers;
 
 namespace AssetsManager

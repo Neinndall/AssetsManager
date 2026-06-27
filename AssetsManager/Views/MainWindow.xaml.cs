@@ -119,22 +119,27 @@ namespace AssetsManager.Views
             _progressUIManager.Initialize(StatusBar.ViewModel, this);
             _logService.SetLogOutput(LogView.LogRichTextBox);
 
+            // --- Progress events wired directly to ProgressUIManager ---
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
-            _wadComparatorService.ComparisonCompleted += _progressUIManager.OnComparisonCompleted;
             _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
 
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
-            _extractionService.ExtractionProgressChanged += (sender, progress) => _progressUIManager.OnExtractionProgressChanged(progress.extractedCount, progress.totalFiles, progress.message);
-            _extractionService.ExtractionCompleted += (sender, e) => OnExtractionCompleted(sender, e);
+            _extractionService.ExtractionProgressChanged += _progressUIManager.OnExtractionProgressChanged;
+            _extractionService.ExtractionCompleted += OnExtractionCompleted;
 
             _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
             _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
             _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
 
-            _versionService.VersionDownloadStarted += (sender, e) => _progressUIManager.OnVersionDownloadStarted(sender, e);
-            _versionService.VersionDownloadProgressChanged += (sender, e) => _progressUIManager.OnVersionDownloadProgressChanged(sender, e);
-            _versionService.VersionDownloadCompleted += (sender, e) => _progressUIManager.OnVersionDownloadCompleted(sender, e);
+            _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
+            _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;
+            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompleted;
+
+            _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
+            _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
+            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
+            _versionService.VerificationCompleted += _progressUIManager.OnVersionVerificationCompleted;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
@@ -229,7 +234,7 @@ namespace AssetsManager.Views
             ShowNotification(true, message);
         }
         
-        private void OnExtractionCompleted(object sender, EventArgs e)
+        private void OnExtractionCompleted()
         {
             Dispatcher.Invoke(() =>
             {
@@ -248,11 +253,14 @@ namespace AssetsManager.Views
             await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
         }
         
-        private async void OnWadComparisonCompleted(List<ChunkDiff> allDiffs, string oldLolPath, string newLolPath, string version)
+        private async void OnWadComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
         {
-            if (allDiffs == null) return;
+            // Ensure the progress window reaches 100% and closes before any follow-up UI is shown.
+            await _progressUIManager.FinishComparisonAsync();
 
-            var serializableDiffs = allDiffs.Select(d => new SerializableChunkDiff
+            if (diffs == null) return;
+
+            var serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
                 OldPath = d.OldPath,
@@ -273,14 +281,14 @@ namespace AssetsManager.Views
             // = same comparison, regardless of session or app restart.
             if (_appSettings.SaveWadComparisonHistory)
             {
-                string displayName = ResolveComparisonDisplayName(serializableDiffs, newLolPath);
+                string displayName = ResolveComparisonDisplayName(serializableDiffs, newPath);
                 
                 _ = Task.Run(async () =>
                 {
                     try
                     {
                         await _comparisonHistoryService.EnsureArchivedAsync(
-                            serializableDiffs, oldLolPath, newLolPath, version, displayName);
+                            serializableDiffs, oldPath, newPath, version, displayName);
                     }
                     catch (Exception ex)
                     {
@@ -292,14 +300,14 @@ namespace AssetsManager.Views
             // 2. Handle follow-up actions (Report, Extraction, or View)
             if (_appSettings.ReportGeneration.Enabled)
             {
-                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldLolPath, newLolPath);
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldPath, newPath);
             }
             else if (_appSettings.EnableExtraction)
             {
                 _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
-                _extractionOldLolPath = oldLolPath;
-                _extractionNewLolPath = newLolPath;
+                _extractionOldLolPath = oldPath;
+                _extractionNewLolPath = newPath;
                 _extractionVersion = version;
 
                 Dispatcher.Invoke(StartExtractionAsync);
@@ -308,7 +316,7 @@ namespace AssetsManager.Views
             {
                 Dispatcher.Invoke(() =>
                 {
-                    ShowComparisonResultWindow(serializableDiffs, oldLolPath, newLolPath, version);
+                    ShowComparisonResultWindow(serializableDiffs, oldPath, newPath, version);
                 });
             }
         }
@@ -326,7 +334,7 @@ namespace AssetsManager.Views
         private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath, version);
+            resultWindow.Initialize(diffs, oldPath, newPath, null, version);
             resultWindow.Owner = this;
             resultWindow.Show();
         }

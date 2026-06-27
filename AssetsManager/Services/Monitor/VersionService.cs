@@ -12,17 +12,16 @@ using System.Threading.Tasks;
 using AssetsManager.Views.Models.Versions;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
-using AssetsManager.Services.Manifests;
-using AssetsManager.Services.Downloads;
 using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Services.Monitor
 {
     public class VersionService
     {
-        public event EventHandler<string> VersionDownloadStarted;
-        public event EventHandler<(string TaskName, int CurrentValue, int TotalValue, string CurrentFile)> VersionDownloadProgressChanged;
-        public event EventHandler<(string TaskName, bool Success, string Message)> VersionDownloadCompleted;
+        public event Action<string> VersionDownloadStarted;
+        public event Action<string, int, int, string> VersionDownloadProgressChanged;
+        public event Action<string, bool, string> VersionDownloadCompleted;
+        public event Action VerificationCompleted;
 
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
@@ -48,9 +47,13 @@ namespace AssetsManager.Services.Monitor
             _manifestDownloader = manifestDownloader;
             _riotApiService = riotApiService;
 
-            _manifestDownloader.ProgressChanged += (taskName, fileName, current, total) => {
-                VersionDownloadProgressChanged?.Invoke(this, (taskName, current, total, fileName));
-            };
+            _manifestDownloader.ProgressChanged += OnManifestProgressChanged;
+            _manifestDownloader.VerificationCompleted += () => VerificationCompleted?.Invoke();
+        }
+
+        private void OnManifestProgressChanged(string taskName, int current, int total, string fileName)
+        {
+            VersionDownloadProgressChanged?.Invoke(taskName, current, total, fileName);
         }
 
         public async Task FetchAllVersionsAsync()
@@ -82,7 +85,7 @@ namespace AssetsManager.Services.Monitor
 
             _logService.LogSuccess("Version fetch process completed successfully.");
             
-            VersionDownloadCompleted?.Invoke(this, ("Fetching Versions", true, "Success"));
+            VersionDownloadCompleted?.Invoke("Fetching Versions", true, "Success");
         }
 
         private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(List<string> manifestUrls)
@@ -150,7 +153,7 @@ namespace AssetsManager.Services.Monitor
             try
             {
                 // Instant notification to UI: This triggers "Verifying Files..." in ProgressUIManager
-                VersionDownloadStarted?.Invoke(this, taskName);
+                VersionDownloadStarted?.Invoke(taskName);
                 
                 _logService.Log($"Verifying/Updating {taskName}...");
 
@@ -167,17 +170,17 @@ namespace AssetsManager.Services.Monitor
                 {
                     _logService.Log("No updates required for this manifest.");
                 }
-                VersionDownloadCompleted?.Invoke(this, (taskName, true, "Finished"));
+                VersionDownloadCompleted?.Invoke(taskName, true, "Finished");
             }
             catch (OperationCanceledException)
             {
                 // Note: Granular logging is handled inside ManifestDownloader for both Verification and Updating phases.
-                VersionDownloadCompleted?.Invoke(this, (taskName, false, "Cancelled"));
+                VersionDownloadCompleted?.Invoke(taskName, false, "Cancelled");
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Error during native {taskName} update");
-                VersionDownloadCompleted?.Invoke(this, (taskName, false, ex.Message));
+                VersionDownloadCompleted?.Invoke(taskName, false, ex.Message);
             }
         }
 

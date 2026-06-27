@@ -297,28 +297,53 @@
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
 
-                                    <!-- Sync Meshes Header -->
-                                    <Border Grid.Row="0" Margin="0,0,0,12" Padding="14,10" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                            Visibility="{Binding SelectedModel.SourceType, Converter={StaticResource EqualityConverter}, ConverterParameter='Chroma'}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialIcons:MaterialIcon Kind="AutoFix" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                                <StackPanel VerticalAlignment="Center">
-                                                    <TextBlock Text="Sync Meshes" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                    <TextBlock Text="Sync visibility with chromas" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                    <!-- Sync Headers Stack -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,12"
+                                                Visibility="{Binding SelectedModel.SourceType, Converter={StaticResource EqualityConverter}, ConverterParameter='Chroma'}">
+                                        <!-- Sync Meshes Header -->
+                                        <Border Margin="0,0,0,6" Padding="14,10" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialIcons:MaterialIcon Kind="AutoFix" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="Sync Meshes" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Text="Sync visibility with chromas" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                                    </StackPanel>
                                                 </StackPanel>
-                                            </StackPanel>
-                                            <CheckBox Grid.Column="1" IsChecked="{Binding IsMeshSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
-                                                <CheckBox.LayoutTransform>
-                                                    <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
-                                                </CheckBox.LayoutTransform>
-                                            </CheckBox>
-                                        </Grid>
-                                    </Border>
+                                                <CheckBox Grid.Column="1" IsChecked="{Binding IsMeshSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                                    <CheckBox.LayoutTransform>
+                                                        <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                                    </CheckBox.LayoutTransform>
+                                                </CheckBox>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Sync Textures Header -->
+                                        <Border Margin="0" Padding="14,10" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialIcons:MaterialIcon Kind="Sync" Width="16" Height="16" Foreground="{StaticResource AccentPurple}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="Sync Textures" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                        <TextBlock Text="Sync textures with meshes" FontSize="9.5" Foreground="{StaticResource TextMuted}" Margin="0,1,0,0"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="1" IsChecked="{Binding IsTextureSyncEnabled, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}" VerticalAlignment="Center">
+                                                    <CheckBox.LayoutTransform>
+                                                        <ScaleTransform ScaleX="0.85" ScaleY="0.85"/>
+                                                    </CheckBox.LayoutTransform>
+                                                </CheckBox>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
 
                                     <!-- Meshes list with texture dropdown (vertical layout, no selection, card-per-item) -->
                                     <ItemsControl x:Name="MeshesListBox"

@@ -249,11 +249,20 @@ namespace AssetsManager.Services.Monitor
                 var parts = lockfileContent.Split(':');
                 if (parts.Length >= 4)
                 {
-                    _appSettings.ApiSettings.Connection.Port = int.Parse(parts[2]);
-                    _appSettings.ApiSettings.Connection.Password = parts[3];
-                    _appSettings.ApiSettings.Connection.LocalApiUrl = $"https://127.0.0.1:{_appSettings.ApiSettings.Connection.Port}";
+                    int newPort = int.Parse(parts[2]);
+                    string newPassword = parts[3];
+                    string newLocalUrl = $"https://127.0.0.1:{newPort}";
 
-                    AppSettings.SaveSettings(_appSettings);
+                    if (_appSettings.ApiSettings.Connection.Port != newPort ||
+                        _appSettings.ApiSettings.Connection.Password != newPassword ||
+                        _appSettings.ApiSettings.Connection.LocalApiUrl != newLocalUrl)
+                    {
+                        _appSettings.ApiSettings.Connection.Port = newPort;
+                        _appSettings.ApiSettings.Connection.Password = newPassword;
+                        _appSettings.ApiSettings.Connection.LocalApiUrl = newLocalUrl;
+
+                        AppSettings.SaveSettings(_appSettings);
+                    }
                     return true;
                 }
                 if (logErrorOnFailure)

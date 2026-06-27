@@ -178,11 +178,13 @@ namespace AssetsManager.Services.Viewer
                     // Updating Point3DCollection by index fires a Changed event for EVERY element in WPF,
                     // which causes severe stuttering. It's much faster to create a new collection 
                     // and assign it once, triggering only a single dependency property invalidation.
-                    var posCollection = new Point3DCollection(range.VertexCount);
+                    var sourceVertexIndices = part.SourceVertexIndices;
+                    int vertexCount = sourceVertexIndices?.Length ?? range.VertexCount;
+                    var posCollection = new Point3DCollection(vertexCount);
 
-                    for (int j = 0; j < range.VertexCount; j++)
+                    for (int j = 0; j < vertexCount; j++)
                     {
-                        var vertexIndex = range.StartVertex + j;
+                        var vertexIndex = sourceVertexIndices != null ? sourceVertexIndices[j] : range.StartVertex + j;
                         var skinnedPos = _skinnedVertices[vertexIndex];
                         posCollection.Add(new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z));
                     }

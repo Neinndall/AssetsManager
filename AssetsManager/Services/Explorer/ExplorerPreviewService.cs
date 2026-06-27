@@ -105,7 +105,25 @@ namespace AssetsManager.Services.Explorer
             }
             else
             {
-                if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer) return;
+                if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer)
+                {
+                    if (requiredPreviewer == Previewer.StatusPanel)
+                    {
+                        _viewModel.IsUnsupportedVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    else if (requiredPreviewer == Previewer.AvalonEdit)
+                    {
+                        _viewModel.IsTextVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    else if (requiredPreviewer == Previewer.WebView)
+                    {
+                        _viewModel.IsWebVisible = true;
+                        _viewModel.IsContentVisible = true;
+                    }
+                    return;
+                }
             }
 
             // Step 1: Prepare the correct slot (Image or Content)
@@ -121,9 +139,9 @@ namespace AssetsManager.Services.Explorer
                 if (!isImage)
                 {
                     _viewModel.IsContentVisible = true;
+                    _viewModel.IsTextVisible = false;
+                    _viewModel.IsWebVisible = false;
                 }
-                _viewModel.IsTextVisible = false;
-                _viewModel.IsWebVisible = false;
             }
 
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)

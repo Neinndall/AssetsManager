@@ -32,7 +32,6 @@ namespace AssetsManager.Services.Viewer
                 StaticMesh staticMesh;
                 using (var stream = File.OpenRead(filePath))
                 {
-                    // Detect signature to decide between Binary (.scb) or Ascii (.sco)
                     byte[] header = new byte[12];
                     if (stream.Read(header, 0, 12) < 8)
                         throw new Exception("File too short");
@@ -44,15 +43,12 @@ namespace AssetsManager.Services.Viewer
                     {
                         staticMesh = StaticMesh.ReadBinary(stream);
                     }
-                    else if (System.Text.Encoding.ASCII.GetString(header, 0, 11) == "[ObjectBegin") // Usually "[ObjectBegin]"
+                    else if (System.Text.Encoding.ASCII.GetString(header, 0, 11) == "[ObjectBegin")
                     {
                         staticMesh = StaticMesh.ReadAscii(stream);
                     }
                     else
                     {
-                         // Fallback heuristic: try ascii if it starts with text
-                         // But for now, let's assume standard format. 
-                         // Check strictly for [ObjectBegin]
                          using (StreamReader reader = new StreamReader(stream, System.Text.Encoding.ASCII, false, 1024, true))
                          {
                              string firstLine = reader.ReadLine();
@@ -63,8 +59,6 @@ namespace AssetsManager.Services.Viewer
                              }
                              else
                              {
-                                 // Try binary as fallback? Or assume it failed.
-                                 // Let's assume it failed signature check.
                                  throw new Exception("Unknown file format signature.");
                              }
                          }
@@ -86,14 +80,13 @@ namespace AssetsManager.Services.Viewer
 
         private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath)
         {
-            // Reusing the same logic from SknModelLoadingService ideally, but copying here for independence
             var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrEmpty(directoryPath) || !Directory.Exists(directoryPath)) return loadedTextures;
 
-            // Old SCO/SCB models are typically paired with .tex or .dds textures.
-            // TextureUtils.LoadTexture handles both extensions internally.
             var allFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
-                .Where(s => s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase));
+                .Where(s => s.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || s.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(path => Path.GetExtension(path).Equals(".dds", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
 
             foreach (string texPath in allFiles)
             {
@@ -101,10 +94,10 @@ namespace AssetsManager.Services.Viewer
                 {
                     using (Stream fileStream = File.OpenRead(texPath))
                     {
-                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
+                        BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(texPath));
                         if (loadedTex != null)
                         {
-                            string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                            string textureKey = Path.GetFileNameWithoutExtension(texPath);
                             if (!loadedTextures.ContainsKey(textureKey))
                                 loadedTextures[textureKey] = loadedTex;
                         }
@@ -120,9 +113,10 @@ namespace AssetsManager.Services.Viewer
 
         private async Task<SceneModel> CreateSceneModel(StaticMesh staticMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+            var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
+            string defaultTextureKey = colorTextureKeys.FirstOrDefault();
 
-            // Move geometry processing to background thread
             var dataList = await Task.Run(() =>
             {
                 var list = new List<SubmeshData>();
@@ -160,7 +154,7 @@ namespace AssetsManager.Services.Viewer
                         i += 3;
                     }
 
-                    string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, modelName, loadedTextures.Keys, null, _logService);
+                    string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, modelName, colorTextureKeys, defaultTextureKey, _logService);
                     list.Add(new SubmeshData(materialName, subPositions, triangleIndices, subTexCoords, initialMatchingKey));
                 }
                 return list;

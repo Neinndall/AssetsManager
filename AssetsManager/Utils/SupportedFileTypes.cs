@@ -27,7 +27,7 @@ namespace AssetsManager.Utils
         {
             if (string.IsNullOrEmpty(fileName)) return false;
             string extension = PathUtils.GetNormalizedExtension(fileName);
-            return AudioBank.Contains(extension) && fileName.Contains("_audio", StringComparison.OrdinalIgnoreCase);
+            return (extension == ".wpk" || extension == ".bnk") && fileName.Contains("_audio", StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool IsAudioDataContainer(string fileName)

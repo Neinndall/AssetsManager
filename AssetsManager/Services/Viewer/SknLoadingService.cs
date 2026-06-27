@@ -14,17 +14,20 @@ using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+
 
 namespace AssetsManager.Services.Viewer
 {
     public class SknLoadingService
     {
         private readonly LogService _logService;
+
 
         public SknLoadingService(LogService logService)
         {
@@ -44,9 +47,10 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
+                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
             }
             catch (Exception ex)
             {
@@ -70,9 +74,10 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
+                var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, null);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath));
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
             }
             catch (Exception ex)
             {
@@ -84,7 +89,11 @@ namespace AssetsManager.Services.Viewer
         private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath)
         {
             var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-            string[] textureFiles = Directory.GetFiles(directoryPath, "*.tex", SearchOption.TopDirectoryOnly);
+            var textureFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
+                .Where(path => path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
+                               path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(path => Path.GetExtension(path).Equals(".dds", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
 
             foreach (string texPath in textureFiles)
             {
@@ -92,10 +101,10 @@ namespace AssetsManager.Services.Viewer
                 {
                     using (Stream fileStream = File.OpenRead(texPath))
                     {
-                        BitmapSource loadedTex = TextureUtils.LoadTexture(fileStream, Path.GetExtension(texPath));
+                        BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(texPath));
                         if (loadedTex != null)
                         {
-                            string textureKey = Path.GetFileName(texPath).Split('.')[0];
+                            string textureKey = Path.GetFileNameWithoutExtension(texPath);
                             loadedTextures[textureKey] = loadedTex;
                         }
                     }
@@ -108,16 +117,29 @@ namespace AssetsManager.Services.Viewer
             return loadedTextures;
         }
 
-        private async Task<SceneModel> CreateSceneModel(SkinnedMesh skinnedMesh, Dictionary<string, BitmapSource> loadedTextures, string modelName)
+        private async Task<SceneModel> CreateSceneModel(
+            SkinnedMesh skinnedMesh,
+            Dictionary<string, BitmapSource> loadedTextures,
+            string modelName,
+            IReadOnlyDictionary<string, string> materialTextureOverrides)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
-
-            string defaultTextureKey = loadedTextures.Keys
-                .Where(k => k.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(k => k.Length)
-                .FirstOrDefault();
-
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
             string skinName = modelName.Split('.')[0];
+            var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
+
+            string defaultTextureKey = colorTextureKeys
+                .Where(k => k.IndexOf(skinName, StringComparison.OrdinalIgnoreCase) >= 0)
+                .Where(k => {
+                    int dotIndex = k.IndexOf('.');
+                    string baseName = dotIndex > 0 ? k.Substring(0, dotIndex) : k;
+                    return baseName.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase);
+                })
+                .OrderBy(k => {
+                    int dotIndex = k.IndexOf('.');
+                    return dotIndex > 0 ? dotIndex : k.Length;
+                })
+                .FirstOrDefault()
+                ?? colorTextureKeys.FirstOrDefault();
 
             // Move geometry processing to background thread
             var dataList = await Task.Run(() =>
@@ -133,29 +155,46 @@ namespace AssetsManager.Services.Viewer
                 {
                     string materialName = rangeObj.Material.TrimEnd('\0');
 
-                    var subPositions = new Point3D[rangeObj.VertexCount];
-                    for (int i = 0; i < rangeObj.VertexCount; i++)
-                    {
-                        var p = positions[rangeObj.StartVertex + i];
-                        subPositions[i] = new Point3D(p.X, p.Y, p.Z);
-                    }
-
-                    var triangleIndices = new int[rangeObj.IndexCount];
                     var subIndices = indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
+                    var vertexMap = new Dictionary<int, int>();
+                    var subPositions = new List<Point3D>();
+                    var subTexCoords = new List<System.Windows.Point>();
+                    var sourceVertexIndices = new List<int>();
+                    var triangleIndices = new int[rangeObj.IndexCount];
+
                     for (int i = 0; i < rangeObj.IndexCount; i++)
                     {
-                        triangleIndices[i] = (int)subIndices[i] - rangeObj.StartVertex;
+                        int sourceIndex = (int)subIndices[i];
+                        if (!vertexMap.TryGetValue(sourceIndex, out int localIndex))
+                        {
+                            var p = positions[sourceIndex];
+                            var uv = texCoords[sourceIndex];
+
+                            localIndex = subPositions.Count;
+                            vertexMap[sourceIndex] = localIndex;
+                            subPositions.Add(new Point3D(p.X, p.Y, p.Z));
+                            subTexCoords.Add(new System.Windows.Point(uv.X, uv.Y));
+                            sourceVertexIndices.Add(sourceIndex);
+                        }
+
+                        triangleIndices[i] = localIndex;
                     }
 
-                    var subTexCoords = new System.Windows.Point[rangeObj.VertexCount];
-                    for (int i = 0; i < rangeObj.VertexCount; i++)
-                    {
-                        var uv = texCoords[rangeObj.StartVertex + i];
-                        subTexCoords[i] = new System.Windows.Point(uv.X, uv.Y);
-                    }
+                    string initialMatchingKey = ResolveMaterialTexture(
+                        materialName,
+                        skinName,
+                        colorTextureKeys,
+                        defaultTextureKey,
+                        materialTextureOverrides,
+                        loadedTextures);
 
-                    string initialMatchingKey = TextureUtils.FindBestTextureMatch(materialName, skinName, loadedTextures.Keys, defaultTextureKey, _logService);
-                    list.Add(new SubmeshData(materialName, subPositions, triangleIndices, subTexCoords, initialMatchingKey));
+                    list.Add(new SubmeshData(
+                        materialName,
+                        subPositions.ToArray(),
+                        triangleIndices,
+                        subTexCoords.ToArray(),
+                        sourceVertexIndices.ToArray(),
+                        initialMatchingKey));
                 }
                 return list;
             });
@@ -165,6 +204,9 @@ namespace AssetsManager.Services.Viewer
                 var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
+
+                var opaqueParts = new List<ModelPart>();
+                var transparentParts = new List<ModelPart>();
 
                 foreach (var data in dataList)
                 {
@@ -185,21 +227,64 @@ namespace AssetsManager.Services.Viewer
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
+                    // Check for transparency using clean keyword-based classification of material name
+                    bool isTransparent = false;
+                    if (!string.IsNullOrEmpty(data.MaterialName))
+                    {
+                        string lowerMat = data.MaterialName.ToLowerInvariant();
+                        if (lowerMat.Contains("eye") || 
+                            lowerMat.Contains("hair") || 
+                            lowerMat.Contains("glass") || 
+                            lowerMat.Contains("trans") || 
+                            lowerMat.Contains("alpha") ||
+                            lowerMat.Contains("vfx") ||
+                            lowerMat.Contains("overlay") ||
+                            lowerMat.Contains("wing") ||
+                            lowerMat.Contains("shadow") ||
+                            lowerMat.Contains("decal") ||
+                            lowerMat.Contains("glow"))
+                        {
+                            isTransparent = true;
+                        }
+                    }
+
                     var modelPart = new ModelPart
                     {
                         Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
                         Visual = new ModelVisual3D(),
+                        SourceVertexIndices = data.SourceVertexIndices,
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.TexturePath,
-                        Geometry = geometryModel
+                        Geometry = geometryModel,
+                        IsTransparent = isTransparent
                     };
 
                     modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
-                    parts.Add(modelPart);
-                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
+                    if (isTransparent)
+                    {
+                        transparentParts.Add(modelPart);
+                    }
+                    else
+                    {
+                        opaqueParts.Add(modelPart);
+                    }
+                }
+
+                // Add opaque parts first to prevent depth-buffer transparency issues
+                foreach (var part in opaqueParts)
+                {
+                    parts.Add(part);
+                    sceneModel.RootVisual.Children.Add(part.Visual);
+                }
+
+                // Add transparent parts last
+                foreach (var part in transparentParts)
+                {
+                    parts.Add(part);
+                    sceneModel.RootVisual.Children.Add(part.Visual);
                 }
 
                 sceneModel.Parts.AddRange(parts);
@@ -208,6 +293,240 @@ namespace AssetsManager.Services.Viewer
             });
         }
 
-        private record SubmeshData(string MaterialName, Point3D[] Positions, int[] TriangleIndices, System.Windows.Point[] TextureCoordinates, string TexturePath);
+        private string ResolveMaterialTexture(
+            string materialName,
+            string skinName,
+            IReadOnlyList<string> colorTextureKeys,
+            string defaultTextureKey,
+            IReadOnlyDictionary<string, string> materialTextureOverrides,
+            Dictionary<string, BitmapSource> loadedTextures)
+        {
+            string normalizedMaterialName = NormalizeMaterialKey(materialName);
+            if (!string.IsNullOrEmpty(normalizedMaterialName) &&
+                materialTextureOverrides != null &&
+                materialTextureOverrides.TryGetValue(normalizedMaterialName, out string overrideTextureKey) &&
+                loadedTextures.ContainsKey(overrideTextureKey))
+            {
+                _logService.LogDebug($"Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
+                return overrideTextureKey;
+            }
+
+            return TextureUtils.FindBestTextureMatch(materialName, skinName, colorTextureKeys, defaultTextureKey, _logService);
+        }
+
+        private Dictionary<string, string> LoadMaterialTextureOverrides(string sknPath, IEnumerable<string> loadedTextureKeys, string textureDirPath)
+        {
+            var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string skinBinPath = TryResolveSkinBinPath(sknPath, textureDirPath);
+            if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath))
+            {
+                _logService.LogDebug($"No skin material bin found for '{Path.GetFileName(sknPath)}'. Texture matching will use heuristics.");
+                return overrides;
+            }
+
+            try
+            {
+                using var stream = File.OpenRead(skinBinPath);
+                var binTree = new BinTree(stream);
+
+                var materialTextures = BuildMaterialTextureMap(binTree, loadedTextureKeys);
+                if (materialTextures.Count == 0)
+                {
+                    _logService.LogDebug($"Skin material bin has no texture override objects, will use heuristics.");
+                    return overrides;
+                }
+
+                foreach (var obj in binTree.Objects.Values)
+                {
+                    if (obj.ClassHash != 0x9B67E9F6) continue;
+                    if (!obj.Properties.TryGetValue(0x45FF5904, out var rootProp) || rootProp is not BinTreeStruct rootStruct) continue;
+                    if (!rootStruct.Properties.TryGetValue(0x24725910, out var groupsProp) || groupsProp is not BinTreeContainer groups) continue;
+
+                    foreach (var element in groups.Elements)
+                    {
+                        if (element is not BinTreeStruct groupEntry) continue;
+
+                        uint objLink = 0;
+                        string groupName = null;
+                        foreach (var prop in groupEntry.Properties)
+                        {
+                            if (prop.Value is BinTreeObjectLink link) objLink = link.Value;
+                            else if (prop.Value is BinTreeString str) groupName = str.Value;
+                        }
+
+                        if (objLink == 0 || string.IsNullOrWhiteSpace(groupName)) continue;
+                        if (!materialTextures.TryGetValue(objLink, out string textureKey)) continue;
+
+                        string submeshKey = NormalizeMaterialKey(groupName);
+                        overrides[submeshKey] = textureKey;
+                        _logService.LogDebug($"Skin material bin maps material group '{groupName}' to texture '{textureKey}'.");
+                    }
+                }
+
+                _logService.LogDebug($"Loaded {overrides.Count} submesh texture override(s) from '{Path.GetFileName(skinBinPath)}'.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to read skin material bin: {skinBinPath}");
+            }
+
+            return overrides;
+        }
+
+        private Dictionary<uint, string> BuildMaterialTextureMap(BinTree binTree, IEnumerable<string> loadedTextureKeys)
+        {
+            var result = new Dictionary<uint, string>();
+            var textureKeyList = loadedTextureKeys.ToList();
+
+            foreach (var kv in binTree.Objects)
+            {
+                if (kv.Value.ClassHash != 0xFF9D3409) continue;
+
+                if (!kv.Value.Properties.TryGetValue(0x0A6F0EB5, out var texProp) || texProp is not BinTreeContainer texContainer)
+                    continue;
+
+                string diffusePath = null;
+                string fallbackPath = null;
+
+                foreach (var element in texContainer.Elements)
+                {
+                    if (element is not BinTreeStruct texEntry) continue;
+
+                    string slotName = null;
+                    string texPath = null;
+                    foreach (var prop in texEntry.Properties)
+                    {
+                        if (prop.Value is BinTreeString str)
+                        {
+                            if (slotName == null) slotName = str.Value;
+                            else texPath = str.Value;
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(slotName) || string.IsNullOrWhiteSpace(texPath)) continue;
+
+                    string lowerSlot = slotName.ToLowerInvariant();
+                    if (lowerSlot.Contains("diffuse") || lowerSlot.Contains("color") || lowerSlot.Contains("base"))
+                    {
+                        diffusePath = texPath;
+                        break;
+                    }
+                    fallbackPath ??= texPath;
+                }
+
+                string texPathToUse = diffusePath ?? fallbackPath;
+                if (string.IsNullOrWhiteSpace(texPathToUse)) continue;
+
+                string normalized = NormalizeAndMatchKey(texPathToUse, textureKeyList);
+                if (normalized != null)
+                    result[kv.Key] = normalized;
+            }
+
+            return result;
+        }
+
+        private static string NormalizeAndMatchKey(string texPath, List<string> availableKeys)
+        {
+            string fileName = Path.GetFileNameWithoutExtension(
+                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar));
+            return availableKeys.FirstOrDefault(k => k.Equals(fileName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string TryResolveSkinBinPath(string sknPath, string textureDirPath = null)
+        {
+            string pathForResolution = !string.IsNullOrEmpty(textureDirPath) ? textureDirPath : sknPath;
+            if (string.IsNullOrWhiteSpace(pathForResolution))
+            {
+                return null;
+            }
+
+            string fullPath = Path.GetFullPath(pathForResolution);
+            string normalizedPath = fullPath.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string marker = $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}characters{Path.DirectorySeparatorChar}";
+            int markerIndex = normalizedPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex >= 0)
+            {
+                string rootPath = normalizedPath[..markerIndex];
+                string relativePath = normalizedPath[(markerIndex + marker.Length)..];
+                string[] parts = relativePath.Split(Path.DirectorySeparatorChar);
+                if (parts.Length >= 3 && parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
+                {
+                    string championName = parts[0];
+                    string skinFolder = parts[2];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (!string.IsNullOrWhiteSpace(skinBinName))
+                    {
+                        string resolvedPath = Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
+                        if (File.Exists(resolvedPath)) return resolvedPath;
+                    }
+                }
+            }
+
+            // Fallback: scan upward for a "data/characters" directory
+            string[] pathParts = normalizedPath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < pathParts.Length; i++)
+            {
+                if (!pathParts[i].Equals("characters", StringComparison.OrdinalIgnoreCase)) continue;
+                if (i < 2 || i >= pathParts.Length - 1) continue;
+
+                string championName = pathParts[i - 1];
+                string foundDataDir = string.Join(Path.DirectorySeparatorChar.ToString(), pathParts.Take(i - 1));
+                if (i - 1 > 0) foundDataDir = Path.DirectorySeparatorChar + foundDataDir;
+
+                // Look for "skins" dir in path after "characters/<champ>"
+                for (int j = i + 1; j < pathParts.Length; j++)
+                {
+                    if (!pathParts[j].Equals("skins", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (j + 1 >= pathParts.Length) continue;
+
+                    string skinFolder = pathParts[j + 1];
+                    string skinBinName = GetSkinBinName(skinFolder);
+                    if (string.IsNullOrWhiteSpace(skinBinName)) continue;
+
+                    string candidate = Path.Combine(foundDataDir, "characters", championName, "skins", skinBinName);
+                    if (File.Exists(candidate)) return candidate;
+                    break;
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetSkinBinName(string skinFolder)
+        {
+            if (string.IsNullOrWhiteSpace(skinFolder))
+            {
+                return null;
+            }
+
+            if (skinFolder.Equals("base", StringComparison.OrdinalIgnoreCase))
+            {
+                return "skin0.bin";
+            }
+
+            Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+            return match.Success ? $"skin{int.Parse(match.Groups[1].Value)}.bin" : null;
+        }
+
+        private static string NormalizeMaterialKey(string materialName)
+        {
+            if (string.IsNullOrWhiteSpace(materialName))
+            {
+                return string.Empty;
+            }
+
+            string key = materialName.TrimEnd('\0').ToLowerInvariant();
+            key = Regex.Replace(key, @"_?skn$", string.Empty, RegexOptions.IgnoreCase);
+            return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
+        }
+
+        private record SubmeshData(
+            string MaterialName,
+            Point3D[] Positions,
+            int[] TriangleIndices,
+            System.Windows.Point[] TextureCoordinates,
+            int[] SourceVertexIndices,
+            string TexturePath);
+
     }
 }

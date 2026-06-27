@@ -14,9 +14,9 @@ namespace AssetsManager.Services.Monitor
 {
     public class BackupManager
     {
-        public event EventHandler<int> BackupStarted;
-        public event EventHandler<(int Processed, int Total, string CurrentFile)> BackupProgressChanged;
-        public event EventHandler<bool> BackupCompleted;
+        public event Action<int> BackupStarted;
+        public event Action<int, int, string> BackupProgressChanged;
+        public event Action<bool> BackupCompleted;
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -37,7 +37,7 @@ namespace AssetsManager.Services.Monitor
         public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken, string logMessage = "Starting backup...")
         {
             // Notify UI immediately to show activity (Indeterminate spinner)
-            BackupStarted?.Invoke(this, 0);
+            BackupStarted?.Invoke(0);
 
             await Task.Run(async () =>
             {
@@ -64,29 +64,29 @@ namespace AssetsManager.Services.Monitor
                     }
 
                     // Update UI with the real total discovered
-                    BackupStarted?.Invoke(this, totalFiles);
+                    BackupStarted?.Invoke(totalFiles);
 
                     int processedFiles = 0;
                     CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
                     
                     _currentSessionBackups.Add(destinationBackupPath);
-                    BackupCompleted?.Invoke(this, true);
+                    BackupCompleted?.Invoke(true);
                 }
                 catch (OperationCanceledException)
                 {
-                    _logService.LogWarning("Backup process was cancelled.");
-                    BackupCompleted?.Invoke(this, false);
+                    BackupCompleted?.Invoke(false);
                     // Clean up partially created backup if cancelled
                     if (Directory.Exists(destinationBackupPath))
                     {
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
                     }
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Backup failed for source: {sourceLolPath}");
-                    BackupCompleted?.Invoke(this, false);
+                    BackupCompleted?.Invoke(false);
                     throw; 
                 }
             }, cancellationToken);
@@ -94,7 +94,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task CloneBackupAsync(string sourceBackupPath, string destinationBackupPath, CancellationToken cancellationToken)
         {
-            BackupStarted?.Invoke(this, 0);
+            BackupStarted?.Invoke(0);
 
             await Task.Run(async () =>
             {
@@ -119,28 +119,28 @@ namespace AssetsManager.Services.Monitor
                         _logService.LogError(ex, $"Could not count files for cloning progress: {sourceBackupPath}");
                     }
 
-                    BackupStarted?.Invoke(this, totalFiles);
+                    BackupStarted?.Invoke(totalFiles);
 
                     int processedFiles = 0;
                     CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
 
                     _currentSessionBackups.Add(destinationBackupPath);
-                    BackupCompleted?.Invoke(this, true);
+                    BackupCompleted?.Invoke(true);
                 }
                 catch (OperationCanceledException)
                 {
-                    _logService.LogWarning("Backup cloning was cancelled.");
-                    BackupCompleted?.Invoke(this, false);
+                    BackupCompleted?.Invoke(false);
                     if (Directory.Exists(destinationBackupPath))
                     {
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
                     }
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error cloning backup: {sourceBackupPath} to {destinationBackupPath}");
-                    BackupCompleted?.Invoke(this, false);
+                    BackupCompleted?.Invoke(false);
                     throw;
                 }
             }, cancellationToken);
@@ -161,7 +161,7 @@ namespace AssetsManager.Services.Monitor
                 cancellationToken.ThrowIfCancellationRequested();
                 file.CopyTo(Path.Combine(destinationDir, file.Name), true);
                 processedFiles++;
-                BackupProgressChanged?.Invoke(this, (processedFiles, totalFiles, file.Name));
+                BackupProgressChanged?.Invoke(processedFiles, totalFiles, file.Name);
             }
 
             foreach (DirectoryInfo subDir in dir.GetDirectories())

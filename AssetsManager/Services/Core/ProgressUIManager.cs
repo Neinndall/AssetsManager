@@ -92,6 +92,7 @@ namespace AssetsManager.Services.Core
                 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                // _progressDetailsWindow.Show(); // Ventana en segundo plano por defecto, el usuario la abre si quiere
             });
         }
 
@@ -115,11 +116,27 @@ namespace AssetsManager.Services.Core
         }
 
         /// <summary>
-        /// Centralizes logic to finish an operation.
-        /// </summary>
         private async Task FinishOperation()
         {
-            if (_taskCancellationManager.IsCancelling) await Task.Delay(1500);
+            bool wasCancelled = _taskCancellationManager.IsCancelling;
+            if (wasCancelled)
+            {
+                // Set the status bar text to the cancellation message to ensure it is displayed
+                UpdateStatusBar(_taskCancellationManager.CancellationMessage);
+                await Task.Delay(1500);
+            }
+            else
+            {
+                // Yield control to the UI thread to allow it to render the final progress state (e.g. 207 of 207)
+                if (System.Windows.Application.Current != null)
+                {
+                    await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                }
+
+                // Give the user 100ms to visually register the completed progress before closing the window
+                await Task.Delay(100);
+            }
+
             _taskCancellationManager.CompleteCurrentOperation();
             UpdateStatusBar("Ready");
             _owner.Dispatcher.Invoke(() =>
@@ -222,40 +239,48 @@ namespace AssetsManager.Services.Core
                     _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
                     return;
                 }
-                
+
                 StartOperation("Comparing WADs", "Comparing", "Compare", totalFiles, "Preparing WADs...");
             });
         }
 
-        public void OnComparisonProgressChanged(int completedFiles, string currentFile, bool isSuccess, string errorMessage)
+        public void OnComparisonProgressChanged(int completedFiles, string currentWadFile, bool isSuccess, string errorMessage)
         {
             // Note: currentFile already comes formatted as "{fileIndex} of {total} files: {wadName}" from WadComparatorService
-            UpdateOperation($"Comparing {currentFile}", completedFiles, _totalFiles, currentFile, isSuccess, errorMessage);
+            UpdateOperation($"Comparing {currentWadFile}", completedFiles, _totalFiles, currentWadFile, isSuccess, errorMessage);
         }
 
-        public async void OnComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version) => await FinishOperation();
+        public async void OnComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version) => await FinishComparisonAsync();
+
+        /// <summary>
+        /// Closes the comparison progress window after rendering the final 100% state.
+        /// Callers should await this before opening follow-up UI (e.g. results window)
+        /// to guarantee the progress window is fully closed first.
+        /// </summary>
+        public async Task FinishComparisonAsync() => await FinishOperation();
 
         // --- Extraction ---
 
-        public void OnExtractionStarted(object sender, (string message, int totalFiles) data)
+        public void OnExtractionStarted(int totalFiles)
         {
             _owner.Dispatcher.Invoke(() =>
             {
-                if (_progressDetailsWindow != null && _totalFiles == 0 && data.totalFiles > 0)
+                if (_progressDetailsWindow != null && _totalFiles == 0 && totalFiles > 0)
                 {
-                    _totalFiles = data.totalFiles;
-                    UpdateStatusBar("Preparing Files...", 0, data.totalFiles);
-                    _progressDetailsWindow.UpdateProgress(0, data.totalFiles, "Initializing...", true, null);
+                    _totalFiles = totalFiles;
+                    UpdateStatusBar("Preparing Files...", 0, totalFiles);
+                    _progressDetailsWindow.UpdateProgress(0, totalFiles, "Initializing...", true, null);
                     return;
                 }
 
-                StartOperation("Extracting Assets", "Extracting", "PackageDown", data.totalFiles, "Preparing Files...");
+                StartOperation("Extracting Assets", "Extracting", "PackageDown", totalFiles, "Preparing Files...");
             });
         }
 
-        public void OnExtractionProgressChanged(int completedFiles, int totalFiles, string currentFile)
+        public void OnExtractionProgressChanged(int extractedCount, int totalFiles, string message)
         {
-            UpdateOperation($"Extracting {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
+            string detail = string.IsNullOrEmpty(message) ? "Preparing Assets..." : message;
+            UpdateOperation($"Extracting {extractedCount} of {totalFiles} assets: {detail}", extractedCount, totalFiles, message);
         }
 
         public async void OnExtractionCompleted() => await FinishOperation();
@@ -280,33 +305,40 @@ namespace AssetsManager.Services.Core
 
         public void OnSavingProgressChanged(int completedFiles, int totalFiles, string currentFile)
         {
-            UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {currentFile}", completedFiles, totalFiles, currentFile);
+            string detail = string.IsNullOrEmpty(currentFile) ? "Preparing Assets..." : currentFile;
+            UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {detail}", completedFiles, totalFiles, currentFile);
         }
 
         public async void OnSavingCompleted() => await FinishOperation();
 
         // --- Versions (Update) ---
 
-        public void OnVersionDownloadStarted(object sender, string taskName)
+        public void OnVersionDownloadStarted(string taskName)
         {
             // Version download always starts with verification
             StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
-        public void OnVersionDownloadProgressChanged(object sender, (string TaskName, int CurrentValue, int TotalValue, string CurrentFile) data)
+        public async void OnVersionVerificationCompleted()
+        {
+            // Pause so the 100% Verifying state is visible in the UI before switching to Updating.
+            await Task.Delay(100);
+        }
+
+        public void OnVersionDownloadProgressChanged(string taskName, int currentValue, int totalValue, string currentFile)
         {
             _owner.Dispatcher.Invoke(() =>
             {
                 if (_progressDetailsWindow != null)
                 {
-                    _progressDetailsWindow.ViewModel.OperationVerb = data.TaskName; // Cambia dinámicamente entre Verifying y Updating
+                    _progressDetailsWindow.ViewModel.OperationVerb = taskName; // Cambia dinámicamente entre Verifying y Updating
                 }
             });
             // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName
-            UpdateOperation($"{data.TaskName} {data.CurrentFile}", data.CurrentValue, data.TotalValue, data.CurrentFile);
+            UpdateOperation($"{taskName} {currentFile}", currentValue, totalValue, currentFile);
         }
 
-        public async void OnVersionDownloadCompleted(object sender, (string TaskName, bool Success, string Message) data)
+        public async void OnVersionDownloadCompleted(string taskName, bool success, string message)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
@@ -314,16 +346,16 @@ namespace AssetsManager.Services.Core
             
             await _owner.Dispatcher.InvokeAsync(() =>
             {
-                if (!data.Success && !wasCancelled) 
+                if (!success && !wasCancelled) 
                 {
-                    _customMessageBoxService.ShowError("Error", data.Message, _owner);
+                    _customMessageBoxService.ShowError("Error", message, _owner);
                 }
             });
         }
 
         // --- Backups ---
 
-        public void OnBackupStarted(object sender, int totalFiles)
+        public void OnBackupStarted(int totalFiles)
         {
             _owner.Dispatcher.Invoke(() =>
             {
@@ -340,12 +372,13 @@ namespace AssetsManager.Services.Core
             });
         }
 
-        public void OnBackupProgressChanged(object sender, (int Processed, int Total, string CurrentFile) data)
+        public void OnBackupProgressChanged(int processed, int total, string currentFile)
         {
-            UpdateOperation($"Backing up {data.Processed} of {data.Total} files: {data.CurrentFile}", data.Processed, data.Total, data.CurrentFile);
+            string detail = string.IsNullOrEmpty(currentFile) ? "Preparing Backup..." : currentFile;
+            UpdateOperation($"Backing up {processed} of {total} files: {detail}", processed, total, currentFile);
         }
 
-        public async void OnBackupCompleted(object sender, bool success)
+        public async void OnBackupCompleted(bool success)
         {
             // BackupsControl handles the success message/logic. We just close the progress UI.
             await FinishOperation();
