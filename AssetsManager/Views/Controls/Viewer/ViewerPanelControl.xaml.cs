@@ -72,7 +72,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 foreach (SceneModel model in e.NewItems)
                 {
                     model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                    model.IsTextureSyncEnabled = _viewModel.IsTextureSyncEnabled;
                     model.MeshVisibilityChanged += HandleMeshVisibilityChanged;
+                    model.MeshTextureChanged += HandleMeshTextureChanged;
                 }
             }
             if (e.OldItems != null)
@@ -80,6 +82,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 foreach (SceneModel model in e.OldItems)
                 {
                     model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                    model.MeshTextureChanged -= HandleMeshTextureChanged;
                 }
             }
             UpdateHeroStats();
@@ -108,6 +111,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 foreach (var model in _viewModel.LoadedModels)
                 {
                     model.IsMeshSyncEnabled = _viewModel.IsMeshSyncEnabled;
+                }
+            }
+            else if (e.PropertyName == nameof(ViewerPanelModel.IsTextureSyncEnabled))
+            {
+                foreach (var model in _viewModel.LoadedModels)
+                {
+                    model.IsTextureSyncEnabled = _viewModel.IsTextureSyncEnabled;
                 }
             }
             else if (e.PropertyName == nameof(ViewerPanelModel.SelectedModelParts))
@@ -154,6 +164,57 @@ namespace AssetsManager.Views.Controls.Viewer
                         finally
                         {
                             model.IsMeshSyncEnabled = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void HandleMeshTextureChanged(ModelPart sourcePart)
+        {
+            if (!_viewModel.IsTextureSyncEnabled) return;
+
+            foreach (var model in _viewModel.LoadedModels)
+            {
+                // Find all parts with the same name (case-insensitive)
+                var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+                
+                foreach (var targetPart in targetParts)
+                {
+                    if (targetPart != sourcePart)
+                    {
+                        try
+                        {
+                            if (sourcePart.SelectedTextureName != null)
+                            {
+                                string sourceTexNormal = PathUtils.TruncateAtDot(sourcePart.SelectedTextureName);
+                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t => 
+                                    string.Equals(PathUtils.TruncateAtDot(t), sourceTexNormal, StringComparison.OrdinalIgnoreCase));
+                                    
+                                if (exactMatch != null)
+                                {
+                                    if (targetPart.SelectedTextureName != exactMatch)
+                                    {
+                                        targetPart.SelectedTextureName = exactMatch;
+                                    }
+                                }
+                                else
+                                {
+                                    // Fallback to index-based matching (for chromas which have differently named textures in the same order)
+                                    int sourceIndex = sourcePart.AvailableTextureNames.IndexOf(sourcePart.SelectedTextureName);
+                                    if (sourceIndex >= 0 && sourceIndex < targetPart.AvailableTextureNames.Count)
+                                    {
+                                        if (targetPart.SelectedTextureName != targetPart.AvailableTextureNames[sourceIndex])
+                                        {
+                                            targetPart.SelectedTextureName = targetPart.AvailableTextureNames[sourceIndex];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogService.LogError(ex, $"Failed to sync texture for part '{targetPart.Name}' in model '{model.Name}'");
                         }
                     }
                 }
@@ -224,11 +285,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.AnimationModels.CollectionChanged -= OnAnimationModelsCollectionChanged;
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
-                // Also detach MeshVisibilityChanged from any model still in the list,
+                // Also detach MeshVisibilityChanged and MeshTextureChanged from any model still in the list,
                 // in case Cleanup is called before ResetScene.
                 foreach (var model in _viewModel.LoadedModels)
                 {
                     model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+                    model.MeshTextureChanged -= HandleMeshTextureChanged;
                 }
 
                 ResetScene();
@@ -248,6 +310,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (model == null) return;
             model.MeshVisibilityChanged -= HandleMeshVisibilityChanged;
+            model.MeshTextureChanged -= HandleMeshTextureChanged;
 
             // Dispose animations that are not shared with any OTHER loaded model
             foreach (var anim in model.Animations)

@@ -4,6 +4,7 @@ HOTFIX UPDATE
 
 New Features
   - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.
+  - Viewer / Sync Textures: added a toggle to synchronize textures and body parts, automatically applying visibility and texture updates to all parts containing "body" in their name.
 
 Improvements
   - Texture Match Viewer/Heuristic: Improved texture guessing on models

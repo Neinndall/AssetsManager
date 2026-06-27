@@ -116,6 +116,13 @@ namespace AssetsManager.Views.Models.Viewer
             set => SetField(ref _isMeshSyncEnabled, value);
         }
 
+        private bool _isTextureSyncEnabled;
+        public bool IsTextureSyncEnabled
+        {
+            get => _isTextureSyncEnabled;
+            set => SetField(ref _isTextureSyncEnabled, value);
+        }
+
         private bool _areAllPartsVisible = true;
         public bool AreAllPartsVisible
         {
@@ -134,6 +141,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         public event PropertyChangedEventHandler PropertyChanged;
         public event Action<ModelPart> MeshVisibilityChanged;
+        public event Action<ModelPart> MeshTextureChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
@@ -200,6 +208,16 @@ namespace AssetsManager.Views.Models.Viewer
                     }
                 }
                 UpdateMasterVisibility();
+            }
+            else if (e.PropertyName == nameof(ModelPart.SelectedTextureName))
+            {
+                if (sender is ModelPart part)
+                {
+                    if (IsTextureSyncEnabled)
+                    {
+                        MeshTextureChanged?.Invoke(part);
+                    }
+                }
             }
         }
 
@@ -271,6 +289,13 @@ namespace AssetsManager.Views.Models.Viewer
                 foreach (var d in MeshVisibilityChanged.GetInvocationList())
                 {
                     MeshVisibilityChanged -= (Action<ModelPart>)d;
+                }
+            }
+            if (MeshTextureChanged != null)
+            {
+                foreach (var d in MeshTextureChanged.GetInvocationList())
+                {
+                    MeshTextureChanged -= (Action<ModelPart>)d;
                 }
             }
         }
