@@ -10,7 +10,7 @@ namespace AssetsManager.Views.Models.Viewer
     public class ViewerViewportModel : INotifyPropertyChanged
     {
         private bool _isFpsVisible = false;
-        private bool _limitFps = true; // Cap FPS at 60 by default to prevent UI lag
+        private bool _limitFps = false; // Cap FPS disabled by default
         private bool _isAutoRotateActive = false;
         private bool _isMaximized = false;
         private bool _isToolbarVisible = false;

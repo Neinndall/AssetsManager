@@ -59,9 +59,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
         private const double TargetFrameTime = 1.0 / 60.0; // 60 FPS limit target
-        private int _fpsCount = 0;
-        private double _fpsTimer = 0.0;
-
+ 
         // Environment references
         private ModelVisual3D _skyVisual;
         private ModelVisual3D _groundVisual;
@@ -468,34 +466,15 @@ namespace AssetsManager.Views.Controls.Viewer
             var elapsed = _frameStopwatch.Elapsed.TotalSeconds;
 
             // Option to limit viewport updates to 60 FPS to prevent thread/UI lag on high-refresh screens (144Hz+)
-            // We use a threshold buffer (5.0ms) to account for timer precision and prevent skipping frames on 60Hz screens
-            if (_viewModel.LimitFps && elapsed < (TargetFrameTime - 0.005))
+            if (_viewModel.LimitFps && elapsed < (TargetFrameTime - 0.0015))
             {
                 return;
             }
 
             _frameStopwatch.Restart();
+            var now = DateTime.Now;
+            _lastFrameTime = now;
             var deltaTime = elapsed;
-
-            // If the elapsed time since the last frame is too large (e.g. > 100ms), WPF was idling.
-            // We reset the counter and skip updating the FPS to prevent idle gaps from causing fluctuating numbers.
-            if (elapsed > 0.1)
-            {
-                _fpsCount = 0;
-                _fpsTimer = 0.0;
-                return;
-            }
-
-            // Track actual render updates per second and update ViewModel
-            _fpsCount++;
-            _fpsTimer += elapsed;
-            if (_fpsTimer >= 0.5)
-            {
-                double fps = _fpsCount / _fpsTimer;
-                _viewModel.DisplayFps = Math.Round(fps).ToString();
-                _fpsCount = 0;
-                _fpsTimer = 0.0;
-            }
 
             if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
@@ -518,7 +497,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         transformGroup.Children.Add(_autoRotation);
                     }
-                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle += 0.5;
+                    double rotationSpeed = 30.0 * elapsed;
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = (((AxisAngleRotation3D)_autoRotation.Rotation).Angle + rotationSpeed) % 360;
                 }
             }
 
