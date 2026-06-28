@@ -14,6 +14,7 @@ using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Controls.Shared;
 using System.Linq;
@@ -371,7 +372,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
                 _viewModel.LoadedModels.Remove(modelToDelete);
-                SafeDisposeModel(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
                 if (_viewModel.LoadedModels.Count == 0)
@@ -609,6 +609,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
+                bool wasMainContentHidden = !_viewModel.IsMainContentVisible;
+
                 if (extension == ".skn")
                 {
                     string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
@@ -623,8 +625,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    Viewport?.SetupScene(false);
                     ViewModel.ShowMainContent(); // MVVM State Update
+
+                    if (wasMainContentHidden)
+                    {
+                        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+                        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+                    }
+
+                    Viewport?.SetupScene(false);
                 }
 
                 // Initialize Transform
@@ -767,8 +776,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                Viewport?.SetupScene(true);
+                bool wasMainContentHidden = !ViewModel.IsMainContentVisible;
                 ViewModel.ShowMainContent(); // MVVM State Update
+
+                if (wasMainContentHidden)
+                {
+                    await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
+                    await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+                }
+
+                Viewport?.SetupScene(true);
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;

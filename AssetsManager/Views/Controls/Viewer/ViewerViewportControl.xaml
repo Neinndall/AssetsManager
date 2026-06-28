@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:helix="http://helix-toolkit.org/wpf"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -30,19 +29,17 @@
         <Border CornerRadius="0" ClipToBounds="True" BorderThickness="0">
             <Grid>
                 <!-- 3D VIEWPORT -->
-                <helix:HelixViewport3D x:Name="Viewport3D" 
-                                       Background="Transparent"
-                                       ShowFrameRate="{Binding IsFpsVisible}"
-                                       ShowCameraInfo="False"
-                                       ShowViewCube="False"
-                                       IsRotationEnabled="False"
-                                       IsZoomEnabled="False"
-                                       IsPanEnabled="False"
-                                       SnapsToDevicePixels="False"
-                                       UseLayoutRounding="False"
-                                       ClipToBounds="True"
-                                       RenderOptions.EdgeMode="Unspecified"
-                                       RenderOptions.BitmapScalingMode="HighQuality">
+                <Viewport3D x:Name="Viewport3D"
+                            ClipToBounds="True"
+                            SnapsToDevicePixels="False"
+                            UseLayoutRounding="False"
+                            RenderOptions.EdgeMode="Unspecified"
+                            RenderOptions.BitmapScalingMode="HighQuality">
+                    <Viewport3D.Camera>
+                        <PerspectiveCamera Position="0,2386,670" LookDirection="0,-250,-650"
+                                           UpDirection="0,1,0" FieldOfView="45"
+                                           NearPlaneDistance="0.1" FarPlaneDistance="100000"/>
+                    </Viewport3D.Camera>
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
                             <Model3DGroup>
@@ -55,7 +52,16 @@
                             </Model3DGroup>
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
-                </helix:HelixViewport3D>
+                </Viewport3D>
+
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,82,0,0"
+                        Padding="8,4" CornerRadius="5" Background="#CC111114"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding IsFpsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding DisplayFps, StringFormat={}{0} FPS}"
+                               Foreground="#FF6EE7A2" FontFamily="Consolas"
+                               FontSize="13" FontWeight="SemiBold"/>
+                </Border>
 
                 <!-- ============================================ -->
                 <!-- TOP-LEFT: SCENE INFO BADGE                  -->
@@ -210,14 +216,6 @@
                                                   IsChecked="{Binding IsFpsVisible}"
                                                   Width="34" Height="34">
                                         <materialIcons:MaterialIcon Kind="Speedometer" Width="15" Height="15"/>
-                                    </ToggleButton>
-                                    <ToggleButton x:Name="LimitFpsToggleButton"
-                                                  Style="{StaticResource TransparentIconToggleButton}"
-                                                  ToolTip="Limit Viewport to 60 FPS (Reduces CPU &amp; Stutter)"
-                                                  IsChecked="{Binding LimitFps}"
-                                                  Width="34" Height="34"
-                                                  Margin="4,0,0,0">
-                                        <materialIcons:MaterialIcon Kind="Gauge" Width="15" Height="15"/>
                                     </ToggleButton>
                                 </StackPanel>
                             </Border>

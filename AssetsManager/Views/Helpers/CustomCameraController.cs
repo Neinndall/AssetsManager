@@ -2,14 +2,14 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
-using HelixToolkit.Wpf;
+using System.Windows.Controls;
 using System.Windows.Media.Media3D;
 
 namespace AssetsManager.Views.Helpers
 {
     public class CustomCameraController : IDisposable
     {
-        private HelixViewport3D _viewport;
+        private Viewport3D _viewport;
         private bool _isRotating;
         private bool _isPanning;
         private System.Windows.Point _lastMousePosition;
@@ -24,7 +24,7 @@ namespace AssetsManager.Views.Helpers
 
         public double ZoomSensitivity { get; set; } = 80.0;
 
-        public CustomCameraController(HelixViewport3D viewport)
+        public CustomCameraController(Viewport3D viewport)
         {
             _viewport = viewport;
             _viewport.PreviewMouseDown += OnPreviewMouseDown;

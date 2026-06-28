@@ -4,7 +4,6 @@ using System.Numerics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Media3D;
-using HelixToolkit.Wpf;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
@@ -92,7 +91,7 @@ namespace AssetsManager.Services.Viewer
         }
 
         public void Update(float totalSeconds, IAnimationAsset animation, RigResource skeleton, SkinnedMesh skin,
-            System.Collections.Generic.IList<ModelPart> modelParts, LinesVisual3D skeletonVisual, PointsVisual3D jointsVisual, string modelName)
+            System.Collections.Generic.IList<ModelPart> modelParts, string modelName)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)

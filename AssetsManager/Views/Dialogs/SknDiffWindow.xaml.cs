@@ -9,7 +9,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using HelixToolkit.Wpf;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Utils;
@@ -144,13 +143,21 @@ namespace AssetsManager.Views.Dialogs
             _isSyncing = true;
             try
             {
-                OldViewport.Viewport3D.SetView(position, lookDir, upDir, 0);
-                NewViewport.Viewport3D.SetView(position, lookDir, upDir, 0);
+                SetCamera(OldViewport, position, lookDir, upDir);
+                SetCamera(NewViewport, position, lookDir, upDir);
             }
             finally
             {
                 _isSyncing = false;
             }
+        }
+
+        private static void SetCamera(ViewerViewportControl viewport, Point3D position, Vector3D lookDir, Vector3D upDir)
+        {
+            if (viewport.Viewport3D.Camera is not ProjectionCamera camera) return;
+            camera.Position = position;
+            camera.LookDirection = lookDir;
+            camera.UpDirection = upDir;
         }
 
         private bool _isSyncing = false;
