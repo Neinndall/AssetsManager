@@ -14,6 +14,7 @@ Improvements
     * Integrated a professional "Clear All" destructive action card next to the Sync button in the History panel.
     * Replaced generic confirmation dialog titles in History, Watcher, and Tracker modules with descriptive titles (Clear History, Clear Watcher, and Clear Tracker).
     * Streamlined the Search Card description in the History panel for a cleaner, more readable look.
+    * Added a direct validation checkmark action to the Watcher list to resolve modified files instantly without opening the diff viewer.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

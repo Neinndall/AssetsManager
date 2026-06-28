@@ -115,6 +115,20 @@ namespace AssetsManager.Views.Controls.Monitor
             }
         }
 
+        private void ValidateChanges_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var asset = button?.Tag as MonitoredAsset;
+
+            if (asset != null && asset.HasChanges)
+            {
+                asset.HasChanges = false;
+                asset.Status = AssetStatus.UpToDate;
+                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                AppSettings.Save();
+            }
+        }
+
         private void Remove_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
