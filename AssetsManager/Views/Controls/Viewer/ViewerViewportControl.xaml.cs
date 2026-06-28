@@ -18,7 +18,6 @@ using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -27,7 +26,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
 
-        public System.Windows.Controls.Viewport3D Viewport => Viewport3D;
+        public Viewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
@@ -40,6 +39,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
         private int _framesSinceFpsUpdate;
         private bool _renderPulse;
+        private TimeSpan _nextLimitedFrame;
         private DateTime _lastFrameTime;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
@@ -48,7 +48,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
         private bool _isCleanedUp;
-        private bool _hasCompletedFirstVisibleActivation;
 
         private struct ModelUpdateKey
         {
@@ -82,6 +81,12 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             switch (e.PropertyName)
             {
+                case nameof(ViewerViewportModel.LimitFps):
+                    _nextLimitedFrame = TimeSpan.Zero;
+                    _frameStopwatch.Restart();
+                    _fpsStopwatch.Restart();
+                    _framesSinceFpsUpdate = 0;
+                    break;
                 case nameof(ViewerViewportModel.IsAutoRotateActive):
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
                     break;
@@ -106,16 +111,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
-            _hasCompletedFirstVisibleActivation = false;
-            // Self-healing: only create the camera controller here.
             _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D);
-            ResetFrameCounter();
-            _ = Dispatcher.BeginInvoke(new Action(() =>
-            {
-                ResetFrameCounter();
-                Viewport3D?.InvalidateVisual();
-            }), DispatcherPriority.Loaded);
 
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
@@ -123,42 +120,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _lastFrameTime = DateTime.Now;
             _frameStopwatch.Restart();
             _fpsStopwatch.Restart();
-        }
-
-        public void RefreshRuntimeAfterFirstVisibleActivation()
-        {
-            if (_hasCompletedFirstVisibleActivation || Viewport3D == null)
-            {
-                return;
-            }
-
-            _hasCompletedFirstVisibleActivation = true;
-
-            _cameraController?.Dispose();
-            _cameraController = new CustomCameraController(Viewport3D);
-
-            CompositionTarget.Rendering -= CompositionTarget_Rendering;
-            CompositionTarget.Rendering += CompositionTarget_Rendering;
-
-            ResetFrameCounter();
-            var originalVisibility = Viewport3D.Visibility;
-            Viewport3D.Visibility = Visibility.Collapsed;
-            UpdateLayout();
-            Viewport3D.InvalidateMeasure();
-            Viewport3D.InvalidateArrange();
-            Viewport3D.Visibility = originalVisibility;
-            UpdateLayout();
-            Viewport3D.InvalidateMeasure();
-            Viewport3D.InvalidateArrange();
-            Viewport3D.InvalidateVisual();
-            _frameStopwatch.Restart();
-        }
-
-        private void ResetFrameCounter()
-        {
-            _frameStopwatch.Restart();
-            _fpsStopwatch.Restart();
-            _framesSinceFpsUpdate = 0;
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -408,7 +369,6 @@ namespace AssetsManager.Views.Controls.Viewer
             
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
-            ResetFrameCounter();
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
 
@@ -488,11 +448,31 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
+            var renderingTime = e is RenderingEventArgs renderingArgs
+                ? renderingArgs.RenderingTime
+                : _fpsStopwatch.Elapsed;
+
+            if (_viewModel.LimitFps)
+            {
+                var targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
+                if (_nextLimitedFrame != TimeSpan.Zero && renderingTime < _nextLimitedFrame)
+                    return;
+
+                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero ||
+                                    renderingTime - _nextLimitedFrame > targetFrameTime * 4
+                    ? renderingTime + targetFrameTime
+                    : _nextLimitedFrame + targetFrameTime;
+            }
+            else
+            {
+                _nextLimitedFrame = TimeSpan.Zero;
+            }
+
             var elapsed = _frameStopwatch.Elapsed.TotalSeconds;
             _frameStopwatch.Restart();
 
             _framesSinceFpsUpdate++;
-            if (_fpsStopwatch.Elapsed.TotalSeconds >= 0.5)
+            if (_fpsStopwatch.Elapsed.TotalSeconds >= 1.0)
             {
                 var fps = _framesSinceFpsUpdate / _fpsStopwatch.Elapsed.TotalSeconds;
                 _viewModel.DisplayFps = Math.Round(fps).ToString("0");
@@ -609,22 +589,15 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            // WPF renders Viewport3D on demand. A static scene therefore stops
-            // producing a continuous stream of presented frames, which makes an
-            // FPS counter look artificially capped. While the counter is visible,
-            // keep the viewport dirty so DisplayFps measures sustained rendering.
-            // The limiter above still decides whether this happens at 60 Hz.
-            if (_viewModel.IsFpsVisible && Viewport3D.IsVisible)
+            // WPF renders static 3D scenes on demand. While FPS measurement is
+            // visible, request continuous real frames without a visible camera change.
+            if (_viewModel.IsFpsVisible && Viewport3D.IsVisible &&
+                Viewport3D.Camera is PerspectiveCamera camera)
             {
-                // InvalidateVisual alone is coalesced for an unchanged Viewport3D.
-                // Touch a harmless camera value so WPF schedules a real 3D frame,
-                // exactly as it does while the user rotates the camera.
-                if (Viewport3D.Camera is PerspectiveCamera camera)
-                {
-                    _renderPulse = !_renderPulse;
-                    camera.NearPlaneDistance = _renderPulse ? 0.1 : 0.100001;
-                }
+                _renderPulse = !_renderPulse;
+                camera.NearPlaneDistance = _renderPulse ? 0.1 : 0.100001;
             }
+
         }
 
         private AnimationPlayer GetPlayerForModel(SceneModel model)
@@ -1041,6 +1014,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }
             }
+
         }
 
         private static T FindVisualChild<T>(DependencyObject parent) where T : Visual

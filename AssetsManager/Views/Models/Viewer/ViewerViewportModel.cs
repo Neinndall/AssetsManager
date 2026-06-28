@@ -10,6 +10,7 @@ namespace AssetsManager.Views.Models.Viewer
     public class ViewerViewportModel : INotifyPropertyChanged
     {
         private bool _isFpsVisible = false;
+        private bool _limitFps = false;
         private bool _isAutoRotateActive = false;
         private bool _isMaximized = false;
         private bool _isToolbarVisible = false;
@@ -26,6 +27,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isFpsVisible;
             set { if (_isFpsVisible != value) { _isFpsVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool LimitFps
+        {
+            get => _limitFps;
+            set { if (_limitFps != value) { _limitFps = value; OnPropertyChanged(); } }
         }
 
         private string _displayFps = "0";

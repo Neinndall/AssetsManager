@@ -36,9 +36,12 @@
                             RenderOptions.EdgeMode="Unspecified"
                             RenderOptions.BitmapScalingMode="HighQuality">
                     <Viewport3D.Camera>
-                        <PerspectiveCamera Position="0,2386,670" LookDirection="0,-250,-650"
-                                           UpDirection="0,1,0" FieldOfView="45"
-                                           NearPlaneDistance="0.1" FarPlaneDistance="100000"/>
+                        <PerspectiveCamera Position="0,2386,670"
+                                           LookDirection="0,-250,-650"
+                                           UpDirection="0,1,0"
+                                           FieldOfView="45"
+                                           NearPlaneDistance="0.1"
+                                           FarPlaneDistance="100000"/>
                     </Viewport3D.Camera>
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
@@ -54,13 +57,33 @@
                     </ModelVisual3D>
                 </Viewport3D>
 
-                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,82,0,0"
-                        Padding="8,4" CornerRadius="5" Background="#CC111114"
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,24,24,0"
+                        Background="#CC18181B"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
                         IsHitTestVisible="False"
                         Visibility="{Binding IsFpsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                    <TextBlock Text="{Binding DisplayFps, StringFormat={}{0} FPS}"
-                               Foreground="#FF6EE7A2" FontFamily="Consolas"
-                               FontSize="13" FontWeight="SemiBold"/>
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.3"/>
+                    </Border.Effect>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#1F22C55E" CornerRadius="6" Width="22" Height="22"
+                                Margin="0,0,8,0" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Speedometer" Width="12" Height="12"
+                                                        Foreground="#FF6EE7A2"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" MinWidth="34">
+                            <TextBlock Text="FPS" FontSize="8" FontWeight="Black"
+                                       Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding DisplayFps}" FontFamily="Consolas"
+                                       FontSize="12" FontWeight="Bold" Foreground="#FF6EE7A2"/>
+                        </StackPanel>
+                    </StackPanel>
                 </Border>
 
                 <!-- ============================================ -->
@@ -216,6 +239,14 @@
                                                   IsChecked="{Binding IsFpsVisible}"
                                                   Width="34" Height="34">
                                         <materialIcons:MaterialIcon Kind="Speedometer" Width="15" Height="15"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="LimitFpsToggleButton"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  ToolTip="Limit Viewport to 60 FPS"
+                                                  IsChecked="{Binding LimitFps}"
+                                                  Width="34" Height="34"
+                                                  Margin="4,0,0,0">
+                                        <materialIcons:MaterialIcon Kind="Gauge" Width="15" Height="15"/>
                                     </ToggleButton>
                                 </StackPanel>
                             </Border>

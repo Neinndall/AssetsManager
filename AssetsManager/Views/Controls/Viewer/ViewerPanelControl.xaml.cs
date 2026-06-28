@@ -14,7 +14,6 @@ using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
 using Material.Icons;
 using System.Threading.Tasks;
-using System.Windows.Threading;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Controls.Shared;
 using System.Linq;
@@ -147,7 +146,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Find all parts with the same name (case-insensitive)
                 var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-                
+
                 foreach (var targetPart in targetParts)
                 {
                     if (targetPart != sourcePart)
@@ -179,7 +178,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Find all parts with the same name (case-insensitive)
                 var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-                
+
                 foreach (var targetPart in targetParts)
                 {
                     if (targetPart != sourcePart)
@@ -189,9 +188,9 @@ namespace AssetsManager.Views.Controls.Viewer
                             if (sourcePart.SelectedTextureName != null)
                             {
                                 string sourceTexNormal = PathUtils.TruncateAtDot(sourcePart.SelectedTextureName);
-                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t => 
+                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t =>
                                     string.Equals(PathUtils.TruncateAtDot(t), sourceTexNormal, StringComparison.OrdinalIgnoreCase));
-                                    
+
                                 if (exactMatch != null)
                                 {
                                     if (targetPart.SelectedTextureName != exactMatch)
@@ -495,7 +494,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public async void HandleChromaGalleryRequest(string skinsPath)
         {
             if (ChromaGallery == null) return;
-            
+
             ViewModel.IsChromaGalleryVisible = true;
             await ChromaGallery.InitializeAsync(skinsPath);
         }
@@ -509,7 +508,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Cargamos primero el modelo en segundo plano
                 await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
-                
+
                 // Una vez cargado y con el viewport listo, ocultamos la galería
                 ViewModel.IsChromaGalleryVisible = false;
             }
@@ -526,7 +525,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public async void HandleMultipleChromasSelected(List<ChromaSkinModel> skins)
         {
             var skinsWithModels = skins.Where(s => !string.IsNullOrEmpty(s.ModelPath)).ToList();
-            
+
             if (skinsWithModels.Count > 0)
             {
                 // Mantenemos la galería abierta durante la carga para mostrar el estado
@@ -609,8 +608,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                bool wasMainContentHidden = !_viewModel.IsMainContentVisible;
-
                 if (extension == ".skn")
                 {
                     string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
@@ -625,15 +622,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 if (isInitialLoad)
                 {
-                    ViewModel.ShowMainContent(); // MVVM State Update
-
-                    if (wasMainContentHidden)
-                    {
-                        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
-                        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-                    }
-
                     Viewport?.SetupScene(false);
+                    ViewModel.ShowMainContent(); // MVVM State Update
                 }
 
                 // Initialize Transform
@@ -776,16 +766,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (newModel != null)
             {
-                bool wasMainContentHidden = !ViewModel.IsMainContentVisible;
-                ViewModel.ShowMainContent(); // MVVM State Update
-
-                if (wasMainContentHidden)
-                {
-                    await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
-                    await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-                }
-
                 Viewport?.SetupScene(true);
+                ViewModel.ShowMainContent(); // MVVM State Update
 
                 Viewport?.AddModel(newModel);
                 _viewModel.SelectedModelParts = newModel.Parts;

@@ -5,7 +5,6 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
-using System.Windows.Threading;
 
 namespace AssetsManager.Views
 {
@@ -21,7 +20,6 @@ namespace AssetsManager.Views
         private readonly LogService _logService;
         private readonly TaskCancellationManager _taskCancellationManager;
         private bool _isCleanedUp;
-        private bool _hasTriggeredFirstMainContentActivation;
 
         public ViewerWindow(
             SknLoadingService sknLoadingService,
@@ -66,22 +64,6 @@ namespace AssetsManager.Views
             ChromaSelectionOverlay.ParentPanel = PanelControl;
 
             Loaded += (s, e) => _isCleanedUp = false;
-            MainContentGrid.IsVisibleChanged += MainContentGrid_IsVisibleChanged;
-        }
-
-        private void MainContentGrid_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            if (_hasTriggeredFirstMainContentActivation || MainContentGrid.Visibility != Visibility.Visible)
-            {
-                return;
-            }
-
-            _hasTriggeredFirstMainContentActivation = true;
-            _ = Dispatcher.BeginInvoke(new Action(() =>
-            {
-                ViewportControl?.RefreshRuntimeAfterFirstVisibleActivation();
-                ViewportControl?.SnapCamera();
-            }), DispatcherPriority.Loaded);
         }
 
         // Empty-state handlers: thin 1-liners that delegate to the Panel
@@ -98,7 +80,6 @@ namespace AssetsManager.Views
             {
                 _taskCancellationManager?.CancelCurrentOperation(false);
 
-                MainContentGrid.IsVisibleChanged -= MainContentGrid_IsVisibleChanged;
                 ViewportControl?.Cleanup();
                 PanelControl?.Cleanup();
             }
