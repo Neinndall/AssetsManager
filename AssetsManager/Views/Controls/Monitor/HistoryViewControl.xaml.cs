@@ -223,7 +223,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             string message = "Are you sure you want to delete ALL history entries? This will physically delete all backup files and comparison histories. This action cannot be undone.";
 
-            if (CustomMessageBoxService.ShowYesNo("Clear All History", message, Window.GetWindow(this)) == true)
+            if (CustomMessageBoxService.ShowYesNo("Clear History", message, Window.GetWindow(this)) == true)
             {
                 try
                 {

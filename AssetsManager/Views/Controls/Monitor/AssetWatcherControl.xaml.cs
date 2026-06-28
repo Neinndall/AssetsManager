@@ -90,7 +90,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void ClearAll_Click(object sender, RoutedEventArgs e)
         {
-            if (CustomMessageBoxService.ShowYesNo("Clear All", "Are you sure you want to remove all monitored assets?", Window.GetWindow(this)) == true)
+            if (CustomMessageBoxService.ShowYesNo("Clear Watcher", "Are you sure you want to remove all monitored assets?", Window.GetWindow(this)) == true)
             {
                 AppSettings.MonitoredAssets.Clear();
                 AppSettings.Save();

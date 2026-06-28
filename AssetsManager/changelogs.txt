@@ -10,6 +10,10 @@ Improvements
     * Added a configurable 60 FPS framerate limit toggle to reduce CPU and GPU overhead on high-refresh-rate monitors.
     * Optimized 3D mesh rendering by offloading background geometries to secondary threads, keeping the user interface completely fluid.
     * Replaced the default framework framerate counter with a custom, high-fidelity HUD FPS indicator.
+  - Monitor / History & Diagnostics HUD
+    * Integrated a professional "Clear All" destructive action card next to the Sync button in the History panel.
+    * Replaced generic confirmation dialog titles in History, Watcher, and Tracker modules with descriptive titles (Clear History, Clear Watcher, and Clear Tracker).
+    * Streamlined the Search Card description in the History panel for a cleaner, more readable look.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

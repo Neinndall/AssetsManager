@@ -321,7 +321,7 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (ViewModel.SelectedCategory == null || !ViewModel.Assets.Any(a => a.Status == "OK")) return;
 
-            var result = CustomMessageBoxService.ShowYesNo("Warning", $"Are you sure you want to remove ALL found assets?", Window.GetWindow(this));
+            var result = CustomMessageBoxService.ShowYesNo("Clear Tracker", $"Are you sure you want to remove ALL found assets?", Window.GetWindow(this));
             if (result == true)
             {
                 MonitorService.RemoveAllFoundAssets(ViewModel.SelectedCategory);
