@@ -7,8 +7,10 @@ This hotfix introduces critical performance optimizations for the 3D Viewport wh
 Improvements
   - Viewer / 3D Performance & FPS Stability
     * Fixed viewport stuttering by allocating dedicated animation caches for each loaded model to prevent frame-by-frame memory recalculations.
-    * Added a configurable 60 FPS framerate limit toggle to reduce CPU and GPU overhead on high-refresh-rate monitors.
+    * Added a configurable 60 FPS framerate limit toggle using high-precision Stopwatch delta timing with a 5.0ms jitter tolerance buffer to prevent double-capping conflicts with VSync.
+    * Integrated a WPF idle-state detection (>100ms elapsed) into the FPS counter to ignore idle gaps and prevent frame rate fluctuations when the screen is static.
     * Optimized 3D mesh rendering by offloading background geometries to secondary threads, keeping the user interface completely fluid.
+    * Implemented a thread-safe static texture cache (ConcurrentDictionary) for skybox and ground elements, preventing redundant DDS texture loads from assembly resources/disk and making model loading instantaneous.
     * Replaced the default framework framerate counter with a custom, high-fidelity HUD FPS indicator.
   - Monitor / History & Diagnostics HUD
     * Integrated a professional "Clear All" destructive action card next to the Sync button in the History panel.

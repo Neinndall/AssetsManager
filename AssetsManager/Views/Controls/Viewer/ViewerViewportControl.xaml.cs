@@ -39,6 +39,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
         private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
+        private readonly System.Diagnostics.Stopwatch _frameStopwatch = new();
         private DateTime _lastFrameTime;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
@@ -122,6 +123,7 @@ namespace AssetsManager.Views.Controls.Viewer
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             CompositionTarget.Rendering += CompositionTarget_Rendering;
             _lastFrameTime = DateTime.Now;
+            _frameStopwatch.Restart();
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -238,6 +240,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _lastFrameTime = DateTime.Now;
+            _frameStopwatch.Restart();
 
             Panel?.SetAnimationPlayingState(animationModel, true);
         }
@@ -462,17 +465,26 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
-            var now = DateTime.Now;
-            var elapsed = (now - _lastFrameTime).TotalSeconds;
+            var elapsed = _frameStopwatch.Elapsed.TotalSeconds;
 
             // Option to limit viewport updates to 60 FPS to prevent thread/UI lag on high-refresh screens (144Hz+)
-            if (_viewModel.LimitFps && elapsed < TargetFrameTime)
+            // We use a threshold buffer (5.0ms) to account for timer precision and prevent skipping frames on 60Hz screens
+            if (_viewModel.LimitFps && elapsed < (TargetFrameTime - 0.005))
             {
                 return;
             }
 
-            _lastFrameTime = now;
+            _frameStopwatch.Restart();
             var deltaTime = elapsed;
+
+            // If the elapsed time since the last frame is too large (e.g. > 100ms), WPF was idling.
+            // We reset the counter and skip updating the FPS to prevent idle gaps from causing fluctuating numbers.
+            if (elapsed > 0.1)
+            {
+                _fpsCount = 0;
+                _fpsTimer = 0.0;
+                return;
+            }
 
             // Track actual render updates per second and update ViewModel
             _fpsCount++;
