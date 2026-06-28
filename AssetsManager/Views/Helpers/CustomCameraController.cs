@@ -64,7 +64,7 @@ namespace AssetsManager.Views.Helpers
 
         private void OnCameraChanged(object sender, EventArgs e)
         {
-            // Update targets when camera changes externally (e.g. Helix panning/reset)
+            // Keep interpolation targets aligned with external camera changes.
             if (!_isTransitioning && _viewport?.Camera is ProjectionCamera camera)
             {
                 _targetPosition = camera.Position;

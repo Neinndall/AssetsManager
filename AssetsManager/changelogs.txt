@@ -7,8 +7,10 @@ This hotfix introduces critical performance optimizations for the 3D Viewport wh
 Improvements
   - Viewer / 3D Performance & FPS Stability
     * Fixed viewport stuttering by allocating dedicated animation caches for each loaded model to prevent frame-by-frame memory recalculations.
-    * Integrated Helix Toolkit's native frame rate counter (ShowFrameRate) bound to the FPS visibility settings, resolving conflicts with custom WPF rendering loop calculations.
-    * Set frame capping (LimitFps) to disabled by default, allowing high-refresh rate monitors (e.g. 144Hz, 165Hz) to display performance at their full hardware potential.
+    * Replaced Helix Toolkit with the native Microsoft WPF 3D viewport, reducing memory usage and simplifying model rendering.
+    * Added a redesigned FPS indicator with stable one-second updates and accurate readings on high-refresh-rate monitors.
+    * Added an optional 60 FPS limiter while keeping unrestricted rendering enabled by default.
+    * Preserved camera controls, Studio lighting, 4K snapshots, and 3D model comparisons on the native viewport.
     * Optimized 3D mesh rendering by offloading background geometries to secondary threads, keeping the user interface completely fluid.
     * Implemented a thread-safe static texture cache (ConcurrentDictionary) for skybox and ground elements, preventing redundant DDS texture loads from assembly resources/disk and making model loading instantaneous.
   - Monitor / History & Diagnostics HUD
