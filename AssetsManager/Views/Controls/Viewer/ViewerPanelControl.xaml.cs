@@ -984,23 +984,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void UpdateInspectorInfo()
         {
-            if (InspectorCounterText == null) return;
-
-            if (TabMeshes != null && TabMeshes.IsChecked == true)
-            {
-                InspectorCounterText.Text = "M";
-                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Textures & meshes";
-            }
-            else if (TabTransform != null && TabTransform.IsChecked == true)
-            {
-                InspectorCounterText.Text = "T";
-                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Transform & rotation";
-            }
-            else if (TabAnimations != null && TabAnimations.IsChecked == true)
-            {
-                InspectorCounterText.Text = "A";
-                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
-            }
+            if (InspectorCounterText != null) InspectorCounterText.Text = "MOD";
+            if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Model properties & animations";
         }
     }
 }
