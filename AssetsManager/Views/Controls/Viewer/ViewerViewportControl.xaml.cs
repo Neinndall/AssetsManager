@@ -38,7 +38,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private CustomCameraController _cameraController;
         private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
         private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
-        private AnimationPlayer _animationPlayer;
+        private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
         private DateTime _lastFrameTime;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
@@ -47,6 +47,19 @@ namespace AssetsManager.Views.Controls.Viewer
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
         private bool _isCleanedUp;
+
+        private struct ModelUpdateKey
+        {
+            public IAnimationAsset Animation;
+            public double AnimationTime;
+            public int VisiblePartsHash;
+            public bool IsVisible;
+        }
+
+        private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
+        private const double TargetFrameTime = 1.0 / 60.0; // 60 FPS limit target
+        private int _fpsCount = 0;
+        private double _fpsTimer = 0.0;
 
         // Environment references
         private ModelVisual3D _skyVisual;
@@ -95,9 +108,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
-            // Self-healing: only create the camera controller and animation player
-            // here. The window must not instantiate them too — see ViewerWindow notes.
-            _animationPlayer = new AnimationPlayer(LogService);
+            // Self-healing: only create the camera controller here.
+            _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D);
 
             // Re-add skeleton visual guides to viewport if they were cleared
@@ -174,9 +186,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 // 5. Limpiar todo el viewport
                 Viewport.Children.Clear();
 
-                // 6. Liberar el AnimationPlayer y todos sus buffers cacheados
-                _animationPlayer?.Dispose();
-                _animationPlayer = null;
+                // 6. Liberar los AnimationPlayers y todos sus buffers cacheados
+                foreach (var player in _modelPlayers.Values)
+                {
+                    player.Dispose();
+                }
+                _modelPlayers.Clear();
 
                 // 7. Liberar el CameraController (dueño único)
                 _cameraController?.Dispose();
@@ -347,7 +362,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // CRITICAL: Free cached vertex/skin buffers from the previous model so
             // the next load does not retain RAM of a model that is no longer in use.
-            _animationPlayer?.ClearCache();
+            foreach (var player in _modelPlayers.Values)
+            {
+                player.Dispose();
+            }
+            _modelPlayers.Clear();
+            _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
@@ -392,6 +412,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
+            _lastModelUpdates.Remove(model);
+            if (_modelPlayers.TryGetValue(model, out var player))
+            {
+                player.Dispose();
+                _modelPlayers.Remove(model);
+            }
             if (Viewport.Children.Contains(model.RootVisual))
             {
                 Viewport.Children.Remove(model.RootVisual);
@@ -437,8 +463,27 @@ namespace AssetsManager.Views.Controls.Viewer
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
             var now = DateTime.Now;
-            var deltaTime = (now - _lastFrameTime).TotalSeconds;
+            var elapsed = (now - _lastFrameTime).TotalSeconds;
+
+            // Option to limit viewport updates to 60 FPS to prevent thread/UI lag on high-refresh screens (144Hz+)
+            if (_viewModel.LimitFps && elapsed < TargetFrameTime)
+            {
+                return;
+            }
+
             _lastFrameTime = now;
+            var deltaTime = elapsed;
+
+            // Track actual render updates per second and update ViewModel
+            _fpsCount++;
+            _fpsTimer += elapsed;
+            if (_fpsTimer >= 0.5)
+            {
+                double fps = _fpsCount / _fpsTimer;
+                _viewModel.DisplayFps = Math.Round(fps).ToString();
+                _fpsCount = 0;
+                _fpsTimer = 0.0;
+            }
 
             if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
@@ -465,7 +510,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            if (_animationPlayer != null && _loadedModels.Count > 0)
+            if (_loadedModels.Count > 0)
             {
                 // Synchronize playback timing across all models if enabled (v3.2.3.2)
                 // IMPORTANT: Only sync if the master model actually has an animation to sync from.
@@ -499,19 +544,44 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         bool isActive = model == _activeSceneModel;
 
-                        // Update skinning for all models that have an animation to ensure they are visible and moving.
-                        // ObservableRangeCollection is passable directly to the AnimationPlayer (it iterates internally);
-                        // the previous ToList() allocation per-frame has been removed.
-                        _animationPlayer.Update(
-                            (float)model.AnimationTime,
-                            model.CurrentAnimation,
-                            model.Skeleton,
-                            model.SkinnedMesh,
-                            model.Parts,
-                            isActive ? _skeletonVisual : null,
-                            isActive ? _jointsVisual : null,
-                            model.Name
-                        );
+                        // Optimize: skip Parallel Skinning (CPU/Memory intensive) if the model is static/paused
+                        // and has already been rendered at this exact frame state.
+                        int visiblePartsHash = model.Parts?.Sum(p => p.IsVisible ? 1 : 0) ?? 0;
+                        var currentKey = new ModelUpdateKey
+                        {
+                            Animation = model.CurrentAnimation,
+                            AnimationTime = model.AnimationTime,
+                            VisiblePartsHash = visiblePartsHash,
+                            IsVisible = model.IsVisible
+                        };
+
+                        bool needsUpdate = true;
+                        if (_lastModelUpdates.TryGetValue(model, out var lastKey))
+                        {
+                            if (lastKey.Animation == currentKey.Animation &&
+                                Math.Abs(lastKey.AnimationTime - currentKey.AnimationTime) < 0.0001 &&
+                                lastKey.VisiblePartsHash == currentKey.VisiblePartsHash &&
+                                lastKey.IsVisible == currentKey.IsVisible)
+                            {
+                                needsUpdate = false;
+                            }
+                        }
+
+                        if (needsUpdate)
+                        {
+                            _lastModelUpdates[model] = currentKey;
+                            var player = GetPlayerForModel(model);
+                            player.Update(
+                                (float)model.AnimationTime,
+                                model.CurrentAnimation,
+                                model.Skeleton,
+                                model.SkinnedMesh,
+                                model.Parts,
+                                isActive ? _skeletonVisual : null,
+                                isActive ? _jointsVisual : null,
+                                model.Name
+                            );
+                        }
                     }
                 }
 
@@ -520,6 +590,16 @@ namespace AssetsManager.Views.Controls.Viewer
                     Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
                 }
             }
+        }
+
+        private AnimationPlayer GetPlayerForModel(SceneModel model)
+        {
+            if (!_modelPlayers.TryGetValue(model, out var player))
+            {
+                player = new AnimationPlayer(LogService);
+                _modelPlayers[model] = player;
+            }
+            return player;
         }
 
         public void ResetCamera(bool smooth = true)

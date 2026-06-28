@@ -1,9 +1,26 @@
+AssetsManager - League of Legends | v4.0.1.2
+
+HOTFIX UPDATE
+This hotfix introduces critical performance optimizations for the 3D Viewport when rendering multiple models simultaneously (such as chromas). It resolves major UI lag and stuttering by parallelizing geometry updates on background threads and isolating animation players to prevent constant vertex cache invalidation.
+
+
+Improvements
+  - Viewer / 3D Performance & FPS Stability
+    * Fixed viewport stuttering by allocating dedicated animation caches for each loaded model to prevent frame-by-frame memory recalculations.
+    * Added a configurable 60 FPS framerate limit toggle to reduce CPU and GPU overhead on high-refresh-rate monitors.
+    * Optimized 3D mesh rendering by offloading background geometries to secondary threads, keeping the user interface completely fluid.
+    * Replaced the default framework framerate counter with a custom, high-fidelity HUD FPS indicator.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.1.1
 
 HOTFIX UPDATE
+This hotfix focuses on improving stability, accuracy, and usability across AssetsManager v4.0.1.1. It introduces full support for NGrid visualization, improves texture synchronization and model texture matching, and refines progress reporting across save, extract, update, and comparison workflows.
+Several critical issues have been resolved, including chroma texture assignment failures, transparent mesh rendering problems, audio export inconsistencies, duplicated audio event nodes, incorrect progress totals, API Center UI resets, and LIVE comparison data mismatches. The Explorer, Viewer, Audio, Monitor, Comparator, and Core systems have also received multiple fixes to ensure smoother previews, cleaner cancellation handling, more reliable progress transitions, and better overall user experience.
+
 
 New Features
-  - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.
   - Viewer / Sync Textures: added a toggle to synchronize textures and body parts, automatically applying visibility and texture updates to all parts containing "body" in their name.
 
 Improvements
@@ -679,4 +696,3 @@ Bug Fixes
   - Explorer / HTML Support & Clean Type Definitions
     * Restored full text previewing and custom League syntax highlighting for .html files.
     * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
-
