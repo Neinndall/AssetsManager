@@ -1,10 +1,20 @@
 AssetsManager - League of Legends | v4.0.1.2
 
 HOTFIX UPDATE
-This hotfix introduces critical performance optimizations for the 3D Viewport when rendering multiple models simultaneously (such as chromas). It resolves major UI lag and stuttering by parallelizing geometry updates on background threads and isolating animation players to prevent constant vertex cache invalidation.
+This hotfix introduces critical performance optimizations for the 3D Viewport when rendering multiple models simultaneously (such as chromas). It resolves major UI lag and stuttering by parallelizing geometry updates on background threads and isolating animation players to prevent constant vertex cache invalidation. Additionally, it implements a brand new audio structure parser that replicates wwiser, grouping audio events by HIRC family containers with full recursive SAVE support.
 
+
+New Features
+  - Audio / Wwise HIRC Family Grouping (wwiser style)
+    * Reconstructed audio event trees to group sounds into virtual family directories based on HIRC container types (e.g. Random, Switch, Blend Containers).
+    * Integrated smart abbreviation labeling for families, replacing long C# class names with readable tags like "[Random] ID", "[Switch] ID", etc.
+    * Added a unique-family flattening filter: if an event has only one container and no root sounds, the subfolder is automatically dissolved to prevent redundant nesting.
 
 Improvements
+  - Audio / Recursive Audio Extraction & SAVE Calculations
+    * Refactored the "SAVE" extraction engine to recursively parse virtual directory structures, guaranteeing correct multi-level export to disk.
+    * Fixed the "SAVE" total audio count calculation to recursively include sounds inside HIRC family folders, resolving incorrect progress totals.
+    * Implemented cross-bank duplicate prevention for sounds referenced by multiple event Actions, ensuring shared sounds are unlinked from the "Unknown" folder and placed correctly in their respective families without internal duplication.
   - Viewer / 3D Performance & FPS Stability
     * Fixed viewport stuttering by allocating dedicated animation caches for each loaded model to prevent frame-by-frame memory recalculations.
     * Replaced Helix Toolkit with the native Microsoft WPF 3D viewport, reducing memory usage and simplifying model rendering.

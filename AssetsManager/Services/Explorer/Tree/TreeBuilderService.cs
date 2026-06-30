@@ -156,43 +156,31 @@ namespace AssetsManager.Services.Explorer.Tree
                         IsTechnicalNode = eventNode.IsTechnicalNode
                     };
 
+                    // Add Sub-Containers (HIRC families) if they exist
+                    var containerNodesToAdd = new List<FileSystemNodeModel>();
+                    foreach (var containerNode in eventNode.Containers)
+                    {
+                        var newContainerNode = new FileSystemNodeModel(containerNode.Name, NodeType.VirtualDirectory)
+                        {
+                            Parent = newEventNode,
+                            IsGroupingFolder = true
+                        };
+
+                        var containerSoundsToAdd = new List<FileSystemNodeModel>();
+                        foreach (var soundNode in containerNode.Sounds)
+                        {
+                            containerSoundsToAdd.Add(CreateSoundNode(soundNode, newContainerNode, linkedBank, clickedNode, absoluteSourceWadPath));
+                        }
+                        newContainerNode.Children.AddRange(containerSoundsToAdd);
+                        containerNodesToAdd.Add(newContainerNode);
+                    }
+                    newEventNode.Children.AddRange(containerNodesToAdd);
+
+                    // Add remaining root-level sounds of the event (if any)
                     var soundNodesToAdd = new List<FileSystemNodeModel>();
                     foreach (var soundNode in eventNode.Sounds)
                     {
-                        // Determine the correct source metadata.
-                        ulong sourceHash;
-                        string backupChunkPath = null;
-                        SerializableChunkDiff soundDiff = null;
-
-                        if (soundNode.Source == AudioSourceType.Wpk && linkedBank.WpkNode != null)
-                        {
-                            sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
-                            backupChunkPath = linkedBank.WpkNode.BackupChunkPath;
-                            soundDiff = linkedBank.WpkNode.ChunkDiff;
-                        }
-                        else if (linkedBank.AudioBnkNode != null)
-                        {
-                            sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
-                            backupChunkPath = linkedBank.AudioBnkNode.BackupChunkPath;
-                            soundDiff = linkedBank.AudioBnkNode.ChunkDiff;
-                        }
-                        else
-                        {
-                            sourceHash = clickedNode.SourceChunkPathHash;
-                            backupChunkPath = clickedNode.BackupChunkPath;
-                            soundDiff = clickedNode.ChunkDiff;
-                        }
-
-                        var newSoundNode = new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
-                        {
-                            SourceWadPath = absoluteSourceWadPath,
-                            SourceChunkPathHash = sourceHash,
-                            BackupChunkPath = backupChunkPath,
-                            ChunkDiff = soundDiff,
-                            AudioSource = soundNode.Source,
-                            Parent = newEventNode
-                        };
-                        soundNodesToAdd.Add(newSoundNode);
+                        soundNodesToAdd.Add(CreateSoundNode(soundNode, newEventNode, linkedBank, clickedNode, absoluteSourceWadPath));
                     }
                     newEventNode.Children.AddRange(soundNodesToAdd);
                     eventNodesToAdd.Add(newEventNode);
@@ -200,6 +188,47 @@ namespace AssetsManager.Services.Explorer.Tree
                 clickedNode.Children.AddRange(eventNodesToAdd);
                 clickedNode.IsExpanded = true;
             });
+        }
+
+        private FileSystemNodeModel CreateSoundNode(
+            WemFileNode soundNode, 
+            FileSystemNodeModel parentNode, 
+            LinkedAudioBank linkedBank, 
+            FileSystemNodeModel clickedNode, 
+            string absoluteSourceWadPath)
+        {
+            ulong sourceHash;
+            string backupChunkPath = null;
+            SerializableChunkDiff soundDiff = null;
+
+            if (soundNode.Source == AudioSourceType.Wpk && linkedBank.WpkNode != null)
+            {
+                sourceHash = linkedBank.WpkNode.SourceChunkPathHash;
+                backupChunkPath = linkedBank.WpkNode.BackupChunkPath;
+                soundDiff = linkedBank.WpkNode.ChunkDiff;
+            }
+            else if (linkedBank.AudioBnkNode != null)
+            {
+                sourceHash = linkedBank.AudioBnkNode.SourceChunkPathHash;
+                backupChunkPath = linkedBank.AudioBnkNode.BackupChunkPath;
+                soundDiff = linkedBank.AudioBnkNode.ChunkDiff;
+            }
+            else
+            {
+                sourceHash = clickedNode.SourceChunkPathHash;
+                backupChunkPath = clickedNode.BackupChunkPath;
+                soundDiff = clickedNode.ChunkDiff;
+            }
+
+            return new FileSystemNodeModel(soundNode.Name, soundNode.Id, soundNode.Offset, soundNode.Size)
+            {
+                SourceWadPath = absoluteSourceWadPath,
+                SourceChunkPathHash = sourceHash,
+                BackupChunkPath = backupChunkPath,
+                ChunkDiff = soundDiff,
+                AudioSource = soundNode.Source,
+                Parent = parentNode
+            };
         }
 
         public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)

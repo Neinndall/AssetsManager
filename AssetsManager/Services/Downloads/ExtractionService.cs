@@ -291,6 +291,10 @@ namespace AssetsManager.Services.Downloads
                             {
                                 if (eventNode.IsTechnicalNode) continue;
                                 soundsCount += eventNode.Sounds.Count;
+                                foreach (var containerNode in eventNode.Containers)
+                                {
+                                    soundsCount += containerNode.Sounds.Count;
+                                }
                             }
 
                             count += (soundsCount > 0) ? soundsCount : 1;
@@ -318,7 +322,7 @@ namespace AssetsManager.Services.Downloads
             foreach (var node in nodes)
             {
                 if (node.Type == NodeType.WemFile) count++;
-                else count += CountSoundsInAudioTree(node.Children);
+                else if (node.Children != null) count += CountSoundsInAudioTree(node.Children);
             }
             return count;
         }
@@ -358,14 +362,25 @@ namespace AssetsManager.Services.Downloads
                 string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                 _directoriesCreator.CreateDirectory(eventPath);
 
-                foreach (var soundNode in node.Children)
+                async Task ExportSoundsRecursiveAsync(FileSystemNodeModel parentNode, string currentPath)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (soundNode.Type == NodeType.WemFile)
+                    foreach (var childNode in parentNode.Children)
                     {
-                        await HandleWemFileAsync(soundNode, eventPath, cancellationToken, onFileSavedCallback);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (childNode.Type == NodeType.WemFile)
+                        {
+                            await HandleWemFileAsync(childNode, currentPath, cancellationToken, onFileSavedCallback);
+                        }
+                        else if (childNode.Type == NodeType.VirtualDirectory)
+                        {
+                            string subFolderPath = Path.Combine(currentPath, PathUtils.SanitizeName(childNode.Name));
+                            _directoriesCreator.CreateDirectory(subFolderPath);
+                            await ExportSoundsRecursiveAsync(childNode, subFolderPath);
+                        }
                     }
                 }
+
+                await ExportSoundsRecursiveAsync(node, eventPath);
                 return;
             }
 
@@ -560,6 +575,32 @@ namespace AssetsManager.Services.Downloads
             else
                 audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
 
+            async Task ExportSoundNodeAsync(WemFileNode soundNode, string eventPath)
+            {
+                byte[] wemData = null;
+                if (soundNode.Source == AudioSourceType.Wpk && wpkData != null)
+                {
+                    wemData = wpkData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
+                }
+                else if (audioBnkFileData != null)
+                {
+                    wemData = audioBnkFileData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
+                }
+
+                if (wemData != null)
+                {
+                    var format = _appSettings.AudioExportFormat;
+                    byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
+                    if (convertedData != null)
+                    {
+                        string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                        string filePath = PathUtils.GetUniqueFilePath(eventPath, Path.ChangeExtension(soundNode.Name, extension));
+                        await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
+                        onFileSavedCallback?.Invoke(filePath);
+                    }
+                }
+            }
+
             foreach (var eventNode in audioTree)
             {
                 if (eventNode.IsTechnicalNode) continue;
@@ -567,29 +608,20 @@ namespace AssetsManager.Services.Downloads
                 string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
                 _directoriesCreator.CreateDirectory(eventPath);
 
+                // Export root-level sounds
                 foreach (var soundNode in eventNode.Sounds)
                 {
-                    byte[] wemData = null;
-                    if (soundNode.Source == AudioSourceType.Wpk && wpkData != null)
-                    {
-                        wemData = wpkData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                    }
-                    else if (audioBnkFileData != null)
-                    {
-                        wemData = audioBnkFileData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                    }
+                    await ExportSoundNodeAsync(soundNode, eventPath);
+                }
 
-                    if (wemData != null)
+                // Export sounds in sub-containers (families)
+                foreach (var containerNode in eventNode.Containers)
+                {
+                    string containerPath = Path.Combine(eventPath, PathUtils.SanitizeName(containerNode.Name));
+                    _directoriesCreator.CreateDirectory(containerPath);
+                    foreach (var soundNode in containerNode.Sounds)
                     {
-                        var format = _appSettings.AudioExportFormat;
-                        byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
-                        if (convertedData != null)
-                        {
-                            string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
-                            string filePath = PathUtils.GetUniqueFilePath(eventPath, Path.ChangeExtension(soundNode.Name, extension));
-                            await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
-                            onFileSavedCallback?.Invoke(filePath);
-                        }
+                        await ExportSoundNodeAsync(soundNode, containerPath);
                     }
                 }
             }

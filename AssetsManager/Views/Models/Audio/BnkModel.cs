@@ -149,4 +149,23 @@ namespace AssetsManager.Views.Models.Audio
         public DidxSectionData Didx { get; set; }
         public DataSectionData Data { get; set; }
     }
+
+    public static class BnkObjectTypeExtensions
+    {
+        public static string GetAbbreviatedName(this BnkObjectType type)
+        {
+            return type switch
+            {
+                BnkObjectType.RandomOrSequenceContainer => "Random",
+                BnkObjectType.SwitchContainer => "Switch",
+                BnkObjectType.BlendContainer => "Blend",
+                BnkObjectType.DialogueEvent => "Dialogue",
+                BnkObjectType.ActorMixer => "ActorMixer",
+                BnkObjectType.MusicSegment => "MusicSegment",
+                BnkObjectType.MusicSwitchContainer => "MusicSwitch",
+                BnkObjectType.MusicPlaylistContainer => "MusicPlaylist",
+                _ => type.ToString()
+            };
+        }
+    }
 }

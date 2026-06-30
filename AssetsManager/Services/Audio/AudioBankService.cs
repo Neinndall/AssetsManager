@@ -195,7 +195,10 @@ namespace AssetsManager.Services.Audio
         {
             if (allSounds == null || !allSounds.Any()) return;
 
-            var linkedWemIds = new HashSet<uint>(eventNodes.SelectMany(e => e.Sounds).Select(s => s.Id));
+            var linkedWemIds = new HashSet<uint>(
+                eventNodes.SelectMany(e => e.Sounds.Select(s => s.Id))
+                .Concat(eventNodes.SelectMany(e => e.Containers.SelectMany(c => c.Sounds.Select(s => s.Id))))
+            );
             var unlinkedWemIds = allSounds.Keys.Where(id => !linkedWemIds.Contains(id)).ToList();
 
             if (unlinkedWemIds.Any())
@@ -254,16 +257,36 @@ namespace AssetsManager.Services.Audio
 
             if (!hircObjects.Any()) return eventNodes;
 
-            void Traverse(uint objectId, AudioEventNode audioEventNode)
+            void Traverse(uint objectId, AudioEventNode audioEventNode, AudioContainerNode currentContainer = null)
             {
                 if (!hircObjects.TryGetValue(objectId, out var currentObject)) return;
 
                 if (currentObject.Data is IHircContainer container)
                 {
                     _logService.LogDebug($"[AUDIO TRAVERSE] Entering {currentObject.Type} (Type {(byte)currentObject.Type}), ID: {objectId}, Children: {container.Children.Count}");
+                    
+                    string typeLabel = currentObject.Type.GetAbbreviatedName();
+                    string containerName = $"[{typeLabel}] {objectId}";
+                    
+                    // Check if this container was already created for this event (due to multiple ActionIds referencing it)
+                    var nextContainer = audioEventNode.Containers.FirstOrDefault(c => c.Name == containerName);
+                    bool isNewContainer = false;
+                    
+                    if (nextContainer == null)
+                    {
+                        nextContainer = new AudioContainerNode { Name = containerName };
+                        isNewContainer = true;
+                    }
+                    
                     foreach (var childId in container.Children)
                     {
-                        Traverse(childId, audioEventNode);
+                        Traverse(childId, audioEventNode, nextContainer);
+                    }
+                    
+                    // If the container accumulated any sounds and is new, add it to the event node
+                    if (isNewContainer && nextContainer.Sounds.Any())
+                    {
+                        audioEventNode.Containers.Add(nextContainer);
                     }
                     return;
                 }
@@ -277,14 +300,29 @@ namespace AssetsManager.Services.Audio
                             {
                                 var wemInfo = wemMetadata[soundData.WemId];
                                 _logService.LogDebug($"[AUDIO] Linking sound: {soundData.WemId}");
-                                audioEventNode.Sounds.Add(new WemFileNode
+                                var wemNode = new WemFileNode
                                 {
                                     Id = soundData.WemId,
                                     Name = $"{soundData.WemId}.wem",
                                     Offset = wemInfo.Offset,
                                     Size = wemInfo.Size,
                                     Source = wemInfo.Source
-                                });
+                                };
+
+                                if (currentContainer != null)
+                                {
+                                    if (!currentContainer.Sounds.Any(s => s.Id == wemNode.Id))
+                                    {
+                                        currentContainer.Sounds.Add(wemNode);
+                                    }
+                                }
+                                else
+                                {
+                                    if (!audioEventNode.Sounds.Any(s => s.Id == wemNode.Id))
+                                    {
+                                        audioEventNode.Sounds.Add(wemNode);
+                                    }
+                                }
                             }
                             else
                             {
@@ -296,7 +334,7 @@ namespace AssetsManager.Services.Audio
                     case BnkObjectType.Action:
                         if (currentObject.Data is ActionBnkObjectData actionData)
                         {
-                            Traverse(actionData.ObjectId, audioEventNode);
+                            Traverse(actionData.ObjectId, audioEventNode, currentContainer);
                         }
                         break;
 
@@ -311,14 +349,29 @@ namespace AssetsManager.Services.Audio
                                 {
                                     var wemInfo = wemMetadata[wemId];
                                     _logService.LogDebug($"[AUDIO] Linking WEM from MusicTrack: {wemId}");
-                                    audioEventNode.Sounds.Add(new WemFileNode
+                                    var wemNode = new WemFileNode
                                     {
                                         Id = wemId,
                                         Name = $"{wemId}.wem",
                                         Offset = wemInfo.Offset,
                                         Size = wemInfo.Size,
                                         Source = wemInfo.Source
-                                    });
+                                    };
+
+                                    if (currentContainer != null)
+                                    {
+                                        if (!currentContainer.Sounds.Any(s => s.Id == wemNode.Id))
+                                        {
+                                            currentContainer.Sounds.Add(wemNode);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (!audioEventNode.Sounds.Any(s => s.Id == wemNode.Id))
+                                        {
+                                            audioEventNode.Sounds.Add(wemNode);
+                                        }
+                                    }
                                 }
                                 else
                                 {
@@ -352,6 +405,17 @@ namespace AssetsManager.Services.Audio
 
                 if (audioEventNode.Sounds.Any() || audioEventNode.Containers.Any())
                 {
+                    // POST-PROCESS OPTIMIZATION:
+                    // If the event has only one container, and no sounds at the root event level,
+                    // we dissolve the container and move all its sounds to the event root level.
+                    // This avoids creating folders when all sounds belong to the exact same "family".
+                    if (audioEventNode.Containers.Count == 1 && !audioEventNode.Sounds.Any())
+                    {
+                        var singleContainer = audioEventNode.Containers[0];
+                        audioEventNode.Sounds.AddRange(singleContainer.Sounds);
+                        audioEventNode.Containers.Clear();
+                    }
+
                     eventNodes.Add(audioEventNode);
                 }
             }
