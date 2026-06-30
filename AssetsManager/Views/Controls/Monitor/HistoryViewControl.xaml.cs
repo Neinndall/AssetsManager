@@ -212,5 +212,30 @@ namespace AssetsManager.Views.Controls.Monitor
                 CustomMessageBoxService.ShowInfo("Information", "Please click the delete button on the entry you want to remove.", Window.GetWindow(this), CustomMessageBoxIcon.Warning);
             }
         }
+
+        private void btnClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings == null || AppSettings.DiffHistory.Count == 0)
+            {
+                CustomMessageBoxService.ShowInfo("Information", "The history is already empty.", Window.GetWindow(this));
+                return;
+            }
+
+            string message = "Are you sure you want to delete ALL history entries? This will physically delete all backup files and comparison histories. This action cannot be undone.";
+
+            if (CustomMessageBoxService.ShowYesNo("Clear History", message, Window.GetWindow(this)) == true)
+            {
+                try
+                {
+                    ComparisonHistoryService.ClearAllHistory();
+                    RefreshHistory();
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, "Error clearing history.");
+                    CustomMessageBoxService.ShowError("Error", "Could not clear the history.", Window.GetWindow(this));
+                }
+            }
+        }
     }
 }

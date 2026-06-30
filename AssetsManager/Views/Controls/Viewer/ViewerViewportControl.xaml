@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:helix="http://helix-toolkit.org/wpf"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -30,19 +29,20 @@
         <Border CornerRadius="0" ClipToBounds="True" BorderThickness="0">
             <Grid>
                 <!-- 3D VIEWPORT -->
-                <helix:HelixViewport3D x:Name="Viewport3D" 
-                                       Background="Transparent"
-                                       ShowFrameRate="{Binding IsFpsVisible}"
-                                       ShowCameraInfo="False"
-                                       ShowViewCube="False"
-                                       IsRotationEnabled="False"
-                                       IsZoomEnabled="False"
-                                       IsPanEnabled="False"
-                                       SnapsToDevicePixels="False"
-                                       UseLayoutRounding="False"
-                                       ClipToBounds="True"
-                                       RenderOptions.EdgeMode="Unspecified"
-                                       RenderOptions.BitmapScalingMode="HighQuality">
+                <Viewport3D x:Name="Viewport3D"
+                            ClipToBounds="True"
+                            SnapsToDevicePixels="False"
+                            UseLayoutRounding="False"
+                            RenderOptions.EdgeMode="Unspecified"
+                            RenderOptions.BitmapScalingMode="HighQuality">
+                    <Viewport3D.Camera>
+                        <PerspectiveCamera Position="0,2386,670"
+                                           LookDirection="0,-250,-650"
+                                           UpDirection="0,1,0"
+                                           FieldOfView="45"
+                                           NearPlaneDistance="0.1"
+                                           FarPlaneDistance="100000"/>
+                    </Viewport3D.Camera>
                     <ModelVisual3D>
                         <ModelVisual3D.Content>
                             <Model3DGroup>
@@ -55,7 +55,36 @@
                             </Model3DGroup>
                         </ModelVisual3D.Content>
                     </ModelVisual3D>
-                </helix:HelixViewport3D>
+                </Viewport3D>
+
+                <Border HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,24,24,0"
+                        Background="#CC18181B"
+                        CornerRadius="10"
+                        Padding="12,8"
+                        BorderBrush="{StaticResource BorderColor}"
+                        BorderThickness="1"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding IsFpsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="Black" BlurRadius="15" ShadowDepth="2" Opacity="0.3"/>
+                    </Border.Effect>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Background="#1F22C55E" CornerRadius="6" Width="22" Height="22"
+                                Margin="0,0,8,0" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="Speedometer" Width="12" Height="12"
+                                                        Foreground="#FF6EE7A2"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" MinWidth="34">
+                            <TextBlock Text="FPS" FontSize="8" FontWeight="Black"
+                                       Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding DisplayFps}" FontFamily="Consolas"
+                                       FontSize="12" FontWeight="Bold" Foreground="#FF6EE7A2"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <!-- ============================================ -->
                 <!-- TOP-LEFT: SCENE INFO BADGE                  -->
@@ -87,7 +116,7 @@
                 <!-- ============================================ -->
                 <Border HorizontalAlignment="Right" 
                         VerticalAlignment="Top" 
-                        Margin="0,24,24,0"
+                        Margin="0,72,24,0"
                         Background="#E618181B" 
                         CornerRadius="14"
                         Padding="6"
@@ -201,7 +230,7 @@
                     <Grid x:Name="ToolbarContentGrid">
                         <!-- Standard Toolbar Group (Visible by default) -->
                         <StackPanel x:Name="StandardToolbarGroup" Orientation="Horizontal" VerticalAlignment="Center">
-                            <!-- Group 1: Stats -->
+                            <!-- Group 1: Stats & Performance -->
                             <Border Background="#1AFFFFFF" CornerRadius="14" Padding="4,2" Margin="0,0,4,0">
                                 <StackPanel Orientation="Horizontal">
                                     <ToggleButton x:Name="FpsToggleButton"
@@ -210,6 +239,14 @@
                                                   IsChecked="{Binding IsFpsVisible}"
                                                   Width="34" Height="34">
                                         <materialIcons:MaterialIcon Kind="Speedometer" Width="15" Height="15"/>
+                                    </ToggleButton>
+                                    <ToggleButton x:Name="LimitFpsToggleButton"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  ToolTip="Limit Viewport to 60 FPS"
+                                                  IsChecked="{Binding LimitFps}"
+                                                  Width="34" Height="34"
+                                                  Margin="4,0,0,0">
+                                        <materialIcons:MaterialIcon Kind="Gauge" Width="15" Height="15"/>
                                     </ToggleButton>
                                 </StackPanel>
                             </Border>

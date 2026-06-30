@@ -4,7 +4,6 @@ using System.Numerics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Media.Media3D;
-using HelixToolkit.Wpf;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
@@ -92,7 +91,7 @@ namespace AssetsManager.Services.Viewer
         }
 
         public void Update(float totalSeconds, IAnimationAsset animation, RigResource skeleton, SkinnedMesh skin,
-            System.Collections.Generic.IList<ModelPart> modelParts, LinesVisual3D skeletonVisual, PointsVisual3D jointsVisual, string modelName)
+            System.Collections.Generic.IList<ModelPart> modelParts, string modelName)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
@@ -168,18 +167,18 @@ namespace AssetsManager.Services.Viewer
                     _skinnedVertices[i] = Vector3.Transform(pos, skinningMatrix);
                 });
 
-                // 5. Update Viewport (WPF)
-                for (int i = 0; i < modelParts.Count; i++)
+                // 5. Update Viewport (WPF) - Offload Point3DCollection creation and freezing to background threads
+                var collections = new Point3DCollection[modelParts.Count];
+
+                Parallel.For(0, modelParts.Count, i =>
                 {
                     var part = modelParts[i];
                     var range = skin.Ranges[i];
-                    var geometry = (MeshGeometry3D)part.Geometry.Geometry;
-
-                    // Updating Point3DCollection by index fires a Changed event for EVERY element in WPF,
-                    // which causes severe stuttering. It's much faster to create a new collection 
-                    // and assign it once, triggering only a single dependency property invalidation.
                     var sourceVertexIndices = part.SourceVertexIndices;
                     int vertexCount = sourceVertexIndices?.Length ?? range.VertexCount;
+
+                    // Instantiating on a background thread is allowed in WPF as long as we freeze the object
+                    // before passing it to the UI thread.
                     var posCollection = new Point3DCollection(vertexCount);
 
                     for (int j = 0; j < vertexCount; j++)
@@ -188,16 +187,21 @@ namespace AssetsManager.Services.Viewer
                         var skinnedPos = _skinnedVertices[vertexIndex];
                         posCollection.Add(new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z));
                     }
-                    
-                    // FREEZE the collection before assigning. This tells WPF we will never modify
-                    // this specific collection instance again. It removes all event handler overhead 
-                    // and allows WPF to optimize the memory in the render thread.
+
                     if (posCollection.CanFreeze)
                     {
                         posCollection.Freeze();
                     }
-                    
-                    geometry.Positions = posCollection;
+
+                    collections[i] = posCollection;
+                });
+
+                // Apply the frozen collections to the geometry on the UI thread (extremely fast pointer assignment)
+                for (int i = 0; i < modelParts.Count; i++)
+                {
+                    var part = modelParts[i];
+                    var geometry = (MeshGeometry3D)part.Geometry.Geometry;
+                    geometry.Positions = collections[i];
                 }
             }
             catch (Exception ex)

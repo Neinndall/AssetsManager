@@ -146,7 +146,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Find all parts with the same name (case-insensitive)
                 var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-                
+
                 foreach (var targetPart in targetParts)
                 {
                     if (targetPart != sourcePart)
@@ -178,7 +178,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Find all parts with the same name (case-insensitive)
                 var targetParts = model.Parts.Where(p => string.Equals(p.Name, sourcePart.Name, StringComparison.OrdinalIgnoreCase)).ToList();
-                
+
                 foreach (var targetPart in targetParts)
                 {
                     if (targetPart != sourcePart)
@@ -188,9 +188,9 @@ namespace AssetsManager.Views.Controls.Viewer
                             if (sourcePart.SelectedTextureName != null)
                             {
                                 string sourceTexNormal = PathUtils.TruncateAtDot(sourcePart.SelectedTextureName);
-                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t => 
+                                string exactMatch = targetPart.AvailableTextureNames.FirstOrDefault(t =>
                                     string.Equals(PathUtils.TruncateAtDot(t), sourceTexNormal, StringComparison.OrdinalIgnoreCase));
-                                    
+
                                 if (exactMatch != null)
                                 {
                                     if (targetPart.SelectedTextureName != exactMatch)
@@ -371,7 +371,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (sender is Button button && button.Tag is SceneModel modelToDelete)
             {
                 _viewModel.LoadedModels.Remove(modelToDelete);
-                SafeDisposeModel(modelToDelete);
                 Viewport?.RemoveModel(modelToDelete);
 
                 if (_viewModel.LoadedModels.Count == 0)
@@ -495,7 +494,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public async void HandleChromaGalleryRequest(string skinsPath)
         {
             if (ChromaGallery == null) return;
-            
+
             ViewModel.IsChromaGalleryVisible = true;
             await ChromaGallery.InitializeAsync(skinsPath);
         }
@@ -509,7 +508,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 // Cargamos primero el modelo en segundo plano
                 await ProcessModelLoading(skin.ModelPath, skin.TexturePath, true);
-                
+
                 // Una vez cargado y con el viewport listo, ocultamos la galería
                 ViewModel.IsChromaGalleryVisible = false;
             }
@@ -526,7 +525,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public async void HandleMultipleChromasSelected(List<ChromaSkinModel> skins)
         {
             var skinsWithModels = skins.Where(s => !string.IsNullOrEmpty(s.ModelPath)).ToList();
-            
+
             if (skinsWithModels.Count > 0)
             {
                 // Mantenemos la galería abierta durante la carga para mostrar el estado

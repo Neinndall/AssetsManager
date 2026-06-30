@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.ComponentModel;
-using HelixToolkit.Wpf;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -19,7 +18,6 @@ using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -28,7 +26,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
 
-        public HelixViewport3D Viewport => Viewport3D;
+        public Viewport3D Viewport => Viewport3D;
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
@@ -36,9 +34,12 @@ namespace AssetsManager.Views.Controls.Viewer
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
 
         private CustomCameraController _cameraController;
-        private readonly LinesVisual3D _skeletonVisual = new LinesVisual3D { Color = Colors.Red, Thickness = 2 };
-        private readonly PointsVisual3D _jointsVisual = new PointsVisual3D { Color = Colors.Blue, Size = 5 };
-        private AnimationPlayer _animationPlayer;
+        private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
+        private readonly System.Diagnostics.Stopwatch _frameStopwatch = new();
+        private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
+        private int _framesSinceFpsUpdate;
+        private bool _renderPulse;
+        private TimeSpan _nextLimitedFrame;
         private DateTime _lastFrameTime;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
@@ -48,6 +49,15 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly List<SceneModel> _loadedModels = new();
         private bool _isCleanedUp;
 
+        private struct ModelUpdateKey
+        {
+            public IAnimationAsset Animation;
+            public double AnimationTime;
+            public int VisiblePartsHash;
+            public bool IsVisible;
+        }
+
+        private readonly Dictionary<SceneModel, ModelUpdateKey> _lastModelUpdates = new();
         // Environment references
         private ModelVisual3D _skyVisual;
         private ModelVisual3D _groundVisual;
@@ -71,6 +81,12 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             switch (e.PropertyName)
             {
+                case nameof(ViewerViewportModel.LimitFps):
+                    _nextLimitedFrame = TimeSpan.Zero;
+                    _frameStopwatch.Restart();
+                    _fpsStopwatch.Restart();
+                    _framesSinceFpsUpdate = 0;
+                    break;
                 case nameof(ViewerViewportModel.IsAutoRotateActive):
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
                     break;
@@ -95,21 +111,15 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
-            // Self-healing: only create the camera controller and animation player
-            // here. The window must not instantiate them too — see ViewerWindow notes.
-            _animationPlayer = new AnimationPlayer(LogService);
+            _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D);
-
-            // Re-add skeleton visual guides to viewport if they were cleared
-            if (!Viewport.Children.Contains(_skeletonVisual))
-                Viewport.Children.Add(_skeletonVisual);
-            if (!Viewport.Children.Contains(_jointsVisual))
-                Viewport.Children.Add(_jointsVisual);
 
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             CompositionTarget.Rendering += CompositionTarget_Rendering;
             _lastFrameTime = DateTime.Now;
+            _frameStopwatch.Restart();
+            _fpsStopwatch.Restart();
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -161,22 +171,15 @@ namespace AssetsManager.Views.Controls.Viewer
                 // 2. Limpiar escena y animaciones
                 ResetScene();
 
-                // 3. Limpiar visuales de esqueleto
-                _skeletonVisual.Points?.Clear();
-                _jointsVisual.Points?.Clear();
-
-                // 4. Remover visuales del viewport
-                if (Viewport.Children.Contains(_skeletonVisual))
-                    Viewport.Children.Remove(_skeletonVisual);
-                if (Viewport.Children.Contains(_jointsVisual))
-                    Viewport.Children.Remove(_jointsVisual);
-
-                // 5. Limpiar todo el viewport
+                // Limpiar todo el viewport
                 Viewport.Children.Clear();
 
-                // 6. Liberar el AnimationPlayer y todos sus buffers cacheados
-                _animationPlayer?.Dispose();
-                _animationPlayer = null;
+                // 6. Liberar los AnimationPlayers y todos sus buffers cacheados
+                foreach (var player in _modelPlayers.Values)
+                {
+                    player.Dispose();
+                }
+                _modelPlayers.Clear();
 
                 // 7. Liberar el CameraController (dueño único)
                 _cameraController?.Dispose();
@@ -223,6 +226,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _lastFrameTime = DateTime.Now;
+            _frameStopwatch.Restart();
 
             Panel?.SetAnimationPlayingState(animationModel, true);
         }
@@ -342,12 +346,14 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.IsAutoRotateActive = false;
             ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
-            _skeletonVisual.Points?.Clear();
-            _jointsVisual.Points?.Clear();
-
             // CRITICAL: Free cached vertex/skin buffers from the previous model so
             // the next load does not retain RAM of a model that is no longer in use.
-            _animationPlayer?.ClearCache();
+            foreach (var player in _modelPlayers.Values)
+            {
+                player.Dispose();
+            }
+            _modelPlayers.Clear();
+            _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
         }
@@ -392,6 +398,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
+            _lastModelUpdates.Remove(model);
+            if (_modelPlayers.TryGetValue(model, out var player))
+            {
+                player.Dispose();
+                _modelPlayers.Remove(model);
+            }
             if (Viewport.Children.Contains(model.RootVisual))
             {
                 Viewport.Children.Remove(model.RootVisual);
@@ -436,9 +448,41 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {
+            var renderingTime = e is RenderingEventArgs renderingArgs
+                ? renderingArgs.RenderingTime
+                : _fpsStopwatch.Elapsed;
+
+            if (_viewModel.LimitFps)
+            {
+                var targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
+                if (_nextLimitedFrame != TimeSpan.Zero && renderingTime < _nextLimitedFrame)
+                    return;
+
+                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero ||
+                                    renderingTime - _nextLimitedFrame > targetFrameTime * 4
+                    ? renderingTime + targetFrameTime
+                    : _nextLimitedFrame + targetFrameTime;
+            }
+            else
+            {
+                _nextLimitedFrame = TimeSpan.Zero;
+            }
+
+            var elapsed = _frameStopwatch.Elapsed.TotalSeconds;
+            _frameStopwatch.Restart();
+
+            _framesSinceFpsUpdate++;
+            if (_fpsStopwatch.Elapsed.TotalSeconds >= 1.0)
+            {
+                var fps = _framesSinceFpsUpdate / _fpsStopwatch.Elapsed.TotalSeconds;
+                _viewModel.DisplayFps = Math.Round(fps).ToString("0");
+                _framesSinceFpsUpdate = 0;
+                _fpsStopwatch.Restart();
+            }
+
             var now = DateTime.Now;
-            var deltaTime = (now - _lastFrameTime).TotalSeconds;
             _lastFrameTime = now;
+            var deltaTime = elapsed;
 
             if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
@@ -461,11 +505,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         transformGroup.Children.Add(_autoRotation);
                     }
-                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle += 0.5;
+                    double rotationSpeed = 30.0 * elapsed;
+                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = (((AxisAngleRotation3D)_autoRotation.Rotation).Angle + rotationSpeed) % 360;
                 }
             }
 
-            if (_animationPlayer != null && _loadedModels.Count > 0)
+            if (_loadedModels.Count > 0)
             {
                 // Synchronize playback timing across all models if enabled (v3.2.3.2)
                 // IMPORTANT: Only sync if the master model actually has an animation to sync from.
@@ -499,19 +544,42 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         bool isActive = model == _activeSceneModel;
 
-                        // Update skinning for all models that have an animation to ensure they are visible and moving.
-                        // ObservableRangeCollection is passable directly to the AnimationPlayer (it iterates internally);
-                        // the previous ToList() allocation per-frame has been removed.
-                        _animationPlayer.Update(
-                            (float)model.AnimationTime,
-                            model.CurrentAnimation,
-                            model.Skeleton,
-                            model.SkinnedMesh,
-                            model.Parts,
-                            isActive ? _skeletonVisual : null,
-                            isActive ? _jointsVisual : null,
-                            model.Name
-                        );
+                        // Optimize: skip Parallel Skinning (CPU/Memory intensive) if the model is static/paused
+                        // and has already been rendered at this exact frame state.
+                        int visiblePartsHash = model.Parts?.Sum(p => p.IsVisible ? 1 : 0) ?? 0;
+                        var currentKey = new ModelUpdateKey
+                        {
+                            Animation = model.CurrentAnimation,
+                            AnimationTime = model.AnimationTime,
+                            VisiblePartsHash = visiblePartsHash,
+                            IsVisible = model.IsVisible
+                        };
+
+                        bool needsUpdate = true;
+                        if (_lastModelUpdates.TryGetValue(model, out var lastKey))
+                        {
+                            if (lastKey.Animation == currentKey.Animation &&
+                                Math.Abs(lastKey.AnimationTime - currentKey.AnimationTime) < 0.0001 &&
+                                lastKey.VisiblePartsHash == currentKey.VisiblePartsHash &&
+                                lastKey.IsVisible == currentKey.IsVisible)
+                            {
+                                needsUpdate = false;
+                            }
+                        }
+
+                        if (needsUpdate)
+                        {
+                            _lastModelUpdates[model] = currentKey;
+                            var player = GetPlayerForModel(model);
+                            player.Update(
+                                (float)model.AnimationTime,
+                                model.CurrentAnimation,
+                                model.Skeleton,
+                                model.SkinnedMesh,
+                                model.Parts,
+                                model.Name
+                            );
+                        }
                     }
                 }
 
@@ -520,6 +588,26 @@ namespace AssetsManager.Views.Controls.Viewer
                     Panel?.UpdateAnimationProgress(_activeSceneModel.AnimationTime);
                 }
             }
+
+            // WPF renders static 3D scenes on demand. While FPS measurement is
+            // visible, request continuous real frames without a visible camera change.
+            if (_viewModel.IsFpsVisible && Viewport3D.IsVisible &&
+                Viewport3D.Camera is PerspectiveCamera camera)
+            {
+                _renderPulse = !_renderPulse;
+                camera.NearPlaneDistance = _renderPulse ? 0.1 : 0.100001;
+            }
+
+        }
+
+        private AnimationPlayer GetPlayerForModel(SceneModel model)
+        {
+            if (!_modelPlayers.TryGetValue(model, out var player))
+            {
+                player = new AnimationPlayer(LogService);
+                _modelPlayers[model] = player;
+            }
+            return player;
         }
 
         public void ResetCamera(bool smooth = true)
@@ -733,20 +821,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
             }
 
-            var originalShowFrameRate = Viewport3D.ShowFrameRate;
-
             try
             {
-                Viewport3D.ShowFrameRate = false;
-
-                // Base size logic
                 int baseWidth = (int)Viewport3D.ActualWidth;
                 int baseHeight = (int)Viewport3D.ActualHeight;
-                
-                // If scaleFactor is high (e.g. 4 for 4K-ish), we use that. 
-                // Helix RenderBitmap uses a scaling factor (supersampling).
-                // If we want exact resolution (e.g. 3840x2160), we might need a different approach, 
-                // but scaling the current view is usually what "Snapshot" implies.
                 int supersamplingFactor = (int)Math.Max(1, scaleFactor);
 
                 if (baseWidth <= 0 || baseHeight <= 0)
@@ -755,17 +833,17 @@ namespace AssetsManager.Views.Controls.Viewer
                     return;
                 }
 
-                // Traverse the visual tree to find the underlying System.Windows.Controls.Viewport3D
-                var underlyingViewport = FindVisualChild<System.Windows.Controls.Viewport3D>(Viewport3D);
-                if (underlyingViewport == null)
+                int outputWidth = baseWidth * supersamplingFactor;
+                int outputHeight = baseHeight * supersamplingFactor;
+                var rtb = new RenderTargetBitmap(outputWidth, outputHeight, 96, 96, PixelFormats.Pbgra32);
+                var drawing = new DrawingVisual();
+                using (var context = drawing.RenderOpen())
                 {
-                    LogService.LogError(null, "Could not find the underlying Viewport3D to create a screenshot.");
-                    return;
+                    context.PushTransform(new ScaleTransform(supersamplingFactor, supersamplingFactor));
+                    context.DrawRectangle(new VisualBrush(Viewport3D), null, new Rect(0, 0, baseWidth, baseHeight));
+                    context.Pop();
                 }
-
-                // Use the built-in helper from HelixToolkit
-                var backgroundBrush = Viewport3D.Background ?? Brushes.Transparent;
-                var rtb = Viewport3DHelper.RenderBitmap(underlyingViewport, baseWidth, baseHeight, backgroundBrush, supersamplingFactor);
+                rtb.Render(drawing);
 
                 var pngEncoder = new PngBitmapEncoder();
                 pngEncoder.Interlace = PngInterlaceOption.Off;
@@ -781,10 +859,6 @@ namespace AssetsManager.Views.Controls.Viewer
             catch (Exception ex)
             {
                 LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
-            }
-            finally
-            {
-                Viewport3D.ShowFrameRate = originalShowFrameRate;
             }
         }
 
@@ -940,6 +1014,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
                 }
             }
+
         }
 
         private static T FindVisualChild<T>(DependencyObject parent) where T : Visual

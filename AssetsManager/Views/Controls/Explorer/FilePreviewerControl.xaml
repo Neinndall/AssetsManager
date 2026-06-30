@@ -238,7 +238,7 @@
                         
                         <avalonedit:TextEditor x:Name="TextEditorPreview" Style="{StaticResource BaseTextEditorStyle}" Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                         
-                        <Grid x:Name="WebViewContainer" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Grid x:Name="WebViewContainer" Margin="0,0,5,0" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         <!-- Error Message inside Content area -->
                         <Border x:Name="UnsupportedFilePanel" 

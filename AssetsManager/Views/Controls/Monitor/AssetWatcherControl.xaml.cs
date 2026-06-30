@@ -90,7 +90,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private void ClearAll_Click(object sender, RoutedEventArgs e)
         {
-            if (CustomMessageBoxService.ShowYesNo("Clear All", "Are you sure you want to remove all monitored assets?", Window.GetWindow(this)) == true)
+            if (CustomMessageBoxService.ShowYesNo("Clear Watcher", "Are you sure you want to remove all monitored assets?", Window.GetWindow(this)) == true)
             {
                 AppSettings.MonitoredAssets.Clear();
                 AppSettings.Save();
@@ -108,6 +108,20 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 await DiffViewService.ShowFileDiffAsync(asset.OldFilePath, asset.NewFilePath, Window.GetWindow(this));
 
+                asset.HasChanges = false;
+                asset.Status = AssetStatus.UpToDate;
+                asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");
+                AppSettings.Save();
+            }
+        }
+
+        private void ValidateChanges_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            var asset = button?.Tag as MonitoredAsset;
+
+            if (asset != null && asset.HasChanges)
+            {
                 asset.HasChanges = false;
                 asset.Status = AssetStatus.UpToDate;
                 asset.StatusColor = (SolidColorBrush)Application.Current.FindResource("AccentGreen");

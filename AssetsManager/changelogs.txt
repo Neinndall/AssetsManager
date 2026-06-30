@@ -1,9 +1,50 @@
+AssetsManager - League of Legends | v4.0.1.2
+
+HOTFIX UPDATE
+This hotfix introduces critical performance optimizations for the 3D Viewport when rendering multiple models simultaneously (such as chromas). It resolves major UI lag and stuttering by parallelizing geometry updates on background threads and isolating animation players to prevent constant vertex cache invalidation. Additionally, it implements a brand new audio structure parser that replicates wwiser, grouping audio events by HIRC family containers with full recursive SAVE support.
+
+
+New Features
+  - Audio / Wwise HIRC Family Grouping (wwiser style)
+    * Reconstructed audio event trees to group sounds into virtual family directories based on HIRC container types (e.g. Random, Switch, Blend Containers).
+    * Integrated smart abbreviation labeling for families, replacing long C# class names with readable tags like "[Random] ID", "[Switch] ID", etc.
+    * Added a unique-family flattening filter: if an event has only one container and no root sounds, the subfolder is automatically dissolved to prevent redundant nesting.
+
+Improvements
+  - Audio / Recursive Audio Extraction & SAVE Calculations
+    * Refactored the "SAVE" extraction engine to recursively parse virtual directory structures, guaranteeing correct multi-level export to disk.
+    * Fixed the "SAVE" total audio count calculation to recursively include sounds inside HIRC family folders, resolving incorrect progress totals.
+    * Implemented cross-bank duplicate prevention for sounds referenced by multiple event Actions, ensuring shared sounds are unlinked from the "Unknown" folder and placed correctly in their respective families without internal duplication.
+  - Viewer / 3D Performance & FPS Stability
+    * Fixed viewport stuttering by allocating dedicated animation caches for each loaded model to prevent frame-by-frame memory recalculations.
+    * Replaced Helix Toolkit with the native Microsoft WPF 3D viewport, reducing memory usage and simplifying model rendering.
+    * Added a redesigned FPS indicator with stable one-second updates and accurate readings on high-refresh-rate monitors.
+    * Added an optional 60 FPS limiter while keeping unrestricted rendering enabled by default.
+    * Preserved camera controls, Studio lighting, 4K snapshots, and 3D model comparisons on the native viewport.
+    * Optimized 3D mesh rendering by offloading background geometries to secondary threads, keeping the user interface completely fluid.
+    * Implemented a thread-safe static texture cache (ConcurrentDictionary) for skybox and ground elements, preventing redundant DDS texture loads from assembly resources/disk and making model loading instantaneous.
+  - Monitor / History & Diagnostics HUD
+    * Integrated a professional "Clear All" destructive action card next to the Sync button in the History panel.
+    * Replaced generic confirmation dialog titles in History, Watcher, and Tracker modules with descriptive titles (Clear History, Clear Watcher, and Clear Tracker).
+    * Streamlined the Search Card description in the History panel for a cleaner, more readable look.
+    * Added a direct validation checkmark action to the Watcher list to resolve modified files instantly without opening the diff viewer.
+
+Bug Fixes
+  - Explorer / WebView2 E_ABORT Concurrency Crash
+    * Implemented active Task Cancellation (`CancellationTokenSource`) in `ExplorerPreviewService` to gracefully abort running audio conversions and I/O tasks when switching files quickly, preventing WebView2 initialization collisions and `E_ABORT` COM exceptions.
+  - Explorer / WebView2 WPF Airspace Window Resizing Block
+    * Added a 5px right margin safety padding to the `WebViewContainer` in `FilePreviewerControl.xaml` to resolve the WPF Airspace layout conflict, allowing native mouse window-width resizing while media is playing without shrinking images or text views.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.1.1
 
 HOTFIX UPDATE
+This hotfix focuses on improving stability, accuracy, and usability across AssetsManager v4.0.1.1. It introduces full support for NGrid visualization, improves texture synchronization and model texture matching, and refines progress reporting across save, extract, update, and comparison workflows.
+Several critical issues have been resolved, including chroma texture assignment failures, transparent mesh rendering problems, audio export inconsistencies, duplicated audio event nodes, incorrect progress totals, API Center UI resets, and LIVE comparison data mismatches. The Explorer, Viewer, Audio, Monitor, Comparator, and Core systems have also received multiple fixes to ensure smoother previews, cleaner cancellation handling, more reliable progress transitions, and better overall user experience.
+
 
 New Features
-  - Explorer / NGrid Visualizer: added full support for .aimesh_ngrid and .ngrid_overlay files. Grids are now automatically parsed and visualized as a top-down technical map of vision and pathing flags in the image previewer.
   - Viewer / Sync Textures: added a toggle to synchronize textures and body parts, automatically applying visibility and texture updates to all parts containing "body" in their name.
 
 Improvements
@@ -679,4 +720,3 @@ Bug Fixes
   - Explorer / HTML Support & Clean Type Definitions
     * Restored full text previewing and custom League syntax highlighting for .html files.
     * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
-

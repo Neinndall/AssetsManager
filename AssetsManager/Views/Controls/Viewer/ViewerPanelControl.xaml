@@ -250,48 +250,48 @@
                         <!-- Inspector section content -->
                         <StackPanel Margin="0,4,0,0"
                                     Visibility="{Binding IsChecked, ElementName=SectionInspector, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <!-- Inspector Navigation (sub-tabs) -->
-                            <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <UniformGrid Columns="3" Height="36">
-                                    <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="MESH" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </RadioButton>
-                                    <RadioButton x:Name="TabTransform" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Transform" Checked="TabTransform_Checked">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="AxisArrow" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="POSE" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </RadioButton>
-                                    <RadioButton x:Name="TabAnimations" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations" Checked="TabAnimations_Checked">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialIcons:MaterialIcon Kind="AnimationPlay" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="ANIM" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </RadioButton>
-                                </UniformGrid>
-                            </Border>
-
-                            <!-- Empty state for no model selected -->
-                            <Border Background="{StaticResource CardBackground}" CornerRadius="10" 
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
-                                    Padding="14,16" Margin="0,0,0,8"
-                                    Visibility="{Binding HasSelectedModel, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <materialIcons:MaterialIcon Kind="CursorDefaultClickOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.5"/>
-                                    <TextBlock Text="Select a model" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                                    <TextBlock Text="Inspector tools will appear here" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.7" Margin="0,2,0,0"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Inspector content -->
-                            <Grid Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <!-- MESHES -->
-                                <Grid x:Name="MeshesPanel"
-                                      Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
+                             <!-- Inspector Navigation (sub-tabs) -->
+                             <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                     Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                 <UniformGrid Columns="3" Height="36">
+                                     <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
+                                         <StackPanel Orientation="Horizontal">
+                                             <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                             <TextBlock Text="MESH" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                         </StackPanel>
+                                     </RadioButton>
+                                     <RadioButton x:Name="TabTransform" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Transform" Checked="TabTransform_Checked">
+                                         <StackPanel Orientation="Horizontal">
+                                             <materialIcons:MaterialIcon Kind="AxisArrow" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                             <TextBlock Text="POSE" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                         </StackPanel>
+                                     </RadioButton>
+                                     <RadioButton x:Name="TabAnimations" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations" Checked="TabAnimations_Checked">
+                                         <StackPanel Orientation="Horizontal">
+                                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                             <TextBlock Text="ANIM" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                         </StackPanel>
+                                     </RadioButton>
+                                 </UniformGrid>
+                             </Border>
+ 
+                             <!-- Empty state for no model selected -->
+                             <Border Background="{StaticResource CardBackground}" CornerRadius="10" 
+                                     BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
+                                     Padding="14,16" Margin="0,0,0,8"
+                                     Visibility="{Binding HasSelectedModel, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                 <StackPanel HorizontalAlignment="Center">
+                                     <materialIcons:MaterialIcon Kind="CursorDefaultClickOutline" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.5"/>
+                                     <TextBlock Text="Select a model" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                                     <TextBlock Text="Inspector tools will appear here" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.7" Margin="0,2,0,0"/>
+                                 </StackPanel>
+                             </Border>
+ 
+                             <!-- Inspector content -->
+                             <Grid Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                 <!-- MESHES -->
+                                 <Grid x:Name="MeshesPanel"
+                                       Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
@@ -596,7 +596,6 @@
                                         </Border>
                                     </StackPanel>
                                 </Grid>
-
                                 <!-- ANIMATIONS -->
                                 <Grid x:Name="AnimationsPanel"
                                       Visibility="{Binding IsChecked, ElementName=TabAnimations, Converter={StaticResource BooleanToVisibilityConverter}}">

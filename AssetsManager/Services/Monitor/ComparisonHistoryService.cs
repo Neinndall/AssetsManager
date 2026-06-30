@@ -342,5 +342,49 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError(ex, $"Failed to delete comparison history {entry.ReferenceId}.");
             }
         }
+
+        public void ClearAllHistory()
+        {
+            try
+            {
+                // 1. Delete physical comparison files
+                if (Directory.Exists(_directoriesCreator.WadComparisonSavePath))
+                {
+                    var dirs = Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath);
+                    foreach (var dir in dirs)
+                    {
+                        try { Directory.Delete(dir, true); } catch {}
+                    }
+                }
+
+                // 2. Delete physical watcher/file diff directories
+                var fileDiffEntries = _appSettings.DiffHistory
+                    .Where(h => h.Type != HistoryEntryType.WadArchive && h.Type != HistoryEntryType.WadFile)
+                    .ToList();
+
+                foreach (var entry in fileDiffEntries)
+                {
+                    try
+                    {
+                        string historyDirectoryPath = Path.GetDirectoryName(entry.OldFilePath);
+                        if (!string.IsNullOrEmpty(historyDirectoryPath) && Directory.Exists(historyDirectoryPath))
+                        {
+                            Directory.Delete(historyDirectoryPath, true);
+                        }
+                    }
+                    catch {}
+                }
+
+                // 3. Clear AppSettings collection and save
+                _appSettings.DiffHistory.Clear();
+                _appSettings.Save();
+
+                _logService.LogSuccess("Entire history cleared successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to clear entire history.");
+            }
+        }
     }
 }

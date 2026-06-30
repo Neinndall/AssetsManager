@@ -15,26 +15,33 @@ namespace AssetsManager.Views.Helpers
         public const double GroundLevel = 2000;
         public const int SceneTextureMaxSize = 2048;
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _textureCache = new();
+
         public static BitmapSource LoadSceneTexture(string path, LogService logService)
         {
-            try
+            if (string.IsNullOrEmpty(path)) return null;
+
+            return _textureCache.GetOrAdd(path, p =>
             {
-                if (File.Exists(path))
+                try
                 {
-                    using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
-                        return TextureUtils.LoadTexture(fileStream, Path.GetExtension(path), SceneTextureMaxSize);
+                    if (File.Exists(p))
+                    {
+                        using (FileStream fileStream = new FileStream(p, FileMode.Open, FileAccess.Read))
+                            return TextureUtils.LoadTexture(fileStream, Path.GetExtension(p), SceneTextureMaxSize);
+                    }
+                    else
+                    {
+                        using (Stream resourceStream = Application.GetResourceStream(new Uri(p)).Stream)
+                            return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(p), SceneTextureMaxSize);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    using (Stream resourceStream = Application.GetResourceStream(new Uri(path)).Stream)
-                        return TextureUtils.LoadTexture(resourceStream, Path.GetExtension(path), SceneTextureMaxSize);
+                    logService.LogError(ex, $"Failed to load scene texture: {p}");
+                    return null;
                 }
-            }
-            catch (Exception ex)
-            {
-                logService.LogError(ex, $"Failed to load scene texture: {path}");
-                return null;
-            }
+            });
         }
 
         public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
