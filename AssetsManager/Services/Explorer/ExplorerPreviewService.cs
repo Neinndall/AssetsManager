@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -37,6 +38,7 @@ namespace AssetsManager.Services.Explorer
         private TextEditor _textEditorPreview;
         private FilePreviewerModel _viewModel;
         private IHighlightingDefinition _jsonHighlightingDefinition;
+        private CancellationTokenSource _previewCancellationTokenSource;
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -144,6 +146,11 @@ namespace AssetsManager.Services.Explorer
                 }
             }
 
+            // Cancel previous active preview task to avoid WebView2 concurrency collisions
+            _previewCancellationTokenSource?.Cancel();
+            _previewCancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = _previewCancellationTokenSource.Token;
+
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
             // We only update/clear metadata if the current node is an image. 
             // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
@@ -170,12 +177,18 @@ namespace AssetsManager.Services.Explorer
             try
             {
                 byte[] data = null;
-                if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node); }
-                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath); }
-                else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node); }
+                if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken); }
+                else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken); }
+                else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken); }
+
+                if (cancellationToken.IsCancellationRequested) return;
 
                 if (data != null) { await DispatchPreview(data, node.Extension, node); }
                 else { await ShowUnsupportedPreviewAsync(node.Extension); }
+            }
+            catch (OperationCanceledException)
+            {
+                // Handled gracefully: Task was cancelled due to quick navigation
             }
             catch (Exception ex)
             {

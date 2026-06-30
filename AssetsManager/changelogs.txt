@@ -29,6 +29,10 @@ Improvements
     * Streamlined the Search Card description in the History panel for a cleaner, more readable look.
     * Added a direct validation checkmark action to the Watcher list to resolve modified files instantly without opening the diff viewer.
 
+Bug Fixes
+  - Explorer / WebView2 E_ABORT Concurrency Crash
+    * Implemented active Task Cancellation (`CancellationTokenSource`) in `ExplorerPreviewService` to gracefully abort running audio conversions and I/O tasks when switching files quickly, preventing WebView2 initialization collisions and `E_ABORT` COM exceptions.
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 AssetsManager - League of Legends | v4.0.1.1
