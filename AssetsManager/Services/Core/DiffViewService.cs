@@ -374,6 +374,18 @@ namespace AssetsManager.Services.Core
 
         private async Task<(string oldText, string newText)> ProcessDataAsync(string dataType, byte[] oldData, byte[] newData)
         {
+            if (dataType == "bin")
+            {
+                try
+                {
+                    return await _contentFormatterService.GetBinDiffJsonAsync(oldData, newData);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to create semantic BIN diff; falling back to full JSON comparison.");
+                }
+            }
+
             // Run sequentially to optimize peak memory. Parsing two massive files concurrently (e.g. 33MB .bin files) 
             // creates two massive object graphs in RAM simultaneously, causing LOH fragmentation and OOM exceptions.
             string oldText = await _contentFormatterService.GetFormattedStringAsync(dataType, oldData);

@@ -155,6 +155,9 @@ namespace AssetsManager.Services.Formatting
             return formattedContent;
         }
 
+        public Task<(string OldJson, string NewJson)> GetBinDiffJsonAsync(byte[] oldData, byte[] newData) =>
+            _binPropertyParser.WriteBinDiffAsJsonAsync(oldData, newData);
+
         private async Task<string> GetBnkJsonStringAsync(byte[] data)
         {
             if (data == null || data.Length == 0)

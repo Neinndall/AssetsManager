@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -248,6 +249,135 @@ namespace AssetsManager.Services.Parsers
         #endregion
 
         #region Fallback Serialization (BinTree)
+
+        public Task<(string OldJson, string NewJson)> WriteBinDiffAsJsonAsync(byte[] oldData, byte[] newData)
+        {
+            return Task.Run(() =>
+            {
+                using var oldStream = new MemoryStream(oldData, writable: false);
+                using var newStream = new MemoryStream(newData, writable: false);
+                var oldTree = new BinTree(oldStream);
+                var newTree = new BinTree(newStream);
+                BinTreeDiff diff = oldTree.Diff(newTree);
+
+                return (WriteBinDiffSideAsJson(diff, useNewValues: false), WriteBinDiffSideAsJson(diff, useNewValues: true));
+            });
+        }
+
+        private string WriteBinDiffSideAsJson(BinTreeDiff diff, bool useNewValues)
+        {
+            using var output = new MemoryStream();
+            var options = new JsonWriterOptions
+            {
+                Indented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+            using var writer = new Utf8JsonWriter(output, options);
+            var resolutionCache = new Dictionary<uint, string>();
+
+            string Resolve(uint hash)
+            {
+                if (resolutionCache.TryGetValue(hash, out string resolved)) return resolved;
+                string result = _hashResolver.ResolveBinHashGeneral(hash);
+                resolutionCache[hash] = result;
+                return result;
+            }
+
+            writer.WriteStartObject();
+            foreach (BinTreeObjectDiff objectDiff in diff.Objects)
+            {
+                BinTreeObject treeObject = GetObjectForSide(objectDiff, useNewValues);
+                if (treeObject == null) continue;
+
+                writer.WritePropertyName(Resolve(objectDiff.PathHash));
+                writer.WriteStartObject();
+                writer.WriteString("type", Resolve(treeObject.ClassHash));
+
+                if (objectDiff is not ModifiedBinTreeObjectDiff modifiedObject)
+                {
+                    foreach (var property in treeObject.Properties.OrderBy(x => x.Key))
+                    {
+                        writer.WritePropertyName(Resolve(property.Key));
+                        WritePropertyValueInternal(writer, property.Value, Resolve);
+                    }
+                }
+                else
+                {
+                    WriteChangedProperties(
+                        writer,
+                        treeObject.Properties,
+                        modifiedObject.Properties,
+                        0,
+                        useNewValues,
+                        Resolve
+                    );
+                }
+
+                writer.WriteEndObject();
+            }
+            writer.WriteEndObject();
+            writer.Flush();
+
+            return Encoding.UTF8.GetString(output.ToArray());
+        }
+
+        private void WriteChangedProperties(
+            Utf8JsonWriter writer,
+            IReadOnlyDictionary<uint, BinTreeProperty> properties,
+            IEnumerable<BinTreePropertyDiff> differences,
+            int pathIndex,
+            bool useNewValues,
+            Func<uint, string> resolve)
+        {
+            foreach (var group in differences.GroupBy(x => x.Path[pathIndex]).OrderBy(x => x.Key))
+            {
+                if (!properties.TryGetValue(group.Key, out BinTreeProperty property)) continue;
+
+                writer.WritePropertyName(resolve(group.Key));
+                if (group.Any(x => x.Path.Count == pathIndex + 1))
+                {
+                    BinTreePropertyDiff difference = group.Single(x => x.Path.Count == pathIndex + 1);
+                    BinTreeProperty changedProperty = GetPropertyForSide(difference, useNewValues);
+                    WritePropertyValueInternal(writer, changedProperty, resolve);
+                    continue;
+                }
+
+                var structure = (BinTreeStruct)property;
+                writer.WriteStartObject();
+                writer.WriteString("type", resolve(structure.ClassHash));
+                WriteChangedProperties(
+                    writer,
+                    structure.Properties,
+                    group,
+                    pathIndex + 1,
+                    useNewValues,
+                    resolve
+                );
+                writer.WriteEndObject();
+            }
+        }
+
+        private static BinTreeObject GetObjectForSide(BinTreeObjectDiff diff, bool useNewValue)
+        {
+            return diff switch
+            {
+                AddedBinTreeObjectDiff added when useNewValue => added.Object,
+                RemovedBinTreeObjectDiff removed when !useNewValue => removed.Object,
+                ModifiedBinTreeObjectDiff modified => useNewValue ? modified.NewObject : modified.OldObject,
+                _ => null
+            };
+        }
+
+        private static BinTreeProperty GetPropertyForSide(BinTreePropertyDiff diff, bool useNewValue)
+        {
+            return diff switch
+            {
+                AddedBinTreePropertyDiff added when useNewValue => added.Property,
+                RemovedBinTreePropertyDiff removed when !useNewValue => removed.Property,
+                ModifiedBinTreePropertyDiff modified => useNewValue ? modified.NewProperty : modified.OldProperty,
+                _ => null
+            };
+        }
 
         private void WriteBinTreeAsJsonInternal(Stream outputStream, BinTree binTree)
         {

@@ -1,3 +1,19 @@
+AssetsManager - League of Legends | v4.0.1.3
+
+HOTFIX UPDATE
+This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
+
+New Features
+  - BIN differences now show only semantic object and property changes with resolved paths.
+
+Improvements
+  - WAD monitoring and comparisons now use native chunk checksums with faster archive table loading.
+
+Bug Fixes
+  - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 AssetsManager - League of Legends | v4.0.1.2
 
 HOTFIX UPDATE
