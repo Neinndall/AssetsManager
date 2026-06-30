@@ -32,6 +32,8 @@ Improvements
 Bug Fixes
   - Explorer / WebView2 E_ABORT Concurrency Crash
     * Implemented active Task Cancellation (`CancellationTokenSource`) in `ExplorerPreviewService` to gracefully abort running audio conversions and I/O tasks when switching files quickly, preventing WebView2 initialization collisions and `E_ABORT` COM exceptions.
+  - Explorer / WebView2 WPF Airspace Window Resizing Block
+    * Added a 5px right margin safety padding to the `WebViewContainer` in `FilePreviewerControl.xaml` to resolve the WPF Airspace layout conflict, allowing native mouse window-width resizing while media is playing without shrinking images or text views.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
