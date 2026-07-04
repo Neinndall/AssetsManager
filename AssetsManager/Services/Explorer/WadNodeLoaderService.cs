@@ -291,6 +291,9 @@ namespace AssetsManager.Services.Explorer
         {
             if (node.Type != NodeType.VirtualDirectory && node.Type != NodeType.WadFile) return;
 
+            // Skip sorting on audio banks, events and family groups to preserve the original Wwise playlist playback order.
+            if (node.IsGroupingFolder || node.Type == NodeType.AudioEvent || node.Type == NodeType.SoundBank) return;
+
             var sortedChildren = node.Children
                 .OrderBy(c => c.Type == NodeType.VirtualDirectory ? 0 : 1)
                 .ThenBy(c => c.Name)

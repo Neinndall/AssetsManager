@@ -8,6 +8,8 @@ New Features
 
 Improvements
   - WAD monitoring and comparisons now use native chunk checksums with faster archive table loading.
+  - Audio bank extraction now preserves the original playback/designer order for family groups.
+  - Updated vgmstream-cli to the latest version in resources for improved audio decoding.
 
 Bug Fixes
   - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
