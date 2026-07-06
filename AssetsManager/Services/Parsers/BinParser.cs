@@ -34,11 +34,45 @@ namespace AssetsManager.Services.Parsers
                 using var stream = new MemoryStream(binData);
                 var binTree = new BinTree(stream);
 
-                foreach (var kvp in binTree.Objects)
+                // Clean the bank name to guess the champion name prefix (e.g. "Ahri_audio" -> "Ahri")
+                string champName = bankName ?? string.Empty;
+                int suffixIndex = champName.IndexOf('_');
+                if (suffixIndex != -1)
                 {
-                    foreach (var propKvp in kvp.Value.Properties)
+                    champName = champName.Substring(0, suffixIndex);
+                }
+
+                // Try to resolve target properties directly to skip parsing unrelated objects
+                string[] commonPaths = new[]
+                {
+                    $"Characters/{champName}/Audio/mAudioEvents",
+                    $"Characters/{champName.ToLowerInvariant()}/Audio/mAudioEvents",
+                    $"Characters/{champName}/Audio",
+                    "mAudioEvents"
+                };
+
+                bool foundDirectly = false;
+                foreach (var path in commonPaths)
+                {
+                    if (binTree.TryGetProperty(path, out var audioEventsProp))
                     {
-                        ExtractStrings(propKvp.Value, mapEventNames);
+                        ExtractStrings(audioEventsProp, mapEventNames);
+                        foundDirectly = true;
+                        logService.LogDebug($"[AUDIO] Successfully resolved audio events directly using path: '{path}'");
+                        break;
+                    }
+                }
+
+                // Safe fallback: Scan the entire tree recursively if direct lookup fails
+                if (!foundDirectly)
+                {
+                    logService.LogDebug($"[AUDIO] Direct path lookup missed for '{bankName}'. Falling back to full recursive scan.");
+                    foreach (var kvp in binTree.Objects)
+                    {
+                        foreach (var propKvp in kvp.Value.Properties)
+                        {
+                            ExtractStrings(propKvp.Value, mapEventNames);
+                        }
                     }
                 }
             }
