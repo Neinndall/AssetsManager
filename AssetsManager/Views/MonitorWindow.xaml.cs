@@ -5,6 +5,7 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using System;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Controls.Monitor;
 using AssetsManager.Views.Models.Monitor;
 
@@ -12,81 +13,64 @@ namespace AssetsManager.Views
 {
     public partial class MonitorWindow : UserControl
     {
-        public MonitorWindow(
-            MonitorService monitorService,
-            AssetDownloader assetDownloader,
-            IServiceProvider serviceProvider,
-            DiffViewService diffViewService,
-            AppSettings appSettings,
-            LogService logService,
-            CustomMessageBoxService customMessageBoxService,
-            AssetWatcherService assetWatcherService,
-            VersionService versionService,
-            DirectoriesCreator directoriesCreator,
-            RiotApiService riotApiService,
-            TaskCancellationManager taskCancellationManager,
-            BackupManager backupManager,
-            PbeStatusService pbeStatusService,
-            Status statusService,
-            UpdateCheckService updateCheckService,
-            ComparisonHistoryService comparisonHistoryService) 
+        public MonitorWindow(IServiceProvider serviceProvider) 
         {
             InitializeComponent();
-
+ 
             // Inject all necessary dependencies into the MonitorDashboardControl
-            MonitorDashboardControl.MonitorService = monitorService;
-            MonitorDashboardControl.PbeStatusService = pbeStatusService;
-            MonitorDashboardControl.AppSettings = appSettings;
-            MonitorDashboardControl.VersionService = versionService;
-            MonitorDashboardControl.StatusService = statusService;
-            MonitorDashboardControl.UpdateCheckService = updateCheckService;
-
+            MonitorDashboardControl.MonitorService = serviceProvider.GetRequiredService<MonitorService>();
+            MonitorDashboardControl.PbeStatusService = serviceProvider.GetRequiredService<PbeStatusService>();
+            MonitorDashboardControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            MonitorDashboardControl.VersionService = serviceProvider.GetRequiredService<VersionService>();
+            MonitorDashboardControl.StatusService = serviceProvider.GetRequiredService<Status>();
+            MonitorDashboardControl.UpdateCheckService = serviceProvider.GetRequiredService<UpdateCheckService>();
+ 
             // Inject all necessary dependencies into the AssetWatcherControl
-            AssetWatcherControl.MonitorService = monitorService;
+            AssetWatcherControl.MonitorService = serviceProvider.GetRequiredService<MonitorService>();
             AssetWatcherControl.ServiceProvider = serviceProvider;
-            AssetWatcherControl.DiffViewService = diffViewService;
-            AssetWatcherControl.AssetWatcherService = assetWatcherService;
-            AssetWatcherControl.AppSettings = appSettings;
-            AssetWatcherControl.LogService = logService;
-            AssetWatcherControl.CustomMessageBoxService = customMessageBoxService;
-
+            AssetWatcherControl.DiffViewService = serviceProvider.GetRequiredService<DiffViewService>();
+            AssetWatcherControl.AssetWatcherService = serviceProvider.GetRequiredService<AssetWatcherService>();
+            AssetWatcherControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            AssetWatcherControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            AssetWatcherControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+ 
             // Setup and inject dependencies for HistoryViewControl
-            HistoryViewControl.AppSettings = appSettings;
-            HistoryViewControl.LogService = logService;
-            HistoryViewControl.CustomMessageBoxService = customMessageBoxService;
-            HistoryViewControl.DiffViewService = diffViewService;
-            HistoryViewControl.ComparisonHistoryService = comparisonHistoryService;
+            HistoryViewControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            HistoryViewControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            HistoryViewControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            HistoryViewControl.DiffViewService = serviceProvider.GetRequiredService<DiffViewService>();
+            HistoryViewControl.ComparisonHistoryService = serviceProvider.GetRequiredService<ComparisonHistoryService>();
             HistoryViewControl.ServiceProvider = serviceProvider;
-
+ 
             // Setup and inject dependencies for AssetTrackerControl
-            AssetTrackerControl.MonitorService = monitorService;
-            AssetTrackerControl.AssetDownloader = assetDownloader;
-            AssetTrackerControl.LogService = logService;
-            AssetTrackerControl.CustomMessageBoxService = customMessageBoxService;
-            AssetTrackerControl.AppSettings = appSettings;
-
+            AssetTrackerControl.MonitorService = serviceProvider.GetRequiredService<MonitorService>();
+            AssetTrackerControl.AssetDownloader = serviceProvider.GetRequiredService<AssetDownloader>();
+            AssetTrackerControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            AssetTrackerControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            AssetTrackerControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+ 
             // Setup and inject dependencies for ManageVersionsControl
-            ManageVersionsControl.VersionService = versionService;
-            ManageVersionsControl.LogService = logService;
-            ManageVersionsControl.AppSettings = appSettings;
-            ManageVersionsControl.CustomMessageBoxService = customMessageBoxService;
-            ManageVersionsControl.TaskCancellationManager = taskCancellationManager;
-
+            ManageVersionsControl.VersionService = serviceProvider.GetRequiredService<VersionService>();
+            ManageVersionsControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            ManageVersionsControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            ManageVersionsControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            ManageVersionsControl.TaskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
+ 
             // Setup and inject dependencies for BackupsControl
-            BackupsControl.BackupManager = backupManager;
-            BackupsControl.VersionService = versionService;
-            BackupsControl.LogService = logService;
-            BackupsControl.AppSettings = appSettings;
-            BackupsControl.CustomMessageBoxService = customMessageBoxService;
-            BackupsControl.TaskCancellationManager = taskCancellationManager;
+            BackupsControl.BackupManager = serviceProvider.GetRequiredService<BackupManager>();
+            BackupsControl.VersionService = serviceProvider.GetRequiredService<VersionService>();
+            BackupsControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            BackupsControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            BackupsControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            BackupsControl.TaskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
             BackupsControl.ServiceProvider = serviceProvider;
-
+ 
             // Setup and inject dependencies for ApiControl
-            ApiControl.LogService = logService;
-            ApiControl.CustomMessageBoxService = customMessageBoxService;
-            ApiControl.RiotApiService = riotApiService;
-            ApiControl.AppSettings = appSettings;
-            ApiControl.DirectoriesCreator = directoriesCreator;
+            ApiControl.LogService = serviceProvider.GetRequiredService<LogService>();
+            ApiControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            ApiControl.RiotApiService = serviceProvider.GetRequiredService<RiotApiService>();
+            ApiControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            ApiControl.DirectoriesCreator = serviceProvider.GetRequiredService<DirectoriesCreator>();
         }
     }
 }

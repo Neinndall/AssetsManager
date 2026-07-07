@@ -44,34 +44,23 @@ namespace AssetsManager.Views.Dialogs
 
         private readonly WadComparisonResultModel _viewModel;
 
-        public WadComparisonResultWindow(
-            IServiceProvider serviceProvider,
-            CustomMessageBoxService customMessageBoxService,
-            AssetDownloader assetDownloaderService,
-            LogService logService,
-            ComparisonHistoryService comparisonHistoryService,
-            DiffViewService diffViewService,
-            HashResolverService hashResolverService,
-            AppSettings appSettings,
-            WadContentProvider wadContentProvider,
-            VersionService versionService,
-            BackupManager backupManager)
+        public WadComparisonResultWindow(IServiceProvider serviceProvider)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
             DataContext = _viewModel;
 
             _serviceProvider = serviceProvider;
-            _customMessageBoxService = customMessageBoxService;
-            _assetDownloaderService = assetDownloaderService;
-            _logService = logService;
-            _comparisonHistoryService = comparisonHistoryService;
-            _diffViewService = diffViewService;
-            _hashResolverService = hashResolverService;
-            _appSettings = appSettings;
-            _wadContentProvider = wadContentProvider;
-            _versionService = versionService;
-            _backupManager = backupManager;
+            _customMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            _assetDownloaderService = serviceProvider.GetRequiredService<AssetDownloader>();
+            _logService = serviceProvider.GetRequiredService<LogService>();
+            _comparisonHistoryService = serviceProvider.GetRequiredService<ComparisonHistoryService>();
+            _diffViewService = serviceProvider.GetRequiredService<DiffViewService>();
+            _hashResolverService = serviceProvider.GetRequiredService<HashResolverService>();
+            _appSettings = serviceProvider.GetRequiredService<AppSettings>();
+            _wadContentProvider = serviceProvider.GetRequiredService<WadContentProvider>();
+            _versionService = serviceProvider.GetRequiredService<VersionService>();
+            _backupManager = serviceProvider.GetRequiredService<BackupManager>();
 
             // Peer Injection
             ResultsTree.ParentWindow = this;

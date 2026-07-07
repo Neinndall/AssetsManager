@@ -66,50 +66,30 @@ namespace AssetsManager.Views
         private GridLength _lastLogHeight = new GridLength(180);
         private bool _isLogMinimized = false;
 
-        public MainWindow(
-            IServiceProvider serviceProvider,
-            LogService logService,
-            AppSettings appSettings,
-            UpdateManager updateManager,
-            WadComparatorService wadComparatorService,
-            CustomMessageBoxService customMessageBoxService,
-            BackupManager backupManager,
-            HashResolverService hashResolverService,
-            WadNodeLoaderService wadNodeLoaderService,
-            ExplorerPreviewService explorerPreviewService,
-            UpdateCheckService updateCheckService,
-            ProgressUIManager progressUIManager,
-            DiffViewService diffViewService,
-            MonitorService monitorService,
-            VersionService versionService,
-            ExtractionService extractionService,
-            ReportGenerationService reportGenerationService,
-            TaskCancellationManager taskCancellationManager,
-            NotificationService notificationService,
-            ComparisonHistoryService comparisonHistoryService)
+        public MainWindow(IServiceProvider serviceProvider)
         {
             InitializeComponent();
 
             _serviceProvider = serviceProvider;
-            _logService = logService;
-            _appSettings = appSettings;
-            _updateManager = updateManager;
-            _wadComparatorService = wadComparatorService;
-            _customMessageBoxService = customMessageBoxService;
-            _backupManager = backupManager;
-            _hashResolverService = hashResolverService;
-            _wadNodeLoaderService = wadNodeLoaderService;
-            _explorerPreviewService = explorerPreviewService;
-            _updateCheckService = updateCheckService;
-            _progressUIManager = progressUIManager;
-            _diffViewService = diffViewService;
-            _monitorService = monitorService;
-            _versionService = versionService;
-            _extractionService = extractionService;
-            _reportGenerationService = reportGenerationService;
-            _taskCancellationManager = taskCancellationManager;
-            _notificationService = notificationService;
-            _comparisonHistoryService = comparisonHistoryService;
+            _logService = serviceProvider.GetRequiredService<LogService>();
+            _appSettings = serviceProvider.GetRequiredService<AppSettings>();
+            _updateManager = serviceProvider.GetRequiredService<UpdateManager>();
+            _wadComparatorService = serviceProvider.GetRequiredService<WadComparatorService>();
+            _customMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            _backupManager = serviceProvider.GetRequiredService<BackupManager>();
+            _hashResolverService = serviceProvider.GetRequiredService<HashResolverService>();
+            _wadNodeLoaderService = serviceProvider.GetRequiredService<WadNodeLoaderService>();
+            _explorerPreviewService = serviceProvider.GetRequiredService<ExplorerPreviewService>();
+            _updateCheckService = serviceProvider.GetRequiredService<UpdateCheckService>();
+            _progressUIManager = serviceProvider.GetRequiredService<ProgressUIManager>();
+            _diffViewService = serviceProvider.GetRequiredService<DiffViewService>();
+            _monitorService = serviceProvider.GetRequiredService<MonitorService>();
+            _versionService = serviceProvider.GetRequiredService<VersionService>();
+            _extractionService = serviceProvider.GetRequiredService<ExtractionService>();
+            _reportGenerationService = serviceProvider.GetRequiredService<ReportGenerationService>();
+            _taskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
+            _notificationService = serviceProvider.GetRequiredService<NotificationService>();
+            _comparisonHistoryService = serviceProvider.GetRequiredService<ComparisonHistoryService>();
 
             // Peer-to-Peer Injection
             Sidebar.ParentWindow = this;
