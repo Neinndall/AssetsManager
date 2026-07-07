@@ -37,14 +37,31 @@ namespace AssetsManager.Views.Controls.Explorer
     {
         public FilePreviewerControl FilePreviewer { get; set; }
 
-        public MenuItem PinMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Pin to Tabs");
-        public MenuItem AddToFavoritesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Favorites");
-        public MenuItem ViewChangesMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString()?.Contains("Differences") == true || m.Header?.ToString()?.Contains("Changes") == true);
-        public MenuItem ExtractMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Extract");
-        public MenuItem SaveMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Save");
-        public MenuItem AddToImageMergerMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Image Merger");
-        public MenuItem WatchAssetMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Add to")?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Watch Asset");
-        public MenuItem CopyMenuItem => (this.FindResource("ExplorerContextMenu") as ContextMenu)?.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Copy");
+        private ContextMenu ExplorerContextMenu => FindResource("ExplorerContextMenu") as ContextMenu;
+
+        public MenuItem PinMenuItem => FindMenuItem(ExplorerContextMenu, nameof(PinMenuItem));
+        public MenuItem AddToFavoritesMenuItem => FindMenuItem(ExplorerContextMenu, nameof(AddToFavoritesMenuItem));
+        public MenuItem ViewChangesMenuItem => FindMenuItem(ExplorerContextMenu, nameof(ViewChangesMenuItem));
+        public MenuItem ExtractMenuItem => FindMenuItem(ExplorerContextMenu, nameof(ExtractMenuItem));
+        public MenuItem SaveMenuItem => FindMenuItem(ExplorerContextMenu, nameof(SaveMenuItem));
+        public MenuItem AddToImageMergerMenuItem => FindMenuItem(ExplorerContextMenu, nameof(AddToImageMergerMenuItem));
+        public MenuItem WatchAssetMenuItem => FindMenuItem(ExplorerContextMenu, nameof(WatchAssetMenuItem));
+        public MenuItem CopyMenuItem => FindMenuItem(ExplorerContextMenu, nameof(CopyMenuItem));
+
+        private static MenuItem FindMenuItem(DependencyObject parent, string name)
+        {
+            if (parent is null) return null;
+            if (parent is MenuItem mi && mi.Name == name) return mi;
+            if (parent is ItemsControl items)
+            {
+                foreach (var child in items.Items.OfType<DependencyObject>())
+                {
+                    var found = FindMenuItem(child, name);
+                    if (found != null) return found;
+                }
+            }
+            return null;
+        }
 
         // Injected Services
         public LogService LogService { get; set; }

@@ -88,6 +88,9 @@ namespace AssetsManager.Utils
         // Delegates to LeagueToolkit's WadFile.GetChunkCount - single source of truth for the
         // WAD format. Kept as a wrapper to preserve call sites and to allow future fallback logic
         // if the library API ever changes.
-        public static int ReadWadChunkCount(string wadFilePath) => WadFile.GetChunkCount(wadFilePath);
+        public static int ReadWadChunkCount(string wadFilePath)
+        {
+            return WadFile.TryReadHeader(wadFilePath, out var info) ? info.ChunkCount : -1;
+        }
     }
 }
