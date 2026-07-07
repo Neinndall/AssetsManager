@@ -621,10 +621,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (TryGetModelBounds(out var center, out var maxDim))
             {
-                double distance = isMap ? maxDim * 1.5 : maxDim * 1.8;
+                double distance = isMap ? maxDim * 0.9 : maxDim * 1.8;
                 if (distance < 50) distance = 250;
 
-                position = new Point3D(center.X, center.Y + distance * 0.15, center.Z + distance);
+                double heightFactor = isMap ? 1.2 : 0.15;
+                double depthFactor = isMap ? 1.0 : 1.0;
+
+                position = new Point3D(center.X, center.Y + distance * heightFactor, center.Z + distance * depthFactor);
                 lookDirection = center - position;
 
                 if (smooth)
