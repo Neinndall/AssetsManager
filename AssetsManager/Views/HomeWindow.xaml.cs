@@ -12,12 +12,17 @@ namespace AssetsManager.Views
     {
         public MainWindow ParentWindow { get; set; }
         private readonly HomeModel _model;
+        private readonly IServiceProvider _serviceProvider;
 
-        public HomeWindow(AppSettings appSettings, DirectoriesCreator directoriesCreator)
+        public HomeWindow(IServiceProvider serviceProvider)
         {
             InitializeComponent();
             
-            _model = new HomeModel(appSettings, directoriesCreator);
+            _serviceProvider = serviceProvider;
+            _model = new HomeModel(
+                serviceProvider.GetRequiredService<AppSettings>(), 
+                serviceProvider.GetRequiredService<DirectoriesCreator>()
+            );
             DataContext = _model;
             
             Unloaded += HomeWindow_Unloaded;
@@ -46,21 +51,21 @@ namespace AssetsManager.Views
 
         private void Notepad_Click(object sender, RoutedEventArgs e)
         {
-            var notepadWindow = App.ServiceProvider.GetRequiredService<NotepadWindow>();
+            var notepadWindow = _serviceProvider.GetRequiredService<NotepadWindow>();
             notepadWindow.Owner = Window.GetWindow(this);
             notepadWindow.Show();
         }
 
         private void AudioPlayer_Click(object sender, RoutedEventArgs e)
         {
-            var audioPlayerWindow = App.ServiceProvider.GetRequiredService<AudioPlayerWindow>();
+            var audioPlayerWindow = _serviceProvider.GetRequiredService<AudioPlayerWindow>();
             audioPlayerWindow.Owner = Window.GetWindow(this);
             audioPlayerWindow.Show();
         }
 
         private void Converter_Click(object sender, RoutedEventArgs e)
         {
-            var converterWindow = App.ServiceProvider.GetRequiredService<ConverterWindow>();
+            var converterWindow = _serviceProvider.GetRequiredService<ConverterWindow>();
             converterWindow.Owner = Window.GetWindow(this);
             converterWindow.Show();
         }
