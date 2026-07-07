@@ -621,7 +621,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (TryGetModelBounds(out var center, out var maxDim))
             {
-                double distance = isMap ? maxDim * 0.9 : maxDim * 1.8;
+                double distance = isMap ? maxDim * 0.55 : maxDim * 1.8;
                 if (distance < 50) distance = 250;
 
                 double heightFactor = isMap ? 1.2 : 0.15;
