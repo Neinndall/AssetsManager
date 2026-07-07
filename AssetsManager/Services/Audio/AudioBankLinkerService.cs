@@ -52,7 +52,8 @@ namespace AssetsManager.Services.Audio
         public async Task<LinkedAudioBank> LinkAudioBankAsync(FileSystemNodeModel clickedNode, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath)
         {
             bool isBackupMode = clickedNode.ChunkDiff != null;
-            string modeLabel = isBackupMode ? "BACKUP" : "LIVE";
+            // "ACTIVE_INSTALLATION" refers to reading directly from the local client files on disk (Live or PBE)
+            string modeLabel = isBackupMode ? "BACKUP" : "ACTIVE_INSTALLATION";
             
             _logService.LogDebug($"[LinkAudioBankAsync] [{modeLabel} MODE] Linking audio bank. Node: '{clickedNode.Name}', Path: '{clickedNode.VirtualPath}'");
 
@@ -80,13 +81,13 @@ namespace AssetsManager.Services.Audio
             else
             {
                 var (binNode, baseName, binType) = await FindAssociatedBinFileAsync(clickedNode, rootNodes, currentRootPath);
-                _logService.LogDebug($"[LinkAudioBankAsync] [LIVE] BinNode resolved: {binNode != null}, BaseName: {baseName}, Type: {binType}");
+                _logService.LogDebug($"[LinkAudioBankAsync] [ACTIVE_INSTALLATION] BinNode resolved: {binNode != null}, BaseName: {baseName}, Type: {binType}");
 
                 byte[] binData = null;
                 if (binNode != null) binData = await _wadContentProvider.GetVirtualFileBytesAsync(binNode);
 
                 var siblingsResult = await FindSiblingFilesFromWadsInternalAsync(clickedNode, clickedNode.SourceWadPath, baseName);
-                _logService.LogDebug($"[LinkAudioBankAsync] [LIVE] Siblings: WPK={siblingsResult.WpkNode != null}, AudioBNK={siblingsResult.AudioBnkNode != null}, EventsBNK={siblingsResult.EventsBnkNode != null}");
+                _logService.LogDebug($"[LinkAudioBankAsync] [ACTIVE_INSTALLATION] Siblings: WPK={siblingsResult.WpkNode != null}, AudioBNK={siblingsResult.AudioBnkNode != null}, EventsBNK={siblingsResult.EventsBnkNode != null}");
 
                 return new LinkedAudioBank
                 {
