@@ -449,6 +449,18 @@ namespace AssetsManager.Services.Downloads
             var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
+            if (format == ImageExportFormat.Png)
+            {
+                string ext = Path.GetExtension(node.Name);
+                if (ext.Equals(".tex", StringComparison.OrdinalIgnoreCase) || ext.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TextureUtils.ExportTextureAsPngDirect(fileBytes, node.Name, destinationPath, onFileSavedCallback, _logService))
+                    {
+                        return;
+                    }
+                }
+            }
+
             using (var memoryStream = new MemoryStream(fileBytes))
             {
                 var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));

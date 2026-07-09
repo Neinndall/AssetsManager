@@ -312,5 +312,47 @@ namespace AssetsManager.Utils
             }
             onFileSavedCallback?.Invoke(filePath);
         }
+
+        public static bool ExportTextureAsPngDirect(byte[] fileBytes, string originalFileName, string destinationPath, Action<string> onFileSavedCallback, LogService logService)
+        {
+            try
+            {
+                using (var memoryStream = new MemoryStream(fileBytes))
+                {
+                    var tex = Texture.Load(memoryStream);
+                    if (tex.Mips.Length > 0)
+                    {
+                        var mip = tex.Mips[0];
+                        string fileName = Path.ChangeExtension(originalFileName, ".png");
+                        string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
+
+                        int pixelCount = mip.Width * mip.Height;
+                        uint[] pixels = System.Buffers.ArrayPool<uint>.Shared.Rent(pixelCount);
+                        try
+                        {
+                            var flatSpan = pixels.AsSpan(0, pixelCount);
+                            for (int y = 0; y < mip.Height; y++)
+                            {
+                                var rowDst = System.Runtime.InteropServices.MemoryMarshal.Cast<uint, Rgba32>(flatSpan.Slice(y * mip.Width, mip.Width));
+                                mip.Span.GetRowSpan(y).CopyTo(rowDst);
+                            }
+                            TexSharp.TextureExporter.SaveToPng(flatSpan.ToArray(), mip.Width, mip.Height, filePath);
+                        }
+                        finally
+                        {
+                            System.Buffers.ArrayPool<uint>.Shared.Return(pixels);
+                        }
+
+                        onFileSavedCallback?.Invoke(filePath);
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logService?.LogError(ex, $"Failed to save texture directly as PNG, falling back to legacy WPF exporter.");
+            }
+            return false;
+        }
     }
 }
