@@ -17,7 +17,7 @@
     <PackageReference Include="Blake3" Version="2.2.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="DiffPlex" Version="1.9.0" />
-    <ProjectReference Include="..\..\LeagueToolkit\src\LeagueToolkit\LeagueToolkit.csproj" />
+    <ProjectReference Include="..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\LeagueToolkit.csproj" />
     <PackageReference Include="Material.Icons.WPF" Version="2.4.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
@@ -40,7 +40,7 @@
   
   <ItemGroup>
     <Reference Include="TexSharp">
-      <HintPath>..\..\LeagueToolkit\src\LeagueToolkit\TexSharp.dll</HintPath>
+      <HintPath>..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\TexSharp.dll</HintPath>
     </Reference>
   </ItemGroup>
   
