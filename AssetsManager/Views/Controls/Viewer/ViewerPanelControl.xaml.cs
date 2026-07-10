@@ -297,7 +297,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Error during ViewerPanelControl.Cleanup");
+                LogService.LogError(ex, "Error during ViewerPanelControl.Cleanup");
             }
         }
 
@@ -597,7 +597,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (System.OperationCanceledException)
             {
-                LogService?.LogDebug("Model loading cancelled before completion.");
+                LogService.LogDebug("Model loading cancelled before completion.");
                 return;
             }
 
@@ -755,7 +755,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (System.OperationCanceledException)
             {
-                LogService?.LogDebug("Map geometry loading cancelled before completion.");
+                LogService.LogDebug("Map geometry loading cancelled before completion.");
                 return;
             }
 

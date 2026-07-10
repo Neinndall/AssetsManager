@@ -37,6 +37,8 @@ namespace AssetsManager.Views.Controls.Explorer
         private FileSystemNodeModel _currentNode;
         private FileSystemNodeModel _currentFolderNode;
         private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
+        private ObservableRangeCollection<FileGridViewModel> _gridItems;
+        private CancellationTokenSource _gridPreviewCancellation;
         private string _currentSearchFilter = string.Empty;
 
         public FilePreviewerControl()
@@ -236,6 +238,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             try
             {
+                CancelGridPreviewLoading();
                 await ExplorerPreviewService.ResetPreviewAsync();
                 
                 if (ViewModel.PinnedFilesManager != null)
@@ -350,6 +353,7 @@ namespace AssetsManager.Views.Controls.Explorer
             else
             {
                 _currentFolderNode = null;
+                CancelGridPreviewLoading();
                 FileGridControl.ItemsSource = null; // Clear immediately when resetting or when folder context is null
             }
             
@@ -375,14 +379,39 @@ namespace AssetsManager.Views.Controls.Explorer
             // Defer execution to avoid issues with current mouse events in the ListBox
             Dispatcher.InvokeAsync(() =>
             {
-                var gridItems = new ObservableRangeCollection<FileGridViewModel>(
+                CancelGridPreviewLoading();
+                _gridPreviewCancellation = new CancellationTokenSource();
+                var cancellationToken = _gridPreviewCancellation.Token;
+
+                _gridItems = new ObservableRangeCollection<FileGridViewModel>(
                     (!string.IsNullOrEmpty(_currentSearchFilter)
                         ? folderNode.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
                         : folderNode.Children)
-                    .Select(n => new FileGridViewModel(n, node => ExplorerPreviewService.GetImagePreviewAsync(node, 256))));
+                    .Select(n => new FileGridViewModel(
+                        n,
+                        (node, token) => ExplorerPreviewService.GetImagePreviewAsync(node, 256, token),
+                        cancellationToken,
+                        ex => LogService.LogError(ex, $"Failed to load grid thumbnail for '{n.VirtualPath}'."))));
 
-                FileGridControl.ItemsSource = gridItems;
+                FileGridControl.ItemsSource = _gridItems;
             }, DispatcherPriority.Background);
+        }
+
+        private void CancelGridPreviewLoading()
+        {
+            _gridPreviewCancellation?.Cancel();
+            _gridPreviewCancellation?.Dispose();
+            _gridPreviewCancellation = null;
+
+            if (_gridItems != null)
+            {
+                foreach (var item in _gridItems)
+                {
+                    item.Dispose();
+                }
+
+                _gridItems = null;
+            }
         }
 
         public void HandleNodeClicked(FileSystemNodeModel node)

@@ -190,7 +190,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Error during ViewerViewportControl.Cleanup");
+                LogService.LogError(ex, "Error during ViewerViewportControl.Cleanup");
             }
         }
 

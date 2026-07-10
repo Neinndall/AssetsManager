@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
@@ -8,7 +7,7 @@ namespace BenchmarkApp
 {
     class Program
     {
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             var services = new ServiceCollection();
 

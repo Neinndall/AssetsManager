@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Explorer
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
         private Previewer _activeContentPreviewer = Previewer.None;
         private Previewer _activeImagePreviewer = Previewer.None;
+        private readonly SemaphoreSlim _thumbnailLoadLimiter = new(4, 4);
         private FileSystemNodeModel _currentContentNode;
         private FileSystemNodeModel _currentImageNode;
         private Image _imagePreview;
@@ -725,19 +726,22 @@ namespace AssetsManager.Services.Explorer
             return Previewer.StatusPanel;
         }
 
-        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0)
+        public async Task<ImageSource> GetImagePreviewAsync(FileSystemNodeModel node, int maxWidth = 0, CancellationToken cancellationToken = default)
         {
             if (node == null || !SupportedFileTypes.IsImage(node.Extension))
             {
                 return null;
             }
 
+            var acquiredSlot = false;
             try
             {
+                await _thumbnailLoadLimiter.WaitAsync(cancellationToken);
+                acquiredSlot = true;
                 byte[] data = node.Type switch
                 {
-                    NodeType.VirtualFile => await _wadContentProvider.GetVirtualFileBytesAsync(node),
-                    NodeType.RealFile => await File.ReadAllBytesAsync(node.VirtualPath),
+                    NodeType.VirtualFile => await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken),
+                    NodeType.RealFile => await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken),
                     _ => null
                 };
 
@@ -749,6 +753,7 @@ namespace AssetsManager.Services.Explorer
                 {
                     return await Task.Run(() =>
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         using var stream = new MemoryStream(data);
                         var bmp = new BitmapImage();
                         bmp.BeginInit();
@@ -758,21 +763,41 @@ namespace AssetsManager.Services.Explorer
                         bmp.EndInit();
                         bmp.Freeze();
                         return bmp;
-                    });
+                    }, cancellationToken);
                 }
                 else if (SupportedFileTypes.Textures.Contains(node.Extension))
                 {
-                    return await Task.Run(() => TextureUtils.LoadTexture(new MemoryStream(data), node.Extension, size, size));
+                    return await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        using var stream = new MemoryStream(data);
+                        return TextureUtils.LoadTexture(stream, node.Extension, size, size);
+                    }, cancellationToken);
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {
-                    return await Task.Run(() => _svgParser.LoadSvg(data));
+                    return await Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return _svgParser.LoadSvg(data);
+                    }, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to get image preview for '{node.VirtualPath}'.");
                 return null;
+            }
+            finally
+            {
+                if (acquiredSlot)
+                {
+                    _thumbnailLoadLimiter.Release();
+                }
             }
 
             return null;

@@ -18,8 +18,6 @@ namespace AssetsManager.Views.Models.Explorer
 
     public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, IMultiSelectable
     {
-        private static readonly Dictionary<string, string> _wadPathPool = new(StringComparer.OrdinalIgnoreCase);
-
         public string Name { get; set; }
         public NodeType Type { get; set; }
 
@@ -103,21 +101,7 @@ namespace AssetsManager.Views.Models.Explorer
         public string SourceWadPath
         {
             get => _sourceWadPath;
-            set
-            {
-                if (value == null) _sourceWadPath = null;
-                else
-                {
-                    lock (_wadPathPool)
-                    {
-                        if (!_wadPathPool.TryGetValue(value, out _sourceWadPath))
-                        {
-                            _sourceWadPath = value;
-                            _wadPathPool[value] = value;
-                        }
-                    }
-                }
-            }
+            set => _sourceWadPath = value;
         }
 
         public string BackupChunkPath { get; set; } // Only for nodes from a backup

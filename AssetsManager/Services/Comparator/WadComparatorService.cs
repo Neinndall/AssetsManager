@@ -185,7 +185,11 @@ namespace AssetsManager.Services.Comparator
                                 oldCount = probeOld != null ? probeOld.Chunks.Count : 0;
                                 newCount = probeNew != null ? probeNew.Chunks.Count : 0;
                             }
-                            catch { continue; /* Skip corrupt WADs */ }
+                            catch (Exception ex)
+                            {
+                                _logService.LogError(ex, $"Failed to read WAD header for '{relativePath}'.");
+                                continue;
+                            }
                         }
 
                         total += (hasOld ? oldCount : 0) + (hasNew ? newCount : 0);
@@ -236,7 +240,15 @@ namespace AssetsManager.Services.Comparator
                                 }
                             }
                         }
-                        catch { /* Skip corrupt WADs */ }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logService.LogError(ex, $"Failed to compare WAD '{file.RelativePath}'.");
+                            NotifyComparisonProgressChanged(_completedChunksGlobal, statusMsg, false, "WAD file could not be read.");
+                        }
                     }
                 }, cancellationToken);
             }
@@ -354,7 +366,10 @@ namespace AssetsManager.Services.Comparator
                         }
                     }
                 }
-                catch { /* Fallback */ }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to infer file type for WAD chunk {hash:x16}.");
+                }
             }
 
             cache[hash] = resolved;
@@ -372,4 +387,3 @@ namespace AssetsManager.Services.Comparator
         }
     }
 }
-

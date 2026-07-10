@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -53,26 +56,21 @@ namespace AssetsManager.Views.Models.Explorer
     /// <summary>
     /// Model for each individual item in the Grid
     /// </summary>
-    public class FileGridViewModel : INotifyPropertyChanged, IMultiSelectable
+    public class FileGridViewModel : INotifyPropertyChanged, IMultiSelectable, IDisposable
     {
         public FileSystemNodeModel Node { get; private set; }
 
         public bool IsFolder => Node.Type == NodeType.VirtualDirectory || Node.Type == NodeType.RealDirectory || Node.Type == NodeType.WadFile || Node.Type == NodeType.SoundBank || Node.Type == NodeType.AudioEvent;
 
-        private string _fileExtensionDisplay;
-        public string FileExtensionDisplay => _fileExtensionDisplay ?? (_fileExtensionDisplay = IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpper()));
+        public string FileExtensionDisplay => IsFolder ? "DIR" : (string.IsNullOrEmpty(Node.Extension) ? "FILE" : Node.Extension.TrimStart('.').ToUpperInvariant());
 
-        private string _displayNameShort;
-        public string DisplayNameShort => _displayNameShort ?? (_displayNameShort = PathUtils.TruncateForDisplay(Node.DisplayName, 50));
+        public string DisplayNameShort => PathUtils.TruncateForDisplay(Node.DisplayName, 50);
 
-        private string _subfolderCount;
-        public string SubfolderCount => _subfolderCount ?? (_subfolderCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
+        public string SubfolderCount => IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
 
-        private string _folderCount;
-        public string FolderCount => _folderCount ?? (_folderCount = IsUnloadedSoundBank ? "0" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
+        public string FolderCount => IsUnloadedSoundBank ? "0" : (Node.Children?.Count(c => IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
 
-        private string _assetCount;
-        public string AssetCount => _assetCount ?? (_assetCount = IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString());
+        public string AssetCount => IsUnloadedSoundBank ? "N/A" : (Node.Children?.Count(c => !IsNodeFolder(c) && !c.Name.Equals("Loading...")) ?? 0).ToString();
 
         private bool IsUnloadedSoundBank => Node.Type == NodeType.SoundBank && 
                                             Node.Children?.Count == 1 && 
@@ -103,7 +101,9 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        private readonly System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> _imageLoader;
+        private readonly Func<FileSystemNodeModel, CancellationToken, Task<ImageSource>> _imageLoader;
+        private readonly Action<Exception> _logError;
+        private readonly CancellationToken _cancellationToken;
         private bool _isImageLoading = false;
 
         private ImageSource _imagePreview;
@@ -114,7 +114,7 @@ namespace AssetsManager.Views.Models.Explorer
                 if (_imagePreview == null && !_isImageLoading && _imageLoader != null)
                 {
                     _isImageLoading = true;
-                    _ = LoadPreviewAsync();
+                    _ = LoadPreviewAsync(_cancellationToken);
                 }
                 return _imagePreview;
             }
@@ -128,26 +128,32 @@ namespace AssetsManager.Views.Models.Explorer
             }
         }
 
-        private async System.Threading.Tasks.Task LoadPreviewAsync()
+        private async Task LoadPreviewAsync(CancellationToken cancellationToken)
         {
             try
             {
-                var image = await _imageLoader(Node);
-                if (image != null)
+                var image = await _imageLoader(Node, cancellationToken);
+                if (!cancellationToken.IsCancellationRequested && image != null)
                 {
                     ImagePreview = image;
                 }
             }
-            catch
+            catch (OperationCanceledException)
             {
-                // Ignore loader errors silently
+                // Expected when the grid is refreshed or unloaded.
+            }
+            catch (Exception ex)
+            {
+                _logError?.Invoke(ex);
             }
         }
 
-        public FileGridViewModel(FileSystemNodeModel node, System.Func<FileSystemNodeModel, System.Threading.Tasks.Task<ImageSource>> imageLoader = null)
+        public FileGridViewModel(FileSystemNodeModel node, Func<FileSystemNodeModel, CancellationToken, Task<ImageSource>> imageLoader = null, CancellationToken cancellationToken = default, Action<Exception> logError = null)
         {
             Node = node;
             _imageLoader = imageLoader;
+            _cancellationToken = cancellationToken;
+            _logError = logError;
 
             if (Node != null)
             {
@@ -167,6 +173,17 @@ namespace AssetsManager.Views.Models.Explorer
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Dispose()
+        {
+            if (Node != null)
+            {
+                PropertyChangedEventManager.RemoveHandler(Node, Node_PropertyChanged, nameof(FileSystemNodeModel.IsMultiSelected));
+            }
+
+            _imagePreview = null;
+            PropertyChanged = null;
         }
     }
 }
