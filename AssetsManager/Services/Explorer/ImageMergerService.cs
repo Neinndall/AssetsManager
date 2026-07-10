@@ -28,9 +28,6 @@ namespace AssetsManager.Services.Explorer
         private CancellationTokenSource _renderCancellation;
         private int _renderGeneration;
 
-        private const int MaxOutputSide = 16384;
-        private const long MaxOutputPixels = 33_554_432;
-
         public ObservableRangeCollection<ImageMergerItem> Items { get; } = new ObservableRangeCollection<ImageMergerItem>();
 
         public ImageMergerService(IServiceProvider serviceProvider, LogService logService, WadContentProvider wadContentProvider)
@@ -253,18 +250,8 @@ namespace AssetsManager.Services.Explorer
             int rows = (int)Math.Ceiling((double)validItems.Count / columns);
             double maxWidth = validItems.Max(item => item.Image.PixelWidth);
             double maxHeight = validItems.Max(item => item.Image.PixelHeight);
-            double rawWidth = columns * maxWidth + (columns - 1) * margin;
-            double rawHeight = rows * maxHeight + (rows - 1) * margin;
-
-            double scale = Math.Min(1d, Math.Min(MaxOutputSide / rawWidth, MaxOutputSide / rawHeight));
-            scale = Math.Min(scale, Math.Sqrt(MaxOutputPixels / (rawWidth * rawHeight)));
-            int totalWidth = Math.Max(1, (int)Math.Floor(rawWidth * scale));
-            int totalHeight = Math.Max(1, (int)Math.Floor(rawHeight * scale));
-
-            if (scale < 1d)
-            {
-                _logService.LogWarning($"Merged image was downscaled to {totalWidth}x{totalHeight} to stay within memory limits.");
-            }
+            int totalWidth = (int)(columns * maxWidth + (columns - 1) * margin);
+            int totalHeight = (int)(rows * maxHeight + (rows - 1) * margin);
 
             cancellationToken.ThrowIfCancellationRequested();
             var drawingVisual = new DrawingVisual();
@@ -275,12 +262,12 @@ namespace AssetsManager.Services.Explorer
                     cancellationToken.ThrowIfCancellationRequested();
                     int row = i / columns;
                     int col = i % columns;
-                    double x = col * (maxWidth + margin) * scale;
-                    double y = row * (maxHeight + margin) * scale;
-                    double width = validItems[i].Image.PixelWidth * scale;
-                    double height = validItems[i].Image.PixelHeight * scale;
-                    double drawX = x + (maxWidth * scale - width) / 2;
-                    double drawY = y + (maxHeight * scale - height) / 2;
+                    double x = col * (maxWidth + margin);
+                    double y = row * (maxHeight + margin);
+                    double width = validItems[i].Image.PixelWidth;
+                    double height = validItems[i].Image.PixelHeight;
+                    double drawX = x + (maxWidth - width) / 2;
+                    double drawY = y + (maxHeight - height) / 2;
                     drawingContext.DrawImage(validItems[i].Image, new Rect(drawX, drawY, width, height));
                 }
             }
