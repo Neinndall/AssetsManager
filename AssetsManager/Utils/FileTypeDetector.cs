@@ -64,6 +64,9 @@ namespace AssetsManager.Utils
             if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE)) return "bin";
             if (StartsWith(data, ICO_SIGNATURE)) return "ico";
 
+            // Riot UIAutoAtlas: no magic bytes, structural validation required.
+            if (IsRiotBinaryAtlas(data)) return "atlas";
+
             if (StartsWith(data, WEBP_SIGNATURE) && Contains(data, WEBP_VP8X_SIGNATURE, 8)) return "webp";
             if (StartsWith(data, WEM_SIGNATURE) && Contains(data, WEM_WAVE_SIGNATURE, 8)) return "wem";
 
@@ -78,6 +81,93 @@ namespace AssetsManager.Utils
 
             return string.Empty;
         }
+
+        private static bool IsRiotBinaryAtlas(Span<byte> data)
+        {
+            // Riot UIAutoAtlas layout (little-endian):
+            // uint textureCount
+            // repeat textureCount times:
+            //   uint texturePathLength + UTF-8 texture path
+            //   uint spriteCount
+            //   repeat spriteCount times:
+            //     uint spriteNameLength + UTF-8 sprite name
+            //     5 x float32 metadata (20 bytes)
+            //
+            // No fixed magic. The WAD loader provides a truncated buffer (256 bytes),
+            // so validate a minimum structural footprint: first texture path (must
+            // reference a known image extension) + sprite count + one complete sprite.
+            int offset = 0;
+            if (!TryReadUInt32(data, ref offset, out uint textureCount) || textureCount == 0 || textureCount > 256)
+                return false;
+
+            if (!TryReadLengthPrefixedUtf8(data, ref offset, out string texturePath))
+                return false;
+
+            if (!(texturePath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                  texturePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                  texturePath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (!TryReadUInt32(data, ref offset, out uint spriteCount) || spriteCount == 0 || spriteCount > 1_000_000)
+                return false;
+
+            // Validate at least one complete sprite entry
+            if (!TryReadLengthPrefixedUtf8(data, ref offset, out string spriteName) || string.IsNullOrWhiteSpace(spriteName))
+                return false;
+
+            const int MetadataSize = 5 * sizeof(float);
+            if (data.Length - offset < MetadataSize)
+                return false;
+
+            return true;
+        }
+
+        #region Binary Readers
+
+        private static bool TryReadUInt32(Span<byte> data, ref int offset, out uint value)
+        {
+            value = 0;
+            if (offset < 0 || data.Length - offset < 4)
+                return false;
+
+            value = (uint)(data[offset] |
+                           (data[offset + 1] << 8) |
+                           (data[offset + 2] << 16) |
+                           (data[offset + 3] << 24));
+            offset += 4;
+            return true;
+        }
+
+        private static bool TryReadLengthPrefixedUtf8(Span<byte> data, ref int offset, out string value)
+        {
+            value = string.Empty;
+            if (!TryReadUInt32(data, ref offset, out uint byteLength) || byteLength == 0 || byteLength > 1_048_576)
+                return false;
+
+            if (data.Length - offset < (int)byteLength)
+                return false;
+
+            Span<byte> bytes = data.Slice(offset, (int)byteLength);
+            offset += (int)byteLength;
+
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                if (bytes[i] == 0 || bytes[i] < 0x09)
+                    return false;
+            }
+
+            try
+            {
+                value = Encoding.UTF8.GetString(bytes);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        #endregion
 
         private static bool StartsWith(Span<byte> data, byte[] signature)
         {
