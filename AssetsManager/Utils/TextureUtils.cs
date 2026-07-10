@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -311,6 +312,45 @@ namespace AssetsManager.Utils
                 encoder.Save(fileStream);
             }
             onFileSavedCallback?.Invoke(filePath);
+        }
+
+        public static BitmapSource ComposeImageGrid(IReadOnlyList<BitmapSource> images, int columns, int margin, CancellationToken cancellationToken = default)
+        {
+            var validImages = images?.Where(image => image != null).ToList();
+            if (validImages == null || validImages.Count == 0) return null;
+
+            columns = Math.Max(1, columns);
+            margin = Math.Max(0, margin);
+
+            int rows = (int)Math.Ceiling((double)validImages.Count / columns);
+            double maxWidth = validImages.Max(image => image.PixelWidth);
+            double maxHeight = validImages.Max(image => image.PixelHeight);
+            int totalWidth = (int)(columns * maxWidth + (columns - 1) * margin);
+            int totalHeight = (int)(rows * maxHeight + (rows - 1) * margin);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            var drawingVisual = new DrawingVisual();
+            using (DrawingContext drawingContext = drawingVisual.RenderOpen())
+            {
+                for (int i = 0; i < validImages.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int row = i / columns;
+                    int col = i % columns;
+                    double x = col * (maxWidth + margin);
+                    double y = row * (maxHeight + margin);
+                    double width = validImages[i].PixelWidth;
+                    double height = validImages[i].PixelHeight;
+                    double drawX = x + (maxWidth - width) / 2;
+                    double drawY = y + (maxHeight - height) / 2;
+                    drawingContext.DrawImage(validImages[i], new System.Windows.Rect(drawX, drawY, width, height));
+                }
+            }
+
+            var bitmap = new RenderTargetBitmap(totalWidth, totalHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(drawingVisual);
+            bitmap.Freeze();
+            return bitmap;
         }
     }
 }

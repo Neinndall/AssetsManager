@@ -194,7 +194,7 @@ namespace AssetsManager.Services.Explorer
             {
                 var items = Items.ToList();
                 var result = await Task.Run(
-                    () => CreateMergedBitmap(items, viewModel.Columns, viewModel.Margin, currentCancellation.Token),
+                    () => TextureUtils.ComposeImageGrid(items.Select(item => item.Image).ToList(), viewModel.Columns, viewModel.Margin, currentCancellation.Token),
                     currentCancellation.Token);
 
                 if (!currentCancellation.IsCancellationRequested && IsCurrentRender(currentCancellation, generation))
@@ -237,45 +237,6 @@ namespace AssetsManager.Services.Explorer
             }
 
             cancellation.Dispose();
-        }
-
-        private BitmapSource CreateMergedBitmap(IReadOnlyList<ImageMergerItem> items, int columns, int margin, CancellationToken cancellationToken)
-        {
-            columns = Math.Max(1, columns);
-            margin = Math.Max(0, margin);
-
-            var validItems = items.Where(item => item.Image != null).ToList();
-            if (validItems.Count == 0) return null;
-
-            int rows = (int)Math.Ceiling((double)validItems.Count / columns);
-            double maxWidth = validItems.Max(item => item.Image.PixelWidth);
-            double maxHeight = validItems.Max(item => item.Image.PixelHeight);
-            int totalWidth = (int)(columns * maxWidth + (columns - 1) * margin);
-            int totalHeight = (int)(rows * maxHeight + (rows - 1) * margin);
-
-            cancellationToken.ThrowIfCancellationRequested();
-            var drawingVisual = new DrawingVisual();
-            using (DrawingContext drawingContext = drawingVisual.RenderOpen())
-            {
-                for (int i = 0; i < validItems.Count; i++)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    int row = i / columns;
-                    int col = i % columns;
-                    double x = col * (maxWidth + margin);
-                    double y = row * (maxHeight + margin);
-                    double width = validItems[i].Image.PixelWidth;
-                    double height = validItems[i].Image.PixelHeight;
-                    double drawX = x + (maxWidth - width) / 2;
-                    double drawY = y + (maxHeight - height) / 2;
-                    drawingContext.DrawImage(validItems[i].Image, new Rect(drawX, drawY, width, height));
-                }
-            }
-
-            var bitmap = new RenderTargetBitmap(totalWidth, totalHeight, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(drawingVisual);
-            bitmap.Freeze();
-            return bitmap;
         }
 
         public async Task ExportImageAsync(BitmapSource image, Window owner)
