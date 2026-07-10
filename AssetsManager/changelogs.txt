@@ -16,6 +16,7 @@ Improvements
 Bug Fixes
   - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
   - Fixed extraction failing on WADs containing extensionless atlas files that share their name with a sibling directory.
+  - Fixed duplicate unsupported format preview screens appearing when clearing the search filter.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

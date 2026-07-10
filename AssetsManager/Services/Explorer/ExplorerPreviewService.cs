@@ -418,9 +418,9 @@ namespace AssetsManager.Services.Explorer
                                           SupportedFileTypes.Textures.Contains(extension) ||
                                           SupportedFileTypes.VectorImages.Contains(extension);
 
-                        // Check if there is currently a file (valid or showing error) in the left panel
+                        // Check if there is currently a file (valid) in the left panel
                         // (which means Dual View should be maintained and we show the image error on the right)
-                        bool isLeftPanelOccupied = _viewModel.IsContentVisible;
+                        bool isLeftPanelOccupied = _viewModel.IsContentVisible && _activeContentPreviewer != Previewer.StatusPanel;
 
                         if (isImageExt && isLeftPanelOccupied)
                         {
