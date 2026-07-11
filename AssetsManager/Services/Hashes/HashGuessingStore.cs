@@ -74,32 +74,34 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in grouped)
                 {
                     var entries = group.Select(match => $"{match.Hash:x16} {match.Path}").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    await WriteHashesToFileAsync(GetConfirmedResearchPath(group.Key), entries, cancellationToken);
-                    await WriteHashesToFileAsync(GetKnownHashFilePath(group.Key), entries, cancellationToken);
+                    var pathsToUpdate = new[] { GetConfirmedResearchPath(group.Key), GetKnownHashFilePath(group.Key) };
+
+                    foreach (var targetPath in pathsToUpdate)
+                    {
+                        var pending = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToDictionary(
+                            entry => entry[..Math.Min(16, entry.Length)], entry => entry, StringComparer.OrdinalIgnoreCase);
+
+                        if (File.Exists(targetPath))
+                        {
+                            foreach (string line in File.ReadLines(targetPath))
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
+                                if (line.Length >= 16) pending.Remove(line[..16]);
+                                if (pending.Count == 0) break;
+                            }
+                        }
+
+                        if (pending.Count > 0)
+                        {
+                            await File.AppendAllLinesAsync(targetPath, pending.Values.OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase), cancellationToken);
+                        }
+                    }
                 }
             }
             finally
             {
                 _lock.Release();
             }
-        }
-
-        private static async Task WriteHashesToFileAsync(string targetPath, IEnumerable<string> entries, CancellationToken cancellationToken)
-        {
-            var pending = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToDictionary(
-                entry => entry[..Math.Min(16, entry.Length)], entry => entry, StringComparer.OrdinalIgnoreCase);
-
-            if (File.Exists(targetPath))
-            {
-                foreach (string line in File.ReadLines(targetPath))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (line.Length >= 16) pending.Remove(line[..16]);
-                    if (pending.Count == 0) return;
-                }
-            }
-
-            await File.AppendAllLinesAsync(targetPath, pending.Values.OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase), cancellationToken);
         }
 
 
