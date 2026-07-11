@@ -538,6 +538,13 @@ namespace AssetsManager.Services.Hashes
 
                 if (engine.RemainingUnknownCount > 0)
                 {
+                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: GAME prefixes" });
+                    var prefixes = new[] { "tft_", "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" };
+                    checkedCandidates += RunPrefixAttack(engine, LoadKnownPaths(HashGuessDomain.Game), prefixes, cancellationToken);
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "GAME Cartesian Cross" });
                     var gamePaths = LoadKnownPaths(HashGuessDomain.Game).ToList();
                     var gameDirs = HashGuessEngine.BuildDirectoryList(gamePaths).Take(5000).ToList();
@@ -1613,6 +1620,30 @@ namespace AssetsManager.Services.Hashes
                     if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
                 }
             }
+            return checkedCount;
+        }
+
+        private static int RunPrefixAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> prefixes, CancellationToken cancellationToken)
+        {
+            var pathsList = paths.ToList();
+            var prefixesList = prefixes.ToList();
+            int checkedCount = 0;
+
+            foreach (string path in pathsList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int separator = path.LastIndexOf('/');
+                string dir = separator >= 0 ? path[..(separator + 1)] : string.Empty;
+                string file = separator >= 0 ? path[(separator + 1)..] : path;
+
+                foreach (string prefix in prefixesList)
+                {
+                    engine.Check(dir + prefix + file, HashGuessStrategy.PrefixVariant, "Prefix variant");
+                    checkedCount++;
+                    if (engine.RemainingUnknownCount == 0) return checkedCount;
+                }
+            }
+
             return checkedCount;
         }
 
