@@ -100,7 +100,15 @@ namespace AssetsManager.Views
                 };
                 foreach (var match in result.Matches) _viewModel.Matches.Add(match);
                 _viewModel.ProgressValue = 100;
-                _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
+                if (result.Matches.Count > 0)
+                {
+                    await _hashGuessingService.PromoteMatchesAsync(result.Matches, CancellationToken.None);
+                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
+                }
+                else
+                {
+                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
+                }
             }
             catch (OperationCanceledException)
             {
@@ -119,20 +127,5 @@ namespace AssetsManager.Views
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
-
-        private async void PromoteMatches_Click(object sender, RoutedEventArgs e)
-        {
-            if (_viewModel.Matches.Count == 0) return;
-            try
-            {
-                await _hashGuessingService.PromoteMatchesAsync(_viewModel.Matches, CancellationToken.None);
-                _viewModel.StatusText = $"Added {_viewModel.Matches.Count:N0} verified matches to the main hash files.";
-                UpdateUnknownCountAsync();
-            }
-            catch (Exception ex)
-            {
-                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
-            }
-        }
     }
 }
