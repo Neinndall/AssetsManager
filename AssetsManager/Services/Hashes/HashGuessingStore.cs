@@ -73,28 +73,49 @@ namespace AssetsManager.Services.Hashes
                 Directory.CreateDirectory(_directoriesCreator.HashLabPath);
                 foreach (var group in grouped)
                 {
-                    var entries = group.Select(match => $"{match.Hash:x16} {match.Path}").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    var newEntries = group.Select(match => $"{match.Hash:x16} {match.Path}").ToList();
                     var pathsToUpdate = new[] { GetConfirmedResearchPath(group.Key), GetKnownHashFilePath(group.Key) };
 
                     foreach (var targetPath in pathsToUpdate)
                     {
-                        var pending = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToDictionary(
-                            entry => entry[..Math.Min(16, entry.Length)], entry => entry, StringComparer.OrdinalIgnoreCase);
+                        var dictionary = new Dictionary<ulong, string>();
 
+                        // 1. Read existing hashes if file exists
                         if (File.Exists(targetPath))
                         {
-                            foreach (string line in File.ReadLines(targetPath))
+                            foreach (string line in await File.ReadAllLinesAsync(targetPath, cancellationToken))
                             {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                if (line.Length >= 16) pending.Remove(line[..16]);
-                                if (pending.Count == 0) break;
+                                if (string.IsNullOrWhiteSpace(line) || line.Length < 17) continue;
+                                string hex = line[..16];
+                                string path = line[17..].Trim();
+                                if (ulong.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                                {
+                                    dictionary[hash] = path;
+                                }
                             }
                         }
 
-                        if (pending.Count > 0)
+                        // 2. Merge new entries
+                        foreach (string entry in newEntries)
                         {
-                            await File.AppendAllLinesAsync(targetPath, pending.Values.OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase), cancellationToken);
+                            if (string.IsNullOrWhiteSpace(entry) || entry.Length < 17) continue;
+                            string hex = entry[..16];
+                            string path = entry[17..].Trim();
+                            if (ulong.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                            {
+                                dictionary[hash] = path;
+                            }
                         }
+
+                        // 3. Sort alphabetically by path string (just like sorted(..., key=lambda kv: kv[1]))
+                        var sortedLines = dictionary
+                            .OrderBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase)
+                            .Select(kv => $"{kv.Key:x16} {kv.Value}");
+
+                        // 4. Overwrite target path
+                        string tempPath = targetPath + ".tmp";
+                        await File.WriteAllLinesAsync(tempPath, sortedLines, cancellationToken);
+                        File.Move(tempPath, targetPath, true);
                     }
                 }
             }
