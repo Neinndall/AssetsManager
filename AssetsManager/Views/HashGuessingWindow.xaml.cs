@@ -102,7 +102,7 @@ namespace AssetsManager.Views
                 _viewModel.ProgressValue = 100;
                 if (result.Matches.Count > 0)
                 {
-                    await _hashGuessingService.PromoteMatchesAsync(result.Matches, CancellationToken.None);
+                    await _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None);
                     _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
                 }
                 else

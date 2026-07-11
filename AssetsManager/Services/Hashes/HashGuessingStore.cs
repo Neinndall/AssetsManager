@@ -63,7 +63,7 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        public async Task PromoteToKnownHashesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
+        public async Task SaveHashesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
         {
             var grouped = (matches ?? Enumerable.Empty<HashGuessMatch>()).GroupBy(match => match.Domain);
             await _lock.WaitAsync(cancellationToken);
@@ -74,8 +74,8 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in grouped)
                 {
                     var entries = group.Select(match => $"{match.Hash:x16} {match.Path}").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    await AppendMissingEntriesAsync(GetConfirmedResearchPath(group.Key), entries, cancellationToken);
-                    await AppendMissingEntriesAsync(GetKnownHashFilePath(group.Key), entries, cancellationToken);
+                    await WriteHashesToFileAsync(GetConfirmedResearchPath(group.Key), entries, cancellationToken);
+                    await WriteHashesToFileAsync(GetKnownHashFilePath(group.Key), entries, cancellationToken);
                 }
             }
             finally
@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static async Task AppendMissingEntriesAsync(string targetPath, IEnumerable<string> entries, CancellationToken cancellationToken)
+        private static async Task WriteHashesToFileAsync(string targetPath, IEnumerable<string> entries, CancellationToken cancellationToken)
         {
             var pending = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToDictionary(
                 entry => entry[..Math.Min(16, entry.Length)], entry => entry, StringComparer.OrdinalIgnoreCase);

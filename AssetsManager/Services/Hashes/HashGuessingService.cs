@@ -165,9 +165,9 @@ namespace AssetsManager.Services.Hashes
             };
         }
 
-        public async Task PromoteMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
+        public async Task SaveMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
         {
-            await _store.PromoteToKnownHashesAsync(matches, cancellationToken);
+            await _store.SaveHashesAsync(matches, cancellationToken);
             await _hashResolverService.ForceReloadHashesAsync();
         }
 
