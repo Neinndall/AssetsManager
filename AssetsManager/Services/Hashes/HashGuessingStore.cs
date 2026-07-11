@@ -84,23 +84,6 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        public async Task MergeConfirmedEntriesAsync(string hashFileName, string downloadedFilePath, CancellationToken cancellationToken)
-        {
-            HashGuessDomain? domain = hashFileName switch
-            {
-                "hashes.game.txt" => HashGuessDomain.Game,
-                "hashes.lcu.txt" => HashGuessDomain.Lcu,
-                _ => null
-            };
-            if (domain == null) return;
-
-            string confirmedPath = GetConfirmedResearchPath(domain.Value);
-            if (!File.Exists(confirmedPath)) return;
-
-            var entries = await File.ReadAllLinesAsync(confirmedPath, cancellationToken);
-            await AppendMissingEntriesAsync(downloadedFilePath, entries, cancellationToken);
-        }
-
         private static async Task AppendMissingEntriesAsync(string targetPath, IEnumerable<string> entries, CancellationToken cancellationToken)
         {
             var pending = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToDictionary(
@@ -118,6 +101,8 @@ namespace AssetsManager.Services.Hashes
 
             await File.AppendAllLinesAsync(targetPath, pending.Values.OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase), cancellationToken);
         }
+
+
 
         public async Task<HashSet<ulong>> LoadUnknownHashesAsync(HashGuessDomain domain, CancellationToken cancellationToken)
         {
