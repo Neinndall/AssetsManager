@@ -152,6 +152,15 @@ namespace AssetsManager.Services.Hashes
             return pathHash.ToString("x16");
         }
 
+        public bool IsKnownHash(ulong pathHash)
+        {
+            foreach (var cache in _gameCaches)
+            {
+                if (cache.Resolve(pathHash) != null) return true;
+            }
+            return false;
+        }
+
         public string ResolveBinHashGeneral(uint hash)
         {
             foreach (var cache in _binCaches)

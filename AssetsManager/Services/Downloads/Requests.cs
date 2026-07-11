@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 
 namespace AssetsManager.Services.Downloads
 {
@@ -14,14 +15,16 @@ namespace AssetsManager.Services.Downloads
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
+        private readonly HashGuessingStore _hashGuessingStore;
 
         public const string BaseUrl = "https://raw.communitydragon.org/data/hashes/lol/";
 
-        public Requests(HttpClient httpClient, DirectoriesCreator directoriesCreator, LogService logService)
+        public Requests(HttpClient httpClient, DirectoriesCreator directoriesCreator, LogService logService, HashGuessingStore hashGuessingStore)
         {
             _httpClient = httpClient;
             _directoriesCreator = directoriesCreator;
             _logService = logService;
+            _hashGuessingStore = hashGuessingStore;
         }
 
         public async Task DownloadHashesAsync(string fileName, string downloadDirectory)
@@ -40,6 +43,8 @@ namespace AssetsManager.Services.Downloads
                     {
                         await response.Content.CopyToAsync(fileStream);
                     }
+
+                    await _hashGuessingStore.MergeConfirmedEntriesAsync(fileName, tempPath, default);
 
                     if (File.Exists(filePath)) File.Delete(filePath);
                     File.Move(tempPath, filePath);

@@ -9,6 +9,7 @@ namespace AssetsManager.Utils
         // Fixed root paths
         public string AppDirectory { get; }
         public string HashesPath { get; }
+        public string HashLabPath { get; }
         public string JsonCacheHistoryPath { get; }
         public string WatcherCacheOldPath { get; }
         public string WatcherCacheNewPath { get; }
@@ -31,6 +32,7 @@ namespace AssetsManager.Utils
             string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
 
             HashesPath = Path.Combine(appFolderPath, "hashes");
+            HashLabPath = Path.Combine(appFolderPath, "hash_lab");
 
             AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
             
@@ -100,6 +102,7 @@ namespace AssetsManager.Utils
         public void CreateHashesDirectories()
         {
             CreateDirectory(HashesPath);
+            CreateDirectory(HashLabPath);
         }
 
         public void CreateDirectory(string path)

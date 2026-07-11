@@ -5,8 +5,12 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 
 New Features
   - BIN differences now show only semantic object and property changes with resolved paths.
+  - Added centralized and persistent tracking of unknown hashes in hash_lab/unknowns.txt, merging historical unknowns with live WAD scans.
+  - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
+  - Enhanced numeric variant guessing to support padded formats (2-digit D2 and 3-digit D3 layouts).
 
 Improvements
+  - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and a path browser dialog.
   - WAD monitoring and comparisons now use native chunk checksums with faster archive table loading.
   - Audio bank extraction now preserves the original playback/designer order for family groups.
   - Optimized audio event name resolution for champions, skins, and maps by using direct pathing to skip deep recursive searches.
@@ -17,6 +21,8 @@ Bug Fixes
   - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
   - Fixed extraction failing on WADs containing extensionless atlas files that share their name with a sibling directory.
   - Fixed duplicate unsupported format preview screens appearing when clearing the search filter.
+  - Fixed application crash when opening the Hash Guessing Lab due to a missing button style.
+  - Fixed UI freezing (Not Responding) during long hash guessing sessions by executing calculations asynchronously in background threads.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

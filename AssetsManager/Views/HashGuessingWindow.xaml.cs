@@ -1,0 +1,143 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Windows;
+using System.Windows.Controls;
+using Microsoft.WindowsAPICodePack.Dialogs;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Hashes;
+
+namespace AssetsManager.Views
+{
+    public partial class HashGuessingWindow : UserControl
+    {
+        private readonly HashGuessingService _hashGuessingService;
+        private readonly AppSettings _appSettings;
+        private readonly CustomMessageBoxService _messageBoxService;
+        private readonly HashGuessLabModel _viewModel = new();
+        private CancellationTokenSource _cancellationTokenSource;
+
+        public HashGuessingWindow(HashGuessingService hashGuessingService, AppSettings appSettings, CustomMessageBoxService messageBoxService)
+        {
+            InitializeComponent();
+            _hashGuessingService = hashGuessingService;
+            _appSettings = appSettings;
+            _messageBoxService = messageBoxService;
+            RootPathTextBox.Text = _appSettings.LolPbeDirectory;
+            DataContext = _viewModel;
+            UpdateUnknownCountAsync();
+        }
+
+        private async void UpdateUnknownCountAsync()
+        {
+            if (DomainSelector == null || TxtUnknownCount == null) return;
+            try
+            {
+                var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+                var unknown = await _hashGuessingService.GetStoreUnknownsAsync(domain, CancellationToken.None);
+                TxtUnknownCount.Text = $"{unknown.Count:N0} hashes";
+            }
+            catch
+            {
+                TxtUnknownCount.Text = "Unknown";
+            }
+        }
+
+        private void DomainSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateUnknownCountAsync();
+        }
+
+        private void BrowsePath_Click(object sender, RoutedEventArgs e)
+        {
+            using (var folderBrowserDialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select Game or Plugins Folder"
+            })
+            {
+                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                {
+                    RootPathTextBox.Text = folderBrowserDialog.FileName;
+                }
+            }
+        }
+
+        private async void RunGrep_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.Grep);
+        private async void RunCanonical_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.Canonical);
+        private async void RunLocales_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.Locales);
+        private async void RunNumbers_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.Numbers);
+        private async void RunGameBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameBasic);
+        private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
+        private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
+        private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
+
+        private async System.Threading.Tasks.Task RunAsync(HashGuessMode mode)
+        {
+            var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+            string rootPath = RootPathTextBox.Text.Trim();
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource = new CancellationTokenSource();
+            _viewModel.IsRunning = true;
+            _viewModel.ProgressValue = 0;
+            _viewModel.StatusText = mode == HashGuessMode.Grep ? "Building unknown hash inventory..." : "Building structural candidates...";
+            _viewModel.Matches.Clear();
+
+            try
+            {
+                var progress = new Progress<HashGuessProgress>(value =>
+                {
+                    _viewModel.ProgressValue = value.TotalWads == 0 ? 0 : value.ProcessedWads * 100d / value.TotalWads;
+                    _viewModel.StatusText = $"Scanning {value.CurrentWad} · {value.ProcessedChunks:N0} chunks · {value.FoundMatches:N0} matches";
+                });
+                var result = mode switch
+                {
+                    HashGuessMode.Canonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.Locales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.Numbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
+                    _ => await _hashGuessingService.RunEmbeddedPathGrepAsync(domain, rootPath, progress, _cancellationTokenSource.Token)
+                };
+                foreach (var match in result.Matches) _viewModel.Matches.Add(match);
+                _viewModel.ProgressValue = 100;
+                _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
+            }
+            catch (OperationCanceledException)
+            {
+                _viewModel.StatusText = "Hash guessing cancelled.";
+            }
+            catch (Exception ex)
+            {
+                _viewModel.StatusText = "Hash guessing failed. Check application_errors.log.";
+                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
+            finally
+            {
+                _viewModel.IsRunning = false;
+                UpdateUnknownCountAsync();
+            }
+        }
+
+        private enum HashGuessMode { Grep, Canonical, Locales, Numbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
+
+        private async void PromoteMatches_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.Matches.Count == 0) return;
+            try
+            {
+                await _hashGuessingService.PromoteMatchesAsync(_viewModel.Matches, CancellationToken.None);
+                _viewModel.StatusText = $"Added {_viewModel.Matches.Count:N0} verified matches to the main hash files.";
+                UpdateUnknownCountAsync();
+            }
+            catch (Exception ex)
+            {
+                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
+        }
+    }
+}
