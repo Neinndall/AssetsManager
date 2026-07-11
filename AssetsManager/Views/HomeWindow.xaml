@@ -318,32 +318,8 @@
                             </Grid>
                         </Button>
 
-                        <!-- Hash Lab -->
-                        <Button Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentOrange}" MinHeight="170">
-                            <Button.CommandParameter>HashLab</Button.CommandParameter>
-                            <Grid Margin="18,14">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Border Width="40" Height="40" CornerRadius="8" Background="#1AFF9100" Margin="0,0,12,0">
-                                        <materialIcons:MaterialIcon Kind="FlaskOutline" Width="22" Height="22" Foreground="{StaticResource AccentOrange}"/>
-                                    </Border>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="DECIPHER" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.6"/>
-                                        <TextBlock Text="Hash Lab" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <TextBlock Grid.Row="1" Text="Advanced hash guessing laboratory &amp; resolvers." 
-                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
-                            </Grid>
-                        </Button>
-
                         <!-- Comparator -->
-                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}" MinHeight="170">
+                        <Button Grid.Row="1" Grid.Column="0" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBrush}" MinHeight="170">
                             <Button.CommandParameter>Comparator</Button.CommandParameter>
                             <Grid Margin="18,14">
                                 <Grid.RowDefinitions>
@@ -366,32 +342,8 @@
                             </Grid>
                         </Button>
 
-                        <!-- Monitor -->
-                        <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentGreen}" MinHeight="170">
-                            <Button.CommandParameter>Monitor</Button.CommandParameter>
-                            <Grid Margin="18,14">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Border Width="40" Height="40" CornerRadius="8" Background="#1A4CAF50" Margin="0,0,12,0">
-                                        <materialIcons:MaterialIcon Kind="Radar" Width="22" Height="22" Foreground="{StaticResource AccentGreen}"/>
-                                    </Border>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="STATUS" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.6"/>
-                                        <TextBlock Text="Monitor" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <TextBlock Grid.Row="1" Text="Real-time server tracking and PBE notifications." 
-                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
-                            </Grid>
-                        </Button>
-
-                        <!-- Viewer -->
-                        <Button Grid.Row="1" Grid.Column="3" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}" MinHeight="170">
+                        <!-- Viewer (Model Viewer) -->
+                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentPurple}" MinHeight="170">
                             <Button.CommandParameter>Viewer</Button.CommandParameter>
                             <Grid Margin="18,14">
                                 <Grid.RowDefinitions>
@@ -410,6 +362,54 @@
                                 </StackPanel>
 
                                 <TextBlock Grid.Row="1" Text="High-fidelity 3D viewport for skin inspection." 
+                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
+                            </Grid>
+                        </Button>
+
+                        <!-- Hash Lab -->
+                        <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentOrange}" MinHeight="170">
+                            <Button.CommandParameter>HashLab</Button.CommandParameter>
+                            <Grid Margin="18,14">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Border Width="40" Height="40" CornerRadius="8" Background="#1AFF9100" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="FlaskOutline" Width="22" Height="22" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="DECIPHER" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.6"/>
+                                        <TextBlock Text="Hash Lab" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="Advanced hash guessing laboratory &amp; resolvers." 
+                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
+                            </Grid>
+                        </Button>
+
+                        <!-- Monitor -->
+                        <Button Grid.Row="1" Grid.Column="3" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentGreen}" MinHeight="170">
+                            <Button.CommandParameter>Monitor</Button.CommandParameter>
+                            <Grid Margin="18,14">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Border Width="40" Height="40" CornerRadius="8" Background="#1A4CAF50" Margin="0,0,12,0">
+                                        <materialIcons:MaterialIcon Kind="Radar" Width="22" Height="22" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="STATUS" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.6"/>
+                                        <TextBlock Text="Monitor" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="Real-time server tracking and PBE notifications." 
                                            FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
                             </Grid>
                         </Button>
