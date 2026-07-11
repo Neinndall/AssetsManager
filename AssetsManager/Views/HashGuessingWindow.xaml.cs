@@ -25,7 +25,6 @@ namespace AssetsManager.Views
             _hashGuessingService = hashGuessingService;
             _appSettings = appSettings;
             _messageBoxService = messageBoxService;
-            RootPathTextBox.Text = _appSettings.LolPbeDirectory;
             DataContext = _viewModel;
             UpdateUnknownCountAsync();
         }
@@ -50,21 +49,6 @@ namespace AssetsManager.Views
             UpdateUnknownCountAsync();
         }
 
-        private void BrowsePath_Click(object sender, RoutedEventArgs e)
-        {
-            using (var folderBrowserDialog = new CommonOpenFileDialog
-            {
-                IsFolderPicker = true,
-                Title = "Select Game or Plugins Folder"
-            })
-            {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    RootPathTextBox.Text = folderBrowserDialog.FileName;
-                }
-            }
-        }
-
         private async void RunGrepGame_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepGame);
         private async void RunGrepLcu_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepLcu);
         private async void RunCanonical_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.RunCanonical);
@@ -81,7 +65,12 @@ namespace AssetsManager.Views
             if (mode == HashGuessMode.GrepGame) domain = HashGuessDomain.Game;
             else if (mode == HashGuessMode.GrepLcu) domain = HashGuessDomain.Lcu;
 
-            string rootPath = RootPathTextBox.Text.Trim();
+            string rootPath = _appSettings.LolPbeDirectory?.Trim();
+            if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
+            {
+                _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
+                return;
+            }
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
             _viewModel.IsRunning = true;

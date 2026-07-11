@@ -53,17 +53,16 @@
                         <RowDefinition Height="Auto"/> <!-- Lab Env Title -->
                         <RowDefinition Height="10"/>
                         <RowDefinition Height="Auto"/> <!-- Domain Selector -->
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/> <!-- Install Dir Label -->
-                        <RowDefinition Height="6"/>
-                        <RowDefinition Height="Auto"/> <!-- Install Dir Input & Browse -->
-                        <RowDefinition Height="16"/>
+                        <RowDefinition Height="16"/>  <!-- Spacer -->
                         <RowDefinition Height="Auto"/> <!-- Divider -->
                         <RowDefinition Height="12"/>
                         <RowDefinition Height="*"/>    <!-- Stats Details -->
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="ENVIRONMENT CONFIG" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="CogOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="ENVIRONMENT CONFIG" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    </StackPanel>
 
                     <!-- Domain Selector -->
                     <StackPanel Grid.Row="2">
@@ -74,24 +73,14 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <!-- Root Path Input & Browse -->
-                    <TextBlock Grid.Row="4" Text="Client Install Directory" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
-                    <Grid Grid.Row="6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="RootPathTextBox" Style="{StaticResource ModernTextBox}" Height="36" Padding="10,0" VerticalContentAlignment="Center"/>
-                        <Button Grid.Column="1" Width="36" Height="36" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" Click="BrowsePath_Click">
-                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18" Foreground="{StaticResource TextPrimary}"/>
-                        </Button>
-                    </Grid>
-
-                    <Border Grid.Row="8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderColor}" Opacity="0.5"/>
+                    <Border Grid.Row="4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderColor}" Opacity="0.5"/>
 
                     <!-- Stats / State -->
-                    <StackPanel Grid.Row="10" VerticalAlignment="Top">
-                        <TextBlock Text="LAB STATS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="0,0,0,10"/>
+                    <StackPanel Grid.Row="6" VerticalAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <materialIcons:MaterialIcon Kind="ChartBar" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBlock Text="LAB STATS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        </StackPanel>
                         
                         <Border Background="{StaticResource HoverColor}" CornerRadius="8" Padding="12" Margin="0,0,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                             <Grid>
@@ -150,7 +139,10 @@
                                     </Style>
                                 </StackPanel.Style>
                                 
-                                <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <Button Click="RunGrepGame_Click" Margin="4,0,4,16" Padding="12">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
@@ -174,7 +166,10 @@
                                     </Grid>
                                 </Button>
 
-                                <TextBlock Text="GAME RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="GAME RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <UniformGrid Columns="2" Margin="0,0,0,16">
                                     <!-- GAME Basic -->
                                     <Button Click="RunGameBasic_Click" Margin="4" Padding="12">
@@ -225,7 +220,10 @@
                                     </Button>
                                 </UniformGrid>
 
-                                <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="WrenchOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <UniformGrid Columns="2" Margin="0,0,0,12">
                                     <!-- Canonical -->
                                     <Button Click="RunCanonical_Click" Margin="4" Padding="12">
@@ -314,7 +312,10 @@
                                     </Style>
                                 </StackPanel.Style>
                                 
-                                <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <Button Click="RunGrepLcu_Click" Margin="4,0,4,16" Padding="12">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
@@ -338,7 +339,10 @@
                                     </Grid>
                                 </Button>
 
-                                <TextBlock Text="LCU RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="Lan" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="LCU RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <UniformGrid Columns="2" Margin="0,0,0,16">
                                     <!-- LCU Basic -->
                                     <Button Click="RunLcuBasic_Click" Margin="4" Padding="12">
@@ -389,7 +393,10 @@
                                     </Button>
                                 </UniformGrid>
 
-                                <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
+                                    <materialIcons:MaterialIcon Kind="WrenchOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                </StackPanel>
                                 <UniformGrid Columns="2" Margin="0,0,0,12">
                                     <!-- Canonical -->
                                     <Button Click="RunCanonical_Click" Margin="4" Padding="12">
