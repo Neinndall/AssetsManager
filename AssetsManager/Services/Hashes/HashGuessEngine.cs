@@ -67,6 +67,47 @@ namespace AssetsManager.Services.Hashes
                 .ToList();
         }
 
+        public static IReadOnlyList<string> BuildBasenameWordlist(IEnumerable<string> paths, int minimumLength = 2, int maximumLength = 48)
+        {
+            return paths.AsParallel()
+                .Select(path => System.IO.Path.GetFileNameWithoutExtension(path ?? string.Empty))
+                .SelectMany(TokenizePath)
+                .Where(word => word.Length >= minimumLength && word.Length <= maximumLength)
+                .Where(word => word.Any(char.IsLetter))
+                .GroupBy(word => word, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.Key)
+                .ToList();
+        }
+
+        public static IReadOnlyList<string> BuildContextualWordlist(
+            IEnumerable<string> scopePaths,
+            IEnumerable<string> fallbackPaths,
+            int minimumLength = 2,
+            int maximumLength = 48)
+        {
+            var score = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            static void AddTokens(Dictionary<string, int> scores, IEnumerable<string> paths, int weight, int min, int max)
+            {
+                foreach (string word in paths.SelectMany(TokenizePath))
+                {
+                    if (word.Length < min || word.Length > max || !word.Any(char.IsLetter)) continue;
+                    scores.TryGetValue(word, out int current);
+                    scores[word] = current + weight;
+                }
+            }
+
+            AddTokens(score, fallbackPaths ?? Enumerable.Empty<string>(), 1, minimumLength, maximumLength);
+            AddTokens(score, scopePaths ?? Enumerable.Empty<string>(), 6, minimumLength, maximumLength);
+
+            return score.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(pair => pair.Key)
+                .ToList();
+        }
+
         private static List<string> TokenizePath(string path)
         {
             var list = new List<string>();

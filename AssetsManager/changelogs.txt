@@ -11,6 +11,7 @@ New Features
 
 Improvements
   - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and a path browser dialog.
+  - LCU Basic guessing now completes plugin, extension, and built-in pattern searches as independent phases.
   - WAD monitoring and comparisons now use native chunk checksums with faster archive table loading.
   - Audio bank extraction now preserves the original playback/designer order for family groups.
   - Optimized audio event name resolution for champions, skins, and maps by using direct pathing to skip deep recursive searches.

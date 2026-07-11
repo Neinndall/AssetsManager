@@ -341,7 +341,7 @@ namespace AssetsManager.Services.Hashes
                 {
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU static-assets" });
                     var staticAssetsPaths = paths.Where(p => p.StartsWith("plugins/rcp-fe-lol-static-assets/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
-                    var sswordlist = HashGuessEngine.BuildWordlist(paths.Where(p => (p.Contains("-fe-lol-") && p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) || p.Contains("fe-lol-static-assets"))).Take(5000).ToList();
+                    var sswordlist = HashGuessEngine.BuildContextualWordlist(staticAssetsPaths, paths.Where(p => (p.Contains("-fe-lol-") && p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) || p.Contains("fe-lol-static-assets"))).Take(5000).ToList();
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, staticAssetsPaths, sswordlist, cancellationToken);
                     if (engine.RemainingUnknownCount > 0)
                         checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, staticAssetsPaths, sswordlist, cancellationToken);
@@ -359,7 +359,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU parties" });
                         var partiesPaths = paths.Where(p => p.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList();
-                        var partiesWords = HashGuessEngine.BuildWordlist(paths.Where(p => p.Contains("-fe-lol-") && p.EndsWith(".png", StringComparison.OrdinalIgnoreCase))).Take(5000).ToList();
+                        var partiesWords = HashGuessEngine.BuildContextualWordlist(partiesPaths, paths.Where(p => p.Contains("-fe-lol-") && p.EndsWith(".png", StringComparison.OrdinalIgnoreCase))).Take(5000).ToList();
                         checkedCandidates += RunFocusedWordlistSubstitution(engine, partiesPaths, partiesWords, cancellationToken);
                     }
 
@@ -435,14 +435,27 @@ namespace AssetsManager.Services.Hashes
             {
                 var engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown);
                 int checkedCandidates = 0;
-                const int budget = 2_000_000;
-                foreach (var candidate in GenerateLcuBasicCandidates(LoadKnownPaths(HashGuessDomain.Lcu), budget))
+                var knownPaths = LoadKnownPaths(HashGuessDomain.Lcu).ToList();
+                var phases = new (string Name, IEnumerable<(string Path, HashGuessStrategy Strategy)> Candidates)[]
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check(candidate.Path, candidate.Strategy, "LCU Basic");
-                    checkedCandidates++;
-                    if (checkedCandidates % 5000 == 0)
-                        progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Generating LCU Basic candidates" });
+                    ("plugin variants", GenerateLcuPluginCandidates(knownPaths, 1_000_000)),
+                    ("extension variants", GenerateLcuExtensionCandidates(knownPaths, 500_000)),
+                    ("LCU patterns", GenerateLcuPatternCandidates(knownPaths))
+                };
+
+                foreach (var phase in phases)
+                {
+                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = $"LCU Basic: {phase.Name}" });
+                    foreach (var candidate in phase.Candidates)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "LCU Basic");
+                        checkedCandidates++;
+                        if (checkedCandidates % 5000 == 0)
+                            progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = $"LCU Basic: {phase.Name}" });
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+
                     if (engine.RemainingUnknownCount == 0) break;
                 }
 
@@ -484,14 +497,14 @@ namespace AssetsManager.Services.Hashes
                     var knownPaths = LoadKnownPaths(HashGuessDomain.Game).ToList();
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Bin paths" });
                     var binPaths = knownPaths.Where(p => p.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
-                    var binWords = HashGuessEngine.BuildWordlist(binPaths.Select(Path.GetFileName)).Take(20000).ToList();
+                    var binWords = HashGuessEngine.BuildBasenameWordlist(binPaths).Take(20000).ToList();
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, binPaths.Take(25000), binWords, cancellationToken);
 
                     if (engine.RemainingUnknownCount > 0)
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Data bin paths" });
                         var dataBinPaths = knownPaths.Where(p => p.StartsWith("data/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
-                        var dataBinWords = HashGuessEngine.BuildWordlist(dataBinPaths.Select(Path.GetFileName)).Take(20000).ToList();
+                        var dataBinWords = HashGuessEngine.BuildBasenameWordlist(dataBinPaths).Take(20000).ToList();
                         checkedCandidates += RunFocusedWordlistSubstitution(engine, dataBinPaths.Take(25000), dataBinWords, cancellationToken);
                     }
 
@@ -499,7 +512,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Characters DDS paths" });
                         var charDdsPaths = knownPaths.Where(p => p.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList();
-                        var charDdsWords = HashGuessEngine.BuildWordlist(charDdsPaths.Select(Path.GetFileName)).Take(20000).ToList();
+                        var charDdsWords = HashGuessEngine.BuildBasenameWordlist(charDdsPaths).Take(20000).ToList();
                         checkedCandidates += RunFocusedWordlistSubstitution(engine, charDdsPaths.Take(25000), charDdsWords, cancellationToken);
                     }
 
@@ -507,7 +520,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Characters TEX paths" });
                         var charTexPaths = knownPaths.Where(p => p.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList();
-                        var charTexWords = HashGuessEngine.BuildWordlist(charTexPaths.Select(Path.GetFileName)).Take(20000).ToList();
+                        var charTexWords = HashGuessEngine.BuildBasenameWordlist(charTexPaths).Take(20000).ToList();
                         checkedCandidates += RunFocusedWordlistSubstitution(engine, charTexPaths.Take(25000), charTexWords, cancellationToken);
                     }
 
@@ -702,6 +715,7 @@ namespace AssetsManager.Services.Hashes
                 }
 
                 int generated = 0;
+                const int candidateBudget = 250_000;
                 foreach (var pair in charToSkins)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -713,6 +727,8 @@ namespace AssetsManager.Services.Hashes
                             string s = string.Concat(combination);
                             engine.Check($"data/{pair.Key}{s}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
                             generated++;
+                            if (generated >= candidateBudget || engine.RemainingUnknownCount == 0)
+                                return generated;
                         }
                     }
                 }
@@ -1058,11 +1074,10 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuBasicCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuPluginCandidates(IEnumerable<string> knownPaths, int candidateBudget)
         {
             var paths = knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
             var plugins = paths.Select(path => path.Split('/')[1]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            var extensions = paths.Select(Path.GetExtension).Where(extension => extension.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
             int generated = 0;
 
             foreach (string path in paths.Take(100000))
@@ -1074,7 +1089,17 @@ namespace AssetsManager.Services.Hashes
                         yield return ("plugins/" + plugin + "/" + parts[2], HashGuessStrategy.PluginVariant);
                         if (++generated >= candidateBudget) yield break;
                     }
+            }
+        }
 
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuExtensionCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        {
+            var paths = knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
+            var extensions = paths.Select(Path.GetExtension).Where(extension => extension.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
+            int generated = 0;
+
+            foreach (string path in paths.Take(100000))
+            {
                 string prefix = Path.ChangeExtension(path, null);
                 foreach (string extension in extensions)
                 {
@@ -1083,6 +1108,11 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
+        }
+
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuPatternCandidates(IEnumerable<string> knownPaths)
+        {
+            var paths = knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
             var perkPrimary = Enumerable.Range(80, 6).Select(value => value * 100).ToList();
             foreach (int i in perkPrimary)
             {
@@ -1470,7 +1500,7 @@ namespace AssetsManager.Services.Hashes
             return HashGuessEngine.NormalizePath(value);
         }
 
-        private static int RunFocusedWordlistSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken)
+        private static int RunFocusedWordlistSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
         {
             var pathsList = paths.ToList();
             var wordsList = words.ToList();
@@ -1498,13 +1528,13 @@ namespace AssetsManager.Services.Hashes
                     cancellationToken.ThrowIfCancellationRequested();
                     engine.Check(string.Format(format, word), HashGuessStrategy.WordlistVariant, "Focused Wordlist");
                     checkedCount++;
-                    if (engine.RemainingUnknownCount == 0) return checkedCount;
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
                 }
             }
             return checkedCount;
         }
 
-        private static int RunFocusedWordlistDoubleSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken)
+        private static int RunFocusedWordlistDoubleSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
         {
             var pathsList = paths.ToList();
             var wordsList = words.ToList();
@@ -1542,14 +1572,14 @@ namespace AssetsManager.Services.Hashes
                         cancellationToken.ThrowIfCancellationRequested();
                         engine.Check(string.Format(format, w1, w2), HashGuessStrategy.WordlistVariant, "Double Wordlist");
                         checkedCount++;
-                        if (engine.RemainingUnknownCount == 0) return checkedCount;
+                        if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
                     }
                 }
             }
             return checkedCount;
         }
 
-        private static int RunWordAdditionAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken)
+        private static int RunWordAdditionAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
         {
             var pathsList = paths.ToList();
             var wordsList = words.ToList();
@@ -1580,7 +1610,7 @@ namespace AssetsManager.Services.Hashes
                     cancellationToken.ThrowIfCancellationRequested();
                     engine.Check(string.Format(format, word), HashGuessStrategy.WordlistVariant, "Word Insertion");
                     checkedCount++;
-                    if (engine.RemainingUnknownCount == 0) return checkedCount;
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
                 }
             }
             return checkedCount;
