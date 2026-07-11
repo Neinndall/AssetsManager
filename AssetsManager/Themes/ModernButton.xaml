@@ -732,7 +732,6 @@
         </Setter>
     </Style>
 
-    <!-- [ViewerWindow.xaml, BugReportsView.xaml] Tarjeta de selección grande con borde reactivo -->
     <Style x:Key="SelectionCardButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource CardBackground}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
@@ -740,6 +739,8 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Margin" Value="10"/>
         <Setter Property="Padding" Value="20"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
