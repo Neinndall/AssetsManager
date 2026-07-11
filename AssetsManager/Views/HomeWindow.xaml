@@ -144,66 +144,8 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <!-- LIVE (Double Width) -->
-                        <Button Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBlue}" MinHeight="170">
-                            <Button.CommandParameter>Explorer_Live</Button.CommandParameter>
-                            <Grid Margin="18,14">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                
-                                <!-- Top Info: Title + Status Badge -->
-                                <DockPanel Grid.Row="0" Margin="0,0,0,10" LastChildFill="False">
-                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <Border Width="40" Height="40" CornerRadius="8" Background="#1A4FC1FF" Margin="0,0,12,0">
-                                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="22" Height="22" Foreground="{StaticResource AccentBlue}"/>
-                                        </Border>
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="LIVE" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource AccentBlue}" Opacity="0.6"/>
-                                            <TextBlock Text="Production" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                    
-                                    <!-- Status Badge -->
-                                    <Border DockPanel.Dock="Right" VerticalAlignment="Top" Padding="8,3" CornerRadius="6" BorderThickness="1">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#1A4CAF50"/>
-                                                <Setter Property="BorderBrush" Value="#334CAF50"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsLiveConfigured}" Value="False">
-                                                        <Setter Property="Background" Value="#1AFF9100"/>
-                                                        <Setter Property="BorderBrush" Value="#33FF9100"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock FontSize="9" FontWeight="Black">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Text" Value="READY"/>
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsLiveConfigured}" Value="False">
-                                                            <Setter Property="Text" Value="SETUP"/>
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Border>
-                                </DockPanel>
-
-                                <TextBlock Grid.Row="1" Text="Explore the stable branch assets, current skins and game data." 
-                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
-                                <materialIcons:MaterialIcon Kind="Server" Width="80" Height="80" Foreground="{StaticResource AccentBlue}" Opacity="0.03" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-15,-15"/>
-                            </Grid>
-                        </Button>
-
-                        <!-- PBE -->
-                        <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentOrange}" MinHeight="170">
+                        <!-- PBE (Beta - Double Width) -->
+                        <Button Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentOrange}" MinHeight="170">
                             <Button.CommandParameter>Explorer_Pbe</Button.CommandParameter>
                             <Grid Margin="18,14">
                                 <Grid.RowDefinitions>
@@ -260,10 +202,68 @@
                             </Grid>
                         </Button>
 
+                        <!-- LIVE -->
+                        <Button Grid.Row="0" Grid.Column="2" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource AccentBlue}" MinHeight="170">
+                            <Button.CommandParameter>Explorer_Live</Button.CommandParameter>
+                            <Grid Margin="16,14">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- Top Info: Title + Status Badge -->
+                                <DockPanel Grid.Row="0" Margin="0,0,0,10" LastChildFill="False">
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                        <Border Width="34" Height="34" CornerRadius="6" Background="#1A4FC1FF" Margin="0,0,8,0">
+                                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="20" Height="20" Foreground="{StaticResource AccentBlue}"/>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="LIVE" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource AccentBlue}" Opacity="0.6"/>
+                                            <TextBlock Text="Live Client" FontSize="14.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    
+                                    <!-- Status Badge -->
+                                    <Border DockPanel.Dock="Right" VerticalAlignment="Top" Padding="8,3" CornerRadius="6" BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#1A4CAF50"/>
+                                                <Setter Property="BorderBrush" Value="#334CAF50"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLiveConfigured}" Value="False">
+                                                        <Setter Property="Background" Value="#1AFF9100"/>
+                                                        <Setter Property="BorderBrush" Value="#33FF9100"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock FontSize="9" FontWeight="Black">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="READY"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLiveConfigured}" Value="False">
+                                                            <Setter Property="Text" Value="SETUP"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DockPanel>
+
+                                <TextBlock Grid.Row="1" Text="Explore the stable branch assets, current skins and game data." 
+                                           FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
+                                <materialIcons:MaterialIcon Kind="Server" Width="80" Height="80" Foreground="{StaticResource AccentBlue}" Opacity="0.03" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-15,-15"/>
+                            </Grid>
+                        </Button>
+
                         <!-- LOCAL -->
                         <Button Grid.Row="0" Grid.Column="3" Style="{StaticResource DashboardTileStyle}" Click="Button_Click" Tag="{StaticResource TextSecondary}" MinHeight="170">
                             <Button.CommandParameter>Explorer_Local</Button.CommandParameter>
-                            <Grid Margin="18,14">
+                            <Grid Margin="16,14">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
@@ -272,12 +272,12 @@
                                 <!-- Top Info: Title + Status Badge -->
                                 <DockPanel Grid.Row="0" Margin="0,0,0,10" LastChildFill="False">
                                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                                        <Border Width="40" Height="40" CornerRadius="8" Background="#1AFFFFFF" Margin="0,0,12,0">
-                                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="22" Height="22" Foreground="{StaticResource TextSecondary}"/>
+                                        <Border Width="34" Height="34" CornerRadius="6" Background="#1AFFFFFF" Margin="0,0,8,0">
+                                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="20" Height="20" Foreground="{StaticResource TextSecondary}"/>
                                         </Border>
                                         <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="LOCAL" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource TextSecondary}" Opacity="0.6"/>
-                                            <TextBlock Text="Extracted" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="LOCAL" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextSecondary}" Opacity="0.6"/>
+                                            <TextBlock Text="Local Files" FontSize="14.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                                         </StackPanel>
                                     </StackPanel>
 
@@ -313,7 +313,7 @@
                                 </DockPanel>
 
                                 <TextBlock Grid.Row="1" Text="Browse your extracted game files and locally saved archives." 
-                                           FontSize="12.5" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
+                                           FontSize="12" Foreground="{StaticResource TextMuted}" TextWrapping="Wrap" LineHeight="17"/>
                                 <materialIcons:MaterialIcon Kind="FolderHomeOutline" Width="80" Height="80" Foreground="{StaticResource TextSecondary}" Opacity="0.03" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-15,-15"/>
                             </Grid>
                         </Button>

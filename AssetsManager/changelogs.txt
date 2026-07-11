@@ -8,9 +8,15 @@ New Features
   - Added centralized and persistent tracking of unknown hashes in hash_lab/unknowns.txt, merging historical unknowns with live WAD scans.
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
   - Enhanced numeric variant guessing to support padded formats (2-digit D2 and 3-digit D3 layouts).
+  - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
-  - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and a path browser dialog.
+  - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and automatic PBE directory configuration from AppSettings.
+  - Alternates Bento buttons dynamically between GAME and LCU options panel, optimizing vertical workspace.
+  - Added auto-promotion of successfully guessed hashes on execution completion, saving results directly to main hash files.
+  - Restructured Home dashboard to use a beautiful 4-column Bento grid, positioning Public Beta (PBE) as a double-width hero card on the far left.
+  - Optimized Home screen text wrapping and card spacing to prevent label clipping across all client modes.
+  - Enriched the application navigation, sidebar, and Guessing Lab sections with high-visibility icon sets (cogs, graphs, brains, network).
   - LCU Basic guessing now completes plugin, extension, and built-in pattern searches as independent phases.
   - WAD monitoring and comparisons now use native chunk checksums with faster archive table loading.
   - Audio bank extraction now preserves the original playback/designer order for family groups.
@@ -22,7 +28,7 @@ Bug Fixes
   - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
   - Fixed extraction failing on WADs containing extensionless atlas files that share their name with a sibling directory.
   - Fixed duplicate unsupported format preview screens appearing when clearing the search filter.
-  - Fixed application crash when opening the Hash Guessing Lab due to a missing button style.
+  - Fixed application crash when opening the Hash Guessing Lab due to a missing button style or duplicate column definitions.
   - Fixed UI freezing (Not Responding) during long hash guessing sessions by executing calculations asynchronously in background threads.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
