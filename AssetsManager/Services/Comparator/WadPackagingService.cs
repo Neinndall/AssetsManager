@@ -3,13 +3,13 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Comparator
@@ -17,30 +17,40 @@ namespace AssetsManager.Services.Comparator
     public class WadPackagingService
     {
         private readonly LogService _logService;
-        private readonly HashResolverService _hashResolverService;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly AudioBankLinkerService _audioBankLinkerService;
 
-        public WadPackagingService(LogService logService, HashResolverService hashResolverService, DirectoriesCreator directoriesCreator, AudioBankLinkerService audioBankLinkerService)
+        public WadPackagingService(LogService logService, DirectoriesCreator directoriesCreator, AudioBankLinkerService audioBankLinkerService)
         {
             _logService = logService;
-            _hashResolverService = hashResolverService;
             _directoriesCreator = directoriesCreator;
             _audioBankLinkerService = audioBankLinkerService;
         }
 
-        public async Task<List<SerializableChunkDiff>> CreateLeanWadPackageAsync(IEnumerable<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string targetOldWadsPath, string targetNewWadsPath)
+        public async Task<List<SerializableChunkDiff>> CreateLeanWadPackageAsync(IEnumerable<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string targetOldWadsPath, string targetNewWadsPath, CancellationToken cancellationToken = default)
         {
             var finalDiffs = diffs.ToList();
+            var diffsByHash = new Dictionary<ulong, SerializableChunkDiff>();
+            var diffsByPath = new Dictionary<string, SerializableChunkDiff>(StringComparer.OrdinalIgnoreCase);
+            foreach (var diff in finalDiffs)
+            {
+                if (diff.OldPathHash != 0) diffsByHash.TryAdd(diff.OldPathHash, diff);
+                if (diff.NewPathHash != 0) diffsByHash.TryAdd(diff.NewPathHash, diff);
+                string path = diff.NewPath ?? diff.OldPath;
+                if (!string.IsNullOrEmpty(path)) diffsByPath.TryAdd(path, diff);
+            }
+
             var audioBankDiffs = finalDiffs.Where(d => 
                 (d.NewPath ?? d.OldPath).EndsWith("_events.bnk", StringComparison.OrdinalIgnoreCase) ||
                 (d.NewPath ?? d.OldPath).EndsWith("_audio.bnk", StringComparison.OrdinalIgnoreCase) ||
                 (d.NewPath ?? d.OldPath).EndsWith("_audio.wpk", StringComparison.OrdinalIgnoreCase)
             ).ToList();
             _logService.LogDebug($"[CreateLeanWadPackageAsync] Found {audioBankDiffs.Count} audio bank diffs to process.");
+            var dependencyRequests = new List<DependencyRequest>(audioBankDiffs.Count * 3);
 
             foreach (var audioBankDiff in audioBankDiffs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 audioBankDiff.Dependencies = new List<AssociatedDependency>();
                 string pathForStrategy = audioBankDiff.NewPath ?? audioBankDiff.OldPath;
                 _logService.LogDebug($"[CreateLeanWadPackageAsync] Processing audio bank: '{pathForStrategy}'");
@@ -73,17 +83,10 @@ namespace AssetsManager.Services.Comparator
 
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Resolved target WAD path: '{targetWadRelativePath}'. Creating dependency...");
 
-                    var diffForBinDependency = finalDiffs.FirstOrDefault(d => d.NewPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()) || d.OldPathHash == XxHash64Ext.Hash(binStrategy.BinPath.ToLower()));
-                    var binDependency = await CreateDependencyAsync(binStrategy.BinPath, XxHash64Ext.Hash(binStrategy.BinPath.ToLower()), targetWadRelativePath, oldPbePath, newPbePath, targetWadRelativePath, diffForBinDependency);
-                    if (binDependency != null)
-                    {
-                        audioBankDiff.Dependencies.Add(binDependency);
-                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added .bin dependency for '{binStrategy.BinPath}'.");
-                    }
-                    else
-                    {
-                        _logService.LogWarning($"[CreateLeanWadPackageAsync] Failed to create .bin dependency for '{binStrategy.BinPath}'. It may not exist in the target WAD '{targetWadRelativePath}'.");
-                    }
+                    ulong binHash = XxHash64Ext.Hash(binStrategy.BinPath.ToLowerInvariant());
+                    diffsByHash.TryGetValue(binHash, out var diffForBinDependency);
+                    dependencyRequests.Add(new DependencyRequest(audioBankDiff, binStrategy.BinPath, binHash,
+                        targetWadRelativePath, targetWadRelativePath, diffForBinDependency));
                 }
                 else
                 {
@@ -99,18 +102,16 @@ namespace AssetsManager.Services.Comparator
                 {
                     string siblingVirtualPath = sibling.Path;
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Attempting to create dependency for sibling: '{siblingVirtualPath}'");
-                    var diffForSiblingDependency = finalDiffs.FirstOrDefault(d => (d.NewPath ?? d.OldPath).Equals(siblingVirtualPath, StringComparison.OrdinalIgnoreCase));
-                    var siblingDependency = await CreateDependencyAsync(siblingVirtualPath, sibling.PathHash, audioBankDiff.SourceWadFile, oldPbePath, newPbePath, audioBankDiff.SourceWadFile, diffForSiblingDependency);
-                    if (siblingDependency != null)
-                    {
-                        audioBankDiff.Dependencies.Add(siblingDependency);
-                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Successfully created and added sibling dependency for '{siblingVirtualPath}'.");
-                    }
-                    else
-                    {
-                        _logService.LogDebug($"[CreateLeanWadPackageAsync] Sibling dependency not found for '{siblingVirtualPath}'. This is normal if the bank doesn't use this specific container type.");
-                    }
+                    diffsByPath.TryGetValue(siblingVirtualPath, out var diffForSiblingDependency);
+                    dependencyRequests.Add(new DependencyRequest(audioBankDiff, siblingVirtualPath, sibling.PathHash,
+                        audioBankDiff.SourceWadFile, audioBankDiff.SourceWadFile, diffForSiblingDependency));
                 }
+            }
+
+            ResolveDependencies(dependencyRequests, oldPbePath, newPbePath, cancellationToken);
+            foreach (var request in dependencyRequests)
+            {
+                if (request.Dependency != null) request.Owner.Dependencies.Add(request.Dependency);
             }
 
             var allChunks = new List<SerializableChunkDiff>(finalDiffs);
@@ -139,6 +140,7 @@ namespace AssetsManager.Services.Comparator
 
             foreach (var wadGroup in diffsByWad)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var wadFileRelativePath = wadGroup.Key;
                 _logService.LogDebug($"Processing {wadFileRelativePath} for chunk packaging...");
 
@@ -149,7 +151,7 @@ namespace AssetsManager.Services.Comparator
                         .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed)
                         .ToList();
                     if (oldChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave, wadFileRelativePath, true);
+                        await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave, wadFileRelativePath, true, cancellationToken);
                 }
 
                 string sourceNewWadPath = Path.Combine(newPbePath, wadFileRelativePath);
@@ -159,25 +161,28 @@ namespace AssetsManager.Services.Comparator
                         .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New)
                         .ToList();
                     if (newChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave, wadFileRelativePath, false);
+                        await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave, wadFileRelativePath, false, cancellationToken);
                 }
             }
 
             return finalDiffs;
         }
 
-        public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath, string version = null)
+        public async Task<List<SerializableChunkDiff>> SaveBackupAsync(List<SerializableChunkDiff> diffs, string oldPbePath, string newPbePath, string destinationPath, string version = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Use the centralized directory creator to prepare the structure
             _directoriesCreator.PrepareComparisonDirectory(destinationPath);
 
             string wadChunksOldDir = Path.Combine(destinationPath, "wad_chunks", "old");
             string wadChunksNewDir = Path.Combine(destinationPath, "wad_chunks", "new");
             string jsonFilePath = Path.Combine(destinationPath, "wadcomparison.json");
+            string temporaryJsonFilePath = jsonFilePath + ".tmp";
 
             _logService.LogDebug($"[WadPackagingService] Saving full backup to {destinationPath}");
 
-            var leanDiffs = await CreateLeanWadPackageAsync(diffs, oldPbePath, newPbePath, wadChunksOldDir, wadChunksNewDir);
+            var leanDiffs = await CreateLeanWadPackageAsync(diffs, oldPbePath, newPbePath, wadChunksOldDir, wadChunksNewDir, cancellationToken);
 
             var comparisonData = new WadComparisonData
             {
@@ -192,55 +197,54 @@ namespace AssetsManager.Services.Comparator
                 WriteIndented = true,
                 Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
             });
-            await File.WriteAllTextAsync(jsonFilePath, json);
+            try
+            {
+                await File.WriteAllTextAsync(temporaryJsonFilePath, json, cancellationToken);
+                File.Move(temporaryJsonFilePath, jsonFilePath, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryJsonFilePath)) File.Delete(temporaryJsonFilePath);
+            }
 
             return leanDiffs;
         }
 
-        private async Task<AssociatedDependency> CreateDependencyAsync(string filePath, ulong fileHash, string wadRelativePath, string oldPbePath, string newPbePath, string sourceWad, SerializableChunkDiff originalDiff)
+        private void ResolveDependencies(List<DependencyRequest> requests, string oldPbePath, string newPbePath, CancellationToken cancellationToken)
         {
-            _logService.LogDebug($"[CreateDependencyAsync] Attempting to create dependency for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadRelativePath}'.");
-            return await Task.Run(() =>
+            foreach (var wadGroup in requests.GroupBy(request => request.WadRelativePath, StringComparer.OrdinalIgnoreCase))
             {
-                string wadVirtualPath = Path.Combine(newPbePath, wadRelativePath);
+                cancellationToken.ThrowIfCancellationRequested();
+                string wadVirtualPath = Path.Combine(newPbePath, wadGroup.Key);
                 if (!File.Exists(wadVirtualPath))
                 {
-                    _logService.LogDebug($"[CreateDependencyAsync] WAD not found at new path, trying old path: '{wadVirtualPath}'");
-                    wadVirtualPath = Path.Combine(oldPbePath, wadRelativePath);
+                    wadVirtualPath = Path.Combine(oldPbePath, wadGroup.Key);
                 }
 
-                if (File.Exists(wadVirtualPath))
+                if (!File.Exists(wadVirtualPath)) continue;
+
+                using var wad = new WadFile(wadVirtualPath);
+                foreach (var request in wadGroup)
                 {
-                    _logService.LogDebug($"[CreateDependencyAsync] WAD found at '{wadVirtualPath}'. Reading...");
-                    using var wad = new WadFile(wadVirtualPath);
-                    if (wad.Chunks.TryGetValue(fileHash, out var chunk))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (wad.Chunks.TryGetValue(request.FileHash, out var chunk))
                     {
-                        _logService.LogDebug($"[CreateDependencyAsync] Chunk found for hash {fileHash:X16}. Creating dependency object.");
-                        return new AssociatedDependency
+                        request.Dependency = new AssociatedDependency
                         {
-                            Path = filePath,
-                            SourceWad = sourceWad,
-                            OldPathHash = fileHash,
-                            NewPathHash = fileHash,
+                            Path = request.FilePath,
+                            SourceWad = request.SourceWad,
+                            OldPathHash = request.FileHash,
+                            NewPathHash = request.FileHash,
                             CompressionType = chunk.Compression,
-                            Type = originalDiff?.Type ?? ChunkDiffType.Dependency, // Assign Dependency if not a top-level diff
-                            WasTopLevelDiff = true // Always true for dependencies so they are shown
+                            Type = request.OriginalDiff?.Type ?? ChunkDiffType.Dependency,
+                            WasTopLevelDiff = true
                         };
                     }
-                    else
-                    {
-                        _logService.LogDebug($"[CreateDependencyAsync] Chunk NOT found for file '{filePath}' (Hash: {fileHash:X16}) in WAD '{wadVirtualPath}'. This is normal for optional siblings.");
-                    }
                 }
-                else
-                {
-                    _logService.LogDebug($"[CreateDependencyAsync] WAD file not found for dependency '{filePath}' at either new or old paths: '{wadRelativePath}'.");
-                }
-                return null;
-            });
+            }
         }
 
-        private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<SerializableChunkDiff> chunkDiffs, string wadRelativePath, bool useOld)
+        private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<SerializableChunkDiff> chunkDiffs, string wadRelativePath, bool useOld, CancellationToken cancellationToken)
         {
             try
             {
@@ -266,18 +270,19 @@ namespace AssetsManager.Services.Comparator
 
                 foreach (var chunk in chunksToProcess)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     fs.Seek(chunk.DataOffset, SeekOrigin.Begin);
-                    byte[] rawChunkData = ArrayPool<byte>.Shared.Rent((int)chunk.CompressedSize);
+                    byte[] rawChunkData = ArrayPool<byte>.Shared.Rent(chunk.CompressedSize);
                     try
                     {
-                        await fs.ReadExactlyAsync(rawChunkData, 0, (int)chunk.CompressedSize);
+                        await fs.ReadExactlyAsync(rawChunkData.AsMemory(0, chunk.CompressedSize), cancellationToken);
 
                         string chunkFileName = $"{chunk.PathHash:X16}.chunk";
                         string destChunkPath = Path.Combine(finalTargetDir, chunkFileName);
 
                         await using (var destFs = new FileStream(destChunkPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
                         {
-                            await destFs.WriteAsync(rawChunkData.AsMemory(0, (int)chunk.CompressedSize));
+                            await destFs.WriteAsync(rawChunkData.AsMemory(0, chunk.CompressedSize), cancellationToken);
                         }
                     }
                     finally
@@ -286,10 +291,22 @@ namespace AssetsManager.Services.Comparator
                     }
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logService.LogError(ex, $"Failed to save chunks from {sourceWadPath}");
+                throw;
             }
+        }
+
+        private sealed record DependencyRequest(
+            SerializableChunkDiff Owner,
+            string FilePath,
+            ulong FileHash,
+            string WadRelativePath,
+            string SourceWad,
+            SerializableChunkDiff OriginalDiff)
+        {
+            public AssociatedDependency Dependency { get; set; }
         }
     }
 }

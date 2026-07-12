@@ -52,7 +52,8 @@ namespace AssetsManager.Services.Monitor
             string oldPbePath,
             string newPbePath,
             string version,
-            string displayName)
+            string displayName,
+            CancellationToken cancellationToken = default)
         {
             if (diffs == null || diffs.Count == 0)
             {
@@ -61,7 +62,8 @@ namespace AssetsManager.Services.Monitor
 
             string comparisonKey = PathUtils.BuildComparisonKey(version, oldPbePath, newPbePath);
 
-            await _archiveLock.WaitAsync();
+            await _archiveLock.WaitAsync(cancellationToken);
+            string pendingArchivePath = null;
             try
             {
                 // Re-check inside the lock: a background auto-archive and a
@@ -86,12 +88,30 @@ namespace AssetsManager.Services.Monitor
                 }
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
-                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version);
+                pendingArchivePath = folderInfo.PhysicalPath;
+                await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version, cancellationToken);
 
                 RegisterInHistory(folderInfo.FolderName, displayName, oldPbePath, newPbePath, version, comparisonKey);
+                pendingArchivePath = null;
                 _logService.LogSuccess("Comparison history saved successfully.");
 
                 return new ArchiveResult(false, folderInfo.FolderName);
+            }
+            catch
+            {
+                if (!string.IsNullOrEmpty(pendingArchivePath) && Directory.Exists(pendingArchivePath))
+                {
+                    try
+                    {
+                        Directory.Delete(pendingArchivePath, true);
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        _logService.LogError(cleanupException, $"Failed to remove incomplete comparison archive '{pendingArchivePath}'.");
+                    }
+                }
+
+                throw;
             }
             finally
             {

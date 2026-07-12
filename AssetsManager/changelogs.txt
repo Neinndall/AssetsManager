@@ -11,6 +11,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Reduced memory pressure while creating WAD backups and made interrupted saves leave no incomplete history entry.
   - Accelerated Explorer tree loading for large WAD and local folder structures.
   - Improved repeated Explorer searches by reusing the loaded tree index and applying UI updates safely.
   - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and automatic PBE directory configuration from AppSettings.
