@@ -13,6 +13,7 @@ namespace AssetsManager.Services.Hashes
     public class HashGuessingStore
     {
         private const string ResearchFileName = "research.json";
+        private const int RecentPatchThreshold = 3;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly SemaphoreSlim _lock = new(1, 1);
 
@@ -73,49 +74,13 @@ namespace AssetsManager.Services.Hashes
                 Directory.CreateDirectory(_directoriesCreator.HashLabPath);
                 foreach (var group in grouped)
                 {
-                    var newEntries = group.Select(match => $"{match.Hash:x16} {match.Path}").ToList();
+                    var newEntries = group.GroupBy(match => match.Hash)
+                        .ToDictionary(matchesByHash => matchesByHash.Key, matchesByHash => matchesByHash.Last().Path);
                     var pathsToUpdate = new[] { GetConfirmedResearchPath(group.Key), GetKnownHashFilePath(group.Key) };
 
                     foreach (var targetPath in pathsToUpdate)
                     {
-                        var dictionary = new Dictionary<ulong, string>();
-
-                        // 1. Read existing hashes if file exists
-                        if (File.Exists(targetPath))
-                        {
-                            foreach (string line in await File.ReadAllLinesAsync(targetPath, cancellationToken))
-                            {
-                                if (string.IsNullOrWhiteSpace(line) || line.Length < 17) continue;
-                                string hex = line[..16];
-                                string path = line[17..].Trim();
-                                if (ulong.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
-                                {
-                                    dictionary[hash] = path;
-                                }
-                            }
-                        }
-
-                        // 2. Merge new entries
-                        foreach (string entry in newEntries)
-                        {
-                            if (string.IsNullOrWhiteSpace(entry) || entry.Length < 17) continue;
-                            string hex = entry[..16];
-                            string path = entry[17..].Trim();
-                            if (ulong.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
-                            {
-                                dictionary[hash] = path;
-                            }
-                        }
-
-                        // 3. Sort alphabetically by path string (just like sorted(..., key=lambda kv: kv[1]))
-                        var sortedLines = dictionary
-                            .OrderBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase)
-                            .Select(kv => $"{kv.Key:x16} {kv.Value}");
-
-                        // 4. Overwrite target path
-                        string tempPath = targetPath + ".tmp";
-                        await File.WriteAllLinesAsync(tempPath, sortedLines, cancellationToken);
-                        File.Move(tempPath, targetPath, true);
+                        await MergeHashFileAsync(targetPath, newEntries, cancellationToken);
                     }
                 }
             }
@@ -151,19 +116,217 @@ namespace AssetsManager.Services.Hashes
             return result;
         }
 
-        public async Task SaveUnknownHashesAsync(HashGuessDomain domain, IEnumerable<ulong> unknownHashes, CancellationToken cancellationToken)
+        public async Task<HashUnknownSummary> LoadUnknownSummaryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        {
+            string suffix = domain == HashGuessDomain.Game ? "game" : "lcu";
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                int current = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"current.{suffix}.txt"), cancellationToken);
+                int recent = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"recent.{suffix}.txt"), cancellationToken);
+                int historical = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"historical.{suffix}.txt"), cancellationToken);
+                if (current + recent + historical == 0)
+                {
+                    string legacyPath = Path.Combine(_directoriesCreator.HashLabPath, $"unknowns.{suffix}.txt");
+                    current = await CountHashLinesAsync(legacyPath, cancellationToken);
+                }
+                return new HashUnknownSummary { Current = current, Recent = recent, Historical = historical };
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
+        internal static Task MergeHashFileAsync(string targetPath, IReadOnlyDictionary<ulong, string> incoming, CancellationToken cancellationToken)
+        {
+            return Task.Run(() => MergeHashFile(targetPath, incoming, cancellationToken), cancellationToken);
+        }
+
+        private static void MergeHashFile(string targetPath, IReadOnlyDictionary<ulong, string> incoming, CancellationToken cancellationToken)
+        {
+            var additions = incoming.OrderBy(pair => pair.Value, StringComparer.Ordinal).ToList();
+            string temporaryPath = targetPath + ".tmp";
+            try
+            {
+                using (var reader = File.Exists(targetPath) ? new StreamReader(targetPath) : null)
+                using (var writer = new StreamWriter(temporaryPath, false, new System.Text.UTF8Encoding(false)))
+                {
+                    int additionIndex = 0;
+                    string line;
+                    while (reader != null && (line = reader.ReadLine()) != null)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!TryParseHashLine(line, out ulong existingHash, out string existingPath)) continue;
+                        if (incoming.ContainsKey(existingHash)) continue;
+
+                        while (additionIndex < additions.Count &&
+                               StringComparer.Ordinal.Compare(additions[additionIndex].Value, existingPath) <= 0)
+                        {
+                            var addition = additions[additionIndex++];
+                            writer.WriteLine($"{addition.Key:x16} {addition.Value}");
+                        }
+                        writer.WriteLine(line);
+                    }
+
+                    while (additionIndex < additions.Count)
+                    {
+                        var addition = additions[additionIndex++];
+                        writer.WriteLine($"{addition.Key:x16} {addition.Value}");
+                    }
+                    writer.Flush();
+                }
+                File.Move(temporaryPath, targetPath, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+        }
+
+        private static bool TryParseHashLine(string line, out ulong hash, out string path)
+        {
+            hash = 0;
+            path = string.Empty;
+            if (string.IsNullOrWhiteSpace(line) || line.Length < 18 || line[16] != ' ') return false;
+            if (!ulong.TryParse(line.AsSpan(0, 16), System.Globalization.NumberStyles.HexNumber, null, out hash)) return false;
+            path = line[17..].Trim();
+            return path.Length > 0;
+        }
+
+        private static async Task<int> CountHashLinesAsync(string path, CancellationToken cancellationToken)
+        {
+            if (!File.Exists(path)) return 0;
+            int count = 0;
+            using var reader = new StreamReader(path);
+            while (await reader.ReadLineAsync(cancellationToken) != null) count++;
+            return count;
+        }
+
+        public async Task SaveUnknownHashesAsync(
+            HashGuessDomain domain,
+            IEnumerable<ulong> unknownHashes,
+            IReadOnlySet<ulong> currentHashes,
+            string patchFingerprint,
+            CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
             try
             {
                 Directory.CreateDirectory(_directoriesCreator.HashLabPath);
                 string path = Path.Combine(_directoriesCreator.HashLabPath, domain == HashGuessDomain.Game ? "unknowns.game.txt" : "unknowns.lcu.txt");
-                var lines = unknownHashes.Select(hash => $"{hash:x16}").OrderBy(x => x);
-                await File.WriteAllLinesAsync(path, lines, cancellationToken);
+                var pending = unknownHashes.ToHashSet();
+                var lines = pending.Select(hash => $"{hash:x16}").OrderBy(x => x).ToList();
+                string temporaryPath = path + ".tmp";
+                try
+                {
+                    await File.WriteAllLinesAsync(temporaryPath, lines, cancellationToken);
+                    File.Move(temporaryPath, path, true);
+                }
+                finally
+                {
+                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+                }
+
+                await SaveInventoryMetadataAsync(domain, pending, currentHashes, patchFingerprint, cancellationToken);
             }
             finally
             {
                 _lock.Release();
+            }
+        }
+
+        private async Task SaveInventoryMetadataAsync(
+            HashGuessDomain domain,
+            HashSet<ulong> pending,
+            IReadOnlySet<ulong> currentHashes,
+            string patchFingerprint,
+            CancellationToken cancellationToken)
+        {
+            string suffix = domain == HashGuessDomain.Game ? "game" : "lcu";
+            string metadataPath = Path.Combine(_directoriesCreator.HashLabPath, $"inventory.{suffix}.json");
+            var existing = new List<HashUnknownRecord>();
+            if (File.Exists(metadataPath))
+            {
+                await using var source = File.OpenRead(metadataPath);
+                var stored = await JsonSerializer.DeserializeAsync<List<HashUnknownRecord>>(source, cancellationToken: cancellationToken);
+                if (stored != null) existing = stored;
+            }
+
+            var ordered = UpdateInventoryRecords(domain, existing, pending, currentHashes, patchFingerprint);
+            await WriteJsonAtomicallyAsync(metadataPath, ordered, cancellationToken);
+
+            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"current.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount == 0), cancellationToken);
+            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"recent.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount is > 0 and <= RecentPatchThreshold), cancellationToken);
+            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"historical.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount > RecentPatchThreshold), cancellationToken);
+        }
+
+        internal static List<HashUnknownRecord> UpdateInventoryRecords(
+            HashGuessDomain domain,
+            IEnumerable<HashUnknownRecord> existing,
+            IReadOnlySet<ulong> pending,
+            IReadOnlySet<ulong> currentHashes,
+            string patchFingerprint)
+        {
+            var records = existing.ToDictionary(record => record.Hash);
+            foreach (ulong hash in pending)
+            {
+                if (!records.TryGetValue(hash, out HashUnknownRecord record))
+                {
+                    record = new HashUnknownRecord
+                    {
+                        Hash = hash,
+                        Domain = domain,
+                        FirstSeenPatch = currentHashes.Contains(hash) ? patchFingerprint : "legacy"
+                    };
+                    records[hash] = record;
+                }
+
+                if (currentHashes.Contains(hash))
+                {
+                    if (!string.Equals(record.LastSeenPatch, patchFingerprint, StringComparison.Ordinal))
+                        record.SeenPatchCount++;
+                    record.LastSeenPatch = patchFingerprint;
+                    record.LastObservedPatch = patchFingerprint;
+                    record.MissedPatchCount = 0;
+                }
+                else if (!string.Equals(record.LastObservedPatch, patchFingerprint, StringComparison.Ordinal))
+                {
+                    record.LastObservedPatch = patchFingerprint;
+                    record.MissedPatchCount++;
+                }
+            }
+
+            foreach (ulong resolved in records.Keys.Where(hash => !pending.Contains(hash)).ToList()) records.Remove(resolved);
+            return records.Values.OrderBy(record => record.Hash).ToList();
+        }
+
+        private static async Task WriteJsonAtomicallyAsync(string path, List<HashUnknownRecord> records, CancellationToken cancellationToken)
+        {
+            string temporaryPath = path + ".tmp";
+            try
+            {
+                await using (var target = File.Create(temporaryPath))
+                    await JsonSerializer.SerializeAsync(target, records, cancellationToken: cancellationToken);
+                File.Move(temporaryPath, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+        }
+
+        private static async Task WriteHashViewAsync(string path, IEnumerable<HashUnknownRecord> records, CancellationToken cancellationToken)
+        {
+            string temporaryPath = path + ".tmp";
+            try
+            {
+                await File.WriteAllLinesAsync(temporaryPath, records.Select(record => $"{record.Hash:x16}"), cancellationToken);
+                File.Move(temporaryPath, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
         }
     }

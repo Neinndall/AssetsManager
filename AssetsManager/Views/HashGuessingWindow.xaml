@@ -493,6 +493,10 @@
                 
                 <!-- Header -->
                 <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <materialIcons:MaterialIcon Kind="CheckDecagram" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="DETERMINISTIC RESULTS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -500,6 +504,8 @@
                             <TextBlock Text="{Binding Matches.Count, StringFormat='{}{0} Resolved &amp; Saved'}" FontSize="10.5" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                         </Border>
                     </StackPanel>
+                    <Button Grid.Column="1" Content="Cancel" Click="Cancel_Click" Padding="14,5"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
 
                 <!-- Polished Progress Bar -->
@@ -546,7 +552,7 @@
                         </Grid>
                         
                         <!-- Smooth Modern Progress Bar -->
-                        <ProgressBar Grid.Row="2" Value="{Binding ProgressValue}" Maximum="100" Height="8" Style="{StaticResource ModernProgressBar}"/>
+                        <ProgressBar Grid.Row="2" Value="{Binding ProgressValue}" Maximum="100" Height="8" Style="{StaticResource ModernProgressBar}" IsIndeterminate="{Binding IsProgressIndeterminate}"/>
                     </Grid>
                 </Border>
                 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Linq;
@@ -33,10 +34,23 @@ namespace AssetsManager.Services.Hashes
         private static readonly Regex LcuAssetPathRegex = new(@"\blol-game-data/assets/([a-zA-Z0-9/_.@-]+)", RegexOptions.Compiled);
         private static readonly Regex LcuRelativePathRegex = new(@"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)", RegexOptions.Compiled);
         private static readonly Regex LcuFileNameRegex = new("[\\\"']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\\.(?:js|json|webm|html|[a-z]{3}))\\b", RegexOptions.Compiled);
+        private static readonly Regex LcuCssUrlRegex = new("url\\(\\s*[\\\"']?([^\\\"')?#]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LcuHtmlAssetRegex = new("(?:src|href|poster|data-src)\\s*=\\s*[\\\"']([^\\\"'?#]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex PreloadNameRegex = new("Name=\\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex ShaderIncludeRegex = new("#include \\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex LocaleRegex = new(@"(?<![a-z])(?:ar_ae|ar_eg|cs_cz|de_de|el_gr|en_au|en_gb|en_ph|en_pl|en_sg|en_us|es_ar|es_es|es_mx|fr_fr|hu_hu|id_id|it_it|ja_jp|ko_kr|ms_my|pl_pl|pt_br|ro_ro|ru_ru|th_th|tr_tr|vi_vn|vn_vn|zh_cn|zh_my|zh_tw)(?![a-z])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex BasenameNumberRegex = new(@"[0-9]+(?=[^/]*\.[^/]+$)", RegexOptions.Compiled);
+        private static readonly Regex LcuNumberExcludedPathRegex = new(@"(?:^(?:plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champion-|plugins/rcp-be-lol-game-data/global/default/(?:data|assets)/characters/|plugins/rcp-be-lol-game-data/global/default/data/items/icons2d/\d+_|plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champions/-1\.json)|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex LcuWordlistExcludedPathRegex = new(@"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly byte[][] GameBinPrefixesA = ToAsciiPrefixes("ASSETS/");
+        private static readonly byte[][] GameBinPrefixesC = ToAsciiPrefixes("COMMON/", "CHARACTERS/", "CLIENTSTATES/");
+        private static readonly byte[][] GameBinPrefixesD = ToAsciiPrefixes("DATA/", "DATA_SOON/");
+        private static readonly byte[][] GameBinPrefixesG = ToAsciiPrefixes("GAMEPLAY/", "GLOBAL/");
+        private static readonly byte[][] GameBinPrefixesL = ToAsciiPrefixes("LEVELS/", "LOADOUTS/");
+        private static readonly byte[][] GameBinPrefixesM = ToAsciiPrefixes("MAPS/");
+        private static readonly byte[][] GameBinPrefixesP = ToAsciiPrefixes("PATCHING/");
+        private static readonly byte[][] GameBinPrefixesS = ToAsciiPrefixes("SHADERS/");
+        private static readonly byte[][] GameBinPrefixesU = ToAsciiPrefixes("UX/", "UIAUTOATLAS/");
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
         private static readonly string[] Regions = { "br", "cn", "eun", "eune", "euw", "garena2", "garena3", "id", "jp", "kr", "la", "la1", "la2", "lan", "las", "na", "oc", "oc1", "oce", "pbe", "ph", "ph2", "ru", "sg", "tencent", "th", "th2", "tr", "tw", "tw2", "vn", "vn2", "global" };
 
@@ -60,11 +74,6 @@ namespace AssetsManager.Services.Hashes
             _httpClient = httpClient;
         }
 
-        public Task<HashSet<ulong>> GetStoreUnknownsAsync(HashGuessDomain domain, CancellationToken cancellationToken)
-        {
-            return _store.LoadUnknownHashesAsync(domain, cancellationToken);
-        }
-
         public async Task<HashGuessRunResult> RunEmbeddedPathGrepAsync(
             HashGuessDomain domain,
             string rootDirectory,
@@ -78,11 +87,15 @@ namespace AssetsManager.Services.Hashes
 
             string pattern = domain == HashGuessDomain.Game ? "*.wad.client" : "*.wad";
             string[] wadPaths = Directory.EnumerateFiles(rootDirectory, pattern, SearchOption.AllDirectories).ToArray();
-            var unknownHashes = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var unknownHashes = inventory.All;
 
             var runResult = await Task.Run(() =>
             {
                 var engine = new HashGuessEngine(domain, unknownHashes);
+                IReadOnlyList<string> lcuDirectories = domain == HashGuessDomain.Lcu
+                    ? HashGuessEngine.BuildDirectoryList(LoadKnownPaths(HashGuessDomain.Lcu))
+                    : Array.Empty<string>();
                 int processedChunks = 0;
 
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
@@ -121,7 +134,17 @@ namespace AssetsManager.Services.Hashes
                                 byte[] data = WadChunkUtils.DecompressChunk(compressedData.Span, chunk.Compression);
                                 foreach (var candidate in ExtractCandidates(domain, data, resolvedChunkPath))
                                 {
-                                    engine.Check(candidate.Path, candidate.Strategy, wadPath, chunk.PathHash);
+                                    if (domain == HashGuessDomain.Lcu &&
+                                        candidate.Strategy == HashGuessStrategy.LcuEmbeddedPath &&
+                                        !candidate.Path.StartsWith("plugins/", StringComparison.Ordinal))
+                                    {
+                                        foreach (string directory in lcuDirectories)
+                                            engine.Check(directory + "/" + candidate.Path, candidate.Strategy, wadPath, chunk.PathHash);
+                                    }
+                                    else
+                                    {
+                                        engine.Check(candidate.Path, candidate.Strategy, wadPath, chunk.PathHash);
+                                    }
                                 }
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -153,7 +176,7 @@ namespace AssetsManager.Services.Hashes
             int processedChunks = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(resultMatches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
 
             _logService.LogSuccess($"Hash Lab {domain} GREP completed: {resultMatches.Count} paths resolved from {unknownHashes.Count + resultMatches.Count} unknown hashes.");
             return new HashGuessRunResult
@@ -175,7 +198,9 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            ISet<ulong> sessionResolved = null,
+            HashUnknownInventory preparedInventory = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
@@ -183,7 +208,8 @@ namespace AssetsManager.Services.Hashes
 
             string pattern = domain == HashGuessDomain.Game ? "*.wad.client" : "*.wad";
             string[] wadPaths = Directory.EnumerateFiles(rootDirectory, pattern, SearchOption.AllDirectories).ToArray();
-            var unknownHashes = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
             {
@@ -221,7 +247,8 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(resultMatches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
+            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
             _logService.LogSuccess($"Hash Lab {domain} canonical guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
             return new HashGuessRunResult
             {
@@ -234,11 +261,14 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunGameBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
+            await _hashResolverService.LoadAllHashesAsync();
+            var inventory = await PrepareInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>();
-            results.Add(await RunCanonicalGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken));
-            results.Add(await RunLanguageGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken));
-            results.Add(await RunNumberGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken));
-            results.Add(await RunGameCrossDomainGuessingAsync(rootDirectory, progress, cancellationToken));
+            results.Add(await RunCanonicalGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
+            results.Add(await RunLanguageGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
+            results.Add(await RunNumberGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
+            results.Add(await RunGameCrossDomainGuessingAsync(rootDirectory, progress, cancellationToken, sessionResolved, inventory));
 
             var matches = results.SelectMany(result => result.Matches)
                 .GroupBy(match => match.Hash)
@@ -257,12 +287,15 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunLcuBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
+            await _hashResolverService.LoadAllHashesAsync();
+            var inventory = await PrepareInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>
             {
-                await RunCanonicalGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken),
-                await RunLanguageGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken),
-                await RunNumberGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken),
-                await RunLcuSupplementalGuessingAsync(rootDirectory, progress, cancellationToken)
+                await RunCanonicalGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, sessionResolved, inventory),
+                await RunLanguageGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, sessionResolved, inventory),
+                await RunNumberGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, sessionResolved, inventory),
+                await RunLcuSupplementalGuessingAsync(rootDirectory, progress, cancellationToken, sessionResolved, inventory)
             };
 
             var matches = results.SelectMany(result => result.Matches).GroupBy(match => match.Hash)
@@ -273,14 +306,16 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashGuessRunResult> RunLcuAdvancedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             string[] wads = Directory.EnumerateFiles(rootDirectory, "*.wad", SearchOption.AllDirectories).ToArray();
-            var unknown = await BuildUnknownInventoryAsync(HashGuessDomain.Lcu, wads, cancellationToken);
+            var inventory = await BuildUnknownInventoryAsync(HashGuessDomain.Lcu, wads, cancellationToken);
+            var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
             {
                 var engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown);
                 var paths = LoadKnownPaths(HashGuessDomain.Lcu).ToList();
-                var names = paths.Select(Path.GetFileName).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase).Take(25000).ToList();
-                var directories = HashGuessEngine.BuildDirectoryList(paths).Take(25000).ToList();
+                var wordPaths = paths.Where(path => !LcuWordlistExcludedPathRegex.IsMatch(path)).ToList();
+                var names = HashGuessEngine.BuildRankedBasenames(paths).Take(1000).ToList();
+                var directories = HashGuessEngine.BuildRankedDirectoryList(paths).Take(2000).ToList();
                 int checkedCandidates = 0;
                 const int budget = 2_000_000;
 
@@ -298,50 +333,21 @@ namespace AssetsManager.Services.Hashes
             Complete:
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    var words = HashGuessEngine.BuildWordlist(paths).Take(5000).ToList();
-                    int wordBudget = 500000;
-                    foreach (string path in paths.Take(100000))
-                    {
-                        Match word = Regex.Match(path, @"([^/_.-]+)(?=[^/]*\.[^/]+$)");
-                        if (!word.Success) continue;
-                        string format = path[..word.Index] + "{0}" + path[(word.Index + word.Length)..];
-                        foreach (string replacement in words)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            engine.Check(string.Format(format, replacement), HashGuessStrategy.PluginVariant, "LCU Advanced word substitution");
-                            checkedCandidates++;
-                            if (--wordBudget == 0 || engine.RemainingUnknownCount == 0) goto CompleteWords;
-                        }
-                    }
+                    var words = HashGuessEngine.BuildBasenameWordlist(wordPaths).Take(5000).ToList();
+                    checkedCandidates += RunFocusedWordlistSubstitution(engine, wordPaths, words, cancellationToken, 500_000);
                 }
 
-            CompleteWords:
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    var words = HashGuessEngine.BuildWordlist(paths).Take(3000).ToList();
-                    int insertionBudget = 500000;
-                    foreach (string path in paths.Take(75000))
-                    {
-                        Match word = Regex.Match(path, @"([^/_.-]+)(?=[^/]*\.[^/]+$)");
-                        if (!word.Success) continue;
-                        foreach (string value in words)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            engine.Check(path.Insert(word.Index, value + "_"), HashGuessStrategy.PluginVariant, "LCU Advanced word insertion");
-                            engine.Check(path.Insert(word.Index + word.Length, "_" + value), HashGuessStrategy.PluginVariant, "LCU Advanced word insertion");
-                            checkedCandidates += 2;
-                            insertionBudget -= 2;
-                            if (insertionBudget <= 0 || engine.RemainingUnknownCount == 0) goto CompleteInsertions;
-                        }
-                    }
+                    var words = HashGuessEngine.BuildBasenameWordlist(wordPaths).Take(5000).ToList();
+                    checkedCandidates += RunWordAdditionAttack(engine, paths, words, cancellationToken, 1_000_000);
                 }
 
-            CompleteInsertions:
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU static-assets" });
                     var staticAssetsPaths = paths.Where(p => p.StartsWith("plugins/rcp-fe-lol-static-assets/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
-                    var sswordlist = HashGuessEngine.BuildContextualWordlist(staticAssetsPaths, paths.Where(p => (p.Contains("-fe-lol-") && p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)) || p.Contains("fe-lol-static-assets"))).Take(5000).ToList();
+                    var sswordlist = HashGuessEngine.BuildBasenameWordlist(staticAssetsPaths).Take(5000).ToList();
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, staticAssetsPaths, sswordlist, cancellationToken);
                     if (engine.RemainingUnknownCount > 0)
                         checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, staticAssetsPaths, sswordlist, cancellationToken);
@@ -359,61 +365,12 @@ namespace AssetsManager.Services.Hashes
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU parties" });
                         var partiesPaths = paths.Where(p => p.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) && p.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList();
-                        var partiesWords = HashGuessEngine.BuildContextualWordlist(partiesPaths, paths.Where(p => p.Contains("-fe-lol-") && p.EndsWith(".png", StringComparison.OrdinalIgnoreCase))).Take(5000).ToList();
+                        var partiesWords = HashGuessEngine.BuildBasenameWordlist(partiesPaths).Take(5000).ToList();
                         checkedCandidates += RunFocusedWordlistSubstitution(engine, partiesPaths, partiesWords, cancellationToken);
                     }
 
-                    if (engine.RemainingUnknownCount > 0)
-                    {
-                        progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU word additions" });
-                        var lcuWords = HashGuessEngine.BuildWordlist(paths).Take(5000).ToList();
-                        checkedCandidates += RunWordAdditionAttack(engine, paths.Take(20000), lcuWords, cancellationToken);
-                    }
                 }
 
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU TFT patterns" });
-                    var words = HashGuessEngine.BuildWordlist(paths).Take(1500).ToList();
-                    int tftBudget = 1_000_000;
-                    foreach (string a in words)
-                    {
-                        foreach (string b in words)
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}{a}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}-{a}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{a}-{b}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{a}{b}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}-{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{a}-{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{a}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft{b}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/tft-{a}{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{b}{a}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}{b}n.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{b}-{a}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}-{b}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}{b}s.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{b}{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{b}-{a}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}-{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}{b}.json", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-                            engine.Check($"plugins/rcp-be-lol-game-data/global/default/v1/{a}{b}", HashGuessStrategy.LcuPattern, "TFT pattern variant");
-
-                            checkedCandidates += 24;
-                            tftBudget -= 24;
-                            if (tftBudget <= 0 || engine.RemainingUnknownCount == 0) goto CompleteTft;
-                        }
-                    }
-                }
-            CompleteTft:
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken);
@@ -422,14 +379,13 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(matches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
-        private async Task<HashGuessRunResult> RunLcuSupplementalGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
+        private async Task<HashGuessRunResult> RunLcuSupplementalGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken, ISet<ulong> sessionResolved, HashUnknownInventory inventory)
         {
-            string[] wads = Directory.EnumerateFiles(rootDirectory, "*.wad", SearchOption.AllDirectories).ToArray();
-            var unknown = await BuildUnknownInventoryAsync(HashGuessDomain.Lcu, wads, cancellationToken);
+            var unknown = CreateSessionPending(inventory.All, sessionResolved);
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
             {
@@ -439,7 +395,7 @@ namespace AssetsManager.Services.Hashes
                 var phases = new (string Name, IEnumerable<(string Path, HashGuessStrategy Strategy)> Candidates)[]
                 {
                     ("plugin variants", GenerateLcuPluginCandidates(knownPaths, 1_000_000)),
-                    ("extension variants", GenerateLcuExtensionCandidates(knownPaths, 500_000)),
+                    ("extension variants", GenerateLcuExtensionCandidates(knownPaths, 1_000_000)),
                     ("LCU patterns", GenerateLcuPatternCandidates(knownPaths))
                 };
 
@@ -467,25 +423,47 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(matches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
+            sessionResolved?.UnionWith(matches.Select(match => match.Hash));
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
         public async Task<HashGuessRunResult> RunGameExtendedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             string[] wads = Directory.EnumerateFiles(rootDirectory, "*.wad.client", SearchOption.AllDirectories).ToArray();
-            var unknown = await BuildUnknownInventoryAsync(HashGuessDomain.Game, wads, cancellationToken);
+            var inventory = await BuildUnknownInventoryAsync(HashGuessDomain.Game, wads, cancellationToken);
+            var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(async () =>
             {
                 var engine = new HashGuessEngine(HashGuessDomain.Game, unknown);
                 int checkedCandidates = 0;
                 const int budget = 2_000_000;
+                var knownPaths = LoadKnownPaths(HashGuessDomain.Game).ToList();
 
-                foreach (var candidate in GenerateGameExtendedCandidates(LoadKnownPaths(HashGuessDomain.Game), budget))
+                foreach (var candidate in GenerateGameSkinNumberCandidates(knownPaths, budget))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check(candidate.Path, candidate.Strategy, "GAME Extended");
+                    engine.Check(candidate.Path, candidate.Strategy, "GAME skin number combinations");
+                    checkedCandidates++;
+                    if (engine.RemainingUnknownCount == 0) break;
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    foreach (var candidate in GenerateExtensionCandidates(knownPaths, 1_000_000))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "GAME extension substitution");
+                        checkedCandidates++;
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+                }
+
+                foreach (var candidate in GenerateGameCharacterSubstitutionCandidates(knownPaths, budget))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    engine.Check(candidate.Path, candidate.Strategy, "GAME character substitution");
                     checkedCandidates++;
                     if (checkedCandidates % 5000 == 0)
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Generating GAME Extended candidates" });
@@ -494,7 +472,17 @@ namespace AssetsManager.Services.Hashes
 
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    var knownPaths = LoadKnownPaths(HashGuessDomain.Game).ToList();
+                    foreach (var candidate in GenerateGameSuffixCandidates(knownPaths, budget))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "GAME suffix substitution");
+                        checkedCandidates++;
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Bin paths" });
                     var binPaths = knownPaths.Where(p => p.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
                     var binWords = HashGuessEngine.BuildBasenameWordlist(binPaths).Take(20000).ToList();
@@ -527,8 +515,13 @@ namespace AssetsManager.Services.Hashes
                     if (engine.RemainingUnknownCount > 0)
                     {
                         progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Word insertions" });
-                        var gameWords = HashGuessEngine.BuildWordlist(knownPaths).Take(20000).ToList();
-                        checkedCandidates += RunWordAdditionAttack(engine, knownPaths.Take(20000), gameWords, cancellationToken);
+                        var gameWords = HashGuessEngine.BuildBasenameWordlist(knownPaths).Take(20000).ToList();
+                        var additionPaths = knownPaths.Where(path =>
+                            !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
+                            !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) &&
+                            !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
+                            !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase));
+                        checkedCandidates += RunWordAdditionAttack(engine, additionPaths.Take(20000), gameWords, cancellationToken);
                     }
                 }
 
@@ -547,8 +540,8 @@ namespace AssetsManager.Services.Hashes
                 {
                     progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "GAME Cartesian Cross" });
                     var gamePaths = LoadKnownPaths(HashGuessDomain.Game).ToList();
-                    var gameDirs = HashGuessEngine.BuildDirectoryList(gamePaths).Take(5000).ToList();
-                    var gameNames = gamePaths.Select(Path.GetFileName).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase).Take(5000).ToList();
+                    var gameDirs = HashGuessEngine.BuildRankedDirectoryList(gamePaths).Take(2000).ToList();
+                    var gameNames = HashGuessEngine.BuildRankedBasenames(gamePaths).Take(1000).ToList();
                     int cartesianChecked = 0;
                     const int cartesianBudget = 2_000_000;
 
@@ -576,7 +569,7 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(matches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(HashGuessDomain.Game, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
@@ -647,15 +640,15 @@ namespace AssetsManager.Services.Hashes
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        // Ignore file read errors
+                        _logService.LogDebug($"Hash Lab skipped JSON word source '{file}': {ex.Message}");
                     }
                 }
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Ignore directory enum errors
+                _logService.LogError(ex, $"Hash Lab could not enumerate JSON word sources under '{rootDirectory}'.");
             }
             return words.ToList();
         }
@@ -743,10 +736,9 @@ namespace AssetsManager.Services.Hashes
             }, cancellationToken);
         }
 
-        private async Task<HashGuessRunResult> RunGameCrossDomainGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
+        private async Task<HashGuessRunResult> RunGameCrossDomainGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken, ISet<ulong> sessionResolved, HashUnknownInventory inventory)
         {
-            string[] wads = Directory.EnumerateFiles(rootDirectory, "*.wad.client", SearchOption.AllDirectories).ToArray();
-            var unknown = await BuildUnknownInventoryAsync(HashGuessDomain.Game, wads, cancellationToken);
+            var unknown = CreateSessionPending(inventory.All, sessionResolved);
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
             {
@@ -756,12 +748,33 @@ namespace AssetsManager.Services.Hashes
                 foreach (string lcuPath in LoadKnownPaths(HashGuessDomain.Lcu))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    Match match = Regex.Match(lcuPath, @"^plugins/rcp-be-lol-game-data/global/default/((?:assets|data)/.*)\.(png|jpg|json)$", RegexOptions.IgnoreCase);
+                    Match match = Regex.Match(lcuPath, @"^plugins/rcp-be-lol-game-data/global/default/((?:assets|data)/.*)\.(png|jpg|dds|json)$", RegexOptions.IgnoreCase);
                     if (!match.Success) continue;
 
                     string path = match.Groups[1].Value;
                     string extension = match.Groups[2].Value;
-                    engine.Check(extension.Equals("json", StringComparison.OrdinalIgnoreCase) ? path + ".json" : path + ".dds", HashGuessStrategy.CrossDomainGame, "LCU to GAME");
+                    if (extension.Equals("json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        engine.Check(path + ".json", HashGuessStrategy.CrossDomainGame, "LCU to GAME");
+                        candidates++;
+                    }
+                    else
+                    {
+                        engine.Check(path + "." + extension.ToLowerInvariant(), HashGuessStrategy.CrossDomainGame, "LCU to GAME");
+                        candidates++;
+                        if (!extension.Equals("dds", StringComparison.OrdinalIgnoreCase))
+                        {
+                            engine.Check(path + ".dds", HashGuessStrategy.CrossDomainGame, "LCU to GAME");
+                            candidates++;
+                        }
+                    }
+                    if (engine.RemainingUnknownCount == 0) break;
+                }
+
+                foreach (var candidate in GenerateExtensionCandidates(LoadKnownPaths(HashGuessDomain.Game), 1_000_000))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    engine.Check(candidate.Path, candidate.Strategy, "GAME extension substitution");
                     candidates++;
                     if (engine.RemainingUnknownCount == 0) break;
                 }
@@ -789,21 +802,6 @@ namespace AssetsManager.Services.Hashes
                     if (engine.RemainingUnknownCount == 0) break;
                 }
 
-                string binEntriesPath = Path.Combine(_directoriesCreator.HashesPath, "hashes.binentries.txt");
-                if (File.Exists(binEntriesPath))
-                {
-                    var extensions = LoadKnownPaths(HashGuessDomain.Game).Select(Path.GetExtension).Where(extension => !extension.Contains("dx", StringComparison.OrdinalIgnoreCase) && !extension.Contains("glsl", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).Take(64).ToList();
-                    foreach (string line in File.ReadLines(binEntriesPath))
-                    {
-                        int separator = line.IndexOf(' ');
-                        if (separator < 0 || separator == line.Length - 1) continue;
-                        string basename = Path.GetFileName(line[(separator + 1)..]).ToLowerInvariant();
-                        foreach (string extension in extensions) engine.Check(basename + extension, HashGuessStrategy.BinEntry, "BIN entry basename");
-                        candidates += extensions.Count;
-                        if (engine.RemainingUnknownCount == 0) break;
-                    }
-                }
-
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, candidates, engine.UnknownHashes);
             }, cancellationToken);
@@ -812,7 +810,8 @@ namespace AssetsManager.Services.Hashes
             int candidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(matches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(HashGuessDomain.Game, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(HashGuessDomain.Game, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
+            sessionResolved?.UnionWith(matches.Select(match => match.Hash));
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = candidates, Matches = matches };
         }
 
@@ -820,7 +819,9 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            ISet<ulong> sessionResolved = null,
+            HashUnknownInventory preparedInventory = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
@@ -828,7 +829,8 @@ namespace AssetsManager.Services.Hashes
 
             string pattern = domain == HashGuessDomain.Game ? "*.wad.client" : "*.wad";
             string[] wadPaths = Directory.EnumerateFiles(rootDirectory, pattern, SearchOption.AllDirectories).ToArray();
-            var unknownHashes = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
             {
@@ -860,7 +862,8 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(resultMatches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
+            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
             _logService.LogSuccess($"Hash Lab {domain} language guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
             return new HashGuessRunResult
             {
@@ -875,7 +878,9 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            ISet<ulong> sessionResolved = null,
+            HashUnknownInventory preparedInventory = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
@@ -883,7 +888,8 @@ namespace AssetsManager.Services.Hashes
 
             string pattern = domain == HashGuessDomain.Game ? "*.wad.client" : "*.wad";
             string[] wadPaths = Directory.EnumerateFiles(rootDirectory, pattern, SearchOption.AllDirectories).ToArray();
-            var unknownHashes = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             int numberLimit = domain == HashGuessDomain.Game ? 100 : 10_000;
             const int candidateBudget = 2_000_000;
@@ -892,7 +898,7 @@ namespace AssetsManager.Services.Hashes
                 var engine = new HashGuessEngine(domain, unknownHashes);
                 int checkedCandidates = 0;
 
-                foreach (string candidate in GenerateNumberCandidates(LoadKnownPaths(domain), numberLimit, candidateBudget))
+                foreach (string candidate in GenerateNumberCandidates(domain, LoadKnownPaths(domain), numberLimit, candidateBudget))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     engine.Check(candidate, HashGuessStrategy.NumberVariant, "Generated numeric variant");
@@ -917,7 +923,8 @@ namespace AssetsManager.Services.Hashes
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
             await _store.SaveResearchMatchesAsync(resultMatches, cancellationToken);
-            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, cancellationToken);
+            await _store.SaveUnknownHashesAsync(domain, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
+            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
             _logService.LogSuccess($"Hash Lab {domain} number guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
             return new HashGuessRunResult
             {
@@ -928,14 +935,40 @@ namespace AssetsManager.Services.Hashes
             };
         }
 
-        private async Task<HashSet<ulong>> BuildUnknownInventoryAsync(HashGuessDomain domain, IEnumerable<string> wadPaths, CancellationToken cancellationToken)
+        private Task<HashUnknownInventory> PrepareInventoryAsync(HashGuessDomain domain, string rootDirectory, CancellationToken cancellationToken)
         {
-            var unknown = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
-            unknown.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
+                throw new DirectoryNotFoundException("The selected game directory does not exist.");
+            string pattern = domain == HashGuessDomain.Game ? "*.wad.client" : "*.wad";
+            string[] wadPaths = Directory.EnumerateFiles(rootDirectory, pattern, SearchOption.AllDirectories).ToArray();
+            return BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+        }
+
+        private static HashSet<ulong> CreateSessionPending(IEnumerable<ulong> hashes, ISet<ulong> sessionResolved)
+        {
+            var pending = hashes.ToHashSet();
+            if (sessionResolved != null)
+                pending.ExceptWith(sessionResolved);
+            return pending;
+        }
+
+        private async Task<HashUnknownInventory> BuildUnknownInventoryAsync(
+            HashGuessDomain domain,
+            IEnumerable<string> wadPaths,
+            CancellationToken cancellationToken,
+            IReadOnlySet<ulong> sessionResolved = null)
+        {
+            string[] paths = wadPaths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+            var pending = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
+            pending.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+            var current = new HashSet<ulong>();
+            ulong patchXor = 0;
+            ulong patchSum = 0;
+            long patchChunkCount = 0;
 
             await Task.Run(() =>
             {
-                foreach (string wadPath in wadPaths)
+                foreach (string wadPath in paths)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     try
@@ -943,8 +976,11 @@ namespace AssetsManager.Services.Hashes
                         using var wad = new WadFile(wadPath);
                         foreach (ulong hash in wad.Chunks.Keys)
                         {
+                            patchXor ^= hash;
+                            patchSum = unchecked(patchSum + hash);
+                            patchChunkCount++;
                             if (!_hashResolverService.IsKnownHash(hash))
-                                unknown.Add(hash);
+                                current.Add(hash);
                         }
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
@@ -954,7 +990,20 @@ namespace AssetsManager.Services.Hashes
                 }
             }, cancellationToken);
 
-            return unknown;
+            pending.UnionWith(current);
+            if (sessionResolved != null)
+            {
+                pending.ExceptWith(sessionResolved);
+                current.ExceptWith(sessionResolved);
+            }
+
+            string fingerprint = $"{domain}:{patchChunkCount}:{patchXor:x16}:{patchSum:x16}";
+            return new HashUnknownInventory { All = pending, Current = current, PatchFingerprint = fingerprint };
+        }
+
+        public Task<HashUnknownSummary> GetUnknownSummaryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        {
+            return _store.LoadUnknownSummaryAsync(domain, cancellationToken);
         }
 
         private IEnumerable<string> LoadKnownPaths(HashGuessDomain domain)
@@ -1012,109 +1061,148 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static IEnumerable<string> GenerateLcuCrossDomainCandidates(IEnumerable<string> gamePaths)
+        private static IEnumerable<string> GenerateLcuCrossDomainCandidates(IEnumerable<string> gamePaths, int candidateBudget = 2_000_000)
         {
             const string basePath = "plugins/rcp-be-lol-game-data/global/default/";
+            int generated = 0;
             foreach (string path in gamePaths)
             {
                 if (path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
                 {
                     string prefix = path[..^4];
+                    yield return basePath + prefix + ".dds";
+                    if (++generated >= candidateBudget) yield break;
                     yield return basePath + prefix + ".png";
+                    if (++generated >= candidateBudget) yield break;
                     yield return basePath + prefix + ".jpg";
+                    if (++generated >= candidateBudget) yield break;
+                }
+                else if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return basePath + path;
+                    if (++generated >= candidateBudget) yield break;
                 }
                 else if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 {
                     yield return basePath + path;
+                    if (++generated >= candidateBudget) yield break;
                 }
             }
         }
 
-        private static IEnumerable<string> GenerateLanguageCandidates(HashGuessDomain domain, IEnumerable<string> knownPaths)
+        private static IEnumerable<string> GenerateLanguageCandidates(HashGuessDomain domain, IEnumerable<string> knownPaths, int candidateBudget = 500_000)
         {
+            int generated = 0;
+            if (domain == HashGuessDomain.Game)
+            {
+                var formats = knownPaths.Where(path => LocaleRegex.IsMatch(path))
+                    .Select(path => LocaleRegex.Replace(path, "{locale}"))
+                    .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal);
+                foreach (string format in formats)
+                    foreach (string locale in Locales)
+                    {
+                        yield return format.Replace("{locale}", locale, StringComparison.Ordinal);
+                        if (++generated >= candidateBudget) yield break;
+                    }
+                yield break;
+            }
+
+            var lcuFormats = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in knownPaths)
             {
-                if (domain == HashGuessDomain.Game)
-                {
-                    if (!LocaleRegex.IsMatch(path)) continue;
-                    foreach (string locale in Locales)
-                        yield return LocaleRegex.Replace(path, locale);
-                    continue;
-                }
-
-                Match lcuPath = Regex.Match(path, @"^plugins/([^/]+)/([^/]+)/([^/]+)/(.*)$", RegexOptions.IgnoreCase);
-                if (!lcuPath.Success) continue;
-
-                string plugin = lcuPath.Groups[1].Value;
-                string suffix = lcuPath.Groups[4].Value;
+                Match match = Regex.Match(path, @"^plugins/([^/]+)/[^/]+/[^/]+/(.*)$", RegexOptions.IgnoreCase);
+                if (match.Success) lcuFormats.Add($"plugins/{match.Groups[1].Value}/{{region}}/{{locale}}/{match.Groups[2].Value}");
+            }
+            foreach (string format in lcuFormats.OrderBy(path => path, StringComparer.Ordinal))
                 foreach (string region in Regions)
                     foreach (string locale in Locales.Append("default"))
-                        yield return $"plugins/{plugin}/{region}/{locale}/{suffix}";
-            }
+                    {
+                        yield return format.Replace("{region}", region, StringComparison.Ordinal).Replace("{locale}", locale, StringComparison.Ordinal);
+                        if (++generated >= candidateBudget) yield break;
+                    }
         }
 
-        private static IEnumerable<string> GenerateNumberCandidates(IEnumerable<string> knownPaths, int numberLimit, int candidateBudget)
+        private static IEnumerable<string> GenerateNumberCandidates(HashGuessDomain domain, IEnumerable<string> knownPaths, int numberLimit, int candidateBudget)
         {
-            int produced = 0;
+            var formats = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in knownPaths)
             {
+                if (domain == HashGuessDomain.Lcu && LcuNumberExcludedPathRegex.IsMatch(path)) continue;
                 foreach (Match match in BasenameNumberRegex.Matches(path))
+                    formats.Add(path[..match.Index] + "{number}" + path[(match.Index + match.Length)..]);
+            }
+
+            int produced = 0;
+            var orderedFormats = formats.OrderBy(path => path, StringComparer.Ordinal).ToList();
+            for (int value = 0; value < numberLimit; value++)
+            {
+                foreach (string format in orderedFormats)
                 {
-                    string format = path[..match.Index] + "{0}" + path[(match.Index + match.Length)..];
-                    for (int value = 0; value < numberLimit; value++)
+                    foreach (string candidate in FormatNumberVariants(format, value))
                     {
-                        yield return string.Format(format, value);
-                        produced++;
-                        if (produced >= candidateBudget) yield break;
-
-                        // Try with 2-digit padding (e.g. 01, 02)
-                        yield return string.Format(format, value.ToString("D2"));
-                        produced++;
-                        if (produced >= candidateBudget) yield break;
-
-                        // Try with 3-digit padding (e.g. 001, 002)
-                        yield return string.Format(format, value.ToString("D3"));
-                        produced++;
-                        if (produced >= candidateBudget) yield break;
+                        yield return candidate;
+                        if (++produced >= candidateBudget) yield break;
                     }
                 }
             }
+        }
+
+        private static IEnumerable<string> FormatNumberVariants(string format, int value)
+        {
+            yield return format.Replace("{number}", value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            if (value < 10)
+                yield return format.Replace("{number}", value.ToString("D2", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            if (value < 100)
+                yield return format.Replace("{number}", value.ToString("D3", CultureInfo.InvariantCulture), StringComparison.Ordinal);
         }
 
         private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuPluginCandidates(IEnumerable<string> knownPaths, int candidateBudget)
         {
             var paths = knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
             var plugins = paths.Select(path => path.Split('/')[1]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var formats = paths.Select(path => Regex.Replace(path, @"^plugins/[^/]+/", "plugins/{plugin}/", RegexOptions.IgnoreCase))
+                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal).ToList();
             int generated = 0;
 
-            foreach (string path in paths.Take(100000))
+            foreach (string format in formats.Take(100000))
             {
-                string[] parts = path.Split('/', 3);
-                if (parts.Length == 3)
-                    foreach (string plugin in plugins)
-                    {
-                        yield return ("plugins/" + plugin + "/" + parts[2], HashGuessStrategy.PluginVariant);
-                        if (++generated >= candidateBudget) yield break;
-                    }
+                foreach (string plugin in plugins)
+                {
+                    yield return (format.Replace("{plugin}", plugin, StringComparison.Ordinal), HashGuessStrategy.PluginVariant);
+                    if (++generated >= candidateBudget) yield break;
+                }
             }
         }
 
         private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuExtensionCandidates(IEnumerable<string> knownPaths, int candidateBudget)
         {
-            var paths = knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
-            var extensions = paths.Select(Path.GetExtension).Where(extension => extension.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
+            return GenerateExtensionCandidates(knownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)), candidateBudget);
+        }
+
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateExtensionCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        {
+            var paths = knownPaths.ToList();
+            var extensions = paths.Select(Path.GetExtension)
+                .Where(extension => extension.Length > 0 && !extension.EndsWith("00", StringComparison.Ordinal))
+                .GroupBy(extension => extension, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => group.Key)
+                .ToList();
+            var prefixes = paths.Select(path => Path.ChangeExtension(path, null))
+                .Where(prefix => !string.IsNullOrEmpty(prefix))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(prefix => prefix, StringComparer.Ordinal);
             int generated = 0;
 
-            foreach (string path in paths.Take(100000))
+            foreach (string prefix in prefixes)
             {
-                string prefix = Path.ChangeExtension(path, null);
                 foreach (string extension in extensions)
                 {
                     yield return (prefix + extension, HashGuessStrategy.ExtensionVariant);
                     if (++generated >= candidateBudget) yield break;
                 }
             }
-
         }
 
         private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateLcuPatternCandidates(IEnumerable<string> knownPaths)
@@ -1178,83 +1266,164 @@ namespace AssetsManager.Services.Hashes
                 yield return (path[..^4] + "_splash.png", HashGuessStrategy.LcuPattern);
         }
 
-        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateGameExtendedCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateGameCharacterSubstitutionCandidates(IEnumerable<string> knownPaths, int candidateBudget)
         {
             var paths = knownPaths.ToList();
-            var characters = paths.Select(path => Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)/", RegexOptions.IgnoreCase))
-                .Where(match => match.Success).Select(match => match.Groups[1].Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            int generated = 0;
-            var suffixes = paths.Select(value => Regex.Match(value, @"^.*?(\.[^.]+)?\.[^.]+$").Groups[1].Value)
-                .Where(value => value.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(128).ToList();
-            var extensions = paths.Select(Path.GetExtension).Where(extension => extension.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(32).ToList();
-
+            var characterCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var formatCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var regex = new Regex(@"^(?:assets|data)/characters/([^/]+)/", RegexOptions.IgnoreCase);
             foreach (string path in paths)
             {
-                Match skin = Regex.Match(path, @"/characters/([^/]+)/skins/(base|skin\d+)/", RegexOptions.IgnoreCase);
-                if (skin.Success)
+                Match match = regex.Match(path);
+                if (!match.Success) continue;
+                string character = match.Groups[1].Value;
+                characterCounts.TryGetValue(character, out int characterSupport);
+                characterCounts[character] = characterSupport + 1;
+                string format = path.Replace(character, "{character}", StringComparison.Ordinal);
+                formatCounts.TryGetValue(format, out int formatSupport);
+                formatCounts[format] = formatSupport + 1;
+            }
+            var characters = characterCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key).ToList();
+            var formats = formatCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key);
+            int generated = 0;
+            foreach (string format in formats)
+            {
+                foreach (string character in characters)
                 {
-                    string format = path[..skin.Groups[2].Index] + "{0}" + path[(skin.Groups[2].Index + skin.Groups[2].Length)..];
-                    foreach (string value in Enumerable.Range(0, 200).Select(number => "skin" + number).Append("base"))
-                    {
-                        yield return (string.Format(format, value), HashGuessStrategy.SkinNumberVariant);
-                        if (++generated >= candidateBudget) yield break;
-                    }
-                }
-
-                Match character = Regex.Match(path, @"^(.*?/characters/)([^/]+)(/.*)$", RegexOptions.IgnoreCase);
-                if (character.Success)
-                {
-                    foreach (string value in characters)
-                    {
-                        yield return (character.Groups[1].Value + value + character.Groups[3].Value, HashGuessStrategy.CharacterSubstitution);
-                        if (++generated >= candidateBudget) yield break;
-                    }
-                }
-
-                Match suffix = Regex.Match(path, @"^(.*?)(\.[^.]+)?(\.[^.]+)$");
-                if (suffix.Success)
-                {
-                    string prefix = suffix.Groups[1].Value;
-                    string extension = suffix.Groups[3].Value;
-                    foreach (string knownSuffix in suffixes)
-                    {
-                        yield return (prefix + knownSuffix + extension, HashGuessStrategy.SuffixVariant);
-                        if (++generated >= candidateBudget) yield break;
-                    }
-                }
-
-                string extPrefix = Path.ChangeExtension(path, null);
-                if (!string.IsNullOrEmpty(extPrefix))
-                {
-                    foreach (string extension in extensions)
-                    {
-                        yield return (extPrefix + extension, HashGuessStrategy.ExtensionVariant);
-                        if (++generated >= candidateBudget) yield break;
-                    }
+                    yield return (format.Replace("{character}", character, StringComparison.Ordinal), HashGuessStrategy.CharacterSubstitution);
+                    if (++generated >= candidateBudget) yield break;
                 }
             }
         }
 
-        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> ExtractCandidates(HashGuessDomain domain, byte[] data, string sourcePath)
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateGameSuffixCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        {
+            var suffixCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [string.Empty] = int.MaxValue };
+            var formatCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var regex = new Regex(@"^(.*?)(\.[^.]+)?(\.[^.]+)$");
+            foreach (string path in knownPaths)
+            {
+                Match match = regex.Match(path);
+                if (!match.Success) continue;
+                string suffix = match.Groups[2].Value;
+                if (suffix.Length > 0)
+                {
+                    suffixCounts.TryGetValue(suffix, out int suffixSupport);
+                    suffixCounts[suffix] = suffixSupport + 1;
+                }
+                string format = match.Groups[1].Value + "{suffix}" + match.Groups[3].Value;
+                formatCounts.TryGetValue(format, out int formatSupport);
+                formatCounts[format] = formatSupport + 1;
+            }
+            int generated = 0;
+            var formats = formatCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key);
+            var suffixes = suffixCounts.OrderByDescending(pair => pair.Value).ThenBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key).ToList();
+            foreach (string format in formats)
+            foreach (string suffix in suffixes)
+            {
+                yield return (format.Replace("{suffix}", suffix, StringComparison.Ordinal), HashGuessStrategy.SuffixVariant);
+                if (++generated >= candidateBudget) yield break;
+            }
+        }
+
+        private static IEnumerable<(string Path, HashGuessStrategy Strategy)> GenerateGameSkinNumberCandidates(IEnumerable<string> knownPaths, int candidateBudget)
+        {
+            var directoryRegex = new Regex(@"/characters/([^/]+)/skins/(base|skin\d+)/", RegexOptions.IgnoreCase);
+            var skinRegex = new Regex(@"(?:base|skin\d+)", RegexOptions.IgnoreCase);
+            var characters = new Dictionary<string, (HashSet<string> Skins, Dictionary<(string Format, int Count), (int Support, int DistinctSupport)> Formats)>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string path in knownPaths)
+            {
+                Match directory = directoryRegex.Match(path);
+                if (!directory.Success || directory.Groups[1].Value.Equals("sightward", StringComparison.OrdinalIgnoreCase)) continue;
+                string character = directory.Groups[1].Value;
+                if (!characters.TryGetValue(character, out var data))
+                {
+                    data = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new Dictionary<(string Format, int Count), (int Support, int DistinctSupport)>());
+                    characters[character] = data;
+                }
+                data.Skins.Add(directory.Groups[2].Value.ToLowerInvariant());
+                MatchCollection matches = skinRegex.Matches(path);
+                int count = matches.Count;
+                var format = (skinRegex.Replace(path, "{skin}"), count);
+                data.Formats.TryGetValue(format, out var support);
+                bool distinct = matches.Select(match => match.Value).Distinct(StringComparer.OrdinalIgnoreCase).Count() == count;
+                data.Formats[format] = (support.Support + 1, support.DistinctSupport + (distinct ? 1 : 0));
+            }
+
+            int generated = 0;
+            var formats = characters.SelectMany(character => character.Value.Formats.Select(format => new
+            {
+                Character = character.Key,
+                Skins = character.Value.Skins,
+                Format = format.Key.Format,
+                Count = format.Key.Count,
+                Support = format.Value.Support,
+                DistinctSupport = format.Value.DistinctSupport
+            })).OrderBy(value => value.DistinctSupport > 0 ? 0 : 1)
+                .ThenBy(value => value.Count == 2 ? 0 : value.Count == 1 ? 1 : value.Count)
+                .ThenByDescending(value => value.DistinctSupport)
+                .ThenByDescending(value => value.Support)
+                .ThenBy(value => value.Character, StringComparer.Ordinal)
+                .ThenBy(value => value.Format, StringComparer.Ordinal);
+
+            foreach (var format in formats)
+            {
+                List<string> skins = format.Skins.OrderBy(value => value, StringComparer.Ordinal).ToList();
+                if (format.Count > skins.Count) continue;
+                foreach (IEnumerable<string> combination in GetPermutations(skins, format.Count))
+                {
+                    string candidate = format.Format;
+                    foreach (string skin in combination)
+                    {
+                        int marker = candidate.IndexOf("{skin}", StringComparison.Ordinal);
+                        candidate = candidate[..marker] + skin + candidate[(marker + 6)..];
+                    }
+                    yield return (candidate, HashGuessStrategy.SkinNumberVariant);
+                    if (++generated >= candidateBudget) yield break;
+                }
+            }
+        }
+
+        private IEnumerable<(string Path, HashGuessStrategy Strategy)> ExtractCandidates(HashGuessDomain domain, byte[] data, string sourcePath)
         {
             if (data == null || data.Length == 0) yield break;
+
+            string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
+            if (domain == HashGuessDomain.Game && extension is "bin" or "inibin")
+            {
+                foreach (int offset in FindGameBinPathOffsets(data))
+                {
+                    if (offset < 2) continue;
+                    int length = data[offset - 2] | (data[offset - 1] << 8);
+                    if (length <= 0 || offset + length > data.Length) continue;
+                    string path = NormalizePath(Encoding.ASCII.GetString(data, offset, length));
+                    foreach (var candidate in ExpandGamePath(path, HashGuessStrategy.BinLengthPath)) yield return candidate;
+                }
+                yield break;
+            }
 
             string text = Encoding.ASCII.GetString(data);
             if (domain == HashGuessDomain.Lcu)
             {
                 var candidates = new List<(string Path, HashGuessStrategy Strategy)>();
+                bool stopAfterStructuredJson = false;
 
-                if (sourcePath.EndsWith("trans.json", StringComparison.OrdinalIgnoreCase))
+                if (sourcePath.Equals("plugins/rcp-fe-lol-loot/global/default/trans.json", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
                         using var doc = JsonDocument.Parse(data);
                         foreach (var prop in doc.RootElement.EnumerateObject())
                             candidates.Add(($"plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/{prop.Name.ToLowerInvariant()}.png", HashGuessStrategy.LcuPattern));
+                        stopAfterStructuredJson = true;
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogDebug($"Hash Lab skipped invalid translation JSON '{sourcePath}': {ex.Message}");
+                    }
                 }
-                else if (sourcePath.EndsWith("champion-summary.json", StringComparison.OrdinalIgnoreCase))
+                else if (sourcePath.Equals("plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
@@ -1269,7 +1438,10 @@ namespace AssetsManager.Services.Hashes
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogDebug($"Hash Lab skipped invalid champion summary JSON '{sourcePath}': {ex.Message}");
+                    }
                 }
 
                 if (text.Contains("pluginDependencies") && text.Contains("name"))
@@ -1287,7 +1459,10 @@ namespace AssetsManager.Services.Hashes
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogDebug($"Hash Lab skipped invalid plugin metadata JSON '{sourcePath}': {ex.Message}");
+                    }
                 }
 
                 if (text.Contains("musicVolume") && text.Contains("files"))
@@ -1313,9 +1488,13 @@ namespace AssetsManager.Services.Hashes
                             {
                                 candidates.Add(($"plugins/rcp-fe-lol-splash/global/default/splash-assets/{sName}/config.json", HashGuessStrategy.LcuPattern));
                             }
+                            stopAfterStructuredJson = true;
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogDebug($"Hash Lab skipped invalid splash configuration JSON '{sourcePath}': {ex.Message}");
+                    }
                 }
 
                 if (text.Contains("recommendedItemDefaults"))
@@ -1333,11 +1512,17 @@ namespace AssetsManager.Services.Hashes
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogDebug($"Hash Lab skipped invalid recommended items JSON '{sourcePath}': {ex.Message}");
+                    }
                 }
 
                 foreach (var candidate in candidates)
                     yield return candidate;
+
+                if (stopAfterStructuredJson)
+                    yield break;
 
                 foreach (Match match in LcuPathRegex.Matches(text))
                     yield return (NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath);
@@ -1351,29 +1536,35 @@ namespace AssetsManager.Services.Hashes
                 foreach (Match match in LcuAssetPathRegex.Matches(text))
                     yield return ($"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(), HashGuessStrategy.LcuEmbeddedPath);
 
+                foreach (Match match in LcuCssUrlRegex.Matches(text))
+                {
+                    string contextualPath = ResolveRelativeLcuPath(sourcePath, match.Groups[1].Value);
+                    if (contextualPath.Length > 0)
+                        yield return (contextualPath, HashGuessStrategy.LcuEmbeddedPath);
+                }
+
+                foreach (Match match in LcuHtmlAssetRegex.Matches(text))
+                {
+                    string contextualPath = ResolveRelativeLcuPath(sourcePath, match.Groups[1].Value);
+                    if (contextualPath.Length > 0)
+                        yield return (contextualPath, HashGuessStrategy.LcuEmbeddedPath);
+                }
+
                 var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (Match match in LcuRelativePathRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+                foreach (Match match in LcuRelativePathRegex.Matches(text))
+                {
+                    string relativePath = match.Groups[1].Value;
+                    relativePaths.Add(relativePath);
+                    string contextualPath = ResolveRelativeLcuPath(sourcePath, relativePath);
+                    if (contextualPath.Length > 0)
+                        yield return (contextualPath, HashGuessStrategy.LcuEmbeddedPath);
+                }
                 foreach (Match match in LcuFileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
                 foreach (Match match in Regex.Matches(text, "<template id=\\\"[^\\\"]*-template-([^\\\"]+)\\\"")) relativePaths.Add(match.Groups[1].Value + "/template.html");
                 foreach (Match match in Regex.Matches(text, "sourceMappingURL=(.*?\\.js)\\.map")) relativePaths.Add(match.Groups[1].Value);
 
                 foreach (string relativePath in relativePaths)
                     yield return (NormalizePath(relativePath), HashGuessStrategy.LcuEmbeddedPath);
-                yield break;
-            }
-
-            string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (extension is "bin" or "inibin")
-            {
-                var binPrefixRegex = new Regex(@"(?:ASSETS|COMMON|DATA|DATA_SOON|GAMEPLAY|GLOBAL|LEVELS|LOADOUTS|UX|UIAUTOATLAS|CHARACTERS|SHADERS|MAPS|CLIENTSTATES|PATCHING)/", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-                foreach (Match match in binPrefixRegex.Matches(text))
-                {
-                    if (match.Index < 2) continue;
-                    int length = data[match.Index - 2] | (data[match.Index - 1] << 8);
-                    if (length <= 0 || match.Index + length > data.Length) continue;
-                    string path = NormalizePath(Encoding.ASCII.GetString(data, match.Index, length));
-                    foreach (var candidate in ExpandGamePath(path, HashGuessStrategy.BinLengthPath)) yield return candidate;
-                }
                 yield break;
             }
 
@@ -1432,6 +1623,71 @@ namespace AssetsManager.Services.Hashes
                 }
             }
         }
+
+        private static string ResolveRelativeLcuPath(string sourcePath, string relativePath)
+        {
+            if (!sourcePath.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)) return string.Empty;
+            relativePath = relativePath.Trim();
+            if (relativePath.Length == 0 || relativePath.StartsWith('/') || relativePath.StartsWith('#') ||
+                relativePath.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith("http:", StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith("https:", StringComparison.OrdinalIgnoreCase)) return string.Empty;
+            int separator = sourcePath.LastIndexOf('/');
+            if (separator < 0) return string.Empty;
+
+            var segments = new List<string>(sourcePath[..separator].Split('/', StringSplitOptions.RemoveEmptyEntries));
+            foreach (string segment in relativePath.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (segment == ".") continue;
+                if (segment == "..")
+                {
+                    if (segments.Count <= 1) return string.Empty;
+                    segments.RemoveAt(segments.Count - 1);
+                }
+                else
+                {
+                    segments.Add(segment);
+                }
+            }
+            return NormalizePath(string.Join('/', segments));
+        }
+
+        private static IReadOnlyList<int> FindGameBinPathOffsets(byte[] data)
+        {
+            var offsets = new HashSet<int>();
+            for (int offset = 0; offset < data.Length; offset++)
+            {
+                byte first = ToUpperAscii(data[offset]);
+                byte[][] needles = first switch
+                {
+                    (byte)'A' => GameBinPrefixesA,
+                    (byte)'C' => GameBinPrefixesC,
+                    (byte)'D' => GameBinPrefixesD,
+                    (byte)'G' => GameBinPrefixesG,
+                    (byte)'L' => GameBinPrefixesL,
+                    (byte)'M' => GameBinPrefixesM,
+                    (byte)'P' => GameBinPrefixesP,
+                    (byte)'S' => GameBinPrefixesS,
+                    (byte)'U' => GameBinPrefixesU,
+                    _ => null
+                };
+                if (needles == null) continue;
+                foreach (byte[] needle in needles)
+                {
+                    if (offset + needle.Length > data.Length) continue;
+                    int index = 1;
+                    while (index < needle.Length && ToUpperAscii(data[offset + index]) == needle[index]) index++;
+                    if (index == needle.Length) offsets.Add(offset);
+                }
+            }
+            return offsets.OrderBy(offset => offset).ToList();
+        }
+
+        private static byte ToUpperAscii(byte value) => value is >= (byte)'a' and <= (byte)'z'
+            ? (byte)(value - ('a' - 'A'))
+            : value;
+
+        private static byte[][] ToAsciiPrefixes(params string[] prefixes) => prefixes.Select(Encoding.ASCII.GetBytes).ToArray();
 
         private static IEnumerable<(string Path, HashGuessStrategy Strategy)> ExpandGamePath(string candidate, HashGuessStrategy strategy)
         {
@@ -1556,15 +1812,12 @@ namespace AssetsManager.Services.Hashes
                 var matches = regexExtract.Matches(path);
                 if (matches.Count >= 2)
                 {
-                    for (int i = 0; i < matches.Count; i++)
+                    for (int i = 0; i < matches.Count - 1; i++)
                     {
-                        for (int j = i + 1; j < matches.Count; j++)
-                        {
-                            var m1 = matches[i];
-                            var m2 = matches[j];
-                            string format = path[..m1.Index] + "{0}" + path[(m1.Index + m1.Length)..m2.Index] + "{1}" + path[(m2.Index + m2.Length)..];
-                            formats.Add(format);
-                        }
+                        var m1 = matches[i];
+                        var m2 = matches[i + 1];
+                        string format = path[..m1.Index] + "{0}" + path[(m1.Index + m1.Length)..m2.Index] + "{1}" + path[(m2.Index + m2.Length)..];
+                        formats.Add(format);
                     }
                 }
             }
@@ -1623,7 +1876,7 @@ namespace AssetsManager.Services.Hashes
             return checkedCount;
         }
 
-        private static int RunPrefixAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> prefixes, CancellationToken cancellationToken)
+        private static int RunPrefixAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> prefixes, CancellationToken cancellationToken, int candidateBudget = 2_000_000)
         {
             var pathsList = paths.ToList();
             var prefixesList = prefixes.ToList();
@@ -1640,7 +1893,7 @@ namespace AssetsManager.Services.Hashes
                 {
                     engine.Check(dir + prefix + file, HashGuessStrategy.PrefixVariant, "Prefix variant");
                     checkedCount++;
-                    if (engine.RemainingUnknownCount == 0) return checkedCount;
+                    if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return checkedCount;
                 }
             }
 
@@ -1652,6 +1905,14 @@ namespace AssetsManager.Services.Hashes
             if (length == 1) return list.Select(t => new[] { t });
             return GetCombinations(list, length - 1)
                 .SelectMany(t => list.Where(o => list.IndexOf(o) > list.IndexOf(t.Last())), (t1, t2) => t1.Concat(new[] { t2 }));
+        }
+
+        private static IEnumerable<IEnumerable<T>> GetPermutations<T>(IReadOnlyList<T> values, int length)
+        {
+            if (length == 1) return values.Select(value => new[] { value }.AsEnumerable());
+            return values.SelectMany(
+                (value, index) => GetPermutations(values.Where((_, candidateIndex) => candidateIndex != index).ToList(), length - 1),
+                (value, tail) => new[] { value }.Concat(tail));
         }
     }
 }

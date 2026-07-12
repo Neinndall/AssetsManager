@@ -11,6 +11,12 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Hash guessing now generates wordlists faster with lower memory usage and updates large result sets in one batch.
+  - Advanced hash guessing now prioritizes proven Riot path combinations and avoids redundant candidate attacks.
+  - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
+  - LCU GREP now resolves relative, CSS, and HTML asset references from their Riot plugin context.
+  - GAME GREP and hash promotion now complete faster while preserving result coverage and file ordering.
+  - GAME Extended now searches base filenames derived from Riot suffix variants.
   - Reduced memory pressure while creating WAD backups and made interrupted saves leave no incomplete history entry.
   - Accelerated Explorer tree loading for large WAD and local folder structures.
   - Improved repeated Explorer searches by reusing the loaded tree index and applying UI updates safely.
@@ -28,6 +34,10 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed LCU embedded paths losing their directory context during guessing.
+  - Added working cancellation, accurate indeterminate progress, and safer unknown-hash persistence to Hash Guessing Lab.
+  - Fixed guessing suites reintroducing hashes resolved by an earlier phase of the same run.
+  - Fixed historical GAME paths with repeated separators and reduced invalid LCU translation guesses.
   - Fixed recycled Explorer rows changing previews, tabs, and pinned files while scrolling.
   - Fixed BIN comparisons falling back to full JSON when files contain empty optional values.
   - Fixed extraction failing on WADs containing extensionless atlas files that share their name with a sibling directory.

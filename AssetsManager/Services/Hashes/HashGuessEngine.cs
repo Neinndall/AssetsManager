@@ -59,50 +59,31 @@ namespace AssetsManager.Services.Hashes
 
         public static IReadOnlyList<string> BuildWordlist(IEnumerable<string> paths)
         {
-            return paths.AsParallel()
-                .SelectMany(TokenizePath)
-                .GroupBy(word => word, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .Select(group => group.Key)
-                .ToList();
-        }
-
-        public static IReadOnlyList<string> BuildBasenameWordlist(IEnumerable<string> paths, int minimumLength = 2, int maximumLength = 48)
-        {
-            return paths.AsParallel()
-                .Select(path => System.IO.Path.GetFileNameWithoutExtension(path ?? string.Empty))
-                .SelectMany(TokenizePath)
-                .Where(word => word.Length >= minimumLength && word.Length <= maximumLength)
-                .Where(word => word.Any(char.IsLetter))
-                .GroupBy(word => word, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.Key)
-                .ToList();
-        }
-
-        public static IReadOnlyList<string> BuildContextualWordlist(
-            IEnumerable<string> scopePaths,
-            IEnumerable<string> fallbackPaths,
-            int minimumLength = 2,
-            int maximumLength = 48)
-        {
-            var score = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            static void AddTokens(Dictionary<string, int> scores, IEnumerable<string> paths, int weight, int min, int max)
+            var words = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string path in paths)
             {
-                foreach (string word in paths.SelectMany(TokenizePath))
-                {
-                    if (word.Length < min || word.Length > max || !word.Any(char.IsLetter)) continue;
-                    scores.TryGetValue(word, out int current);
-                    scores[word] = current + weight;
-                }
+                List<string> tokens = TokenizePath(path);
+                for (int index = 0; index < tokens.Count - 1; index++)
+                    words.Add(tokens[index]);
             }
 
-            AddTokens(score, fallbackPaths ?? Enumerable.Empty<string>(), 1, minimumLength, maximumLength);
-            AddTokens(score, scopePaths ?? Enumerable.Empty<string>(), 6, minimumLength, maximumLength);
+            return words.OrderBy(word => word, StringComparer.Ordinal).ToList();
+        }
 
-            return score.OrderByDescending(pair => pair.Value)
+        public static IReadOnlyList<string> BuildBasenameWordlist(IEnumerable<string> paths, int minimumLength = 1, int maximumLength = 48)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                string basename = System.IO.Path.GetFileNameWithoutExtension(path ?? string.Empty);
+                foreach (string word in TokenizePath(basename))
+                {
+                    if (word.Length < minimumLength || word.Length > maximumLength) continue;
+                    counts.TryGetValue(word, out int count);
+                    counts[word] = count + 1;
+                }
+            }
+            return counts.OrderByDescending(pair => pair.Value)
                 .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(pair => pair.Key)
                 .ToList();
@@ -148,24 +129,61 @@ namespace AssetsManager.Services.Hashes
 
         public static IReadOnlyList<string> BuildDirectoryList(IEnumerable<string> paths)
         {
-            var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var directories = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in paths)
             {
                 int separator = path?.LastIndexOf('/') ?? -1;
-                while (separator > 0)
+                while (separator >= 0)
                 {
                     directories.Add(path[..separator]);
+                    if (separator == 0) break;
                     separator = path.LastIndexOf('/', separator - 1);
                 }
             }
-            return directories.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToList();
+            directories.Add(string.Empty);
+            return directories.OrderBy(path => path, StringComparer.Ordinal).ToList();
+        }
+
+        public static IReadOnlyList<string> BuildRankedBasenames(IEnumerable<string> paths)
+        {
+            return paths.Select(System.IO.Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .ThenBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => group.Key)
+                .ToList();
+        }
+
+        public static IReadOnlyList<string> BuildRankedDirectoryList(IEnumerable<string> paths)
+        {
+            var scores = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string path in paths)
+            {
+                int separator = path?.LastIndexOf('/') ?? -1;
+                while (separator >= 0)
+                {
+                    string directory = path[..separator];
+                    scores.TryGetValue(directory, out int score);
+                    scores[directory] = score + 1;
+                    if (separator == 0) break;
+                    separator = path.LastIndexOf('/', separator - 1);
+                }
+            }
+            scores.TryAdd(string.Empty, 0);
+            return scores.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key)
+                .ToList();
         }
 
         public static string NormalizePath(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             string path = value.Trim().Replace('\\', '/').ToLowerInvariant().Replace("data_soon/", "data/");
-            return path.Contains("//", StringComparison.Ordinal) || path.Length > 512 ? string.Empty : path;
+            // Riot's historical GAME list contains valid hashed paths with repeated separators.
+            // Preserve the exact path spelling: collapsing or rejecting it changes the hash.
+            return path.Length > 512 ? string.Empty : path;
         }
     }
 }

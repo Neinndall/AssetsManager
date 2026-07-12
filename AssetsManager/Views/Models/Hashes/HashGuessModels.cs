@@ -34,10 +34,29 @@ namespace AssetsManager.Views.Models.Hashes
         public IReadOnlyList<HashGuessMatch> Matches { get; init; } = Array.Empty<HashGuessMatch>();
     }
 
-    public sealed class HashGuessStageResult
+    public sealed class HashUnknownRecord
     {
-        public string Name { get; init; }
-        public int Candidates { get; init; }
-        public int Matches { get; init; }
+        public ulong Hash { get; set; }
+        public HashGuessDomain Domain { get; set; }
+        public string FirstSeenPatch { get; set; }
+        public string LastSeenPatch { get; set; }
+        public string LastObservedPatch { get; set; }
+        public int SeenPatchCount { get; set; }
+        public int MissedPatchCount { get; set; }
+    }
+
+    public sealed class HashUnknownInventory
+    {
+        public HashSet<ulong> All { get; init; } = new();
+        public HashSet<ulong> Current { get; init; } = new();
+        public string PatchFingerprint { get; init; }
+    }
+
+    public sealed class HashUnknownSummary
+    {
+        public int Current { get; init; }
+        public int Recent { get; init; }
+        public int Historical { get; init; }
+        public int Total => Current + Recent + Historical;
     }
 }

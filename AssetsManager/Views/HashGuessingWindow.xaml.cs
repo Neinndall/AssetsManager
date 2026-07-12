@@ -16,16 +16,19 @@ namespace AssetsManager.Views
         private readonly HashGuessingService _hashGuessingService;
         private readonly AppSettings _appSettings;
         private readonly CustomMessageBoxService _messageBoxService;
+        private readonly LogService _logService;
         private readonly HashGuessLabModel _viewModel = new();
         private CancellationTokenSource _cancellationTokenSource;
 
-        public HashGuessingWindow(HashGuessingService hashGuessingService, AppSettings appSettings, CustomMessageBoxService messageBoxService)
+        public HashGuessingWindow(HashGuessingService hashGuessingService, AppSettings appSettings, CustomMessageBoxService messageBoxService, LogService logService)
         {
             InitializeComponent();
             _hashGuessingService = hashGuessingService;
             _appSettings = appSettings;
             _messageBoxService = messageBoxService;
+            _logService = logService;
             DataContext = _viewModel;
+            Unloaded += OnUnloaded;
             UpdateUnknownCountAsync();
         }
 
@@ -35,11 +38,14 @@ namespace AssetsManager.Views
             try
             {
                 var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                var unknown = await _hashGuessingService.GetStoreUnknownsAsync(domain, CancellationToken.None);
-                TxtUnknownCount.Text = $"{unknown.Count:N0} hashes";
+                var summary = await _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None);
+                TxtUnknownCount.Text = summary.Recent + summary.Historical == 0
+                    ? $"{summary.Current:N0} current"
+                    : $"{summary.Current:N0} current · {summary.Recent:N0} recent · {summary.Historical:N0} historical";
             }
-            catch
+            catch (Exception ex)
             {
+                _logService.LogError(ex, "Hash Lab could not refresh the unknown hash count.");
                 TxtUnknownCount.Text = "Unknown";
             }
         }
@@ -58,9 +64,19 @@ namespace AssetsManager.Views
         private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
         private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
         private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
+        private void Cancel_Click(object sender, RoutedEventArgs e) => _cancellationTokenSource?.Cancel();
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+        }
 
         private async System.Threading.Tasks.Task RunAsync(HashGuessMode mode)
         {
+            if (_viewModel.IsRunning) return;
+
             var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
             if (mode == HashGuessMode.GrepGame) domain = HashGuessDomain.Game;
             else if (mode == HashGuessMode.GrepLcu) domain = HashGuessDomain.Lcu;
@@ -71,10 +87,11 @@ namespace AssetsManager.Views
                 _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
                 return;
             }
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource = new CancellationTokenSource();
+            var runCancellation = new CancellationTokenSource();
+            _cancellationTokenSource = runCancellation;
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
+            _viewModel.IsProgressIndeterminate = mode != HashGuessMode.GrepGame && mode != HashGuessMode.GrepLcu;
             _viewModel.StatusText = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
             _viewModel.Matches.Clear();
 
@@ -82,24 +99,27 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
-                    _viewModel.ProgressValue = value.TotalWads == 0 ? 0 : value.ProcessedWads * 100d / value.TotalWads;
+                    _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
+                    if (value.TotalWads > 0)
+                        _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
                     _viewModel.StatusText = $"Scanning {value.CurrentWad} · {value.ProcessedChunks:N0} chunks · {value.FoundMatches:N0} matches";
                 });
                 var result = mode switch
                 {
-                    HashGuessMode.RunCanonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.RunLocales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.RunNumbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, _cancellationTokenSource.Token),
-                    HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, _cancellationTokenSource.Token),
+                    HashGuessMode.RunCanonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, runCancellation.Token),
+                    HashGuessMode.RunLocales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, runCancellation.Token),
+                    HashGuessMode.RunNumbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, runCancellation.Token),
+                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token),
+                    HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
-                foreach (var match in result.Matches) _viewModel.Matches.Add(match);
+                _viewModel.Matches.AddRange(result.Matches);
                 _viewModel.ProgressValue = 100;
+                _viewModel.IsProgressIndeterminate = false;
                 if (result.Matches.Count > 0)
                 {
                     await _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None);
@@ -116,11 +136,16 @@ namespace AssetsManager.Views
             }
             catch (Exception ex)
             {
+                _logService.LogError(ex, "Hash guessing failed.");
                 _viewModel.StatusText = "Hash guessing failed. Check application_errors.log.";
                 _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             finally
             {
+                if (ReferenceEquals(_cancellationTokenSource, runCancellation))
+                    _cancellationTokenSource = null;
+                runCancellation.Dispose();
+                _viewModel.IsProgressIndeterminate = false;
                 _viewModel.IsRunning = false;
                 UpdateUnknownCountAsync();
             }
