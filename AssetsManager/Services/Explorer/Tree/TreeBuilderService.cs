@@ -231,11 +231,6 @@ namespace AssetsManager.Services.Explorer.Tree
             };
         }
 
-        public async Task EnsureAllChildrenLoadedAsync(FileSystemNodeModel node, string currentRootPath, CancellationToken cancellationToken = default, Action<string> onScanningProgress = null, Action<string> onMountingProgress = null)
-        {
-            await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath, cancellationToken, onScanningProgress, onMountingProgress);
-        }
-
         private bool PruneEmptyDirectories(FileSystemNodeModel node)
         {
             if (node.Type != NodeType.RealDirectory)
