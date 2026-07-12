@@ -460,6 +460,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 cancellationToken.ThrowIfCancellationRequested();
 
                 _viewModel.RootNodes.ReplaceRange(newNodes);
+                WadSearchBoxService.RebuildIndex(_viewModel.RootNodes);
 
                 onSuccess?.Invoke(newNodes);
 
@@ -884,7 +885,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 // Deselect immediately so it can be clicked again
                 FavoritesListView.SelectedItem = null;
 
-                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes, LoadAllChildrenForSearch);
+                var node = await WadSearchBoxService.NavigateToPathAsync(item.VirtualPath, _viewModel.RootNodes);
 
                 if (node != null)
                 {
@@ -951,6 +952,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
+                    WadSearchBoxService.InvalidateIndex(_viewModel.RootNodes);
                 }
                 
                 if (FilePreviewer != null)
@@ -1011,18 +1013,6 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private async Task LoadAllChildrenForSearch(FileSystemNodeModel node)
-        {
-            if (node.Type == NodeType.SoundBank)
-            {
-                await TreeBuilderService.ExpandAudioBankAsync(node, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
-            }
-            else
-            {
-                await TreeBuilderService.EnsureAllChildrenLoadedAsync(node, _currentRootPath);
-            }
-        }
-
         private async void SearchTimer_Tick(object sender, EventArgs e)
         {
             _searchTimer.Stop();
@@ -1045,7 +1035,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
 
             var selectedNode = FileTreeView.SelectedItem as FileSystemNodeModel;
-            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, null, selectedNode);
+            var nodeToSelect = await WadSearchBoxService.PerformSearchAsync(searchText, _viewModel.RootNodes, selectedNode);
 
             // Update No Results found UI after search completes
             if (!string.IsNullOrEmpty(searchText))

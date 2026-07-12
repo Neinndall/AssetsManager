@@ -6,8 +6,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace AssetsManager.Services.Explorer
 {
@@ -21,11 +24,36 @@ namespace AssetsManager.Services.Explorer
         private readonly LogService _logService;
         private CancellationTokenSource _searchCts;
         private readonly object _searchLock = new object();
+        private readonly object _indexLock = new object();
+        private readonly ConditionalWeakTable<ObservableRangeCollection<FileSystemNodeModel>, List<FileSystemNodeModel>> _treeIndexes = new();
 
         public WadSearchBoxService(NarrativeMetadataService metadataService, LogService logService)
         {
             _metadataService = metadataService;
             _logService = logService;
+        }
+
+        public void RebuildIndex(ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        {
+            if (rootNodes == null) return;
+
+            var index = BuildIndex(rootNodes, CancellationToken.None);
+
+            lock (_indexLock)
+            {
+                _treeIndexes.Remove(rootNodes);
+                _treeIndexes.Add(rootNodes, index);
+            }
+        }
+
+        public void InvalidateIndex(ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        {
+            if (rootNodes == null) return;
+
+            lock (_indexLock)
+            {
+                _treeIndexes.Remove(rootNodes);
+            }
         }
 
         #region --- Public API ---
@@ -36,7 +64,6 @@ namespace AssetsManager.Services.Explorer
         public async Task<FileSystemNodeModel> PerformSearchAsync(
             string searchText,
             ObservableRangeCollection<FileSystemNodeModel> rootNodes,
-            Func<FileSystemNodeModel, Task> loadChildrenFunc,
             FileSystemNodeModel activeNode = null)
         {
             var token = PrepareCancellationToken();
@@ -71,8 +98,7 @@ namespace AssetsManager.Services.Explorer
         /// </summary>
         public async Task<FileSystemNodeModel> NavigateToPathAsync(
             string path,
-            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
-            Func<FileSystemNodeModel, Task> loadChildrenFunc)
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes)
         {
             if (string.IsNullOrEmpty(path)) return null;
 
@@ -94,9 +120,8 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                // 1. Identification and Flattening (Fast, no UI updates)
-                var allNodes = new List<FileSystemNodeModel>();
-                await Task.Run(() => Flatten(nodes, allNodes, cancellationToken), cancellationToken);
+                // 1. Reuse the immutable node projection for this tree.
+                var allNodes = await GetIndexedNodesAsync(nodes, cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -123,7 +148,7 @@ namespace AssetsManager.Services.Explorer
                     if (contextNode != null) await _metadataService.PreloadMetadataAsync(contextNode);
                 }
 
-                await Task.Run(async () =>
+                var searchResult = await Task.Run(() =>
                 {
                     var toShow = new HashSet<FileSystemNodeModel>();
                     var matchIndices = new Dictionary<FileSystemNodeModel, int>();
@@ -134,9 +159,14 @@ namespace AssetsManager.Services.Explorer
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // PHASE 2: Application (Surgical UI updates with time-slicing)
-                    await ApplySearchVisibilityAsync(allNodes, toShow, matchIndices, query, isMetadataSearch, cancellationToken);
+                    var visibleChildren = BuildVisibleChildren(allNodes, toShow, cancellationToken);
+                    return new TreeFilterProjection(toShow, matchIndices, visibleChildren);
                 }, cancellationToken);
+
+                await Application.Current.Dispatcher
+                    .InvokeAsync(() => ApplySearchVisibilityAsync(allNodes, searchResult, query, isMetadataSearch, cancellationToken))
+                    .Task
+                    .Unwrap();
 
                 return null; // Always return null during search to enforce manual navigation
             }
@@ -159,7 +189,7 @@ namespace AssetsManager.Services.Explorer
         /// Evaluates each node to see if it matches the search criteria.
         /// </summary>
         private int IdentifyMatchingNodes(
-            List<FileSystemNodeModel> allNodes, 
+            IReadOnlyList<FileSystemNodeModel> allNodes,
             string[] keywords, 
             string query,
             bool isMetadataSearch,
@@ -219,9 +249,8 @@ namespace AssetsManager.Services.Explorer
         /// Efficiently applies visibility and highlighting changes to the UI.
         /// </summary>
         private async Task ApplySearchVisibilityAsync(
-            List<FileSystemNodeModel> allNodes,
-            HashSet<FileSystemNodeModel> toShow,
-            Dictionary<FileSystemNodeModel, int> matchIndices,
+            IReadOnlyList<FileSystemNodeModel> allNodes,
+            TreeFilterProjection searchResult,
             string query,
             bool isMetadataSearch,
             CancellationToken ct)
@@ -231,8 +260,8 @@ namespace AssetsManager.Services.Explorer
             {
                 ct.ThrowIfCancellationRequested();
 
-                bool shouldBeVisible = toShow.Contains(node);
-                bool hasMatch = matchIndices.TryGetValue(node, out int matchIndex);
+                bool shouldBeVisible = searchResult.VisibleNodes.Contains(node);
+                bool hasMatch = searchResult.MatchIndices.TryGetValue(node, out int matchIndex);
                 bool changed = false;
 
                 // 1. Highlighting (Standard mode only)
@@ -261,10 +290,9 @@ namespace AssetsManager.Services.Explorer
                 var children = node.LoadedChildren;
                 if (FileSystemNodeModel.CanHaveChildren(node.Type) && children != null)
                 {
-                    var visibleItems = children.Where(c => toShow.Contains(c)).ToList();
-                    if (visibleItems.Count != children.Count)
+                    if (searchResult.VisibleChildren.TryGetValue(node, out var visibleItems))
                     {
-                        if (node.VisibleChildren == children || node.VisibleChildren.Count != visibleItems.Count)
+                        if (!HasSameItems(node.VisibleChildren, visibleItems))
                         {
                             node.VisibleChildren = new ObservableRangeCollection<FileSystemNodeModel>(visibleItems);
                             changed = true;
@@ -285,6 +313,53 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
+        private static Dictionary<FileSystemNodeModel, IReadOnlyList<FileSystemNodeModel>> BuildVisibleChildren(
+            IReadOnlyList<FileSystemNodeModel> allNodes,
+            HashSet<FileSystemNodeModel> visibleNodes,
+            CancellationToken cancellationToken)
+        {
+            var result = new Dictionary<FileSystemNodeModel, IReadOnlyList<FileSystemNodeModel>>();
+            foreach (var node in allNodes)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var children = node.LoadedChildren;
+                if (children == null || children.Count == 0) continue;
+
+                List<FileSystemNodeModel> visibleChildren = null;
+                for (int i = 0; i < children.Count; i++)
+                {
+                    var child = children[i];
+                    if (visibleNodes.Contains(child))
+                    {
+                        visibleChildren ??= new List<FileSystemNodeModel>();
+                        visibleChildren.Add(child);
+                    }
+                }
+
+                if (visibleChildren == null || visibleChildren.Count != children.Count)
+                {
+                    result[node] = visibleChildren is null
+                        ? Array.Empty<FileSystemNodeModel>()
+                        : visibleChildren;
+                }
+            }
+
+            return result;
+        }
+
+        private static bool HasSameItems(
+            IReadOnlyList<FileSystemNodeModel> current,
+            IReadOnlyList<FileSystemNodeModel> replacement)
+        {
+            if (current == null || current.Count != replacement.Count) return false;
+            for (int i = 0; i < current.Count; i++)
+            {
+                if (!ReferenceEquals(current[i], replacement[i])) return false;
+            }
+
+            return true;
+        }
+
         private bool AllKeywordsMatch(NarrativeMetadata metadata, string[] keywords)
         {
             foreach (var kw in keywords)
@@ -300,7 +375,7 @@ namespace AssetsManager.Services.Explorer
 
         #region --- Reset Logic ---
 
-        private async Task PerformResetAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, List<FileSystemNodeModel> allNodes, FileSystemNodeModel activeNode, CancellationToken cancellationToken)
+        private async Task PerformResetAsync(ObservableRangeCollection<FileSystemNodeModel> nodes, IReadOnlyList<FileSystemNodeModel> allNodes, FileSystemNodeModel activeNode, CancellationToken cancellationToken)
         {
             var prioritizedNodes = new HashSet<FileSystemNodeModel>();
             foreach (var root in nodes) prioritizedNodes.Add(root);
@@ -336,7 +411,7 @@ namespace AssetsManager.Services.Explorer
                 if (sw.ElapsedMilliseconds > 16) { await Task.Yield(); sw.Restart(); }
             }
 
-            _ = Task.Run(async () =>
+            _ = Application.Current.Dispatcher.InvokeAsync(async () =>
             {
                 try
                 {
@@ -359,7 +434,7 @@ namespace AssetsManager.Services.Explorer
                 {
                     _logService.LogError(ex, "An error occurred during background search reset.");
                 }
-            }, cancellationToken);
+            }, DispatcherPriority.Background).Task.Unwrap();
         }
 
         private void ResetNodeState(FileSystemNodeModel node)
@@ -379,7 +454,7 @@ namespace AssetsManager.Services.Explorer
 
         #region --- Helpers & Navigation ---
 
-        private void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
+        private static void Flatten(IEnumerable<FileSystemNodeModel> roots, List<FileSystemNodeModel> result, CancellationToken ct)
         {
             if (roots == null) return;
             var stack = new Stack<FileSystemNodeModel>();
@@ -396,6 +471,42 @@ namespace AssetsManager.Services.Explorer
                     for (int i = children.Count - 1; i >= 0; i--) stack.Push(children[i]);
                 }
             }
+        }
+
+        private async Task<IReadOnlyList<FileSystemNodeModel>> GetIndexedNodesAsync(
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            CancellationToken cancellationToken)
+        {
+            lock (_indexLock)
+            {
+                if (_treeIndexes.TryGetValue(rootNodes, out var existingIndex))
+                {
+                    return existingIndex;
+                }
+            }
+
+            var newIndex = await Task.Run(() => BuildIndex(rootNodes, cancellationToken), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            lock (_indexLock)
+            {
+                if (_treeIndexes.TryGetValue(rootNodes, out var existingIndex))
+                {
+                    return existingIndex;
+                }
+
+                _treeIndexes.Add(rootNodes, newIndex);
+                return newIndex;
+            }
+        }
+
+        private static List<FileSystemNodeModel> BuildIndex(
+            ObservableRangeCollection<FileSystemNodeModel> rootNodes,
+            CancellationToken cancellationToken)
+        {
+            var nodes = new List<FileSystemNodeModel>();
+            Flatten(rootNodes, nodes, cancellationToken);
+            return nodes;
         }
 
         private async Task<FileSystemNodeModel> ExpandToPathAsync(string path, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
@@ -447,5 +558,10 @@ namespace AssetsManager.Services.Explorer
         }
 
         #endregion
+
+        private sealed record TreeFilterProjection(
+            HashSet<FileSystemNodeModel> VisibleNodes,
+            Dictionary<FileSystemNodeModel, int> MatchIndices,
+            Dictionary<FileSystemNodeModel, IReadOnlyList<FileSystemNodeModel>> VisibleChildren);
     }
 }

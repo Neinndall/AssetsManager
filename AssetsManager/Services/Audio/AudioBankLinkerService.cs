@@ -400,15 +400,13 @@ namespace AssetsManager.Services.Audio
             }
             else
             {
-                Func<FileSystemNodeModel, Task> loader = async (node) => await _wadNodeLoaderService.EnsureAllChildrenLoadedAsync(node, currentRootPath);
-                
                 // BRIDGE FIX: Try to find the target WAD node anywhere in the tree (not just top-level)
                 var targetWadNode = FindNodeByName(rootNodes, strategy.TargetWadName);
                 
                 if (targetWadNode != null)
                 {
                     _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Target WAD '{strategy.TargetWadName}' found in tree. Searching for BIN '{strategy.BinPath}'...");
-                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode }, loader);
+                    var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { targetWadNode });
                     if (binNode != null) return (binNode, baseName, strategy.Type);
                 }
                 else
@@ -423,7 +421,7 @@ namespace AssetsManager.Services.Audio
                            if (match != null)
                            {
                                _logService.LogDebug($"[FindAssociatedBinFileAsync] [LIVE] Fallback: Found target WAD '{strategy.TargetWadName}' in sub-hierarchy.");
-                               var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { match }, loader);
+                               var binNode = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { match });
                                if (binNode != null) return (binNode, baseName, strategy.Type);
                            }
                         }
@@ -433,7 +431,7 @@ namespace AssetsManager.Services.Audio
                 var commonWadNode = FindNodeByName(rootNodes, "Common.wad.client");
                 if (commonWadNode != null && commonWadNode != targetWadNode)
                 {
-                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode }, loader);
+                    var binNodeInCommon = await _wadSearchBoxService.PerformSearchAsync(strategy.BinPath, new ObservableRangeCollection<FileSystemNodeModel> { commonWadNode });
                     if (binNodeInCommon != null) return (binNodeInCommon, baseName, strategy.Type);
                 }
             }
