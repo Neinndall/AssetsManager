@@ -170,6 +170,34 @@ namespace AssetsManager.Services.Hashes
             var gamePaths = await LoadGamePathsAsync(cancellationToken);
             int scanned = 0;
 
+            // Build a unified casing map and resolver for cross-dictionary bin hash resolution.
+            // This allows us to reconstruct the proper uppercase/lowercase path names of files
+            // and combine them with resolved fields/types to recreate the original string representations.
+            var casingMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var binResolver = new Dictionary<uint, string>();
+            if (includeBin)
+            {
+                foreach (string gp in gamePaths.Values)
+                {
+                    foreach (string segment in gp.Split('/'))
+                    {
+                        if (segment.Length > 0)
+                        {
+                            casingMap.TryAdd(segment, segment);
+                        }
+                    }
+                }
+
+                foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
+                {
+                    foreach (var pair in await _store.LoadKnownAsync(kind, cancellationToken))
+                    {
+                        uint key = unchecked((uint)pair.Key);
+                        binResolver.TryAdd(key, pair.Value);
+                    }
+                }
+            }
+
             await Task.Run(() =>
             {
                 for (int index = 0; index < wads.Length && matcher.Remaining > 0; index++)
@@ -210,7 +238,17 @@ namespace AssetsManager.Services.Hashes
                                 {
                                     using var stream = new MemoryStream(data.Memory.ToArray(), false);
                                     var tree = new BinTree(stream);
+                                    
+                                    // 1. Visit raw string values inside the bin
                                     VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+                                    
+                                    // 2. Perform "double work": reconstruct the cased path of the bin, resolve known hashes,
+                                    // and generate combinations (simulating scanning the resolved .bin.json)
+                                    if (binResolver.Count > 0)
+                                    {
+                                        string casedBasePath = ReconstructCasedPath(path, casingMap);
+                                        VisitBinResolvedNamesAndPaths(tree, casedBasePath, binResolver, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+                                    }
                                 }
                                 else
                                 {
@@ -473,6 +511,120 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
+        private static string ReconstructCasedPath(string path, Dictionary<string, string> casingMap)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+
+            string clean = path;
+            if (clean.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                clean = clean[..^4];
+            if (clean.StartsWith("[unknown_bin_", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            var segments = clean.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (casingMap.TryGetValue(segments[i], out string cased))
+                {
+                    segments[i] = cased;
+                }
+                else if (segments[i].Length > 0)
+                {
+                    // Fallback capitalization if segment is not found in known game paths
+                    segments[i] = char.ToUpper(segments[i][0]) + segments[i][1..];
+                }
+            }
+            return string.Join('/', segments);
+        }
+
+        /// <summary>
+        /// Collects raw strings and resolved known hashes from the BinTree, and evaluates
+        /// combined path candidates (recreating the .bin.json structure).
+        /// </summary>
+        private static void VisitBinResolvedNamesAndPaths(BinTree tree, string casedBasePath, Dictionary<uint, string> resolver, Action<string> check)
+        {
+            var plainStrings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Collect plain strings
+            VisitBinStrings(tree, val => { if (!string.IsNullOrWhiteSpace(val)) plainStrings.Add(val.Trim()); });
+
+            // Collect resolved names of objects, classes, fields, and values
+            foreach (var pair in tree.Objects)
+            {
+                if (pair.Key != 0 && resolver.TryGetValue(unchecked((uint)pair.Key), out string entryName))
+                    resolvedNames.Add(entryName);
+                if (pair.Value.ClassHash != 0 && resolver.TryGetValue(pair.Value.ClassHash, out string className))
+                    resolvedNames.Add(className);
+                foreach (var property in pair.Value.Properties.Values)
+                    CollectResolvedPropertyNames(property, resolver, resolvedNames);
+            }
+            foreach (var item in tree.DataOverrides)
+            {
+                if (item.ObjectPathHash != 0 && resolver.TryGetValue(unchecked((uint)item.ObjectPathHash), out string overrideName))
+                    resolvedNames.Add(overrideName);
+                CollectResolvedPropertyNames(item.Property, resolver, resolvedNames);
+            }
+
+            // Reconstruct and check combined candidates
+            if (!string.IsNullOrEmpty(casedBasePath))
+            {
+                // BasePath/PlainString
+                foreach (string s in plainStrings)
+                {
+                    check($"{casedBasePath}/{s}");
+                }
+
+                // BasePath/ResolvedName
+                foreach (string r in resolvedNames)
+                {
+                    check($"{casedBasePath}/{r}");
+                }
+
+                // BasePath/ResolvedName/PlainString
+                foreach (string r in resolvedNames)
+                {
+                    foreach (string s in plainStrings)
+                    {
+                        check($"{casedBasePath}/{r}/{s}");
+                    }
+                }
+            }
+        }
+
+        private static void CollectResolvedPropertyNames(BinTreeProperty property, Dictionary<uint, string> resolver, HashSet<string> resolvedNames)
+        {
+            if (property.NameHash != 0 && resolver.TryGetValue(property.NameHash, out string fieldName))
+                resolvedNames.Add(fieldName);
+            switch (property)
+            {
+                case BinTreeHash hash when hash.Value != 0:
+                    if (resolver.TryGetValue(hash.Value, out string hashName))
+                        resolvedNames.Add(hashName);
+                    break;
+                case BinTreeStruct structure:
+                    if (structure.ClassHash != 0 && resolver.TryGetValue(structure.ClassHash, out string structClass))
+                        resolvedNames.Add(structClass);
+                    foreach (var child in structure.Properties.Values)
+                        CollectResolvedPropertyNames(child, resolver, resolvedNames);
+                    break;
+                case BinTreeContainer container:
+                    foreach (var child in container.Elements)
+                        CollectResolvedPropertyNames(child, resolver, resolvedNames);
+                    break;
+                case BinTreeOptional option when option.Value != null:
+                    CollectResolvedPropertyNames(option.Value, resolver, resolvedNames);
+                    break;
+                case BinTreeMap map:
+                    foreach (var child in map)
+                    {
+                        CollectResolvedPropertyNames(child.Key, resolver, resolvedNames);
+                        CollectResolvedPropertyNames(child.Value, resolver, resolvedNames);
+                    }
+                    break;
+            }
+        }
+
         private static void ReadRstInventory(Stream stream, HashSet<ulong> observed)
         {
             using var reader = new BinaryReader(stream, Encoding.UTF8, true);
@@ -516,8 +668,7 @@ namespace AssetsManager.Services.Hashes
 
             static bool IsCandidateByte(byte value) => value is >= (byte)'0' and <= (byte)'9' or
                 >= (byte)'a' and <= (byte)'z' or >= (byte)'A' and <= (byte)'Z' or
-                (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-' or
-                (byte)'@' or (byte)'[' or (byte)']' or (byte)':' ;
+                (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-';
         }
 
         private static void CheckCandidateSlice(ReadOnlySpan<byte> data, int offset, int length, Action<string> check)
