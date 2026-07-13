@@ -242,7 +242,7 @@ namespace AssetsManager.Services.Hashes
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
-                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable";
+                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".bnk" or ".anm" or ".skn" or ".pfx" or ".material" or ".troybin" or ".preload";
                     })
                     .ToList();
 
@@ -564,7 +564,10 @@ namespace AssetsManager.Services.Hashes
             path.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".material", StringComparison.OrdinalIgnoreCase);
+            path.EndsWith(".material", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".troybin", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".preload", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
 
         private static string BuildFingerprint(IEnumerable<string> paths)
         {
