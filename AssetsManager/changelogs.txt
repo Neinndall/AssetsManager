@@ -13,6 +13,8 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Hash Guessing Lab results list columns now automatically resize to perfectly fit the window width.
+  - Expanded local files scanning to support additional game assets (audio, animations, models, and scripts).
   - Optimized BIN structural candidate generation to run significantly faster with minimal CPU and RAM overhead.
   - Hash Guessing Lab now separates GAME, LCU, BIN, and RST domains with categorized results and patch-aware inventories.
   - BIN and RST inventories now refresh independently and present dedicated actions with consistent strategy icons.
@@ -40,6 +42,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed progress spinner animation continuing to rotate after search completes.
   - Fixed BIN and RST guessing results displaying fully qualified class names instead of resolved paths.
   - Fixed source WAD files not displaying correct container paths for resolved BIN and RST matches.
   - Fixed BIN unknown inventories showing 64-bit padding and retaining placeholder zero hashes.
