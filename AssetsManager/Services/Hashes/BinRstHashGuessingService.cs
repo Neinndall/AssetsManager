@@ -296,7 +296,7 @@ namespace AssetsManager.Services.Hashes
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
-                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin" or ".css";
+                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin" or ".css" or ".js" or ".html" or ".log" or ".info";
                     })
                     .ToList();
 
@@ -738,7 +738,10 @@ namespace AssetsManager.Services.Hashes
             path.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".css", StringComparison.OrdinalIgnoreCase);
+            path.EndsWith(".css", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".log", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".info", StringComparison.OrdinalIgnoreCase);
 
         private static string BuildFingerprint(IEnumerable<string> paths)
         {
