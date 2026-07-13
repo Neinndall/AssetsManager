@@ -20,6 +20,12 @@ namespace BenchmarkApp
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "check-plugins")
+            {
+                CheckPluginsWads();
+                return;
+            }
+
             Console.WriteLine("==================================================");
             Console.WriteLine("    ASSETSMANAGER OFFLINE HASH LAB BENCHMARK");
             Console.WriteLine("==================================================");
@@ -238,6 +244,77 @@ namespace BenchmarkApp
             {
                 CheckedFiles = value.ProcessedFiles;
                 Console.Write($"\r -> [Progress] stage={value.CurrentStage} processed={value.ProcessedFiles} matches={value.FoundMatches}          ");
+            }
+        }
+
+        private static void CheckPluginsWads()
+        {
+            Console.WriteLine("Scanning Plugins folder for WADs containing BIN or RST signatures...");
+            string pluginsDir = Path.Combine(PbeDirectory, "LeagueClient", "Plugins");
+            if (!Directory.Exists(pluginsDir))
+            {
+                var dirs = Directory.GetDirectories(PbeDirectory, "*Plugins*", SearchOption.AllDirectories);
+                if (dirs.Length > 0) pluginsDir = dirs[0];
+            }
+
+            if (!Directory.Exists(pluginsDir))
+            {
+                Console.WriteLine($"Plugins directory not found at: {pluginsDir}");
+                return;
+            }
+
+            Console.WriteLine($"Searching in: {pluginsDir}");
+            var wads = Directory.EnumerateFiles(pluginsDir, "*.wad*", SearchOption.AllDirectories)
+                .Where(p => p.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Console.WriteLine($"Found {wads.Count} WAD files in Plugins.");
+            int totalBins = 0;
+            int totalRsts = 0;
+
+            foreach (var wadPath in wads)
+            {
+                try
+                {
+                    using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
+                    int bins = 0;
+                    int rsts = 0;
+                    foreach (var pair in wad.Chunks)
+                    {
+                        string sig = GetChunkSignature(wad, pair.Value);
+                        if (sig == "PROP" || sig == "PTCH") bins++;
+                        else if (sig.StartsWith("RST")) rsts++;
+                    }
+                    if (bins > 0 || rsts > 0)
+                    {
+                        Console.WriteLine($" -> {Path.GetFileName(wadPath)}: {bins} BINs, {rsts} RSTs");
+                        totalBins += bins;
+                        totalRsts += rsts;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error reading {Path.GetFileName(wadPath)}: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"Finished scanning. Total BINs in Plugins: {totalBins}, Total RSTs: {totalRsts}");
+        }
+
+        private static string GetChunkSignature(LeagueToolkit.Core.Wad.WadFile wad, LeagueToolkit.Core.Wad.WadChunk chunk)
+        {
+            try
+            {
+                using Stream stream = wad.OpenChunk(chunk);
+                byte[] buffer = new byte[4];
+                int read = stream.Read(buffer, 0, 4);
+                if (read < 3) return string.Empty;
+                if (read == 3) return System.Text.Encoding.ASCII.GetString(buffer, 0, 3);
+                return System.Text.Encoding.ASCII.GetString(buffer);
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
     }
