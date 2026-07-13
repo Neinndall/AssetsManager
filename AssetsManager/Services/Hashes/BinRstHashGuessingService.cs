@@ -23,27 +23,22 @@ namespace AssetsManager.Services.Hashes
     {
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
         private const int NumericBudget = 5_000_000;
-        private const string ExportManifestUrl = "https://raw.communitydragon.org/pbe/cdragon/files.exported.txt";
-        private const string PbeRawBaseUrl = "https://raw.communitydragon.org/pbe/";
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
         private readonly BinRstHashGuessingStore _store;
         private readonly HashResolverService _resolver;
         private readonly DirectoriesCreator _directories;
         private readonly LogService _log;
-        private readonly HttpClient _httpClient;
 
         public BinRstHashGuessingService(
             BinRstHashGuessingStore store,
             HashResolverService resolver,
             DirectoriesCreator directories,
-            LogService log,
-            HttpClient httpClient)
+            LogService log)
         {
             _store = store;
             _resolver = resolver;
             _directories = directories;
             _log = log;
-            _httpClient = httpClient;
         }
 
         public Task<InternalHashSummary> GetSummaryAsync(CancellationToken cancellationToken) => _store.LoadSummaryAsync(cancellationToken);
@@ -75,9 +70,31 @@ namespace AssetsManager.Services.Hashes
                         foreach (var pair in wad.Chunks)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (!gamePaths.TryGetValue(pair.Key, out string path)) continue;
-                            bool isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
-                            bool isRst = includeRst && path.EndsWith(".stringtable", StringComparison.OrdinalIgnoreCase);
+                            string path = null;
+                            bool isBin = false;
+                            bool isRst = false;
+                            if (gamePaths.TryGetValue(pair.Key, out path))
+                            {
+                                isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                                isRst = includeRst && path.EndsWith(".stringtable", StringComparison.OrdinalIgnoreCase);
+                            }
+                            else
+                            {
+                                if (includeBin || includeRst)
+                                {
+                                    string sig = GetChunkSignature(wad, pair.Value);
+                                    if (includeBin && (sig == "PROP" || sig == "PTCH"))
+                                    {
+                                        isBin = true;
+                                        path = $"[unknown_bin_{pair.Key:x16}]";
+                                    }
+                                    else if (includeRst && sig.StartsWith("RST"))
+                                    {
+                                        isRst = true;
+                                        path = $"[unknown_rst_{pair.Key:x16}]";
+                                    }
+                                }
+                            }
                             if (!isBin && !isRst) continue;
                             try
                             {
@@ -165,9 +182,26 @@ namespace AssetsManager.Services.Hashes
                         foreach (var pair in wad.Chunks)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            if (!gamePaths.TryGetValue(pair.Key, out string path)) continue;
-                            bool isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
-                            bool isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
+                            string path = null;
+                            bool isBin = false;
+                            bool isText = false;
+                            if (gamePaths.TryGetValue(pair.Key, out path))
+                            {
+                                isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                                isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
+                            }
+                            else
+                            {
+                                if (includeBin)
+                                {
+                                    string sig = GetChunkSignature(wad, pair.Value);
+                                    if (sig == "PROP" || sig == "PTCH")
+                                    {
+                                        isBin = true;
+                                        path = $"[unknown_bin_{pair.Key:x16}]";
+                                    }
+                                }
+                            }
                             if (!isBin && !isText) continue;
                             try
                             {
@@ -176,11 +210,11 @@ namespace AssetsManager.Services.Hashes
                                 {
                                     using var stream = new MemoryStream(data.Memory.ToArray(), false);
                                     var tree = new BinTree(stream);
-                                    VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path));
+                                    VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
                                 }
                                 else
                                 {
-                                    CheckTextCandidates(data.Memory.Span, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, path));
+                                    CheckTextCandidates(data.Memory.Span, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, path, wadPath, path));
                                 }
                                 scanned++;
                             }
@@ -202,91 +236,32 @@ namespace AssetsManager.Services.Hashes
                 }
             }, cancellationToken);
 
-            string executable = Directory.EnumerateFiles(rootDirectory, "League of Legends.exe", SearchOption.AllDirectories).FirstOrDefault();
-            if (executable != null && matcher.Remaining > 0)
+            if (matcher.Remaining > 0)
             {
-                await ScanTextFileAsync(executable, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, executable), cancellationToken);
-                scanned++;
-            }
-            return await CompleteRunAsync(matcher, initial, scanned, cancellationToken);
-        }
-
-        public async Task<InternalHashRunResult> RunRemoteContentGuessingAsync(
-            string rootDirectory,
-            IProgress<InternalHashProgress> progress,
-            CancellationToken cancellationToken)
-        {
-            ValidateRoot(rootDirectory);
-            await EnsureInventoryAsync(rootDirectory, true, false, progress, cancellationToken);
-            var matcher = await CreateMatcherAsync(true, false, cancellationToken);
-            int initial = matcher.Remaining;
-            int scanned = matcher.Remaining == 0 ? 0 : await ScanRemoteJsonAsync(matcher, progress, cancellationToken);
-            return await CompleteRunAsync(matcher, initial, scanned, cancellationToken);
-        }
-
-        private async Task<int> ScanRemoteJsonAsync(CandidateMatcher matcher, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
-        {
-            string manifest;
-            try
-            {
-                manifest = await _httpClient.GetStringAsync(ExportManifestUrl, cancellationToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _log.LogWarning($"Internal Hash Lab could not load the CommunityDragon export manifest: {ex.Message}");
-                return 0;
-            }
-
-            string[] paths = manifest.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-                .Where(path => path.StartsWith("game/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            int processed = 0;
-            object matcherLock = new();
-            await Parallel.ForEachAsync(paths, new ParallelOptions
-            {
-                MaxDegreeOfParallelism = 8,
-                CancellationToken = cancellationToken
-            }, async (path, token) =>
-            {
-                try
-                {
-                    using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-                    requestCancellation.CancelAfter(TimeSpan.FromSeconds(5));
-                    using var response = await _httpClient.GetAsync(PbeRawBaseUrl + path, HttpCompletionOption.ResponseHeadersRead, requestCancellation.Token);
-                    if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > MaximumTextChunkSize) return;
-                    byte[] data = await response.Content.ReadAsByteArrayAsync(requestCancellation.Token);
-                    if (data.Length > MaximumTextChunkSize) return;
-                    CheckTextCandidates(data, candidate =>
+                var filesToScan = Directory.EnumerateFiles(rootDirectory, "*.*", SearchOption.AllDirectories)
+                    .Where(file =>
                     {
-                        lock (matcherLock)
-                            matcher.Check(candidate, InternalHashGuessStrategy.RemoteContent, path);
-                    });
-                }
-                catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                        string ext = Path.GetExtension(file).ToLowerInvariant();
+                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable";
+                    })
+                    .ToList();
+
+                foreach (string file in filesToScan)
                 {
-                    _log.LogDebug($"Internal Hash Lab timed out remote export '{path}'.");
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _log.LogDebug($"Internal Hash Lab skipped remote export '{path}': {ex.Message}");
-                }
-                finally
-                {
-                    int current = Interlocked.Increment(ref processed);
-                    if ((current & 0x7f) == 0 || current == paths.Length)
+                    if (matcher.Remaining == 0) break;
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
                     {
-                        int found;
-                        lock (matcherLock) found = matcher.Matches.Count;
-                        progress?.Report(new InternalHashProgress
-                        {
-                            ProcessedFiles = current,
-                            FoundMatches = found,
-                            CurrentStage = "Scanning CommunityDragon JSON exports"
-                        });
+                        await ScanTextFileAsync(file, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, file, null, file), cancellationToken);
+                        scanned++;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _log.LogDebug($"Internal Hash Lab content scan skipped local file '{file}': {ex.Message}");
                     }
                 }
-            });
-            return processed;
+            }
+            return await CompleteRunAsync(matcher, initial, scanned, cancellationToken);
         }
 
         public async Task<InternalHashRunResult> RunStructuralGuessingAsync(
@@ -320,7 +295,19 @@ namespace AssetsManager.Services.Hashes
                     CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionary keys");
                     CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
                     CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
-                    CheckCandidates(GenerateNumberCandidates(rst3, 500, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "RST numeric variants");
+                }
+
+                // Run advanced structural candidate generation
+                if (matcher.Remaining > 0)
+                {
+                    var wordlist = new TokenWordlist();
+                    foreach (string val in binKnown) wordlist.AddName(val);
+                    foreach (string val in rst3) wordlist.AddName(val);
+                    foreach (string val in rst64) wordlist.AddName(val);
+                    foreach (string val in gamePaths) wordlist.AddName(val);
+                    wordlist.FinalizeList();
+
+                    CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
                 }
 
                 void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source)
@@ -574,7 +561,10 @@ namespace AssetsManager.Services.Hashes
 
         private static bool IsTextCandidatePath(string path) => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase);
+            path.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".material", StringComparison.OrdinalIgnoreCase);
 
         private static string BuildFingerprint(IEnumerable<string> paths)
         {
@@ -595,6 +585,273 @@ namespace AssetsManager.Services.Hashes
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
         }
 
+        private static string GetChunkSignature(WadFile wad, WadChunk chunk)
+        {
+            try
+            {
+                using Stream stream = wad.OpenChunk(chunk);
+                Span<byte> buffer = stackalloc byte[4];
+                int read = stream.Read(buffer);
+                if (read < 3) return string.Empty;
+                if (read == 3) return Encoding.ASCII.GetString(buffer.Slice(0, 3));
+                return Encoding.ASCII.GetString(buffer);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static IEnumerable<string> SplitCamelCaseAndSymbols(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) yield break;
+            
+            var segments = input.Split(new[] { '/', '\\', '.', '_', '-', ' ', ':', '[', ']' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var segment in segments)
+            {
+                yield return segment.ToLowerInvariant();
+                
+                int lastStart = 0;
+                for (int i = 1; i < segment.Length; i++)
+                {
+                    bool isUpper = char.IsUpper(segment[i]);
+                    bool isDigit = char.IsDigit(segment[i]);
+                    bool prevLower = char.IsLower(segment[i - 1]);
+                    
+                    if ((isUpper || isDigit) && prevLower)
+                    {
+                        yield return segment[lastStart..i].ToLowerInvariant();
+                        lastStart = i;
+                    }
+                    else if (char.IsLower(segment[i]) && char.IsDigit(segment[i - 1]))
+                    {
+                        yield return segment[lastStart..i].ToLowerInvariant();
+                        lastStart = i;
+                    }
+                }
+                if (lastStart < segment.Length)
+                {
+                    yield return segment[lastStart..].ToLowerInvariant();
+                }
+            }
+        }
+
+        private sealed class TokenWordlist
+        {
+            public List<string> AllTokens { get; } = new();
+            public Dictionary<string, int> TokenCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> Characters { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public List<string> PathTemplates { get; } = new();
+            public List<string> FieldTemplates { get; } = new();
+
+            public void AddName(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return;
+
+                if (name.Contains('/'))
+                {
+                    if (name.Contains("characters", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = name.Split('/');
+                        for (int i = 0; i < parts.Length; i++)
+                        {
+                            if (string.Equals(parts[i], "characters", StringComparison.OrdinalIgnoreCase) && i + 1 < parts.Length)
+                            {
+                                string character = parts[i + 1];
+                                Characters.Add(character);
+                                string templated = name.Replace(character, "{character}", StringComparison.OrdinalIgnoreCase);
+                                PathTemplates.Add(templated);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    bool hasDigit = false;
+                    for (int i = 0; i < name.Length; i++)
+                    {
+                        if (char.IsDigit(name[i])) { hasDigit = true; break; }
+                    }
+                    if (hasDigit && NumberRegex.IsMatch(name))
+                    {
+                        string templated = NumberRegex.Replace(name, "{0}");
+                        FieldTemplates.Add(templated);
+                    }
+                }
+
+                foreach (string token in SplitCamelCaseAndSymbols(name))
+                {
+                    if (token.Length >= 2)
+                    {
+                        TokenCounts.TryGetValue(token, out int count);
+                        TokenCounts[token] = count + 1;
+                    }
+                }
+            }
+
+            public void FinalizeList()
+            {
+                AllTokens.Clear();
+                AllTokens.AddRange(TokenCounts.OrderByDescending(pair => pair.Value).Select(pair => pair.Key));
+                PathTemplates.Clear();
+                PathTemplates.AddRange(PathTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
+                FieldTemplates.Clear();
+                FieldTemplates.AddRange(FieldTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
+            }
+        }
+
+        private static IEnumerable<string> GenerateStructuralCandidates(
+            TokenWordlist wordlist,
+            int budget,
+            CancellationToken cancellationToken)
+        {
+            var generatedSet = new HashSet<string>(StringComparer.Ordinal);
+            int count = 0;
+
+            bool Emit(string candidate)
+            {
+                if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > 512) return false;
+                string clean = candidate.Trim().ToLowerInvariant();
+                if (generatedSet.Add(clean))
+                {
+                    count++;
+                    return true;
+                }
+                return false;
+            }
+
+            // 1. Path template substitution
+            foreach (string template in wordlist.PathTemplates)
+            {
+                foreach (string character in wordlist.Characters)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string candidate = template.Replace("{character}", character, StringComparison.OrdinalIgnoreCase);
+                    if (Emit(candidate))
+                    {
+                        yield return candidate;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+
+            // 2. Field template numeric substitution
+            foreach (string template in wordlist.FieldTemplates)
+            {
+                for (int num = 0; num <= 200; num++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string candidate = string.Format(CultureInfo.InvariantCulture, template, num);
+                    if (Emit(candidate))
+                    {
+                        yield return candidate;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+
+            // 3. Plurals and singulars
+            var topTokens = wordlist.AllTokens.Take(1000).ToList();
+            foreach (string token in topTokens)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string plural = Pluralize(token);
+                if (Emit(plural))
+                {
+                    yield return plural;
+                    if (count >= budget) yield break;
+                }
+                if (token.EndsWith('s') && token.Length > 3)
+                {
+                    string singular = token[..^1];
+                    if (Emit(singular))
+                    {
+                        yield return singular;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+
+            // 4. Prefix & Suffix addition
+            string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
+            string[] suffixes = { "s", "es", "list", "map", "array", "hash", "id", "name", "type", "file", "path", "vector", "color", "override", "data", "config", "event", "trigger" };
+            
+            foreach (string token in topTokens.Take(500))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (string pref in prefixes)
+                {
+                    string candidate = pref + token;
+                    if (Emit(candidate))
+                    {
+                        yield return candidate;
+                        if (count >= budget) yield break;
+                    }
+                }
+                foreach (string suff in suffixes)
+                {
+                    string candidate = token + suff;
+                    if (Emit(candidate))
+                    {
+                        yield return candidate;
+                        if (count >= budget) yield break;
+                    }
+                    string candidateUnderscore = token + "_" + suff;
+                    if (Emit(candidateUnderscore))
+                    {
+                        yield return candidateUnderscore;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+
+            // 5. Token combinations (2-word combinations)
+            var combTokens = topTokens.Take(300).ToList();
+            for (int i = 0; i < combTokens.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (int j = 0; j < combTokens.Count; j++)
+                {
+                    if (i == j) continue;
+                    
+                    string comb1 = combTokens[i] + combTokens[j];
+                    if (Emit(comb1))
+                    {
+                        yield return comb1;
+                        if (count >= budget) yield break;
+                    }
+
+                    string comb2 = combTokens[i] + "_" + combTokens[j];
+                    if (Emit(comb2))
+                    {
+                        yield return comb2;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+        }
+
+        private static string Pluralize(string word)
+        {
+            if (word.EndsWith("y", StringComparison.OrdinalIgnoreCase) &&
+                !word.EndsWith("ay", StringComparison.OrdinalIgnoreCase) &&
+                !word.EndsWith("ey", StringComparison.OrdinalIgnoreCase) &&
+                !word.EndsWith("oy", StringComparison.OrdinalIgnoreCase) &&
+                !word.EndsWith("uy", StringComparison.OrdinalIgnoreCase))
+            {
+                return word[..^1] + "ies";
+            }
+            if (word.EndsWith("s", StringComparison.OrdinalIgnoreCase) ||
+                word.EndsWith("x", StringComparison.OrdinalIgnoreCase) ||
+                word.EndsWith("z", StringComparison.OrdinalIgnoreCase) ||
+                word.EndsWith("ch", StringComparison.OrdinalIgnoreCase) ||
+                word.EndsWith("sh", StringComparison.OrdinalIgnoreCase))
+            {
+                return word + "es";
+            }
+            return word + "s";
+        }
+
         private sealed class CandidateMatcher
         {
             private const ulong Rst38Mask = (1UL << 38) - 1;
@@ -604,33 +861,33 @@ namespace AssetsManager.Services.Hashes
             public IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
             public int Remaining => _targets.Values.Sum(values => values.Count);
 
-            public void Check(string value, InternalHashGuessStrategy strategy, string source)
+            public void Check(string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
             {
                 if (string.IsNullOrWhiteSpace(value) || value.Length > 512) return;
                 string candidate = value.Trim().ToLowerInvariant();
                 uint fnv = Fnv1a.HashLower(candidate);
-                bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent or InternalHashGuessStrategy.RemoteContent;
+                bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
                 bool crossDictionary = strategy == InternalHashGuessStrategy.CrossDictionary;
                 bool gamePath = strategy == InternalHashGuessStrategy.GamePath;
                 if (content || crossDictionary || gamePath)
                 {
                     if (candidate.Contains('/'))
-                        Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source);
-                    Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source);
+                        Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin);
+                    Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin);
                 }
                 if ((content || crossDictionary) && IsIdentifier(candidate))
                 {
-                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source);
-                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source);
+                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin);
+                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin);
                 }
 
                 if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
                 {
                     byte[] bytes = Encoding.UTF8.GetBytes(candidate);
                     ulong xxh3 = XxHash3.HashToUInt64(bytes);
-                    CheckRst(InternalHashKind.RstXxh3, xxh3, candidate, strategy, source, new[] { 38 });
+                    CheckRst(InternalHashKind.RstXxh3, xxh3, candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
                     ulong xxh64 = XxHash64.HashToUInt64(bytes);
-                    CheckRst(InternalHashKind.RstXxh64, xxh64, candidate, strategy, source, new[] { 64, 38, 39, 40 });
+                    CheckRst(InternalHashKind.RstXxh64, xxh64, candidate, strategy, source, new[] { 64, 38, 39, 40 }, sourceWad, sourceBin);
                 }
             }
 
@@ -642,17 +899,18 @@ namespace AssetsManager.Services.Hashes
                 return true;
             }
 
-            private void Check32(InternalHashKind kind, uint hash, string value, InternalHashGuessStrategy strategy, string source)
+            private void Check32(InternalHashKind kind, uint hash, string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
             {
                 if (!_targets[kind].Remove(hash)) return;
                 _matches[(kind, hash)] = new InternalHashGuessMatch
                 {
                     Hash = hash, LookupHash = hash, HashBits = 32, Value = value,
-                    Kind = kind, Strategy = strategy, Source = source
+                    Kind = kind, Strategy = strategy, Source = source,
+                    SourceWad = sourceWad, SourceBin = sourceBin
                 };
             }
 
-            private void CheckRst(InternalHashKind kind, ulong fullHash, string value, InternalHashGuessStrategy strategy, string source, IEnumerable<int> bitOptions)
+            private void CheckRst(InternalHashKind kind, ulong fullHash, string value, InternalHashGuessStrategy strategy, string source, IEnumerable<int> bitOptions, string sourceWad = null, string sourceBin = null)
             {
                 foreach (int bits in bitOptions)
                 {
@@ -661,7 +919,8 @@ namespace AssetsManager.Services.Hashes
                     _matches[(kind, fullHash)] = new InternalHashGuessMatch
                     {
                         Hash = fullHash, LookupHash = lookup, HashBits = bits, Value = value,
-                        Kind = kind, Strategy = strategy, Source = source
+                        Kind = kind, Strategy = strategy, Source = source,
+                        SourceWad = sourceWad, SourceBin = sourceBin
                     };
                     break;
                 }

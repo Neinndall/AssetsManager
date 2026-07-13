@@ -24,12 +24,16 @@ namespace AssetsManager.Utils
         public string ApiCacheMythicPath { get; }
         public string ApiCacheRewardsPath { get; }
 
-        public DirectoriesCreator()
+        public DirectoriesCreator(string customAppFolderPath = null)
         {
             AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+            string appFolderPath = customAppFolderPath;
+            if (string.IsNullOrEmpty(appFolderPath))
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+            }
 
             HashesPath = Path.Combine(appFolderPath, "hashes");
             HashLabPath = Path.Combine(appFolderPath, "hash_lab");

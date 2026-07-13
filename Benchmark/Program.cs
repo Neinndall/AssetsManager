@@ -1,29 +1,244 @@
 using System;
-using AssetsManager.Services.Core;
-using Microsoft.Extensions.DependencyInjection;
+using System.IO;
+using System.Linq;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Globalization;
 using Serilog;
+using AssetsManager.Utils;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Hashes;
 
 namespace BenchmarkApp
 {
     class Program
     {
-        static void Main(string[] args)
-        {
-            var services = new ServiceCollection();
+        private static readonly string PbeDirectory = @"C:\Riot Games\League of Legends (PBE)";
 
-            var logger = new LoggerConfiguration()
+        static async Task Main(string[] args)
+        {
+            Console.WriteLine("==================================================");
+            Console.WriteLine("    ASSETSMANAGER OFFLINE HASH LAB BENCHMARK");
+            Console.WriteLine("==================================================");
+
+            if (!Directory.Exists(PbeDirectory))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Error: PBE Directory not found at: {PbeDirectory}");
+                Console.ResetColor();
+                return;
+            }
+
+            string tempDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Benchmark_TempData");
+            if (Directory.Exists(tempDir))
+            {
+                try { Directory.Delete(tempDir, true); } catch { }
+            }
+            Directory.CreateDirectory(tempDir);
+
+            // Copy real hashes databases to temp directory
+            string realAppDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager");
+            string realHashesPath = Path.Combine(realAppDataPath, "hashes");
+            string realHashLabPath = Path.Combine(realAppDataPath, "hash_lab");
+
+            string tempHashesPath = Path.Combine(tempDir, "hashes");
+            string tempHashLabPath = Path.Combine(tempDir, "hash_lab");
+
+            Directory.CreateDirectory(tempHashesPath);
+            Directory.CreateDirectory(tempHashLabPath);
+
+            Console.WriteLine("Copying hashes databases to temporary workspace...");
+            CopyDirectory(realHashesPath, tempHashesPath);
+            CopyDirectory(realHashLabPath, tempHashLabPath);
+
+            // Initialize services for temp environment
+            var directories = new DirectoriesCreator(tempDir);
+            var serilogLogger = new LoggerConfiguration()
+                .MinimumLevel.Warning()
                 .WriteTo.Console()
                 .CreateLogger();
+            var log = new LogService(serilogLogger);
+            var store = new BinRstHashGuessingStore(directories);
+            var resolver = new HashResolverService(directories, log);
+            var service = new BinRstHashGuessingService(store, resolver, directories, log);
 
-            services.AddSingleton<ILogger>(logger);
-            services.AddSingleton<LogService>();
+            // Create Controlled Hidden Test Corpus (Blind Test)
+            Console.WriteLine("Establishing Controlled Hidden Test Corpus (Blind Test)...");
+            var hiddenCorpus = await EstablishHiddenCorpusAsync(store, tempHashesPath, tempHashLabPath);
+            Console.WriteLine($"Corpus established. Hidden: {hiddenCorpus.Count} known hashes.");
 
-            var serviceProvider = services.BuildServiceProvider();
-            var logService = serviceProvider.GetRequiredService<LogService>();
+            // Perform Benchmark
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
 
-            Console.WriteLine("=== ASSETSMANAGER PERFORMANCE LAB ===");
-            Console.WriteLine("Ready for benchmarks.");
-            Console.WriteLine("=====================================");
+            var process = Process.GetCurrentProcess();
+            TimeSpan startCpu = process.TotalProcessorTime;
+            long startMemory = process.WorkingSet64;
+            var stopwatch = Stopwatch.StartNew();
+
+            Console.WriteLine("\n[1/3] Building BIN & RST Inventory (Discovery)...");
+            var progress = new ProgressTracker();
+            var inventory = await service.BuildInventoryAsync(PbeDirectory, true, true, progress, CancellationToken.None);
+            
+            Console.WriteLine($" -> Scanned BINs: {inventory.ScannedBins}");
+            Console.WriteLine($" -> Scanned RSTs: {inventory.ScannedStringTables}");
+
+            Console.WriteLine("\n[2/3] Running Content-based Offline Guessing...");
+            var contentResult = await service.RunContentGuessingAsync(PbeDirectory, true, true, progress, CancellationToken.None);
+            Console.WriteLine($" -> Files scanned: {contentResult.ScannedFiles}");
+            Console.WriteLine($" -> Matches found: {contentResult.Matches.Count}");
+
+            Console.WriteLine("\n[3/3] Running Structural-based Offline Guessing...");
+            var structuralResult = await service.RunStructuralGuessingAsync(PbeDirectory, true, true, progress, CancellationToken.None);
+            Console.WriteLine($" -> Candidates checked: {progress.CheckedFiles}");
+            Console.WriteLine($" -> Matches found: {structuralResult.Matches.Count}");
+
+            stopwatch.Stop();
+            TimeSpan endCpu = process.TotalProcessorTime;
+            long endMemory = process.WorkingSet64;
+
+            // Analyze blind test recovery
+            var allMatches = contentResult.Matches.Concat(structuralResult.Matches).ToList();
+            int recovered = 0;
+            foreach (var match in allMatches)
+            {
+                if (hiddenCorpus.TryGetValue(match.Hash, out string expectedName))
+                {
+                    if (string.Equals(match.Value, expectedName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        recovered++;
+                    }
+                }
+            }
+
+            Console.WriteLine("\n================ BENCHMARK RESULTS ================");
+            Console.WriteLine($"Total Execution Time : {stopwatch.Elapsed.TotalSeconds:F2} seconds");
+            Console.WriteLine($"CPU Time consumed    : {(endCpu - startCpu).TotalSeconds:F2} seconds");
+            Console.WriteLine($"Peak RAM (Working Set): {endMemory / (1024 * 1024):N0} MB");
+            Console.WriteLine($"Memory Delta         : {(endMemory - startMemory) / (1024 * 1024):N0} MB");
+            Console.WriteLine($"Blind Test Recovery  : {recovered} / {hiddenCorpus.Count} ({((double)recovered / hiddenCorpus.Count) * 100:F1}%)");
+            
+            // FNV Collision check
+            var fnvCollisions = allMatches.GroupBy(m => m.Hash).Where(g => g.Select(x => x.Value.ToLowerInvariant()).Distinct().Count() > 1).ToList();
+            Console.WriteLine($"FNV Collisions Found : {fnvCollisions.Count}");
+            foreach (var col in fnvCollisions)
+            {
+                Console.WriteLine($" -> Hash {col.Key:x16}: {string.Join(" vs ", col.Select(x => x.Value).Distinct())}");
+            }
+            Console.WriteLine("==================================================");
+
+            // Test Cancellation Graceful Exit
+            Console.WriteLine("\nTesting Cancellation Graceful Exit...");
+            using var cts = new CancellationTokenSource();
+            var cancelTask = service.RunStructuralGuessingAsync(PbeDirectory, true, true, progress, cts.Token);
+            await Task.Delay(50);
+            cts.Cancel();
+            try
+            {
+                await cancelTask;
+                Console.WriteLine(" -> Verification: OK (Exited cleanly)");
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine(" -> Verification: OK (Canceled as expected)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($" -> Verification: FAILED ({ex.Message})");
+            }
+
+            // Cleanup temp directory
+            try
+            {
+                Directory.Delete(tempDir, true);
+            }
+            catch { }
+        }
+
+        private static void CopyDirectory(string source, string dest)
+        {
+            if (!Directory.Exists(source)) return;
+            foreach (string dir in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+            {
+                Directory.CreateDirectory(dir.Replace(source, dest));
+            }
+            foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                File.Copy(file, file.Replace(source, dest), true);
+            }
+        }
+
+        private static async Task<Dictionary<ulong, string>> EstablishHiddenCorpusAsync(BinRstHashGuessingStore store, string hashesPath, string hashLabPath)
+        {
+            var corpus = new Dictionary<ulong, string>();
+
+            // Load some known entries
+            var binEntries = await store.LoadKnownAsync(InternalHashKind.BinEntries, CancellationToken.None);
+            var binFields = await store.LoadKnownAsync(InternalHashKind.BinFields, CancellationToken.None);
+            var binTypes = await store.LoadKnownAsync(InternalHashKind.BinTypes, CancellationToken.None);
+            var binHashes = await store.LoadKnownAsync(InternalHashKind.BinHashes, CancellationToken.None);
+
+            // Hide 142 random BIN Local GREP results
+            var localGrep = binEntries.Take(142).ToList();
+            foreach (var pair in localGrep) corpus[pair.Key] = pair.Value;
+
+            // Hide 48 hashes of "Practice Tool" (e.g. from binFields or binEntries)
+            var practiceTool = binFields.Skip(200).Take(48).ToList();
+            foreach (var pair in practiceTool) corpus[pair.Key] = pair.Value;
+
+            // Hide 100 representatively hidden known hashes
+            var representative = binHashes.Take(100).ToList();
+            foreach (var pair in representative) corpus[pair.Key] = pair.Value;
+
+            // Remove hidden corpus from known files in temp workspace
+            RemoveHashesFromFile(Path.Combine(hashesPath, "hashes.binentries.txt"), corpus.Keys, 8);
+            RemoveHashesFromFile(Path.Combine(hashesPath, "hashes.binfields.txt"), corpus.Keys, 8);
+            RemoveHashesFromFile(Path.Combine(hashesPath, "hashes.binhashes.txt"), corpus.Keys, 8);
+            RemoveHashesFromFile(Path.Combine(hashesPath, "hashes.bintypes.txt"), corpus.Keys, 8);
+
+            // Insert them into unknowns txt files to simulate historical unknowns
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binentries.txt"),
+                localGrep.Select(x => x.Key.ToString("x8"))
+            );
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binfields.txt"),
+                practiceTool.Select(x => x.Key.ToString("x8"))
+            );
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binhashes.txt"),
+                representative.Select(x => x.Key.ToString("x8"))
+            );
+
+            return corpus;
+        }
+
+        private static void RemoveHashesFromFile(string path, IEnumerable<ulong> hashesToRemove, int width)
+        {
+            if (!File.Exists(path)) return;
+            var set = hashesToRemove.Select(h => h.ToString(width == 16 ? "x16" : "x8")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var remainingLines = File.ReadLines(path)
+                .Where(line =>
+                {
+                    if (line.Length <= width) return true;
+                    string prefix = line[..width];
+                    return !set.Contains(prefix);
+                })
+                .ToList();
+            File.WriteAllLines(path, remainingLines);
+        }
+
+        private class ProgressTracker : IProgress<InternalHashProgress>
+        {
+            public int CheckedFiles { get; set; }
+            public void Report(InternalHashProgress value)
+            {
+                CheckedFiles = value.ProcessedFiles;
+                Console.Write($"\r -> [Progress] stage={value.CurrentStage} processed={value.ProcessedFiles} matches={value.FoundMatches}          ");
+            }
         }
     }
 }

@@ -83,7 +83,6 @@ namespace AssetsManager.Views
         private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
         private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
         private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
-        private async void RunBinRemoteContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.RemoteContent);
         private async void RunInternalStructural_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Structural);
         private void Cancel_Click(object sender, RoutedEventArgs e) => _cancellationTokenSource?.Cancel();
 
@@ -215,7 +214,6 @@ namespace AssetsManager.Views
                     InternalHashRunResult result = action switch
                     {
                         InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
-                        InternalHashAction.RemoteContent => await _binRstHashGuessingService.RunRemoteContentGuessingAsync(rootPath, progress, runCancellation.Token),
                         _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
                     };
                     _viewModel.Matches.AddRange(result.Matches.Cast<object>());
@@ -244,6 +242,6 @@ namespace AssetsManager.Views
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
-        private enum InternalHashAction { Inventory, Content, RemoteContent, Structural }
+        private enum InternalHashAction { Inventory, Content, Structural }
     }
 }

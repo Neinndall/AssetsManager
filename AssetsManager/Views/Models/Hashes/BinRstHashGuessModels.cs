@@ -17,7 +17,6 @@ namespace AssetsManager.Views.Models.Hashes
     {
         BinContent,
         TextContent,
-        RemoteContent,
         GamePath,
         CrossDictionary,
         CrossVersion,
@@ -33,6 +32,8 @@ namespace AssetsManager.Views.Models.Hashes
         public InternalHashKind Kind { get; init; }
         public InternalHashGuessStrategy Strategy { get; init; }
         public string Source { get; init; }
+        public string SourceWad { get; init; }
+        public string SourceBin { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
@@ -48,7 +49,19 @@ namespace AssetsManager.Views.Models.Hashes
         };
         public string Path => Value;
         public string StrategyText => Strategy.ToString();
-        public string SourceWadPath => Source;
+        public string SourceWadPath
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(SourceWad) && !string.IsNullOrEmpty(SourceBin))
+                {
+                    return $"{System.IO.Path.GetFileName(SourceWad)} -> {SourceBin}";
+                }
+                if (!string.IsNullOrEmpty(SourceWad)) return SourceWad;
+                if (!string.IsNullOrEmpty(SourceBin)) return SourceBin;
+                return Source;
+            }
+        }
     }
 
     public sealed class InternalHashInventory
