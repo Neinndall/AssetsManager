@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
@@ -245,20 +246,72 @@ namespace AssetsManager.Views
         {
             if (sender is ListView listView && listView.View is GridView gridView)
             {
-                double totalWidth = listView.ActualWidth;
-                double availableWidth = totalWidth - 30; // Deduct borders/scrollbar
-                if (availableWidth <= 0) return;
-
-                double fixedWidths = 140 + 80 + 120; // Hash (140), Domain (80), Strategy (120)
-                double remainingWidth = availableWidth - fixedWidths;
-                if (remainingWidth < 150) remainingWidth = 150;
-
-                gridView.Columns[0].Width = 140;
-                gridView.Columns[1].Width = 80;
-                gridView.Columns[2].Width = remainingWidth * 0.45; // Resolved value (45%)
-                gridView.Columns[3].Width = 120;
-                gridView.Columns[4].Width = remainingWidth * 0.55; // Source WAD (55%)
+                UpdateColumnWidths(listView, gridView);
             }
+        }
+
+        private void UpdateColumnWidths(ListView listView, GridView gridView)
+        {
+            double totalWidth = listView.ActualWidth;
+            if (totalWidth <= 0) return;
+
+            // Detect vertical scrollbar visibility to allocate exact space
+            double scrollbarWidth = 0;
+            var scrollViewer = GetScrollViewer(listView);
+            if (scrollViewer != null)
+            {
+                if (scrollViewer.ComputedVerticalScrollBarVisibility == Visibility.Visible)
+                {
+                    scrollbarWidth = SystemParameters.VerticalScrollBarWidth;
+                }
+                
+                // Subscribe to ScrollChanged to adjust widths immediately if a scrollbar appears/disappears
+                if (scrollViewer.Tag == null)
+                {
+                    scrollViewer.ScrollChanged += (s, args) =>
+                    {
+                        if (args.ViewportHeightChange != 0 || args.ExtentHeightChange != 0)
+                        {
+                            UpdateColumnWidths(listView, gridView);
+                        }
+                    };
+                    scrollViewer.Tag = true;
+                }
+            }
+            else
+            {
+                // Fallback width for scrollbar if visual tree isn't fully loaded yet
+                scrollbarWidth = 18;
+            }
+
+            double availableWidth = totalWidth - 4 - scrollbarWidth; // Deduct borders and scrollbar
+            if (availableWidth <= 0) return;
+
+            double fixedWidths = 140 + 80 + 120; // Hash (140), Domain (80), Strategy (120)
+            double remainingWidth = availableWidth - fixedWidths;
+            if (remainingWidth < 150) remainingWidth = 150;
+
+            gridView.Columns[0].Width = 140;
+            gridView.Columns[1].Width = 80;
+            
+            double resolvedWidth = Math.Floor(remainingWidth * 0.45);
+            gridView.Columns[2].Width = resolvedWidth;
+            gridView.Columns[3].Width = 120;
+            
+            // Last column takes EXACTLY the remaining width to leave 0px empty gap
+            gridView.Columns[4].Width = Math.Max(100, availableWidth - (140 + 80 + resolvedWidth + 120));
+        }
+
+        private static ScrollViewer GetScrollViewer(DependencyObject depObj)
+        {
+            if (depObj is ScrollViewer) return (ScrollViewer)depObj;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = VisualTreeHelper.GetChild(depObj, i);
+                var result = GetScrollViewer(child);
+                if (result != null) return result;
+            }
+            return null;
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
