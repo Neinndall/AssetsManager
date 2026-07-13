@@ -65,17 +65,15 @@
                             <Setter Property="Background" Value="{StaticResource CardBackground}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
-                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsSelected" Value="True"/>
                                 <Condition Property="IsMouseOver" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Background" Value="{StaticResource HoverColor}"/>
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -99,17 +97,15 @@
                                     <Setter Property="Background" Value="{StaticResource CardBackground}"/>
                                 </Trigger>
                                 <Trigger Property="IsSelected" Value="True">
-                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                    <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                                 </Trigger>
                                 <MultiTrigger>
                                     <MultiTrigger.Conditions>
                                         <Condition Property="IsSelected" Value="True"/>
                                         <Condition Property="IsMouseOver" Value="True"/>
                                     </MultiTrigger.Conditions>
-                                    <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="Background" Value="{StaticResource HoverColor}"/>
                                 </MultiTrigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
