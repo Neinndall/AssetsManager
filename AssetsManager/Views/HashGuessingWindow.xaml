@@ -633,7 +633,7 @@
                 <!-- Results List -->
                 <ListView Grid.Row="4" ItemsSource="{Binding Matches}" Style="{StaticResource ModernListView}" SizeChanged="ListView_SizeChanged">
                     <ListView.View>
-                        <GridView>
+                        <GridView AllowsColumnReorder="False">
                             <GridViewColumn Header="Hash" Width="140">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
