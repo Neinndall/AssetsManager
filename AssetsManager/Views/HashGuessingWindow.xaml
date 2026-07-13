@@ -638,15 +638,27 @@
                     <ListView.View>
                         <GridView AllowsColumnReorder="False">
                             <GridViewColumn Header="Hash" Width="140">
+                                <GridViewColumn.HeaderContainerStyle>
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    </Style>
+                                </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding HashText}" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBlock Text="{Binding HashText}" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Domain" Width="80">
+                                <GridViewColumn.HeaderContainerStyle>
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    </Style>
+                                </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
-                                    <DataTemplate><TextBlock Text="{Binding DomainText}" Foreground="{StaticResource TextMuted}"/></DataTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DomainText}" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                                    </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Resolved value" Width="340">
@@ -657,9 +669,14 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Strategy" Width="135">
+                                <GridViewColumn.HeaderContainerStyle>
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                    </Style>
+                                </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                        <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding StrategyText}" FontSize="10" Foreground="{StaticResource AccentBrush}"/>
                                         </Border>
                                     </DataTemplate>
