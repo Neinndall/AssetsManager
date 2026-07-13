@@ -77,6 +77,14 @@ namespace AssetsManager.Services.Hashes
                             {
                                 isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                                 isRst = includeRst && path.EndsWith(".stringtable", StringComparison.OrdinalIgnoreCase);
+                                if (includeBin && !isBin && !isRst)
+                                {
+                                    string sig = GetChunkSignature(wad, pair.Value);
+                                    if (sig == "PROP" || sig == "PTCH")
+                                    {
+                                        isBin = true;
+                                    }
+                                }
                             }
                             else
                             {
@@ -217,6 +225,14 @@ namespace AssetsManager.Services.Hashes
                             {
                                 isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                                 isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
+                                if (!isBin && !isText)
+                                {
+                                    string sig = GetChunkSignature(wad, pair.Value);
+                                    if (sig == "PROP" || sig == "PTCH")
+                                    {
+                                        isBin = true;
+                                    }
+                                }
                             }
                             else
                             {
@@ -280,7 +296,7 @@ namespace AssetsManager.Services.Hashes
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
-                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".bnk" or ".anm" or ".skn" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin";
+                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin";
                     })
                     .ToList();
 
@@ -713,8 +729,6 @@ namespace AssetsManager.Services.Hashes
         private static bool IsTextCandidatePath(string path) => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".material", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".troybin", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".preload", StringComparison.OrdinalIgnoreCase) ||
