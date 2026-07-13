@@ -631,17 +631,17 @@
                 </Border>
                 
                 <!-- Results List -->
-                <ListView Grid.Row="4" ItemsSource="{Binding Matches}" Style="{StaticResource ModernListView}">
+                <ListView Grid.Row="4" ItemsSource="{Binding Matches}" Style="{StaticResource ModernListView}" SizeChanged="ListView_SizeChanged">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="Hash" Width="145">
+                            <GridViewColumn Header="Hash" Width="140">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding HashText}" FontFamily="Consolas" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Domain" Width="100">
+                            <GridViewColumn Header="Domain" Width="80">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate><TextBlock Text="{Binding DomainText}" Foreground="{StaticResource TextMuted}"/></DataTemplate>
                                 </GridViewColumn.CellTemplate>
@@ -649,7 +649,7 @@
                             <GridViewColumn Header="Resolved value" Width="340">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Path=Path}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Path=Path}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>

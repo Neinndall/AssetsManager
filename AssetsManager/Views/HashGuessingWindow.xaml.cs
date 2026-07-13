@@ -241,6 +241,26 @@ namespace AssetsManager.Views
             }
         }
 
+        private void ListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (sender is ListView listView && listView.View is GridView gridView)
+            {
+                double totalWidth = listView.ActualWidth;
+                double availableWidth = totalWidth - 30; // Deduct borders/scrollbar
+                if (availableWidth <= 0) return;
+
+                double fixedWidths = 140 + 80 + 120; // Hash (140), Domain (80), Strategy (120)
+                double remainingWidth = availableWidth - fixedWidths;
+                if (remainingWidth < 150) remainingWidth = 150;
+
+                gridView.Columns[0].Width = 140;
+                gridView.Columns[1].Width = 80;
+                gridView.Columns[2].Width = remainingWidth * 0.45; // Resolved value (45%)
+                gridView.Columns[3].Width = 120;
+                gridView.Columns[4].Width = remainingWidth * 0.55; // Source WAD (55%)
+            }
+        }
+
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
         private enum InternalHashAction { Inventory, Content, Structural }
     }
