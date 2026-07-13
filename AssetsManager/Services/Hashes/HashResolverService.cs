@@ -184,6 +184,8 @@ namespace AssetsManager.Services.Hashes
         public Task ForceReloadHashesAsync()
         {
             Dispose();
+            _cachedRstXxh3Hashes = null;
+            _cachedRstXxh64Hashes = null;
             _gameLcuHashesLoaded = false;
             _binHashesLoaded = false;
             _rstHashesLoaded = false;

@@ -15,6 +15,9 @@ namespace AssetsManager.Views.Models.Hashes
         public string SourceWadPath { get; set; }
         public ulong SourceChunkHash { get; set; }
         public DateTime FoundAtUtc { get; set; } = DateTime.UtcNow;
+        public string HashText => Hash.ToString("x16");
+        public string DomainText => Domain.ToString().ToUpperInvariant();
+        public string StrategyText => Strategy.ToString();
     }
 
     public sealed class HashGuessProgress

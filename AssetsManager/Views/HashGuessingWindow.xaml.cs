@@ -14,16 +14,23 @@ namespace AssetsManager.Views
     public partial class HashGuessingWindow : UserControl
     {
         private readonly HashGuessingService _hashGuessingService;
+        private readonly BinRstHashGuessingService _binRstHashGuessingService;
         private readonly AppSettings _appSettings;
         private readonly CustomMessageBoxService _messageBoxService;
         private readonly LogService _logService;
         private readonly HashGuessLabModel _viewModel = new();
         private CancellationTokenSource _cancellationTokenSource;
 
-        public HashGuessingWindow(HashGuessingService hashGuessingService, AppSettings appSettings, CustomMessageBoxService messageBoxService, LogService logService)
+        public HashGuessingWindow(
+            HashGuessingService hashGuessingService,
+            BinRstHashGuessingService binRstHashGuessingService,
+            AppSettings appSettings,
+            CustomMessageBoxService messageBoxService,
+            LogService logService)
         {
             InitializeComponent();
             _hashGuessingService = hashGuessingService;
+            _binRstHashGuessingService = binRstHashGuessingService;
             _appSettings = appSettings;
             _messageBoxService = messageBoxService;
             _logService = logService;
@@ -37,11 +44,21 @@ namespace AssetsManager.Views
             if (DomainSelector == null || TxtUnknownCount == null) return;
             try
             {
-                var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                var summary = await _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None);
-                TxtUnknownCount.Text = summary.Recent + summary.Historical == 0
-                    ? $"{summary.Current:N0} current"
-                    : $"{summary.Current:N0} current · {summary.Recent:N0} recent · {summary.Historical:N0} historical";
+                if (DomainSelector.SelectedIndex < 2)
+                {
+                    var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+                    var summary = await _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None);
+                    TxtUnknownCount.Text = summary.Recent + summary.Historical == 0
+                        ? $"{summary.Current:N0} current"
+                        : $"{summary.Current:N0} current · {summary.Recent:N0} recent · {summary.Historical:N0} historical";
+                }
+                else
+                {
+                    var summary = await _binRstHashGuessingService.GetSummaryAsync(CancellationToken.None);
+                    TxtUnknownCount.Text = DomainSelector.SelectedIndex == 2
+                        ? $"{summary.BinTotal:N0} BIN unknowns"
+                        : $"{summary.RstTotal:N0} RST unknowns";
+                }
             }
             catch (Exception ex)
             {
@@ -64,6 +81,10 @@ namespace AssetsManager.Views
         private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
         private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
         private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
+        private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
+        private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
+        private async void RunBinRemoteContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.RemoteContent);
+        private async void RunInternalStructural_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Structural);
         private void Cancel_Click(object sender, RoutedEventArgs e) => _cancellationTokenSource?.Cancel();
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -151,6 +172,78 @@ namespace AssetsManager.Views
             }
         }
 
+        private async System.Threading.Tasks.Task RunInternalAsync(InternalHashAction action)
+        {
+            if (_viewModel.IsRunning) return;
+            string rootPath = _appSettings.LolPbeDirectory?.Trim();
+            if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
+            {
+                _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
+                return;
+            }
+
+            bool includeBin = DomainSelector.SelectedIndex == 2;
+            bool includeRst = DomainSelector.SelectedIndex == 3;
+            var runCancellation = new CancellationTokenSource();
+            _cancellationTokenSource = runCancellation;
+            _viewModel.IsRunning = true;
+            _viewModel.ProgressValue = 0;
+            _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
+            string internalDomain = includeBin ? "BIN" : "RST";
+            _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash candidates...";
+            _viewModel.Matches.Clear();
+
+            try
+            {
+                var progress = new Progress<InternalHashProgress>(value =>
+                {
+                    _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
+                    if (value.TotalWads > 0) _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
+                    _viewModel.StatusText = $"{value.CurrentStage} · {value.ProcessedFiles:N0} files/candidates · {value.FoundMatches:N0} matches";
+                });
+
+                if (action == InternalHashAction.Inventory)
+                {
+                    var inventory = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
+                    _viewModel.ProgressValue = 100;
+                    _viewModel.StatusText = includeBin
+                        ? $"BIN inventory completed: {inventory.ScannedBins:N0} files parsed."
+                        : $"RST inventory completed: {inventory.ScannedStringTables:N0} stringtables parsed.";
+                }
+                else
+                {
+                    InternalHashRunResult result = action switch
+                    {
+                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
+                        InternalHashAction.RemoteContent => await _binRstHashGuessingService.RunRemoteContentGuessingAsync(rootPath, progress, runCancellation.Token),
+                        _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
+                    };
+                    _viewModel.Matches.AddRange(result.Matches.Cast<object>());
+                    _viewModel.ProgressValue = 100;
+                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} internal hashes resolved and saved.";
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _viewModel.StatusText = "Internal hash guessing cancelled.";
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Internal hash guessing failed.");
+                _viewModel.StatusText = "Internal hash guessing failed. Check application_errors.log.";
+                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
+            finally
+            {
+                if (ReferenceEquals(_cancellationTokenSource, runCancellation)) _cancellationTokenSource = null;
+                runCancellation.Dispose();
+                _viewModel.IsProgressIndeterminate = false;
+                _viewModel.IsRunning = false;
+                UpdateUnknownCountAsync();
+            }
+        }
+
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
+        private enum InternalHashAction { Inventory, Content, RemoteContent, Structural }
     }
 }

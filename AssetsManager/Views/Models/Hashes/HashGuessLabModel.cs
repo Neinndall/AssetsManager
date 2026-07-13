@@ -11,7 +11,7 @@ namespace AssetsManager.Views.Models.Hashes
         private double _progressValue;
         private bool _isProgressIndeterminate;
 
-        public ObservableRangeCollection<HashGuessMatch> Matches { get; } = new();
+        public ObservableRangeCollection<object> Matches { get; } = new();
 
         public bool IsRunning { get => _isRunning; set { _isRunning = value; OnPropertyChanged(); } }
         public string StatusText { get => _statusText; set { _statusText = value; OnPropertyChanged(); } }

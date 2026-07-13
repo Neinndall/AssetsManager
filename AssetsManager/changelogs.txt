@@ -4,6 +4,7 @@ HOTFIX UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Added independent BIN and RST hash guessing with local inventory, content scanning, structural strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.
   - Added centralized and persistent tracking of unknown hashes in hash_lab/unknowns.txt, merging historical unknowns with live WAD scans.
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
@@ -11,6 +12,9 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Hash Guessing Lab now separates GAME, LCU, BIN, and RST domains with categorized results and patch-aware inventories.
+  - BIN and RST inventories now refresh independently and present dedicated actions with consistent strategy icons.
+  - BIN guessing now exposes local, exported-content and structural searches separately.
   - Hash guessing now generates wordlists faster with lower memory usage and updates large result sets in one batch.
   - Advanced hash guessing now prioritizes proven Riot path combinations and avoids redundant candidate attacks.
   - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
@@ -34,6 +38,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed BIN unknown inventories showing 64-bit padding and retaining placeholder zero hashes.
   - Fixed LCU embedded paths losing their directory context during guessing.
   - Added working cancellation, accurate indeterminate progress, and safer unknown-hash persistence to Hash Guessing Lab.
   - Fixed guessing suites reintroducing hashes resolved by an earlier phase of the same run.

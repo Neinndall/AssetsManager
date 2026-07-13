@@ -151,6 +151,8 @@ namespace AssetsManager
       services.AddSingleton<HashService>();
       services.AddSingleton<HashGuessingStore>();
       services.AddSingleton<HashGuessingService>();
+      services.AddSingleton<BinRstHashGuessingStore>();
+      services.AddSingleton<BinRstHashGuessingService>();
 
       // Comparator Services
       services.AddSingleton<WadComparatorService>();
