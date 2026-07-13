@@ -242,7 +242,7 @@ namespace AssetsManager.Services.Hashes
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
-                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".bnk" or ".anm" or ".skn" or ".pfx" or ".material" or ".troybin" or ".preload";
+                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".bnk" or ".anm" or ".skn" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin";
                     })
                     .ToList();
 
@@ -563,11 +563,16 @@ namespace AssetsManager.Services.Hashes
             path.EndsWith(".js", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".inibin", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".material", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".troybin", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".preload", StringComparison.OrdinalIgnoreCase) ||
-            path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase);
+            path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".luabin64", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".luabin", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".yml", StringComparison.OrdinalIgnoreCase);
 
         private static string BuildFingerprint(IEnumerable<string> paths)
         {
