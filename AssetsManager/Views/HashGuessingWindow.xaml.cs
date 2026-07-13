@@ -252,25 +252,20 @@ namespace AssetsManager.Views
 
         private void UpdateColumnWidths(ListView listView, GridView gridView)
         {
-            double totalWidth = listView.ActualWidth;
-            if (totalWidth <= 0) return;
-
-            // Detect vertical scrollbar visibility to allocate exact space
-            double scrollbarWidth = 0;
             var scrollViewer = GetScrollViewer(listView);
+            double availableWidth = 0;
+
             if (scrollViewer != null)
             {
-                if (scrollViewer.ComputedVerticalScrollBarVisibility == Visibility.Visible)
-                {
-                    scrollbarWidth = SystemParameters.VerticalScrollBarWidth;
-                }
-                
-                // Subscribe to ScrollChanged to adjust widths immediately if a scrollbar appears/disappears
+                // ViewportWidth is the exact visible width of the content area (scrollbars subtracted automatically)
+                availableWidth = scrollViewer.ViewportWidth;
+
+                // Subscribe to ScrollChanged to recalculate when the viewport size changes
                 if (scrollViewer.Tag == null)
                 {
                     scrollViewer.ScrollChanged += (s, args) =>
                     {
-                        if (args.ViewportHeightChange != 0 || args.ExtentHeightChange != 0)
+                        if (args.ViewportWidthChange != 0 || args.ViewportHeightChange != 0 || args.ExtentHeightChange != 0)
                         {
                             UpdateColumnWidths(listView, gridView);
                         }
@@ -278,14 +273,16 @@ namespace AssetsManager.Views
                     scrollViewer.Tag = true;
                 }
             }
-            else
+
+            if (availableWidth <= 0)
             {
-                // Fallback width for scrollbar if visual tree isn't fully loaded yet
-                scrollbarWidth = 18;
+                double totalWidth = listView.ActualWidth;
+                if (totalWidth <= 0) return;
+                availableWidth = totalWidth - 22; // Fallback
             }
 
-            double availableWidth = totalWidth - 4 - scrollbarWidth; // Deduct borders and scrollbar
-            if (availableWidth <= 0) return;
+            // Subtract 2 pixels to prevent minor floating point rounding from triggering a horizontal scrollbar
+            availableWidth = Math.Max(300, availableWidth - 2);
 
             double fixedWidths = 140 + 80 + 120; // Hash (140), Domain (80), Strategy (120)
             double remainingWidth = availableWidth - fixedWidths;
