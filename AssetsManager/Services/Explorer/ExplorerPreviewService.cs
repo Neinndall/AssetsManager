@@ -67,6 +67,7 @@ namespace AssetsManager.Services.Explorer
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
         private readonly DiffViewService _diffViewService;
+        private readonly AssetMemoryCacheService _assetMemoryCacheService;
 
         private bool _isGridActive;
 
@@ -78,7 +79,8 @@ namespace AssetsManager.Services.Explorer
             WadContentProvider wadContentProvider,
             SvgParser svgParser,
             NarrativeMetadataService narrativeMetadataService,
-            DiffViewService diffViewService)
+            DiffViewService diffViewService,
+            AssetMemoryCacheService assetMemoryCacheService)
         {
             _logService = logService;
             _directoriesCreator = directoriesCreator;
@@ -88,6 +90,7 @@ namespace AssetsManager.Services.Explorer
             _svgParser = svgParser;
             _narrativeMetadataService = narrativeMetadataService;
             _diffViewService = diffViewService;
+            _assetMemoryCacheService = assetMemoryCacheService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
@@ -316,8 +319,8 @@ namespace AssetsManager.Services.Explorer
             _directoriesCreator.CreateDirectory(_directoriesCreator.TempPreviewPath);
 
             if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension, previewRequest); }
-            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data, previewRequest); }
-            else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data, previewRequest); }
+            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data, extension, previewRequest); }
+            else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data, extension, previewRequest); }
             else if (SupportedFileTypes.Media.Contains(extension))
             {
                 if (extension == ".wem")
@@ -651,10 +654,18 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task ShowImagePreviewAsync(byte[] data, PreviewRequest previewRequest)
+        private async Task ShowImagePreviewAsync(byte[] data, string extension, PreviewRequest previewRequest)
         {
+            string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
+            if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
+            {
+                await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
+                return;
+            }
+
             var bitmap = await Task.Run(() =>
             {
+                previewRequest.CancellationToken.ThrowIfCancellationRequested();
                 using var stream = new MemoryStream(data);
                 var bmp = new BitmapImage();
                 bmp.BeginInit();
@@ -663,21 +674,31 @@ namespace AssetsManager.Services.Explorer
                 bmp.EndInit();
                 bmp.Freeze();
                 return bmp;
-            });
+            }, previewRequest.CancellationToken);
 
+            _assetMemoryCacheService.SetImage(imageCacheKey, bitmap);
             await SetPreviewerAsync(Previewer.Image, bitmap, false, previewRequest);
         }
 
         private async Task ShowTexturePreviewAsync(byte[] data, string extension, PreviewRequest previewRequest)
         {
+            string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
+            if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
+            {
+                await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
+                return;
+            }
+
             var bitmapSource = await Task.Run(() =>
             {
+                previewRequest.CancellationToken.ThrowIfCancellationRequested();
                 using var stream = new MemoryStream(data);
                 return TextureUtils.LoadTexture(stream, extension);
-            });
+            }, previewRequest.CancellationToken);
 
             if (bitmapSource != null)
             {
+                _assetMemoryCacheService.SetImage(imageCacheKey, bitmapSource);
                 await SetPreviewerAsync(Previewer.Image, bitmapSource, false, previewRequest);
             }
             else
@@ -686,13 +707,25 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task ShowSvgPreviewAsync(byte[] data, PreviewRequest previewRequest)
+        private async Task ShowSvgPreviewAsync(byte[] data, string extension, PreviewRequest previewRequest)
         {
             try
             {
-                var drawingImage = await Task.Run(() => _svgParser.LoadSvg(data));
+                string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
+                if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
+                {
+                    await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
+                    return;
+                }
+
+                var drawingImage = await Task.Run(() =>
+                {
+                    previewRequest.CancellationToken.ThrowIfCancellationRequested();
+                    return _svgParser.LoadSvg(data);
+                }, previewRequest.CancellationToken);
                 if (drawingImage != null)
                 {
+                    _assetMemoryCacheService.SetImage(imageCacheKey, drawingImage);
                     await SetPreviewerAsync(Previewer.Image, drawingImage, false, previewRequest);
                 }
                 else
@@ -877,10 +910,17 @@ namespace AssetsManager.Services.Explorer
                 if (data == null) return null;
 
                 int? size = maxWidth > 0 ? maxWidth : null;
+                string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, node.Extension, maxWidth, maxWidth);
+                if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
+                {
+                    return cachedImage;
+                }
+
+                ImageSource image = null;
 
                 if (SupportedFileTypes.Images.Contains(node.Extension))
                 {
-                    return await Task.Run(() =>
+                    image = await Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         using var stream = new MemoryStream(data);
@@ -896,7 +936,7 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.Textures.Contains(node.Extension))
                 {
-                    return await Task.Run(() =>
+                    image = await Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         using var stream = new MemoryStream(data);
@@ -905,12 +945,15 @@ namespace AssetsManager.Services.Explorer
                 }
                 else if (SupportedFileTypes.VectorImages.Contains(node.Extension))
                 {
-                    return await Task.Run(() =>
+                    image = await Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         return _svgParser.LoadSvg(data);
                     }, cancellationToken);
                 }
+
+                _assetMemoryCacheService.SetImage(imageCacheKey, image);
+                return image;
             }
             catch (OperationCanceledException)
             {
@@ -929,7 +972,6 @@ namespace AssetsManager.Services.Explorer
                 }
             }
 
-            return null;
         }
 
         public async Task ShowFileDiffAsync(string oldPath, string newPath, Window owner)

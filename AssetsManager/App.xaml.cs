@@ -63,6 +63,7 @@ namespace AssetsManager
 
       // Core Services
       services.AddSingleton<LogService>();
+      services.AddSingleton<AssetMemoryCacheService>();
       services.AddSingleton<NotificationService>();
       services.AddSingleton<GitHubApiService>();
       services.AddSingleton<TaskCancellationManager>();
