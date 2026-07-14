@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Collections.Generic;
 using System.Windows.Media;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using AssetsManager.Services.Parsers;
 using System.Reflection;
@@ -40,7 +41,7 @@ namespace AssetsManager.Services.Explorer
         private FilePreviewerModel _viewModel;
         private IHighlightingDefinition _jsonHighlightingDefinition;
         private CancellationTokenSource _previewCancellationTokenSource;
-        private Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> _webViewEnvironmentTask;
+        private Task<CoreWebView2Environment> _webViewEnvironmentTask;
         private long _previewGeneration;
 
         private readonly LogService _logService;
@@ -548,13 +549,13 @@ namespace AssetsManager.Services.Explorer
                 ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
                 // Set settings and mappings
-                webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, CoreWebView2HostResourceAccessKind.Allow);
                 webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
 
                 // Navigate and handle autoplay
-                void OnNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+                void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
                 {
                     webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
                     if (shouldAutoplay && IsCurrentPreview(previewGeneration, cancellationToken))
@@ -594,9 +595,9 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> GetWebViewEnvironmentAsync()
+        private async Task<CoreWebView2Environment> GetWebViewEnvironmentAsync()
         {
-            _webViewEnvironmentTask ??= Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
+            _webViewEnvironmentTask ??= CoreWebView2Environment.CreateAsync(
                 userDataFolder: _directoriesCreator.WebView2DataPath);
 
             try
