@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Windows.Controls;
+using AssetsManager.Views.Dialogs.Controls;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Wad;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Tests.Explorer
@@ -47,6 +49,19 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             string xaml = File.ReadAllText(stylePath);
 
             Assert.DoesNotContain("Property=\"IsSelected\" Value=\"{Binding IsSelected", xaml);
+        }
+
+        [Fact]
+        public void ComparisonTreeSelection_UpdatesActiveDiffState()
+        {
+            var previous = new SerializableChunkDiff { IsSelected = true };
+            var current = new SerializableChunkDiff();
+
+            WadResultsTreeControl.SetItemSelection(previous, false);
+            WadResultsTreeControl.SetItemSelection(current, true);
+
+            Assert.False(previous.IsSelected);
+            Assert.True(current.IsSelected);
         }
     }
 }
