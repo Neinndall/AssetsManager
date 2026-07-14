@@ -114,9 +114,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D);
 
-            _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
-            _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
-
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             CompositionTarget.Rendering += CompositionTarget_Rendering;
@@ -156,7 +153,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // Ensure initial state is applied
-            SetGroundVisibility(!_viewModel.IsTransparentBg);
+            SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
             SetSkyboxVisibility(_viewModel.ShowSkybox);
         }
 
@@ -347,6 +344,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeSceneModel = null;
 
             _viewModel.IsAutoRotateActive = false;
+            _viewModel.ResetStudioSettings();
             ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
             // CRITICAL: Free cached vertex/skin buffers from the previous model so

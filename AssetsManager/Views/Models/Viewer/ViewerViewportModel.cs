@@ -142,6 +142,17 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        public void ResetStudioSettings()
+        {
+            AmbientIntensity = 100;
+            LightRotation = 0;
+            LightHeight = 0;
+            FieldOfView = 45;
+            IsGroundVisible = true;
+            IsTransparentBg = false;
+            ShowSkybox = true;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
