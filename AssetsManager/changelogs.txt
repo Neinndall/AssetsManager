@@ -13,6 +13,12 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - LCU Basic guessing now includes full basename and basename-word substitution before its plugin and pattern phases.
+  - LCU Advanced guessing now targets two-word party image variants with a reduced PNG vocabulary.
+  - GAME chroma-group guessing now works offline from the installed skins catalog.
+  - Hash guessing now preserves complete CDTB baseline coverage before running additional optimized GAME and LCU strategies.
+  - Hash guessing now uses dedicated shared, GAME, and LCU strategy components with one centralized save flow.
+  - Hash guessing now isolates GAME and LCU WAD discovery while preserving shared unknown tracking and expanded path coverage.
   - Hash Guessing Lab results list columns now automatically resize to perfectly fit the window width.
   - Expanded local files scanning to support additional game assets (audio, animations, models, and scripts).
   - Optimized BIN structural candidate generation to run significantly faster with minimal CPU and RAM overhead.

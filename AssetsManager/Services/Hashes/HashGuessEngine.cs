@@ -183,7 +183,7 @@ namespace AssetsManager.Services.Hashes
             string path = value.Trim().Replace('\\', '/').ToLowerInvariant().Replace("data_soon/", "data/");
             // Riot's historical GAME list contains valid hashed paths with repeated separators.
             // Preserve the exact path spelling: collapsing or rejecting it changes the hash.
-            return path.Length > 512 ? string.Empty : path;
+            return path;
         }
     }
 }

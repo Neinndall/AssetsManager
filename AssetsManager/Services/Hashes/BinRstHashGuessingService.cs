@@ -25,17 +25,20 @@ namespace AssetsManager.Services.Hashes
         private const int NumericBudget = 5_000_000;
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
         private readonly BinRstHashGuessingStore _store;
+        private readonly HashGuessPersistenceService _persistence;
         private readonly HashResolverService _resolver;
         private readonly DirectoriesCreator _directories;
         private readonly LogService _log;
 
         public BinRstHashGuessingService(
             BinRstHashGuessingStore store,
+            HashGuessPersistenceService persistence,
             HashResolverService resolver,
             DirectoriesCreator directories,
             LogService log)
         {
             _store = store;
+            _persistence = persistence;
             _resolver = resolver;
             _directories = directories;
             _log = log;
@@ -146,7 +149,7 @@ namespace AssetsManager.Services.Hashes
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
             try
             {
-                await _store.SaveInventoryAsync(selectedObserved, fingerprint, includeBin ? "bin" : "rst", CancellationToken.None);
+                await _persistence.CommitInternalInventoryAsync(selectedObserved, fingerprint, includeBin ? "bin" : "rst", CancellationToken.None);
             }
             finally
             {
@@ -392,7 +395,7 @@ namespace AssetsManager.Services.Hashes
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
             try
             {
-                await _store.SaveMatchesAsync(matches, CancellationToken.None);
+                await _persistence.CommitInternalMatchesAsync(matches, CancellationToken.None);
             }
             finally
             {

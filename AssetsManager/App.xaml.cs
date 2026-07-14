@@ -150,6 +150,7 @@ namespace AssetsManager
       services.AddSingleton<HashResolverService>();
       services.AddSingleton<HashService>();
       services.AddSingleton<HashGuessingStore>();
+      services.AddSingleton<HashGuessPersistenceService>();
       services.AddSingleton<HashGuessingService>();
       services.AddSingleton<BinRstHashGuessingStore>();
       services.AddSingleton<BinRstHashGuessingService>();
