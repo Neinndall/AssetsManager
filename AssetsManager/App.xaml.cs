@@ -117,6 +117,8 @@ namespace AssetsManager
       services.AddSingleton<SvgParser>();
  
       // Explorer Services
+      services.AddTransient<MediaTempFileStore>();
+      services.AddTransient<MediaWebViewPreviewService>();
       services.AddTransient<ExplorerPreviewService>();
       services.AddSingleton<WadExportService>();
       services.AddSingleton<WadContentProvider>();
