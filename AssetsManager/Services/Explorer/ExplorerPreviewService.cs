@@ -72,7 +72,6 @@ namespace AssetsManager.Services.Explorer
         private readonly SvgParser _svgParser;
         private readonly NarrativeMetadataService _narrativeMetadataService;
         private readonly DiffViewService _diffViewService;
-        private readonly AssetMemoryCacheService _assetMemoryCacheService;
         private readonly MediaWebViewPreviewService _mediaWebViewPreviewService;
 
         private bool _isGridActive;
@@ -85,7 +84,6 @@ namespace AssetsManager.Services.Explorer
             SvgParser svgParser,
             NarrativeMetadataService narrativeMetadataService,
             DiffViewService diffViewService,
-            AssetMemoryCacheService assetMemoryCacheService,
             MediaWebViewPreviewService mediaWebViewPreviewService)
         {
             _logService = logService;
@@ -95,7 +93,6 @@ namespace AssetsManager.Services.Explorer
             _svgParser = svgParser;
             _narrativeMetadataService = narrativeMetadataService;
             _diffViewService = diffViewService;
-            _assetMemoryCacheService = assetMemoryCacheService;
             _mediaWebViewPreviewService = mediaWebViewPreviewService;
         }
 
@@ -534,13 +531,6 @@ namespace AssetsManager.Services.Explorer
 
         private async Task ShowImagePreviewAsync(byte[] data, string extension, PreviewRequest previewRequest)
         {
-            string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
-            if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
-            {
-                await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
-                return;
-            }
-
             var bitmap = await Task.Run(() =>
             {
                 previewRequest.CancellationToken.ThrowIfCancellationRequested();
@@ -554,19 +544,11 @@ namespace AssetsManager.Services.Explorer
                 return bmp;
             }, previewRequest.CancellationToken);
 
-            _assetMemoryCacheService.SetImage(imageCacheKey, bitmap);
             await SetPreviewerAsync(Previewer.Image, bitmap, false, previewRequest);
         }
 
         private async Task ShowTexturePreviewAsync(byte[] data, string extension, PreviewRequest previewRequest)
         {
-            string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
-            if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
-            {
-                await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
-                return;
-            }
-
             var bitmapSource = await Task.Run(() =>
             {
                 previewRequest.CancellationToken.ThrowIfCancellationRequested();
@@ -576,7 +558,6 @@ namespace AssetsManager.Services.Explorer
 
             if (bitmapSource != null)
             {
-                _assetMemoryCacheService.SetImage(imageCacheKey, bitmapSource);
                 await SetPreviewerAsync(Previewer.Image, bitmapSource, false, previewRequest);
             }
             else
@@ -589,13 +570,6 @@ namespace AssetsManager.Services.Explorer
         {
             try
             {
-                string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, extension, 0, 0);
-                if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
-                {
-                    await SetPreviewerAsync(Previewer.Image, cachedImage, false, previewRequest);
-                    return;
-                }
-
                 var drawingImage = await Task.Run(() =>
                 {
                     previewRequest.CancellationToken.ThrowIfCancellationRequested();
@@ -603,7 +577,6 @@ namespace AssetsManager.Services.Explorer
                 }, previewRequest.CancellationToken);
                 if (drawingImage != null)
                 {
-                    _assetMemoryCacheService.SetImage(imageCacheKey, drawingImage);
                     await SetPreviewerAsync(Previewer.Image, drawingImage, false, previewRequest);
                 }
                 else
@@ -674,12 +647,6 @@ namespace AssetsManager.Services.Explorer
                 if (data == null) return null;
 
                 int? size = maxWidth > 0 ? maxWidth : null;
-                string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, node.Extension, maxWidth, maxWidth);
-                if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
-                {
-                    return cachedImage;
-                }
-
                 ImageSource image = null;
 
                 if (SupportedFileTypes.Images.Contains(node.Extension))
@@ -716,7 +683,6 @@ namespace AssetsManager.Services.Explorer
                     }, cancellationToken);
                 }
 
-                _assetMemoryCacheService.SetImage(imageCacheKey, image);
                 return image;
             }
             catch (OperationCanceledException)

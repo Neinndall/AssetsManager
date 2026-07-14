@@ -1,13 +1,10 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows.Media.Imaging;
 using System.Windows.Media;
-using System.Runtime.InteropServices;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Core.Wad;
 using AssetsManager.Services.Parsers;
@@ -24,18 +21,15 @@ namespace AssetsManager.Services.Explorer
         private readonly LogService _logService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly AssetMemoryCacheService _assetMemoryCacheService;
 
         public WadContentProvider(
             LogService logService, 
             WadNodeLoaderService wadNodeLoaderService, 
-            DirectoriesCreator directoriesCreator,
-            AssetMemoryCacheService assetMemoryCacheService)
+            DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
             _wadNodeLoaderService = wadNodeLoaderService;
             _directoriesCreator = directoriesCreator;
-            _assetMemoryCacheService = assetMemoryCacheService;
         }
 
         /// <summary>
@@ -142,16 +136,8 @@ namespace AssetsManager.Services.Explorer
         private async Task<byte[]> ReadAndDecompressBackupChunkAsync(string chunkPath, WadChunkCompression? compressionType, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string cacheKey = CreatePhysicalCacheKey("backup", chunkPath, 0, compressionType);
-            if (_assetMemoryCacheService.TryGetBytes(cacheKey, out byte[] cachedData))
-            {
-                return cachedData;
-            }
-
             byte[] compressedData = await File.ReadAllBytesAsync(chunkPath, cancellationToken);
-            byte[] data = await Task.Run(() => WadChunkUtils.DecompressChunk(compressedData, compressionType), cancellationToken);
-            _assetMemoryCacheService.SetBytes(cacheKey, data);
-            return data;
+            return await Task.Run(() => WadChunkUtils.DecompressChunk(compressedData, compressionType), cancellationToken);
         }
 
         // Obtiene los bytes descomprimidos de un chunk guardado en el backup.
@@ -294,13 +280,7 @@ namespace AssetsManager.Services.Explorer
             if (data == null) return null;
 
             string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
-            string imageCacheKey = _assetMemoryCacheService.CreateImageKey(data, ext, maxWidth, maxWidth);
-            if (_assetMemoryCacheService.TryGetImage(imageCacheKey, out ImageSource cachedImage))
-            {
-                return cachedImage;
-            }
-
-            ImageSource image = await Task.Run(() =>
+            return await Task.Run(() =>
             {
                 try
                 {
@@ -310,9 +290,6 @@ namespace AssetsManager.Services.Explorer
                 }
                 catch { return null; }
             }, cancellationToken);
-
-            _assetMemoryCacheService.SetImage(imageCacheKey, image);
-            return image;
         }
 
         // Orquesta la extracción de datos de audio .wem desde su contenedor (.bnk o .wpk).
@@ -369,12 +346,6 @@ namespace AssetsManager.Services.Explorer
         private Task<byte[]> DecompressChunkByHashAsync(string wadPath, ulong chunkHash, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string cacheKey = CreatePhysicalCacheKey("wad", wadPath, chunkHash, null);
-            if (_assetMemoryCacheService.TryGetBytes(cacheKey, out byte[] cachedData))
-            {
-                return Task.FromResult(cachedData);
-            }
-
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -389,9 +360,7 @@ namespace AssetsManager.Services.Explorer
                     }
 
                     using var compressedDataOwner = wadFile.LoadChunk(chunk);
-                    byte[] data = WadChunkUtils.DecompressChunk(compressedDataOwner.Memory, chunk.Compression);
-                    _assetMemoryCacheService.SetBytes(cacheKey, data);
-                    return data;
+                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Memory, chunk.Compression);
                 }
                 catch (OperationCanceledException)
                 {
@@ -406,10 +375,5 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
-        private static string CreatePhysicalCacheKey(string source, string path, ulong chunkHash, WadChunkCompression? compressionType)
-        {
-            var file = new FileInfo(path);
-            return $"{source}|{file.FullName.ToUpperInvariant()}|{file.Length}|{file.LastWriteTimeUtc.Ticks}|{chunkHash:X16}|{(int?)compressionType}";
-        }
     }
 }

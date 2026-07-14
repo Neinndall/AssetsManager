@@ -14,7 +14,7 @@ New Features
 
 Improvements
   - Media previews now switch faster while keeping transitions free of stale frames.
-  - Reopening recent assets, image grids, and formatted data now reuses a memory-bounded cache.
+  - Reduced retained memory by loading WAD content, decoded images, and formatted data only when needed.
   - Asset previews and backups now load WAD content more smoothly.
   - Hash validation now shares the existing benchmark project instead of maintaining a separate test application.
   - LCU Basic guessing now includes full basename and basename-word substitution before its plugin and pattern phases.
