@@ -1,0 +1,59 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Shared.FindInDocumentControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d" 
+             d:DesignHeight="48" d:DesignWidth="250"
+             Width="250" Height="38">
+             
+    <UserControl.Resources>
+        <Style x:Key="FindIconButton" TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="{StaticResource CardBackground}"
+            BorderBrush="{StaticResource BorderColor}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="6,4">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 1. Document Searcher -->
+            <TextBox x:Name="SearchTextBox"
+                     Grid.Column="0"
+                     Style="{StaticResource StandardSearchBoxStyle}"
+                     KeyDown="SearchTextBox_KeyDown"
+                     TextChanged="SearchTextBox_TextChanged"
+                     Padding="5,0"
+                     Tag="Search..."
+                     VerticalContentAlignment="Center"
+                     Height="26"
+                     Margin="0,0,8,0"
+                     />
+
+            <!-- 2. Navigation Tools -->
+            <StackPanel Grid.Column="1" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="PreviousButton" Style="{StaticResource FindIconButton}" Click="PreviousButton_Click" ToolTip="Find Previous">
+                    <materialIcons:MaterialIcon Kind="ChevronUp" Width="18" Height="18" />
+                </Button>
+                <Button x:Name="NextButton" Style="{StaticResource FindIconButton}" Click="NextButton_Click" ToolTip="Find Next" Margin="2,0">
+                    <materialIcons:MaterialIcon Kind="ChevronDown" Width="18" Height="18" />
+                </Button>
+                <!-- Vertical Separator -->
+                <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="4,6" VerticalAlignment="Stretch"/>
+                <Button x:Name="CloseButton" Style="{StaticResource FindIconButton}" Click="CloseButton_Click" ToolTip="Close" Margin="2,0,0,0">
+                    <materialIcons:MaterialIcon Kind="Close" Width="16" Height="16" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

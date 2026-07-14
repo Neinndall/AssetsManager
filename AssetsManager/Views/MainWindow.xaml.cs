@@ -1,0 +1,473 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.Comparator;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Downloads;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Monitor;
+using AssetsManager.Services.Updater;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Win;
+using AssetsManager.Views.Controls;
+using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Dialogs.Controls;
+using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.Wad;
+using LeagueToolkit.Core.Wad;
+
+namespace AssetsManager.Views
+{
+    public partial class MainWindow : HudWindow
+    {
+        // ──────────────────────────────────────────────────────────────────────
+        // Fields
+        // ──────────────────────────────────────────────────────────────────────
+
+        private readonly IServiceProvider _serviceProvider;
+        private readonly LogService _logService;
+        private readonly AppSettings _appSettings;
+        private readonly UpdateManager _updateManager;
+        private readonly WadComparatorService _wadComparatorService;
+        private readonly CustomMessageBoxService _customMessageBoxService;
+        private readonly BackupManager _backupManager;
+        private readonly HashResolverService _hashResolverService;
+        private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private readonly ExplorerPreviewService _explorerPreviewService;
+        private readonly UpdateCheckService _updateCheckService;
+        private readonly ProgressUIManager _progressUIManager;
+        private readonly DiffViewService _diffViewService;
+        private readonly MonitorService _monitorService;
+        private readonly VersionService _versionService;
+        private readonly ExtractionService _extractionService;
+        private readonly ReportGenerationService _reportGenerationService;
+        private readonly TaskCancellationManager _taskCancellationManager;
+        private readonly NotificationService _notificationService;
+        private readonly ComparisonHistoryService _comparisonHistoryService;
+
+        private string _latestAppVersionAvailable;
+        
+        // New fields to manage the state of the extraction after comparison
+        private bool _isExtractingAfterComparison = false;
+        private string _extractionOldLolPath;
+        private string _extractionNewLolPath;
+        private string _extractionVersion;
+        private List<SerializableChunkDiff> _diffsForExtraction;
+
+        private GridLength _lastLogHeight = new GridLength(180);
+        private bool _isLogMinimized = false;
+
+        public MainWindow(IServiceProvider serviceProvider)
+        {
+            InitializeComponent();
+
+            _serviceProvider = serviceProvider;
+            _logService = serviceProvider.GetRequiredService<LogService>();
+            _appSettings = serviceProvider.GetRequiredService<AppSettings>();
+            _updateManager = serviceProvider.GetRequiredService<UpdateManager>();
+            _wadComparatorService = serviceProvider.GetRequiredService<WadComparatorService>();
+            _customMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            _backupManager = serviceProvider.GetRequiredService<BackupManager>();
+            _hashResolverService = serviceProvider.GetRequiredService<HashResolverService>();
+            _wadNodeLoaderService = serviceProvider.GetRequiredService<WadNodeLoaderService>();
+            _explorerPreviewService = serviceProvider.GetRequiredService<ExplorerPreviewService>();
+            _updateCheckService = serviceProvider.GetRequiredService<UpdateCheckService>();
+            _progressUIManager = serviceProvider.GetRequiredService<ProgressUIManager>();
+            _diffViewService = serviceProvider.GetRequiredService<DiffViewService>();
+            _monitorService = serviceProvider.GetRequiredService<MonitorService>();
+            _versionService = serviceProvider.GetRequiredService<VersionService>();
+            _extractionService = serviceProvider.GetRequiredService<ExtractionService>();
+            _reportGenerationService = serviceProvider.GetRequiredService<ReportGenerationService>();
+            _taskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
+            _notificationService = serviceProvider.GetRequiredService<NotificationService>();
+            _comparisonHistoryService = serviceProvider.GetRequiredService<ComparisonHistoryService>();
+
+            // Peer-to-Peer Injection
+            Sidebar.ParentWindow = this;
+            StatusBar.ParentWindow = this;
+            LogView.ParentWindow = this;
+
+            _progressUIManager.Initialize(StatusBar.ViewModel, this);
+            _logService.SetLogOutput(LogView.LogRichTextBox);
+
+            // --- Progress events wired directly to ProgressUIManager ---
+            _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
+            _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
+            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+
+            _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
+            _extractionService.ExtractionProgressChanged += _progressUIManager.OnExtractionProgressChanged;
+            _extractionService.ExtractionCompleted += OnExtractionCompleted;
+
+            _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
+            _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
+            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
+
+            _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
+            _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;
+            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompleted;
+
+            _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
+            _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
+            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
+            _versionService.VerificationCompleted += _progressUIManager.OnVersionVerificationCompleted;
+
+            _updateCheckService.UpdatesFound += OnUpdatesFound;
+
+            LoadHomeWindow();
+
+            _updateCheckService.Start();
+            InitializeApplicationAsync();
+
+            StateChanged += MainWindow_StateChanged;
+            Closing += MainWindow_Closing;
+        }
+
+        private async void InitializeApplicationAsync()
+        {
+            await _updateCheckService.CheckForAllUpdatesAsync();
+            await _hashResolverService.LoadAllHashesAsync();
+        }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+        }
+
+        protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            // Single instance: restaurar desde tray cuando otra instancia intenta arrancar
+            if (msg == SingleInstance.WM_SHOW_APP)
+            {
+                ShowAppFromTray();
+                handled = true;
+                return IntPtr.Zero;
+            }
+
+            return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
+        }
+
+
+        // --- Taskbar / NotifyIcon Logic ---
+
+        private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
+        {
+            ShowAppFromTray();
+        }
+
+        private void MenuItem_Show_Click(object sender, RoutedEventArgs e)
+        {
+            ShowAppFromTray();
+        }
+
+        private void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private void ShowAppFromTray()
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            TrayIcon.Visibility = Visibility.Collapsed;
+        }
+
+        private void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized && _appSettings.MinimizeToTrayOnClose)
+            {
+                TrayIcon.Visibility = Visibility.Visible;
+                Hide();
+                // Show a balloon tip when minimized to tray
+                TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
+            }
+        }
+
+        // --- End Taskbar Logic ---
+        private void OnUpdatesFound(string message, string latestVersion)
+        {
+            if (!string.IsNullOrEmpty(latestVersion))
+            {
+                _latestAppVersionAvailable = latestVersion;
+            }
+
+            // Show System Tray Balloon Notification if window is not visible
+            if (Visibility != Visibility.Visible)
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
+                });
+            }
+
+            // Always update internal notification system
+            ShowNotification(true, message);
+        }
+        
+        private void OnExtractionCompleted()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                _progressUIManager.OnExtractionCompleted();
+                if (_isExtractingAfterComparison)
+                {
+                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion);
+                    _isExtractingAfterComparison = false; // Reset flag
+                }
+            });
+        }
+
+        private async void StartExtractionAsync()
+        {
+            var cancellationToken = _taskCancellationManager.PrepareNewOperation();
+            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+        }
+        
+        private async void OnWadComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
+        {
+            // Ensure the progress window reaches 100% and closes before any follow-up UI is shown.
+            await _progressUIManager.FinishComparisonAsync();
+
+            if (diffs == null) return;
+
+            var serializableDiffs = diffs.Select(d => new SerializableChunkDiff
+            {
+                Type = d.Type,
+                OldPath = d.OldPath,
+                NewPath = d.NewPath,
+                SourceWadFile = d.SourceWadFile,
+                OldPathHash = (d.Type == ChunkDiffType.New) ? 0 : d.OldChunk.PathHash,
+                NewPathHash = (d.Type == ChunkDiffType.Removed) ? 0 : d.NewChunk.PathHash,
+                OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
+                NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
+                OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
+            }).ToList();
+
+            if (!serializableDiffs.Any()) return;
+
+            // 1. ALWAYS Save to History if enabled (Independent of other actions).
+            // Dedup is delegated to ComparisonHistoryService: same version + same paths
+            // = same comparison, regardless of session or app restart.
+            if (_appSettings.SaveWadComparisonHistory)
+            {
+                string displayName = ResolveComparisonDisplayName(serializableDiffs, newPath);
+                
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _comparisonHistoryService.EnsureArchivedAsync(
+                            serializableDiffs, oldPath, newPath, version, displayName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to auto-save comparison history.");
+                    }
+                });
+            }
+
+            // 2. Handle follow-up actions (Report, Extraction, or View)
+            if (_appSettings.ReportGeneration.Enabled)
+            {
+                await _reportGenerationService.GenerateReportAsync(serializableDiffs, oldPath, newPath);
+            }
+            else if (_appSettings.EnableExtraction)
+            {
+                _isExtractingAfterComparison = true;
+                _diffsForExtraction = serializableDiffs;
+                _extractionOldLolPath = oldPath;
+                _extractionNewLolPath = newPath;
+                _extractionVersion = version;
+
+                Dispatcher.Invoke(StartExtractionAsync);
+            }
+            else
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    ShowComparisonResultWindow(serializableDiffs, oldPath, newPath, version);
+                });
+            }
+        }
+
+        private string ResolveComparisonDisplayName(List<SerializableChunkDiff> diffs, string newPath)
+        {
+            var uniqueWads = diffs.Select(d => d.SourceWadFile).Distinct().ToList();
+
+            if (uniqueWads.Count == 1) return Path.GetFileName(uniqueWads[0]);
+
+            string folderName = Path.GetFileName(newPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return string.IsNullOrEmpty(folderName) ? "Root" : folderName;
+        }
+
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
+        {
+            var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
+            resultWindow.Initialize(diffs, oldPath, newPath, null, version);
+            resultWindow.Owner = this;
+            resultWindow.Show();
+        }
+
+        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
+        {
+            if (show)
+            {
+                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+            }
+        }
+
+        public void ClearStatusBar()
+        {
+            _progressUIManager.ClearStatusText();
+            // Delegate to StatusBar
+            StatusBar.ClearStatusBar();
+        }
+
+        public void HandleProgressSummaryClicked()
+        {
+            _progressUIManager.ShowDetails();
+        }
+
+        public void HandleLogExpandedManually()
+        {
+            _isLogMinimized = false;
+        }
+
+        public void OnToggleLogSizeRequested(object sender, EventArgs e)
+        {
+            if (_isLogMinimized || LogViewRow.ActualHeight <= 45)
+            {
+                // Restore / Expand
+                if (!_lastLogHeight.IsAbsolute || _lastLogHeight.Value <= 45)
+                {
+                    _lastLogHeight = new GridLength(180);
+                }
+
+                LogViewRow.Height = _lastLogHeight;
+                _isLogMinimized = false;
+                LogView.ViewModel.SetLogVisibility(true); // <--- Restaurar flecha
+            }
+            else
+            {
+                // Minimize
+                _lastLogHeight = LogViewRow.Height;
+                LogViewRow.Height = GridLength.Auto;
+                _isLogMinimized = true;
+                LogView.ViewModel.SetLogVisibility(false); // <--- Restaurar flecha
+            }
+        }
+
+        public async void OnNotificationHubRequested(object sender, EventArgs e)
+        {
+            var hubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
+            hubWindow.Owner = this;
+            hubWindow.ShowDialog();
+
+            if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
+            {
+                await _updateManager.CheckForUpdatesAsync(this, true);
+                _latestAppVersionAvailable = null;
+            }
+        }
+
+        public async void OnSidebarNavigationRequested(string viewTag)
+        {
+            // Only clean up the current view if we are navigating to a *main content view*
+            // Dialogs (Settings, Help) do not replace the main content, so no cleanup is needed.
+            if (viewTag != "Settings" && viewTag != "Help")
+            {
+                if (MainContentArea.Content is ExplorerWindow explorerWindow)
+                {
+                    explorerWindow.CleanupResources();
+                }
+                else if (MainContentArea.Content is ViewerWindow viewerWindow)
+                {
+                    viewerWindow.CleanupResources();
+                }
+            }
+
+            switch (viewTag)
+            {
+                case "Home": LoadHomeWindow(); break;
+                case "Explorer": LoadExplorerWindow(); break;
+                case "Explorer_Live": await LoadExplorerWithModeAsync("Live"); break;
+                case "Explorer_Pbe": await LoadExplorerWithModeAsync("Pbe"); break;
+                case "Explorer_Local": await LoadExplorerWithModeAsync("Local"); break;
+                case "Comparator": LoadComparatorWindow(); break;
+                case "Viewer": LoadViewerWindow(); break;
+                case "Monitor": LoadMonitorWindow(); break;
+                case "HashLab": LoadHashGuessingWindow(); break;
+                case "Settings": btnSettings_Click(null, null); break;
+                case "Help": btnHelp_Click(null, null); break;
+            }
+        }
+
+        private async Task LoadExplorerWithModeAsync(string mode)
+        {
+            var explorerWindow = _serviceProvider.GetRequiredService<ExplorerWindow>();
+            MainContentArea.Content = explorerWindow;
+            await explorerWindow.InitializeWithMode(mode);
+        }
+
+        private void LoadHomeWindow()
+        {
+            var homeWindow = _serviceProvider.GetRequiredService<HomeWindow>();
+            homeWindow.ParentWindow = this;
+            MainContentArea.Content = homeWindow;
+        }
+
+        private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
+        private void LoadComparatorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ComparatorWindow>();
+        private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
+        private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
+        private void LoadHashGuessingWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<HashGuessingWindow>();
+
+        private void btnHelp_Click(object sender, RoutedEventArgs e)
+        {
+            var helpWindow = _serviceProvider.GetRequiredService<HelpWindow>();
+            helpWindow.Owner = this;
+            helpWindow.ShowDialog();
+        }
+
+        private void btnSettings_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
+            settingsWindow.Owner = this;
+            settingsWindow.SettingsChanged += OnSettingsChanged;
+            settingsWindow.ShowDialog();
+        }
+
+        private void OnSettingsChanged(object sender, SettingsChangedEventArgs e)
+        {
+            _updateCheckService.Stop();
+            _updateCheckService.Start();
+        }
+
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            StateChanged -= MainWindow_StateChanged;
+            TrayIcon?.Dispose();
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+    }
+}

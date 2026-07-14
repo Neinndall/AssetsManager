@@ -1,0 +1,26 @@
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.NotepadWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+        xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+        Height="500" Width="400"
+        MinWidth="400" MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource SidebarBackground}"
+        HeaderTitle="Notepad"
+        HeaderIcon="NoteTextOutline"
+        Style="{StaticResource HudWindowStyle}">
+
+    <Grid>
+        <avalonEdit:TextEditor x:Name="NotesEditor" 
+                             Style="{StaticResource BaseTextEditorStyle}"
+                             IsReadOnly="False"
+                             ShowLineNumbers="True"
+                             Padding="10"
+                             Margin="8"/>
+    </Grid>
+</base:HudWindow>

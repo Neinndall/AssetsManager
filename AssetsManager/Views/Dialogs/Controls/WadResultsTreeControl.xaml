@@ -1,0 +1,206 @@
+<UserControl x:Class="AssetsManager.Views.Dialogs.Controls.WadResultsTreeControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d">
+             
+    <UserControl.Resources>
+        <ContextMenu x:Key="WadDiffContextMenu" Opened="ContextMenu_Opened">
+            <MenuItem Header="View Differences" x:Name="ViewDifferencesMenuItem" Click="ViewDifferences_Click">
+                <MenuItem.Icon><materialIcons:MaterialIcon Kind="FileFindOutline"/></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Copy" x:Name="CopyMenuItem">
+                <MenuItem.Icon>
+                    <materialIcons:MaterialIcon Kind="ContentCopy"/>
+                </MenuItem.Icon>
+                <MenuItem Header="Copy Name" Click="CopyName_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Copy Full Path" Click="CopyPath_Click">
+                    <MenuItem.Icon>
+                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+        </ContextMenu>
+
+        <!-- Template para Archivos -->
+        <HierarchicalDataTemplate x:Key="DiffItemTemplate">
+            <Grid Margin="0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}" 
+                                             Width="18" Height="18"
+                                             VerticalAlignment="Center" 
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource TextSecondary}"/>
+                <TextBlock Grid.Column="1" Text="{Binding FileName}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </HierarchicalDataTemplate>
+
+        <!-- Template para Tipos -->
+        <HierarchicalDataTemplate x:Key="DiffTypeTemplate" ItemsSource="{Binding Diffs}" ItemTemplate="{StaticResource DiffItemTemplate}">
+            <Grid Margin="0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
+                                            Width="18" Height="18"
+                                            VerticalAlignment="Center" 
+                                            Margin="0,0,6,0" 
+                                            Foreground="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                <TextBlock Grid.Column="1" Text="{Binding TypeNameWithCount}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </HierarchicalDataTemplate>
+
+        <!-- Template para WAD -->
+        <HierarchicalDataTemplate x:Key="WadGroupTemplate" ItemsSource="{Binding Types}" ItemTemplate="{StaticResource DiffTypeTemplate}">
+            <Grid Margin="0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding Converter={StaticResource PathToIconConverter}}"
+                                             Width="18" Height="18"
+                                             VerticalAlignment="Center" 
+                                             Margin="0,0,6,0"
+                                             Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Grid.Column="1" Text="{Binding WadNameWithCount}" VerticalAlignment="Center" FontSize="13">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Foreground" Value="White"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </HierarchicalDataTemplate>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource SettingsCard}" Padding="0" Margin="0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- 1. Header -->
+            <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="20,15" Background="{StaticResource SidebarBackground}" CornerRadius="11,11,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="FormatListGroup" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Differences Explorer" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. Tree Content (Unified Background) -->
+            <Border Grid.Row="1" Grid.RowSpan="2" Padding="0" Background="{StaticResource CardBackground}" CornerRadius="0,0,12,12">
+                <Grid>
+                    <!-- Loading Indicator (HUD Style) -->
+                    <StackPanel x:Name="LoadingIndicator" 
+                                VerticalAlignment="Center" 
+                                HorizontalAlignment="Center"
+                                Visibility="{Binding DataContext.IsLoading, RelativeSource={RelativeSource AncestorType={x:Type Window}}, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid Width="140" Height="140">
+                            <!-- Background Glow -->
+                            <Ellipse Width="100" Height="100" Fill="{StaticResource AccentBrush}" Opacity="0.1">
+                                <Ellipse.Effect>
+                                    <BlurEffect Radius="40"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+
+                            <!-- Pulse Rings -->
+                            <Ellipse Width="80" Height="80" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" Opacity="0.3" Style="{StaticResource TechnicalGlowStyle}"/>
+                            <Ellipse Width="110" Height="110" Stroke="{StaticResource AccentBrush}" StrokeThickness="0.5" Opacity="0.1" Style="{StaticResource TechnicalGlowStyle}"/>
+
+                            <!-- Main Spinner -->
+                            <materialIcons:MaterialIcon Kind="Sync" 
+                                                        Width="54" Height="54" 
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Style="{StaticResource SpinningIconStyle}"/>
+
+                            <!-- Inner Tech Icon -->
+                            <materialIcons:MaterialIcon Kind="Memory" 
+                                                        Width="20" Height="20" 
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                        Opacity="0.8"/>
+                        </Grid>
+
+                        <StackPanel Margin="0,-15,0,0">
+                            <TextBlock Text="{Binding DataContext.SummaryText, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" 
+                                       HorizontalAlignment="Center" 
+                                       FontSize="14" 
+                                       FontWeight="Black" 
+                                       Foreground="{StaticResource AccentBrush}" 
+                                       Opacity="0.9">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect BlurRadius="10" Color="{Binding Color, Source={StaticResource AccentBrush}}" ShadowDepth="0" Opacity="0.5"/>
+                                </TextBlock.Effect>
+                            </TextBlock>
+                            <TextBlock Text="PLEASE WAIT" 
+                                       HorizontalAlignment="Center" 
+                                       FontSize="11" 
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextMuted}" 
+                                       Margin="0,2,0,0"
+                                       Opacity="0.5"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TreeView -->
+                    <TreeView x:Name="resultsTreeView" 
+                              Style="{StaticResource ModernTreeView}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              Padding="8"
+                              ItemsSource="{Binding WadGroups}"
+                              Visibility="{Binding DataContext.IsLoading, RelativeSource={RelativeSource AncestorType={x:Type Window}}, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                              ItemTemplate="{StaticResource WadGroupTemplate}"
+                              SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                                <Setter Property="ContextMenu" Value="{StaticResource WadDiffContextMenu}"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                    </TreeView>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

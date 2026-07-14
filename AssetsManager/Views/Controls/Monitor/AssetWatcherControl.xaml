@@ -1,0 +1,247 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Monitor.AssetWatcherControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="1000">
+
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 1. Actions & Search Row -->
+            <RowDefinition Height="Auto"/> <!-- 2. Watcher Info Header -->
+            <RowDefinition Height="*"/>    <!-- 3. Assets List -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. ACTIONS & SEARCH ROW (Balanced Proportions) -->
+        <Grid Grid.Row="0" Margin="0,0,0,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>    <!-- Search Card (Flexible) -->
+                <ColumnDefinition Width="160"/>  <!-- Clear Button (Slimmer) -->
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: Search Card -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon Box -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Magnify" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Text -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="Watcher Engine" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                        <TextBlock Text="Track live modifications and filter detected game assets" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Input (Search Hub Integration - Aligned with 44px Icon Box) -->
+                    <Border Grid.Column="2" 
+                            Background="{StaticResource SidebarBackground}" 
+                            BorderBrush="{StaticResource BorderColor}" 
+                            BorderThickness="1" 
+                            CornerRadius="10" 
+                            Padding="0"
+                            Width="260" Height="44"
+                            VerticalAlignment="Center">
+                        <Grid>
+                            <TextBox x:Name="txtSearch" 
+                                     Style="{StaticResource ResourceKey=StandardSearchBoxStyle}" 
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="12,0"
+                                     VerticalContentAlignment="Center"
+                                     TextChanged="TxtSearch_TextChanged" 
+                                     Tag="Search assets..."/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- RIGHT: Clear All -->
+            <Button Grid.Column="1" 
+                    Click="ClearAll_Click" 
+                    Style="{StaticResource DestructiveSelectionCardButtonStyle}" 
+                    Margin="0" 
+                    Height="90" 
+                    Padding="0" 
+                    HorizontalContentAlignment="Stretch" 
+                    VerticalContentAlignment="Stretch">
+                <Grid>
+                    <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Clear All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Reset list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </Grid>
+
+        <!-- 2. WATCHER INFO HEADER (Bento Style) -->
+        <Border Grid.Row="1" Margin="0,0,0,16" Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Radar" Width="16" Foreground="{StaticResource AccentBlue}" Margin="0,0,10,0"/>
+                    <TextBlock Text="Monitored Log Entries" FontSize="11" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Paginator integrated in header like in HistoryView -->
+                <shared:PaginationControl Grid.Column="2" Paginator="{Binding Paginator}"/>
+            </Grid>
+        </Border>
+
+        <!-- 3. ASSETS LIST -->
+        <ListView x:Name="MonitoredAssetsListView" 
+                  Grid.Row="2" 
+                  Style="{StaticResource ModernListView}"
+                  ItemsSource="{Binding Paginator.PagedItems}"
+                  Background="Transparent" BorderThickness="0">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Margin" Value="0,0,0,6"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListViewItem">
+                                <ContentPresenter/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <!-- Card Background -->
+                        <Border x:Name="CardBorder" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"/>
+                        
+                        <!-- Side Status Accent -->
+                        <Border x:Name="StatusIndicator" BorderThickness="2,0,0,0" CornerRadius="8" BorderBrush="{Binding StatusColor}"/>
+
+                        <!-- Content -->
+                        <Grid Margin="16,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                                <ColumnDefinition Width="*"/>    <!-- Info -->
+                                <ColumnDefinition Width="Auto"/> <!-- Actions -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Professional Icon Box -->
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="10" Background="{StaticResource SidebarBackground}" Margin="0,0,16,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <materialIcons:MaterialIcon Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon.Style>
+                                        <Style TargetType="materialIcons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                            <Setter Property="Kind" Value="HelpCircleOutline"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="UpToDate">
+                                                    <Setter Property="Kind" Value="CheckCircleOutline"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Updated">
+                                                    <Setter Property="Kind" Value="Radar"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                    <Setter Property="Kind" Value="Sync"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Error">
+                                                    <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </materialIcons:MaterialIcon.Style>
+                                </materialIcons:MaterialIcon>
+                            </Border>
+
+                            <!-- Information -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Alias}" FontWeight="Black" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                                
+                                <StackPanel Orientation="Horizontal">
+                                    <!-- 1. STATUS BADGE -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Circle" Width="8" Height="8" Foreground="{Binding StatusColor}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding StatusText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 2. VERSION BADGE -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center"
+                                            Visibility="{Binding Version, Converter={StaticResource NullToVisibilityConverter}}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="Tag" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Version}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 3. TIMESTAMP BADGE (HORA) -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="CalendarClock" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding LastUpdated, StringFormat='{}{0:dd MMM yyyy · HH:mm}'}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 4. WAD SOURCE BADGE (DIRECCION) -->
+                                    <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="PackageVariant" Width="11" Height="11" Foreground="{StaticResource TextMuted}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding WadName}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Contextual Actions -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Click="ValidateChanges_Click" 
+                                        Tag="{Binding}"
+                                        ToolTip="Mark as Validated" 
+                                        Style="{StaticResource TransparentIconButton}" 
+                                        Width="34" Height="34" Margin="0,0,8,0" 
+                                        Background="{StaticResource SidebarBackground}"
+                                        Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <materialIcons:MaterialIcon Kind="Check" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                </Button>
+                                <Button Click="ViewChanges_Click" 
+                                        Tag="{Binding}"
+                                        ToolTip="View Differences" 
+                                        Style="{StaticResource TransparentIconButton}" 
+                                        Width="34" Height="34" Margin="0,0,8,0" 
+                                        Background="{StaticResource SidebarBackground}"
+                                        Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                </Button>
+                                <Button Click="Remove_Click" 
+                                        Tag="{Binding}"
+                                        Style="{StaticResource TransparentIconButton}" Width="32" Height="32" ToolTip="Remove Monitor">
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</UserControl>

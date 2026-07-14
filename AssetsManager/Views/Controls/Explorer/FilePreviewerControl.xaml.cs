@@ -1,0 +1,496 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
+using Microsoft.Web.WebView2.Core;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Controls.Explorer;
+using AssetsManager.Views.Models.Wad;
+using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
+
+namespace AssetsManager.Views.Controls.Explorer
+{
+    public partial class FilePreviewerControl : UserControl
+    {
+        public LogService LogService { get; set; }
+        public CustomMessageBoxService CustomMessageBoxService { get; set; }
+        public DirectoriesCreator DirectoriesCreator { get; set; }
+        public ExplorerPreviewService ExplorerPreviewService { get; set; }
+        public TreeUIManager TreeUIManager { get; set; }
+        public FileExplorerControl FileExplorer { get; set; } // Peer Injection
+
+        public FilePreviewerModel ViewModel { get; set; }
+
+        private FileSystemNodeModel _currentNode;
+        private FileSystemNodeModel _currentFolderNode;
+        private ObservableRangeCollection<FileSystemNodeModel> _rootNodes;
+        private ObservableRangeCollection<FileGridViewModel> _gridItems;
+        private CancellationTokenSource _gridPreviewCancellation;
+        private string _currentSearchFilter = string.Empty;
+
+        public FilePreviewerControl()
+        {
+            InitializeComponent();
+            ViewModel = new FilePreviewerModel();
+            
+            this.DataContext = ViewModel;
+            
+            this.Loaded += FilePreviewerControl_Loaded;
+            this.Unloaded += FilePreviewerControl_Unloaded;
+        }
+
+        public void SetSearchFilter(string searchText)
+        {
+            _currentSearchFilter = searchText;
+            if (ViewModel.IsGridMode && _currentFolderNode != null)
+            {
+                // Force a refresh even if the folder is the same because the search filter changed
+                RefreshGridItems(_currentFolderNode);
+            }
+        }
+
+        public void SetViewMode(bool isGridMode)
+        {
+            if (ViewModel.IsGridMode != isGridMode)
+            {
+                ViewModel.IsGridMode = isGridMode;
+            }
+
+            if (ViewModel.IsGridMode)
+            {
+                if (_currentFolderNode != null)
+                {
+                    RefreshGridItems(_currentFolderNode);
+                }
+            }
+            else // Preview Mode
+            {
+                if (_currentNode != null && !ViewModel.IsSelectedNodeContainer)
+                {
+                    _ = ShowPreviewAsync(_currentNode);
+                }
+                else if (!ViewModel.HasEverPreviewedAFile)
+                {
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
+            }
+        }
+
+        private void PinnedFiles_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateScrollButtonsVisibility();
+        }
+
+        private void ScrollLeftButton_Click(object sender, RoutedEventArgs e)
+        {
+            TabsScrollViewer.ScrollToHorizontalOffset(TabsScrollViewer.HorizontalOffset - TabsScrollViewer.ActualWidth);
+        }
+
+        private void ScrollRightButton_Click(object sender, RoutedEventArgs e)
+        {
+            TabsScrollViewer.ScrollToHorizontalOffset(TabsScrollViewer.HorizontalOffset + TabsScrollViewer.ActualWidth);
+        }
+
+        private void TabsScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            UpdateScrollButtonsVisibility();
+        }
+
+        private void UpdateScrollButtonsVisibility()
+        {
+            if (TabsScrollViewer.ScrollableWidth > 0)
+            {
+                ViewModel.CanScrollLeft = TabsScrollViewer.HorizontalOffset > 0;
+                ViewModel.CanScrollRight = TabsScrollViewer.HorizontalOffset < TabsScrollViewer.ScrollableWidth;
+            }
+            else
+            {
+                ViewModel.CanScrollLeft = false;
+                ViewModel.CanScrollRight = false;
+            }
+        }
+
+        private void FilePreviewerControl_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                if (TextEditorPreview.Visibility == Visibility.Visible)
+                {
+                    ViewModel.IsFindVisible = true;
+                    FindInDocumentControl.FocusInput();
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void FindInDocumentControl_Close(object sender, RoutedEventArgs e)
+        {
+            ViewModel.IsFindVisible = false;
+            TextEditorPreview.Focus();
+        }
+
+        private async void PinnedFilesManager_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(PinnedFilesManager.SelectedFile))
+            {
+                var selectedPin = ViewModel.PinnedFilesManager.SelectedFile;
+
+                if (selectedPin == null)
+                {
+                    // If no pins are left, we MUST reset the service state so it "forgets" the last file
+                    // This prevents the bug where re-opening the same file shows Welcome instead of content.
+                    if (ViewModel.PinnedFilesManager.PinnedFiles.Count == 0)
+                    {
+                        await ExplorerPreviewService.ResetPreviewAsync();
+
+                        if (_currentFolderNode != null)
+                        {
+                            UpdateSelectedNode(_currentFolderNode, _rootNodes);
+                            FileExplorer?.SelectNode(_currentFolderNode);
+                        }
+                        else
+                        {
+                            _currentNode = null;
+                            UpdateBreadcrumbs(null);
+                        }
+                    }
+                    return;
+                }
+
+                _currentNode = selectedPin.Node;
+                ViewModel.HasSelectedNode = true;
+                ViewModel.IsSelectedNodeContainer = false;
+
+                ViewModel.RenamedDiffDetails = selectedPin.Node?.ChunkDiff;
+
+                UpdateBreadcrumbs(selectedPin.Node);
+                FileExplorer?.SelectNode(selectedPin.Node);
+
+                // Important: Always call the service with the LATEST node from the pin
+                await ExplorerPreviewService.ShowPreviewAsync(selectedPin.Node);
+            }
+        }
+
+        private void Tab_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
+            {
+                ViewModel.PinnedFilesManager.SelectedFile = vm;
+            }
+        }
+
+        private void CloseTabButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is PinnedFileModel vm)
+            {
+                ExplorerPreviewService.CloseSlotByCategory(vm.Node);
+                ViewModel.PinnedFilesManager.UnpinFile(vm);
+            }
+        }
+
+        private void FilePreviewerControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ExplorerPreviewService.Initialize(
+                    ImagePreview,
+                    WebViewContainer,
+                    TextEditorPreview,
+                    ViewModel
+                );
+
+                // Setup subscriptions - Self-healing pattern to avoid duplicates
+                if (ViewModel.PinnedFilesManager != null)
+                {
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged += PinnedFiles_CollectionChanged;
+                    
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PropertyChanged += PinnedFilesManager_PropertyChanged;
+                }
+
+                // Setup sub-controls peer connection
+                Breadcrumbs.ParentPreviewer = this;
+                FileGridControl.ParentPreviewer = this;
+                
+                UpdateScrollButtonsVisibility();
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error loading FilePreviewerControl");
+            }
+        }
+
+        private async void FilePreviewerControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                CancelGridPreviewLoading();
+                await ExplorerPreviewService.ResetPreviewAsync();
+                
+                if (ViewModel.PinnedFilesManager != null)
+                {
+                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                }
+
+                // Clear sub-controls peer connection
+                if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
+                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Error cleaning FilePreviewerControl on unload");
+            }
+        }
+
+        public async Task ShowPreviewAsync(FileSystemNodeModel node)
+        {
+            if (node == null) return;
+
+            _currentNode = node;
+
+            // ONLY auto-pin if it's a previewable file (not a folder or container)
+            bool isContainer = node.Type == NodeType.RealDirectory || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile || node.Type == NodeType.SoundBank || node.Type == NodeType.AudioEvent;
+
+            if (!isContainer)
+            {
+                // Check if the file is already pinned
+                var existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+
+                if (existingPin == null)
+                {
+                    // Auto-pin the file so it appears in the tabs and can be closed/managed
+                    ViewModel.PinnedFilesManager.PinFile(node);
+                    existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+                }
+
+                // Select the tab (this will trigger PinnedFilesManager_PropertyChanged which calls the service)
+                if (existingPin != null)
+                {
+                    var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
+                    ViewModel.PinnedFilesManager.SelectedFile = existingPin;
+
+                    if (previousSelected == existingPin)
+                    {
+                        await ExplorerPreviewService.ShowPreviewAsync(node);
+                    }
+                }
+            }
+            else
+            {
+                // For containers, we just call the service to handle potential keep-alive logic
+                await ExplorerPreviewService.ShowPreviewAsync(node);
+            }
+        }
+
+        public async Task ResetToDefaultState()
+        {
+            _currentFolderNode = null;
+            UpdateSelectedNode(null, null);
+            await ExplorerPreviewService.ResetPreviewAsync();
+        }
+
+        public void UpdateSelectedNode(FileSystemNodeModel node, ObservableRangeCollection<FileSystemNodeModel> rootNodes)
+        {
+            var previousFolder = _currentFolderNode;
+            var previousNode = _currentNode;
+            _currentNode = node;
+            _rootNodes = rootNodes;
+            ViewModel.HasSelectedNode = node != null;
+
+            ViewModel.RenamedDiffDetails = node?.ChunkDiff;
+
+            UpdateBreadcrumbs(node);
+
+            bool isContainer = node != null && FileSystemNodeModel.CanHaveChildren(node.Type);
+            ViewModel.IsSelectedNodeContainer = isContainer;
+
+            // 1. Identify current folder context
+            FileSystemNodeModel folderToLoad = null;
+            if (isContainer)
+            {
+                folderToLoad = node;
+            }
+            else if (node != null && rootNodes != null)
+            {
+                // If it's a file, the folder context is its parent
+                var path = TreeUIManager.FindNodePath(rootNodes, node);
+                if (path != null && path.Count > 1)
+                {
+                    folderToLoad = path[path.Count - 2];
+                }
+            }
+
+            // 2. Refresh grid items if the folder context has changed
+            if (folderToLoad != null)
+            {
+                if (folderToLoad != previousFolder)
+                {
+                    _currentFolderNode = folderToLoad;
+                    FileGridControl.ItemsSource = null; // Clear immediately to prevent visual ghosting/flashing of previous folder items
+                    RefreshGridItems(_currentFolderNode);
+                }
+
+                if (!isContainer && !ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
+                {
+                    _ = ExplorerPreviewService.ResetPreviewAsync();
+                }
+            }
+            else
+            {
+                _currentFolderNode = null;
+                CancelGridPreviewLoading();
+                FileGridControl.ItemsSource = null; // Clear immediately when resetting or when folder context is null
+            }
+            
+            if (!isContainer && node != null && node != previousNode)
+            {
+                // If it's a file, hide status messages immediately to avoid flickers during load
+                ViewModel.IsWelcomeVisible = false;
+
+                // Selective hide: Only hide unsupported if the new file is NOT an image
+                bool isImage = SupportedFileTypes.IsImage(node.Extension);
+                
+                if (!isImage)
+                {
+                    ViewModel.IsUnsupportedVisible = false;
+                }
+            }
+        }
+
+        private void RefreshGridItems(FileSystemNodeModel folderNode)
+        {
+            if (folderNode == null) return;
+
+            // Defer execution to avoid issues with current mouse events in the ListBox
+            Dispatcher.InvokeAsync(() =>
+            {
+                CancelGridPreviewLoading();
+                _gridPreviewCancellation = new CancellationTokenSource();
+                var cancellationToken = _gridPreviewCancellation.Token;
+
+                _gridItems = new ObservableRangeCollection<FileGridViewModel>(
+                    (!string.IsNullOrEmpty(_currentSearchFilter)
+                        ? folderNode.Children.Where(c => c.Name.IndexOf(_currentSearchFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+                        : folderNode.Children)
+                    .Select(n => new FileGridViewModel(
+                        n,
+                        (node, token) => ExplorerPreviewService.GetImagePreviewAsync(node, 256, token),
+                        cancellationToken,
+                        ex => LogService.LogError(ex, $"Failed to load grid thumbnail for '{n.VirtualPath}'."))));
+
+                FileGridControl.ItemsSource = _gridItems;
+            }, DispatcherPriority.Background);
+        }
+
+        private void CancelGridPreviewLoading()
+        {
+            _gridPreviewCancellation?.Cancel();
+            _gridPreviewCancellation?.Dispose();
+            _gridPreviewCancellation = null;
+
+            if (_gridItems != null)
+            {
+                foreach (var item in _gridItems)
+                {
+                    item.Dispose();
+                }
+
+                _gridItems = null;
+            }
+        }
+
+        public void HandleNodeClicked(FileSystemNodeModel node)
+        {
+            FileExplorer?.SelectNode(node);
+        }
+
+        public async Task HandleBatchDiffRequestAsync(List<FileSystemNodeModel> nodes)
+        {
+            if (nodes == null || nodes.Count == 0 || FileExplorer == null) return;
+
+            // Filter only those that actually HAVE a real difference (exclude dependencies)
+            var diffs = nodes.Where(n => n.ChunkDiff != null && n.Status != DiffStatus.Dependency).Select(n => n.ChunkDiff).ToList();
+            if (diffs.Count == 0) return;
+
+            // Get PBE paths from FileExplorer
+            string oldPath = FileExplorer.OldPbePath;
+            string newPath = FileExplorer.NewPbePath;
+            Window owner = Window.GetWindow(this);
+
+            var diffViewService = FileExplorer.DiffViewService;
+            if (diffViewService != null)
+            {
+                await diffViewService.ShowBatchWadDiffAsync(diffs, 0, oldPath, newPath, owner);
+            }
+        }
+
+        public void HandleSelectionActionRequested(string action, List<FileSystemNodeModel> nodes)
+        {
+            if (FileExplorer == null) return;
+
+            switch (action)
+            {
+                case "Extract":
+                    FileExplorer.TriggerExtractNodes(nodes);
+                    break;
+                case "Save":
+                    FileExplorer.TriggerSaveNodes(nodes);
+                    break;
+                case "Merge":
+                    FileExplorer.TriggerAddToMerger(nodes);
+                    break;
+            }
+        }
+        
+        public void SetBreadcrumbToggleState(bool isToggleOn)
+        {
+            ViewModel.IsBreadcrumbToggleOn = isToggleOn;
+        }
+
+        private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
+        {
+            Breadcrumbs.Nodes.Clear();
+            if (selectedNode == null || _rootNodes == null) return;
+
+            var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
+            if (path == null) return;
+
+            const int maxItems = 5;
+
+            if (path.Count > maxItems)
+            {
+                var truncatedPath = new List<FileSystemNodeModel>();
+                truncatedPath.Add(path[0]);
+                truncatedPath.Add(path[1]);
+
+                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
+
+                for (int i = path.Count - 2; i < path.Count; i++)
+                {
+                    truncatedPath.Add(path[i]);
+                }
+                path = truncatedPath;
+            }
+
+            foreach (var node in path)
+            {
+                Breadcrumbs.Nodes.Add(node);
+            }
+        }
+    }
+}

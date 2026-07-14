@@ -1,0 +1,226 @@
+<UserControl x:Class="AssetsManager.Views.Help.DocumentationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d" 
+             d:DesignHeight="1200" d:DesignWidth="900">
+    <StackPanel Margin="0,16,0,0">
+        <!-- SECTION: TECHNICAL DOCUMENTATION -->
+        <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,24">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="BookOpenVariant" Foreground="{StaticResource AccentBrush}" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="TECHNICAL DOCUMENTATION" FontSize="12" FontWeight="Black" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0"/>
+                    <TextBlock Text="Essential guides and modules to master AssetsManager" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Opacity="0.8" Margin="0,2,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 2. CORE MODULES GRID -->
+        <TextBlock Text="CORE MODULES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <UniformGrid Columns="2" Margin="0,0,0,40">
+            <!-- Comparator -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,12,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="FileCompare" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="Advanced differential analysis with byte-level precision. Features rename detection via checksum mapping and automated backup packaging for historical fidelity." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+
+            <!-- Explorer -->
+            <Border Style="{StaticResource SettingsCard}" Margin="12,0,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="FolderSearchOutline" Foreground="{StaticResource AccentGreen}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Archive Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="High-performance archive navigation. Powered by a thin-path optimization engine for low RAM usage and smart VO/SFX filtering for a clean hierarchy." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+
+            <!-- Models -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,12,12,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Model Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in real-time. Supports Linear Blend Skinning (LBS) and animation synchronization across all scene assets." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+
+            <!-- Monitor -->
+            <Border Style="{StaticResource SettingsCard}" Margin="12,12,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Real-time Monitor" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="Global integrity tracking for PBE and CDN assets. Detects file changes post-patch using shadow caching and real-time maintenance status analysis." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+        </UniformGrid>
+
+        <!-- 3. SETUP GUIDE (Timeline Style) -->
+        <TextBlock Text="QUICK START GUIDE" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,20"/>
+        <Border Background="{StaticResource CardBackground}" CornerRadius="12" Padding="30" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,40">
+            <Grid>
+                <!-- Timeline Vertical Line -->
+                <Border HorizontalAlignment="Left" Width="2" Background="{StaticResource BorderColor}" Margin="19,20,0,20"/>
+
+                <StackPanel>
+                    <!-- Step 1 -->
+                    <Grid Margin="0,0,0,32">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2">
+                            <TextBlock Text="1" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Environment Setup" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Navigate to Settings and configure your game paths. Use the 'Preferred Client' option to automate WAD discovery and jump directly to roots." 
+                                       FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Step 2 -->
+                    <Grid Margin="0,0,0,32">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2">
+                            <TextBlock Text="2" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Asset Surveillance" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="The app periodically checks for PBE status and asset updates using ETags. Check the Monitor Dashboard for versioning and server health alerts." 
+                                       FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Step 3 -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="40" Height="40" CornerRadius="20" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="2">
+                            <TextBlock Text="3" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Differential Analysis" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Use the WAD Comparator to isolate changes between versions. Leverage 'Quick Select' to automatically find matching archives for analysis." 
+                                       FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 4. PRO TIPS (Vertical Cards) -->
+        <TextBlock Text="PRO TIPS" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextMuted}" Margin="4,0,0,16"/>
+        <StackPanel>
+            <!-- Tip 1 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="44" Height="44" CornerRadius="10" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="LightbulbOnOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Smart Extraction" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="Use 'Save Selected' in Explorer to automatically convert textures to PNG and data files to JSON while preserving original folder structures." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Tip 2 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="44" Height="44" CornerRadius="10" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="Audio" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Linked Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="The explorer automatically detects and links voice-over (VO) regional banks to their master containers, allowing full HIRC logic resolution." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Tip 3 -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="44" Height="44" CornerRadius="10" VerticalAlignment="Top">
+                        <materialIcons:MaterialIcon Kind="CloudSyncOutline" Foreground="{StaticResource AccentGreen}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="20,0,0,0">
+                        <TextBlock Text="Always Synced" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="The app periodically checks for PBE status and asset changes in the background automatically, keeping you informed without interruptions." 
+                                   FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- FOOTER -->
+        <StackPanel Margin="0,30,0,0" HorizontalAlignment="Center">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Opacity="0.6">
+                <materialIcons:MaterialIcon Kind="Github" Foreground="{StaticResource TextSecondary}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock FontSize="12" VerticalAlignment="Center">
+                    <Hyperlink NavigateUri="https://github.com/Neinndall/AssetsManager" RequestNavigate="Hyperlink_RequestNavigate" Foreground="{StaticResource TextSecondary}" TextDecorations="None">
+                        Visit GitHub Repository
+                    </Hyperlink>
+                </TextBlock>
+            </StackPanel>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

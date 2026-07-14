@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+# List of issue forms to display
+issue_forms:
+  - name: "🐛 Bug Report"
+    path: bug_report.yml
+    description: "Report a bug or unexpected behavior in the application."
+  - name: "💡 Requests a Suggestion"
+    path: suggestion.yml
+    description: "Suggest an improvement for a feature currently implemented or a new feature? We'd love to hear it!"

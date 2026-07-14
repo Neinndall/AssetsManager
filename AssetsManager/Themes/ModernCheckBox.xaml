@@ -1,0 +1,148 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Themes/Colors.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Professional Studio CheckBox Style -->
+    <Style x:Key="ModernCheckBox" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,8,0,8"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid x:Name="RootGrid" Background="Transparent">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Grid Width="16" Height="16" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <!-- Background Layer -->
+                                <Border x:Name="CheckBorder"
+                                        Background="{StaticResource DarkBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"/>
+                                
+                                <!-- Check Icon (Refined Path) -->
+                                <Path x:Name="CheckMark"
+                                      Data="M3.5,8 L6.5,11 L12.5,4.5"
+                                      Stroke="White"
+                                      StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      Opacity="0"
+                                      Stretch="Uniform"
+                                      Margin="3"
+                                      RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleX="0.6" ScaleY="0.6"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Grid>
+                            <!-- Adjusted margin to compensate for font baseline and align perfectly with 16px box -->
+                            <ContentPresenter VerticalAlignment="Center" x:Name="Content" Margin="0,-1,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CheckBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter TargetName="CheckMark" Property="Opacity" Value="1"/>
+                            <Setter TargetName="CheckMark" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="CheckBorder" Property="BorderThickness" Value="1.5"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Technical HUD Toggle Switch (Refined) -->
+    <Style x:Key="ModernToggleSwitch" TargetType="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Background="Transparent" Height="28">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ContentPresenter Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0"/>
+
+                        <Grid Grid.Column="1" Width="42" Height="18" VerticalAlignment="Center">
+                            <!-- Technical Track -->
+                            <Border x:Name="Track"
+                                    Background="{StaticResource DarkBackground}"
+                                    BorderBrush="{StaticResource BorderColor}"
+                                    BorderThickness="1.5"
+                                    CornerRadius="2"/>
+
+                            <!-- State Indicator Light -->
+                            <Border x:Name="Indicator"
+                                    Background="{StaticResource AccentBrush}"
+                                    Width="4" Height="4"
+                                    CornerRadius="2"
+                                    HorizontalAlignment="Left"
+                                    Margin="6,0"
+                                    Opacity="0.2"/>
+
+                            <!-- Technical Thumb -->
+                            <Border x:Name="Thumb"
+                                    Background="{StaticResource TextMuted}"
+                                    Width="16" Height="10"
+                                    CornerRadius="1"
+                                    HorizontalAlignment="Left"
+                                    Margin="4,0">
+                                <Border.RenderTransform>
+                                    <TranslateTransform X="0"/>
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Track" Property="Background" Value="#1000BFFF"/>
+                            <Setter TargetName="Thumb" Property="Background" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Indicator" Property="Opacity" Value="1"/>
+                            <Setter TargetName="Indicator" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="Thumb" Property="Margin" Value="0,0,4,0"/>
+                            <!-- Subtle Glow -->
+                            <Setter TargetName="Indicator" Property="Effect">
+                                <Setter.Value>
+                                    <BlurEffect Radius="4"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="Track" Property="BorderThickness" Value="1.5"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.3"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

@@ -1,0 +1,87 @@
+<base:HudWindow x:Class="AssetsManager.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AssetsManager.Views"
+        xmlns:controls="clr-namespace:AssetsManager.Views.Controls"
+        xmlns:dialogControls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+        xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+        mc:Ignorable="d"
+        Title="AssetsManager"
+        Width="1100" Height="900"
+        MinWidth="1100" MinHeight="900"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico"
+        Background="{StaticResource SidebarBackground}"
+        HeaderTitle="AssetsManager"
+        Style="{StaticResource HudWindowStyle}"
+        FontFamily="{StaticResource AppFontFamily}">
+
+    <Grid>
+        <!-- Main Layout Split: Sidebar | (Content + Log + Status) -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar (Left) -->
+        <controls:SidebarView x:Name="Sidebar" Grid.Column="0"/>
+
+        <!-- Main Content Area (Right) -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>    <!-- 0: Content Area -->
+                <RowDefinition Height="Auto"/> <!-- 1: Glinder Row -->
+                <RowDefinition x:Name="LogViewRow" Height="180" MinHeight="38"/> <!-- 2: LogView Row -->
+                <RowDefinition Height="Auto"/> <!-- 3: Status Bar Row -->
+            </Grid.RowDefinitions>
+
+            <!-- 0. Main Content Area -->
+            <Border Grid.Row="0"
+                    Background="Transparent"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="0,0,0,1">
+                <ContentControl x:Name="MainContentArea" Background="Transparent"/>
+            </Border>
+
+            <!-- 1. GLINDER (Custom GridSplitter) -->
+            <GridSplitter Grid.Row="1" Style="{StaticResource ModernGlinderStyle}"/>
+
+            <!-- 2. LogView Container -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource SidebarBackground}"
+                    BorderBrush="{StaticResource BorderColor}"
+                    BorderThickness="0,1,0,0"
+                    CornerRadius="0,0,11,0"
+                    Padding="0">
+                <controls:LogView x:Name="LogView" 
+                                  StatusText="{Binding ViewModel.StatusText, ElementName=StatusBar}"/>
+            </Border>
+
+            <!-- 3. MODERN STATUS BAR -->
+            <controls:StatusBarView x:Name="StatusBar" Grid.Row="3"/>
+        </Grid>
+
+        <!-- Taskbar Icon (Independent from Grid layout) -->
+        <tb:TaskbarIcon x:Name="TrayIcon" Visibility="Collapsed" ToolTipText="AssetsManager" IconSource="pack://application:,,,/AssetsManager;component/Resources/Img/logo.ico" TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Show" Click="MenuItem_Show_Click">
+                        <MenuItem.Icon>
+                            <icons:MaterialIcon Kind="WindowRestore" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator Background="{StaticResource BorderColor}" Margin="0,2"/>
+                    <MenuItem Header="Exit" Click="MenuItem_Exit_Click">
+                        <MenuItem.Icon>
+                            <icons:MaterialIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{StaticResource TextPrimary}"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Grid>
+</base:HudWindow>

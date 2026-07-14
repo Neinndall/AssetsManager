@@ -1,0 +1,3 @@
+# Ignorar carpetas de compilación
+bin/
+obj/

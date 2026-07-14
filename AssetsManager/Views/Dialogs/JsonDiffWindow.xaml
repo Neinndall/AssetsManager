@@ -1,0 +1,56 @@
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.JsonDiffWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:controls="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+                xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                xmlns:local="clr-namespace:AssetsManager.Views.Dialogs"
+                xmlns:localUtils="clr-namespace:AssetsManager.Utils"
+                mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+                HeaderTitle="Text Comparison" 
+                HeaderIcon="FileDocumentEditOutline"
+                Height="900" Width="1400" MinHeight="900" MinWidth="1400"
+                WindowStartupLocation="CenterOwner"
+                Style="{StaticResource HudWindowStyle}">
+
+    <Window.InputBindings>
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Key="Down" Modifiers="Alt" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Key="Up" Modifiers="Alt" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Key="Right" Modifiers="Alt" />
+        <KeyBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Key="Left" Modifiers="Alt" />
+    </Window.InputBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>    <!-- 0: Main Content -->
+            <RowDefinition Height="Auto"/> <!-- 1: Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Main Content Area -->
+        <Grid Grid.Row="0">
+            <controls:JsonDiffControl x:Name="JsonDiffControl"/>
+        </Grid>
+
+        <!-- 2. Slim Status Bar (With bottom rounding) -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="20,6" CornerRadius="0,0,11,11" ClipToBounds="True">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock Text="Alt + Up/Down: Prev/Next Diff" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                    
+                    <icons:MaterialIcon Kind="KeyboardOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock Text="Alt + Left/Right: Prev/Next File" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+
+                    <icons:MaterialIcon Kind="MouseOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock Text="Sync Scroll: Locked" FontSize="10" FontWeight="Medium" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="10" Foreground="{StaticResource TextMuted}" Opacity="0.6">
+                    <Run Text="Content Type: "/><Run Text="JSON / Data Buffer"/>
+                </TextBlock>
+            </Grid>
+        </Border>
+    </Grid>
+</base:HudWindow>

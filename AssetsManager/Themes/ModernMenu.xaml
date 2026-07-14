@@ -1,0 +1,189 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/Themes/Colors.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Global ContextMenu Style - Minimalist HUD -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="{StaticResource DarkBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Grid.IsSharedSizeScope" Value="True"/>
+        <Setter Property="HasDropShadow" Value="True"/>
+        <Setter Property="MinWidth" Value="150"/>
+        <Setter Property="Padding" Value="0,2"/>
+        <Setter Property="Popup.PopupAnimation" Value="None"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Grid x:Name="Grid">
+                        <!-- Shadow Layer -->
+                        <Border Background="Transparent" CornerRadius="6" Margin="4">
+                            <Border.Effect>
+                                <DropShadowEffect Color="Black" Direction="270" ShadowDepth="2" Opacity="0.4" BlurRadius="12"/>
+                            </Border.Effect>
+                        </Border>
+
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Margin="4"
+                                SnapsToDevicePixels="True">
+                            <StackPanel IsItemsHost="True" 
+                                      KeyboardNavigation.DirectionalNavigation="Cycle"
+                                      Margin="1,3,1,3"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Global Separator Style - Disabled -->
+    <Style TargetType="Separator">
+        <Setter Property="Visibility" Value="Collapsed"/>
+    </Style>
+
+    <!-- Global MenuItem Style - Minimalist HUD with Submenu Support -->
+    <Style TargetType="MenuItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,0,8,0"/>
+        <Setter Property="FontSize" Value="11.5"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Margin="3,1"
+                                SnapsToDevicePixels="True">
+                            <Grid MinHeight="{TemplateBinding MinHeight}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="28" SharedSizeGroup="MenuItemIcon"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="MenuItemGesture"/>
+                                    <ColumnDefinition Width="20" SharedSizeGroup="MenuItemArrow"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Icon Layer -->
+                                <ContentPresenter x:Name="Icon" 
+                                                ContentSource="Icon"
+                                                Grid.Column="0" 
+                                                VerticalAlignment="Center" 
+                                                HorizontalAlignment="Center"
+                                                Width="14" 
+                                                Height="14"/>
+                                
+                                <!-- Main Text -->
+                                <ContentPresenter Grid.Column="1" 
+                                                ContentSource="Header" 
+                                                RecognizesAccessKey="True" 
+                                                VerticalAlignment="Center"
+                                                Margin="4,0,8,0"/>
+                                
+                                <!-- Shortcut Hint -->
+                                <TextBlock x:Name="GestureText" 
+                                         Grid.Column="2" 
+                                         Text="{TemplateBinding InputGestureText}"
+                                         VerticalAlignment="Center" 
+                                         Margin="12,0,8,0"
+                                         FontSize="10.5"
+                                         Foreground="{StaticResource TextSecondary}"
+                                         Opacity="0.5"/>
+                                
+                                <!-- Submenu Arrow -->
+                                <Path x:Name="ArrowPath"
+                                    Grid.Column="3"
+                                    Data="M0,0 L3,3 L0,6 z"
+                                    Fill="{StaticResource TextSecondary}"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Submenu Popup -->
+                        <Popup x:Name="PART_Popup"
+                               AllowsTransparency="True"
+                               Focusable="False"
+                               IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                               Placement="Right"
+                               PopupAnimation="None"
+                               VerticalOffset="-5"
+                               HorizontalOffset="-2">
+                            <Grid x:Name="SubmenuGrid">
+                                <!-- Shadow Layer -->
+                                <Border Background="Transparent" CornerRadius="6" Margin="4">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" Direction="270" ShadowDepth="2" Opacity="0.4" BlurRadius="12"/>
+                                    </Border.Effect>
+                                </Border>
+
+                                <Border Background="{StaticResource DarkBackground}"
+                                        BorderBrush="{StaticResource BorderColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Margin="4"
+                                        SnapsToDevicePixels="True">
+                                    <ScrollViewer x:Name="SubMenuScrollViewer" Style="{DynamicResource {ComponentResourceKey ResourceId=MenuScrollViewer, TypeInTargetAssembly={x:Type FrameworkElement}}}">
+                                        <Grid RenderOptions.ClearTypeHint="Enabled">
+                                            <Canvas Height="0" Width="0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                <Rectangle x:Name="OpaqueRect" 
+                                                         Fill="{Binding Background, ElementName=Border}" 
+                                                         Height="{Binding ActualHeight, ElementName=PART_Popup}" 
+                                                         Width="{Binding ActualWidth, ElementName=PART_Popup}"/>
+                                            </Canvas>
+                                            <ItemsPresenter x:Name="ItemsPresenter" 
+                                                          KeyboardNavigation.DirectionalNavigation="Cycle" 
+                                                          Grid.IsSharedSizeScope="True" 
+                                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" 
+                                                          KeyboardNavigation.TabNavigation="Cycle"
+                                                          Margin="1,3,1,3"/>
+                                        </Grid>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover: Clean Background Change -->
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource HoverColor}"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter TargetName="GestureText" Property="Foreground" Value="White"/>
+                            <Setter TargetName="GestureText" Property="Opacity" Value="0.8"/>
+                            <Setter TargetName="ArrowPath" Property="Fill" Value="White"/>
+                        </Trigger>
+                        
+                        <!-- Disabled State -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                        
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="ArrowPath" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+
+                        <!-- Icon Presence Management -->
+                        <Trigger Property="Icon" Value="{x:Null}">
+                            <Setter TargetName="Icon" Property="Visibility" Value="Collapsed"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

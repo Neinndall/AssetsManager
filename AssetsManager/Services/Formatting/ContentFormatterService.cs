@@ -1,0 +1,302 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using LeagueToolkit.Core.Meta;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Parsers;
+using AssetsManager.Services.Audio;
+using AssetsManager.Services.Explorer;
+using AssetsManager.Views.Models.Audio;
+
+namespace AssetsManager.Services.Formatting
+{
+    public class ContentFormatterService
+    {
+        private readonly LogService _logService;
+        private readonly JsBeautifierService _jsBeautifierService;
+        private readonly CSSParserService _cssParserService;
+        private readonly HashResolverService _hashResolverService;
+        private readonly AudioBankService _audioBankService;
+        private readonly WadContentProvider _wadContentProvider;
+        private readonly JsonFormatterService _jsonFormatterService;
+        private readonly BinParser _binParser;
+        private readonly BinPropertyParser _binPropertyParser;
+        private readonly TroybinParser _troybinParser;
+        private readonly PreloadParser _preloadParser;
+        private readonly StringTableParser _stringTableParser;
+        private readonly LuaParser _luaParser;
+
+        public ContentFormatterService(
+            LogService logService, 
+            JsBeautifierService jsBeautifierService, 
+            CSSParserService cssParserService, 
+            HashResolverService hashResolverService, 
+            AudioBankService audioBankService, 
+            WadContentProvider wadContentProvider, 
+            JsonFormatterService jsonFormatterService,
+            BinParser binParser,
+            BinPropertyParser binPropertyParser,
+            TroybinParser troybinParser,
+            PreloadParser preloadParser,
+            StringTableParser stringTableParser,
+            LuaParser luaParser)
+        {
+            _logService = logService;
+            _jsBeautifierService = jsBeautifierService;
+            _cssParserService = cssParserService;
+            _hashResolverService = hashResolverService;
+            _audioBankService = audioBankService;
+            _wadContentProvider = wadContentProvider;
+            _jsonFormatterService = jsonFormatterService;
+            _binParser = binParser;
+            _binPropertyParser = binPropertyParser;
+            _troybinParser = troybinParser;
+            _preloadParser = preloadParser;
+            _stringTableParser = stringTableParser;
+            _luaParser = luaParser;
+        }
+
+        public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
+        {
+            if (linkedBank == null) return string.Empty;
+
+            try
+            {
+                var wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode) : null;
+                var audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode) : null;
+                var eventsBnkData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode) : null;
+
+                List<AudioEventNode> result;
+                if (linkedBank.BinData != null)
+                {
+                    result = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsBnkData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                }
+                else
+                {
+                    result = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsBnkData);
+                }
+
+                if (result == null || result.Count == 0) return string.Empty;
+
+                var options = new System.Text.Json.JsonSerializerOptions
+                {
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                };
+                return await _jsonFormatterService.FormatJsonAsync(result, options);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to format audio bank with resolved names.");
+                return "Error formatting audio bank. See logs for details.";
+            }
+        }
+
+        public async Task<string> GetFormattedStringAsync(string dataType, byte[] data)
+        {
+            if (data == null) return string.Empty;
+
+            string formattedContent;
+
+            switch (dataType)
+            {
+                case "bin":
+                    formattedContent = await GetBinJsonStringAsync(data);
+                    break;
+                case "troybin":
+                    formattedContent = await GetTroybinJsonStringAsync(data);
+                    break;
+                case "preload":
+                    formattedContent = await GetPreloadJsonStringAsync(data);
+                    break;
+                case "stringtable":
+                    formattedContent = await GetStringTableJsonStringAsync(data);
+                    break;
+                case "css":
+                    formattedContent = await GetCssJsonStringAsync(data);
+                    break;
+                case "json":
+                    formattedContent = await GetFormattedJsonStringAsync(data);
+                    break;
+                case "js":
+                    try
+                    {
+                        var jsText = Encoding.UTF8.GetString(data);
+                        
+                        // Fix for AvalonEdit: Null bytes (\0) truncate the WPF text renderer. 
+                        // Riot files sometimes have trailing or hidden null bytes.
+                        if (jsText.Contains('\0'))
+                        {
+                            jsText = jsText.Replace("\0", "");
+                        }
+
+                        formattedContent = await _jsBeautifierService.BeautifyAsync(jsText);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogWarning($"JS Beautifier failed: {ex.Message}");
+                        formattedContent = Encoding.UTF8.GetString(data).Replace("\0", "");
+                    }
+                    break;
+                case "bnk":
+                    formattedContent = await GetBnkJsonStringAsync(data);
+                    break;
+                case "luabin64":
+                    formattedContent = await _luaParser.DecompileAsync(data);
+                    break;
+                case "text":
+                default:
+                    formattedContent = Encoding.UTF8.GetString(data).Replace("\0", "");
+                    break;
+            }
+            
+            return formattedContent;
+        }
+
+        public Task<(string OldJson, string NewJson)> GetBinDiffJsonAsync(byte[] oldData, byte[] newData) =>
+            _binPropertyParser.WriteBinDiffAsJsonAsync(oldData, newData);
+
+        private async Task<string> GetBnkJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var bnkStream = new MemoryStream(data);
+                var bnkFile = BnkParser.Parse(bnkStream, _logService);
+                return await _jsonFormatterService.FormatJsonAsync(bnkFile);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .bnk file content.");
+                return "Error parsing .bnk file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetBinJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var jsonStream = new MemoryStream();
+                using (var binStream = new MemoryStream(data))
+                {
+                    // Llamar al orquestador BinParser
+                    await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binStream);
+                } 
+                
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream, Encoding.UTF8);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .bin file content.");
+                return "Error parsing .bin file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetStringTableJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var inputStream = new MemoryStream(data);
+                using var jsonStream = new MemoryStream();
+                await _stringTableParser.WriteStringTableAsJsonAsync(jsonStream, inputStream);
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream, Encoding.UTF8);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .stringtable file content.");
+                return "Error parsing .stringtable file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetCssJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var cssText = Encoding.UTF8.GetString(data);
+                return await _cssParserService.ConvertToJsonAsync(cssText);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .css file content.");
+                return "Error parsing .css file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetFormattedJsonStringAsync(byte[] data)
+        {
+            var rawJson = Encoding.UTF8.GetString(data);
+            return await _jsonFormatterService.FormatJsonAsync(rawJson);
+        }
+
+        private async Task<string> GetTroybinJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var troybinStream = new MemoryStream(data);
+                using var jsonStream = new MemoryStream();
+                var inibinFile = new LeagueToolkit.IO.Inibin.InibinFile(troybinStream);
+                await _troybinParser.WriteInibinAsJsonAsync(jsonStream, inibinFile);
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .troybin file content.");
+                return "Error parsing .troybin file. See logs for details.";
+            }
+        }
+
+        private async Task<string> GetPreloadJsonStringAsync(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                using var jsonStream = new MemoryStream();
+                await _preloadParser.WritePreloadAsJsonAsync(jsonStream, data);
+                jsonStream.Position = 0;
+                using var reader = new StreamReader(jsonStream);
+                return await reader.ReadToEndAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse .preload file content.");
+                return "Error parsing .preload file. See logs for details.";
+            }
+        }
+    }
+}

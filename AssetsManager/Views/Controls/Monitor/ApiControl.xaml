@@ -1,0 +1,311 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Monitor.ApiControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
+             xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
+             mc:Ignorable="d"
+             d:DesignHeight="800" d:DesignWidth="1000">
+    
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 1. Control Row (Card + Buttons) -->
+            <RowDefinition Height="Auto"/> <!-- 2. Tab Selector -->
+            <RowDefinition Height="*"/>    <!-- 3. Content Area -->
+        </Grid.RowDefinitions>
+        
+        <!-- 1. CONTROL ROW -->
+        <Grid Grid.Row="0" Margin="0,0,0,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Config Section (Conditional) -->
+                <RowDefinition Height="Auto"/> <!-- Main Header -->
+            </Grid.RowDefinitions>
+
+            <!-- 1.1 CONFIG SECTION: Visible only for Pass Rewards -->
+            <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                    Visibility="{Binding IsChecked, ElementName=TabPass, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- ROW 1: Manual View Pass (Browser) -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Icon -->
+                        <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                            <materialIcons:MaterialIcon Kind="TicketOutline" Foreground="{StaticResource AccentTeal}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Content -->
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Manual View Pass" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Browse and view previously cached event rewards instantly" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            </StackPanel>
+                            <ComboBox Grid.Column="1" Width="250" Height="36" 
+                                      Style="{StaticResource ModernComboBox}"
+                                      ItemsSource="{Binding AvailablePasses}"
+                                      SelectedItem="{Binding SelectedPass, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectionChanged="PassBrowser_SelectionChanged"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Grid>
+
+                    <!-- DIVIDER LINE -->
+                    <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Margin="60,-7,0,-7" Opacity="0.3"/>
+
+                    <!-- ROW 2: Manual Pass ID -->
+                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Icon -->
+                        <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                            <materialIcons:MaterialIcon Kind="Identifier" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Content -->
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Manual Pass ID" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                                <TextBlock Text="Enter the 'trackConfig' ID for manual event tracking or leave empty for auto-discovery" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                            </StackPanel>
+                            <TextBox Grid.Column="1" Width="250" Height="36" Style="{StaticResource ModernTextBoxEditable}" 
+                                     HorizontalAlignment="Right" VerticalAlignment="Center"
+                                     VerticalContentAlignment="Center" Padding="8,0"
+                                     Text="{Binding ManualPassId, UpdateSourceTrigger=PropertyChanged}" 
+                                     Tag="Enter custom Event ID..."/>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 1.2 MAIN HEADER: Info Card & Connect -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>    <!-- Info Card -->
+                    <ColumnDefinition Width="Auto"/> <!-- Connect Button -->
+                    <ColumnDefinition Width="Auto"/> <!-- Action Buttons -->
+                </Grid.ColumnDefinitions>
+
+                <!-- LEFT: LCU Info Card -->
+                <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,12,0" Height="90">
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                            <ColumnDefinition Width="Auto"/> <!-- Status -->
+                            <ColumnDefinition Width="*"/>    <!-- Profile Info -->
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                            <materialIcons:MaterialIcon Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon.Style>
+                                    <Style TargetType="materialIcons:MaterialIcon">
+                                        <Setter Property="Kind" Value="LinkVariantOff" />
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                                                <Setter Property="Kind" Value="LinkVariant" />
+                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding StatusText}" Value="Status: Connecting...">
+                                                <Setter Property="Kind" Value="Sync" />
+                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </materialIcons:MaterialIcon.Style>
+                            </materialIcons:MaterialIcon>
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="LCU SERVICE" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="{Binding StatusColor}" Margin="-2,2,0,0"/>
+                            <StackPanel Orientation="Horizontal" Margin="-2,1,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsAuthenticated}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding SummonerIdText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock Text=" • " FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="4,0"/>
+                                <TextBlock Text="{Binding RegionText}" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- CENTER: Connect Button Card -->
+                <Button Grid.Column="1" Click="ConnectButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Link" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding ButtonContent}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Connect client" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- RIGHT: Action Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Sales -->
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabSales, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Click="RequestsSales_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="Refresh" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Fetch Sales" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Get skin offers" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="SaveButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="ImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Export PNG" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Mythic -->
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabMythic, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Click="RequestsMythicShop_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="AutoFix" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Fetch Mythic" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Get rare loot" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="SaveMythicShopButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="CameraBurst" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Export PNG" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Pass Rewards -->
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsChecked, ElementName=TabPass, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Button Click="RequestsPassRewards_Click" IsEnabled="{Binding IsConnected}" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,8,0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="TicketOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Fetch Pass" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Get rewards" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Click="SavePassRewardsButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0" Width="140" Height="90" Padding="0">
+                            <StackPanel VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="FileImageOutline" Width="24" Height="24" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                <TextBlock Text="Export PNG" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                                <TextBlock Text="Save image" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- 2. TABS & PAGINATION -->
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="8" Padding="4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="TabSales" Content="Sales" Click="TabSales_Click" IsChecked="True" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
+                    <RadioButton x:Name="TabMythic" Content="Mythic Shop" Click="TabMythic_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
+                    <RadioButton x:Name="TabPass" Content="Pass Rewards" Click="TabPass_Click" GroupName="ApiTabs" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="120"/>
+                </StackPanel>
+            </Border>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsChecked, ElementName=TabSales}" Value="True"/>
+                                    <Condition Binding="{Binding Paginator.TotalPages, Converter={StaticResource CountToVisibilityConverter}}" Value="Visible"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </MultiDataTrigger>
+                            <DataTrigger Binding="{Binding Paginator.TotalPages}" Value="1">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <shared:PaginationControl Paginator="{Binding Paginator}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- 3. CONTENT AREA -->
+        <TabControl x:Name="MainTabControl" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0">
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Style>
+            </TabControl.ItemContainerStyle>
+            <TabItem>
+                <ItemsControl x:Name="SalesItemsControl" ItemsSource="{Binding SalesCatalog}" ItemTemplate="{StaticResource StoreItemTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </TabItem>
+            <TabItem>
+                <ItemsControl x:Name="MythicShopCategoriesItemsControl" ItemsSource="{Binding MythicShopCategories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,24">
+                                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Left" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                    <TextBlock Text="{Binding CategoryName}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                </Border>
+                                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource MythicItemTemplate}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </TabItem>
+            <TabItem>
+                <ItemsControl x:Name="PassRewardsItemsControl" ItemsSource="{Binding PassRewards}" ItemTemplate="{StaticResource PassRewardTemplate}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="5"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>

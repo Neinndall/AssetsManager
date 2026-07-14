@@ -1,0 +1,256 @@
+<UserControl x:Class="AssetsManager.Views.Controls.Monitor.AssetTrackerControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d">
+
+    <Grid Margin="0,10,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 1. Category Configuration -->
+            <RowDefinition Height="Auto"/> <!-- 2. Action Buttons -->
+            <RowDefinition Height="*"/>    <!-- 3. Grid Area -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. CATEGORY CONFIGURATION -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- ROW 1: CATEGORY SELECTION -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="ShapeOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Content -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- Texts -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Tracked Category" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Select the asset category you want to monitor" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- Combo -->
+                        <ComboBox Grid.Column="1" Name="CategoryComboBox" Style="{StaticResource ModernComboBox}" Width="250" Height="36" HorizontalAlignment="Right" VerticalAlignment="Center" SelectionChanged="CategoryComboBox_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="4,0">
+                                        <Border Width="8" Height="8" CornerRadius="4" Margin="0,0,10,0" VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasNewAssets}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="Checking">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Setter Property="Background" Value="{StaticResource AccentBlue}"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Status}" Value="CompletedSuccess">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Setter Property="Background" Value="{StaticResource AccentGreen}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+                </Grid>
+
+                <!-- DIVIDER LINE -->
+                <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Margin="60,-7,0,-7" Opacity="0.3"/>
+
+                <!-- ROW 2: START ID CONFIGURATION -->
+                <Grid Grid.Row="1" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                        <materialIcons:MaterialIcon Kind="Numeric" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Content -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Texts -->
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Start Sequence ID" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Force scanning to start from a specific ID" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- TextBox -->
+                        <TextBox Grid.Column="1" Text="{Binding SelectedItem.Start, ElementName=CategoryComboBox, UpdateSourceTrigger=PropertyChanged}" Width="250" Height="36" Style="{StaticResource ModernTextBoxEditable}" VerticalContentAlignment="Center" Padding="8,0" HorizontalAlignment="Right" ToolTip="Force scanning to start from this ID if higher than last found"/>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 2. ACTION BUTTONS (Now below Configuration) -->
+        <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,20">
+            <Button Name="CheckButton" Click="CheckButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="0,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Radar" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Scan CDN" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Check for new assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="LoadMoreButton" Click="LoadMoreButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="PlusBoxMultipleOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Load More" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Fetch next batch" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="DownloadButton" Click="DownloadButton_Click" Style="{StaticResource SelectionCardButtonStyle}" Margin="6,0,6,0" Height="86" Padding="0">
+                <StackPanel VerticalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="DownloadOutline" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="Download All" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                    <TextBlock Text="Save visible assets" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Button>
+            <Button Name="RemoveFoundButton" Click="RemoveFoundButton_Click" Style="{StaticResource DestructiveSelectionCardButtonStyle}" Margin="6,0,0,0" Height="86" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Grid>
+                    <Border Background="{StaticResource AccentRed}" Opacity="0.05" CornerRadius="12"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Broom" Width="24" Height="24" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock Text="Clean Found" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock Text="Reset found list" FontSize="10" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </UniformGrid>
+
+        <!-- 3. ASSET GRID -->
+        <ItemsControl Grid.Row="2" Name="AssetsItemsControl">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Margin="0,0,0,10" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Width="220" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Top">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="15" ShadowDepth="4" Opacity="0.2" Color="Black"/>
+                        </Border.Effect>
+                        <StackPanel>
+                            <!-- Image Header -->
+                            <Border Margin="10,10,10,0" Height="140" CornerRadius="12" Background="{StaticResource SidebarBackground}">
+                                <Grid>
+                                    <!-- Placeholder Icon -->
+                                    <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    
+                                    <!-- Thumbnail with proper Rounded Corners and Subtle Border -->
+                                    <Border CornerRadius="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Opacity="0.5">
+                                        <Border.Background>
+                                            <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" Opacity="0.9"/>
+                                        </Border.Background>
+                                    </Border>
+                                    
+                                    <!-- Status Overlay (Top-Right Badge) -->
+                                    <Border VerticalAlignment="Top" HorizontalAlignment="Right" Margin="8" Padding="8,4" CornerRadius="6" Background="#CC18181B">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Width="12" Height="12" Margin="0,0,6,0">
+                                                <materialIcons:MaterialIcon.Style>
+                                                    <Style TargetType="materialIcons:MaterialIcon">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Status}" Value="OK">
+                                                                <Setter Property="Kind" Value="CheckCircle"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Pending">
+                                                                <Setter Property="Kind" Value="ClockOutline"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Checking">
+                                                                <Setter Property="Kind" Value="Sync"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="Not Found">
+                                                                <Setter Property="Kind" Value="AlertCircleOutline"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialIcons:MaterialIcon.Style>
+                                            </materialIcons:MaterialIcon>
+                                            <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Opacity="0.9"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Content Area -->
+                            <Border Padding="12,14">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding DisplayName}" 
+                                               FontSize="13" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="{StaticResource TextPrimary}" 
+                                               TextAlignment="Center" 
+                                               TextTrimming="CharacterEllipsis" 
+                                               Margin="0,0,0,14"
+                                               Height="18"/>
+                                    
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Save Button -->
+                                        <Button Grid.Column="0" Click="SaveAssetButton_Click" Tag="{Binding}" Style="{StaticResource PrimaryButton}" Height="34" Margin="0,0,4,0" ToolTip="Save Asset">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="SAVE" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        
+                                        <!-- Ignore Button -->
+                                        <Button Grid.Column="1" Click="RemoveAssetButton_Click" Tag="{Binding}" Style="{StaticResource DestructiveButton}" Height="34" Margin="4,0,0,0" ToolTip="Ignore Asset">
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="REMOVE" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

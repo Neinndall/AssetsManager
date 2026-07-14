@@ -1,0 +1,416 @@
+<UserControl x:Class="AssetsManager.Views.Dialogs.Controls.JsonDiffControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+             xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+             xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:jsonDiff="clr-namespace:AssetsManager.Views.Dialogs.Controls"
+             xmlns:localUtils="clr-namespace:AssetsManager.Utils"
+             mc:Ignorable="d" Background="{StaticResource SidebarBackground}">
+
+    <UserControl.CommandBindings>
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextDifference}" Executed="NextDifference_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousDifference}" Executed="PreviousDifference_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.NextFile}" Executed="NextFile_Executed" />
+        <CommandBinding Command="{x:Static localUtils:ShortKeys.PreviousFile}" Executed="PreviousFile_Executed" />
+    </UserControl.CommandBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main Editors -->
+            <RowDefinition Height="Auto"/> <!-- JSON Path Breadcrumb -->
+        </Grid.RowDefinitions>
+
+        <!-- Professional Toolbar Area (Sub-header) -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource CardBackground}" 
+                BorderBrush="{StaticResource BorderColor}" 
+                BorderThickness="0,0,0,1" 
+                Padding="24,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Status (Left) -->
+                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- All Tools (Right) -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: Metadata -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="TEXT ANALYSIS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Structure &amp; Syntax Analysis" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
+                </StackPanel>
+
+                <!-- Right: Unified Tools Capsule -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- INSIGHTS SECTION (Metrics) -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
+                                <TextBlock Text="INSIGHTS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,12,0"/>
+                                
+                                <Border Background="#1A00E676" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Insertion" MouseLeftButtonDown="JumpToInsertion_Click" MouseRightButtonDown="FilterInsertion_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="Plus" Width="12" Height="12" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding InsertionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1AFF5252" CornerRadius="6" Padding="6,2" Margin="0,0,6,0" ToolTip="Jump to first Deletion" MouseLeftButtonDown="JumpToDeletion_Click" MouseRightButtonDown="FilterDeletion_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="Minus" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding DeletionsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentRed}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Background="#1A5C85FF" CornerRadius="6" Padding="6,2" ToolTip="Jump to first Modification" MouseLeftButtonDown="JumpToModification_Click" MouseRightButtonDown="FilterModification_Click" Cursor="Hand">
+                                    <StackPanel Orientation="Horizontal">
+                                        <icons:MaterialIcon Kind="EditOutline" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
+                                        <TextBlock Text="{Binding ModificationsCount}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="0,0,12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
+                            <!-- FILES SECTION (Playlist) - Only visible in Batch Mode -->
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding IsBatchMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="FILES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,8,0"/>
+                                <Button Click="BtnPrevFile_Click" 
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Width="30" Height="30"
+                                        ToolTip="Previous File in Batch (Alt+Left)">
+                                     <icons:MaterialIcon Kind="ChevronLeft" Width="18" Height="18"/>
+                                </Button>
+                                
+                                <TextBlock VerticalAlignment="Center" Margin="4,0" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}">
+                                    <Run Text="{Binding CurrentFileIndex, Mode=OneWay}"/><Run Text=" / "/><Run Text="{Binding TotalFilesCount, Mode=OneWay}" Foreground="{StaticResource TextPrimary}"/>
+                                </TextBlock>
+
+                                <Button Click="BtnNextFile_Click" 
+                                        Style="{StaticResource TransparentIconButton}"
+                                        Width="30" Height="30"
+                                        ToolTip="Next File in Batch (Alt+Right)">
+                                     <icons:MaterialIcon Kind="ChevronRight" Width="18" Height="18"/>
+                                </Button>
+
+                                <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+                            </StackPanel>
+
+                            <!-- MODES SECTION -->
+                            <TextBlock Text="MODES" Style="{StaticResource ToolSectionLabel}" Margin="4,0,10,0"/>
+                            <RadioButton x:Name="SideBySideBtn" Style="{StaticResource ModernIconRadioButton}"
+                                         IsChecked="{Binding IsInlineMode, Converter={StaticResource InverseBooleanConverter}, FallbackValue=True}" 
+                                         Checked="ComparisonInlineMode_Checked" ToolTip="Side by Side View" Width="30" Height="30">
+                                <icons:MaterialIcon Kind="DockWindow" Width="16" Height="16"/>
+                            </RadioButton>
+                            <RadioButton x:Name="UnifiedBtn" Style="{StaticResource ModernIconRadioButton}"
+                                         IsChecked="{Binding IsInlineMode}"
+                                         Checked="ComparisonInlineMode_Checked" ToolTip="Unified Inline Mode" Width="30" Height="30">
+                                <icons:MaterialIcon Kind="ViewStream" Width="16" Height="16"/>
+                            </RadioButton>
+
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
+                            <!-- FILTERS SECTION -->
+                            <TextBlock Text="FILTERS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <ToggleButton IsChecked="{Binding ShowInsertions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Insertions">
+                                <icons:MaterialIcon Kind="Plus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowInsertions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowDeletions}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Deletions">
+                                <icons:MaterialIcon Kind="Minus" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowDeletions}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+                            <ToggleButton IsChecked="{Binding ShowModifications}" 
+                                          Click="FilterButton_Click" 
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Modifications">
+                                <icons:MaterialIcon Kind="EditOutline" Width="14" Height="14">
+                                    <icons:MaterialIcon.Style>
+                                        <Style TargetType="icons:MaterialIcon">
+                                            <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ShowModifications}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </icons:MaterialIcon.Style>
+                                </icons:MaterialIcon>
+                            </ToggleButton>
+
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
+                            <!-- DIFFS SECTION (Navigation within file) -->
+                            <TextBlock Text="DIFFS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <Button x:Name="PreviousDiffButton" 
+                                    Click="PreviousDiffButton_Click" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Width="30" Height="30"
+                                    ToolTip="Previous Difference (Alt+Up)">
+                                 <icons:MaterialIcon Kind="ChevronUp" Width="18" Height="18"/>
+                            </Button>
+                            <Button x:Name="NextDiffButton" 
+                                    Click="NextDiffButton_Click" 
+                                    Style="{StaticResource TransparentIconButton}"
+                                    Width="30" Height="30"
+                                    ToolTip="Next Difference (Alt+Down)">
+                                 <icons:MaterialIcon Kind="ChevronDown" Width="18" Height="18"/>
+                            </Button>
+
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+
+                            <!-- TOOLS SECTION -->
+                            <TextBlock Text="TOOLS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0"/>
+                            <ToggleButton x:Name="WordWrapButton"
+                                          IsChecked="{Binding IsWordWrapEnabled}"
+                                          Click="WordWrapButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Word Wrap">
+                                 <icons:MaterialIcon Kind="Wrap" Width="16" Height="16"/>
+                            </ToggleButton>
+                            <ToggleButton x:Name="WordLevelDiffButton"
+                                          IsChecked="{Binding IsWordLevelDiff}"
+                                          Click="WordLevelDiffButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Toggle Word-Level Diff">
+                                 <icons:MaterialIcon Kind="FormatText" Width="16" Height="16"/>
+                            </ToggleButton>
+                            <ToggleButton x:Name="HideUnchangedButton"
+                                          IsChecked="{Binding HideUnchangedLines}"
+                                          Click="HideUnchangedButton_Click"
+                                          Style="{StaticResource TransparentIconToggleButton}"
+                                          Width="30" Height="30"
+                                          ToolTip="Show/Hide Unchanged Lines">
+                                 <icons:MaterialIcon Kind="FilterVariant" Width="16" Height="16"/>
+                            </ToggleButton>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="24,14,24,0">
+            <!-- Diff Grid -->
+            <Grid x:Name="DiffGrid" Visibility="{Binding IsInlineMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="64"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Old JSON Card -->
+                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Sub-Header: OLD VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <Border Background="#1AFF9100" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="History" Width="18" Height="18" Foreground="{StaticResource AccentOrange}"/>
+                                    </Border>
+                                    
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="OLD VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentOrange}" Opacity="0.8"/>
+                                        <TextBlock x:Name="OldFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Technical Actions -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OldSize, FallbackValue='0 KB'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Border>
+
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
+                            <Grid>
+                                <avalonEdit:TextEditor x:Name="OldJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+
+                                <!-- Initial Comparison Overlay -->
+                                <Border Background="{StaticResource DarkBackground}" 
+                                        Visibility="{Binding IsInitialComparison, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        CornerRadius="0,0,12,12">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.5">
+                                        <icons:MaterialIcon Kind="InformationOutline" Width="48" Height="48" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="NO PREVIOUS INFORMATION" FontSize="14" FontWeight="Black" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="This is the first time this asset is being tracked." FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
+
+                <!-- New JSON Card -->
+                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Sub-Header: NEW VERSION -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="12,12,12,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <Border Background="#1A00E676" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                        <icons:MaterialIcon Kind="FlashOutline" Width="18" Height="18" Foreground="{StaticResource AccentGreen}"/>
+                                    </Border>
+                                    
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="NEW VERSION" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentGreen}" Opacity="0.8"/>
+                                        <TextBlock x:Name="NewFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+
+                                    <!-- Technical Actions -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding NewSize, FallbackValue='0 KB'}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Border>
+
+                        <Border Grid.Row="1" Padding="0" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
+                            <avalonEdit:TextEditor x:Name="NewJsonContent" Style="{StaticResource BaseTextEditorStyle}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <GridSplitter Grid.Column="3" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent"/>
+
+                <!-- Navigation Panel Card -->
+                <Border Grid.Column="4" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- Sub-Header: MAP -->
+                        <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                            <Border Padding="8,10">
+                                <icons:MaterialIcon Kind="MapOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}"/>
+                            </Border>
+                        </Border>
+                        
+                        <Border Grid.Row="1" 
+                                Background="{StaticResource DarkBackground}" 
+                                CornerRadius="0,0,11,11" 
+                                Margin="1,0,1,1"
+                                ClipToBounds="True">
+                            <jsonDiff:DiffNavigationPanel x:Name="DiffNavigationPanel"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Unified Diff Editor (Inline) -->
+            <Border x:Name="UnifiedDiffContainer" Grid.Row="1" Visibility="{Binding IsInlineMode, Converter={StaticResource BooleanToVisibilityConverter}}" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Unified Header: Simplified Title View -->
+                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="12,12,0,0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                        <Border Padding="12,12,12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <Border Background="#1A5C85FF" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                                    <icons:MaterialIcon Kind="ViewStream" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                </Border>
+                                
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="UNIFIED VIEW" FontSize="10" FontWeight="Black" Foreground="{StaticResource AccentBrush}" Opacity="0.8"/>
+                                    <TextBlock x:Name="UnifiedFileNameLabel" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Border>
+
+                    <Border Grid.Row="1" Background="{StaticResource DarkBackground}" CornerRadius="0,0,12,12">
+                        <avalonEdit:TextEditor x:Name="UnifiedDiffEditor" Style="{StaticResource BaseTextEditorStyle}" IsReadOnly="True" ShowLineNumbers="True"/>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Bottom Info Bar (Line Info) -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="24,6">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <!-- LINE INDICATOR -->
+                    <icons:MaterialIcon Kind="LineScan" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>
+                    <TextBlock FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <Run Text="Line "/><Run Text="{Binding CurrentLine, FallbackValue='1'}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

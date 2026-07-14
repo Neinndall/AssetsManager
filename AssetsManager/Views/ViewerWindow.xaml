@@ -1,0 +1,181 @@
+<UserControl x:Class="AssetsManager.Views.ViewerWindow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewer="clr-namespace:AssetsManager.Views.Controls.Viewer"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}">
+    <Grid>
+        <!-- CUERPO -->
+        <Grid>
+            <!-- LANDING PAGE / EMPTY STATE -->
+            <Grid x:Name="EmptyStatePanel" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    
+                    <!-- Default Content (Buttons) -->
+                    <StackPanel x:Name="DefaultEmptyStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                        <!-- HERO HEADER: Centered Model -->
+                        <StackPanel Margin="0,0,0,32" HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8">
+                                <Border Background="#1A00E676" CornerRadius="4" Padding="8,3" VerticalAlignment="Center" Margin="0,0,10,0">
+                                    <TextBlock Text="3D WORKSPACE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                                </Border>
+                                <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.7"/>
+                            </StackPanel>
+                            <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Visualize characters, animations, and map geometry in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
+                        </StackPanel>
+
+                        <!-- Action Cards -->
+                        <UniformGrid Columns="3" HorizontalAlignment="Center">
+                            <!-- Load Model Card -->
+                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                                    Click="OpenFile_Click"
+                                    Width="180" Height="160">
+                                <StackPanel>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
+                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Load Model"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Import skn, sco and scb"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Load Chroma Card -->
+                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                                    Click="OpenChromaFile_Click"
+                                    Width="180" Height="160">
+                                <StackPanel>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
+                                        <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Load Chroma"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Import skn with textures"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Load Map Card -->
+                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                                    Click="OpenGeometryFile_Click"
+                                    Width="180" Height="160">
+                                <StackPanel>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
+                                        <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Load Map"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Import mapgeo"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </UniformGrid>
+                    </StackPanel>
+                    
+                    <!-- Loading Indicator (Enhanced) -->
+                    <Grid x:Name="LoadingStateContent" Visibility="{Binding IsLoadingVisible, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <!-- Animated Spinner (Explorer Style) -->
+                            <materialIcons:MaterialIcon Kind="Sync" 
+                                                        Width="38" 
+                                                        Height="38" 
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Style="{StaticResource SpinningIconStyle}"/>
+
+                            <!-- Title -->
+                            <TextBlock x:Name="LoadingTitleText"
+                                       Text="{Binding LoadingTitle}"
+                                       FontSize="24"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       HorizontalAlignment="Center" 
+                                       Margin="0,18,0,8"/>
+
+                            <!-- Description -->
+                            <TextBlock x:Name="LoadingDescriptionText"
+                                       Text="{Binding LoadingDescription}"
+                                       FontSize="14"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+
+                </StackPanel>
+            </Grid>
+
+            <!-- MAIN CONTENT (Viewport + Panel) -->
+            <Grid x:Name="MainContentGrid" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Column 0: Viewport -->
+                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl">
+                    <viewer:ViewerViewportControl.Style>
+                        <Style TargetType="viewer:ViewerViewportControl">
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Grid.ColumnSpan" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
+                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
+                                    <Setter Property="Margin" Value="0,0,4,0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </viewer:ViewerViewportControl.Style>
+                </viewer:ViewerViewportControl>
+
+                <!-- Column 1: Splitter -->
+                <GridSplitter Grid.Column="1"
+                              x:Name="MainGridSplitter"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Stretch"
+                              Width="4"
+                              Background="Transparent"
+                              ResizeBehavior="PreviousAndNext"
+                              ResizeDirection="Columns"
+                              Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+                
+                <!-- Column 2: Controls Panel -->
+                <viewer:ViewerPanelControl Grid.Column="2" x:Name="PanelControl"
+                                           Visibility="{Binding ViewModel.IsMaximized, ElementName=ViewportControl, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+            </Grid>
+
+
+            <!-- CHROMA SELECTION OVERLAY -->
+            <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay" 
+                                           Visibility="{Binding ViewModel.IsChromaGalleryVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,62 @@
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.UpdateProgressWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+                mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+                HeaderTitle="Downloading Update" 
+                HeaderIcon="CloudDownload"
+                Width="440" Height="165"
+                WindowStartupLocation="CenterScreen"
+                Style="{StaticResource HudWindowStyle}"
+                ShowMaximizeButton="False"
+                ResizeMode="NoResize">
+
+    <Grid>
+        <!-- 1. Dark Body Area (With bottom rounding) -->
+        <Border Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" Padding="28,20" ClipToBounds="True">
+            <StackPanel VerticalAlignment="Center">
+                
+                <!-- Status Row -->
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="{Binding OperationTitle}" 
+                               Foreground="{StaticResource TextSecondary}"
+                               FontSize="11"
+                               FontWeight="Black"
+                               HorizontalAlignment="Left"/>
+                    
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding ProgressPercentage}" 
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="13"
+                                   FontWeight="Bold"/>
+                        <TextBlock Text="%" 
+                                   Foreground="{StaticResource AccentBrush}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Margin="1,0,0,0"
+                                   VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Solid Rounded Progress Bar -->
+                <ProgressBar Value="{Binding ProgressPercentage}" 
+                             Minimum="0" Maximum="100" 
+                             HorizontalAlignment="Stretch" 
+                             Style="{StaticResource ModernProgressBar}" 
+                             Margin="0,4"/>
+
+                <!-- Details Row -->
+                <TextBlock Text="{Binding DetailsText}" 
+                           Foreground="{StaticResource TextSecondary}"
+                           FontSize="12"
+                           Margin="0,10,0,0"
+                           HorizontalAlignment="Center"
+                           Opacity="0.8"/>
+                
+            </StackPanel>
+        </Border>
+    </Grid>
+</base:HudWindow>

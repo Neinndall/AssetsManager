@@ -1,0 +1,124 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+
+namespace AssetsManager.Utils
+{
+    public class DirectoriesCreator
+    {
+        // Fixed root paths
+        public string AppDirectory { get; }
+        public string HashesPath { get; }
+        public string HashLabPath { get; }
+        public string JsonCacheHistoryPath { get; }
+        public string WatcherCacheOldPath { get; }
+        public string WatcherCacheNewPath { get; }
+        public string AssetsDownloadedPath { get; }
+        public string WadComparisonSavePath { get; }
+        public string VersionsPath { get; }
+        public string UpdateCachePath { get; }
+        public string WebView2DataPath { get; }
+        public string TempPreviewPath { get; }
+        public string ApiCachePath { get; }
+        public string ApiCacheSalesPath { get; }
+        public string ApiCacheMythicPath { get; }
+        public string ApiCacheRewardsPath { get; }
+
+        public DirectoriesCreator(string customAppFolderPath = null)
+        {
+            AppDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            string appFolderPath = customAppFolderPath;
+            if (string.IsNullOrEmpty(appFolderPath))
+            {
+                string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                appFolderPath = Path.Combine(appDataPath, "AssetsManager");
+            }
+
+            HashesPath = Path.Combine(appFolderPath, "hashes");
+            HashLabPath = Path.Combine(appFolderPath, "hash_lab");
+
+            AssetsDownloadedPath = Path.Combine(AppDirectory, "AssetsDownloaded");
+            
+            JsonCacheHistoryPath = Path.Combine(appFolderPath, "json_cache", "history");
+
+            WatcherCacheOldPath = Path.Combine(appFolderPath, "watcher_cache", "old");
+            WatcherCacheNewPath = Path.Combine(appFolderPath, "watcher_cache", "new");
+
+            UpdateCachePath = Path.Combine(appFolderPath, "update_cache");
+
+            WebView2DataPath = Path.Combine(appFolderPath, "webview2data");
+            TempPreviewPath = Path.Combine(WebView2DataPath, "TempPreview");
+            
+            ApiCachePath = Path.Combine(appFolderPath, "api_cache");
+            ApiCacheSalesPath = Path.Combine(ApiCachePath, "sales");
+            ApiCacheMythicPath = Path.Combine(ApiCachePath, "mythic");
+            ApiCacheRewardsPath = Path.Combine(ApiCachePath, "rewards");
+
+            WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
+            VersionsPath = Path.Combine(appFolderPath, "versions");
+        }
+
+        // Dynamic naming logic (Stateless & Safe)
+        public string GetNewSubAssetsDownloadedPath()
+        {
+            string path = Path.Combine(AssetsDownloadedPath, DateTime.Now.ToString("ddMMyyyy_HHmmss"));
+            CreateDirectory(path);
+            return path;
+        }
+
+        public (string FolderName, string PhysicalPath) GetNewWadComparisonFolderInfo()
+        {
+            string folderName = $"comparison_{DateTime.Now:ddMMyyyy_HHmmss}";
+            string physicalPath = Path.Combine(WadComparisonSavePath, folderName);
+            return (folderName, physicalPath);
+        }
+
+        public string GetNewJsonHistoryPath(string fileName)
+        {
+            string historyKey = fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) 
+                ? fileName.Substring(0, fileName.Length - 5) 
+                : fileName;
+            
+            string path = Path.Combine(JsonCacheHistoryPath, historyKey, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
+            CreateDirectory(path);
+            return path;
+        }
+
+        public (string DirectoryPath, string ExePath, string LogFilePath) GetUpdaterInfo()
+        {
+            string dirPath = Path.Combine(UpdateCachePath, "Updater");
+            string exePath = Path.Combine(dirPath, "Updater.exe");
+            string logPath = Path.Combine(UpdateCachePath, "update_log.log");
+            
+            CreateDirectory(dirPath);
+            return (dirPath, exePath, logPath);
+        }
+
+        // Action methods
+        public void PrepareComparisonDirectory(string physicalPath)
+        {
+            CreateDirectory(physicalPath);
+            CreateDirectory(Path.Combine(physicalPath, "wad_chunks", "old"));
+            CreateDirectory(Path.Combine(physicalPath, "wad_chunks", "new"));
+        }
+        
+        public void CreateHashesDirectories()
+        {
+            CreateDirectory(HashesPath);
+            CreateDirectory(HashLabPath);
+        }
+
+        public void CreateDirectory(string path)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
+                {
+                    Directory.CreateDirectory(path);
+                }
+            }
+            catch { /* Silent Fail */ }
+        }
+    }
+}

@@ -1,0 +1,274 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Net.Http;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using AssetsManager.Utils;
+using AssetsManager.Services.Core;
+using Newtonsoft.Json.Linq;
+
+namespace AssetsManager.Services.Monitor
+{
+    public class PbeStatusService
+    {
+        private readonly HttpClient _httpClient;
+        private readonly LogService _logService;
+        private readonly AppSettings _appSettings;
+        private const string PbeStatusUrl = "https://lol.secure.dyn.riotcdn.net/channels/public/x/status/pbe.json";
+
+        public event Action StatusChecked;
+
+        // Dictionary to map common timezone abbreviations to their UTC offsets.
+        private static readonly Dictionary<string, TimeSpan> TimeZoneAbbreviations = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "PDT", TimeSpan.FromHours(-7) },
+            { "PST", TimeSpan.FromHours(-8) },
+            { "UTC", TimeSpan.FromHours(0) },
+            // Add more as needed
+        };
+
+        public PbeStatusService(HttpClient httpClient, LogService logService, AppSettings appSettings)
+        {
+            _httpClient = httpClient;
+            _logService = logService;
+            _appSettings = appSettings;
+        }
+
+        public async Task<string> CheckPbeStatusAsync()
+        {
+            string notificationMessage = null;
+            try
+            {
+                var response = await _httpClient.GetStringAsync(PbeStatusUrl);
+                string fullStatus = ExtractStatus(response);
+                string conciseStatus = ExtractConciseStatus(response);
+
+                if (conciseStatus != _appSettings.LastPbeStatusMessage)
+                {
+                    string previousConciseStatus = _appSettings.LastPbeStatusMessage;
+                    _appSettings.LastPbeStatusMessage = conciseStatus;
+                    AppSettings.SaveSettings(_appSettings);
+
+                    // If maintenance ended, send specific notification.
+                    if (conciseStatus == "ONLINE" && previousConciseStatus != "ONLINE")
+                    {
+                        notificationMessage = "PBE Status: Maintenance ended.";
+                    }
+                    // If maintenance just started or changed, send the full message.
+                    else if (conciseStatus != "ONLINE")
+                    {
+                        notificationMessage = fullStatus;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to check PBE status.");
+            }
+            finally
+            {
+                _appSettings.LastPbeCheckTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                AppSettings.SaveSettings(_appSettings);
+                StatusChecked?.Invoke();
+            }
+            return notificationMessage;
+        }
+
+        private string ExtractStatus(string jsonContent)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(jsonContent)) return string.Empty;
+
+                var data = JObject.Parse(jsonContent);
+                var maintenances = data["maintenances"] as JArray;
+
+                if (maintenances == null || maintenances.Count == 0) return string.Empty;
+
+                foreach (var maintenance in maintenances)
+                {
+                    var updates = maintenance?["updates"] as JArray;
+                    if (updates == null || updates.Count == 0) continue;
+
+                    string originalContent = null;
+                    Match match = null;
+
+                    foreach (var update in updates)
+                    {
+                        var translations = update?["translations"] as JArray;
+                        if (translations == null) continue;
+
+                        var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                        string content = enTranslation?["content"]?.ToString();
+
+                        if (string.IsNullOrEmpty(content)) continue;
+
+                        // Only consider it a "real" maintenance if it contains specific keywords
+                        bool isRealMaintenance = content.Contains("maintenance", StringComparison.OrdinalIgnoreCase) || 
+                                               content.Contains("unavailable", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isRealMaintenance) continue;
+
+                        // Check for the specific pattern with more flexibility (single digits)
+                        var m = Regex.Match(content, @"(\d{1,2}/\d{1,2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        if (m.Success)
+                        {
+                            originalContent = content;
+                            match = m;
+                            break;
+                        }
+                        else if (string.IsNullOrEmpty(originalContent))
+                        {
+                            // Capture the first content available as a fallback
+                            originalContent = content;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(originalContent)) continue;
+
+                    if (match == null) return originalContent; // If no regex match, return the raw message
+
+                    string dateStr = match.Groups[1].Value;
+                    string timeStr = match.Groups[2].Value;
+                    string tzAbbr = match.Groups[3].Value;
+
+                    // Support both MM/dd/yyyy and M/d/yyyy
+                    string dateFormat = dateStr.Contains("/") && dateStr.Split('/')[0].Length == 1 ? "M/d/yyyy" : "MM/dd/yyyy";
+                    if (dateStr.Split('/')[1].Length == 1) dateFormat = dateFormat.Replace("dd", "d");
+
+                    if (!DateTime.TryParse(dateStr + " " + timeStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime))
+                    {
+                        return originalContent; // Return original if parsing fails
+                    }
+
+                    if (!TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
+                    {
+                        return originalContent; // Return original if timezone is unknown
+                    }
+
+                    var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
+
+                    // 2. Parse Maintenance Duration
+                    TimeSpan duration = TimeSpan.FromHours(3); // Default grace period of 3 hours
+                    var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
+
+                    if (durationMatch.Success)
+                    {
+                        if (int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
+                        {
+                            string unit = durationMatch.Groups[2].Value.ToLower();
+                            if (unit.StartsWith("hour"))
+                            {
+                                duration = TimeSpan.FromHours(durationValue);
+                            }
+                            else if (unit.StartsWith("minute"))
+                            {
+                                duration = TimeSpan.FromMinutes(durationValue);
+                            }
+                        }
+                    }
+
+                    // 3. Format the final message by injecting the user's local time.
+                    var localMaintenanceTime = maintenanceStartTime.ToLocalTime();
+                    string newDateTimeString = $"{match.Value} ({localMaintenanceTime:HH:mm} your timezone)";
+
+                    return originalContent.Replace(match.Value, newDateTimeString);
+                }
+
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse PBE status JSON.");
+                return "Failed to parse PBE status information.";
+            }
+        }
+
+        private string ExtractConciseStatus(string jsonContent)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(jsonContent)) return "ONLINE";
+
+                var data = JObject.Parse(jsonContent);
+                var maintenances = data["maintenances"] as JArray;
+
+                if (maintenances == null || maintenances.Count == 0) return "ONLINE";
+
+                foreach (var maintenance in maintenances)
+                {
+                    var updates = maintenance?["updates"] as JArray;
+                    if (updates == null || updates.Count == 0) continue;
+
+                    string originalContent = null;
+                    Match match = null;
+
+                    foreach (var update in updates)
+                    {
+                        var translations = update?["translations"] as JArray;
+                        if (translations == null) continue;
+
+                        var enTranslation = translations.FirstOrDefault(t => t["locale"]?.ToString() == "en_US") ?? translations.FirstOrDefault(t => t["locale"]?.ToString().StartsWith("en_") ?? false);
+                        string content = enTranslation?["content"]?.ToString();
+
+                        if (string.IsNullOrEmpty(content)) continue;
+
+                        bool isRealMaintenance = content.Contains("maintenance", StringComparison.OrdinalIgnoreCase) || 
+                                               content.Contains("unavailable", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isRealMaintenance) continue;
+
+                        var m = Regex.Match(content, @"(\d{1,2}/\d{1,2}/\d{4})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})", RegexOptions.IgnoreCase);
+                        if (m.Success)
+                        {
+                            originalContent = content;
+                            match = m;
+                            break;
+                        }
+                        else if (string.IsNullOrEmpty(originalContent))
+                        {
+                            originalContent = content;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(originalContent)) continue;
+
+                    if (match == null) return "Maintenance detected";
+
+                    string dateStr = match.Groups[1].Value;
+                    string timeStr = match.Groups[2].Value;
+                    string tzAbbr = match.Groups[3].Value;
+
+                    if (!DateTime.TryParse(dateStr + " " + timeStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var maintenanceDateTime) || !TimeZoneAbbreviations.TryGetValue(tzAbbr, out var offset))
+                    {
+                        return "Maintenance detected";
+                    }
+
+                    var maintenanceStartTime = new DateTimeOffset(maintenanceDateTime, offset);
+
+                    TimeSpan duration = TimeSpan.FromHours(3);
+                    var durationMatch = Regex.Match(originalContent, @"for approximately (\d+)\s+(hour|minute)s?", RegexOptions.IgnoreCase);
+
+                    if (durationMatch.Success && int.TryParse(durationMatch.Groups[1].Value, out int durationValue))
+                    {
+                        string unit = durationMatch.Groups[2].Value.ToLower();
+                        if (unit.StartsWith("hour")) duration = TimeSpan.FromHours(durationValue);
+                        else if (unit.StartsWith("minute")) duration = TimeSpan.FromMinutes(durationValue);
+                    }
+
+                    var localMaintenanceStartTime = maintenanceStartTime.ToLocalTime();
+                    return $"Maintenance started at {localMaintenanceStartTime:HH:mm}";
+                }
+
+                return "ONLINE";
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to parse PBE concise status JSON.");
+                return "Failed to parse PBE status information.";
+            }
+        }
+    }
+}
