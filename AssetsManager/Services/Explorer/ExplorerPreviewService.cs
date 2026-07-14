@@ -40,6 +40,8 @@ namespace AssetsManager.Services.Explorer
         private FilePreviewerModel _viewModel;
         private IHighlightingDefinition _jsonHighlightingDefinition;
         private CancellationTokenSource _previewCancellationTokenSource;
+        private Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> _webViewEnvironmentTask;
+        private long _previewGeneration;
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -147,15 +149,13 @@ namespace AssetsManager.Services.Explorer
                 }
             }
 
-            // Cancel previous active preview task to avoid WebView2 concurrency collisions
-            _previewCancellationTokenSource?.Cancel();
-            _previewCancellationTokenSource = new CancellationTokenSource();
-            var cancellationToken = _previewCancellationTokenSource.Token;
+            var (previewGeneration, cancellationToken) = BeginPreviewRequest();
 
             // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
             // We only update/clear metadata if the current node is an image. 
             // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
             var metadata = await _narrativeMetadataService.GetMetadataAsync(node);
+            ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
             if (isImage || metadata != null)
             {
                 _viewModel.NarrativeMetadata = metadata;
@@ -182,10 +182,10 @@ namespace AssetsManager.Services.Explorer
                 else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken); }
                 else if (node.Type == NodeType.WemFile) { data = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken); }
 
-                if (cancellationToken.IsCancellationRequested) return;
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
-                if (data != null) { await DispatchPreview(data, node.Extension, node); }
-                else { await ShowUnsupportedPreviewAsync(node.Extension); }
+                if (data != null) { await DispatchPreview(data, node.Extension, node, previewGeneration, cancellationToken); }
+                else { await ShowUnsupportedPreviewAsync(node.Extension, previewGeneration, cancellationToken); }
             }
             catch (OperationCanceledException)
             {
@@ -194,12 +194,16 @@ namespace AssetsManager.Services.Explorer
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to preview file '{node.VirtualPath}'.");
-                await ShowUnsupportedPreviewAsync(node.Extension);
+                if (IsCurrentPreview(previewGeneration, cancellationToken))
+                {
+                    await ShowUnsupportedPreviewAsync(node.Extension, previewGeneration, cancellationToken);
+                }
             }
         }
 
         public async Task ResetPreviewAsync()
         {
+            CancelCurrentPreview();
             _currentContentNode = null;
             _currentImageNode = null;
 
@@ -214,6 +218,38 @@ namespace AssetsManager.Services.Explorer
 
             // Step 2: Restore the UI state
             await SetPreviewerAsync(Previewer.StatusPanel);
+        }
+
+        private (long Generation, CancellationToken Token) BeginPreviewRequest()
+        {
+            _previewCancellationTokenSource?.Cancel();
+            _previewCancellationTokenSource?.Dispose();
+
+            _previewCancellationTokenSource = new CancellationTokenSource();
+            return (Interlocked.Increment(ref _previewGeneration), _previewCancellationTokenSource.Token);
+        }
+
+        private void CancelCurrentPreview()
+        {
+            Interlocked.Increment(ref _previewGeneration);
+            _previewCancellationTokenSource?.Cancel();
+            _previewCancellationTokenSource?.Dispose();
+            _previewCancellationTokenSource = null;
+        }
+
+        private bool IsCurrentPreview(long previewGeneration, CancellationToken cancellationToken)
+        {
+            return !cancellationToken.IsCancellationRequested &&
+                   (previewGeneration == 0 || previewGeneration == Interlocked.Read(ref _previewGeneration));
+        }
+
+        private void ThrowIfPreviewIsObsolete(long previewGeneration, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (previewGeneration != 0 && !IsCurrentPreview(previewGeneration, cancellationToken))
+            {
+                throw new OperationCanceledException();
+            }
         }
 
         public void PrepareSlotForFile(FileSystemNodeModel node)
@@ -282,43 +318,46 @@ namespace AssetsManager.Services.Explorer
             await DispatchPreview(decompressedData, node.Extension, node);
         }
 
-        private async Task DispatchPreview(byte[] data, string extension, FileSystemNodeModel node)
+        private async Task DispatchPreview(byte[] data, string extension, FileSystemNodeModel node, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
+            ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
             // Aseguramos la creacion de la carpeta necesaria
             _directoriesCreator.CreateDirectory(_directoriesCreator.TempPreviewPath);
 
-            if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension); }
-            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data); }
-            else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data); }
+            if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension, previewGeneration, cancellationToken); }
+            else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data, previewGeneration, cancellationToken); }
+            else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data, previewGeneration, cancellationToken); }
             else if (SupportedFileTypes.Media.Contains(extension))
             {
                 if (extension == ".wem")
                 {
                     byte[] oggData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Ogg);
+                    ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
                     if (oggData != null)
                     {
-                        await ShowAudioVideoPreviewAsync(oggData, ".ogg", node.Name);
+                        await ShowAudioVideoPreviewAsync(oggData, ".ogg", node.Name, previewGeneration, cancellationToken);
                     }
                     else
                     {
-                        await ShowUnsupportedPreviewAsync(".wem");
+                        await ShowUnsupportedPreviewAsync(".wem", previewGeneration, cancellationToken);
                     }
                 }
                 else
                 {
-                    await ShowAudioVideoPreviewAsync(data, extension, node.Name);
+                    await ShowAudioVideoPreviewAsync(data, extension, node.Name, previewGeneration, cancellationToken);
                 }
             }
-            else if (SupportedFileTypes.IsText(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension); }
-            else { await ShowUnsupportedPreviewAsync(extension); }
+            else if (SupportedFileTypes.IsText(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension, previewGeneration, cancellationToken); }
+            else { await ShowUnsupportedPreviewAsync(extension, previewGeneration, cancellationToken); }
         }
 
-        private async Task ShowAvalonEditTextPreviewAsync(byte[] data, string extension)
+        private async Task ShowAvalonEditTextPreviewAsync(byte[] data, string extension, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
             try
             {
                 string dataType = extension.TrimStart('.');
                 string textContent = await _contentFormatterService.GetFormattedStringAsync(dataType, data);
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
                 IHighlightingDefinition syntaxHighlighting = null;
 
@@ -328,13 +367,19 @@ namespace AssetsManager.Services.Explorer
                     syntaxHighlighting = GetJsonHighlighting();
                 }
 
-                await SetPreviewerAsync(Previewer.AvalonEdit, (textContent, syntaxHighlighting));
+                await SetPreviewerAsync(Previewer.AvalonEdit, (textContent, syntaxHighlighting), previewGeneration: previewGeneration, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to show text preview for extension {extension}");
                 string errorText = $"Error showing {extension} file.";
-                await SetPreviewerAsync(Previewer.AvalonEdit, (errorText, (IHighlightingDefinition)null));
+                if (IsCurrentPreview(previewGeneration, cancellationToken))
+                {
+                    await SetPreviewerAsync(Previewer.AvalonEdit, (errorText, (IHighlightingDefinition)null), previewGeneration: previewGeneration, cancellationToken: cancellationToken);
+                }
             }
         }
 
@@ -353,8 +398,9 @@ namespace AssetsManager.Services.Explorer
             return _jsonHighlightingDefinition;
         }
 
-        private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false)
+        private async Task SetPreviewerAsync(Previewer newPreviewer, object content = null, bool shouldAutoplay = false, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
+            ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
             // Dispose of WebView only when we are explicitly replacing it in the left Content slot
             if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
             {
@@ -390,7 +436,13 @@ namespace AssetsManager.Services.Explorer
                         var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
                         if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
 
-                        await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay);
+                        bool webViewCreated = await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewGeneration, cancellationToken);
+                        if (!webViewCreated)
+                        {
+                            return;
+                        }
+
+                        ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
                         _viewModel.IsContentVisible = true;
                         _viewModel.IsTextVisible = false;
                         _viewModel.IsWebVisible = true;
@@ -475,11 +527,14 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task CreateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay)
+        private async Task<bool> CreateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay, long previewGeneration, CancellationToken cancellationToken)
         {
+            WebView2 webView = null;
             try
             {
-                var webView = new WebView2()
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
+
+                webView = new WebView2()
                 {
                     DefaultBackgroundColor = System.Drawing.Color.Transparent
                 };
@@ -487,8 +542,10 @@ namespace AssetsManager.Services.Explorer
                 _webViewContainer.Children.Add(webView);
 
                 // Initialize CoreWebView2
-                var environment = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(userDataFolder: _directoriesCreator.WebView2DataPath);
+                var environment = await GetWebViewEnvironmentAsync();
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
                 await webView.EnsureCoreWebView2Async(environment);
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
                 // Set settings and mappings
                 webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
@@ -500,7 +557,7 @@ namespace AssetsManager.Services.Explorer
                 void OnNavigationCompleted(object sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
                 {
                     webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
-                    if (shouldAutoplay)
+                    if (shouldAutoplay && IsCurrentPreview(previewGeneration, cancellationToken))
                     {
                         _ = webView.Dispatcher.InvokeAsync(async () =>
                         {
@@ -518,22 +575,57 @@ namespace AssetsManager.Services.Explorer
 
                 webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
                 webView.CoreWebView2.NavigateToString(htmlContent);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                DisposeWebView(webView);
+                return false;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to create, initialize, and show WebView2.");
-                // Clean up a failed creation
-                var webView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                if (webView != null)
+                DisposeWebView(webView);
+                if (IsCurrentPreview(previewGeneration, cancellationToken))
                 {
-                    webView.Dispose();
-                    _webViewContainer.Children.Remove(webView);
+                    await ShowUnsupportedPreviewAsync(".media", previewGeneration, cancellationToken);
                 }
-                await ShowUnsupportedPreviewAsync(".media"); // Show a generic error
+                return false;
             }
         }
 
-        private async Task ShowImagePreviewAsync(byte[] data)
+        private async Task<Microsoft.Web.WebView2.Core.CoreWebView2Environment> GetWebViewEnvironmentAsync()
+        {
+            _webViewEnvironmentTask ??= Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
+                userDataFolder: _directoriesCreator.WebView2DataPath);
+
+            try
+            {
+                return await _webViewEnvironmentTask;
+            }
+            catch
+            {
+                _webViewEnvironmentTask = null;
+                throw;
+            }
+        }
+
+        private void DisposeWebView(WebView2 webView)
+        {
+            if (webView == null)
+            {
+                return;
+            }
+
+            if (_webViewContainer?.Children.Contains(webView) == true)
+            {
+                _webViewContainer.Children.Remove(webView);
+            }
+
+            webView.Dispose();
+        }
+
+        private async Task ShowImagePreviewAsync(byte[] data, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
             var bitmap = await Task.Run(() =>
             {
@@ -547,10 +639,11 @@ namespace AssetsManager.Services.Explorer
                 return bmp;
             });
 
-            await SetPreviewerAsync(Previewer.Image, bitmap);
+            ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
+            await SetPreviewerAsync(Previewer.Image, bitmap, previewGeneration: previewGeneration, cancellationToken: cancellationToken);
         }
 
-        private async Task ShowTexturePreviewAsync(byte[] data, string extension)
+        private async Task ShowTexturePreviewAsync(byte[] data, string extension, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
             var bitmapSource = await Task.Run(() =>
             {
@@ -558,42 +651,50 @@ namespace AssetsManager.Services.Explorer
                 return TextureUtils.LoadTexture(stream, extension);
             });
 
+            ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
             if (bitmapSource != null)
             {
-                await SetPreviewerAsync(Previewer.Image, bitmapSource);
+                await SetPreviewerAsync(Previewer.Image, bitmapSource, previewGeneration: previewGeneration, cancellationToken: cancellationToken);
             }
             else
             {
-                await ShowUnsupportedPreviewAsync(extension);
+                await ShowUnsupportedPreviewAsync(extension, previewGeneration, cancellationToken);
             }
         }
 
-        private async Task ShowSvgPreviewAsync(byte[] data)
+        private async Task ShowSvgPreviewAsync(byte[] data, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
             try
             {
                 var drawingImage = await Task.Run(() => _svgParser.LoadSvg(data));
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
                 if (drawingImage != null)
                 {
-                    await SetPreviewerAsync(Previewer.Image, drawingImage);
+                    await SetPreviewerAsync(Previewer.Image, drawingImage, previewGeneration: previewGeneration, cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    await ShowUnsupportedPreviewAsync(".svg");
+                    await ShowUnsupportedPreviewAsync(".svg", previewGeneration, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to show SVG preview.");
-                await ShowUnsupportedPreviewAsync(".svg");
+                if (IsCurrentPreview(previewGeneration, cancellationToken))
+                {
+                    await ShowUnsupportedPreviewAsync(".svg", previewGeneration, cancellationToken);
+                }
             }
         }
 
-        private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension, string displayName)
+        private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension, string displayName, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
             if (_webViewContainer == null)
             {
-                await ShowUnsupportedPreviewAsync(extension);
+                await ShowUnsupportedPreviewAsync(extension, previewGeneration, cancellationToken);
                 return;
             }
 
@@ -614,10 +715,23 @@ namespace AssetsManager.Services.Explorer
                         _logService.LogError(ex, "Failed to clean temp files");
                     }
                 });
+                ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
                 var tempFileName = $"preview_{DateTime.Now.Ticks}{extension}";
                 var tempFilePath = Path.Combine(_directoriesCreator.TempPreviewPath, tempFileName);
                 await File.WriteAllBytesAsync(tempFilePath, data);
+                if (!IsCurrentPreview(previewGeneration, cancellationToken))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to remove stale preview media file.");
+                    }
+                    ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
+                }
 
                 var mimeType = extension switch
                 {
@@ -641,6 +755,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         htmlContent = await reader.ReadToEndAsync();
                     }
+                    ThrowIfPreviewIsObsolete(previewGeneration, cancellationToken);
 
                     htmlContent = htmlContent.Replace("{{DISPLAY_NAME}}", displayName)
                                              .Replace("{{FILE_EXTENSION}}", extension.ToUpper().TrimStart('.'))
@@ -689,18 +804,24 @@ namespace AssetsManager.Services.Explorer
                     </html>";
                 }
 
-                await SetPreviewerAsync(Previewer.WebView, htmlContent, shouldAutoplay: true);
+                await SetPreviewerAsync(Previewer.WebView, htmlContent, shouldAutoplay: true, previewGeneration: previewGeneration, cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to create and show preview for {extension} file.");
-                await ShowUnsupportedPreviewAsync(extension);
+                if (IsCurrentPreview(previewGeneration, cancellationToken))
+                {
+                    await ShowUnsupportedPreviewAsync(extension, previewGeneration, cancellationToken);
+                }
             }
         }
 
-        private async Task ShowUnsupportedPreviewAsync(string extension)
+        private async Task ShowUnsupportedPreviewAsync(string extension, long previewGeneration = 0, CancellationToken cancellationToken = default)
         {
-            await SetPreviewerAsync(Previewer.StatusPanel, extension);
+            await SetPreviewerAsync(Previewer.StatusPanel, extension, previewGeneration: previewGeneration, cancellationToken: cancellationToken);
         }
 
         private Previewer GetRequiredPreviewer(FileSystemNodeModel node)

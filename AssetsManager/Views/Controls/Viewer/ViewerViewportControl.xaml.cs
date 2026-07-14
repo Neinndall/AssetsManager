@@ -114,6 +114,9 @@ namespace AssetsManager.Views.Controls.Viewer
             _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D);
 
+            _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
+            _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
+
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             CompositionTarget.Rendering += CompositionTarget_Rendering;
