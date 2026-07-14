@@ -904,15 +904,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ResetStudio_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel.ViewportViewModel != null)
-            {
-                _viewModel.ViewportViewModel.AmbientIntensity = 100;
-                _viewModel.ViewportViewModel.LightRotation = 0;
-                _viewModel.ViewportViewModel.LightHeight = 0;
-                _viewModel.ViewportViewModel.FieldOfView = 45;
-                _viewModel.ViewportViewModel.IsTransparentBg = false;
-                _viewModel.ViewportViewModel.ShowSkybox = true;
-            }
+            _viewModel.ViewportViewModel?.ResetStudioSettings();
         }
 
         // ===== Control Deck navigation handlers =====
