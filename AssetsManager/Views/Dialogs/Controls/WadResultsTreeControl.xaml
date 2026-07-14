@@ -194,7 +194,6 @@
                               SelectedItemChanged="ResultsTreeView_SelectedItemChanged">
                         <TreeView.ItemContainerStyle>
                             <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
-                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                 <Setter Property="ContextMenu" Value="{StaticResource WadDiffContextMenu}"/>
                             </Style>
                         </TreeView.ItemContainerStyle>
