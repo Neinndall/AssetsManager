@@ -78,6 +78,7 @@ namespace AssetsManager.Services.Explorer
                     .GroupBy(path => LeagueToolkit.Hashing.XxHash64Ext.Hash(path))
                     .ToDictionary(group => group.Key, group => group.ToList());
                 var unresolvedHashes = new HashSet<ulong>(pathsByHash.Keys);
+                var resolvedHashes = new List<ulong>();
                 var seenWads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var wadPath in Directory.EnumerateFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
@@ -92,7 +93,9 @@ namespace AssetsManager.Services.Explorer
                     try
                     {
                         using var wadFile = new WadFile(wadPath);
-                        foreach (var hash in unresolvedHashes.ToArray())
+                        resolvedHashes.Clear();
+
+                        foreach (var hash in unresolvedHashes)
                         {
                             if (!wadFile.Chunks.TryGetValue(hash, out var chunk))
                             {
@@ -109,11 +112,17 @@ namespace AssetsManager.Services.Explorer
                                 };
                             }
 
+                            resolvedHashes.Add(hash);
+                        }
+
+                        foreach (var hash in resolvedHashes)
+                        {
                             unresolvedHashes.Remove(hash);
-                            if (unresolvedHashes.Count == 0)
-                            {
-                                return (IReadOnlyDictionary<string, FileSystemNodeModel>)results;
-                            }
+                        }
+
+                        if (unresolvedHashes.Count == 0)
+                        {
+                            return (IReadOnlyDictionary<string, FileSystemNodeModel>)results;
                         }
                     }
                     catch (Exception ex)
