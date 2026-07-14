@@ -31,6 +31,12 @@ namespace BenchmarkApp
                 return;
             }
 
+            if (args.Length == 0 || !string.Equals(args[0], "guessing", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("No benchmark selected. Use 'dotnet test' for the test suite or pass 'guessing' explicitly.");
+                return;
+            }
+
             Console.WriteLine("==================================================");
             Console.WriteLine("    ASSETSMANAGER OFFLINE HASH LAB BENCHMARK");
             Console.WriteLine("==================================================");

@@ -133,6 +133,77 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
+        public async Task RepeatedVirtualFileReadUsesTheSharedByteCache()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "cached.wad");
+            const string virtualPath = "assets/test/cached.json";
+
+            try
+            {
+                byte[] expected = Encoding.UTF8.GetBytes(new string('x', 128 * 1024));
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(expected), WadChunkCompression.None) },
+                    wadPath,
+                    new WadBakeSettings());
+
+                var cache = new AssetMemoryCacheService(1024 * 1024, 0, 0);
+                var provider = CreateProvider(cache);
+                var node = await provider.FindNodeByVirtualPathAsync(virtualPath, directory);
+
+                byte[] first = await provider.GetVirtualFileBytesAsync(node);
+                byte[] second = await provider.GetVirtualFileBytesAsync(node);
+                var snapshot = cache.GetSnapshot().Bytes;
+
+                Assert.Equal(expected, first);
+                Assert.Same(first, second);
+                Assert.Equal(1, snapshot.Misses);
+                Assert.Equal(1, snapshot.Hits);
+                Assert.Equal(expected.Length, snapshot.UsedBytes);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public async Task ChangedWadMetadataInvalidatesThePreviousByteEntry()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "changing.wad");
+            const string virtualPath = "assets/test/changing.json";
+
+            try
+            {
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(Encoding.UTF8.GetBytes("first!")), WadChunkCompression.None) },
+                    wadPath,
+                    new WadBakeSettings());
+
+                var cache = new AssetMemoryCacheService(1024 * 1024, 0, 0);
+                var provider = CreateProvider(cache);
+                var node = await provider.FindNodeByVirtualPathAsync(virtualPath, directory);
+                Assert.Equal("first!", Encoding.UTF8.GetString(await provider.GetVirtualFileBytesAsync(node)));
+
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(Encoding.UTF8.GetBytes("second")), WadChunkCompression.None) },
+                    wadPath,
+                    new WadBakeSettings());
+                File.SetLastWriteTimeUtc(wadPath, DateTime.UtcNow.AddSeconds(2));
+
+                Assert.Equal("second", Encoding.UTF8.GetString(await provider.GetVirtualFileBytesAsync(node)));
+                Assert.Equal(2, cache.GetSnapshot().Bytes.Misses);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public void GzipDecompressionReturnsOriginalBytes()
         {
             byte[] expected = Encoding.UTF8.GetBytes(new string('a', 4096));
@@ -204,9 +275,9 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
             return GC.GetAllocatedBytesForCurrentThread() - before;
         }
 
-        private static WadContentProvider CreateProvider()
+        private static WadContentProvider CreateProvider(AssetMemoryCacheService cache = null)
         {
-            return new WadContentProvider(new LogService(Log.Logger), null, null);
+            return new WadContentProvider(new LogService(Log.Logger), null, null, cache ?? new AssetMemoryCacheService());
         }
     }
 }
