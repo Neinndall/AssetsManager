@@ -73,8 +73,10 @@ namespace BenchmarkApp
                 .CreateLogger();
             var log = new LogService(serilogLogger);
             var store = new BinRstHashGuessingStore(directories);
+            var pathStore = new HashGuessingStore(directories);
+            var persistence = new HashGuessPersistenceService(pathStore, store);
             var resolver = new HashResolverService(directories, log);
-            var service = new BinRstHashGuessingService(store, resolver, directories, log);
+            var service = new BinRstHashGuessingService(store, persistence, resolver, directories, log);
 
             // Create Controlled Hidden Test Corpus (Blind Test)
             Console.WriteLine("Establishing Controlled Hidden Test Corpus (Blind Test)...");

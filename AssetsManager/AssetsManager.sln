@@ -4,8 +4,6 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetsManager", "AssetsManager.csproj", "{C065AE9C-6853-4B8B-A4EC-F2B7285880B1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AssetsManager.Tests", "..\AssetsManager.Tests\AssetsManager.Tests.csproj", "{9B21ED8B-90F5-4A5A-98ED-38D5983B77CB}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,9 +17,5 @@ Global
 		{C065AE9C-6853-4B8B-A4EC-F2B7285880B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C065AE9C-6853-4B8B-A4EC-F2B7285880B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C065AE9C-6853-4B8B-A4EC-F2B7285880B1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9B21ED8B-90F5-4A5A-98ED-38D5983B77CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9B21ED8B-90F5-4A5A-98ED-38D5983B77CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9B21ED8B-90F5-4A5A-98ED-38D5983B77CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9B21ED8B-90F5-4A5A-98ED-38D5983B77CB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

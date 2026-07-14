@@ -12,7 +12,7 @@ using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using Xunit;
 
-namespace AssetsManager.Tests.Services.Hashes
+namespace AssetsManager.BenchmarkTests.Services.Hashes
 {
     public sealed class WadHashGuesserTests
     {
