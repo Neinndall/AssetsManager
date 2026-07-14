@@ -947,15 +947,8 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void FileTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (e.OldValue is FileSystemNodeModel previousNode && !ReferenceEquals(previousNode, e.NewValue))
-            {
-                previousNode.IsSelected = false;
-            }
-
             if (e.NewValue is FileSystemNodeModel selectedNode)
             {
-                selectedNode.IsSelected = true;
-
                 if (selectedNode.Type == NodeType.SoundBank && selectedNode.Children.Count == 1 && selectedNode.Children[0].Name == "Loading...")
                 {
                     await TreeBuilderService.ExpandAudioBankAsync(selectedNode, _viewModel.RootNodes, _currentRootPath, NewLolPath, OldLolPath);
