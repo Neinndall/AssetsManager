@@ -13,6 +13,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Media previews now switch faster while keeping transitions free of stale frames.
   - Reopening recent assets, image grids, and formatted data now reuses a memory-bounded cache.
   - Asset previews and backups now load WAD content more smoothly.
   - Hash validation now shares the existing benchmark project instead of maintaining a separate test application.

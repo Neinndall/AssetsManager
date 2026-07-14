@@ -29,6 +29,8 @@ namespace AssetsManager.Services.Explorer
 {
     public class ExplorerPreviewService
     {
+        private const string BlankWebViewDocument = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body></body></html>";
+
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
 
         private readonly struct PreviewRequest
@@ -55,6 +57,10 @@ namespace AssetsManager.Services.Explorer
         private IHighlightingDefinition _jsonHighlightingDefinition;
         private CancellationTokenSource _previewCancellationTokenSource;
         private Task<CoreWebView2Environment> _webViewEnvironmentTask;
+        private Task<WebView2> _webViewInitializationTask;
+        private readonly SemaphoreSlim _webViewNavigationLock = new(1, 1);
+        private readonly HashSet<string> _pendingMediaTempFiles = new(StringComparer.OrdinalIgnoreCase);
+        private WebView2 _webView;
         private long _previewGeneration;
         private readonly string _mediaTempOwnerId = Guid.NewGuid().ToString("N");
         private string _activeMediaTempFilePath;
@@ -95,6 +101,11 @@ namespace AssetsManager.Services.Explorer
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
         {
+            if (_webViewContainer != null && _webViewContainer != webViewContainer)
+            {
+                DisposePersistentWebView();
+            }
+
             _imagePreview = imagePreview;
             _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
@@ -401,10 +412,10 @@ namespace AssetsManager.Services.Explorer
             {
                 ThrowIfPreviewIsObsolete(previewRequest.Value);
             }
-            // Dispose of WebView only when we are explicitly replacing it in the left Content slot
+            // Keep the resident WebView hidden and neutralized when another content renderer takes its slot.
             if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
             {
-                ReleaseActiveMediaPreview();
+                DeactivateActiveMediaPreview();
             }
 
             switch (newPreviewer)
@@ -428,10 +439,10 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.WebView:
                     if (content is string htmlContent && previewRequest.HasValue)
                     {
-                        ReleaseActiveMediaPreview();
+                        PrepareWebViewTransition();
 
-                        bool webViewCreated = await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewRequest.Value);
-                        if (!webViewCreated)
+                        bool webViewReady = await NavigateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewRequest.Value);
+                        if (!webViewReady)
                         {
                             return;
                         }
@@ -480,10 +491,10 @@ namespace AssetsManager.Services.Explorer
                         else
                         {
                             // Full Screen or Left-only Scenario: Show error on the left
-                            // Dispose of left WebView as it is being replaced by the StatusPanel error
+                            // Neutralize the resident WebView before the status panel takes its slot.
                             if (_webViewContainer != null)
                             {
-                                ReleaseActiveMediaPreview();
+                                DeactivateActiveMediaPreview();
                             }
 
                             _viewModel.IsUnsupportedVisible = true;
@@ -503,11 +514,10 @@ namespace AssetsManager.Services.Explorer
                     }
                     else
                     {
-                        // Global Reset
-                        // Dispose of WebView as we are doing a full clean
+                        // Global reset keeps the resident control neutral and hidden until the view unloads.
                         if (_webViewContainer != null)
                         {
-                            ReleaseActiveMediaPreview();
+                            DeactivateActiveMediaPreview();
                         }
 
                         _viewModel.ResetAllVisibility();
@@ -519,43 +529,68 @@ namespace AssetsManager.Services.Explorer
             }
         }
 
-        private async Task<bool> CreateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay, PreviewRequest previewRequest)
+        private async Task<bool> NavigateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay, PreviewRequest previewRequest)
         {
-            WebView2 webView = null;
+            bool lockAcquired = false;
             try
             {
                 ThrowIfPreviewIsObsolete(previewRequest);
+                await _webViewNavigationLock.WaitAsync(previewRequest.CancellationToken);
+                lockAcquired = true;
+                ThrowIfPreviewIsObsolete(previewRequest);
 
-                webView = new WebView2()
+                WebView2 webView = await GetOrCreateWebViewAsync();
+                ThrowIfPreviewIsObsolete(previewRequest);
+
+                webView.Visibility = Visibility.Hidden;
+                CoreWebView2 coreWebView = webView.CoreWebView2;
+                ulong navigationId = 0;
+                var navigationCompletion = new TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
                 {
-                    DefaultBackgroundColor = System.Drawing.Color.Transparent
-                };
+                    navigationId = args.NavigationId;
+                    coreWebView.NavigationStarting -= OnNavigationStarting;
+                }
 
-                _webViewContainer.Children.Add(webView);
-
-                // Initialize CoreWebView2
-                var environment = await GetWebViewEnvironmentAsync();
-                ThrowIfPreviewIsObsolete(previewRequest);
-                await webView.EnsureCoreWebView2Async(environment);
-                ThrowIfPreviewIsObsolete(previewRequest);
-
-                // Set settings and mappings
-                webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, CoreWebView2HostResourceAccessKind.Allow);
-                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-                webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
-                webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
-
-                // Navigate and handle autoplay
                 void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
                 {
-                    webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
-                    if (shouldAutoplay && IsCurrentPreview(previewRequest))
+                    if (navigationId != 0 && args.NavigationId == navigationId)
+                    {
+                        navigationCompletion.TrySetResult(args);
+                    }
+                }
+
+                coreWebView.NavigationStarting += OnNavigationStarting;
+                coreWebView.NavigationCompleted += OnNavigationCompleted;
+                using var cancellationRegistration = previewRequest.CancellationToken.Register(() =>
+                    navigationCompletion.TrySetCanceled(previewRequest.CancellationToken));
+
+                try
+                {
+                    coreWebView.Stop();
+                    coreWebView.NavigateToString(htmlContent);
+                    CoreWebView2NavigationCompletedEventArgs result = await navigationCompletion.Task;
+                    ThrowIfPreviewIsObsolete(previewRequest);
+
+                    if (!result.IsSuccess)
+                    {
+                        throw new InvalidOperationException($"WebView2 navigation failed with status {result.WebErrorStatus}.");
+                    }
+
+                    TryDeletePendingMediaTempFiles();
+                    webView.Visibility = Visibility.Visible;
+
+                    if (shouldAutoplay)
                     {
                         _ = webView.Dispatcher.InvokeAsync(async () =>
                         {
                             try
                             {
-                                await webView.CoreWebView2.ExecuteScriptAsync("playMedia();");
+                                if (IsCurrentPreview(previewRequest) && webView.CoreWebView2 != null)
+                                {
+                                    await webView.CoreWebView2.ExecuteScriptAsync("playMedia();");
+                                }
                             }
                             catch (Exception ex)
                             {
@@ -563,27 +598,72 @@ namespace AssetsManager.Services.Explorer
                             }
                         });
                     }
-                }
 
-                webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
-                webView.CoreWebView2.NavigateToString(htmlContent);
-                return true;
+                    return true;
+                }
+                finally
+                {
+                    coreWebView.NavigationStarting -= OnNavigationStarting;
+                    coreWebView.NavigationCompleted -= OnNavigationCompleted;
+                }
             }
             catch (OperationCanceledException)
             {
-                DisposeWebView(webView);
                 return false;
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Failed to create, initialize, and show WebView2.");
-                DisposeWebView(webView);
+                _logService.LogError(ex, "Failed to initialize or navigate WebView2.");
+                DisposePersistentWebView();
                 if (IsCurrentPreview(previewRequest))
                 {
                     await ShowUnsupportedPreviewAsync(".media", previewRequest);
                 }
                 return false;
             }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    _webViewNavigationLock.Release();
+                }
+            }
+        }
+
+        private Task<WebView2> GetOrCreateWebViewAsync()
+        {
+            return _webViewInitializationTask ??= InitializePersistentWebViewAsync();
+        }
+
+        private async Task<WebView2> InitializePersistentWebViewAsync()
+        {
+            if (_webViewContainer == null)
+            {
+                throw new InvalidOperationException("WebView2 container is not initialized.");
+            }
+
+            var webView = new WebView2
+            {
+                DefaultBackgroundColor = System.Drawing.Color.Transparent,
+                Visibility = Visibility.Hidden
+            };
+
+            _webView = webView;
+            _webViewContainer.Children.Add(webView);
+
+            CoreWebView2Environment environment = await GetWebViewEnvironmentAsync();
+            await webView.EnsureCoreWebView2Async(environment);
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, CoreWebView2HostResourceAccessKind.Allow);
+            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+            webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
+            webView.CoreWebView2.NavigationCompleted += PersistentWebView_NavigationCompleted;
+            return webView;
+        }
+
+        private void PersistentWebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            TryDeletePendingMediaTempFiles();
         }
 
         private async Task<CoreWebView2Environment> GetWebViewEnvironmentAsync()
@@ -617,12 +697,45 @@ namespace AssetsManager.Services.Explorer
             webView.Dispose();
         }
 
-        private void ReleaseActiveMediaPreview()
+        private void DisposePersistentWebView()
         {
-            var webView = _webViewContainer?.Children.OfType<WebView2>().FirstOrDefault();
-            if (webView != null)
+            QueueActiveMediaTempFileForDeletion();
+            WebView2 webView = _webView;
+            _webView = null;
+            _webViewInitializationTask = null;
+
+            try
             {
-                DisposeWebView(webView);
+                if (webView?.CoreWebView2 != null)
+                {
+                    webView.CoreWebView2.NavigationCompleted -= PersistentWebView_NavigationCompleted;
+                    webView.CoreWebView2.Stop();
+                }
+            }
+            finally
+            {
+                try
+                {
+                    DisposeWebView(webView);
+                }
+                finally
+                {
+                    TryDeletePendingMediaTempFiles(true);
+                }
+            }
+        }
+
+        private void PrepareWebViewTransition()
+        {
+            if (_viewModel != null)
+            {
+                _viewModel.IsWebVisible = false;
+            }
+
+            if (_webView != null)
+            {
+                _webView.Visibility = Visibility.Hidden;
+                _webView.CoreWebView2?.Stop();
             }
 
             if (_activeContentPreviewer == Previewer.WebView)
@@ -630,15 +743,56 @@ namespace AssetsManager.Services.Explorer
                 _activeContentPreviewer = Previewer.None;
             }
 
-            DeleteMediaTempFile(_activeMediaTempFilePath);
+            QueueActiveMediaTempFileForDeletion();
+        }
+
+        private void DeactivateActiveMediaPreview()
+        {
+            PrepareWebViewTransition();
+            if (_webView?.CoreWebView2 != null)
+            {
+                _webView.CoreWebView2.NavigateToString(BlankWebViewDocument);
+            }
+            else
+            {
+                TryDeletePendingMediaTempFiles();
+            }
+        }
+
+        private void QueueActiveMediaTempFileForDeletion()
+        {
+            if (!string.IsNullOrEmpty(_activeMediaTempFilePath))
+            {
+                _pendingMediaTempFiles.Add(_activeMediaTempFilePath);
+            }
+
             _activeMediaTempFilePath = null;
+        }
+
+        private void TryDeletePendingMediaTempFiles(bool logFailures = false)
+        {
+            foreach (string filePath in _pendingMediaTempFiles.ToList())
+            {
+                if (TryDeleteMediaTempFile(filePath, logFailures))
+                {
+                    _pendingMediaTempFiles.Remove(filePath);
+                }
+            }
         }
 
         private void DeleteMediaTempFile(string filePath)
         {
+            if (!TryDeleteMediaTempFile(filePath, true) && !string.IsNullOrEmpty(filePath))
+            {
+                _pendingMediaTempFiles.Add(filePath);
+            }
+        }
+
+        private bool TryDeleteMediaTempFile(string filePath, bool logFailure)
+        {
             if (string.IsNullOrEmpty(filePath))
             {
-                return;
+                return true;
             }
 
             try
@@ -647,10 +801,15 @@ namespace AssetsManager.Services.Explorer
                 {
                     File.Delete(filePath);
                 }
+                return true;
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to remove media preview temp file '{filePath}'.");
+                if (logFailure)
+                {
+                    _logService.LogError(ex, $"Failed to remove media preview temp file '{filePath}'.");
+                }
+                return false;
             }
         }
 
@@ -977,6 +1136,22 @@ namespace AssetsManager.Services.Explorer
         public async Task ShowFileDiffAsync(string oldPath, string newPath, Window owner)
         {
             await _diffViewService.ShowFileDiffAsync(oldPath, newPath, owner);
+        }
+
+        public void ReleaseResources()
+        {
+            CancelCurrentPreview();
+            try
+            {
+                DisposePersistentWebView();
+            }
+            finally
+            {
+                _imagePreview = null;
+                _webViewContainer = null;
+                _textEditorPreview = null;
+                _viewModel = null;
+            }
         }
     }
 }
