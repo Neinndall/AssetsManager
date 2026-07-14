@@ -68,15 +68,10 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_isUpdatingItemsSource) return;
 
-            // Sync selection state to ViewModels for multi-select consistency
+            // Keep the batch selection state separate from the active item state.
             foreach (FileGridViewModel item in e.RemovedItems)
             {
-                item.IsSelected = false;
                 item.IsMultiSelected = false;
-            }
-            foreach (FileGridViewModel item in e.AddedItems)
-            {
-                item.IsSelected = true;
             }
 
             // Sync IsMultiSelected if multiple items are selected OR if the user is using CTRL to select

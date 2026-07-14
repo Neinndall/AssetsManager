@@ -52,8 +52,16 @@ namespace AssetsManager.Views.Helpers
         {
             if (d is TreeViewItem item)
             {
-                if ((bool)e.NewValue) item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
-                else item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                if ((bool)e.NewValue)
+                {
+                    item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
+                    AttachSelectionSynchronization(item);
+                }
+                else
+                {
+                    item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                    DetachSelectionSynchronization(item);
+                }
             }
         }
 
@@ -68,10 +76,18 @@ namespace AssetsManager.Views.Helpers
 
         private static void OnEnableUnifiedSelectionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (d is FrameworkElement item)
+            if (d is ListBoxItem item)
             {
-                if ((bool)e.NewValue) item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
-                else item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                if ((bool)e.NewValue)
+                {
+                    item.PreviewMouseLeftButtonDown += OnItemPreviewMouseLeftButtonDown;
+                    AttachSelectionSynchronization(item);
+                }
+                else
+                {
+                    item.PreviewMouseLeftButtonDown -= OnItemPreviewMouseLeftButtonDown;
+                    DetachSelectionSynchronization(item);
+                }
             }
         }
 
@@ -138,7 +154,55 @@ namespace AssetsManager.Views.Helpers
             }
 
             item.IsSelected = true;
+            SynchronizeSelectionState(item.DataContext, true);
             item.Focus();
+        }
+
+        private static void AttachSelectionSynchronization(FrameworkElement item)
+        {
+            item.AddHandler(Selector.SelectedEvent, new RoutedEventHandler(OnItemSelected));
+            item.AddHandler(Selector.UnselectedEvent, new RoutedEventHandler(OnItemUnselected));
+            item.DataContextChanged += OnItemDataContextChanged;
+        }
+
+        private static void DetachSelectionSynchronization(FrameworkElement item)
+        {
+            item.RemoveHandler(Selector.SelectedEvent, new RoutedEventHandler(OnItemSelected));
+            item.RemoveHandler(Selector.UnselectedEvent, new RoutedEventHandler(OnItemUnselected));
+            item.DataContextChanged -= OnItemDataContextChanged;
+        }
+
+        private static void OnItemSelected(object sender, RoutedEventArgs e)
+        {
+            if (ReferenceEquals(sender, e.OriginalSource) && sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(item.DataContext, true);
+            }
+        }
+
+        private static void OnItemUnselected(object sender, RoutedEventArgs e)
+        {
+            if (ReferenceEquals(sender, e.OriginalSource) && sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(item.DataContext, false);
+            }
+        }
+
+        private static void OnItemDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            SynchronizeSelectionState(e.OldValue, false);
+            if (sender is FrameworkElement item)
+            {
+                SynchronizeSelectionState(e.NewValue, IsItemSelected(item));
+            }
+        }
+
+        internal static void SynchronizeSelectionState(object dataContext, bool isSelected)
+        {
+            if (dataContext is ISelectable selectable)
+            {
+                selectable.IsSelected = isSelected;
+            }
         }
 
         #region Helpers
@@ -164,6 +228,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (container is ListBoxItem lbi) lbi.IsSelected = value;
             else if (container is TreeViewItem tvi) tvi.IsSelected = value;
+            SynchronizeSelectionState(container.DataContext, value);
             if (value) container.Focus();
         }
 
