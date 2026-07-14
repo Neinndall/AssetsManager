@@ -518,7 +518,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     using var wad = new WadFile(wadPath);
                     if (!wad.Chunks.TryGetValue(skinsJsonHash, out WadChunk chunk)) continue;
                     using var compressedData = wad.LoadChunk(chunk);
-                    byte[] data = WadChunkUtils.DecompressChunk(compressedData.Span, chunk.Compression);
+                    byte[] data = WadChunkUtils.DecompressChunk(compressedData.Memory, chunk.Compression);
                     if (!TryDecodeWadText(data, out string json)) continue;
                     using (JsonDocument document = JsonDocument.Parse(json))
                     {

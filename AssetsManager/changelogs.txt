@@ -13,6 +13,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Asset previews and backups now load WAD content more smoothly.
   - Hash validation now shares the existing benchmark project instead of maintaining a separate test application.
   - LCU Basic guessing now includes full basename and basename-word substitution before its plugin and pattern phases.
   - LCU Advanced guessing now targets two-word party image variants with a reduced PNG vocabulary.

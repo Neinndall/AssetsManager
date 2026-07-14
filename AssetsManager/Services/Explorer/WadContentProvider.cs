@@ -126,6 +126,12 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
+        private static async Task<byte[]> ReadAndDecompressBackupChunkAsync(string chunkPath, WadChunkCompression? compressionType, CancellationToken cancellationToken)
+        {
+            byte[] compressedData = await File.ReadAllBytesAsync(chunkPath, cancellationToken);
+            return await Task.Run(() => WadChunkUtils.DecompressChunk(compressedData, compressionType), cancellationToken);
+        }
+
         // Obtiene los bytes descomprimidos de un chunk guardado en el backup.
         public async Task<byte[]> GetBackupChunkBytesAsync(string backupRoot, string sourceWad, ulong hash, WadChunkCompression? compressionType, bool isOld, CancellationToken cancellationToken = default)
         {
@@ -138,11 +144,7 @@ namespace AssetsManager.Services.Explorer
                 string chunkPath = Path.Combine(backupRoot, "wad_chunks", chunkDir, sourceWad ?? string.Empty, $"{hash:X16}.chunk");
                 if (!File.Exists(chunkPath)) return null;
 
-                return await Task.Run(() =>
-                {
-                    byte[] compressedData = File.ReadAllBytes(chunkPath);
-                    return WadChunkUtils.DecompressChunk(compressedData, compressionType ?? WadChunkCompression.None);
-                }, cancellationToken);
+                return await ReadAndDecompressBackupChunkAsync(chunkPath, compressionType ?? WadChunkCompression.None, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -159,16 +161,9 @@ namespace AssetsManager.Services.Explorer
                 if (!string.IsNullOrEmpty(fileNode.BackupChunkPath))
                 {
                     _logService.LogDebug($"[DATA DIRECTION] Loading from BACKUP directory: 'wad_chunks/{ (fileNode.BackupChunkPath.Contains("old") ? "old" : "new") }'");
-                    return await Task.Run(() =>
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        // MODO BACKUP: Carga directa y exclusiva de chunks guardados.
-                        byte[] compressedData = File.ReadAllBytes(fileNode.BackupChunkPath);
-                        bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
-                        var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
-                        return WadChunkUtils.DecompressChunk(compressedData, compressionType);
-                    }, cancellationToken);
+                    bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
+                    var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
+                    return await ReadAndDecompressBackupChunkAsync(fileNode.BackupChunkPath, compressionType, cancellationToken);
                 }
 
                 _logService.LogDebug($"[DATA DIRECTION] Loading from LOCAL installation: '{Path.GetDirectoryName(fileNode.SourceWadPath)}'");
@@ -303,9 +298,8 @@ namespace AssetsManager.Services.Explorer
                 {
                     _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from BACKUP storage: 'wad_chunks/{ (node.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     // MODO BACKUP: Carga del contenedor desde el chunk.
-                    byte[] compressedData = File.ReadAllBytes(node.BackupChunkPath);
                     var compressionType = node.ChunkDiff?.NewCompressionType ?? WadChunkCompression.None;
-                    containerData = WadChunkUtils.DecompressChunk(compressedData, compressionType);
+                    containerData = await ReadAndDecompressBackupChunkAsync(node.BackupChunkPath, compressionType, cancellationToken);
                 }
                 else
                 {
@@ -356,9 +350,8 @@ namespace AssetsManager.Services.Explorer
                         return null;
                     }
 
-                    // Usamos LoadChunk del WadFile que ya gestiona el stream interno, evitando aperturas dobles.
                     using var compressedDataOwner = wadFile.LoadChunk(chunk);
-                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Span, chunk.Compression);
+                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Memory, chunk.Compression);
                 }
                 catch (OperationCanceledException)
                 {
