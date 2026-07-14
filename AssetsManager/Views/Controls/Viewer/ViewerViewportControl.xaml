@@ -57,6 +57,8 @@
                     </ModelVisual3D>
                 </Viewport3D>
 
+                <Border x:Name="CameraInputSurface" Background="Transparent"/>
+
                 <Border HorizontalAlignment="Right"
                         VerticalAlignment="Top"
                         Margin="0,24,24,0"

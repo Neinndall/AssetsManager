@@ -112,7 +112,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _isCleanedUp = false;
             _modelPlayers.Clear();
-            _cameraController = new CustomCameraController(Viewport3D);
+            _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
 
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
