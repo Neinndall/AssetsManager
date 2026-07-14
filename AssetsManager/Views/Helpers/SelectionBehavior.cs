@@ -122,14 +122,23 @@ namespace AssetsManager.Views.Helpers
                 // Disparar el evento de acción primaria para que el control sepa que debe "ejecutar" el nodo
                 item.RaiseEvent(new RoutedEventArgs(PrimaryActionEvent, item));
 
-                if (item is TreeViewItem tvi && tvi.HasItems)
+                if (item is TreeViewItem tvi)
                 {
-                    tvi.IsExpanded = !tvi.IsExpanded;
-                    tvi.IsSelected = true;
-                    tvi.Focus();
+                    ApplyPrimaryTreeAction(tvi);
                     e.Handled = true;
                 }
             }
+        }
+
+        internal static void ApplyPrimaryTreeAction(TreeViewItem item)
+        {
+            if (item.HasItems)
+            {
+                item.IsExpanded = !item.IsExpanded;
+            }
+
+            item.IsSelected = true;
+            item.Focus();
         }
 
         #region Helpers
