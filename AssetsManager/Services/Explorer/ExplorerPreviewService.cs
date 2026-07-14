@@ -56,6 +56,8 @@ namespace AssetsManager.Services.Explorer
         private CancellationTokenSource _previewCancellationTokenSource;
         private Task<CoreWebView2Environment> _webViewEnvironmentTask;
         private long _previewGeneration;
+        private readonly string _mediaTempOwnerId = Guid.NewGuid().ToString("N");
+        private string _activeMediaTempFilePath;
 
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
@@ -399,12 +401,7 @@ namespace AssetsManager.Services.Explorer
             // Dispose of WebView only when we are explicitly replacing it in the left Content slot
             if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
             {
-                var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                if (oldWebView != null)
-                {
-                    oldWebView.Dispose();
-                    _webViewContainer.Children.Remove(oldWebView);
-                }
+                DisposeActiveWebView();
             }
 
             switch (newPreviewer)
@@ -428,8 +425,7 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.WebView:
                     if (content is string htmlContent && previewRequest.HasValue)
                     {
-                        var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                        if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+                        DisposeActiveWebView();
 
                         bool webViewCreated = await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewRequest.Value);
                         if (!webViewCreated)
@@ -484,8 +480,7 @@ namespace AssetsManager.Services.Explorer
                             // Dispose of left WebView as it is being replaced by the StatusPanel error
                             if (_webViewContainer != null)
                             {
-                                var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                                if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+                                DisposeActiveWebView();
                             }
 
                             _viewModel.IsUnsupportedVisible = true;
@@ -509,8 +504,7 @@ namespace AssetsManager.Services.Explorer
                         // Dispose of WebView as we are doing a full clean
                         if (_webViewContainer != null)
                         {
-                            var oldWebView = _webViewContainer.Children.OfType<WebView2>().FirstOrDefault();
-                            if (oldWebView != null) { oldWebView.Dispose(); _webViewContainer.Children.Remove(oldWebView); }
+                            DisposeActiveWebView();
                         }
 
                         _viewModel.ResetAllVisibility();
@@ -620,6 +614,54 @@ namespace AssetsManager.Services.Explorer
             webView.Dispose();
         }
 
+        private void DisposeActiveWebView()
+        {
+            var webView = _webViewContainer?.Children.OfType<WebView2>().FirstOrDefault();
+            if (webView != null)
+            {
+                DisposeWebView(webView);
+            }
+
+            if (_activeContentPreviewer == Previewer.WebView)
+            {
+                _activeContentPreviewer = Previewer.None;
+            }
+
+            DeleteMediaTempFile(_activeMediaTempFilePath);
+            _activeMediaTempFilePath = null;
+        }
+
+        private void SetActiveMediaTempFile(string filePath)
+        {
+            if (string.Equals(_activeMediaTempFilePath, filePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            DeleteMediaTempFile(_activeMediaTempFilePath);
+            _activeMediaTempFilePath = filePath;
+        }
+
+        private void DeleteMediaTempFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+            {
+                return;
+            }
+
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to remove media preview temp file '{filePath}'.");
+            }
+        }
+
         private async Task ShowImagePreviewAsync(byte[] data, PreviewRequest previewRequest)
         {
             var bitmap = await Task.Run(() =>
@@ -690,40 +732,15 @@ namespace AssetsManager.Services.Explorer
                 return;
             }
 
+            string tempFilePath = null;
             try
             {
-                // Clean up previous temp files before creating a new one.
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        foreach (var file in Directory.GetFiles(_directoriesCreator.TempPreviewPath))
-                        {
-                            File.Delete(file);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, "Failed to clean temp files");
-                    }
-                });
                 ThrowIfPreviewIsObsolete(previewRequest);
 
-                var tempFileName = $"preview_{DateTime.Now.Ticks}{extension}";
-                var tempFilePath = Path.Combine(_directoriesCreator.TempPreviewPath, tempFileName);
+                var tempFileName = $"preview_{_mediaTempOwnerId}_{previewRequest.Generation}{extension}";
+                tempFilePath = Path.Combine(_directoriesCreator.TempPreviewPath, tempFileName);
                 await File.WriteAllBytesAsync(tempFilePath, data);
-                if (!IsCurrentPreview(previewRequest))
-                {
-                    try
-                    {
-                        File.Delete(tempFilePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, "Failed to remove stale preview media file.");
-                    }
-                    ThrowIfPreviewIsObsolete(previewRequest);
-                }
+                ThrowIfPreviewIsObsolete(previewRequest);
 
                 var mimeType = extension switch
                 {
@@ -797,6 +814,12 @@ namespace AssetsManager.Services.Explorer
                 }
 
                 await SetPreviewerAsync(Previewer.WebView, htmlContent, true, previewRequest);
+                ThrowIfPreviewIsObsolete(previewRequest);
+                if (_activeContentPreviewer == Previewer.WebView)
+                {
+                    SetActiveMediaTempFile(tempFilePath);
+                    tempFilePath = null;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -808,6 +831,10 @@ namespace AssetsManager.Services.Explorer
                 {
                     await ShowUnsupportedPreviewAsync(extension, previewRequest);
                 }
+            }
+            finally
+            {
+                DeleteMediaTempFile(tempFilePath);
             }
         }
 
