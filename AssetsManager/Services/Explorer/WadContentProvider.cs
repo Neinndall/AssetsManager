@@ -46,8 +46,9 @@ namespace AssetsManager.Services.Explorer
                 return null;
             }
 
-            var nodes = await FindNodesByVirtualPathsAsync(new[] { virtualPath }, gameDataPath);
-            return nodes.TryGetValue(virtualPath, out var node) ? node : null;
+            string normalizedPath = virtualPath.Replace('\\', '/').ToLowerInvariant();
+            var nodes = await FindNodesByVirtualPathsAsync(new[] { normalizedPath }, gameDataPath);
+            return nodes.TryGetValue(normalizedPath, out var node) ? node : null;
         }
 
         public async Task<IReadOnlyDictionary<string, FileSystemNodeModel>> FindNodesByVirtualPathsAsync(

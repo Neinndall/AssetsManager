@@ -80,6 +80,34 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
+        public async Task SingleLookupAcceptsBackslashSeparatedPath()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "paths.wad");
+
+            try
+            {
+                const string virtualPath = "assets/test/first.json";
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(Encoding.UTF8.GetBytes("content")), WadChunkCompression.None) },
+                    wadPath,
+                    new WadBakeSettings());
+
+                var provider = CreateProvider();
+                var node = await provider.FindNodeByVirtualPathAsync("assets\\test\\first.json", directory);
+
+                Assert.NotNull(node);
+                Assert.Equal(virtualPath, node.VirtualPath);
+                Assert.Equal(wadPath, node.SourceWadPath);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task BackupChunkReadingReturnsOriginalBytes()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
