@@ -240,20 +240,38 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 CancelGridPreviewLoading();
                 await ExplorerPreviewService.ResetPreviewAsync();
-                
-                if (ViewModel.PinnedFilesManager != null)
-                {
-                    ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
-                    ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
-                }
-
-                // Clear sub-controls peer connection
-                if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
-                if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
             }
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error cleaning FilePreviewerControl on unload");
+            }
+            finally
+            {
+                try
+                {
+                    ExplorerPreviewService?.ReleaseResources();
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, "Error releasing Explorer preview resources");
+                }
+
+                try
+                {
+                    if (ViewModel.PinnedFilesManager != null)
+                    {
+                        ViewModel.PinnedFilesManager.PropertyChanged -= PinnedFilesManager_PropertyChanged;
+                        ViewModel.PinnedFilesManager.PinnedFiles.CollectionChanged -= PinnedFiles_CollectionChanged;
+                    }
+
+                    // Clear sub-controls peer connection
+                    if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
+                    if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
+                }
+                catch (Exception ex)
+                {
+                    LogService.LogError(ex, "Error detaching FilePreviewerControl subscriptions");
+                }
             }
         }
 
