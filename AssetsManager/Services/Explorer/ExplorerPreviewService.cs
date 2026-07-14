@@ -401,7 +401,7 @@ namespace AssetsManager.Services.Explorer
             // Dispose of WebView only when we are explicitly replacing it in the left Content slot
             if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
             {
-                DisposeActiveWebView();
+                ReleaseActiveMediaPreview();
             }
 
             switch (newPreviewer)
@@ -425,7 +425,7 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.WebView:
                     if (content is string htmlContent && previewRequest.HasValue)
                     {
-                        DisposeActiveWebView();
+                        ReleaseActiveMediaPreview();
 
                         bool webViewCreated = await CreateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewRequest.Value);
                         if (!webViewCreated)
@@ -480,7 +480,7 @@ namespace AssetsManager.Services.Explorer
                             // Dispose of left WebView as it is being replaced by the StatusPanel error
                             if (_webViewContainer != null)
                             {
-                                DisposeActiveWebView();
+                                ReleaseActiveMediaPreview();
                             }
 
                             _viewModel.IsUnsupportedVisible = true;
@@ -504,7 +504,7 @@ namespace AssetsManager.Services.Explorer
                         // Dispose of WebView as we are doing a full clean
                         if (_webViewContainer != null)
                         {
-                            DisposeActiveWebView();
+                            ReleaseActiveMediaPreview();
                         }
 
                         _viewModel.ResetAllVisibility();
@@ -614,7 +614,7 @@ namespace AssetsManager.Services.Explorer
             webView.Dispose();
         }
 
-        private void DisposeActiveWebView()
+        private void ReleaseActiveMediaPreview()
         {
             var webView = _webViewContainer?.Children.OfType<WebView2>().FirstOrDefault();
             if (webView != null)
@@ -629,17 +629,6 @@ namespace AssetsManager.Services.Explorer
 
             DeleteMediaTempFile(_activeMediaTempFilePath);
             _activeMediaTempFilePath = null;
-        }
-
-        private void SetActiveMediaTempFile(string filePath)
-        {
-            if (string.Equals(_activeMediaTempFilePath, filePath, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            DeleteMediaTempFile(_activeMediaTempFilePath);
-            _activeMediaTempFilePath = filePath;
         }
 
         private void DeleteMediaTempFile(string filePath)
@@ -817,7 +806,7 @@ namespace AssetsManager.Services.Explorer
                 ThrowIfPreviewIsObsolete(previewRequest);
                 if (_activeContentPreviewer == Previewer.WebView)
                 {
-                    SetActiveMediaTempFile(tempFilePath);
+                    _activeMediaTempFilePath = tempFilePath;
                     tempFilePath = null;
                 }
             }
