@@ -54,7 +54,6 @@ Bug Fixes
   - Fixed Viewer studio settings and environment options not resetting after removing the last model.
   - Fixed the ground plane reappearing after loading a new model when it was disabled.
   - Fixed previews changing unexpectedly when switching files quickly.
-  - Fixed 3D viewer controls after the viewer is reopened.
   - Fixed individual WAD lookups failing when virtual paths use backslashes.
   - Fixed ModernListView selected and hover state colors to consistently use HoverColor in Hash Guessing Lab results.
   - Fixed progress spinner animation continuing to rotate after search completes.
