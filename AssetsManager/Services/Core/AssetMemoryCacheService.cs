@@ -10,9 +10,9 @@ namespace AssetsManager.Services.Core
 {
     public sealed class AssetMemoryCacheService
     {
-        public const long DefaultByteBudget = 256L * 1024 * 1024;
-        public const long DefaultImageBudget = 192L * 1024 * 1024;
-        public const long DefaultTextBudget = 64L * 1024 * 1024;
+        public const long DefaultByteBudget = 128L * 1024 * 1024;
+        public const long DefaultImageBudget = 64L * 1024 * 1024;
+        public const long DefaultTextBudget = 32L * 1024 * 1024;
 
         private readonly MemoryBudgetLruCache<string, byte[]> _byteCache;
         private readonly MemoryBudgetLruCache<string, ImageSource> _imageCache;
