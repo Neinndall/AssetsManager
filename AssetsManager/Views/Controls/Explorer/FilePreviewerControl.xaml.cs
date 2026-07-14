@@ -292,20 +292,18 @@ namespace AssetsManager.Views.Controls.Explorer
                 if (existingPin == null)
                 {
                     // Auto-pin the file so it appears in the tabs and can be closed/managed
+                    // Selecting or recycling the temporary tab raises SelectedFile and starts the preview.
                     ViewModel.PinnedFilesManager.PinFile(node);
-                    existingPin = ViewModel.PinnedFilesManager.PinnedFiles.FirstOrDefault(p => p.Node == node);
+                    return;
                 }
 
                 // Select the tab (this will trigger PinnedFilesManager_PropertyChanged which calls the service)
-                if (existingPin != null)
-                {
-                    var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
-                    ViewModel.PinnedFilesManager.SelectedFile = existingPin;
+                var previousSelected = ViewModel.PinnedFilesManager.SelectedFile;
+                ViewModel.PinnedFilesManager.SelectedFile = existingPin;
 
-                    if (previousSelected == existingPin)
-                    {
-                        await ExplorerPreviewService.ShowPreviewAsync(node);
-                    }
+                if (previousSelected == existingPin)
+                {
+                    await ExplorerPreviewService.ShowPreviewAsync(node);
                 }
             }
             else

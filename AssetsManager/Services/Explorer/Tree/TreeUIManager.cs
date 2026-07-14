@@ -37,6 +37,7 @@ namespace AssetsManager.Services.Explorer.Tree
                 var finalContainer = GetGeneratedContainerForPath(container, path);
                 if (finalContainer != null)
                 {
+                    finalContainer.IsSelected = true;
                     if (focus) finalContainer.Focus();
                     finalContainer.BringIntoView();
                     return;
@@ -51,7 +52,6 @@ namespace AssetsManager.Services.Explorer.Tree
                 
                 // Ensure expansion
                 if (node != target && !node.IsExpanded) node.IsExpanded = true;
-                if (node == target) node.IsSelected = true;
 
                 TreeViewItem itemContainer = currentContainer.ItemContainerGenerator.ContainerFromItem(node) as TreeViewItem;
 

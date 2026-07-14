@@ -176,32 +176,32 @@ namespace AssetsManager.Services.Explorer
 
             var previewRequest = BeginPreviewRequest();
 
-            // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
-            // We only update/clear metadata if the current node is an image. 
-            // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
-            var metadata = await _narrativeMetadataService.GetMetadataAsync(node);
-            ThrowIfPreviewIsObsolete(previewRequest);
-            if (isImage || metadata != null)
-            {
-                _viewModel.NarrativeMetadata = metadata;
-            }
-
-            // Step 3: SELECTIVE clearing to maintain Dual View
-            if (isImage)
-            {
-                _imagePreview.Source = null;
-                _currentImageNode = node;
-            }
-            else
-            {
-                // Keep old content visible until new data is ready in SetPreviewerAsync.
-                // This prevents both the blank ContentPanel flash (Dual View collapsing)
-                // and the empty TextEditor flash during async I/O + parsing.
-                _currentContentNode = node;
-            }
-
             try
             {
+                // Step 2: Discovery of technical metadata (e.g., Summoner Icons, Emotes)
+                // We only update/clear metadata if the current node is an image.
+                // If it's a text file, we keep the metadata of the image shown in the other slot (Dual View).
+                var metadata = await _narrativeMetadataService.GetMetadataAsync(node);
+                ThrowIfPreviewIsObsolete(previewRequest);
+                if (isImage || metadata != null)
+                {
+                    _viewModel.NarrativeMetadata = metadata;
+                }
+
+                // Step 3: SELECTIVE clearing to maintain Dual View
+                if (isImage)
+                {
+                    _imagePreview.Source = null;
+                    _currentImageNode = node;
+                }
+                else
+                {
+                    // Keep old content visible until new data is ready in SetPreviewerAsync.
+                    // This prevents both the blank ContentPanel flash (Dual View collapsing)
+                    // and the empty TextEditor flash during async I/O + parsing.
+                    _currentContentNode = node;
+                }
+
                 byte[] data = null;
                 if (node.Type == NodeType.VirtualFile) { data = await _wadContentProvider.GetVirtualFileBytesAsync(node, previewRequest.CancellationToken); }
                 else if (node.Type == NodeType.RealFile) { if (File.Exists(node.VirtualPath)) data = await File.ReadAllBytesAsync(node.VirtualPath, previewRequest.CancellationToken); }
