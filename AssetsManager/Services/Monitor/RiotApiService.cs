@@ -61,13 +61,15 @@ namespace AssetsManager.Services.Monitor
                     new { Info = RiotCatalogDefinitions.WardCatalog, Map = _wardNamePathMap },
                     new { Info = RiotCatalogDefinitions.IconCatalog, Map = _iconNamePathMap }
                 };
+                var catalogNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(
+                    catalogs.Select(catalog => catalog.Info.Path),
+                    pluginPath);
 
                 foreach (var catalog in catalogs)
                 {
                     try
                     {
-                        var node = await _wadContentProvider.FindNodeByVirtualPathAsync(catalog.Info.Path, pluginPath);
-                        if (node == null) continue;
+                        if (!catalogNodes.TryGetValue(catalog.Info.Path, out var node)) continue;
 
                         byte[] jsonData = await _wadContentProvider.GetVirtualFileBytesAsync(node);
                         if (jsonData == null) continue;
@@ -505,44 +507,35 @@ namespace AssetsManager.Services.Monitor
             if (string.IsNullOrEmpty(lolDirectory)) return (null, null);
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
-            string[] possiblePaths = { 
-                "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
-                "global/default/v1/event-hub.json",
-                "v1/event-hub.json"
-            };
+            var node = await _wadContentProvider.FindNodeByVirtualPathAsync(RiotCatalogDefinitions.EventHubJsonPath, pluginPath);
+            if (node == null) return (null, null);
 
-            foreach (var path in possiblePaths)
+            try
             {
-                var node = await _wadContentProvider.FindNodeByVirtualPathAsync(path, pluginPath);
-                if (node == null) continue;
+                byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                if (data == null) return (null, null);
 
-                try
+                using var doc = JsonDocument.Parse(data);
+                var bestEvent = doc.RootElement.EnumerateArray()
+                    .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
+                    .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
+                    .Select(ev => new {
+                        Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
+                        Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
+                        Start = ev.Value.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd) ? sd : DateTime.MinValue,
+                        End = ev.Value.TryGetProperty("endDate", out var ed) && DateTime.TryParse(ed.GetString(), out var edd) ? edd : DateTime.MaxValue
+                    })
+                    .Where(e => DateTime.UtcNow <= e.End)
+                    .OrderByDescending(e => e.Start)
+                    .FirstOrDefault();
+
+                if (bestEvent != null)
                 {
-                    byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
-                    if (data == null) continue;
-
-                    using var doc = JsonDocument.Parse(data);
-                    var bestEvent = doc.RootElement.EnumerateArray()
-                        .Select(e => e.TryGetProperty("event", out var ev) ? ev : (JsonElement?)null)
-                        .Where(ev => ev != null && ev.Value.TryGetProperty("eventHubType", out var t) && t.GetString() == "kSeasonPass")
-                        .Select(ev => new {
-                            Id = ev.Value.GetProperty("rewardTrack").GetProperty("trackConfig").GetProperty("id").GetString(),
-                            Name = ev.Value.TryGetProperty("localizedName", out var n) ? n.GetString() : "Unknown Event",
-                            Start = ev.Value.TryGetProperty("startDate", out var s) && DateTime.TryParse(s.GetString(), out var sd) ? sd : DateTime.MinValue,
-                            End = ev.Value.TryGetProperty("endDate", out var ed) && DateTime.TryParse(ed.GetString(), out var edd) ? edd : DateTime.MaxValue
-                        })
-                        .Where(e => DateTime.UtcNow <= e.End)
-                        .OrderByDescending(e => e.Start)
-                        .FirstOrDefault();
-
-                    if (bestEvent != null)
-                    {
-                        _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
-                        return (bestEvent.Id, bestEvent.Name);
-                    }
+                    _logService.LogSuccess($"Active Pass found: {bestEvent.Name}");
+                    return (bestEvent.Id, bestEvent.Name);
                 }
-                catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             }
+            catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             return (null, null);
         }
 
@@ -554,43 +547,35 @@ namespace AssetsManager.Services.Monitor
             if (string.IsNullOrEmpty(lolDirectory)) return null;
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
-            string[] possiblePaths = { 
-                "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json",
-                "global/default/v1/event-hub.json",
-                "v1/event-hub.json" 
-            };
+            var node = await _wadContentProvider.FindNodeByVirtualPathAsync(RiotCatalogDefinitions.EventHubJsonPath, pluginPath);
+            if (node == null) return null;
 
-            foreach (var path in possiblePaths)
+            try
             {
-                var node = await _wadContentProvider.FindNodeByVirtualPathAsync(path, pluginPath);
-                if (node == null) continue;
+                byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
+                if (data == null) return null;
 
-                try 
+                using var doc = JsonDocument.Parse(data);
+                foreach (var item in doc.RootElement.EnumerateArray())
                 {
-                    byte[] data = await _wadContentProvider.GetVirtualFileBytesAsync(node);
-                    if (data == null) continue;
-
-                    using var doc = JsonDocument.Parse(data);
-                    foreach (var item in doc.RootElement.EnumerateArray())
+                    if (item.TryGetProperty("event", out var ev))
                     {
-                        if (item.TryGetProperty("event", out var ev))
+                        if (ev.TryGetProperty("rewardTrack", out var rt) &&
+                            rt.TryGetProperty("trackConfig", out var tc) &&
+                            tc.TryGetProperty("id", out var idProp) &&
+                            string.Equals(idProp.GetString(), trackConfigId, StringComparison.OrdinalIgnoreCase))
                         {
-                            if (ev.TryGetProperty("rewardTrack", out var rt) && 
-                                rt.TryGetProperty("trackConfig", out var tc) &&
-                                tc.TryGetProperty("id", out var idProp) &&
-                                idProp.GetString().Equals(trackConfigId, StringComparison.OrdinalIgnoreCase))
+                            string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
+                            if (!string.IsNullOrEmpty(name))
                             {
-                                string name = ev.TryGetProperty("localizedName", out var n) ? n.GetString() : null;
-                                if (!string.IsNullOrEmpty(name))
-                                {
-                                    _logService.Log($"Found name for event ID: {name}");
-                                    return name;
-                                }
+                                _logService.Log($"Found name for event ID: {name}");
+                                return name;
                             }
                         }
                     }
-                } catch { }
+                }
             }
+            catch (Exception ex) { _logService.LogError(ex, $"Error parsing event-hub from {node.SourceWadPath}"); }
             
             _logService.LogWarning($"[EventHub] Could not find a localized name for ID {trackConfigId} in the Hub.");
             return null;
@@ -622,10 +607,14 @@ namespace AssetsManager.Services.Monitor
             await _extractionSemaphore.WaitAsync();
             try
             {
+                var iconNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(
+                    remainingUrls.Select(GetIconWadPath),
+                    pluginPath);
+
                 foreach (var url in remainingUrls)
                 {
                     var virtualPath = GetIconWadPath(url);
-                    var node = await _wadContentProvider.FindNodeByVirtualPathAsync(virtualPath, pluginPath);
+                    if (!iconNodes.TryGetValue(virtualPath, out var node)) continue;
 
                     if (node != null)
                     {

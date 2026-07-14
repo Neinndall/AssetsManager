@@ -15,6 +15,7 @@ namespace AssetsManager.Utils
         public const string WardsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/ward-skins.json";
         public const string IconsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-icons.json";
         public const string LootJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/loot.json";
+        public const string EventHubJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json";
 
         // --- Virtual Folder Paths (for Explorer/WAD resolution) ---
         public const string ProfileIconsVirtualPath = "v1/profile-icons/";

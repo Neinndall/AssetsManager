@@ -37,6 +37,10 @@
     <PackageReference Include="WindowsAPICodePackShell" Version="8.0.14" />
     <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AssetsManager.BenchmarkTests" />
+  </ItemGroup>
   
   <ItemGroup>
     <Reference Include="BCnEncoder">

@@ -41,30 +41,78 @@ namespace AssetsManager.Services.Explorer
         /// </summary>
         public async Task<FileSystemNodeModel> FindNodeByVirtualPathAsync(string virtualPath, string gameDataPath)
         {
+            if (string.IsNullOrWhiteSpace(virtualPath))
+            {
+                return null;
+            }
+
+            var nodes = await FindNodesByVirtualPathsAsync(new[] { virtualPath }, gameDataPath);
+            return nodes.TryGetValue(virtualPath, out var node) ? node : null;
+        }
+
+        public async Task<IReadOnlyDictionary<string, FileSystemNodeModel>> FindNodesByVirtualPathsAsync(
+            IEnumerable<string> virtualPaths,
+            string gameDataPath,
+            CancellationToken cancellationToken = default)
+        {
+            if (virtualPaths == null)
+            {
+                return new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
+            }
+
             return await Task.Run(() =>
             {
-                // WAD paths are hashed in lowercase
-                string normalizedPath = virtualPath.Replace('\\', '/').ToLowerInvariant();
-                ulong targetHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(normalizedPath);
+                var requestedPaths = virtualPaths
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path => path.Replace('\\', '/').ToLowerInvariant())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
-                var wadFiles = Directory.GetFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
-                                              .Concat(Directory.GetFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories))
-                                              .ToList();
-
-                foreach (var wadPath in wadFiles)
+                var results = new Dictionary<string, FileSystemNodeModel>(StringComparer.OrdinalIgnoreCase);
+                if (requestedPaths.Count == 0)
                 {
+                    return (IReadOnlyDictionary<string, FileSystemNodeModel>)results;
+                }
+
+                var pathsByHash = requestedPaths
+                    .GroupBy(path => LeagueToolkit.Hashing.XxHash64Ext.Hash(path))
+                    .ToDictionary(group => group.Key, group => group.ToList());
+                var unresolvedHashes = new HashSet<ulong>(pathsByHash.Keys);
+                var seenWads = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var wadPath in Directory.EnumerateFiles(gameDataPath, "*.wad", SearchOption.AllDirectories)
+                    .Concat(Directory.EnumerateFiles(gameDataPath, "*.wad.client", SearchOption.AllDirectories)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!seenWads.Add(wadPath))
+                    {
+                        continue;
+                    }
+
                     try
                     {
-                        using (var wadFile = new WadFile(wadPath))
+                        using var wadFile = new WadFile(wadPath);
+                        foreach (var hash in unresolvedHashes.ToArray())
                         {
-                            if (wadFile.Chunks.TryGetValue(targetHash, out var chunk))
+                            if (!wadFile.Chunks.TryGetValue(hash, out var chunk))
                             {
-                                return new FileSystemNodeModel(Path.GetFileName(normalizedPath), false, normalizedPath, wadPath)
+                                continue;
+                            }
+
+                            foreach (var normalizedPath in pathsByHash[hash])
+                            {
+                                results[normalizedPath] = new FileSystemNodeModel(Path.GetFileName(normalizedPath), false, normalizedPath, wadPath)
                                 {
                                     SourceChunkPathHash = chunk.PathHash,
                                     SourceWadPath = wadPath,
                                     Type = NodeType.VirtualFile
                                 };
+                            }
+
+                            unresolvedHashes.Remove(hash);
+                            if (unresolvedHashes.Count == 0)
+                            {
+                                return (IReadOnlyDictionary<string, FileSystemNodeModel>)results;
                             }
                         }
                     }
@@ -74,8 +122,8 @@ namespace AssetsManager.Services.Explorer
                     }
                 }
 
-                return null;
-            });
+                return (IReadOnlyDictionary<string, FileSystemNodeModel>)results;
+            }, cancellationToken);
         }
 
         // Obtiene los bytes descomprimidos de un chunk guardado en el backup.
