@@ -50,6 +50,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed transparent Viewer backgrounds not accepting camera controls outside the model.
   - Fixed Viewer studio settings and environment options not resetting after removing the last model.
   - Fixed the ground plane reappearing after loading a new model when it was disabled.
   - Fixed previews changing unexpectedly when switching files quickly.

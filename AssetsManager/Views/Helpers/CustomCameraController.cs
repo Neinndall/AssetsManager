@@ -10,6 +10,7 @@ namespace AssetsManager.Views.Helpers
     public class CustomCameraController : IDisposable
     {
         private Viewport3D _viewport;
+        private FrameworkElement _inputSurface;
         private bool _isRotating;
         private bool _isPanning;
         private System.Windows.Point _lastMousePosition;
@@ -24,13 +25,14 @@ namespace AssetsManager.Views.Helpers
 
         public double ZoomSensitivity { get; set; } = 80.0;
 
-        public CustomCameraController(Viewport3D viewport)
+        public CustomCameraController(Viewport3D viewport, FrameworkElement inputSurface = null)
         {
             _viewport = viewport;
-            _viewport.PreviewMouseDown += OnPreviewMouseDown;
-            _viewport.MouseUp += OnMouseUp;
-            _viewport.MouseMove += OnMouseMove;
-            _viewport.MouseWheel += OnMouseWheel;
+            _inputSurface = inputSurface ?? viewport;
+            _inputSurface.PreviewMouseDown += OnPreviewMouseDown;
+            _inputSurface.MouseUp += OnMouseUp;
+            _inputSurface.MouseMove += OnMouseMove;
+            _inputSurface.MouseWheel += OnMouseWheel;
             
             // Start the smooth update loop
             CompositionTarget.Rendering += OnRendering;
@@ -54,10 +56,11 @@ namespace AssetsManager.Views.Helpers
                 {
                     _viewport.Camera.Changed -= OnCameraChanged;
                 }
-                _viewport.PreviewMouseDown -= OnPreviewMouseDown;
-                _viewport.MouseUp -= OnMouseUp;
-                _viewport.MouseMove -= OnMouseMove;
-                _viewport.MouseWheel -= OnMouseWheel;
+                _inputSurface.PreviewMouseDown -= OnPreviewMouseDown;
+                _inputSurface.MouseUp -= OnMouseUp;
+                _inputSurface.MouseMove -= OnMouseMove;
+                _inputSurface.MouseWheel -= OnMouseWheel;
+                _inputSurface = null;
                 _viewport = null;
             }
         }
@@ -160,15 +163,15 @@ namespace AssetsManager.Views.Helpers
             {
                 _isRotating = true;
                 _lastMousePosition = e.GetPosition(_viewport);
-                _viewport.Cursor = System.Windows.Input.Cursors.SizeAll;
-                _viewport.CaptureMouse();
+                _inputSurface.Cursor = System.Windows.Input.Cursors.SizeAll;
+                _inputSurface.CaptureMouse();
             }
             else if (e.RightButton == MouseButtonState.Pressed)
             {
                 _isPanning = true;
                 _lastMousePosition = e.GetPosition(_viewport);
-                _viewport.Cursor = System.Windows.Input.Cursors.Hand;
-                _viewport.CaptureMouse();
+                _inputSurface.Cursor = System.Windows.Input.Cursors.Hand;
+                _inputSurface.CaptureMouse();
             }
         }
 
@@ -179,8 +182,8 @@ namespace AssetsManager.Views.Helpers
                 if (_isRotating)
                 {
                     _isRotating = false;
-                    _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
-                    _viewport.ReleaseMouseCapture();
+                    _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
+                    _inputSurface.ReleaseMouseCapture();
                 }
             }
             if (e.RightButton == MouseButtonState.Released)
@@ -188,8 +191,8 @@ namespace AssetsManager.Views.Helpers
                 if (_isPanning)
                 {
                     _isPanning = false;
-                    _viewport.Cursor = System.Windows.Input.Cursors.Arrow;
-                    _viewport.ReleaseMouseCapture();
+                    _inputSurface.Cursor = System.Windows.Input.Cursors.Arrow;
+                    _inputSurface.ReleaseMouseCapture();
                 }
             }
         }
