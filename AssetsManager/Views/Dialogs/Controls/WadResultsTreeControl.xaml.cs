@@ -69,29 +69,7 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void ResultsTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (!ReferenceEquals(e.OldValue, e.NewValue))
-            {
-                SetItemSelection(e.OldValue, false);
-                SetItemSelection(e.NewValue, true);
-            }
-
             ParentWindow?.HandleTreeSelectionChanged(e.NewValue as SerializableChunkDiff);
-        }
-
-        internal static void SetItemSelection(object item, bool isSelected)
-        {
-            switch (item)
-            {
-                case WadGroupViewModel wadGroup:
-                    wadGroup.IsSelected = isSelected;
-                    break;
-                case DiffTypeGroupViewModel typeGroup:
-                    typeGroup.IsSelected = isSelected;
-                    break;
-                case SerializableChunkDiff diff:
-                    diff.IsSelected = isSelected;
-                    break;
-            }
         }
 
         private void ViewDifferences_Click(object sender, RoutedEventArgs e)
