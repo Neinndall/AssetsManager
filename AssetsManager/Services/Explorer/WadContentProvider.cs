@@ -46,7 +46,7 @@ namespace AssetsManager.Services.Explorer
                 return null;
             }
 
-            string normalizedPath = virtualPath.Replace('\\', '/').ToLowerInvariant();
+            string normalizedPath = PathUtils.NormalizePath(virtualPath);
             var nodes = await FindNodesByVirtualPathsAsync(new[] { normalizedPath }, gameDataPath);
             return nodes.TryGetValue(normalizedPath, out var node) ? node : null;
         }
