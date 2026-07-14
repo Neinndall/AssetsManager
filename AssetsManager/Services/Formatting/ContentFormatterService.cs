@@ -28,12 +28,6 @@ namespace AssetsManager.Services.Formatting
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
         private readonly LuaParser _luaParser;
-        private readonly AssetMemoryCacheService _assetMemoryCacheService;
-
-        private static readonly HashSet<string> CacheableDataTypes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "bin", "troybin", "preload", "stringtable", "css", "json", "js", "bnk", "luabin64"
-        };
 
         public ContentFormatterService(
             LogService logService, 
@@ -48,8 +42,7 @@ namespace AssetsManager.Services.Formatting
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
-            LuaParser luaParser,
-            AssetMemoryCacheService assetMemoryCacheService)
+            LuaParser luaParser)
         {
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
@@ -64,7 +57,6 @@ namespace AssetsManager.Services.Formatting
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
             _luaParser = luaParser;
-            _assetMemoryCacheService = assetMemoryCacheService;
         }
 
         public async Task<string> FormatAudioBankAsync(LinkedAudioBank linkedBank)
@@ -107,13 +99,6 @@ namespace AssetsManager.Services.Formatting
             if (data == null) return string.Empty;
 
             dataType = dataType?.ToLowerInvariant() ?? "text";
-            bool useCache = CacheableDataTypes.Contains(dataType);
-            string cacheKey = useCache ? _assetMemoryCacheService.CreateTextKey(dataType, data) : null;
-            if (useCache && _assetMemoryCacheService.TryGetText(cacheKey, out string cachedContent))
-            {
-                return cachedContent;
-            }
-
             string formattedContent;
 
             switch (dataType)
@@ -168,12 +153,6 @@ namespace AssetsManager.Services.Formatting
                     break;
             }
             
-            if (useCache && !string.IsNullOrEmpty(formattedContent) &&
-                !formattedContent.StartsWith("Error ", StringComparison.Ordinal))
-            {
-                _assetMemoryCacheService.SetText(cacheKey, formattedContent);
-            }
-
             return formattedContent;
         }
 
