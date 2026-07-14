@@ -2,16 +2,12 @@ using System;
 using System.Xml;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
-using System.Collections.Generic;
 using System.Windows.Media;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
 using AssetsManager.Services.Parsers;
 using System.Reflection;
 using ICSharpCode.AvalonEdit;
@@ -29,8 +25,6 @@ namespace AssetsManager.Services.Explorer
 {
     public class ExplorerPreviewService
     {
-        private const string BlankWebViewDocument = "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body></body></html>";
-
         private enum Previewer { None, Image, WebView, AvalonEdit, StatusPanel }
 
         private readonly struct PreviewRequest
@@ -45,28 +39,33 @@ namespace AssetsManager.Services.Explorer
             public CancellationToken CancellationToken { get; }
         }
 
+        private readonly struct MediaPreviewContent
+        {
+            public MediaPreviewContent(byte[] data, string extension, string displayName)
+            {
+                Data = data;
+                Extension = extension;
+                DisplayName = displayName;
+            }
+
+            public byte[] Data { get; }
+            public string Extension { get; }
+            public string DisplayName { get; }
+        }
+
         private Previewer _activeContentPreviewer = Previewer.None;
         private Previewer _activeImagePreviewer = Previewer.None;
         private readonly SemaphoreSlim _thumbnailLoadLimiter = new(4, 4);
         private FileSystemNodeModel _currentContentNode;
         private FileSystemNodeModel _currentImageNode;
         private Image _imagePreview;
-        private Grid _webViewContainer;
         private TextEditor _textEditorPreview;
         private FilePreviewerModel _viewModel;
         private IHighlightingDefinition _jsonHighlightingDefinition;
         private CancellationTokenSource _previewCancellationTokenSource;
-        private Task<CoreWebView2Environment> _webViewEnvironmentTask;
-        private Task<WebView2> _webViewInitializationTask;
-        private readonly SemaphoreSlim _webViewNavigationLock = new(1, 1);
-        private readonly HashSet<string> _pendingMediaTempFiles = new(StringComparer.OrdinalIgnoreCase);
-        private WebView2 _webView;
         private long _previewGeneration;
-        private readonly string _mediaTempOwnerId = Guid.NewGuid().ToString("N");
-        private string _activeMediaTempFilePath;
 
         private readonly LogService _logService;
-        private readonly DirectoriesCreator _directoriesCreator;
         private readonly ContentFormatterService _contentFormatterService;
         private readonly AudioConversionService _audioConversionService;
         private readonly WadContentProvider _wadContentProvider;
@@ -74,22 +73,22 @@ namespace AssetsManager.Services.Explorer
         private readonly NarrativeMetadataService _narrativeMetadataService;
         private readonly DiffViewService _diffViewService;
         private readonly AssetMemoryCacheService _assetMemoryCacheService;
+        private readonly MediaWebViewPreviewService _mediaWebViewPreviewService;
 
         private bool _isGridActive;
 
         public ExplorerPreviewService(
             LogService logService, 
-            DirectoriesCreator directoriesCreator, 
             ContentFormatterService contentFormatterService, 
             AudioConversionService audioConversionService, 
             WadContentProvider wadContentProvider,
             SvgParser svgParser,
             NarrativeMetadataService narrativeMetadataService,
             DiffViewService diffViewService,
-            AssetMemoryCacheService assetMemoryCacheService)
+            AssetMemoryCacheService assetMemoryCacheService,
+            MediaWebViewPreviewService mediaWebViewPreviewService)
         {
             _logService = logService;
-            _directoriesCreator = directoriesCreator;
             _contentFormatterService = contentFormatterService;
             _audioConversionService = audioConversionService;
             _wadContentProvider = wadContentProvider;
@@ -97,19 +96,15 @@ namespace AssetsManager.Services.Explorer
             _narrativeMetadataService = narrativeMetadataService;
             _diffViewService = diffViewService;
             _assetMemoryCacheService = assetMemoryCacheService;
+            _mediaWebViewPreviewService = mediaWebViewPreviewService;
         }
 
         public void Initialize(Image imagePreview, Grid webViewContainer, TextEditor textEditor, FilePreviewerModel viewModel)
         {
-            if (_webViewContainer != null && _webViewContainer != webViewContainer)
-            {
-                DisposePersistentWebView();
-            }
-
             _imagePreview = imagePreview;
-            _webViewContainer = webViewContainer;
             _textEditorPreview = textEditor;
             _viewModel = viewModel;
+            _mediaWebViewPreviewService.Initialize(webViewContainer);
         }
 
         public async Task ShowPreviewAsync(FileSystemNodeModel node)
@@ -326,8 +321,6 @@ namespace AssetsManager.Services.Explorer
         private async Task DispatchPreview(byte[] data, string extension, FileSystemNodeModel node, PreviewRequest previewRequest)
         {
             ThrowIfPreviewIsObsolete(previewRequest);
-            // Aseguramos la creacion de la carpeta necesaria
-            _directoriesCreator.CreateDirectory(_directoriesCreator.TempPreviewPath);
 
             if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension, previewRequest); }
             else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data, extension, previewRequest); }
@@ -340,7 +333,11 @@ namespace AssetsManager.Services.Explorer
                     ThrowIfPreviewIsObsolete(previewRequest);
                     if (oggData != null)
                     {
-                        await ShowAudioVideoPreviewAsync(oggData, ".ogg", node.Name, previewRequest);
+                        await SetPreviewerAsync(
+                            Previewer.WebView,
+                            new MediaPreviewContent(oggData, ".ogg", node.Name),
+                            true,
+                            previewRequest);
                     }
                     else
                     {
@@ -349,7 +346,11 @@ namespace AssetsManager.Services.Explorer
                 }
                 else
                 {
-                    await ShowAudioVideoPreviewAsync(data, extension, node.Name, previewRequest);
+                    await SetPreviewerAsync(
+                        Previewer.WebView,
+                        new MediaPreviewContent(data, extension, node.Name),
+                        true,
+                        previewRequest);
                 }
             }
             else if (SupportedFileTypes.IsText(extension)) { await ShowAvalonEditTextPreviewAsync(data, extension, previewRequest); }
@@ -412,10 +413,9 @@ namespace AssetsManager.Services.Explorer
             {
                 ThrowIfPreviewIsObsolete(previewRequest.Value);
             }
-            // Keep the resident WebView hidden and neutralized when another content renderer takes its slot.
-            if (newPreviewer == Previewer.AvalonEdit && _webViewContainer != null)
+            if (newPreviewer == Previewer.AvalonEdit)
             {
-                DeactivateActiveMediaPreview();
+                _mediaWebViewPreviewService.Deactivate();
             }
 
             switch (newPreviewer)
@@ -437,13 +437,24 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.WebView:
-                    if (content is string htmlContent && previewRequest.HasValue)
+                    if (content is MediaPreviewContent mediaContent && previewRequest.HasValue)
                     {
-                        PrepareWebViewTransition();
+                        _viewModel.IsWebVisible = false;
+                        if (_activeContentPreviewer == Previewer.WebView)
+                        {
+                            _activeContentPreviewer = Previewer.None;
+                        }
 
-                        bool webViewReady = await NavigateAndShowWebViewAsync(htmlContent, shouldAutoplay, previewRequest.Value);
+                        bool webViewReady = await _mediaWebViewPreviewService.ShowAsync(
+                            mediaContent.Data,
+                            mediaContent.Extension,
+                            mediaContent.DisplayName,
+                            shouldAutoplay,
+                            previewRequest.Value.CancellationToken);
                         if (!webViewReady)
                         {
+                            ThrowIfPreviewIsObsolete(previewRequest.Value);
+                            await ShowUnsupportedPreviewAsync(mediaContent.Extension, previewRequest.Value);
                             return;
                         }
 
@@ -491,11 +502,7 @@ namespace AssetsManager.Services.Explorer
                         else
                         {
                             // Full Screen or Left-only Scenario: Show error on the left
-                            // Neutralize the resident WebView before the status panel takes its slot.
-                            if (_webViewContainer != null)
-                            {
-                                DeactivateActiveMediaPreview();
-                            }
+                            _mediaWebViewPreviewService.Deactivate();
 
                             _viewModel.IsUnsupportedVisible = true;
                             _viewModel.IsContentVisible = true;
@@ -514,11 +521,7 @@ namespace AssetsManager.Services.Explorer
                     }
                     else
                     {
-                        // Global reset keeps the resident control neutral and hidden until the view unloads.
-                        if (_webViewContainer != null)
-                        {
-                            DeactivateActiveMediaPreview();
-                        }
+                        _mediaWebViewPreviewService.Deactivate();
 
                         _viewModel.ResetAllVisibility();
                         _imagePreview.Source = null;
@@ -526,290 +529,6 @@ namespace AssetsManager.Services.Explorer
                         _activeImagePreviewer = Previewer.None;
                     }
                     break;
-            }
-        }
-
-        private async Task<bool> NavigateAndShowWebViewAsync(string htmlContent, bool shouldAutoplay, PreviewRequest previewRequest)
-        {
-            bool lockAcquired = false;
-            try
-            {
-                ThrowIfPreviewIsObsolete(previewRequest);
-                await _webViewNavigationLock.WaitAsync(previewRequest.CancellationToken);
-                lockAcquired = true;
-                ThrowIfPreviewIsObsolete(previewRequest);
-
-                WebView2 webView = await GetOrCreateWebViewAsync();
-                ThrowIfPreviewIsObsolete(previewRequest);
-
-                webView.Visibility = Visibility.Hidden;
-                CoreWebView2 coreWebView = webView.CoreWebView2;
-                ulong navigationId = 0;
-                var navigationCompletion = new TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-                void OnNavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
-                {
-                    navigationId = args.NavigationId;
-                    coreWebView.NavigationStarting -= OnNavigationStarting;
-                }
-
-                void OnNavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
-                {
-                    if (navigationId != 0 && args.NavigationId == navigationId)
-                    {
-                        navigationCompletion.TrySetResult(args);
-                    }
-                }
-
-                coreWebView.NavigationStarting += OnNavigationStarting;
-                coreWebView.NavigationCompleted += OnNavigationCompleted;
-                using var cancellationRegistration = previewRequest.CancellationToken.Register(() =>
-                    navigationCompletion.TrySetCanceled(previewRequest.CancellationToken));
-
-                try
-                {
-                    coreWebView.Stop();
-                    coreWebView.NavigateToString(htmlContent);
-                    CoreWebView2NavigationCompletedEventArgs result = await navigationCompletion.Task;
-                    ThrowIfPreviewIsObsolete(previewRequest);
-
-                    if (!result.IsSuccess)
-                    {
-                        throw new InvalidOperationException($"WebView2 navigation failed with status {result.WebErrorStatus}.");
-                    }
-
-                    TryDeletePendingMediaTempFiles();
-                    webView.Visibility = Visibility.Visible;
-
-                    if (shouldAutoplay)
-                    {
-                        _ = webView.Dispatcher.InvokeAsync(async () =>
-                        {
-                            try
-                            {
-                                if (IsCurrentPreview(previewRequest) && webView.CoreWebView2 != null)
-                                {
-                                    await webView.CoreWebView2.ExecuteScriptAsync("playMedia();");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _logService.LogError(ex, "Failed to autoplay media");
-                            }
-                        });
-                    }
-
-                    return true;
-                }
-                finally
-                {
-                    coreWebView.NavigationStarting -= OnNavigationStarting;
-                    coreWebView.NavigationCompleted -= OnNavigationCompleted;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to initialize or navigate WebView2.");
-                DisposePersistentWebView();
-                if (IsCurrentPreview(previewRequest))
-                {
-                    await ShowUnsupportedPreviewAsync(".media", previewRequest);
-                }
-                return false;
-            }
-            finally
-            {
-                if (lockAcquired)
-                {
-                    _webViewNavigationLock.Release();
-                }
-            }
-        }
-
-        private Task<WebView2> GetOrCreateWebViewAsync()
-        {
-            return _webViewInitializationTask ??= InitializePersistentWebViewAsync();
-        }
-
-        private async Task<WebView2> InitializePersistentWebViewAsync()
-        {
-            if (_webViewContainer == null)
-            {
-                throw new InvalidOperationException("WebView2 container is not initialized.");
-            }
-
-            var webView = new WebView2
-            {
-                DefaultBackgroundColor = System.Drawing.Color.Transparent,
-                Visibility = Visibility.Hidden
-            };
-
-            _webView = webView;
-            _webViewContainer.Children.Add(webView);
-
-            CoreWebView2Environment environment = await GetWebViewEnvironmentAsync();
-            await webView.EnsureCoreWebView2Async(environment);
-            webView.CoreWebView2.SetVirtualHostNameToFolderMapping("preview.assets", _directoriesCreator.TempPreviewPath, CoreWebView2HostResourceAccessKind.Allow);
-            webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-            webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
-            webView.CoreWebView2.Settings.IsSwipeNavigationEnabled = false;
-            webView.CoreWebView2.NavigationCompleted += PersistentWebView_NavigationCompleted;
-            return webView;
-        }
-
-        private void PersistentWebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            TryDeletePendingMediaTempFiles();
-        }
-
-        private async Task<CoreWebView2Environment> GetWebViewEnvironmentAsync()
-        {
-            _webViewEnvironmentTask ??= CoreWebView2Environment.CreateAsync(
-                userDataFolder: _directoriesCreator.WebView2DataPath);
-
-            try
-            {
-                return await _webViewEnvironmentTask;
-            }
-            catch
-            {
-                _webViewEnvironmentTask = null;
-                throw;
-            }
-        }
-
-        private void DisposeWebView(WebView2 webView)
-        {
-            if (webView == null)
-            {
-                return;
-            }
-
-            if (_webViewContainer?.Children.Contains(webView) == true)
-            {
-                _webViewContainer.Children.Remove(webView);
-            }
-
-            webView.Dispose();
-        }
-
-        private void DisposePersistentWebView()
-        {
-            QueueActiveMediaTempFileForDeletion();
-            WebView2 webView = _webView;
-            _webView = null;
-            _webViewInitializationTask = null;
-
-            try
-            {
-                if (webView?.CoreWebView2 != null)
-                {
-                    webView.CoreWebView2.NavigationCompleted -= PersistentWebView_NavigationCompleted;
-                    webView.CoreWebView2.Stop();
-                }
-            }
-            finally
-            {
-                try
-                {
-                    DisposeWebView(webView);
-                }
-                finally
-                {
-                    TryDeletePendingMediaTempFiles(true);
-                }
-            }
-        }
-
-        private void PrepareWebViewTransition()
-        {
-            if (_viewModel != null)
-            {
-                _viewModel.IsWebVisible = false;
-            }
-
-            if (_webView != null)
-            {
-                _webView.Visibility = Visibility.Hidden;
-                _webView.CoreWebView2?.Stop();
-            }
-
-            if (_activeContentPreviewer == Previewer.WebView)
-            {
-                _activeContentPreviewer = Previewer.None;
-            }
-
-            QueueActiveMediaTempFileForDeletion();
-        }
-
-        private void DeactivateActiveMediaPreview()
-        {
-            PrepareWebViewTransition();
-            if (_webView?.CoreWebView2 != null)
-            {
-                _webView.CoreWebView2.NavigateToString(BlankWebViewDocument);
-            }
-            else
-            {
-                TryDeletePendingMediaTempFiles();
-            }
-        }
-
-        private void QueueActiveMediaTempFileForDeletion()
-        {
-            if (!string.IsNullOrEmpty(_activeMediaTempFilePath))
-            {
-                _pendingMediaTempFiles.Add(_activeMediaTempFilePath);
-            }
-
-            _activeMediaTempFilePath = null;
-        }
-
-        private void TryDeletePendingMediaTempFiles(bool logFailures = false)
-        {
-            foreach (string filePath in _pendingMediaTempFiles.ToList())
-            {
-                if (TryDeleteMediaTempFile(filePath, logFailures))
-                {
-                    _pendingMediaTempFiles.Remove(filePath);
-                }
-            }
-        }
-
-        private void DeleteMediaTempFile(string filePath)
-        {
-            if (!TryDeleteMediaTempFile(filePath, true) && !string.IsNullOrEmpty(filePath))
-            {
-                _pendingMediaTempFiles.Add(filePath);
-            }
-        }
-
-        private bool TryDeleteMediaTempFile(string filePath, bool logFailure)
-        {
-            if (string.IsNullOrEmpty(filePath))
-            {
-                return true;
-            }
-
-            try
-            {
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                if (logFailure)
-                {
-                    _logService.LogError(ex, $"Failed to remove media preview temp file '{filePath}'.");
-                }
-                return false;
             }
         }
 
@@ -902,120 +621,6 @@ namespace AssetsManager.Services.Explorer
                 {
                     await ShowUnsupportedPreviewAsync(".svg", previewRequest);
                 }
-            }
-        }
-
-        private async Task ShowAudioVideoPreviewAsync(byte[] data, string extension, string displayName, PreviewRequest previewRequest)
-        {
-            if (_webViewContainer == null)
-            {
-                await ShowUnsupportedPreviewAsync(extension, previewRequest);
-                return;
-            }
-
-            string tempFilePath = null;
-            try
-            {
-                ThrowIfPreviewIsObsolete(previewRequest);
-
-                var tempFileName = $"preview_{_mediaTempOwnerId}_{previewRequest.Generation}{extension}";
-                tempFilePath = Path.Combine(_directoriesCreator.TempPreviewPath, tempFileName);
-                await File.WriteAllBytesAsync(tempFilePath, data);
-                ThrowIfPreviewIsObsolete(previewRequest);
-
-                var mimeType = extension switch
-                {
-                    ".ogg" => "audio/ogg",
-                    ".webm" => "video/webm",
-                    _ => "application/octet-stream"
-                };
-
-                string tag = mimeType.StartsWith("video/") ? "video" : "audio";
-                string extraAttributes = tag == "video" ? "muted" : "";
-                var fileUrl = $"https://preview.assets/{tempFileName}";
-
-                string htmlContent;
-
-                if (tag == "audio")
-                {
-                    var assembly = Assembly.GetExecutingAssembly();
-                    var resourceName = "AssetsManager.Resources.AudioPlayer.html";
-                    using (var stream = assembly.GetManifestResourceStream(resourceName))
-                    using (var reader = new StreamReader(stream))
-                    {
-                        htmlContent = await reader.ReadToEndAsync();
-                    }
-                    ThrowIfPreviewIsObsolete(previewRequest);
-
-                    htmlContent = htmlContent.Replace("{{DISPLAY_NAME}}", displayName)
-                                             .Replace("{{FILE_EXTENSION}}", extension.ToUpper().TrimStart('.'))
-                                             .Replace("{{FILE_URL}}", fileUrl);
-                }
-                else
-                {
-                    // MODERN VIDEO PLAYER
-                    htmlContent = $@"
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset='UTF-8'>
-                        <style>
-                            html, body {{
-                                background-color: transparent !important;
-                                margin: 0; padding: 0; height: 100vh;
-                                display: flex; justify-content: center; align-items: center; overflow: hidden;
-                            }}
-                            video {{
-                                max-width: 90%; max-height: 90%;
-                                border-radius: 12px; 
-                                box-shadow: 0 4px 12px rgba(0,0,0,0.20); /* Adjusted for subtlety */
-                                background-color: #000;
-                                opacity: 0;
-                                transition: opacity 0.3s ease-out;
-                            }}
-                            video.loaded {{
-                                opacity: 1;
-                            }}
-                        </style>
-                    </head>
-                    <body>
-                        <video id='mediaElement' controls preload='auto' {extraAttributes}>
-                            <source src='{fileUrl}' type='{mimeType}'>
-                        </video>
-                        <script>
-                            const mediaElement = document.getElementById('mediaElement');
-                            window.playMedia = () => {{
-                                mediaElement.play().catch(e => console.log('Play error:', e));
-                            }};
-                            mediaElement.addEventListener('loadeddata', () => mediaElement.classList.add('loaded'));
-                            setTimeout(() => mediaElement.classList.add('loaded'), 1000); // Fallback
-                        </script>
-                    </body>
-                    </html>";
-                }
-
-                await SetPreviewerAsync(Previewer.WebView, htmlContent, true, previewRequest);
-                ThrowIfPreviewIsObsolete(previewRequest);
-                if (_activeContentPreviewer == Previewer.WebView)
-                {
-                    _activeMediaTempFilePath = tempFilePath;
-                    tempFilePath = null;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Failed to create and show preview for {extension} file.");
-                if (IsCurrentPreview(previewRequest))
-                {
-                    await ShowUnsupportedPreviewAsync(extension, previewRequest);
-                }
-            }
-            finally
-            {
-                DeleteMediaTempFile(tempFilePath);
             }
         }
 
@@ -1143,12 +748,11 @@ namespace AssetsManager.Services.Explorer
             CancelCurrentPreview();
             try
             {
-                DisposePersistentWebView();
+                _mediaWebViewPreviewService.ReleaseResources();
             }
             finally
             {
                 _imagePreview = null;
-                _webViewContainer = null;
                 _textEditorPreview = null;
                 _viewModel = null;
             }
