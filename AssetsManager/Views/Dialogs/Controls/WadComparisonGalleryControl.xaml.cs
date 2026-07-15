@@ -29,5 +29,17 @@ namespace AssetsManager.Views.Dialogs.Controls
                 ItemVisibilityChanged?.Invoke(item, false);
             }
         }
+
+        public void LoadRealizedItems()
+        {
+            foreach (var entry in GalleryListBox.Items)
+            {
+                if (entry is SerializableChunkDiff item
+                    && GalleryListBox.ItemContainerGenerator.ContainerFromItem(item) is ListBoxItem { IsLoaded: true })
+                {
+                    ItemVisibilityChanged?.Invoke(item, true);
+                }
+            }
+        }
     }
 }
