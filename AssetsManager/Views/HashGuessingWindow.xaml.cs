@@ -4,6 +4,7 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
@@ -21,6 +22,7 @@ namespace AssetsManager.Views
         private readonly LogService _logService;
         private readonly HashGuessLabModel _viewModel = new();
         private CancellationTokenSource _cancellationTokenSource;
+        private bool _isUpdatingResultsColumns;
 
         public HashGuessingWindow(
             HashGuessingService hashGuessingService,
@@ -66,6 +68,77 @@ namespace AssetsManager.Views
                 _logService.LogError(ex, "Hash Lab could not refresh the unknown hash count.");
                 TxtUnknownCount.Text = "Unknown";
             }
+        }
+
+        private void ResultsListView_Loaded(object sender, RoutedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(UpdateSourceWadColumnWidth, DispatcherPriority.Loaded);
+        }
+
+        private void ResultsListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateSourceWadColumnWidth();
+        }
+
+        private void ResultsColumnHeader_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!_isUpdatingResultsColumns)
+            {
+                UpdateSourceWadColumnWidth();
+            }
+        }
+
+        private void UpdateSourceWadColumnWidth()
+        {
+            if (_isUpdatingResultsColumns ||
+                ResultsListView?.View is not GridView gridView ||
+                gridView.Columns.Count != 5)
+            {
+                return;
+            }
+
+            var scrollViewer = FindScrollViewer(ResultsListView);
+            if (scrollViewer == null || scrollViewer.ViewportWidth <= 0)
+            {
+                return;
+            }
+
+            double precedingWidth = gridView.Columns.Take(4).Sum(column => column.ActualWidth);
+            double sourceWadWidth = Math.Max(100, scrollViewer.ViewportWidth - precedingWidth);
+
+            if (Math.Abs(gridView.Columns[4].Width - sourceWadWidth) < 0.5)
+            {
+                return;
+            }
+
+            _isUpdatingResultsColumns = true;
+            try
+            {
+                gridView.Columns[4].Width = sourceWadWidth;
+            }
+            finally
+            {
+                _isUpdatingResultsColumns = false;
+            }
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject element)
+        {
+            if (element is ScrollViewer scrollViewer)
+            {
+                return scrollViewer;
+            }
+
+            for (int index = 0; index < VisualTreeHelper.GetChildrenCount(element); index++)
+            {
+                var result = FindScrollViewer(VisualTreeHelper.GetChild(element, index));
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
 
         private void DomainSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -240,75 +313,6 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 UpdateUnknownCountAsync();
             }
-        }
-
-        private void ListView_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (sender is ListView listView && listView.View is GridView gridView)
-            {
-                UpdateColumnWidths(listView, gridView);
-            }
-        }
-
-        private void UpdateColumnWidths(ListView listView, GridView gridView)
-        {
-            var scrollViewer = GetScrollViewer(listView);
-            double availableWidth = 0;
-
-            if (scrollViewer != null)
-            {
-                // ViewportWidth is the exact visible width of the content area (scrollbars subtracted automatically)
-                availableWidth = scrollViewer.ViewportWidth;
-
-                // Subscribe to ScrollChanged to recalculate when the viewport size changes
-                if (scrollViewer.Tag == null)
-                {
-                    scrollViewer.ScrollChanged += (s, args) =>
-                    {
-                        if (args.ViewportWidthChange != 0 || args.ViewportHeightChange != 0 || args.ExtentHeightChange != 0)
-                        {
-                            UpdateColumnWidths(listView, gridView);
-                        }
-                    };
-                    scrollViewer.Tag = true;
-                }
-            }
-
-            if (availableWidth <= 0)
-            {
-                double totalWidth = listView.ActualWidth;
-                if (totalWidth <= 0) return;
-                availableWidth = totalWidth - 22; // Fallback
-            }
-
-            // Subtract 2 pixels to prevent minor floating point rounding from triggering a horizontal scrollbar
-            availableWidth = Math.Max(300, availableWidth - 2);
-
-            double fixedWidths = 140 + 80 + 120; // Hash (140), Domain (80), Strategy (120)
-            double remainingWidth = availableWidth - fixedWidths;
-            if (remainingWidth < 150) remainingWidth = 150;
-
-            gridView.Columns[0].Width = 140;
-            gridView.Columns[1].Width = 80;
-            
-            double resolvedWidth = Math.Floor(remainingWidth * 0.45);
-            gridView.Columns[2].Width = resolvedWidth;
-            gridView.Columns[3].Width = 120;
-            
-            // Last column takes EXACTLY the remaining width to leave 0px empty gap
-            gridView.Columns[4].Width = Math.Max(100, availableWidth - (140 + 80 + resolvedWidth + 120));
-        }
-
-        private static ScrollViewer GetScrollViewer(DependencyObject depObj)
-        {
-            if (depObj is ScrollViewer) return (ScrollViewer)depObj;
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
-            {
-                var child = VisualTreeHelper.GetChild(depObj, i);
-                var result = GetScrollViewer(child);
-                if (result != null) return result;
-            }
-            return null;
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
