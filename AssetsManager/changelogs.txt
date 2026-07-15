@@ -4,6 +4,7 @@ HOTFIX UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab now shows each GREP match as soon as it is discovered.
   - Added independent BIN and RST hash guessing with local inventory, content scanning, structural strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.
   - BIN differences now show only semantic object and property changes with resolved paths.

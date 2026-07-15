@@ -47,7 +47,8 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<HashGuessMatch> matchProgress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
 
@@ -61,7 +62,7 @@ namespace AssetsManager.Services.Hashes
 
             var runResult = await Task.Run(() =>
             {
-                var engine = new HashGuessEngine(domain, unknownHashes);
+                var engine = new HashGuessEngine(domain, unknownHashes, matchProgress?.Report);
                 int processedChunks = 0;
 
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
