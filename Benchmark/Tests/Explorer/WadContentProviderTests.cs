@@ -30,6 +30,16 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
+        public void ResolveWadPathRejectsDifferentWadForSingleWadSource()
+        {
+            string wadPath = Path.Combine(Path.GetTempPath(), "Katarina.wad.client");
+
+            string resolvedPath = PathUtils.ResolveWadPath(wadPath, "Ahri.wad.client");
+
+            Assert.Null(resolvedPath);
+        }
+
+        [Fact]
         public async Task BatchLookupResolvesRequestedPathsAcrossWads()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));

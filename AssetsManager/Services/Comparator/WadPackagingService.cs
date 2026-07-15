@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Comparator
                     else
                     {
                         string potentialPath = Path.Combine(sourceWadDirectory, binStrategy.TargetWadName).Replace('\\', '/');
-                        if (File.Exists(Path.Combine(newPbePath, potentialPath)) || File.Exists(Path.Combine(oldPbePath, potentialPath)))
+                        if (File.Exists(PathUtils.ResolveWadPath(newPbePath, potentialPath)) || File.Exists(PathUtils.ResolveWadPath(oldPbePath, potentialPath)))
                         {
                             targetWadRelativePath = potentialPath;
                         }
@@ -144,24 +144,28 @@ namespace AssetsManager.Services.Comparator
                 var wadFileRelativePath = wadGroup.Key;
                 _logService.LogDebug($"Processing {wadFileRelativePath} for chunk packaging...");
 
-                string sourceOldWadPath = Path.Combine(oldPbePath, wadFileRelativePath);
-                if (File.Exists(sourceOldWadPath))
+                string sourceOldWadPath = PathUtils.ResolveWadPath(oldPbePath, wadFileRelativePath);
+                var oldChunksToSave = wadGroup
+                    .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed)
+                    .ToList();
+                if (oldChunksToSave.Any())
                 {
-                    var oldChunksToSave = wadGroup
-                        .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.Removed)
-                        .ToList();
-                    if (oldChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave, wadFileRelativePath, true, cancellationToken);
+                    if (!File.Exists(sourceOldWadPath))
+                        throw new FileNotFoundException($"Unable to package OLD chunks because the source WAD could not be resolved: '{wadFileRelativePath}'.", sourceOldWadPath);
+
+                    await SaveChunksFromWadAsync(sourceOldWadPath, targetOldWadsPath, oldChunksToSave, wadFileRelativePath, true, cancellationToken);
                 }
 
-                string sourceNewWadPath = Path.Combine(newPbePath, wadFileRelativePath);
-                if (File.Exists(sourceNewWadPath))
+                string sourceNewWadPath = PathUtils.ResolveWadPath(newPbePath, wadFileRelativePath);
+                var newChunksToSave = wadGroup
+                    .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New)
+                    .ToList();
+                if (newChunksToSave.Any())
                 {
-                    var newChunksToSave = wadGroup
-                        .Where(d => d.Type == ChunkDiffType.Modified || d.Type == ChunkDiffType.Renamed || d.Type == ChunkDiffType.New)
-                        .ToList();
-                    if (newChunksToSave.Any())
-                        await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave, wadFileRelativePath, false, cancellationToken);
+                    if (!File.Exists(sourceNewWadPath))
+                        throw new FileNotFoundException($"Unable to package NEW chunks because the source WAD could not be resolved: '{wadFileRelativePath}'.", sourceNewWadPath);
+
+                    await SaveChunksFromWadAsync(sourceNewWadPath, targetNewWadsPath, newChunksToSave, wadFileRelativePath, false, cancellationToken);
                 }
             }
 
@@ -215,10 +219,10 @@ namespace AssetsManager.Services.Comparator
             foreach (var wadGroup in requests.GroupBy(request => request.WadRelativePath, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string wadVirtualPath = Path.Combine(newPbePath, wadGroup.Key);
+                string wadVirtualPath = PathUtils.ResolveWadPath(newPbePath, wadGroup.Key);
                 if (!File.Exists(wadVirtualPath))
                 {
-                    wadVirtualPath = Path.Combine(oldPbePath, wadGroup.Key);
+                    wadVirtualPath = PathUtils.ResolveWadPath(oldPbePath, wadGroup.Key);
                 }
 
                 if (!File.Exists(wadVirtualPath)) continue;
