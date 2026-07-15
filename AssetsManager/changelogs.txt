@@ -53,6 +53,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed Versions list scrolling when the pointer is over a version entry.
   - Fixed and unified file selection across Explorer trees, grids, and comparison results while preventing cancelled preview errors.
   - Fixed cancelled media previews removing files used by the active preview.
   - Fixed transparent Viewer backgrounds not accepting camera controls outside the model.
