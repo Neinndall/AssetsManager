@@ -128,7 +128,7 @@ namespace AssetsManager.Services.Downloads
                     }
                     else
                     {
-                        await ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null, true);
+                        await ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null);
                     }
                 }
 
@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Downloads
                             string fileName = Path.GetFileName(path);
                             SavingProgressChanged?.Invoke(processedCount, totalFiles, fileName);
                             onFileSavedCallback?.Invoke(path);
-                        }, true);
+                        });
                 }
             }
             catch (OperationCanceledException)
@@ -331,7 +331,7 @@ namespace AssetsManager.Services.Downloads
 
         #region Smart Export Logic & Handlers
 
-        private async Task ExportSmartAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
+        private async Task ExportSmartAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -350,7 +350,7 @@ namespace AssetsManager.Services.Downloads
                 foreach (var child in node.Children)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await ExportSmartAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback, forceSmart);
+                    await ExportSmartAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
                 }
                 return;
             }
@@ -398,7 +398,7 @@ namespace AssetsManager.Services.Downloads
 
                 case ".tex":
                 case ".dds":
-                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
+                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".bin":
@@ -406,15 +406,15 @@ namespace AssetsManager.Services.Downloads
                 case ".css":
                 case ".troybin":
                 case ".preload":
-                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback, forceSmart);
+                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".luabin64":
-                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
+                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".js":
-                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback, forceSmart);
+                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".wem":
@@ -432,13 +432,9 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
+        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             var format = _appSettings.ImageExportFormat;
-            if (forceSmart && format == ImageExportFormat.Original)
-            {
-                format = ImageExportFormat.Png;
-            }
 
             if (format == ImageExportFormat.Original)
             {
@@ -459,9 +455,9 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
+        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            if (_appSettings.DataExportFormat == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -478,9 +474,9 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
+        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            if (_appSettings.DataExportFormat == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -496,9 +492,9 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, bool forceSmart)
+        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (!forceSmart && _appSettings.DataExportFormat == DataExportFormat.Original)
+            if (_appSettings.DataExportFormat == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
