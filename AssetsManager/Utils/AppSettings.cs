@@ -39,7 +39,7 @@ namespace AssetsManager.Utils
         public string LastPbeCheckTime { get; set; }
         public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
-        public string CustomFloorTexturePath { get; set; } = string.Empty;
+        public string CustomGroundLogoPath { get; set; } = string.Empty;
 
         private static IList<T> WrapList<T>(IList<T> value) =>
             value is SafeList<T> sl ? sl : new SafeList<T>(value ?? new List<T>());
@@ -262,7 +262,7 @@ namespace AssetsManager.Utils
                 LolPbeDirectory = null,
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
-                CustomFloorTexturePath = null,
+                CustomGroundLogoPath = null,
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
@@ -311,7 +311,7 @@ namespace AssetsManager.Utils
             LolPbeDirectory = defaultSettings.LolPbeDirectory;
             LolLiveDirectory = defaultSettings.LolLiveDirectory;
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
-            CustomFloorTexturePath = defaultSettings.CustomFloorTexturePath;
+            CustomGroundLogoPath = defaultSettings.CustomGroundLogoPath;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;

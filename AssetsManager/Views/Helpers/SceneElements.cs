@@ -13,9 +13,11 @@ namespace AssetsManager.Views.Helpers
     public static class SceneElements
     {
         public const double GroundLevel = 2000;
+        private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _textureCache = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _groundLogoTextureCache = new();
 
         public static BitmapSource LoadSceneTexture(string path, LogService logService)
         {
@@ -44,43 +46,61 @@ namespace AssetsManager.Views.Helpers
             });
         }
 
-        public static ModelVisual3D CreateSidePlanes(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc)
+        private static BitmapSource LoadGroundLogoTexture(string path, LogService logService)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+
+            return _groundLogoTextureCache.GetOrAdd(path, p =>
+            {
+                try
+                {
+                    return TextureUtils.LoadTextureFromFile(p);
+                }
+                catch (Exception ex)
+                {
+                    logService?.LogError(ex, $"Failed to load ground logo: {p}");
+                    return null;
+                }
+            });
+        }
+
+        public static ModelVisual3D CreateSidePlanes(LogService logService)
         {
             Model3DGroup finalGroup = new Model3DGroup();
             double size = 2500; // Sides are 5000x5000
 
             // 1. Load individual textures for each side and create their materials
             string frontTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_front.dds";
-            BitmapSource frontTexture = loadTextureFunc(frontTexturePath);
+            BitmapSource frontTexture = LoadSceneTexture(frontTexturePath, logService);
             Material3D frontMaterial = (frontTexture != null) ? new DiffuseMaterial(new ImageBrush(frontTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (frontTexture == null) logErrorFunc($"Failed to load sky_front texture from {frontTexturePath}. Using solid color fallback.");
+            if (frontTexture == null) logService.LogError($"Failed to load sky_front texture from {frontTexturePath}. Using solid color fallback.");
 
             string rightTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_right.dds";
-            BitmapSource rightTexture = loadTextureFunc(rightTexturePath);
+            BitmapSource rightTexture = LoadSceneTexture(rightTexturePath, logService);
             Material3D rightMaterial = (rightTexture != null) ? new DiffuseMaterial(new ImageBrush(rightTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (rightTexture == null) logErrorFunc($"Failed to load sky_right texture from {rightTexturePath}. Using solid color fallback.");
+            if (rightTexture == null) logService.LogError($"Failed to load sky_right texture from {rightTexturePath}. Using solid color fallback.");
 
             string backTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_back.dds";
-            BitmapSource backTexture = loadTextureFunc(backTexturePath);
+            BitmapSource backTexture = LoadSceneTexture(backTexturePath, logService);
             Material3D backMaterial = (backTexture != null) ? new DiffuseMaterial(new ImageBrush(backTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (backTexture == null) logErrorFunc($"Failed to load sky_back texture from {backTexturePath}. Using solid color fallback.");
+            if (backTexture == null) logService.LogError($"Failed to load sky_back texture from {backTexturePath}. Using solid color fallback.");
 
             string leftTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_left.dds";
-            BitmapSource leftTexture = loadTextureFunc(leftTexturePath);
+            BitmapSource leftTexture = LoadSceneTexture(leftTexturePath, logService);
             Material3D leftMaterial = (leftTexture != null) ? new DiffuseMaterial(new ImageBrush(leftTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.Gray));
-            if (leftTexture == null) logErrorFunc($"Failed to load sky_left texture from {leftTexturePath}. Using solid color fallback.");
+            if (leftTexture == null) logService.LogError($"Failed to load sky_left texture from {leftTexturePath}. Using solid color fallback.");
 
             // Load sky_up texture
             string skyUpTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_up.dds";
-            BitmapSource skyUpTexture = loadTextureFunc(skyUpTexturePath);
+            BitmapSource skyUpTexture = LoadSceneTexture(skyUpTexturePath, logService);
             Material3D skyUpMaterial = (skyUpTexture != null) ? new DiffuseMaterial(new ImageBrush(skyUpTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.LightBlue)); // Fallback color
-            if (skyUpTexture == null) logErrorFunc($"Failed to load sky_up texture from {skyUpTexturePath}. Using solid color fallback.");
+            if (skyUpTexture == null) logService.LogError($"Failed to load sky_up texture from {skyUpTexturePath}. Using solid color fallback.");
 
             // Load sky_down texture
             string skyDownTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Sky/sky_down.dds";
-            BitmapSource skyDownTexture = loadTextureFunc(skyDownTexturePath);
+            BitmapSource skyDownTexture = LoadSceneTexture(skyDownTexturePath, logService);
             Material3D skyDownMaterial = (skyDownTexture != null) ? new DiffuseMaterial(new ImageBrush(skyDownTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.DarkGray)); // Fallback color
-            if (skyDownTexture == null) logErrorFunc($"Failed to load sky_down texture from {skyDownTexturePath}. Using solid color fallback.");
+            if (skyDownTexture == null) logService.LogError($"Failed to load sky_down texture from {skyDownTexturePath}. Using solid color fallback.");
 
             // 2. Create a single, canonical plane geometry. By default, its front face points towards +Z.
             var planeMesh = new MeshGeometry3D
@@ -152,7 +172,7 @@ namespace AssetsManager.Views.Helpers
             return new ModelVisual3D { Content = finalGroup };
         }
 
-        public static ModelVisual3D CreateGroundPlane(Func<string, BitmapSource> loadTextureFunc, Action<string> logErrorFunc, string customTexturePath = null)
+        public static ModelVisual3D CreateGroundPlane(LogService logService, string groundLogoPath = null)
         {
             MeshGeometry3D groundMesh = new MeshGeometry3D();
 
@@ -178,15 +198,8 @@ namespace AssetsManager.Views.Helpers
                 new System.Windows.Point(0, 0)
             };
 
-            // Load the ground texture
-            string finalGroundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds"; // Default to resource path
-
-            if (!string.IsNullOrEmpty(customTexturePath) && File.Exists(customTexturePath))
-            {
-                finalGroundTexturePath = customTexturePath;
-            }
-
-            BitmapSource groundTexture = loadTextureFunc(finalGroundTexturePath);
+            const string groundTexturePath = "pack://application:,,,/AssetsManager;component/Resources/Scene/Floor/ground_rift.dds";
+            BitmapSource groundTexture = LoadSceneTexture(groundTexturePath, logService);
 
             Material3D groundMaterial;
             if (groundTexture != null)
@@ -197,12 +210,43 @@ namespace AssetsManager.Views.Helpers
             {
                 // Fallback to a solid color if texture loading fails
                 groundMaterial = new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Color.FromRgb(100, 120, 80))); // Earthy color
-                logErrorFunc($"Failed to load ground texture from {finalGroundTexturePath}. Using solid color fallback.");
+                logService.LogError($"Failed to load ground texture from {groundTexturePath}. Using solid color fallback.");
             }
 
-            // Create the GeometryModel3D and ModelVisual3D
             GeometryModel3D groundModel = new GeometryModel3D(groundMesh, groundMaterial);
-            return new ModelVisual3D { Content = groundModel };
+            var scene = new Model3DGroup();
+            scene.Children.Add(groundModel);
+
+            BitmapSource groundLogo = LoadGroundLogoTexture(groundLogoPath, logService);
+            if (groundLogo != null)
+            {
+                const double logoMaxSize = 850;
+                double aspectRatio = (double)groundLogo.PixelWidth / groundLogo.PixelHeight;
+                double logoWidth = aspectRatio >= 1 ? logoMaxSize : logoMaxSize * aspectRatio;
+                double logoHeight = aspectRatio >= 1 ? logoMaxSize / aspectRatio : logoMaxSize;
+
+                var logoMesh = new MeshGeometry3D
+                {
+                    Positions = new Point3DCollection
+                    {
+                        new Point3D(-logoWidth / 2, GroundLevel + GroundLogoElevation, -logoHeight / 2),
+                        new Point3D(logoWidth / 2, GroundLevel + GroundLogoElevation, -logoHeight / 2),
+                        new Point3D(logoWidth / 2, GroundLevel + GroundLogoElevation, logoHeight / 2),
+                        new Point3D(-logoWidth / 2, GroundLevel + GroundLogoElevation, logoHeight / 2)
+                    },
+                    TriangleIndices = new Int32Collection { 0, 3, 2, 0, 2, 1 },
+                    TextureCoordinates = new PointCollection
+                    {
+                        new Point(0, 0), new Point(1, 0), new Point(1, 1), new Point(0, 1)
+                    }
+                };
+
+                var logoBrush = new ImageBrush(groundLogo) { Stretch = Stretch.Uniform };
+                RenderOptions.SetBitmapScalingMode(logoBrush, BitmapScalingMode.HighQuality);
+                scene.Children.Add(new GeometryModel3D(logoMesh, new DiffuseMaterial(logoBrush)));
+            }
+
+            return new ModelVisual3D { Content = scene };
         }
     }
 }

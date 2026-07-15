@@ -142,13 +142,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_groundVisual == null)
             {
-                _groundVisual = SceneElements.CreateGroundPlane(p => SceneElements.LoadSceneTexture(p, LogService), LogService.LogError, AppSettings?.CustomFloorTexturePath);
+                _groundVisual = SceneElements.CreateGroundPlane(LogService, AppSettings?.CustomGroundLogoPath);
                 Viewport.Children.Add(_groundVisual);
             }
 
             if (_skyVisual == null)
             {
-                _skyVisual = SceneElements.CreateSidePlanes(p => SceneElements.LoadSceneTexture(p, LogService), LogService.LogError);
+                _skyVisual = SceneElements.CreateSidePlanes(LogService);
                 Viewport.Children.Add(_skyVisual);
             }
 

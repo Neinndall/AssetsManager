@@ -807,3 +807,4 @@ Bug Fixes
   - Explorer / HTML Support & Clean Type Definitions
     * Restored full text previewing and custom League syntax highlighting for .html files.
     * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
+  - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
