@@ -44,8 +44,6 @@
                  x:Name="GalleryListBox"
                  ItemsSource="{Binding DiscoveryItems}" 
                  Style="{StaticResource ModernFileGridListBox}"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 ScrollViewer.ScrollChanged="GalleryListBox_ScrollChanged"
                  SelectionMode="Single">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">

@@ -190,22 +190,14 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
-        public async Task BackupChunkReadingLoadsChunkedMetadataSidecarOnDemand()
+        public async Task BackupChunkReadingLoadsChunkedPayloadWithoutMetadata()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             const string sourceWad = "champions/test.wad.client";
             const ulong hash = 0xABCDEFUL;
-            byte[] first = Encoding.UTF8.GetBytes(new string('a', 4096));
-            byte[] second = Encoding.UTF8.GetBytes("raw-subchunk");
+            byte[] expected = Encoding.UTF8.GetBytes(new string('a', 4096));
             using var compressor = new Compressor();
-            byte[] compressedFirst = compressor.Wrap(first).ToArray();
-            byte[] stored = compressedFirst.Concat(second).ToArray();
-            byte[] expected = first.Concat(second).ToArray();
-            var subchunks = new[]
-            {
-                new WadSubchunk(compressedFirst.Length, first.Length),
-                new WadSubchunk(second.Length, second.Length)
-            };
+            byte[] stored = compressor.Wrap(expected).ToArray();
 
             try
             {
@@ -214,8 +206,6 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
                 Directory.CreateDirectory(chunkDirectory);
                 string chunkPath = Path.Combine(chunkDirectory, $"{hash:X16}.chunk");
                 await File.WriteAllBytesAsync(chunkPath, stored);
-                await WadChunkMetadataStore.WriteAsync(
-                    chunkPath, stored.Length, expected.Length, subchunks, CancellationToken.None);
 
                 var provider = CreateProvider();
                 byte[] actual = await provider.GetBackupChunkBytesAsync(

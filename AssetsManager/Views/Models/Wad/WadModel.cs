@@ -127,12 +127,6 @@ namespace AssetsManager.Views.Models.Wad
 
         public WadChunkCompression? OldCompressionType { get; set; }
         public WadChunkCompression? NewCompressionType { get; set; }
-        [JsonIgnore]
-        public string OldSourceRoot { get; set; }
-
-        [JsonIgnore]
-        public string NewSourceRoot { get; set; }
-
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<AssociatedDependency> Dependencies { get; set; }
 

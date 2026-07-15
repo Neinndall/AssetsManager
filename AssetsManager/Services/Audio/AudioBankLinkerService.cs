@@ -536,10 +536,10 @@ namespace AssetsManager.Services.Audio
 
                 byte[] oldBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
                     backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType,
-                    isOld: true, sourceRoot: diff.OldSourceRoot);
+                    isOld: true);
                 byte[] newBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
                     backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType,
-                    isOld: false, sourceRoot: diff.NewSourceRoot);
+                    isOld: false);
 
                 switch (dep.Type)
                 {
