@@ -634,12 +634,18 @@
                 </Border>
                 
                 <!-- Results List -->
-                <ListView Grid.Row="4" ItemsSource="{Binding Matches}" Style="{StaticResource ModernListView}" SizeChanged="ListView_SizeChanged">
+                <ListView x:Name="ResultsListView"
+                          Grid.Row="4"
+                          ItemsSource="{Binding Matches}"
+                          Style="{StaticResource ModernListView}"
+                          Loaded="ResultsListView_Loaded"
+                          SizeChanged="ResultsListView_SizeChanged">
                     <ListView.View>
                         <GridView AllowsColumnReorder="False">
                             <GridViewColumn Header="Hash" Width="140">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
@@ -652,6 +658,7 @@
                             <GridViewColumn Header="Domain" Width="80">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
@@ -664,6 +671,7 @@
                             <GridViewColumn Header="Resolved value" Width="340">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
@@ -676,6 +684,7 @@
                             <GridViewColumn Header="Strategy" Width="135">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
@@ -690,6 +699,7 @@
                             <GridViewColumn Header="Source WAD" Width="240">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Type GridViewColumnHeader}}">
+                                        <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
