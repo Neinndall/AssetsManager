@@ -288,9 +288,7 @@ namespace AssetsManager.Services.Explorer
                 // MODO LIVE
                 if (!string.IsNullOrEmpty(lolPath))
                 {
-                    string wadPath = SupportedFileTypes.IsWadFile(lolPath)
-                        ? lolPath
-                        : Path.Combine(lolPath, diff.SourceWadFile);
+                    string wadPath = PathUtils.ResolveWadPath(lolPath, diff.SourceWadFile);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
                     
                     if (hash != 0)

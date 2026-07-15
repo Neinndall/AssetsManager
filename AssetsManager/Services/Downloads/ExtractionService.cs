@@ -100,7 +100,7 @@ namespace AssetsManager.Services.Downloads
                     string progressMessage = $"{diff.FileName}";
                     ExtractionProgressChanged?.Invoke(extractedCount, totalFiles, progressMessage);
 
-                    string sourceWadFullPath = Path.Combine(newLolPath, diff.SourceWadFile);
+                    string sourceWadFullPath = PathUtils.ResolveWadPath(newLolPath, diff.SourceWadFile);
                     var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
                     {
                         SourceChunkPathHash = diff.NewPathHash,

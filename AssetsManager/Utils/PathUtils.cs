@@ -320,6 +320,14 @@ namespace AssetsManager.Utils
             }
         }
 
+        public static string ResolveWadPath(string sourcePath, string relativeWadPath)
+        {
+            string normalizedSourcePath = sourcePath?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return SupportedFileTypes.IsWadFile(normalizedSourcePath)
+                ? normalizedSourcePath
+                : Path.Combine(normalizedSourcePath ?? string.Empty, relativeWadPath ?? string.Empty);
+        }
+
         /// <summary>
         /// Converts a physical or mixed path into a clean virtual path for WAD lookups.
         /// </summary>
