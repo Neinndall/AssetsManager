@@ -396,12 +396,6 @@ namespace AssetsManager.Services.Explorer
                         _imagePreview.Source = imageSource;
                         _viewModel.ShowImagePreview();
                         _activeImagePreviewer = Previewer.Image;
-
-                        if (_viewModel.IsContentStatusVisible)
-                        {
-                            _viewModel.ClearContentPreview();
-                            _activeContentPreviewer = Previewer.None;
-                        }
                     }
                     break;
 
