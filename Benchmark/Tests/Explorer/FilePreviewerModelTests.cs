@@ -39,6 +39,19 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
         }
 
         [Fact]
+        public void ImagePreview_PreservesAnUnsupportedContentPanel()
+        {
+            var model = new FilePreviewerModel();
+            model.ShowContentUnsupported(".skn");
+
+            model.ShowImagePreview();
+
+            Assert.Equal(PreviewState.Unsupported, model.ContentPreviewState);
+            Assert.Equal(PreviewState.Image, model.ImagePreviewState);
+            Assert.True(model.IsDualView);
+        }
+
+        [Fact]
         public void ContentPreview_RejectsUnsupportedDisplayKinds()
         {
             var model = new FilePreviewerModel();
