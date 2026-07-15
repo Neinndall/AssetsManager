@@ -211,12 +211,36 @@ namespace AssetsManager.Services.Hashes.Guessers
                 "LCU parties PNG word-pair substitution");
         }
 
+        private static bool IsFrontendJsonPath(string path) =>
+            path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase) &&
+            path.Contains("-fe-lol-", StringComparison.OrdinalIgnoreCase) &&
+            path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+
+        private static IReadOnlyList<string> BuildFrontendJsonWordlist(IEnumerable<string> paths) =>
+            HashGuessEngine.BuildBasenameWordlist(paths.Where(IsFrontendJsonPath)).Take(2_000).ToList();
+
         internal int RunAdvancedAttacks(HashGuessEngine engine, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             var paths = KnownPaths.ToList();
-            var wordPaths = WordlistPaths;
             int checkedCandidates = 0;
 
+            if (engine.RemainingUnknownCount > 0)
+            {
+                var frontendJsonPaths = paths.Where(IsFrontendJsonPath).ToList();
+                var frontendJsonWords = BuildFrontendJsonWordlist(frontendJsonPaths);
+                if (frontendJsonPaths.Count > 0 && frontendJsonWords.Count > 0)
+                {
+                    progress?.Report(new HashGuessProgress
+                    {
+                        ProcessedChunks = checkedCandidates,
+                        FoundMatches = engine.Matches.Count,
+                        CurrentWad = "LCU Advanced: frontend JSON"
+                    });
+                    checkedCandidates += RunFocusedWordlistSubstitution(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
+                    if (engine.RemainingUnknownCount > 0)
+                        checkedCandidates += RunWordAdditionAttack(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
+                }
+            }
             if (engine.RemainingUnknownCount > 0)
             {
                 checkedCandidates += AddBasenameWord(engine, cancellationToken);
