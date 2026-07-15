@@ -13,11 +13,13 @@ namespace AssetsManager.Services.Hashes
 
         private readonly HashSet<ulong> _unknownHashes;
         private readonly Dictionary<ulong, HashGuessMatch> _matches = new();
+        private readonly Action<HashGuessMatch> _matchFound;
 
-        public HashGuessEngine(HashGuessDomain domain, HashSet<ulong> unknownHashes)
+        public HashGuessEngine(HashGuessDomain domain, HashSet<ulong> unknownHashes, Action<HashGuessMatch> matchFound = null)
         {
             Domain = domain;
             _unknownHashes = unknownHashes ?? throw new ArgumentNullException(nameof(unknownHashes));
+            _matchFound = matchFound;
         }
 
         public HashGuessDomain Domain { get; }
@@ -33,7 +35,7 @@ namespace AssetsManager.Services.Hashes
             ulong hash = XxHash64Ext.Hash(path);
             if (!_unknownHashes.Remove(hash)) return false;
 
-            _matches[hash] = new HashGuessMatch
+            var match = new HashGuessMatch
             {
                 Hash = hash,
                 Path = path,
@@ -42,6 +44,8 @@ namespace AssetsManager.Services.Hashes
                 SourceWadPath = source,
                 SourceChunkHash = sourceChunkHash
             };
+            _matches[hash] = match;
+            _matchFound?.Invoke(match);
             return true;
         }
 
