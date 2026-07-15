@@ -19,6 +19,17 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
     public sealed class WadContentProviderTests
     {
         [Fact]
+        public void ResolveWadPathKeepsSingleWadWhenSourceEndsWithSeparator()
+        {
+            string wadPath = Path.Combine(Path.GetTempPath(), "Katarina.wad.client");
+            string sourcePath = wadPath + Path.DirectorySeparatorChar;
+
+            string resolvedPath = PathUtils.ResolveWadPath(sourcePath, "Katarina.wad.client");
+
+            Assert.Equal(wadPath, resolvedPath);
+        }
+
+        [Fact]
         public async Task BatchLookupResolvesRequestedPathsAcrossWads()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
