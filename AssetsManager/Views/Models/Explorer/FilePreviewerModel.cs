@@ -6,6 +6,17 @@ using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Explorer
 {
+    public enum PreviewState
+    {
+        Empty,
+        Loading,
+        Image,
+        Text,
+        Media,
+        Unsupported,
+        Error
+    }
+
     public class FilePreviewerModel : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
@@ -155,27 +166,6 @@ namespace AssetsManager.Views.Models.Explorer
             set { _welcomeDescription = value; OnPropertyChanged(); }
         }
 
-        private string _unsupportedTitle = "Preview not available";
-        public string UnsupportedTitle
-        {
-            get => _unsupportedTitle;
-            set { _unsupportedTitle = value; OnPropertyChanged(); }
-        }
-
-        private string _unsupportedMessage = "The file format is not supported to preview it";
-        public string UnsupportedMessage
-        {
-            get => _unsupportedMessage;
-            set { _unsupportedMessage = value; OnPropertyChanged(); }
-        }
-
-        private string _imageUnsupportedMessage = "The file format is not supported to preview it";
-        public string ImageUnsupportedMessage
-        {
-            get => _imageUnsupportedMessage;
-            set { _imageUnsupportedMessage = value; OnPropertyChanged(); }
-        }
-
         private bool _isWelcomeVisible = true;
         public bool IsWelcomeVisible
         {
@@ -183,47 +173,71 @@ namespace AssetsManager.Views.Models.Explorer
             set { _isWelcomeVisible = value; OnPropertyChanged(); }
         }
 
-        private bool _isUnsupportedVisible;
-        public bool IsUnsupportedVisible
+        private PreviewState _contentPreviewState;
+        public PreviewState ContentPreviewState
         {
-            get => _isUnsupportedVisible;
-            set { _isUnsupportedVisible = value; OnPropertyChanged(); }
+            get => _contentPreviewState;
+            private set
+            {
+                if (_contentPreviewState == value) return;
+
+                _contentPreviewState = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsContentPreviewVisible));
+                OnPropertyChanged(nameof(IsContentStatusVisible));
+                OnPropertyChanged(nameof(IsDualView));
+            }
         }
 
-        private bool _isImageVisible;
-        public bool IsImageVisible
+        private PreviewState _imagePreviewState;
+        public PreviewState ImagePreviewState
         {
-            get => _isImageVisible;
-            set { _isImageVisible = value; OnPropertyChanged(); }
+            get => _imagePreviewState;
+            private set
+            {
+                if (_imagePreviewState == value) return;
+
+                _imagePreviewState = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsImagePreviewVisible));
+                OnPropertyChanged(nameof(IsImageStatusVisible));
+                OnPropertyChanged(nameof(IsDualView));
+            }
         }
 
-        private bool _isImageUnsupportedVisible;
-        public bool IsImageUnsupportedVisible
+        private string _contentPreviewTitle;
+        public string ContentPreviewTitle
         {
-            get => _isImageUnsupportedVisible;
-            set { _isImageUnsupportedVisible = value; OnPropertyChanged(); }
+            get => _contentPreviewTitle;
+            private set { _contentPreviewTitle = value; OnPropertyChanged(); }
         }
 
-        private bool _isContentVisible;
-        public bool IsContentVisible
+        private string _contentPreviewMessage;
+        public string ContentPreviewMessage
         {
-            get => _isContentVisible;
-            set { _isContentVisible = value; OnPropertyChanged(); }
+            get => _contentPreviewMessage;
+            private set { _contentPreviewMessage = value; OnPropertyChanged(); }
         }
 
-        private bool _isTextVisible;
-        public bool IsTextVisible
+        private string _imagePreviewTitle;
+        public string ImagePreviewTitle
         {
-            get => _isTextVisible;
-            set { _isTextVisible = value; OnPropertyChanged(); }
+            get => _imagePreviewTitle;
+            private set { _imagePreviewTitle = value; OnPropertyChanged(); }
         }
 
-        private bool _isWebVisible;
-        public bool IsWebVisible
+        private string _imagePreviewMessage;
+        public string ImagePreviewMessage
         {
-            get => _isWebVisible;
-            set { _isWebVisible = value; OnPropertyChanged(); }
+            get => _imagePreviewMessage;
+            private set { _imagePreviewMessage = value; OnPropertyChanged(); }
         }
+
+        public bool IsContentPreviewVisible => ContentPreviewState != PreviewState.Empty;
+        public bool IsImagePreviewVisible => ImagePreviewState != PreviewState.Empty;
+        public bool IsContentStatusVisible => IsStatus(ContentPreviewState);
+        public bool IsImageStatusVisible => IsStatus(ImagePreviewState);
+        public bool IsDualView => IsContentPreviewVisible && IsImagePreviewVisible;
 
         private bool _isFindVisible;
         public bool IsFindVisible
@@ -259,19 +273,15 @@ namespace AssetsManager.Views.Models.Explorer
             {
                 if (isImage)
                 {
-                    IsImageVisible = false;
-                    IsImageUnsupportedVisible = false;
+                    ClearImagePreview();
                 }
                 else
                 {
-                    IsContentVisible = false;
-                    IsTextVisible = false;
-                    IsWebVisible = false;
-                    IsUnsupportedVisible = false;
+                    ClearContentPreview();
                 }
             }
 
-            if (!IsImageVisible && !IsContentVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
+            if (!IsImagePreviewVisible && !IsContentPreviewVisible && PinnedFilesManager.PinnedFiles.Count <= 1)
             {
                 HasEverPreviewedAFile = false;
                 IsWelcomeVisible = true;
@@ -281,34 +291,125 @@ namespace AssetsManager.Views.Models.Explorer
         public void ResetAllVisibility()
         {
             IsWelcomeVisible = true;
-            IsUnsupportedVisible = false;
-            IsImageVisible = false;
-            IsImageUnsupportedVisible = false;
-            IsContentVisible = false;
-            IsTextVisible = false;
-            IsWebVisible = false;
+            ClearContentPreview();
+            ClearImagePreview();
             IsFindVisible = false;
             HasEverPreviewedAFile = false;
         }
 
-        public void SetUnsupportedStatus(string extension, bool isImageMode)
+        public void BeginContentLoading(bool showPlaceholderWhenEmpty)
         {
-            bool isNoExtension = string.IsNullOrWhiteSpace(extension) || extension == ".";
-
-            UnsupportedTitle = isNoExtension ? "Preview not available" : "Format not supported";
-
-            string message = isNoExtension
-                ? "This file format is not supported to preview it"
-                : $"The {extension} format is not supported to preview it";
-
-            if (isImageMode)
+            if (showPlaceholderWhenEmpty &&
+                (ContentPreviewState == PreviewState.Empty || IsContentStatusVisible))
             {
-                ImageUnsupportedMessage = message;
+                ContentPreviewState = PreviewState.Loading;
+            }
+        }
+
+        public void ShowContentLoading()
+        {
+            ContentPreviewState = PreviewState.Loading;
+        }
+
+        public void BeginImageLoading()
+        {
+            if (ImagePreviewState != PreviewState.Empty)
+            {
+                ImagePreviewTitle = null;
+                ImagePreviewMessage = null;
+                ImagePreviewState = PreviewState.Loading;
+            }
+        }
+
+        public void ShowContentPreview(PreviewState state)
+        {
+            if (state != PreviewState.Text && state != PreviewState.Media)
+            {
+                throw new System.ArgumentOutOfRangeException(nameof(state));
+            }
+
+            ContentPreviewTitle = null;
+            ContentPreviewMessage = null;
+            ContentPreviewState = state;
+        }
+
+        public void ShowImagePreview()
+        {
+            ImagePreviewTitle = null;
+            ImagePreviewMessage = null;
+            ImagePreviewState = PreviewState.Image;
+        }
+
+        public void ShowContentUnsupported(string extension)
+        {
+            SetUnsupportedStatus(extension, false);
+            ContentPreviewState = PreviewState.Unsupported;
+        }
+
+        public void ShowImageUnsupported(string extension)
+        {
+            SetUnsupportedStatus(extension, true);
+            ImagePreviewState = PreviewState.Unsupported;
+        }
+
+        public void ShowContentError(string extension)
+        {
+            ContentPreviewTitle = "Preview error";
+            ContentPreviewMessage = GetPreviewErrorMessage(extension);
+            ContentPreviewState = PreviewState.Error;
+        }
+
+        public void ShowImageError(string extension)
+        {
+            ImagePreviewTitle = "Preview error";
+            ImagePreviewMessage = GetPreviewErrorMessage(extension);
+            ImagePreviewState = PreviewState.Error;
+        }
+
+        public void ClearContentPreview()
+        {
+            ContentPreviewTitle = null;
+            ContentPreviewMessage = null;
+            ContentPreviewState = PreviewState.Empty;
+        }
+
+        public void ClearImagePreview()
+        {
+            ImagePreviewTitle = null;
+            ImagePreviewMessage = null;
+            ImagePreviewState = PreviewState.Empty;
+        }
+
+        private void SetUnsupportedStatus(string extension, bool isImage)
+        {
+            bool hasExtension = !string.IsNullOrWhiteSpace(extension) && extension != ".";
+            string title = hasExtension ? "Format not supported" : "Preview not available";
+            string message = hasExtension
+                ? $"The {extension} format is not supported to preview it"
+                : "This file format is not supported to preview it";
+
+            if (isImage)
+            {
+                ImagePreviewTitle = title;
+                ImagePreviewMessage = message;
             }
             else
             {
-                UnsupportedMessage = message;
+                ContentPreviewTitle = title;
+                ContentPreviewMessage = message;
             }
+        }
+
+        private static string GetPreviewErrorMessage(string extension)
+        {
+            return string.IsNullOrWhiteSpace(extension) || extension == "."
+                ? "The file could not be loaded for preview."
+                : $"The {extension} file could not be loaded for preview.";
+        }
+
+        private static bool IsStatus(PreviewState state)
+        {
+            return state == PreviewState.Unsupported || state == PreviewState.Error;
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
