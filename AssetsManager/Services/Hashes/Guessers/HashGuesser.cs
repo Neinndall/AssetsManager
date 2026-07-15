@@ -286,7 +286,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             int newWordCount,
             CancellationToken cancellationToken,
             int candidateBudget = 500_000,
-            string source = "Wordlist substitution")
+            string source = "Wordlist substitution",
+            Action<int> progress = null)
         {
             if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
             if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
@@ -312,6 +313,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 engine.Check(prefix + string.Join(separator, combination) + suffix, HashGuessStrategy.WordlistVariant, source);
+                if (checkedCount > 0 && checkedCount % 5000 == 0)
+                    progress?.Invoke(checkedCount);
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
             }
             return checkedCount;
