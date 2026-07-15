@@ -71,24 +71,24 @@ namespace AssetsManager.Views.Settings
             }
         }
 
-        private void btnBrowseCustomFloorTexture_Click(object sender, RoutedEventArgs e)
+        private void btnBrowseCustomGroundLogo_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel?.Settings == null) return;
 
             using (var openFileDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = false,
-                Title = "Select custom floor texture file",
-                InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomFloorTexturePath),
+                Title = "Select viewport ground logo",
+                InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomGroundLogoPath),
                 Filters = {
-                    new CommonFileDialogFilter("Image Files", "*.png;*.jpg;*.jpeg;*.dds;*.tga"),
+                    new CommonFileDialogFilter("Ground Logo Image", "*.png;*.webp"),
                     new CommonFileDialogFilter("All Files", "*.*")
                 }
             })
             {
                 if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
-                    ViewModel.Settings.CustomFloorTexturePath = openFileDialog.FileName;
+                    ViewModel.Settings.CustomGroundLogoPath = openFileDialog.FileName;
                     ViewModel.NotifySettingsChanged();
                 }
             }

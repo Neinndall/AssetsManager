@@ -283,6 +283,22 @@ namespace AssetsManager.Utils
             return LoadTexture(textureStream, extension, null, null);
         }
 
+        public static BitmapSource LoadTextureFromFile(string filePath, int? maxWidth = null, int? maxHeight = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
+
+            using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            string extension = Path.GetExtension(filePath);
+            if (extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
+            {
+                using Image<Rgba32> image = Image.Load<Rgba32>(fileStream);
+                return ConvertToBgra32BitmapSource(image, maxWidth, maxHeight);
+            }
+
+            return LoadTexture(fileStream, extension, maxWidth, maxHeight);
+        }
+
         public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)
         {
             BitmapEncoder encoder;
