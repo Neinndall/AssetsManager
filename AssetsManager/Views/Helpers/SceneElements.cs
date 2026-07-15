@@ -172,7 +172,7 @@ namespace AssetsManager.Views.Helpers
             return new ModelVisual3D { Content = finalGroup };
         }
 
-        public static ModelVisual3D CreateGroundPlane(LogService logService, string groundLogoPath = null)
+        public static ModelVisual3D CreateGroundPlane(LogService logService, string groundLogoPath = null, double groundLogoScale = 1.0)
         {
             MeshGeometry3D groundMesh = new MeshGeometry3D();
 
@@ -220,7 +220,7 @@ namespace AssetsManager.Views.Helpers
             BitmapSource groundLogo = LoadGroundLogoTexture(groundLogoPath, logService);
             if (groundLogo != null)
             {
-                const double logoMaxSize = 850;
+                double logoMaxSize = 850 * Math.Clamp(groundLogoScale, 0.25, 1.5);
                 double aspectRatio = (double)groundLogo.PixelWidth / groundLogo.PixelHeight;
                 double logoWidth = aspectRatio >= 1 ? logoMaxSize : logoMaxSize * aspectRatio;
                 double logoHeight = aspectRatio >= 1 ? logoMaxSize / aspectRatio : logoMaxSize;

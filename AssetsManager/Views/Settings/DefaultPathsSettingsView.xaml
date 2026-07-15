@@ -64,16 +64,16 @@
             </Border>
 
             <StackPanel Margin="28,0,0,0">
-                <!-- Ground Logo -->
+                <!-- Ground Logo Path -->
                 <StackPanel Margin="0,0,0,28">
-                    <TextBlock Text="Viewport Ground Logo" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                    <TextBlock Text="Add a transparent logo over the viewer ground." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
+                    <TextBlock Text="Ground Logo Image" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                    <TextBlock Text="Select the image used over the viewer ground." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,12"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomGroundLogoPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Style="{StaticResource ModernTextBox}" Height="38" Padding="12,0" Margin="0,0,8,0" Text="{Binding Settings.CustomGroundLogoPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                         <Button Grid.Column="1" Click="btnBrowseCustomGroundLogo_Click" Style="{StaticResource BrowseButtonStyle}" Width="44" Height="38">
                             <materialIcons:MaterialIcon Kind="ImageOutline" Width="18" Height="18"/>
                         </Button>

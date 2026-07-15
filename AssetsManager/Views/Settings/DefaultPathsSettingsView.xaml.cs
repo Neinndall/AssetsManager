@@ -75,23 +75,24 @@ namespace AssetsManager.Views.Settings
         {
             if (ViewModel?.Settings == null) return;
 
-            using (var openFileDialog = new CommonOpenFileDialog
+            using var openFileDialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = false,
                 Title = "Select viewport ground logo",
                 InitialDirectory = System.IO.Path.GetDirectoryName(ViewModel.Settings.CustomGroundLogoPath),
-                Filters = {
+                Filters =
+                {
                     new CommonFileDialogFilter("Ground Logo Image", "*.png;*.webp"),
                     new CommonFileDialogFilter("All Files", "*.*")
                 }
-            })
+            };
+
+            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    ViewModel.Settings.CustomGroundLogoPath = openFileDialog.FileName;
-                    ViewModel.NotifySettingsChanged();
-                }
+                ViewModel.Settings.CustomGroundLogoPath = openFileDialog.FileName;
+                ViewModel.NotifySettingsChanged();
             }
         }
+
     }
 }

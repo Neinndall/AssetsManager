@@ -809,3 +809,4 @@ Bug Fixes
     * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
   - Gallery thumbnails now load in archived results and remain cached while filtering.
+  - Viewer / Added a configurable ground logo size in General settings.
