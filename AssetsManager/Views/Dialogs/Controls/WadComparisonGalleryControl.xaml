@@ -40,11 +40,18 @@
         </Border>
 
         <!-- Discovery Grid (Visual selection disabled by removing Triggers) -->
-        <ListBox Grid.Row="1" 
+        <ListBox Grid.Row="1"
+                 x:Name="GalleryListBox"
                  ItemsSource="{Binding DiscoveryItems}" 
                  Style="{StaticResource ModernFileGridListBox}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  SelectionMode="Single">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
+                    <EventSetter Event="Loaded" Handler="GalleryItem_Loaded"/>
+                    <EventSetter Event="Unloaded" Handler="GalleryItem_Unloaded"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid Width="160" Margin="4">

@@ -83,8 +83,8 @@ namespace AssetsManager.Services.Hashes
 
                             try
                             {
-                                using var compressedData = wad.LoadChunk(chunk);
-                                byte[] data = WadChunkUtils.DecompressChunk(compressedData.Memory, chunk.Compression);
+                                using var dataOwner = wad.LoadChunkDecompressed(chunk);
+                                byte[] data = dataOwner.Span.ToArray();
                                 guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)

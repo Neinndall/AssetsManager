@@ -172,8 +172,12 @@ namespace AssetsManager.Services.Comparator
 
                         if (!hasOld && !hasNew) continue;
 
-                        int oldCount = hasOld ? WadChunkUtils.ReadWadChunkCount(oldWadFile) : 0;
-                        int newCount = hasNew ? WadChunkUtils.ReadWadChunkCount(newWadFile) : 0;
+                        int oldCount = hasOld && WadFile.TryReadHeader(oldWadFile, out var oldHeader)
+                            ? oldHeader.ChunkCount
+                            : hasOld ? -1 : 0;
+                        int newCount = hasNew && WadFile.TryReadHeader(newWadFile, out var newHeader)
+                            ? newHeader.ChunkCount
+                            : hasNew ? -1 : 0;
 
                         // Fallback: if header read fails, try a full open to salvage the count
                         if ((hasOld && oldCount < 0) || (hasNew && newCount < 0))

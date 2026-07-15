@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,6 +37,8 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
         private readonly BackupManager _backupManager;
+        private readonly SemaphoreSlim _galleryLoadLimiter = new(2, 2);
+        private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _galleryLoads = new();
 
         private string _oldPbePath;
         private string _newPbePath;
@@ -67,6 +70,7 @@ namespace AssetsManager.Views.Dialogs
 
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+            Gallery.ItemVisibilityChanged += OnGalleryItemVisibilityChanged;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
@@ -76,29 +80,9 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                if (_viewModel.ActiveView != ComparisonViewMode.Discovery)
                 {
-                    _ = LoadGalleryThumbnailsAsync();
-                }
-            }
-        }
-
-        private async Task LoadGalleryThumbnailsAsync()
-        {
-            var itemsToLoad = _viewModel.DiscoveryItems.Where(i => i.ImagePreview == null).ToList();
-            if (!itemsToLoad.Any()) return;
-
-            foreach (var item in itemsToLoad)
-            {
-                try
-                {
-                    // Delegamos todo al servicio: extracción + procesado (TextureUtils)
-                    // Mantenemos el límite de 256px para optimizar memoria
-                    item.ImagePreview = await _wadContentProvider.GetDiffThumbnailAsync(item, _oldPbePath, _newPbePath, 256);
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to load gallery thumbnail for {item.Path}");
+                    ResetGalleryLoading();
                 }
             }
         }
@@ -108,9 +92,72 @@ namespace AssetsManager.Views.Dialogs
             Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
+        private void OnGalleryItemVisibilityChanged(SerializableChunkDiff item, bool isVisible)
+        {
+            if (!isVisible || _viewModel.ActiveView != ComparisonViewMode.Discovery)
+            {
+                CancelGalleryThumbnail(item);
+                return;
+            }
+
+            LoadGalleryThumbnail(item);
+        }
+
+        private void ResetGalleryLoading()
+        {
+            foreach (var cancellation in _galleryLoads.Values) cancellation.Cancel();
+            _galleryLoads.Clear();
+            foreach (var item in _viewModel.DiscoveryItems) item.ImagePreview = null;
+        }
+
+        private async void LoadGalleryThumbnail(SerializableChunkDiff item)
+        {
+            if (item.ImagePreview != null || _galleryLoads.ContainsKey(item)) return;
+
+            var cancellation = new CancellationTokenSource();
+            _galleryLoads.Add(item, cancellation);
+            bool acquiredSlot = false;
+            try
+            {
+                await _galleryLoadLimiter.WaitAsync(cancellation.Token);
+                acquiredSlot = true;
+                var preview = await _wadContentProvider.GetDiffThumbnailAsync(
+                    item, _oldPbePath, _newPbePath, 256, cancellation.Token);
+
+                if (_galleryLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                    item.ImagePreview = preview;
+            }
+            catch (OperationCanceledException)
+            {
+                // Recycling and filtering cancel thumbnails by design.
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to load gallery thumbnail. WAD='{item.SourceWadFile}', Path='{item.Path}'");
+            }
+            finally
+            {
+                if (acquiredSlot) _galleryLoadLimiter.Release();
+                if (_galleryLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                    _galleryLoads.Remove(item);
+                cancellation.Dispose();
+            }
+        }
+
+        private void CancelGalleryThumbnail(SerializableChunkDiff item)
+        {
+            if (_galleryLoads.Remove(item, out var cancellation)) cancellation.Cancel();
+            item.ImagePreview = null;
+        }
+
         public void ApplyFilters()
         {
             if (_serializableDiffs == null) return;
+
+            if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+            {
+                ResetGalleryLoading();
+            }
 
             var filtered = _serializableDiffs.Where(d => 
             {
@@ -129,11 +176,6 @@ namespace AssetsManager.Views.Dialogs
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
 
-            // If we are in Gallery mode, trigger thumbnail loading for newly visible filtered items
-            if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-            {
-                _ = LoadGalleryThumbnailsAsync();
-            }
         }
 
         public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
@@ -152,7 +194,9 @@ namespace AssetsManager.Views.Dialogs
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
                 OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression,
+                OldSourceRoot = oldPbePath,
+                NewSourceRoot = newPbePath
             }).ToList();
         }
 
@@ -163,12 +207,19 @@ namespace AssetsManager.Views.Dialogs
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
             _version = version;
+            foreach (var diff in _serializableDiffs ?? Enumerable.Empty<SerializableChunkDiff>())
+            {
+                diff.OldSourceRoot = oldPbePath;
+                diff.NewSourceRoot = newPbePath;
+            }
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
+            Gallery.ItemVisibilityChanged -= OnGalleryItemVisibilityChanged;
+            ResetGalleryLoading();
 
             if (_viewModel != null)
             {
@@ -178,23 +229,27 @@ namespace AssetsManager.Views.Dialogs
                     _viewModel.TreeModel.FilterChanged -= OnTreeFilterChanged;
                 }
             }
-            _serializableDiffs?.Clear();
+            _serializableDiffs = null;
+            _viewModel.DiscoveryItems.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();
+            DataContext = null;
         }
 
         private async void WadComparisonResultWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
-            
+
+            var diffs = _serializableDiffs;
             var wadGroups = await Task.Run(() =>
             {
-                TryResolveHashes();
-                return PrepareGroupedResults(_serializableDiffs);
+                TryResolveHashes(diffs);
+                return PrepareGroupedResults(diffs);
             });
 
-            _viewModel.SetResults(_serializableDiffs, wadGroups);
+            if (_serializableDiffs != null)
+                _viewModel.SetResults(diffs, wadGroups);
         }
 
         // --- Handle methods for direct peer communication ---
@@ -264,11 +319,11 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private void TryResolveHashes()
+        private void TryResolveHashes(IEnumerable<SerializableChunkDiff> diffs)
         {
             string backupRoot = !string.IsNullOrEmpty(_sourceJsonPath) ? Path.GetDirectoryName(_sourceJsonPath) : null;
             
-            foreach (var diff in _serializableDiffs)
+            foreach (var diff in diffs)
             {
                 if (backupRoot != null)
                 {
