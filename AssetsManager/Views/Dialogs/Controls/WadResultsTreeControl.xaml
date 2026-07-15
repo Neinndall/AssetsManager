@@ -45,11 +45,6 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="Foreground" Value="White"/>
-                                </DataTrigger>
-                            </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
@@ -72,11 +67,6 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{Binding Type, Converter={StaticResource ChunkDiffTypeToBrushConverter}}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="Foreground" Value="White"/>
-                                </DataTrigger>
-                            </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
@@ -99,11 +89,6 @@
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                    <Setter Property="Foreground" Value="White"/>
-                                </DataTrigger>
-                            </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>

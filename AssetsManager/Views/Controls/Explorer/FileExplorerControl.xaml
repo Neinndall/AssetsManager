@@ -163,10 +163,6 @@
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </MultiDataTrigger>
                                             
-                                            <!-- Selection Override -->
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </materialIcons:MaterialIcon.Style>
@@ -203,10 +199,7 @@
                                                 <Setter Property="Foreground" Value="{StaticResource AccentTeal}"/>
                                             </DataTrigger>
 
-                                            <!-- Selection and Loading overrides -->
-                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </DataTrigger>
+                                            <!-- Loading override -->
                                             <DataTrigger Binding="{Binding Name}" Value="Loading...">
                                                 <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                                 <Setter Property="FontStyle" Value="Italic"/>

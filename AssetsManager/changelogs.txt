@@ -53,6 +53,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Fixed selected Explorer and comparison results keeping their NEW, MODIFIED, and REMOVED colors.
   - Fixed archived single-WAD comparisons saving empty snapshots that could not be previewed.
   - Fixed new asset extraction from a single WAD comparison using invalid duplicate WAD paths.
   - Fixed texture and data saves ignoring the Original export preference.
