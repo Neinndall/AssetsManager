@@ -185,6 +185,7 @@ namespace AssetsManager.Views
             _cancellationTokenSource = runCancellation;
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
+            _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = mode != HashGuessMode.GrepGame && mode != HashGuessMode.GrepLcu;
             _viewModel.StatusText = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
             _viewModel.Matches.Clear();
@@ -196,7 +197,14 @@ namespace AssetsManager.Views
                 {
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
                     if (value.TotalWads > 0)
+                    {
                         _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
+                        _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
+                    }
+                    else
+                    {
+                        _viewModel.ProgressText = $"{value.ProcessedChunks:N0} checked";
+                    }
                     _viewModel.StatusText = $"Scanning {value.CurrentWad} · {value.ProcessedChunks:N0} chunks · {value.FoundMatches:N0} matches";
                 });
                 IProgress<HashGuessMatch> matchProgress = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu)
@@ -221,6 +229,7 @@ namespace AssetsManager.Views
                 };
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
                 _viewModel.ProgressValue = 100;
+                _viewModel.ProgressText = "100%";
                 _viewModel.IsProgressIndeterminate = false;
                 if (result.Matches.Count > 0)
                 {
@@ -269,6 +278,7 @@ namespace AssetsManager.Views
             _cancellationTokenSource = runCancellation;
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
+            _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
             string internalDomain = includeBin ? "BIN" : "RST";
             _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash candidates...";
@@ -279,7 +289,15 @@ namespace AssetsManager.Views
                 var progress = new Progress<InternalHashProgress>(value =>
                 {
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
-                    if (value.TotalWads > 0) _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
+                    if (value.TotalWads > 0)
+                    {
+                        _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
+                        _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
+                    }
+                    else
+                    {
+                        _viewModel.ProgressText = $"{value.ProcessedFiles:N0} checked";
+                    }
                     _viewModel.StatusText = $"{value.CurrentStage} · {value.ProcessedFiles:N0} files/candidates · {value.FoundMatches:N0} matches";
                 });
 
@@ -287,6 +305,7 @@ namespace AssetsManager.Views
                 {
                     var inventory = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
                     _viewModel.ProgressValue = 100;
+                    _viewModel.ProgressText = "100%";
                     _viewModel.StatusText = includeBin
                         ? $"BIN inventory completed: {inventory.ScannedBins:N0} files parsed."
                         : $"RST inventory completed: {inventory.ScannedStringTables:N0} stringtables parsed.";
@@ -300,6 +319,7 @@ namespace AssetsManager.Views
                     };
                     _viewModel.Matches.AddRange(result.Matches.Cast<object>());
                     _viewModel.ProgressValue = 100;
+                    _viewModel.ProgressText = "100%";
                     _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} internal hashes resolved and saved.";
                 }
             }

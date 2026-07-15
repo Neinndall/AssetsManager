@@ -329,7 +329,16 @@ namespace AssetsManager.Services.Hashes
                         FoundMatches = engine.Matches.Count,
                         CurrentWad = "LCU Basic: basename word substitution"
                     });
-                    checkedCandidates += _lcuGuesser.SubstituteBasenameWords(engine, cancellationToken);
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteBasenameWords(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(new HashGuessProgress
+                        {
+                            ProcessedChunks = progressOffset + count,
+                            FoundMatches = engine.Matches.Count,
+                            CurrentWad = "LCU Basic: basename word substitution"
+                        }));
                 }
 
                 var phases = new (string Name, IEnumerable<HashGuessCandidate> Candidates)[]

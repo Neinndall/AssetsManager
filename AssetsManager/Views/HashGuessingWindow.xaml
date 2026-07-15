@@ -703,7 +703,7 @@
                                 <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <!-- Progress Value Badge -->
-                            <TextBlock Grid.Column="1" Text="{Binding ProgressValue, StringFormat='{}{0:F0}%'}" FontSize="12" FontWeight="Black" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProgressText}" FontSize="12" FontWeight="Black" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
                         </Grid>
                         
                         <!-- Smooth Modern Progress Bar -->
