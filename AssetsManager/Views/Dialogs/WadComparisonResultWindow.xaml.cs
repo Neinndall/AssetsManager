@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
@@ -80,7 +81,11 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView != ComparisonViewMode.Discovery)
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    QueueGalleryThumbnailLoading();
+                }
+                else
                 {
                     ResetGalleryLoading();
                 }
@@ -101,6 +106,17 @@ namespace AssetsManager.Views.Dialogs
             }
 
             LoadGalleryThumbnail(item);
+        }
+
+        private void QueueGalleryThumbnailLoading()
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    Gallery.LoadRealizedItems();
+                }
+            }, DispatcherPriority.Loaded);
         }
 
         private void ResetGalleryLoading()
@@ -175,6 +191,7 @@ namespace AssetsManager.Views.Dialogs
 
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
+            QueueGalleryThumbnailLoading();
 
         }
 
@@ -249,7 +266,10 @@ namespace AssetsManager.Views.Dialogs
             });
 
             if (_serializableDiffs != null)
+            {
                 _viewModel.SetResults(diffs, wadGroups);
+                QueueGalleryThumbnailLoading();
+            }
         }
 
         // --- Handle methods for direct peer communication ---
