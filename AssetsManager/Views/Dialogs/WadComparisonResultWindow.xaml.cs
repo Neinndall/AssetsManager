@@ -81,7 +81,11 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView != ComparisonViewMode.Discovery)
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    QueueGalleryThumbnailLoading();
+                }
+                else
                 {
                     ResetGalleryLoading();
                 }
@@ -104,11 +108,25 @@ namespace AssetsManager.Views.Dialogs
             LoadGalleryThumbnail(item);
         }
 
+        private void QueueGalleryThumbnailLoading()
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                {
+                    Gallery.LoadRealizedItems();
+                }
+            }, DispatcherPriority.Loaded);
+        }
+
         private void ResetGalleryLoading()
         {
             foreach (var cancellation in _galleryLoads.Values) cancellation.Cancel();
             _galleryLoads.Clear();
-            foreach (var item in _viewModel.DiscoveryItems) item.ImagePreview = null;
+            foreach (var item in _serializableDiffs ?? Enumerable.Empty<SerializableChunkDiff>())
+            {
+                item.ImagePreview = null;
+            }
         }
 
         private async void LoadGalleryThumbnail(SerializableChunkDiff item)
@@ -148,17 +166,11 @@ namespace AssetsManager.Views.Dialogs
         private void CancelGalleryThumbnail(SerializableChunkDiff item)
         {
             if (_galleryLoads.Remove(item, out var cancellation)) cancellation.Cancel();
-            item.ImagePreview = null;
         }
 
         public void ApplyFilters()
         {
             if (_serializableDiffs == null) return;
-
-            if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-            {
-                ResetGalleryLoading();
-            }
 
             var filtered = _serializableDiffs.Where(d => 
             {
@@ -176,6 +188,7 @@ namespace AssetsManager.Views.Dialogs
 
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
+            QueueGalleryThumbnailLoading();
 
         }
 
@@ -243,7 +256,10 @@ namespace AssetsManager.Views.Dialogs
             });
 
             if (_serializableDiffs != null)
+            {
                 _viewModel.SetResults(diffs, wadGroups);
+                QueueGalleryThumbnailLoading();
+            }
         }
 
         // --- Handle methods for direct peer communication ---
