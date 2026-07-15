@@ -5,6 +5,9 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 
 New Features
   - Hash Guessing Lab now shows each GREP match as soon as it is discovered.
+  - Viewer / Added configurable ground logo opacity in General settings.
+  - Viewer / Added a configurable ground logo size in General settings.
+  - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
   - Added independent BIN and RST hash guessing with local inventory, content scanning, structural strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.
   - BIN differences now show only semantic object and property changes with resolved paths.
@@ -14,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Gallery thumbnails now load in archived results and remain cached while filtering.
   - Explorer previews now distinguish unsupported formats from loading errors while keeping dual previews stable.
   - Media previews now switch faster while keeping transitions free of stale frames.
   - Reduced retained memory by loading WAD content, decoded images, and formatted data only when needed.
@@ -808,7 +812,3 @@ Bug Fixes
   - Explorer / HTML Support & Clean Type Definitions
     * Restored full text previewing and custom League syntax highlighting for .html files.
     * Cleaned up unused extensions (.htm, .webp, .lua, .luaobj) from supported types and icons to keep definitions accurate.
-  - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
-  - Gallery thumbnails now load in archived results and remain cached while filtering.
-  - Viewer / Added a configurable ground logo size in General settings.
-  - Viewer / Added configurable ground logo opacity in General settings.
