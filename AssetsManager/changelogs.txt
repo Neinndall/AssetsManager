@@ -58,7 +58,7 @@ Bug Fixes
   - Fixed new asset extraction from a single WAD comparison using invalid duplicate WAD paths.
   - Fixed texture and data saves ignoring the Original export preference.
   - Fixed Comparison Gallery memory growth, recycled thumbnail loading, and SVG previews after closing or filtering results.
-  - Fixed archived and live Zstd chunk loading for chunked assets.
+  - Fixed archived Zstd chunk previews without requiring auxiliary metadata.
   - Fixed Versions list scrolling when the pointer is over a version entry.
   - Fixed and unified file selection across Explorer trees, grids, and comparison results while preventing cancelled preview errors.
   - Fixed cancelled media previews removing files used by the active preview.

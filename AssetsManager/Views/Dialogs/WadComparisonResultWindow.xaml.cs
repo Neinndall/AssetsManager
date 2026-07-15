@@ -81,11 +81,7 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-                {
-                    QueueGalleryThumbnailLoading();
-                }
-                else
+                if (_viewModel.ActiveView != ComparisonViewMode.Discovery)
                 {
                     ResetGalleryLoading();
                 }
@@ -106,17 +102,6 @@ namespace AssetsManager.Views.Dialogs
             }
 
             LoadGalleryThumbnail(item);
-        }
-
-        private void QueueGalleryThumbnailLoading()
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-                {
-                    Gallery.LoadRealizedItems();
-                }
-            }, DispatcherPriority.Loaded);
         }
 
         private void ResetGalleryLoading()
@@ -191,7 +176,6 @@ namespace AssetsManager.Views.Dialogs
 
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
-            QueueGalleryThumbnailLoading();
 
         }
 
@@ -211,9 +195,7 @@ namespace AssetsManager.Views.Dialogs
                 OldUncompressedSize = (d.Type == ChunkDiffType.New) ? (ulong?)null : (ulong)d.OldChunk.UncompressedSize,
                 NewUncompressedSize = (d.Type == ChunkDiffType.Removed) ? (ulong?)null : (ulong)d.NewChunk.UncompressedSize,
                 OldCompressionType = (d.Type == ChunkDiffType.New) ? null : (WadChunkCompression?)d.OldChunk.Compression,
-                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression,
-                OldSourceRoot = oldPbePath,
-                NewSourceRoot = newPbePath
+                NewCompressionType = (d.Type == ChunkDiffType.Removed) ? null : (WadChunkCompression?)d.NewChunk.Compression
             }).ToList();
         }
 
@@ -224,11 +206,6 @@ namespace AssetsManager.Views.Dialogs
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
             _version = version;
-            foreach (var diff in _serializableDiffs ?? Enumerable.Empty<SerializableChunkDiff>())
-            {
-                diff.OldSourceRoot = oldPbePath;
-                diff.NewSourceRoot = newPbePath;
-            }
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
@@ -266,10 +243,7 @@ namespace AssetsManager.Views.Dialogs
             });
 
             if (_serializableDiffs != null)
-            {
                 _viewModel.SetResults(diffs, wadGroups);
-                QueueGalleryThumbnailLoading();
-            }
         }
 
         // --- Handle methods for direct peer communication ---
