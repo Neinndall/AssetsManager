@@ -323,9 +323,15 @@ namespace AssetsManager.Utils
         public static string ResolveWadPath(string sourcePath, string relativeWadPath)
         {
             string normalizedSourcePath = sourcePath?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return SupportedFileTypes.IsWadFile(normalizedSourcePath)
-                ? normalizedSourcePath
-                : Path.Combine(normalizedSourcePath ?? string.Empty, relativeWadPath ?? string.Empty);
+            if (SupportedFileTypes.IsWadFile(normalizedSourcePath))
+            {
+                return string.IsNullOrEmpty(relativeWadPath)
+                    || string.Equals(Path.GetFileName(normalizedSourcePath), Path.GetFileName(relativeWadPath), StringComparison.OrdinalIgnoreCase)
+                    ? normalizedSourcePath
+                    : null;
+            }
+
+            return Path.Combine(normalizedSourcePath ?? string.Empty, relativeWadPath ?? string.Empty);
         }
 
         /// <summary>
