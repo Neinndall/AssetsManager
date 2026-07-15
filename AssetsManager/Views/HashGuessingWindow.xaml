@@ -3,41 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF">
     <UserControl.Resources>
-        <Style x:Key="HashResultsListViewItem" TargetType="ListViewItem">
-            <Setter Property="ClipToBounds" Value="True"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="Padding" Value="16,1"/>
-            <Setter Property="MinHeight" Value="28"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <GridViewRowPresenter Content="{TemplateBinding Content}"
-                                                  Columns="{TemplateBinding GridView.ColumnCollection}"
-                                                  VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="HashResultsListView" TargetType="ListView">
             <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
@@ -45,7 +10,7 @@
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="ItemContainerStyle" Value="{StaticResource HashResultsListViewItem}"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource HashGuessingResultsListViewItem}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListView">
