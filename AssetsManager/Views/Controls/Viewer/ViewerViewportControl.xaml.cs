@@ -145,7 +145,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _groundVisual = SceneElements.CreateGroundPlane(
                     LogService,
                     AppSettings?.CustomGroundLogoPath,
-                    AppSettings?.GroundLogoScale ?? 1.0);
+                    AppSettings?.GroundLogoScale ?? 1.0,
+                    AppSettings?.GroundLogoOpacity ?? 1.0);
                 Viewport.Children.Add(_groundVisual);
             }
 

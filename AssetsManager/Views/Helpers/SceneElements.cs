@@ -172,7 +172,11 @@ namespace AssetsManager.Views.Helpers
             return new ModelVisual3D { Content = finalGroup };
         }
 
-        public static ModelVisual3D CreateGroundPlane(LogService logService, string groundLogoPath = null, double groundLogoScale = 1.0)
+        public static ModelVisual3D CreateGroundPlane(
+            LogService logService,
+            string groundLogoPath = null,
+            double groundLogoScale = 1.0,
+            double groundLogoOpacity = 1.0)
         {
             MeshGeometry3D groundMesh = new MeshGeometry3D();
 
@@ -241,7 +245,11 @@ namespace AssetsManager.Views.Helpers
                     }
                 };
 
-                var logoBrush = new ImageBrush(groundLogo) { Stretch = Stretch.Uniform };
+                var logoBrush = new ImageBrush(groundLogo)
+                {
+                    Stretch = Stretch.Uniform,
+                    Opacity = Math.Clamp(groundLogoOpacity, 0.0, 1.0)
+                };
                 RenderOptions.SetBitmapScalingMode(logoBrush, BitmapScalingMode.HighQuality);
                 scene.Children.Add(new GeometryModel3D(logoMesh, new DiffuseMaterial(logoBrush)));
             }

@@ -273,6 +273,25 @@
                         <TextBlock Grid.Column="1" Text="{Binding Value, ElementName=GroundLogoSizeSlider, StringFormat={}{0:P0}}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
                     </Grid>
                 </Grid>
+
+                <Grid Margin="0,24,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Ground Logo Opacity" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Adjust the logo transparency over the viewer ground." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Grid Grid.Column="1" Width="230" Margin="24,0,0,0" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="42"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="GroundLogoOpacitySlider" Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding Settings.GroundLogoOpacity, Mode=TwoWay}" Style="{StaticResource HUDSliderStyle}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Value, ElementName=GroundLogoOpacitySlider, StringFormat={}{0:P0}}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                    </Grid>
+                </Grid>
             </StackPanel>
         </StackPanel>
     </StackPanel>
