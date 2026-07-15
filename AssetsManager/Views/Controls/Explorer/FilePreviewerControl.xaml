@@ -192,7 +192,7 @@
                                 <Style TargetType="ColumnDefinition">
                                     <Setter Property="Width" Value="*"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsContentVisible}" Value="False">
+                                        <DataTrigger Binding="{Binding IsContentPreviewVisible}" Value="False">
                                             <Setter Property="Width" Value="0"/>
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -205,13 +205,9 @@
                                 <Style TargetType="ColumnDefinition">
                                     <Setter Property="Width" Value="0"/>
                                     <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding IsContentVisible}" Value="True"/>
-                                                <Condition Binding="{Binding IsImageVisible}" Value="True"/>
-                                            </MultiDataTrigger.Conditions>
+                                        <DataTrigger Binding="{Binding IsDualView}" Value="True">
                                             <Setter Property="Width" Value="Auto"/>
-                                        </MultiDataTrigger>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </ColumnDefinition.Style>
@@ -223,7 +219,7 @@
                                     <Setter Property="Width" Value="*"/>
                                     <Setter Property="MinWidth" Value="150"/>
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsImageVisible}" Value="False">
+                                        <DataTrigger Binding="{Binding IsImagePreviewVisible}" Value="False">
                                             <Setter Property="Width" Value="0"/>
                                             <Setter Property="MinWidth" Value="0"/>
                                         </DataTrigger>
@@ -234,23 +230,45 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Content Panel -->
-                    <Grid x:Name="ContentPanel" Grid.Column="0" Visibility="{Binding IsContentVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Grid x:Name="ContentPanel" Grid.Column="0" Visibility="{Binding IsContentPreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
                         
-                        <avalonedit:TextEditor x:Name="TextEditorPreview" Style="{StaticResource BaseTextEditorStyle}" Visibility="{Binding IsTextVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <avalonedit:TextEditor x:Name="TextEditorPreview">
+                            <avalonedit:TextEditor.Style>
+                                <Style TargetType="avalonedit:TextEditor" BasedOn="{StaticResource BaseTextEditorStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ContentPreviewState}" Value="Text">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </avalonedit:TextEditor.Style>
+                        </avalonedit:TextEditor>
                         
-                        <Grid x:Name="WebViewContainer" Margin="0,0,5,0" Visibility="{Binding IsWebVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        <Grid x:Name="WebViewContainer" Margin="0,0,5,0">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ContentPreviewState}" Value="Media">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                        </Grid>
 
                         <!-- Error Message inside Content area -->
                         <Border x:Name="UnsupportedFilePanel" 
                                 HorizontalAlignment="Center" 
                                 VerticalAlignment="Center" 
-                                Visibility="{Binding IsUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                Visibility="{Binding IsContentStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                 MaxWidth="400">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                 <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
-                                <TextBlock Text="{Binding UnsupportedTitle}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                <TextBlock Text="{Binding ContentPreviewTitle}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
                                 <TextBlock x:Name="UnsupportedFileSubMessage" 
-                                           Text="{Binding UnsupportedMessage}"
+                                           Text="{Binding ContentPreviewMessage}"
                                            FontSize="14" Foreground="{StaticResource TextSecondary}" 
                                            HorizontalAlignment="Center" Margin="0,8,0,0" 
                                            TextAlignment="Center" TextWrapping="Wrap"/>
@@ -267,25 +285,21 @@
                             <Style TargetType="GridSplitter">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                                 <Style.Triggers>
-                                    <MultiDataTrigger>
-                                        <MultiDataTrigger.Conditions>
-                                            <Condition Binding="{Binding IsContentVisible}" Value="True"/>
-                                            <Condition Binding="{Binding IsImageVisible}" Value="True"/>
-                                        </MultiDataTrigger.Conditions>
+                                    <DataTrigger Binding="{Binding IsDualView}" Value="True">
                                         <Setter Property="Visibility" Value="Visible"/>
-                                    </MultiDataTrigger>
+                                    </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </GridSplitter.Style>
                     </GridSplitter>
 
                     <!-- Right: Image Panel -->
-                    <Border x:Name="ImagePanel" Grid.Column="2" Visibility="{Binding IsImageVisible, Converter={StaticResource BooleanToVisibilityConverter}}" BorderBrush="{StaticResource BorderColor}">
+                    <Border x:Name="ImagePanel" Grid.Column="2" Visibility="{Binding IsImagePreviewVisible, Converter={StaticResource BooleanToVisibilityConverter}}" BorderBrush="{StaticResource BorderColor}">
                         <Border.Style>
                             <Style TargetType="Border">
                                 <Setter Property="BorderThickness" Value="0"/>
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsContentVisible}" Value="True">
+                                    <DataTrigger Binding="{Binding IsDualView}" Value="True">
                                         <Setter Property="BorderThickness" Value="1,0,0,0"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -300,10 +314,10 @@
                             <Image x:Name="ImagePreview" Grid.Row="0" Stretch="Uniform" Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Image.Style>
                                     <Style TargetType="Image">
-                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Setter Property="Visibility" Value="Collapsed"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsImageUnsupportedVisible}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            <DataTrigger Binding="{Binding ImagePreviewState}" Value="Image">
+                                                <Setter Property="Visibility" Value="Visible"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -315,12 +329,12 @@
                                     Grid.Row="0"
                                     HorizontalAlignment="Center" 
                                     VerticalAlignment="Center" 
-                                    Visibility="{Binding IsImageUnsupportedVisible, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                    Visibility="{Binding IsImageStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                     MaxWidth="400">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="FileRemoveOutline" Width="64" Height="64" Foreground="{StaticResource TextMuted}" Opacity="0.5" Margin="0,0,0,16"/>
-                                    <TextBlock Text="{Binding UnsupportedTitle}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
-                                    <TextBlock Text="{Binding ImageUnsupportedMessage}"
+                                    <TextBlock Text="{Binding ImagePreviewTitle}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                                    <TextBlock Text="{Binding ImagePreviewMessage}"
                                                FontSize="14" Foreground="{StaticResource TextSecondary}" 
                                                HorizontalAlignment="Center" Margin="0,8,0,0" 
                                                TextAlignment="Center" TextWrapping="Wrap"/>

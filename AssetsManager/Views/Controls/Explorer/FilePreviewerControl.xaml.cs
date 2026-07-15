@@ -378,13 +378,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 // If it's a file, hide status messages immediately to avoid flickers during load
                 ViewModel.IsWelcomeVisible = false;
 
-                // Selective hide: Only hide unsupported if the new file is NOT an image
-                bool isImage = SupportedFileTypes.IsImage(node.Extension);
-                
-                if (!isImage)
-                {
-                    ViewModel.IsUnsupportedVisible = false;
-                }
             }
         }
 

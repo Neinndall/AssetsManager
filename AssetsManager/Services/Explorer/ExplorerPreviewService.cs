@@ -121,34 +121,19 @@ namespace AssetsManager.Services.Explorer
             }
 
             Previewer requiredPreviewer = GetRequiredPreviewer(node);
-            bool isImage = requiredPreviewer == Previewer.Image;
+            bool isImage = SupportedFileTypes.IsImage(node.Extension);
 
             // Per-Slot Early Exit:
             // Check if the node is already loaded in its corresponding slot with the correct previewer.
             // This prevents reloads when alternating focus in Dual View, while correctly restoring tabs.
             if (isImage)
             {
-                if (_currentImageNode == node && _viewModel.IsImageVisible && _activeImagePreviewer == requiredPreviewer) return;
+                if (_currentImageNode == node && _viewModel.ImagePreviewState == PreviewState.Image && _activeImagePreviewer == requiredPreviewer) return;
             }
             else
             {
                 if (_currentContentNode == node && _activeContentPreviewer == requiredPreviewer)
                 {
-                    if (requiredPreviewer == Previewer.StatusPanel)
-                    {
-                        _viewModel.IsUnsupportedVisible = true;
-                        _viewModel.IsContentVisible = true;
-                    }
-                    else if (requiredPreviewer == Previewer.AvalonEdit)
-                    {
-                        _viewModel.IsTextVisible = true;
-                        _viewModel.IsContentVisible = true;
-                    }
-                    else if (requiredPreviewer == Previewer.WebView)
-                    {
-                        _viewModel.IsWebVisible = true;
-                        _viewModel.IsContentVisible = true;
-                    }
                     return;
                 }
             }
@@ -165,9 +150,7 @@ namespace AssetsManager.Services.Explorer
                 _isGridActive = false;
                 if (!isImage)
                 {
-                    _viewModel.IsContentVisible = true;
-                    _viewModel.IsTextVisible = false;
-                    _viewModel.IsWebVisible = false;
+                    _viewModel.ShowContentLoading();
                 }
             }
 
@@ -218,7 +201,7 @@ namespace AssetsManager.Services.Explorer
                 _logService.LogError(ex, $"Failed to preview file '{node.VirtualPath}'.");
                 if (IsCurrentPreview(previewRequest))
                 {
-                    await ShowUnsupportedPreviewAsync(node.Extension, previewRequest);
+                    await ShowPreviewErrorAsync(node.Extension, previewRequest);
                 }
             }
         }
@@ -281,19 +264,15 @@ namespace AssetsManager.Services.Explorer
             _viewModel.IsWelcomeVisible = false;
             _viewModel.HasEverPreviewedAFile = true;
 
-            bool isImage = node.Extension != null &&
-                (SupportedFileTypes.Images.Contains(node.Extension) ||
-                 SupportedFileTypes.Textures.Contains(node.Extension) ||
-                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+            bool isImage = SupportedFileTypes.IsImage(node.Extension);
 
             if (isImage)
             {
-                _viewModel.IsImageUnsupportedVisible = false;
+                _viewModel.BeginImageLoading();
             }
             else
             {
-                _viewModel.IsUnsupportedVisible = false;
-                _viewModel.IsContentVisible = true;
+                _viewModel.BeginContentLoading(true);
             }
         }
 
@@ -301,16 +280,11 @@ namespace AssetsManager.Services.Explorer
         {
             if (node == null) return;
 
-            bool isImage = node.Extension != null &&
-                (SupportedFileTypes.Images.Contains(node.Extension) ||
-                 SupportedFileTypes.Textures.Contains(node.Extension) ||
-                 SupportedFileTypes.VectorImages.Contains(node.Extension));
+            bool isImage = SupportedFileTypes.IsImage(node.Extension);
 
             bool hasMoreOfSameCategory = _viewModel.PinnedFilesManager.PinnedFiles.Any(p =>
                 p.Node != node &&
-                (SupportedFileTypes.Images.Contains(p.Node.Extension) ||
-                 SupportedFileTypes.Textures.Contains(p.Node.Extension) ||
-                 SupportedFileTypes.VectorImages.Contains(p.Node.Extension)) == isImage);
+                SupportedFileTypes.IsImage(p.Node.Extension) == isImage);
 
             _viewModel.UnloadSlotByCategory(isImage, hasMoreOfSameCategory);
         }
@@ -376,10 +350,9 @@ namespace AssetsManager.Services.Explorer
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Failed to show text preview for extension {extension}");
-                string errorText = $"Error showing {extension} file.";
                 if (IsCurrentPreview(previewRequest))
                 {
-                    await SetPreviewerAsync(Previewer.AvalonEdit, (errorText, (IHighlightingDefinition)null), false, previewRequest);
+                    await ShowPreviewErrorAsync(extension, previewRequest);
                 }
             }
         }
@@ -421,13 +394,12 @@ namespace AssetsManager.Services.Explorer
                     if (content is ImageSource imageSource)
                     {
                         _imagePreview.Source = imageSource;
-                        _viewModel.IsImageVisible = true;
+                        _viewModel.ShowImagePreview();
                         _activeImagePreviewer = Previewer.Image;
 
-                        if (_viewModel.IsUnsupportedVisible && !_viewModel.IsContentVisible)
+                        if (_viewModel.IsContentStatusVisible)
                         {
-                            _viewModel.IsUnsupportedVisible = false;
-                            _viewModel.IsContentVisible = false;
+                            _viewModel.ClearContentPreview();
                             _activeContentPreviewer = Previewer.None;
                         }
                     }
@@ -436,7 +408,6 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.WebView:
                     if (content is MediaPreviewContent mediaContent && previewRequest.HasValue)
                     {
-                        _viewModel.IsWebVisible = false;
                         if (_activeContentPreviewer == Previewer.WebView)
                         {
                             _activeContentPreviewer = Previewer.None;
@@ -456,9 +427,7 @@ namespace AssetsManager.Services.Explorer
                         }
 
                         ThrowIfPreviewIsObsolete(previewRequest.Value);
-                        _viewModel.IsContentVisible = true;
-                        _viewModel.IsTextVisible = false;
-                        _viewModel.IsWebVisible = true;
+                        _viewModel.ShowContentPreview(PreviewState.Media);
                         _activeContentPreviewer = Previewer.WebView;
                     }
                     break;
@@ -468,9 +437,7 @@ namespace AssetsManager.Services.Explorer
                     {
                         _textEditorPreview.Text = textData.Item1;
                         _textEditorPreview.SyntaxHighlighting = textData.Item2;
-                        _viewModel.IsContentVisible = true;
-                        _viewModel.IsWebVisible = false;
-                        _viewModel.IsTextVisible = true;
+                        _viewModel.ShowContentPreview(PreviewState.Text);
                         _textEditorPreview.Focus();
                         _activeContentPreviewer = Previewer.AvalonEdit;
                     }
@@ -479,21 +446,16 @@ namespace AssetsManager.Services.Explorer
                 case Previewer.StatusPanel:
                     if (content is string extension)
                     {
-                        bool isImageExt = extension.Contains("tex") || extension.Contains("dds") || extension.Contains("svg") ||
-                                          SupportedFileTypes.Images.Contains(extension) ||
-                                          SupportedFileTypes.Textures.Contains(extension) ||
-                                          SupportedFileTypes.VectorImages.Contains(extension);
+                        bool isImageExt = SupportedFileTypes.IsImage(extension);
 
                         // Check if there is currently a file (valid) in the left panel
                         // (which means Dual View should be maintained and we show the image error on the right)
-                        bool isLeftPanelOccupied = _viewModel.IsContentVisible && _activeContentPreviewer != Previewer.StatusPanel;
+                        bool isLeftPanelOccupied = _viewModel.ContentPreviewState == PreviewState.Text || _viewModel.ContentPreviewState == PreviewState.Media;
 
                         if (isImageExt && isLeftPanelOccupied)
                         {
                             // Dual View Scenario: Keep left panel active, show error on the right
-                            _viewModel.IsImageVisible = true;
-                            _viewModel.IsImageUnsupportedVisible = true;
-                            _viewModel.SetUnsupportedStatus(extension, true);
+                            _viewModel.ShowImageUnsupported(extension);
                             _activeImagePreviewer = Previewer.StatusPanel;
                         }
                         else
@@ -501,17 +463,12 @@ namespace AssetsManager.Services.Explorer
                             // Full Screen or Left-only Scenario: Show error on the left
                             _mediaWebViewPreviewService.Deactivate();
 
-                            _viewModel.IsUnsupportedVisible = true;
-                            _viewModel.IsContentVisible = true;
-                            _viewModel.IsTextVisible = false;
-                            _viewModel.IsWebVisible = false;
-                            _viewModel.SetUnsupportedStatus(extension, false);
+                            _viewModel.ShowContentUnsupported(extension);
                             _activeContentPreviewer = Previewer.StatusPanel;
 
                             if (isImageExt)
                             {
-                                _viewModel.IsImageVisible = false;
-                                _viewModel.IsImageUnsupportedVisible = false;
+                                _viewModel.ClearImagePreview();
                                 _activeImagePreviewer = Previewer.None;
                             }
                         }
@@ -592,7 +549,7 @@ namespace AssetsManager.Services.Explorer
                 _logService.LogError(ex, "Failed to show SVG preview.");
                 if (IsCurrentPreview(previewRequest))
                 {
-                    await ShowUnsupportedPreviewAsync(".svg", previewRequest);
+                    await ShowPreviewErrorAsync(".svg", previewRequest);
                 }
             }
         }
@@ -600,6 +557,35 @@ namespace AssetsManager.Services.Explorer
         private async Task ShowUnsupportedPreviewAsync(string extension, PreviewRequest previewRequest)
         {
             await SetPreviewerAsync(Previewer.StatusPanel, extension, false, previewRequest);
+        }
+
+        private Task ShowPreviewErrorAsync(string extension, PreviewRequest previewRequest)
+        {
+            ThrowIfPreviewIsObsolete(previewRequest);
+
+            bool isImage = SupportedFileTypes.IsImage(extension);
+            bool hasContentPreview = _viewModel.ContentPreviewState == PreviewState.Text ||
+                                     _viewModel.ContentPreviewState == PreviewState.Media;
+
+            if (isImage && hasContentPreview)
+            {
+                _viewModel.ShowImageError(extension);
+                _activeImagePreviewer = Previewer.StatusPanel;
+            }
+            else
+            {
+                _mediaWebViewPreviewService.Deactivate();
+                _viewModel.ShowContentError(extension);
+                _activeContentPreviewer = Previewer.StatusPanel;
+
+                if (isImage)
+                {
+                    _viewModel.ClearImagePreview();
+                    _activeImagePreviewer = Previewer.None;
+                }
+            }
+
+            return Task.CompletedTask;
         }
 
         private Previewer GetRequiredPreviewer(FileSystemNodeModel node)
