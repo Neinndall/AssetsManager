@@ -41,6 +41,7 @@ namespace AssetsManager.Utils
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
         public string CustomGroundLogoPath { get; set; } = string.Empty;
         public double GroundLogoScale { get; set; } = 1.0;
+        public double GroundLogoOpacity { get; set; } = 1.0;
 
         private static IList<T> WrapList<T>(IList<T> value) =>
             value is SafeList<T> sl ? sl : new SafeList<T>(value ?? new List<T>());
@@ -265,6 +266,7 @@ namespace AssetsManager.Utils
                 DefaultExtractedSelectDirectory = null,
                 CustomGroundLogoPath = null,
                 GroundLogoScale = 1.0,
+                GroundLogoOpacity = 1.0,
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
@@ -315,6 +317,7 @@ namespace AssetsManager.Utils
             DefaultExtractedSelectDirectory = defaultSettings.DefaultExtractedSelectDirectory;
             CustomGroundLogoPath = defaultSettings.CustomGroundLogoPath;
             GroundLogoScale = defaultSettings.GroundLogoScale;
+            GroundLogoOpacity = defaultSettings.GroundLogoOpacity;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
