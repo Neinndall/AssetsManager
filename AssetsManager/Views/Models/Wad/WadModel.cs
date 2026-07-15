@@ -127,6 +127,11 @@ namespace AssetsManager.Views.Models.Wad
 
         public WadChunkCompression? OldCompressionType { get; set; }
         public WadChunkCompression? NewCompressionType { get; set; }
+        [JsonIgnore]
+        public string OldSourceRoot { get; set; }
+
+        [JsonIgnore]
+        public string NewSourceRoot { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<AssociatedDependency> Dependencies { get; set; }
@@ -141,6 +146,7 @@ namespace AssetsManager.Views.Models.Wad
             get => _imagePreview;
             set { if (_imagePreview != value) { _imagePreview = value; OnPropertyChanged(); } }
         }
+
     }
 
     public class WadComparisonData

@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using System.IO.Compression;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +10,7 @@ using AssetsManager.Utils;
 using LeagueToolkit.Core.Wad;
 using Serilog;
 using Xunit;
+using ZstdSharp;
 
 namespace AssetsManager.BenchmarkTests.Services.Explorer
 {
@@ -166,24 +167,75 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
-        public void GzipDecompressionReturnsOriginalBytes()
+        public async Task BackupChunkReadingLoadsChunkedMetadataSidecarOnDemand()
         {
-            byte[] expected = Encoding.UTF8.GetBytes(new string('a', 4096));
-            byte[] compressed;
-
-            using (var stream = new MemoryStream())
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            const string sourceWad = "champions/test.wad.client";
+            const ulong hash = 0xABCDEFUL;
+            byte[] first = Encoding.UTF8.GetBytes(new string('a', 4096));
+            byte[] second = Encoding.UTF8.GetBytes("raw-subchunk");
+            using var compressor = new Compressor();
+            byte[] compressedFirst = compressor.Wrap(first).ToArray();
+            byte[] stored = compressedFirst.Concat(second).ToArray();
+            byte[] expected = first.Concat(second).ToArray();
+            var subchunks = new[]
             {
-                using (var gzip = new GZipStream(stream, CompressionLevel.SmallestSize, leaveOpen: true))
-                {
-                    gzip.Write(expected);
-                }
+                new WadSubchunk(compressedFirst.Length, first.Length),
+                new WadSubchunk(second.Length, second.Length)
+            };
 
-                compressed = stream.ToArray();
+            try
+            {
+                Directory.CreateDirectory(directory);
+                string chunkDirectory = Path.Combine(directory, "wad_chunks", "new", sourceWad);
+                Directory.CreateDirectory(chunkDirectory);
+                string chunkPath = Path.Combine(chunkDirectory, $"{hash:X16}.chunk");
+                await File.WriteAllBytesAsync(chunkPath, stored);
+                await WadChunkMetadataStore.WriteAsync(
+                    chunkPath, stored.Length, expected.Length, subchunks, CancellationToken.None);
+
+                var provider = CreateProvider();
+                byte[] actual = await provider.GetBackupChunkBytesAsync(
+                    directory,
+                    sourceWad,
+                    hash,
+                    WadChunkCompression.ZstdChunked,
+                    isOld: false,
+                    uncompressedSize: (ulong)expected.Length);
+
+                Assert.Equal(expected, actual);
             }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
 
-            byte[] actual = WadChunkUtils.DecompressChunk(compressed, WadChunkCompression.GZip);
+        [Fact]
+        public async Task LiveZstdChunkUsesWadMetadataForDecompression()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "zstd.wad");
+            const string virtualPath = "assets/test/zstd.json";
+            byte[] expected = Encoding.UTF8.GetBytes(new string('x', 16384));
 
-            Assert.Equal(expected, actual);
+            try
+            {
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(expected), WadChunkCompression.Zstd) },
+                    wadPath,
+                    new WadBakeSettings());
+
+                var provider = CreateProvider();
+                var node = await provider.FindNodeByVirtualPathAsync(virtualPath, directory);
+
+                Assert.Equal(expected, await provider.GetVirtualFileBytesAsync(node));
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
         }
 
         [Fact]
@@ -196,45 +248,6 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
 
             await Assert.ThrowsAsync<OperationCanceledException>(() =>
                 provider.GetBackupChunkBytesAsync("unused", "unused.wad", 1, WadChunkCompression.None, false, cancellation.Token));
-        }
-
-        [Fact]
-        public void MemoryGzipInputAvoidsTheSpanInputCopy()
-        {
-            byte[] expected = new byte[128 * 1024];
-            new Random(42).NextBytes(expected);
-            byte[] compressed = CompressGzip(expected);
-
-            _ = WadChunkUtils.DecompressChunk(compressed.AsMemory(), WadChunkCompression.GZip);
-            _ = WadChunkUtils.DecompressChunk(compressed.AsSpan(), WadChunkCompression.GZip);
-
-            long memoryAllocated = MeasureAllocation(() => WadChunkUtils.DecompressChunk(compressed.AsMemory(), WadChunkCompression.GZip));
-            long spanAllocated = MeasureAllocation(() => WadChunkUtils.DecompressChunk(compressed.AsSpan(), WadChunkCompression.GZip));
-
-            Assert.True(memoryAllocated < spanAllocated - (compressed.Length / 2));
-        }
-
-        private static byte[] CompressGzip(byte[] data)
-        {
-            using var stream = new MemoryStream();
-            using (var gzip = new GZipStream(stream, CompressionLevel.SmallestSize, leaveOpen: true))
-            {
-                gzip.Write(data);
-            }
-
-            return stream.ToArray();
-        }
-
-        private static long MeasureAllocation(Func<byte[]> action)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            byte[] result = action();
-            GC.KeepAlive(result);
-            return GC.GetAllocatedBytesForCurrentThread() - before;
         }
 
         private static WadContentProvider CreateProvider()

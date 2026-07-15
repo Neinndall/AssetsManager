@@ -133,15 +133,45 @@ namespace AssetsManager.Services.Explorer
             }, cancellationToken);
         }
 
-        private async Task<byte[]> ReadAndDecompressBackupChunkAsync(string chunkPath, WadChunkCompression? compressionType, CancellationToken cancellationToken)
+        private async Task<byte[]> ReadAndDecompressBackupChunkAsync(
+            string chunkPath,
+            WadChunkCompression? compressionType,
+            int? uncompressedSize,
+            WadSubchunk[] subchunks,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             byte[] compressedData = await File.ReadAllBytesAsync(chunkPath, cancellationToken);
-            return await Task.Run(() => WadChunkUtils.DecompressChunk(compressedData, compressionType), cancellationToken);
+            WadChunkCompression compression = compressionType ?? WadChunkCompression.None;
+            int expectedSize = uncompressedSize
+                ?? (compression == WadChunkCompression.None
+                    ? compressedData.Length
+                    : throw new InvalidDataException($"Archived {compression} chunk does not declare its uncompressed size."));
+
+            return await Task.Run(
+                () =>
+                {
+                    using var decompressor = new WadChunkDecompressor();
+                    using var decompressedData = decompressor.Decompress(
+                        compressedData,
+                        compression,
+                        expectedSize,
+                        subchunks);
+                    return decompressedData.Span.ToArray();
+                },
+                cancellationToken);
         }
 
         // Obtiene los bytes descomprimidos de un chunk guardado en el backup.
-        public async Task<byte[]> GetBackupChunkBytesAsync(string backupRoot, string sourceWad, ulong hash, WadChunkCompression? compressionType, bool isOld, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GetBackupChunkBytesAsync(
+            string backupRoot,
+            string sourceWad,
+            ulong hash,
+            WadChunkCompression? compressionType,
+            bool isOld,
+            CancellationToken cancellationToken = default,
+            ulong? uncompressedSize = null,
+            string sourceRoot = null)
         {
             try
             {
@@ -152,11 +182,48 @@ namespace AssetsManager.Services.Explorer
                 string chunkPath = Path.Combine(backupRoot, "wad_chunks", chunkDir, sourceWad ?? string.Empty, $"{hash:X16}.chunk");
                 if (!File.Exists(chunkPath)) return null;
 
-                return await ReadAndDecompressBackupChunkAsync(chunkPath, compressionType ?? WadChunkCompression.None, cancellationToken);
+                int? effectiveUncompressedSize = ToInt32Size(uncompressedSize);
+                WadSubchunk[] effectiveSubchunks = null;
+                if (compressionType == WadChunkCompression.ZstdChunked)
+                {
+                    if (WadChunkMetadataStore.TryRead(chunkPath, out int storedSize, out var storedSubchunks))
+                    {
+                        if (effectiveUncompressedSize.HasValue && effectiveUncompressedSize.Value != storedSize)
+                            throw new InvalidDataException($"Archived metadata size mismatch for hash {hash:X16}.");
+
+                        effectiveUncompressedSize = storedSize;
+                        effectiveSubchunks = storedSubchunks;
+                    }
+                    else if (WadChunkMetadataStore.TryRecover(
+                        sourceRoot,
+                        sourceWad,
+                        hash,
+                        chunkPath,
+                        effectiveUncompressedSize,
+                        out int recoveredSize,
+                        out var recoveredSubchunks))
+                    {
+                        effectiveUncompressedSize = recoveredSize;
+                        effectiveSubchunks = recoveredSubchunks;
+                        _logService.LogDebug($"[WAD BACKUP] Lazily recovered legacy subchunk metadata. Side={(isOld ? "OLD" : "NEW")}, WAD='{sourceWad}', Hash={hash:X16}.");
+                    }
+                    else
+                    {
+                        throw new InvalidDataException($"ZstdChunked metadata is unavailable for archived hash {hash:X16}.");
+                    }
+                }
+
+                return await ReadAndDecompressBackupChunkAsync(
+                    chunkPath,
+                    compressionType ?? WadChunkCompression.None,
+                    effectiveUncompressedSize,
+                    effectiveSubchunks,
+                    cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logService.LogError(ex, $"Failed to get backup chunk bytes: {sourceWad}/{hash:X16}");
+                _logService.LogError(ex,
+                    $"Failed to get backup chunk bytes. Side={(isOld ? "OLD" : "NEW")}, WAD='{sourceWad}', Hash={hash:X16}, Compression={compressionType?.ToString() ?? "None"}, UncompressedSize={uncompressedSize?.ToString() ?? "unknown"}");
                 return null;
             }
         }
@@ -170,8 +237,13 @@ namespace AssetsManager.Services.Explorer
                 {
                     _logService.LogDebug($"[DATA DIRECTION] Loading from BACKUP directory: 'wad_chunks/{ (fileNode.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     bool useOld = fileNode.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
-                    var compressionType = useOld ? fileNode.ChunkDiff.OldCompressionType : fileNode.ChunkDiff.NewCompressionType;
-                    return await ReadAndDecompressBackupChunkAsync(fileNode.BackupChunkPath, compressionType, cancellationToken);
+                    var diff = fileNode.ChunkDiff;
+                    var compressionType = useOld ? diff.OldCompressionType : diff.NewCompressionType;
+                    ulong? uncompressedSize = useOld ? diff.OldUncompressedSize : diff.NewUncompressedSize;
+                    return await GetBackupChunkBytesAsync(
+                        GetBackupRoot(fileNode.BackupChunkPath), diff.SourceWadFile,
+                        useOld ? diff.OldPathHash : diff.NewPathHash, compressionType, useOld,
+                        cancellationToken, uncompressedSize, useOld ? diff.OldSourceRoot : diff.NewSourceRoot);
                 }
 
                 _logService.LogDebug($"[DATA DIRECTION] Loading from LOCAL installation: '{Path.GetDirectoryName(fileNode.SourceWadPath)}'");
@@ -186,7 +258,11 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Obtiene los bytes de un lado específico (Old o New) de un diff, gestionando tanto WADs como Backups.
-        public async Task<byte[]> GetDiffSideBytesAsync(SerializableChunkDiff diff, string lolPath, bool isOld, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GetDiffSideBytesAsync(
+            SerializableChunkDiff diff,
+            string lolPath,
+            bool isOld,
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -198,17 +274,26 @@ namespace AssetsManager.Services.Explorer
                     string root = GetBackupRoot(diff.BackupChunkPath);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
                     var compressionType = isOld ? diff.OldCompressionType : diff.NewCompressionType;
+                    ulong? uncompressedSize = isOld ? diff.OldUncompressedSize : diff.NewUncompressedSize;
 
-                    return await GetBackupChunkBytesAsync(root, diff.SourceWadFile, hash, compressionType, isOld, cancellationToken);
+                    return await GetBackupChunkBytesAsync(
+                        root, diff.SourceWadFile, hash, compressionType, isOld,
+                        cancellationToken, uncompressedSize,
+                        lolPath ?? (isOld ? diff.OldSourceRoot : diff.NewSourceRoot));
                 }
 
                 // MODO LIVE
                 if (!string.IsNullOrEmpty(lolPath))
                 {
-                    string wadPath = Path.Combine(lolPath, diff.SourceWadFile);
+                    string wadPath = SupportedFileTypes.IsWadFile(lolPath)
+                        ? lolPath
+                        : Path.Combine(lolPath, diff.SourceWadFile);
                     ulong hash = isOld ? diff.OldPathHash : diff.NewPathHash;
                     
-                    if (hash != 0) return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
+                    if (hash != 0)
+                    {
+                        return await DecompressChunkByHashAsync(wadPath, hash, cancellationToken);
+                    }
                 }
 
                 return null;
@@ -266,7 +351,11 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Obtiene los bytes descomprimidos de un diff (lado predominante para previsualización)
-        public async Task<byte[]> GetDiffFileBytesAsync(SerializableChunkDiff diff, string oldLolPath, string newLolPath, CancellationToken cancellationToken = default)
+        public async Task<byte[]> GetDiffFileBytesAsync(
+            SerializableChunkDiff diff,
+            string oldLolPath,
+            string newLolPath,
+            CancellationToken cancellationToken = default)
         {
             bool useOld = (diff.Type == ChunkDiffType.Removed);
             string basePath = useOld ? oldLolPath : newLolPath;
@@ -282,13 +371,9 @@ namespace AssetsManager.Services.Explorer
             string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
             return await Task.Run(() =>
             {
-                try
-                {
-                    using var ms = new MemoryStream(data);
-                    int? size = maxWidth > 0 ? maxWidth : null;
-                    return TextureUtils.LoadTexture(ms, ext, size, size);
-                }
-                catch { return null; }
+                using var ms = new MemoryStream(data);
+                int? size = maxWidth > 0 ? maxWidth : null;
+                return TextureUtils.LoadTexture(ms, ext, size, size);
             }, cancellationToken);
         }
 
@@ -306,8 +391,17 @@ namespace AssetsManager.Services.Explorer
                 {
                     _logService.LogDebug($"[DATA DIRECTION] Extracting WEM from BACKUP storage: 'wad_chunks/{ (node.BackupChunkPath.Contains("old") ? "old" : "new") }'");
                     // MODO BACKUP: Carga del contenedor desde el chunk.
-                    var compressionType = node.ChunkDiff?.NewCompressionType ?? WadChunkCompression.None;
-                    containerData = await ReadAndDecompressBackupChunkAsync(node.BackupChunkPath, compressionType, cancellationToken);
+                    bool useOld = node.BackupChunkPath.Contains(Path.Combine("wad_chunks", "old"));
+                    var diff = node.ChunkDiff;
+                    var compressionType = useOld
+                        ? diff?.OldCompressionType ?? WadChunkCompression.None
+                        : diff?.NewCompressionType ?? WadChunkCompression.None;
+                    ulong? uncompressedSize = useOld ? diff?.OldUncompressedSize : diff?.NewUncompressedSize;
+                    containerData = await GetBackupChunkBytesAsync(
+                        GetBackupRoot(node.BackupChunkPath), diff?.SourceWadFile,
+                        useOld ? diff?.OldPathHash ?? 0 : diff?.NewPathHash ?? 0,
+                        compressionType, useOld, cancellationToken, uncompressedSize,
+                        useOld ? diff?.OldSourceRoot : diff?.NewSourceRoot);
                 }
                 else
                 {
@@ -343,7 +437,10 @@ namespace AssetsManager.Services.Explorer
         }
 
         // Encuentra un chunk en un WAD por su hash y devuelve su contenido descomprimido.
-        private Task<byte[]> DecompressChunkByHashAsync(string wadPath, ulong chunkHash, CancellationToken cancellationToken)
+        private Task<byte[]> DecompressChunkByHashAsync(
+            string wadPath,
+            ulong chunkHash,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.Run(() =>
@@ -359,8 +456,8 @@ namespace AssetsManager.Services.Explorer
                         return null;
                     }
 
-                    using var compressedDataOwner = wadFile.LoadChunk(chunk);
-                    return WadChunkUtils.DecompressChunk(compressedDataOwner.Memory, chunk.Compression);
+                    using var data = wadFile.LoadChunkDecompressed(chunk);
+                    return data.Span.ToArray();
                 }
                 catch (OperationCanceledException)
                 {
@@ -369,10 +466,17 @@ namespace AssetsManager.Services.Explorer
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, $"Failed to get bytes for virtual file with hash: {chunkHash:x16}");
+                    _logService.LogError(ex, $"Failed to decompress WAD chunk. WAD='{wadPath}', Hash={chunkHash:X16}");
                     return null;
                 }
             }, cancellationToken);
+        }
+
+        private static int? ToInt32Size(ulong? size)
+        {
+            if (!size.HasValue) return null;
+            if (size.Value > int.MaxValue) throw new InvalidDataException($"Chunk size {size.Value} exceeds the supported in-memory limit.");
+            return (int)size.Value;
         }
 
     }

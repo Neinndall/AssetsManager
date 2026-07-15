@@ -65,6 +65,13 @@ namespace AssetsManager.Utils
             return AudioBank.Contains(extension);
         }
 
+        public static bool IsWadFile(string fileName)
+        {
+            return !string.IsNullOrEmpty(fileName)
+                && (fileName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase)
+                    || fileName.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase));
+        }
+
         public static bool IsText(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;

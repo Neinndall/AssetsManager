@@ -58,6 +58,8 @@ namespace AssetsManager.Services.Explorer
 
                 foreach (var file in wadGroup)
                 {
+                    file.OldSourceRoot = comparisonData.OldLolPath;
+                    file.NewSourceRoot = comparisonData.NewLolPath;
                     if (file.OldPathHash != 0)
                         file.OldPath = RestoreExtension(file.OldPath, _hashResolverService.ResolveHash(file.OldPathHash), file.OldPathHash);
 
@@ -133,6 +135,8 @@ namespace AssetsManager.Services.Explorer
                                         NewPathHash = dep.NewPathHash,
                                         OldCompressionType = dep.CompressionType,
                                         NewCompressionType = dep.CompressionType,
+                                        OldSourceRoot = comparisonData.OldLolPath,
+                                        NewSourceRoot = comparisonData.NewLolPath,
                                         BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType, SourceWadFile = dep.SourceWad })
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
@@ -183,6 +187,8 @@ namespace AssetsManager.Services.Explorer
                                             NewPathHash = dep.NewPathHash,
                                             OldCompressionType = dep.CompressionType,
                                             NewCompressionType = dep.CompressionType,
+                                            OldSourceRoot = comparisonData.OldLolPath,
+                                            NewSourceRoot = comparisonData.NewLolPath,
                                             BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
                                         };
                                     }

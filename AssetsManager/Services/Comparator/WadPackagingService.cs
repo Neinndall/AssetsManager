@@ -284,6 +284,8 @@ namespace AssetsManager.Services.Comparator
                         {
                             await destFs.WriteAsync(rawChunkData.AsMemory(0, chunk.CompressedSize), cancellationToken);
                         }
+
+                        await WadChunkMetadataStore.WriteAsync(destChunkPath, sourceWad, chunk, cancellationToken);
                     }
                     finally
                     {

@@ -155,7 +155,8 @@
                 <controls:WadComparisonOverviewControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Overview}}"/>
                 
                 <!-- Discovery View -->
-                <controls:WadComparisonGalleryControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
+                <controls:WadComparisonGalleryControl x:Name="Gallery"
+                                                      Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
                 
                 <!-- Advanced View (Hierarchy + Details) -->
                 <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
