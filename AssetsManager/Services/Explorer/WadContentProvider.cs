@@ -21,15 +21,18 @@ namespace AssetsManager.Services.Explorer
         private readonly LogService _logService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
         private readonly DirectoriesCreator _directoriesCreator;
+        private readonly SvgParser _svgParser;
 
         public WadContentProvider(
             LogService logService, 
             WadNodeLoaderService wadNodeLoaderService, 
-            DirectoriesCreator directoriesCreator)
+            DirectoriesCreator directoriesCreator,
+            SvgParser svgParser)
         {
             _logService = logService;
             _wadNodeLoaderService = wadNodeLoaderService;
             _directoriesCreator = directoriesCreator;
+            _svgParser = svgParser;
         }
 
         /// <summary>
@@ -369,6 +372,11 @@ namespace AssetsManager.Services.Explorer
             if (data == null) return null;
 
             string ext = Path.GetExtension(diff.Path).ToLowerInvariant();
+            if (SupportedFileTypes.VectorImages.Contains(ext))
+            {
+                return await Task.Run(() => _svgParser.LoadSvg(data), cancellationToken);
+            }
+
             return await Task.Run(() =>
             {
                 using var ms = new MemoryStream(data);

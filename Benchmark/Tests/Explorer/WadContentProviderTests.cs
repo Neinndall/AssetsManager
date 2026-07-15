@@ -6,7 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Wad;
 using LeagueToolkit.Core.Wad;
 using Serilog;
 using Xunit;
@@ -239,6 +241,45 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
+        public async Task GalleryThumbnailRendersArchivedSvg()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            const string sourceWad = "default-assets.wad.client";
+            const ulong hash = 0x12345678UL;
+            byte[] svg = Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\"><rect width=\"32\" height=\"32\" fill=\"#44aaee\"/></svg>");
+
+            try
+            {
+                string chunkDirectory = Path.Combine(directory, "wad_chunks", "new", sourceWad);
+                Directory.CreateDirectory(chunkDirectory);
+                string chunkPath = Path.Combine(chunkDirectory, $"{hash:X16}.chunk");
+                await File.WriteAllBytesAsync(chunkPath, svg);
+
+                var diff = new SerializableChunkDiff
+                {
+                    Type = ChunkDiffType.New,
+                    NewPath = "assets/test/icon.svg",
+                    NewPathHash = hash,
+                    NewCompressionType = WadChunkCompression.None,
+                    NewUncompressedSize = (ulong)svg.Length,
+                    SourceWadFile = sourceWad,
+                    BackupChunkPath = chunkPath
+                };
+
+                var provider = CreateProvider();
+                var thumbnail = await provider.GetDiffThumbnailAsync(diff, null, null, 256);
+
+                Assert.NotNull(thumbnail);
+                Assert.True(thumbnail.IsFrozen);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task BackupChunkReadingPropagatesCancellation()
         {
             using var cancellation = new CancellationTokenSource();
@@ -252,7 +293,7 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
 
         private static WadContentProvider CreateProvider()
         {
-            return new WadContentProvider(new LogService(Log.Logger), null, null);
+            return new WadContentProvider(new LogService(Log.Logger), null, null, new SvgParser());
         }
     }
 }
