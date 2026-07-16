@@ -11,12 +11,12 @@ using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Services.Core
 {
-    public sealed class NonOverlappingAsyncJobTests
+    public sealed class BackgroundJobGateTests
     {
         [Fact]
         public async Task ConcurrentRunIsSkippedWhileFirstRunIsActive()
         {
-            using var job = new NonOverlappingAsyncJob();
+            using var job = new BackgroundJobGate();
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             int executions = 0;
@@ -44,7 +44,7 @@ namespace AssetsManager.BenchmarkTests.Services.Core
         [Fact]
         public async Task StopCancelsActiveRunAndRejectsNewRuns()
         {
-            using var job = new NonOverlappingAsyncJob();
+            using var job = new BackgroundJobGate();
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             Task<bool> active = job.TryRunAsync(async cancellationToken =>
             {
@@ -62,7 +62,7 @@ namespace AssetsManager.BenchmarkTests.Services.Core
         [Fact]
         public async Task StartAllowsRunsAfterAStop()
         {
-            using var job = new NonOverlappingAsyncJob();
+            using var job = new BackgroundJobGate();
             job.Stop();
             job.Start();
 
