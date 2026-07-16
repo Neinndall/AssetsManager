@@ -50,8 +50,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             : this(new HashFile(HashGuessDomain.Lcu, knownPaths), logService) { }
 
         internal override bool ShouldSkip(string extension) => SkippedExtensions.Contains(extension);
-        internal IReadOnlyList<string> WordlistPaths => KnownPaths.Where(path => !WordlistExcludedPathRegex.IsMatch(path)).ToList();
-        internal override IReadOnlyList<string> BuildWordlist() => HashGuessEngine.BuildWordlist(WordlistPaths);
+        internal IReadOnlyList<string> WordlistPaths => Corpus.GetOrCreate(
+            "wordlist-paths",
+            paths => paths.Where(path => !WordlistExcludedPathRegex.IsMatch(path)).ToList());
+        internal override IReadOnlyList<string> BuildWordlist() =>
+            Corpus.GetOrCreate("wordlist", _ => HashGuessEngine.BuildWordlist(WordlistPaths));
 
         internal override IEnumerable<HashGuessCandidate> GenerateCanonicalCandidates(HashGuesser otherDomain, int candidateBudget = int.MaxValue)
         {
@@ -190,7 +193,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IEnumerable<HashGuessCandidate> SubstitutePlugin() => GeneratePluginCandidates(int.MaxValue);
 
-        internal override void GrepWad(HashGuessEngine engine, byte[] data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
+        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
             CheckChunk(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
 
         internal IEnumerable<HashGuessCandidate> GuessFromGameHashes(HashGuesser gameGuesser) =>
@@ -200,12 +203,13 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal int SubstitutePartiesBasenameWordPairs(HashGuessEngine engine, CancellationToken cancellationToken)
         {
-            var partyImages = KnownPaths.Where(path =>
-                path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) &&
-                path.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
-            var imageWords = HashGuessEngine.BuildBasenameWordlist(KnownPaths.Where(path =>
-                path.Contains("-fe-lol-s", StringComparison.OrdinalIgnoreCase) &&
-                path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)));
+            var partyImages = Corpus.GetOrCreate("party-images", paths => paths.Where(path =>
+                    path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList());
+            var imageWords = Corpus.GetOrCreate("splash-image-words", paths =>
+                HashGuessEngine.BuildBasenameWordlist(paths.Where(path =>
+                    path.Contains("-fe-lol-s", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))));
 
             return RunBasenameWordSubstitution(
                 engine, partyImages, imageWords, 1, 2, cancellationToken, int.MaxValue,
@@ -222,21 +226,16 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal int RunAdvancedAttacks(HashGuessEngine engine, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
-            var paths = KnownPaths.ToList();
+            var paths = KnownPaths;
             int checkedCandidates = 0;
 
             if (engine.RemainingUnknownCount > 0)
             {
-                var frontendJsonPaths = paths.Where(IsFrontendJsonPath).ToList();
-                var frontendJsonWords = BuildFrontendJsonWordlist(frontendJsonPaths);
+                var frontendJsonPaths = Corpus.GetOrCreate("frontend-json-paths", values => values.Where(IsFrontendJsonPath).ToList());
+                var frontendJsonWords = Corpus.GetOrCreate("frontend-json-words", _ => BuildFrontendJsonWordlist(frontendJsonPaths));
                 if (frontendJsonPaths.Count > 0 && frontendJsonWords.Count > 0)
                 {
-                    progress?.Report(new HashGuessProgress
-                    {
-                        ProcessedChunks = checkedCandidates,
-                        FoundMatches = engine.Matches.Count,
-                        CurrentWad = "LCU Advanced: frontend JSON"
-                    });
+                    progress?.Report(engine.CreateProgress("LCU Advanced: frontend JSON", checkedCandidates));
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
                     if (engine.RemainingUnknownCount > 0)
                         checkedCandidates += RunWordAdditionAttack(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
@@ -248,36 +247,31 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress
-                {
-                    ProcessedChunks = checkedCandidates,
-                    FoundMatches = engine.Matches.Count,
-                    CurrentWad = "LCU Advanced: parties PNG word pairs"
-                });
+                progress?.Report(engine.CreateProgress("LCU Advanced: parties PNG word pairs", checkedCandidates));
                 checkedCandidates += SubstitutePartiesBasenameWordPairs(engine, cancellationToken);
             }
             if (engine.RemainingUnknownCount == 0) return checkedCandidates;
 
-            progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU static-assets" });
-            var staticAssets = paths.Where(path => path.StartsWith("plugins/rcp-fe-lol-static-assets/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
-            var staticWords = HashGuessEngine.BuildBasenameWordlist(staticAssets).Take(5000).ToList();
+            progress?.Report(engine.CreateProgress("Focused Attack: LCU static-assets", checkedCandidates));
+            var staticAssets = Corpus.GetOrCreate("static-svg-paths", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-static-assets/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList());
+            var staticWords = Corpus.GetOrCreate("static-svg-words", _ => HashGuessEngine.BuildBasenameWordlist(staticAssets).Take(5000).ToList());
             checkedCandidates += RunFocusedWordlistSubstitution(engine, staticAssets, staticWords, cancellationToken);
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, staticAssets, staticWords, cancellationToken);
 
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU navigation" });
-                var navigation = paths.Where(path => path.StartsWith("plugins/rcp-fe-lol-navigation/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
+                progress?.Report(engine.CreateProgress("Focused Attack: LCU navigation", checkedCandidates));
+                var navigation = Corpus.GetOrCreate("navigation-svg-paths", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-navigation/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList());
                 checkedCandidates += RunFocusedWordlistSubstitution(engine, navigation, staticWords, cancellationToken);
                 if (engine.RemainingUnknownCount > 0)
                     checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, navigation, staticWords, cancellationToken);
             }
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: LCU parties" });
-                var parties = paths.Where(path => path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList();
-                var partyWords = HashGuessEngine.BuildBasenameWordlist(parties).Take(5000).ToList();
+                progress?.Report(engine.CreateProgress("Focused Attack: LCU parties", checkedCandidates));
+                var parties = Corpus.GetOrCreate("party-images", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList());
+                var partyWords = Corpus.GetOrCreate("party-image-words", _ => HashGuessEngine.BuildBasenameWordlist(parties).Take(5000).ToList());
                 checkedCandidates += RunFocusedWordlistSubstitution(engine, parties, partyWords, cancellationToken);
             }
             return checkedCandidates;
@@ -311,12 +305,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(byte[] data, string sourcePath)
+        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath)
         {
-            if (data == null || data.Length == 0) yield break;
+            if (data.Count == 0) yield break;
 
             if (!TryDecodeWadText(data, out string text))
-                text = Encoding.ASCII.GetString(data);
+                text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
             var structuredCandidates = new List<HashGuessCandidate>();
             bool stopAfterStructuredJson = false;
 
@@ -324,7 +318,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 try
                 {
-                    using var document = JsonDocument.Parse(data);
+                    using var document = JsonDocument.Parse(data.AsMemory());
                     foreach (JsonProperty property in document.RootElement.EnumerateObject())
                     {
                         structuredCandidates.Add(new HashGuessCandidate(
@@ -342,7 +336,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 try
                 {
-                    using var document = JsonDocument.Parse(data);
+                    using var document = JsonDocument.Parse(data.AsMemory());
                     foreach (JsonElement element in document.RootElement.EnumerateArray())
                     {
                         if (!element.TryGetProperty("id", out JsonElement idProperty)) continue;
@@ -423,11 +417,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuEmbeddedPath);
         }
 
-        private void AddPluginDescriptionCandidates(byte[] data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private void AddPluginDescriptionCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
         {
             try
             {
-                using var document = JsonDocument.Parse(data);
+                using var document = JsonDocument.Parse(data.AsMemory());
                 if (!document.RootElement.TryGetProperty("name", out JsonElement nameProperty)) return;
                 string name = nameProperty.GetString()?.ToLowerInvariant();
                 if (string.IsNullOrEmpty(name)) return;
@@ -440,11 +434,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private bool AddSplashCandidates(byte[] data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private bool AddSplashCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
         {
             try
             {
-                using var document = JsonDocument.Parse(data);
+                using var document = JsonDocument.Parse(data.AsMemory());
                 if (!document.RootElement.TryGetProperty("files", out JsonElement filesProperty) || filesProperty.ValueKind != JsonValueKind.Object)
                     return false;
 
@@ -476,11 +470,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private void AddRecommendedItemCandidates(byte[] data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private void AddRecommendedItemCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
         {
             try
             {
-                using var document = JsonDocument.Parse(data);
+                using var document = JsonDocument.Parse(data.AsMemory());
                 if (!document.RootElement.TryGetProperty("recommendedItemDefaults", out JsonElement property) || property.ValueKind != JsonValueKind.Array)
                     return;
                 foreach (JsonElement value in property.EnumerateArray())

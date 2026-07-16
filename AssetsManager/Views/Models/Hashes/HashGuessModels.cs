@@ -27,6 +27,11 @@ namespace AssetsManager.Views.Models.Hashes
         public int ProcessedChunks { get; init; }
         public int FoundMatches { get; init; }
         public string CurrentWad { get; init; }
+        public long CheckedCandidates { get; init; }
+        public long DiscardedCandidates { get; init; }
+        public double CandidatesPerSecond { get; init; }
+        public TimeSpan Elapsed { get; init; }
+        public long ManagedMemoryBytes { get; init; }
     }
 
     public sealed class HashGuessRunResult

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
@@ -14,6 +15,7 @@ namespace AssetsManager.Services.Hashes
         private readonly HashSet<ulong> _unknownHashes;
         private readonly Dictionary<ulong, HashGuessMatch> _matches = new();
         private readonly Action<HashGuessMatch> _matchFound;
+        private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
         public HashGuessEngine(HashGuessDomain domain, HashSet<ulong> unknownHashes, Action<HashGuessMatch> matchFound = null)
         {
@@ -26,14 +28,25 @@ namespace AssetsManager.Services.Hashes
         public IReadOnlyDictionary<ulong, HashGuessMatch> Matches => _matches;
         public int RemainingUnknownCount => _unknownHashes.Count;
         public IReadOnlyCollection<ulong> UnknownHashes => _unknownHashes;
+        public long CheckedCandidates { get; private set; }
+        public long DiscardedCandidates { get; private set; }
 
         public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {
+            CheckedCandidates++;
             string path = NormalizePath(candidate);
-            if (path.Length == 0) return false;
+            if (path.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
 
             ulong hash = XxHash64Ext.Hash(path);
-            if (!_unknownHashes.Remove(hash)) return false;
+            if (!_unknownHashes.Remove(hash))
+            {
+                DiscardedCandidates++;
+                return false;
+            }
 
             var match = new HashGuessMatch
             {
@@ -47,6 +60,28 @@ namespace AssetsManager.Services.Hashes
             _matches[hash] = match;
             _matchFound?.Invoke(match);
             return true;
+        }
+
+        public HashGuessProgress CreateProgress(
+            string stage,
+            int processedChunks = 0,
+            int processedWads = 0,
+            int totalWads = 0)
+        {
+            TimeSpan elapsed = _stopwatch.Elapsed;
+            return new HashGuessProgress
+            {
+                ProcessedWads = processedWads,
+                TotalWads = totalWads,
+                ProcessedChunks = processedChunks,
+                FoundMatches = _matches.Count,
+                CurrentWad = stage,
+                CheckedCandidates = CheckedCandidates,
+                DiscardedCandidates = DiscardedCandidates,
+                CandidatesPerSecond = elapsed.TotalSeconds > 0 ? CheckedCandidates / elapsed.TotalSeconds : 0,
+                Elapsed = elapsed,
+                ManagedMemoryBytes = GC.GetTotalMemory(false)
+            };
         }
 
         public int CheckMany(IEnumerable<string> candidates, HashGuessStrategy strategy, string source = "Generated")

@@ -18,6 +18,8 @@ namespace AssetsManager.Services.Hashes.Guessers
     internal abstract class HashGuesser
     {
         private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+        private readonly object _corpusSync = new();
+        private HashCorpusIndex _corpus;
 
         protected HashGuesser(HashFile hashFile, string wadPattern)
         {
@@ -29,13 +31,28 @@ namespace AssetsManager.Services.Hashes.Guessers
         protected HashFile HashFile { get; }
         internal HashGuessDomain Domain { get; }
         internal string WadPattern { get; }
-        internal IReadOnlyList<string> KnownPaths => HashFile.LoadPaths();
+        protected HashCorpusIndex Corpus
+        {
+            get
+            {
+                IReadOnlyList<string> paths = HashFile.LoadPaths();
+                long revision = HashFile.Revision;
+                lock (_corpusSync)
+                {
+                    if (_corpus == null || _corpus.Revision != revision)
+                        _corpus = new HashCorpusIndex(revision, paths);
+                    return _corpus;
+                }
+            }
+        }
+
+        internal IReadOnlyList<string> KnownPaths => Corpus.Paths;
 
         internal static HashSet<ulong> UnknownFromExport(string directory) =>
             HashFile.LoadUnknownFromExport(directory);
 
         internal IReadOnlyList<string> DirectoryList() =>
-            HashGuessEngine.BuildDirectoryList(KnownPaths);
+            Corpus.GetOrCreate("directories", HashGuessEngine.BuildDirectoryList);
 
         internal string[] FindWads(string rootDirectory)
         {
@@ -86,13 +103,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             return new HashWadInventory(paths, hashes, chunkCount, hashXor, hashSum);
         }
 
-        internal static bool TryDecodeWadText(byte[] data, out string text)
+        internal static bool TryDecodeWadText(ArraySegment<byte> data, out string text)
         {
             text = string.Empty;
-            if (data == null || data.Length == 0) return false;
+            if (data.Count == 0) return false;
             try
             {
-                text = StrictUtf8.GetString(data);
+                text = StrictUtf8.GetString(data.Array, data.Offset, data.Count);
                 if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..];
                 return text.Length > 0;
             }
@@ -104,11 +121,11 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal abstract bool ShouldSkip(string extension);
         internal abstract IReadOnlyList<string> BuildWordlist();
-        internal abstract void GrepWad(HashGuessEngine engine, byte[] data, string sourcePath, string sourceWadPath, ulong sourceChunkHash);
+        internal abstract void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash);
 
         internal void CheckChunk(
             HashGuessEngine engine,
-            byte[] data,
+            ArraySegment<byte> data,
             string sourcePath,
             string sourceWadPath,
             ulong sourceChunkHash)
@@ -123,7 +140,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        protected abstract IEnumerable<HashGuessCandidate> ExtractCandidates(byte[] data, string sourcePath);
+        protected abstract IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath);
 
         internal abstract IEnumerable<HashGuessCandidate> GenerateCanonicalCandidates(HashGuesser otherDomain, int candidateBudget = int.MaxValue);
         internal abstract IEnumerable<HashGuessCandidate> GenerateLanguageCandidates(int candidateBudget = int.MaxValue);
@@ -179,12 +196,21 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         protected virtual bool IncludeNumberPath(string path) => true;
 
-        internal IEnumerable<HashGuessCandidate> GenerateExtensionCandidates(int candidateBudget = int.MaxValue) =>
-            GenerateExtensionCandidates(KnownPaths, candidateBudget);
+        internal IEnumerable<HashGuessCandidate> GenerateExtensionCandidates(int candidateBudget = int.MaxValue)
+        {
+            var paths = Corpus.GetOrCreate("extension-paths", BuildExtensionPaths);
+            return GenerateExtensionCandidates(paths.Prefixes, paths.Extensions, candidateBudget);
+        }
 
         protected static IEnumerable<HashGuessCandidate> GenerateExtensionCandidates(IEnumerable<string> knownPaths, int candidateBudget)
         {
-            var paths = knownPaths.ToList();
+            var paths = BuildExtensionPaths(knownPaths);
+            return GenerateExtensionCandidates(paths.Prefixes, paths.Extensions, candidateBudget);
+        }
+
+        private static (IReadOnlyList<string> Prefixes, IReadOnlyList<string> Extensions) BuildExtensionPaths(IEnumerable<string> knownPaths)
+        {
+            var paths = knownPaths as IReadOnlyList<string> ?? knownPaths.ToList();
             var extensions = paths.Select(Path.GetExtension)
                 .Where(extension => extension.Length > 0 && !extension.EndsWith("00", StringComparison.Ordinal))
                 .GroupBy(extension => extension, StringComparer.OrdinalIgnoreCase)
@@ -195,7 +221,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             var prefixes = paths.Select(path => Path.ChangeExtension(path, null))
                 .Where(prefix => !string.IsNullOrEmpty(prefix))
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(prefix => prefix, StringComparer.Ordinal);
+                .OrderBy(prefix => prefix, StringComparer.Ordinal)
+                .ToList();
+            return (prefixes, extensions);
+        }
+
+        private static IEnumerable<HashGuessCandidate> GenerateExtensionCandidates(
+            IReadOnlyList<string> prefixes,
+            IReadOnlyList<string> extensions,
+            int candidateBudget)
+        {
             int generated = 0;
             foreach (string prefix in prefixes)
             foreach (string extension in extensions)
@@ -252,10 +287,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             int? maxDirectories = null,
             int candidateBudget = int.MaxValue)
         {
-            IEnumerable<string> names = KnownPaths.Select(Path.GetFileName)
+            IEnumerable<string> names = Corpus.GetOrCreate("basenames", paths => paths.Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(name => name, StringComparer.Ordinal);
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList());
             IEnumerable<string> directories = DirectoryList();
             if (maxNames.HasValue) names = names.Take(Math.Max(0, maxNames.Value));
             if (maxDirectories.HasValue) directories = directories.Take(Math.Max(0, maxDirectories.Value));

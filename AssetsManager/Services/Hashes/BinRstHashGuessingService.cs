@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Hashing;
@@ -110,7 +111,8 @@ namespace AssetsManager.Services.Hashes
                             try
                             {
                                 using var data = wad.LoadChunkDecompressed(pair.Value);
-                                using var stream = new MemoryStream(data.Memory.ToArray(), false);
+                                ArraySegment<byte> buffer = data.DangerousGetArray();
+                                using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
                                 if (isBin)
                                 {
                                     ReadBinInventory(stream, observed);
@@ -176,6 +178,7 @@ namespace AssetsManager.Services.Hashes
             ValidateRoot(rootDirectory);
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
+            var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
             string[] wads = EnumerateWadContainers(rootDirectory);
             var gamePaths = await LoadGamePathsAsync(cancellationToken);
@@ -255,7 +258,8 @@ namespace AssetsManager.Services.Hashes
                                 using var data = wad.LoadChunkDecompressed(pair.Value);
                                 if (isBin)
                                 {
-                                    using var stream = new MemoryStream(data.Memory.ToArray(), false);
+                                    ArraySegment<byte> buffer = data.DangerousGetArray();
+                                    using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
                                     var tree = new BinTree(stream);
                                     
                                     // 1. Visit raw string values inside the bin
@@ -285,11 +289,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         _log.LogError(ex, $"Internal Hash Lab could not scan WAD '{wadPath}'.");
                     }
-                    progress?.Report(new InternalHashProgress
-                    {
-                        ProcessedWads = index + 1, TotalWads = wads.Length, ProcessedFiles = scanned,
-                        FoundMatches = matcher.Matches.Count, CurrentStage = "Scanning BIN and text content"
-                    });
+                    progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN and text content", scanned, index + 1, wads.Length));
                 }
             }, cancellationToken);
 
@@ -331,6 +331,7 @@ namespace AssetsManager.Services.Hashes
             ValidateRoot(rootDirectory);
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
+            var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
@@ -375,11 +376,8 @@ namespace AssetsManager.Services.Hashes
                         matcher.Check(candidate, strategy, source);
                         checkedCandidates++;
                         if ((checkedCandidates & 0x3ffff) == 0)
-                            progress?.Report(new InternalHashProgress
-                            {
-                                ProcessedFiles = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates,
-                                FoundMatches = matcher.Matches.Count, CurrentStage = source
-                            });
+                            progress?.Report(CreateProgress(matcher, stopwatch, source,
+                                checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
                         if (matcher.Remaining == 0) break;
                     }
                 }
@@ -405,6 +403,26 @@ namespace AssetsManager.Services.Hashes
             _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} values resolved from {initial} unknown hashes.");
             return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
         }
+
+        private static InternalHashProgress CreateProgress(
+            CandidateMatcher matcher,
+            Stopwatch stopwatch,
+            string stage,
+            int processedFiles,
+            int processedWads = 0,
+            int totalWads = 0) => new()
+        {
+            ProcessedWads = processedWads,
+            TotalWads = totalWads,
+            ProcessedFiles = processedFiles,
+            FoundMatches = matcher.Matches.Count,
+            CheckedCandidates = matcher.CheckedCandidates,
+            DiscardedCandidates = matcher.DiscardedCandidates,
+            CandidatesPerSecond = matcher.CheckedCandidates / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001),
+            Elapsed = stopwatch.Elapsed,
+            ManagedMemoryBytes = GC.GetTotalMemory(false),
+            CurrentStage = stage
+        };
 
         private async Task EnsureInventoryAsync(string rootDirectory, bool includeBin, bool includeRst, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
         {
@@ -1040,10 +1058,17 @@ namespace AssetsManager.Services.Hashes
             public CandidateMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) => _targets = targets;
             public IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
             public int Remaining => _targets.Values.Sum(values => values.Count);
+            public long CheckedCandidates { get; private set; }
+            public long DiscardedCandidates { get; private set; }
 
             public void Check(string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
             {
-                if (string.IsNullOrWhiteSpace(value) || value.Length > 512) return;
+                CheckedCandidates++;
+                if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
+                {
+                    DiscardedCandidates++;
+                    return;
+                }
                 string candidate = value.Trim().ToLowerInvariant();
                 uint fnv = Fnv1a.HashLower(candidate);
                 bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
@@ -1063,7 +1088,9 @@ namespace AssetsManager.Services.Hashes
 
                 if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
                 {
-                    byte[] bytes = Encoding.UTF8.GetBytes(candidate);
+                    int byteCount = Encoding.UTF8.GetByteCount(candidate);
+                    Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
+                    Encoding.UTF8.GetBytes(candidate, bytes);
                     ulong xxh3 = XxHash3.HashToUInt64(bytes);
                     CheckRst(InternalHashKind.RstXxh3, xxh3, candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
                     ulong xxh64 = XxHash64.HashToUInt64(bytes);

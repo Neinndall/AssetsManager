@@ -93,7 +93,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             return characters.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        internal override IReadOnlyList<string> BuildWordlist() => HashGuessEngine.BuildWordlist(KnownPaths);
+        internal override IReadOnlyList<string> BuildWordlist() =>
+            Corpus.GetOrCreate("wordlist", HashGuessEngine.BuildWordlist);
 
         internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
@@ -350,7 +351,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken)
         {
             int checkedCandidates = 0;
-            var paths = KnownPaths.ToList();
+            var paths = KnownPaths;
 
             checkedCandidates += CheckCandidates(engine, SubstituteSkinNumbers(), "GAME skin number combinations", cancellationToken);
             if (engine.RemainingUnknownCount > 0)
@@ -367,31 +368,31 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Bin paths" });
-                var binPaths = paths.Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
+                progress?.Report(engine.CreateProgress("Focused Attack: Bin paths", checkedCandidates));
+                var binPaths = Corpus.GetOrCreate("bin-paths", values => values.Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList());
                 checkedCandidates += RunFocusedWordlistSubstitution(engine, binPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(binPaths).Take(20000), cancellationToken);
 
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Data bin paths" });
-                    var dataBins = paths.Where(path => path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList();
+                    progress?.Report(engine.CreateProgress("Focused Attack: Data bin paths", checkedCandidates));
+                    var dataBins = Corpus.GetOrCreate("data-bin-paths", values => values.Where(path => path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList());
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, dataBins.Take(25000), HashGuessEngine.BuildBasenameWordlist(dataBins).Take(20000), cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Characters DDS paths" });
-                    var ddsPaths = paths.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList();
+                    progress?.Report(engine.CreateProgress("Focused Attack: Characters DDS paths", checkedCandidates));
+                    var ddsPaths = Corpus.GetOrCreate("character-dds-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList());
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, ddsPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(ddsPaths).Take(20000), cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Characters TEX paths" });
-                    var texPaths = paths.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList();
+                    progress?.Report(engine.CreateProgress("Focused Attack: Characters TEX paths", checkedCandidates));
+                    var texPaths = Corpus.GetOrCreate("character-tex-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList());
                     checkedCandidates += RunFocusedWordlistSubstitution(engine, texPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(texPaths).Take(20000), cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: Word insertions" });
+                    progress?.Report(engine.CreateProgress("Focused Attack: Word insertions", checkedCandidates));
                     var additionPaths = paths.Where(path => !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
                         !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) && !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
                         !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase));
@@ -405,14 +406,14 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "Focused Attack: GAME prefixes" });
+                progress?.Report(engine.CreateProgress("Focused Attack: GAME prefixes", checkedCandidates));
                 checkedCandidates += CheckCandidates(engine, CheckBasenamePrefixes(), "GAME basename prefixes", cancellationToken);
                 if (engine.RemainingUnknownCount > 0)
                     checkedCandidates += CheckCandidates(engine, GuessShaderVariants(), "GAME shader variants", cancellationToken);
             }
             if (engine.RemainingUnknownCount > 0)
             {
-                progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = "GAME Cartesian Cross" });
+                progress?.Report(engine.CreateProgress("GAME Cartesian Cross", checkedCandidates));
                 checkedCandidates += SubstituteBasenames(engine, cancellationToken);
             }
             return checkedCandidates;
@@ -433,7 +434,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 engine.Check(candidate.Path, candidate.Strategy, source);
                 checkedCount++;
                 if (checkedCount % 5000 == 0)
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = progressOffset + checkedCount, FoundMatches = engine.Matches.Count, CurrentWad = source });
+                    progress?.Report(engine.CreateProgress(source, progressOffset + checkedCount));
                 if (engine.RemainingUnknownCount == 0) break;
             }
             return checkedCount;
@@ -518,7 +519,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     using var wad = new WadFile(wadPath);
                     if (!wad.Chunks.TryGetValue(skinsJsonHash, out WadChunk chunk)) continue;
                     using var dataOwner = wad.LoadChunkDecompressed(chunk);
-                    byte[] data = dataOwner.Span.ToArray();
+                    ArraySegment<byte> data = dataOwner.DangerousGetArray();
                     if (!TryDecodeWadText(data, out string json)) continue;
                     using (JsonDocument document = JsonDocument.Parse(json))
                     {
@@ -605,7 +606,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return words.ToList();
         }
 
-        internal override void GrepWad(HashGuessEngine engine, byte[] data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
+        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
             CheckChunk(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
 
         internal int GrepFile(
@@ -626,9 +627,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(byte[] data, string sourcePath)
+        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath)
         {
-            if (data == null || data.Length == 0) yield break;
+            if (data.Count == 0) yield break;
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
             if (extension is "bin" or "inibin")
@@ -636,9 +637,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 foreach (int offset in FindBinPathOffsets(data))
                 {
                     if (offset < 2) continue;
-                    int length = data[offset - 2] | (data[offset - 1] << 8);
-                    if (length <= 0 || offset + length > data.Length) continue;
-                    string path = NormalizePath(Encoding.ASCII.GetString(data, offset, length));
+                    int length = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
+                    if (length <= 0 || offset + length > data.Count) continue;
+                    string path = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
                     foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.BinLengthPath))
                         yield return candidate;
                 }
@@ -646,7 +647,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             if (!TryDecodeWadText(data, out string text))
-                text = Encoding.ASCII.GetString(data);
+                text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
             if (extension == "preload")
             {
                 string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
@@ -688,21 +689,21 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return candidate;
         }
 
-        private static IEnumerable<HashGuessCandidate> GrepFileCandidates(byte[] data)
+        private static IEnumerable<HashGuessCandidate> GrepFileCandidates(ArraySegment<byte> data)
         {
             var paths = new HashSet<string>(StringComparer.Ordinal);
             foreach ((int offset, int length) in FindGeneralPathRanges(data))
             {
-                string path = NormalizePath(Encoding.ASCII.GetString(data, offset, length));
+                string path = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
                 if (path.Length > 0) paths.Add(path);
 
                 if (offset < 2) continue;
-                int encodedLength = data[offset - 2] | (data[offset - 1] << 8);
+                int encodedLength = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
                 if (encodedLength == 0 && offset >= 4)
-                    encodedLength = data[offset - 4] | (data[offset - 3] << 8) |
-                                    (data[offset - 2] << 16) | (data[offset - 1] << 24);
-                if (encodedLength <= 0 || encodedLength >= length || offset + encodedLength > data.Length) continue;
-                string shortened = NormalizePath(Encoding.ASCII.GetString(data, offset, encodedLength));
+                    encodedLength = ByteAt(data, offset - 4) | (ByteAt(data, offset - 3) << 8) |
+                                    (ByteAt(data, offset - 2) << 16) | (ByteAt(data, offset - 1) << 24);
+                if (encodedLength <= 0 || encodedLength >= length || offset + encodedLength > data.Count) continue;
+                string shortened = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, encodedLength));
                 if (shortened.Length > 0) paths.Add(shortened);
             }
 
@@ -712,18 +713,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (emitted.Add(candidate.Path)) yield return candidate;
         }
 
-        private static IEnumerable<(int Offset, int Length)> FindGeneralPathRanges(byte[] data)
+        private static IEnumerable<(int Offset, int Length)> FindGeneralPathRanges(ArraySegment<byte> data)
         {
-            for (int offset = 0; offset < data.Length; offset++)
+            for (int offset = 0; offset < data.Count; offset++)
             foreach (byte[] prefix in GeneralPathPrefixes)
             {
-                if (offset + prefix.Length > data.Length) continue;
+                if (offset + prefix.Length > data.Count) continue;
                 int prefixIndex = 0;
-                while (prefixIndex < prefix.Length && ToUpperAscii(data[offset + prefixIndex]) == prefix[prefixIndex]) prefixIndex++;
+                while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
                 if (prefixIndex != prefix.Length) continue;
 
                 int end = offset + prefix.Length;
-                while (end < data.Length && IsGeneralPathByte(data[end])) end++;
+                while (end < data.Count && IsGeneralPathByte(ByteAt(data, end))) end++;
                 yield return (offset, end - offset);
                 break;
             }
@@ -795,12 +796,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private static IReadOnlyList<int> FindBinPathOffsets(byte[] data)
+        private static IReadOnlyList<int> FindBinPathOffsets(ArraySegment<byte> data)
         {
             var offsets = new HashSet<int>();
-            for (int offset = 0; offset < data.Length; offset++)
+            for (int offset = 0; offset < data.Count; offset++)
             {
-                byte[][] needles = ToUpperAscii(data[offset]) switch
+                byte[][] needles = ToUpperAscii(ByteAt(data, offset)) switch
                 {
                     (byte)'A' => BinPrefixesA,
                     (byte)'C' => BinPrefixesC,
@@ -816,9 +817,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (needles == null) continue;
                 foreach (byte[] needle in needles)
                 {
-                    if (offset + needle.Length > data.Length) continue;
+                    if (offset + needle.Length > data.Count) continue;
                     int index = 1;
-                    while (index < needle.Length && ToUpperAscii(data[offset + index]) == needle[index]) index++;
+                    while (index < needle.Length && ToUpperAscii(ByteAt(data, offset + index)) == needle[index]) index++;
                     if (index == needle.Length) offsets.Add(offset);
                 }
             }
@@ -828,6 +829,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static byte ToUpperAscii(byte value) => value is >= (byte)'a' and <= (byte)'z'
             ? (byte)(value - ('a' - 'A'))
             : value;
+
+        private static byte ByteAt(ArraySegment<byte> data, int index) => data.Array[data.Offset + index];
 
         private static byte[][] ToAsciiPrefixes(params string[] prefixes) => prefixes.Select(Encoding.ASCII.GetBytes).ToArray();
 

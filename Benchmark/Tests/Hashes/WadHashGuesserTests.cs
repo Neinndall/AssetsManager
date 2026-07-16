@@ -29,6 +29,52 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void CorpusCollectionsAreReusedWithinTheSameRevision()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.bin",
+                "assets/characters/lux/lux.bin"
+            }));
+
+            Assert.Same(game.KnownPaths, game.KnownPaths);
+            Assert.Same(game.DirectoryList(), game.DirectoryList());
+            Assert.Same(game.BuildWordlist(), game.BuildWordlist());
+        }
+
+        [Fact]
+        public void GrepDoesNotReadPooledArrayPaddingOutsideTheOwnedSegment()
+        {
+            const string hiddenPath = "assets/characters/ahri/hidden.bin";
+            byte[] prefix = Encoding.ASCII.GetBytes("no paths here");
+            byte[] padding = Encoding.ASCII.GetBytes(hiddenPath);
+            byte[] pooledArray = prefix.Concat(padding).ToArray();
+            var engine = CreateEngine(HashGuessDomain.Game, hiddenPath);
+            var game = new GameHashGuesser();
+
+            game.GrepWad(engine, new ArraySegment<byte>(pooledArray, 0, prefix.Length), "test.txt", "test.wad.client", 1);
+
+            Assert.Equal(1, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
+        public void EngineTelemetryCountsCheckedAndDiscardedCandidates()
+        {
+            const string expected = "assets/test.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            engine.Check("assets/missing.bin", HashGuessStrategy.EmbeddedPathGrep);
+            engine.Check(expected, HashGuessStrategy.EmbeddedPathGrep);
+            HashGuessProgress progress = engine.CreateProgress("test");
+
+            Assert.Equal(2, progress.CheckedCandidates);
+            Assert.Equal(1, progress.DiscardedCandidates);
+            Assert.Equal(1, progress.FoundMatches);
+            Assert.True(progress.CandidatesPerSecond > 0);
+            Assert.True(progress.ManagedMemoryBytes > 0);
+        }
+
+        [Fact]
         public void LcuGrepCombinesRelativeBasenamesWithKnownDirectories()
         {
             const string expected = "plugins/rcp-fe-test/global/default/images/icon.png";
