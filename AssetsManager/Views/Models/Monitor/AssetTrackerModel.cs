@@ -12,6 +12,16 @@ namespace AssetsManager.Views.Models.Monitor
     /// ENUM: Status of a category check
     /// </summary>
     public enum CategoryStatus { Idle, Checking, CompletedSuccess }
+    public enum TrackedAssetState
+    {
+        Pending = 0,
+        Checking = 1,
+        Available = 2,
+        Missing = 5,
+        TemporaryError = 6,
+        RemovedCandidate = 7,
+        Removed = 8
+    }
 
     /// <summary>
     /// MAIN MODEL: State of the Asset Tracker Control
@@ -70,6 +80,9 @@ namespace AssetsManager.Views.Models.Monitor
         public string Name { get; set; }
         public string BaseUrl { get; set; }
         public string Extension { get; set; }
+        public List<string> Extensions { get; set; } = new List<string>();
+        public int ForwardScanWindow { get; set; } = 10;
+        public int MaxConcurrency { get; set; } = 6;
         
         private long _start;
         public long Start
@@ -78,11 +91,8 @@ namespace AssetsManager.Views.Models.Monitor
             set { if (_start != value) { _start = value; OnPropertyChanged(); } }
         }
 
-        public long LastValid { get; set; }
-        public List<long> FoundUrls { get; set; } = new List<long>();
-        public List<long> FailedUrls { get; set; } = new List<long>();
         public List<long> UserRemovedUrls { get; set; } = new List<long>();
-        public Dictionary<long, string> FoundUrlOverrides { get; set; } = new Dictionary<long, string>();
+        public Dictionary<long, AssetTrackerEntry> Entries { get; set; } = new Dictionary<long, AssetTrackerEntry>();
 
         private bool _hasNewAssets;
         public bool HasNewAssets
@@ -114,6 +124,13 @@ namespace AssetsManager.Views.Models.Monitor
         private string _thumbnail;
         private string _displayName;
         private string _url;
+        private TrackedAssetState _state;
+
+        public TrackedAsset()
+        {
+            _state = TrackedAssetState.Pending;
+            _status = "Pending";
+        }
 
         public string Url
         {
@@ -139,10 +156,41 @@ namespace AssetsManager.Views.Models.Monitor
             set { if (_thumbnail != value) { _thumbnail = value; OnPropertyChanged(); } }
         }
 
+        public long AssetId { get; set; }
+        public TrackedAssetState State
+        {
+            get => _state;
+            set { if (_state != value) { _state = value; Status = GetStatusText(value); OnPropertyChanged(); } }
+        }
+        private static string GetStatusText(TrackedAssetState state) => state switch
+        {
+            TrackedAssetState.Available => "OK",
+            TrackedAssetState.Checking => "Checking",
+            TrackedAssetState.Missing => "Not Found",
+            TrackedAssetState.TemporaryError => "Pending",
+            TrackedAssetState.RemovedCandidate => "Not Found",
+            TrackedAssetState.Removed => "Not Found",
+            _ => "Pending"
+        };
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public class AssetTrackerEntry
+    {
+        public long AssetId { get; set; }
+        public string Url { get; set; }
+        public string Extension { get; set; }
+        public TrackedAssetState State { get; set; } = TrackedAssetState.Pending;
+        public int? LastHttpStatus { get; set; }
+        public int FailureCount { get; set; }
+        public DateTime? FirstSeen { get; set; }
+        public DateTime? LastSeen { get; set; }
+        public DateTime? LastChecked { get; set; }
+        public bool WasCdnProbed { get; set; }
     }
 }

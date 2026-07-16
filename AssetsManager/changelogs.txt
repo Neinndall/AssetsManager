@@ -17,6 +17,8 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Asset Tracker now shares one ten-candidate flow between manual and background checks.
+  - Asset Tracker now persists per-ID CDN results and checks both JPG and PNG formats.
   - Simplified GitHub issue templates (Bug Report and Suggestion) to reduce input redundancy and improve user experience.
   - Comparison archives now report when history saving begins.
   - Hash Guessing Lab now shows live candidate counts during long guessing phases.
@@ -62,6 +64,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Prevented temporary CDN errors from being recorded as permanently missing assets.
   - Fixed selected Explorer and comparison results keeping their NEW, MODIFIED, and REMOVED colors.
   - Fixed archived single-WAD comparisons saving empty snapshots that could not be previewed.
   - Fixed new asset extraction from a single WAD comparison using invalid duplicate WAD paths.

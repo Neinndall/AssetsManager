@@ -483,17 +483,23 @@ namespace AssetsManager.Views.Models.Monitor
             if (!_monitorService.AssetCategories.Any()) _monitorService.LoadAssetCategories();
 
             AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
-            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(c => c.FoundUrls?.Count ?? 0);
+            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(category =>
+                category.Entries.Values.Count(entry => entry.State == TrackedAssetState.Available));
 
             var lastActiveCategory = _monitorService.AssetCategories
-                .Where(c => c.FoundUrls != null && c.FoundUrls.Any())
-                .OrderByDescending(c => c.FoundUrls.Max())
+                .Where(category => category.Entries.Values.Any(entry => entry.State == TrackedAssetState.Available))
+                .OrderByDescending(category => category.Entries.Values
+                    .Where(entry => entry.State == TrackedAssetState.Available)
+                    .Max(entry => entry.AssetId))
                 .FirstOrDefault();
 
             if (lastActiveCategory != null)
             {
                 LastDiscoveredCategory = lastActiveCategory.Name;
-                LastDiscoveredAssetId = lastActiveCategory.FoundUrls.Max().ToString();
+                LastDiscoveredAssetId = lastActiveCategory.Entries.Values
+                    .Where(entry => entry.State == TrackedAssetState.Available)
+                    .Max(entry => entry.AssetId)
+                    .ToString();
             }
             else
             {
