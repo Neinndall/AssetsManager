@@ -10,54 +10,34 @@ body:
       value: |
         > [!IMPORTANT]  
         > Thanks for taking the time to fill out this bug report!
-        >
-        > Please provide the following information as detailed as possible.
+        > Please provide the information below to help us investigate.
 
   - type: textarea
     id: description
     attributes:
-      label: "📝 Description of the Bug"
-      description: "Clearly describe the problem you encountered. What were you trying to do? What happened instead?"
-      placeholder: "A clear and concise description of what the bug is."
+      label: "📝 Bug Description"
+      description: "Clearly describe the problem. What were you doing? What happened, and what did you expect to happen?"
+      placeholder: "A clear and concise description of the bug, including expected vs actual behavior."
     validations:
       required: true
       
   - type: textarea
     id: steps-to-reproduce
     attributes:
-      label: "🛠️ (Steps to Reproduce)"
-      description: "List the exact steps to reproduce the behavior. This is crucial for us to investigate the issue."
+      label: "🛠️ Steps to Reproduce (Optional)"
+      description: "List the exact steps to reproduce the behavior if applicable."
       placeholder: |
         1. Go to '...'
         2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
+        3. See error
     validations:
-      required: true
-      
-  - type: textarea
-    id: expected-behavior
-    attributes:
-      label: "🎯 Expected Behavior"
-      description: "Describe what you expected to happen when you followed the steps above."
-      placeholder: "A clear and concise description of what you expected to happen."
-    validations:
-      required: true
-      
-  - type: textarea
-    id: actual-behavior
-    attributes:
-      label: "💥 Actual Behavior"
-      description: "Describe what actually happened, including any error messages, crashes, or unexpected results."
-      placeholder: "A clear and concise description of what actually happened."
-    validations:
-      required: true
+      required: false
       
   - type: textarea
     id: screenshots
     attributes:
       label: "📸 Screenshots or Videos (Optional)"
-      description: "If possible, attach screenshots or a short video showing the problem. This can greatly help in understanding the context."
+      description: "Attach screenshots or a short video showing the problem."
       placeholder: "Drag and drop images or videos here, or paste links."
     validations:
       required: false
@@ -66,50 +46,28 @@ body:
     id: version
     attributes:
       label: "AssetsManager Version"
-      description: "e.g., v2.1.0.0, you can find it in the Help -> About window"
-      placeholder: "vX.Y.Z.W"
+      description: "e.g., v4.1.0.3 (found in the Help -> About window)"
+      placeholder: "v4.x.y.z"
     validations:
       required: true
       
   - type: input
-    id: os
+    id: environment
     attributes:
-      label: "Operating System"
-      description: "e.g., Windows 10, Windows 11"
-      placeholder: "Windows 11"
+      label: "Operating System & Environment (Optional)"
+      description: "e.g., Windows 11 x64, Update (or Clean Installation)"
+      placeholder: "Windows 11 x64"
     validations:
-      required: true
-      
-  - type: input
-    id: architecture
-    attributes:
-      label: "Architecture"
-      description: "e.g., x64"
-      placeholder: "x64"
-    validations:
-      required: true
-      
-  - type: dropdown
-    id: installation-type
-    attributes:
-      label: "Installation Type"
-      description: "Is this a clean installation or an update?"
-      options:
-        - "Clean Installation"
-        - "Update"
-    validations:
-      required: true
+      required: false
       
   - type: textarea
     id: log-files
     attributes:
-      label: "📄 Log Files"
+      label: "📄 Log Files (Optional)"
       description: |
-        Please provide relevant log entries. You can find log files in the `logs` folder next to the application executable:
+        Please provide relevant log entries if available. You can find log files in the `logs` folder:
         - `application.log`: General application logs.
-        - `application_errors.log`: Critical errors and fatal exceptions.
-        
-        If the application crashed, please attach the `application_errors.log` file directly to the issue comment after creating the issue. For smaller logs, you can paste them here.
+        - `application_errors.log`: Critical errors.
       render: shell
     validations:
       required: false
@@ -118,6 +76,6 @@ body:
     id: additional-context
     attributes:
       label: "💡 Additional Context (Optional)"
-      description: "Any other information you deem relevant to understand or solve the problem (e.g., recent system changes, specific configurations, etc.)."
+      description: "Any other information or specific configurations."
     validations:
       required: false
