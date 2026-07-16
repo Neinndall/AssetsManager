@@ -62,7 +62,9 @@ namespace AssetsManager.Services.Hashes
 
             var runResult = await Task.Run(() =>
             {
-                var engine = new HashGuessEngine(domain, unknownHashes, matchProgress?.Report);
+                Action<HashGuessMatch> reportMatch =
+                    matchProgress is null ? null : matchProgress.Report;
+                var engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
                 int processedChunks = 0;
 
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
