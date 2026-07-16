@@ -67,6 +67,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Configuration writes are now atomic and recover automatically from a valid backup after corruption.
   - Background update, Asset Tracker, and PBE checks no longer overlap or continue notifying after shutdown.
   - Raw export now correctly saves loose physical files, including local BNK and WPK sound banks.
   - WAD Path GREP no longer runs the numbered shader attack reserved for GAME Basic Suite.
