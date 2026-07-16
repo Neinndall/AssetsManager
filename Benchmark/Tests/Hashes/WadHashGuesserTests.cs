@@ -75,6 +75,22 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void WadGrepDoesNotRunNumberedShaderAttack()
+        {
+            const string numberedShader = "assets/shaders/generated/shaders/test.ps_2_0.dx11_100";
+            var game = new GameHashGuesser();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+            {
+                XxHash64Ext.Hash(numberedShader)
+            });
+
+            game.GrepFile(engine, data: Encoding.ASCII.GetBytes("SHADERS/test"));
+
+            Assert.Empty(engine.Matches);
+            Assert.Equal(1, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
         public void LcuGrepCombinesRelativeBasenamesWithKnownDirectories()
         {
             const string expected = "plugins/rcp-fe-test/global/default/images/icon.png";
