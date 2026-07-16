@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Threading;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using Newtonsoft.Json.Linq;
@@ -36,12 +37,13 @@ namespace AssetsManager.Services.Monitor
             _appSettings = appSettings;
         }
 
-        public async Task<string> CheckPbeStatusAsync()
+        public async Task<string> CheckPbeStatusAsync(CancellationToken cancellationToken = default)
         {
             string notificationMessage = null;
             try
             {
-                var response = await _httpClient.GetStringAsync(PbeStatusUrl);
+                var response = await _httpClient.GetStringAsync(PbeStatusUrl, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 string fullStatus = ExtractStatus(response);
                 string conciseStatus = ExtractConciseStatus(response);
 
@@ -63,15 +65,18 @@ namespace AssetsManager.Services.Monitor
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logService.LogError(ex, "Failed to check PBE status.");
             }
             finally
             {
-                _appSettings.LastPbeCheckTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                AppSettings.SaveSettings(_appSettings);
-                StatusChecked?.Invoke();
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _appSettings.LastPbeCheckTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    AppSettings.SaveSettings(_appSettings);
+                    StatusChecked?.Invoke();
+                }
             }
             return notificationMessage;
         }
