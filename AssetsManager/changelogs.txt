@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Simplified GitHub issue templates (Bug Report and Suggestion) to reduce input redundancy and improve user experience.
   - Comparison archives now report when history saving begins.
   - Hash Guessing Lab now shows live candidate counts during long guessing phases.
   - LCU Advanced guessing now targets frontend JSON assets with a dedicated vocabulary.
