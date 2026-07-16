@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Hash Guessing Lab now shows session targets, resolved hashes, and clear unresolved-history breakdowns.
   - Automated regression coverage now verifies Viewer scene disposal and media-preview cleanup lifecycles.
   - Hash Guessing now reuses indexed corpus data, reduces temporary buffers across GAME, LCU, BIN and RST, and shows live performance metrics.
   - Image exports now use less memory and remain responsive during encoding.
@@ -68,6 +69,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
 
 Bug Fixes
+  - Version updates now display the completed verification and updating states before advancing or closing.
   - Background update, Asset Tracker, and PBE checks no longer overlap or continue notifying after shutdown.
   - Raw export now correctly saves loose physical files, including local BNK and WPK sound banks.
   - WAD Path GREP no longer runs the numbered shader attack reserved for GAME Basic Suite.

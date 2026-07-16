@@ -119,7 +119,6 @@ namespace AssetsManager.Views
             _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
             _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
             _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
-            _versionService.VerificationCompleted += _progressUIManager.OnVersionVerificationCompleted;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
