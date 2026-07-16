@@ -24,7 +24,9 @@ namespace AssetsManager.Services.Core
         private Timer _updateTimer;
         private Timer _assetTrackerTimer;
         private Timer _pbeStatusTimer;
-        private bool _isCheckingAssets = false;
+        private readonly NonOverlappingAsyncJob _generalUpdatesJob = new();
+        private readonly NonOverlappingAsyncJob _assetTrackerJob = new();
+        private readonly NonOverlappingAsyncJob _pbeStatusJob = new();
 
         public event Action<string, string> UpdatesFound;
 
@@ -42,6 +44,10 @@ namespace AssetsManager.Services.Core
 
         public void Start()
         {
+            _generalUpdatesJob.Start();
+            _assetTrackerJob.Start();
+            _pbeStatusJob.Start();
+
             // Start general updates timer
             if (_appSettings.BackgroundUpdates)
             {
@@ -84,21 +90,25 @@ namespace AssetsManager.Services.Core
 
         private async void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            await CheckForGeneralUpdatesAsync(true);
+            await RunTimerJobAsync(() => CheckForGeneralUpdatesAsync(true), "Background update check");
         }
 
         private async void AssetTrackerTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            await CheckForAssetsAsync();
+            await RunTimerJobAsync(CheckForAssetsAsync, "Asset Tracker check");
         }
 
         private async void PbeStatusTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            await CheckForPbeStatusAsync();
+            await RunTimerJobAsync(CheckForPbeStatusAsync, "PBE status check");
         }
 
         public void Stop()
         {
+            _generalUpdatesJob.Stop();
+            _assetTrackerJob.Stop();
+            _pbeStatusJob.Stop();
+
             if (_updateTimer != null)
             {
                 _updateTimer.Enabled = false;
@@ -132,14 +142,7 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private async Task CheckForAssetsAsync()
         {
-            if (_isCheckingAssets)
-            {
-                _logService.LogDebug("Asset check is already in progress. Skipping this run.");
-                return;
-            }
-
-            _isCheckingAssets = true;
-            try
+            bool completed = await _assetTrackerJob.TryRunAsync(async cancellationToken =>
             {
                 var updatedCategoryNames = new List<string>();
                 await _monitorService.CheckAllAssetCategoriesAsync(true, (categoryName) =>
@@ -148,8 +151,9 @@ namespace AssetsManager.Services.Core
                     {
                         updatedCategoryNames.Add(categoryName);
                     }
-                });
+                }, cancellationToken);
 
+                cancellationToken.ThrowIfCancellationRequested();
                 if (updatedCategoryNames.Any())
                 {
                     if (updatedCategoryNames.Count == 1)
@@ -162,11 +166,8 @@ namespace AssetsManager.Services.Core
                         UpdatesFound?.Invoke($"New assets found in categories: {categories}", null);
                     }
                 }
-            }
-            finally
-            {
-                _isCheckingAssets = false;
-            }
+            });
+            if (!completed) _logService.LogDebug("Asset check skipped because it is already running or monitoring stopped.");
         }
 
         /// <summary>
@@ -176,11 +177,13 @@ namespace AssetsManager.Services.Core
         /// </summary>
         private async Task CheckForPbeStatusAsync()
         {
-            string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync();
-            if (!string.IsNullOrEmpty(pbeStatusMessage))
+            bool completed = await _pbeStatusJob.TryRunAsync(async cancellationToken =>
             {
-                UpdatesFound?.Invoke(pbeStatusMessage, null);
-            }
+                string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null);
+            });
+            if (!completed) _logService.LogDebug("PBE status check skipped because it is already running or monitoring stopped.");
         }
 
         /// <summary>
@@ -190,66 +193,57 @@ namespace AssetsManager.Services.Core
         /// </summary>
         public async Task CheckForGeneralUpdatesAsync(bool silent = false)
         {
-            var tasks = new List<Task>();
-
-            // 1. App Version Check
-            tasks.Add(Task.Run(async () =>
+            bool completed = await _generalUpdatesJob.TryRunAsync(async cancellationToken =>
             {
-                var (appUpdateAvailable, newVersion) = await _updateManager.IsNewVersionAvailableAsync();
-                if (appUpdateAvailable)
+                var tasks = new List<Task>();
+
+                tasks.Add(CheckApplicationUpdateAsync());
+
+                if (_appSettings.SyncHashesWithCDTB)
                 {
-                    AvailableVersion = newVersion;
-                    
-                    // Decide notification message
+                    tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
+                    {
+                        if (silent && !cancellationToken.IsCancellationRequested)
+                            UpdatesFound?.Invoke("New hashes are available!", null);
+                    }));
+                }
+
+                if (_appSettings.AssetWatcherUpdates) tasks.Add(CheckMonitoredAssetsAsync());
+
+                await Task.WhenAll(tasks);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                async Task CheckApplicationUpdateAsync()
+                {
+                    var (appUpdateAvailable, newVersion) = await _updateManager.IsNewVersionAvailableAsync();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    AvailableVersion = appUpdateAvailable ? newVersion : null;
+                    if (!appUpdateAvailable) return;
+
                     string currentVerStr = ApplicationInfos.Version.Split('-')[0].Replace("v", "");
                     string latestVerStr = newVersion.Replace("v", "");
+                    if (!Version.TryParse(currentVerStr, out var currentVer) ||
+                        !Version.TryParse(latestVerStr, out var latestVer)) return;
 
-                    if (Version.TryParse(currentVerStr, out var currentVer) && 
-                        Version.TryParse(latestVerStr, out var latestVer))
-                    {
-                        string message = ApplicationInfos.IsQA && latestVer <= currentVer
-                            ? $"New stable version {newVersion} is available!"
-                            : $"New version {newVersion} is available!";
-
-                        UpdatesFound?.Invoke(message, newVersion);
-                    }
+                    string message = ApplicationInfos.IsQA && latestVer <= currentVer
+                        ? $"New stable version {newVersion} is available!"
+                        : $"New version {newVersion} is available!";
+                    UpdatesFound?.Invoke(message, newVersion);
                 }
-                else
+
+                async Task CheckMonitoredAssetsAsync()
                 {
-                    AvailableVersion = null;
+                    var (anyUpdated, updatedNames) = await _monitorService.CheckAssetsUpdatesAsync(silent);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!anyUpdated) return;
+
+                    string message = updatedNames.Count > 0
+                        ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
+                        : "Some monitored local assets have been updated!";
+                    UpdatesFound?.Invoke(message, null);
                 }
-            }));
-
-            // 2. Hash Sync Check
-            if (_appSettings.SyncHashesWithCDTB)
-            {
-                tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
-                {
-                    if (silent)
-                    {
-                        UpdatesFound?.Invoke("New hashes are available!", null);
-                    }
-                }));
-            }
-
-            // 3. Asset Updates Check (Local WADs)
-            if (_appSettings.AssetWatcherUpdates)
-            {
-                tasks.Add(_monitorService.CheckAssetsUpdatesAsync(silent).ContinueWith(t =>
-                {
-                    var (anyUpdated, updatedNames) = t.Result;
-                    if (anyUpdated)
-                    {
-                        string message = updatedNames.Count > 0
-                            ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
-                            : "Some monitored local assets have been updated!";
-
-                        UpdatesFound?.Invoke(message, null);
-                    }
-                }));
-            }
-
-            await Task.WhenAll(tasks);
+            });
+            if (!completed) _logService.LogDebug("General update check skipped because it is already running or monitoring stopped.");
         }
 
         /// <summary>
@@ -271,6 +265,18 @@ namespace AssetsManager.Services.Core
             }
 
             await Task.WhenAll(tasks);
+        }
+
+        private async Task RunTimerJobAsync(Func<Task> operation, string name)
+        {
+            try
+            {
+                await operation();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"{name} failed.");
+            }
         }
     }
 }

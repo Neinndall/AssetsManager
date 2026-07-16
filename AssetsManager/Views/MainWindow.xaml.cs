@@ -456,6 +456,7 @@ namespace AssetsManager.Views
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
+            _updateCheckService.Stop();
             StateChanged -= MainWindow_StateChanged;
             TrayIcon?.Dispose();
         }

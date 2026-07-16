@@ -270,19 +270,21 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<bool> CheckAllAssetCategoriesAsync(bool silent, Action<string> onUpdatesFound = null)
+        public async Task<bool> CheckAllAssetCategoriesAsync(bool silent, Action<string> onUpdatesFound = null, CancellationToken cancellationToken = default)
         {
             if (!AssetCategories.Any()) LoadAssetCategories();
             bool anyNewAssetFound = false;
             foreach (var category in AssetCategories)
             {
-                if (await CheckCategoryAsync(category, silent, onUpdatesFound)) anyNewAssetFound = true;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (await CheckCategoryAsync(category, silent, onUpdatesFound, cancellationToken)) anyNewAssetFound = true;
             }
             return anyNewAssetFound;
         }
 
-        private async Task<bool> CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
+        private async Task<bool> CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             try
             {
@@ -290,7 +292,7 @@ namespace AssetsManager.Services.Monitor
 
                 IReadOnlyList<long> idsToCheck = _assetTrackerScannerService.BuildCandidateIds(category);
 
-                AssetTrackerScanResult result = await ScanAndSaveAsync(idsToCheck, category, onUpdatesFound);
+                AssetTrackerScanResult result = await ScanAndSaveAsync(idsToCheck, category, onUpdatesFound, cancellationToken);
 
                 CategoryCheckCompleted?.Invoke(category);
                 return result.NewDiscoveries > 0;
