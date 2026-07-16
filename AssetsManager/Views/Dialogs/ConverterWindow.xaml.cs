@@ -177,7 +177,7 @@ namespace AssetsManager.Views.Dialogs
                 var bitmap = TextureUtils.LoadTexture(stream, Path.GetExtension(item.FilePath));
                 if (bitmap != null)
                 {
-                    TextureUtils.SaveBitmapSourceAsImage(bitmap, item.FileName, destinationPath, ViewModel.SelectedImageFormat, null);
+                    await TextureUtils.SaveBitmapSourceAsImageAsync(bitmap, item.FileName, destinationPath, ViewModel.SelectedImageFormat, null);
                     item.Status = "Done";
                 }
                 else
