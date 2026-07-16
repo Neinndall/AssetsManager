@@ -438,23 +438,14 @@ public class ManifestDownloader
                     }
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception ex) { _logService.LogError(ex, $"Bundle {bundleEntry.Key:X16} processing error"); }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Bundle {bundleEntry.Key:X16} processing error");
+                    throw;
+                }
                 finally { netSem.Release(); }
             });
             await Task.WhenAll(tasks);
-
-            if (completedChunks != totalChunks)
-            {
-                throw new InvalidOperationException($"Updating stopped after {completedChunks} of {totalChunks} chunks.");
-            }
-
-            var finalFile = filesToPatchList[^1];
-            int finalFileChunks = initialChunksPerFile[finalFile.PhysicalPath];
-            ProgressChanged?.Invoke(
-                "Updating",
-                totalChunks,
-                totalChunks,
-                $"{totalFilesToPatch} of {totalFilesToPatch} files: {finalFile.FileInfo.Name}|{finalFileChunks}/{finalFileChunks}");
         }
         catch (OperationCanceledException)
         {
