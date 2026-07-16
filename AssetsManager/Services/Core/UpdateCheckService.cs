@@ -24,9 +24,9 @@ namespace AssetsManager.Services.Core
         private Timer _updateTimer;
         private Timer _assetTrackerTimer;
         private Timer _pbeStatusTimer;
-        private readonly NonOverlappingAsyncJob _generalUpdatesJob = new();
-        private readonly NonOverlappingAsyncJob _assetTrackerJob = new();
-        private readonly NonOverlappingAsyncJob _pbeStatusJob = new();
+        private readonly BackgroundJobGate _generalUpdatesJob = new();
+        private readonly BackgroundJobGate _assetTrackerJob = new();
+        private readonly BackgroundJobGate _pbeStatusJob = new();
 
         public event Action<string, string> UpdatesFound;
 

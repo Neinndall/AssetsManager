@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace AssetsManager.Services.Core
 {
-    internal sealed class NonOverlappingAsyncJob : IDisposable
+    internal sealed class BackgroundJobGate : IDisposable
     {
         private readonly object _sync = new();
         private CancellationTokenSource _lifetime = new();
