@@ -122,16 +122,16 @@ namespace AssetsManager.Utils
         private const string ConfigFilePath = "config.json";
         private static readonly SemaphoreSlim _saveSemaphore = new SemaphoreSlim(1, 1);
 
-        private void SaveInternal(string configFilePath = ConfigFilePath)
+        private void SaveInternal()
         {
             var json = JsonConvert.SerializeObject(this, Formatting.Indented);
-            WriteAtomically(configFilePath, json);
+            File.WriteAllText(ConfigFilePath, json);
         }
 
-        private async Task SaveInternalAsync(string configFilePath = ConfigFilePath)
+        private async Task SaveInternalAsync()
         {
             var json = JsonConvert.SerializeObject(this, Formatting.Indented);
-            await WriteAtomicallyAsync(configFilePath, json);
+            await File.WriteAllTextAsync(ConfigFilePath, json);
         }
 
         public void Save()
@@ -163,145 +163,53 @@ namespace AssetsManager.Utils
         }
 
         public static AppSettings LoadSettings()
-            => LoadSettings(ConfigFilePath);
-
-        internal static AppSettings LoadSettings(string configFilePath)
         {
             _saveSemaphore.Wait();
             try
             {
-                DeleteIfExists(configFilePath + ".tmp");
-                if (TryLoad(configFilePath, out AppSettings settings))
+                if (!File.Exists(ConfigFilePath))
                 {
-                    if (Normalize(settings)) settings.SaveInternal(configFilePath);
-                    return settings;
+                    var defaultSettings = GetDefaultSettings();
+                    defaultSettings.SaveInternal();
+                    return defaultSettings;
                 }
 
-                string backupPath = configFilePath + ".bak";
-                if (TryLoad(backupPath, out settings))
+                var json = File.ReadAllText(ConfigFilePath);
+                var settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? GetDefaultSettings();
+
+                bool needsResave = false;
+
+                settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
+                settings.DiffHistory ??= new SafeList<HistoryEntry>();
+                settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
+                settings.AssetTrackerEntries ??= new ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>>();
+                settings.FavoritePaths ??= new SafeList<string>();
+                settings.SearchHistory ??= new SafeList<string>();
+                settings.AudioPlaylists ??= new SafeList<AudioPlaylistPack>();
+
+                // Robustly initialize and heal ApiSettings
+                if (settings.ApiSettings == null)
                 {
-                    Normalize(settings);
-                    settings.SaveInternal(configFilePath);
-                    return settings;
+                    settings.ApiSettings = GetDefaultSettings().ApiSettings;
+                    needsResave = true;
+                }
+                else
+                {
+                    settings.ApiSettings.Connection ??= new ConnectionInfo();
+                    settings.ApiSettings.Token ??= new TokenInfo();
                 }
 
-                var defaultSettings = GetDefaultSettings();
-                defaultSettings.SaveInternal(configFilePath);
-                return defaultSettings;
+                if (needsResave)
+                {
+                    settings.SaveInternal();
+                }
+
+                return settings;
             }
             finally
             {
                 _saveSemaphore.Release();
             }
-        }
-
-        internal void Save(string configFilePath)
-        {
-            _saveSemaphore.Wait();
-            try
-            {
-                SaveInternal(configFilePath);
-            }
-            finally
-            {
-                _saveSemaphore.Release();
-            }
-        }
-
-        private static bool Normalize(AppSettings settings)
-        {
-            bool changed = false;
-            settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
-            settings.DiffHistory ??= new SafeList<HistoryEntry>();
-            settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
-            settings.AssetTrackerEntries ??= new ConcurrentDictionary<string, Dictionary<long, AssetTrackerEntry>>();
-            settings.FavoritePaths ??= new SafeList<string>();
-            settings.SearchHistory ??= new SafeList<string>();
-            settings.AudioPlaylists ??= new SafeList<AudioPlaylistPack>();
-            if (settings.ApiSettings == null)
-            {
-                settings.ApiSettings = GetDefaultSettings().ApiSettings;
-                changed = true;
-            }
-            else
-            {
-                settings.ApiSettings.Connection ??= new ConnectionInfo();
-                settings.ApiSettings.Token ??= new TokenInfo();
-            }
-            return changed;
-        }
-
-        private static bool TryLoad(string path, out AppSettings settings)
-        {
-            settings = null;
-            if (!File.Exists(path)) return false;
-            try
-            {
-                settings = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(path));
-                return settings != null;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-            catch (IOException)
-            {
-                return false;
-            }
-        }
-
-        private static void WriteAtomically(string path, string json)
-        {
-            EnsureParentDirectory(path);
-            string temporaryPath = path + ".tmp";
-            try
-            {
-                File.WriteAllText(temporaryPath, json);
-                CommitTemporaryFile(path, temporaryPath);
-            }
-            finally
-            {
-                DeleteIfExists(temporaryPath);
-            }
-        }
-
-        private static async Task WriteAtomicallyAsync(string path, string json)
-        {
-            EnsureParentDirectory(path);
-            string temporaryPath = path + ".tmp";
-            try
-            {
-                await File.WriteAllTextAsync(temporaryPath, json);
-                CommitTemporaryFile(path, temporaryPath);
-            }
-            finally
-            {
-                DeleteIfExists(temporaryPath);
-            }
-        }
-
-        private static void CommitTemporaryFile(string path, string temporaryPath)
-        {
-            string backupPath = path + ".bak";
-            if (File.Exists(path) && IsValidSettingsFile(path))
-                File.Replace(temporaryPath, path, backupPath, true);
-            else
-                File.Move(temporaryPath, path, true);
-
-            if (!IsValidSettingsFile(backupPath)) File.Copy(path, backupPath, true);
-        }
-
-        private static bool IsValidSettingsFile(string path) => TryLoad(path, out _);
-
-        private static void EnsureParentDirectory(string path)
-        {
-            string directory = Path.GetDirectoryName(Path.GetFullPath(path));
-            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-        }
-
-        private static void DeleteIfExists(string path)
-        {
-            if (File.Exists(path)) File.Delete(path);
         }
 
         public static AppSettings GetDefaultSettings()
