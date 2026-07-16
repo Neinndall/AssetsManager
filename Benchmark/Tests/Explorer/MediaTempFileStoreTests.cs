@@ -96,6 +96,31 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
             }
         }
 
+        [Fact]
+        public async Task ReleaseRemovesTheActiveMediaPreview()
+        {
+            string rootPath = Path.Combine(Path.GetTempPath(), $"AssetsManager_MediaTemp_{Guid.NewGuid():N}");
+            var store = CreateStore(rootPath);
+            string filePath = await store.CreateAsync(new byte[] { 7, 8, 9 }, ".ogg", CancellationToken.None);
+
+            try
+            {
+                store.Activate(filePath);
+
+                store.Release();
+
+                Assert.False(File.Exists(filePath));
+                Assert.Equal(0, store.PendingCount);
+            }
+            finally
+            {
+                if (Directory.Exists(rootPath))
+                {
+                    Directory.Delete(rootPath, true);
+                }
+            }
+        }
+
         private static MediaTempFileStore CreateStore(string rootPath)
         {
             return new MediaTempFileStore(

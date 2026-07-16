@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Automated regression coverage now verifies Viewer scene disposal and media-preview cleanup lifecycles.
   - Hash Guessing now reuses indexed corpus data, reduces temporary buffers across GAME, LCU, BIN and RST, and shows live performance metrics.
   - Image exports now use less memory and remain responsive during encoding.
   - Viewer textures now use less temporary memory while preserving their original quality.

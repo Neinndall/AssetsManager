@@ -1,0 +1,469 @@
+{
+  "project": "AssetsManager",
+  "documentType": "technical-and-functional-backlog",
+  "generatedFrom": "Repository audit",
+  "statusValues": [
+    "todo",
+    "in_progress",
+    "blocked",
+    "done",
+    "rejected"
+  ],
+  "items": [
+    {
+      "id": "CORE-001",
+      "category": "Core",
+      "title": "Prevent overlapping background update checks",
+      "description": "Replace or protect timer callbacks so general updates, Asset Tracker, and PBE status checks cannot overlap, propagate unhandled exceptions, or continue after cancellation.",
+      "priority": "critical",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Each background job has independent concurrency protection.",
+        "All jobs support cancellation during shutdown and settings reload.",
+        "Timer callback exceptions are logged with their complete stack trace.",
+        "No async void method remains outside framework event boundaries."
+      ]
+    },
+    {
+      "id": "CORE-002",
+      "category": "Core",
+      "title": "Complete MainWindow shutdown cleanup",
+      "description": "Stop background update services and detach all singleton service events registered by MainWindow before the application closes.",
+      "priority": "critical",
+      "impact": "high",
+      "effort": "low",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "UpdateCheckService is stopped during shutdown.",
+        "Comparator, extraction, backup, version, update, and progress events are detached symmetrically.",
+        "No UI callback executes after MainWindow begins closing."
+      ]
+    },
+    {
+      "id": "CORE-003",
+      "category": "Persistence",
+      "title": "Make configuration persistence atomic and recoverable",
+      "description": "Write configuration through a temporary file, keep a valid backup, serialize concurrent saves, and recover automatically when the primary JSON is corrupt.",
+      "priority": "critical",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Configuration writes use a temporary file and atomic replacement.",
+        "A last-known-good backup is maintained.",
+        "Concurrent synchronous and asynchronous saves cannot overlap.",
+        "Startup restores the backup when the primary file is invalid.",
+        "Recovery and failures are logged."
+      ]
+    },
+    {
+      "id": "MON-001",
+      "category": "Monitor",
+      "title": "Make history cleanup truthful and recoverable",
+      "description": "Stop suppressing deletion failures and retain history references for entries whose physical data could not be removed.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "low",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Every failed deletion is logged with its exception.",
+        "Failed entries remain visible or are marked for retry.",
+        "The result reports deleted items, failed items, and recovered disk space.",
+        "No empty catch block remains in history cleanup."
+      ]
+    },
+    {
+      "id": "PERF-001",
+      "category": "Performance",
+      "title": "Reduce memory usage during PNG export",
+      "description": "Avoid retaining redundant full-image buffers and remove unnecessary nested Task.Run calls while preserving responsive UI during large exports.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "done",
+      "acceptanceCriteria": [
+        "PNG data is encoded directly to the destination when safe.",
+        "Large captures expose cancellation.",
+        "Export validates dimensions and estimated memory before rendering.",
+        "Image Merger export does not block the UI thread for large images."
+      ]
+    },
+    {
+      "id": "QA-001",
+      "category": "Quality",
+      "title": "Expand automated regression coverage",
+      "description": "Add permanent tests for comparison, packaging, extraction, history, update scheduling, audio linking, parsers, and Viewer cleanup.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "done",
+      "acceptanceCriteria": [
+        "~~WadComparatorService and WadPackagingService have regression tests.~~",
+        "~~Extraction and historical reconstruction have success, cancellation, and corruption tests.~~",
+        "~~Update scheduling tests cover overlap and shutdown.~~",
+        "~~Viewer and audio resource cleanup have lifecycle tests where technically feasible.~~"
+      ]
+    },
+    {
+      "id": "QA-002",
+      "category": "Quality",
+      "title": "Introduce nullable analysis and targeted analyzers",
+      "description": "Enable nullable reference analysis incrementally and add rules for lost tasks, disposable resources, event lifecycle, and exception handling.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Nullable analysis is enabled first for new files and Core services.",
+        "Analyzer warnings are introduced without a global warning-suppression baseline.",
+        "Rules detect discarded tasks and undisposed resources.",
+        "The application builds without new analyzer warnings in migrated areas."
+      ]
+    },
+    {
+      "id": "ARCH-001",
+      "category": "Architecture",
+      "title": "Split oversized UI controllers by responsibility",
+      "description": "Extract independently testable operations from Explorer, Viewer, JSON diff, SKN diff, and API controls without performing a disruptive full MVVM rewrite.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Explorer actions are separated from selection and navigation lifecycle.",
+        "Viewer loading coordination is separated from viewport rendering.",
+        "Diff navigation and metric calculation are independently testable.",
+        "Sales, Mythic Shop, and Pass Rewards presentation logic is separated."
+      ]
+    },
+    {
+      "id": "PERF-002",
+      "category": "Performance",
+      "title": "Optimize Hash Guessing pipelines",
+      "description": "Reduce repeated sorting, materialization, corpus reads, wordlist rebuilding, and large-buffer allocation across guessing phases.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "in_progress",
+      "acceptanceCriteria": [
+        "~~Corpus indexes are reused by revision, extension, prefix, and basename.~~",
+        "~~Large GREP inputs avoid redundant full-buffer copies when materialization is required by the WAD reader.~~",
+        "~~Normalized wordlists are reused between compatible phases.~~",
+        "~~The HUD reports guesses per second, discarded candidates, elapsed time, and memory.~~",
+        "Each phase has a reproducible performance benchmark.",
+        "Long sessions can optionally resume from a checkpoint."
+      ]
+    },
+    {
+      "id": "PERF-003",
+      "category": "Performance",
+      "title": "Add a memory-budgeted WAD preview cache",
+      "description": "Cache recent WAD headers, decompressed previews, thumbnails, parsed BIN results, and resolved HIRC data under an explicit LRU memory budget.",
+      "priority": "medium",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Cache size is configurable with safe presets.",
+        "Entries are evicted through an LRU policy.",
+        "Mount changes invalidate incompatible cache entries.",
+        "Hit rate, miss rate, size, and eviction count are observable.",
+        "Users can release the cache manually."
+      ]
+    },
+    {
+      "id": "CORE-004",
+      "category": "Core",
+      "title": "Standardize safe asynchronous execution",
+      "description": "Remove unnecessary dispatcher and Task.Run usage and centralize logging for intentionally discarded asynchronous operations.",
+      "priority": "high",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "No Task.Run is used for trivial synchronous file existence checks.",
+        "Nested Dispatcher.InvokeAsync async delegates are replaced with explicit awaited flows.",
+        "Intentional fire-and-forget operations use one logging helper.",
+        "Cancellation and owner lifecycle are propagated consistently."
+      ]
+    },
+    {
+      "id": "EXP-001",
+      "category": "Explorer",
+      "title": "Add combinable technical filters",
+      "description": "Filter Explorer results by extension, size, source WAD, hash resolution, compression, preview support, regex, and case sensitivity.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Multiple filters can be active simultaneously.",
+        "Filtering remains asynchronous and cancelable.",
+        "Active filters are visible and individually removable.",
+        "Filters work consistently in LIVE, PBE, LOCAL, and RESULTS modes."
+      ]
+    },
+    {
+      "id": "EXP-002",
+      "category": "Explorer",
+      "title": "Show calculated folder statistics",
+      "description": "Display file count, compressed and uncompressed size, dominant extensions, unknown hashes, and WAD distribution for the selected folder.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Statistics are calculated outside the UI thread.",
+        "Calculation can be canceled when selection changes.",
+        "Large folders show progressive or indeterminate feedback.",
+        "Repeated selection can reuse valid cached statistics."
+      ]
+    },
+    {
+      "id": "EXP-003",
+      "category": "Explorer",
+      "title": "Implement a hexadecimal viewer",
+      "description": "Provide structured fallback inspection for unsupported binary files with offsets, hex, ASCII, search, endianness, range export, and magic-signature detection.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Large files are virtualized and are not loaded as formatted strings in full.",
+        "Users can search text and byte patterns.",
+        "Selected byte ranges can be exported.",
+        "Known magic signatures and basic metadata are displayed.",
+        "Historical WAD content never falls back to current local bytes."
+      ]
+    },
+    {
+      "id": "EXP-004",
+      "category": "Explorer",
+      "title": "Add Open As parser override",
+      "description": "Allow users to force BIN, texture, audio, JSON, plain text, or hexadecimal parsing for extensionless or incorrectly named files.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "low",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Open As is available from the file context menu.",
+        "Parser failures return to the original preview state.",
+        "The override affects only the current preview unless explicitly persisted."
+      ]
+    },
+    {
+      "id": "CMP-001",
+      "category": "Comparator",
+      "title": "Add advanced comparison filters",
+      "description": "Filter results by absolute and percentage size delta, compression transition, extension, source WAD, rename state, hash resolution, and semantic equivalence.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Filters combine with existing search and result type filters.",
+        "Users can isolate binary changes that are semantically equivalent.",
+        "Filtering does not reload archived content.",
+        "Current filter state is reflected in overview metrics."
+      ]
+    },
+    {
+      "id": "CMP-002",
+      "category": "Comparator",
+      "title": "Export patch statistics",
+      "description": "Generate CSV and JSON summaries for WAD growth, extension distribution, largest assets, result types, and total space added or removed.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Statistics respect active result filters.",
+        "Exports include comparison version and source paths.",
+        "CSV output is compatible with common spreadsheet applications.",
+        "JSON output has a documented stable schema."
+      ]
+    },
+    {
+      "id": "CMP-003",
+      "category": "Comparator",
+      "title": "Recompare a selected subset",
+      "description": "Allow selected WADs, folders, or result groups to be compared again without repeating the entire original comparison.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Users can select one or more WADs or folders from results.",
+        "The new run preserves original comparison context.",
+        "Progress and cancellation use the standard progress protocol."
+      ]
+    },
+    {
+      "id": "IMG-001",
+      "category": "ImageDiff",
+      "title": "Add diagnostic image comparison modes",
+      "description": "Add before-and-after slider, blink, heatmap, amplified difference, RGB-only, alpha-only, MAE, PSNR, and changed-pixel percentage modes.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "All modes preserve original image dimensions and alpha semantics.",
+        "Metric calculation runs outside the UI thread and supports cancellation.",
+        "Users can export the currently selected diagnostic view.",
+        "Mismatched dimensions have an explicit alignment policy."
+      ]
+    },
+    {
+      "id": "IMG-002",
+      "category": "ImageMerger",
+      "title": "Expand Image Merger layout and export controls",
+      "description": "Add uniform scaling, explicit cell size, background selection, labels, drag-and-drop ordering, outer padding, additional formats, and automatic output splitting.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Item order can be changed through drag and drop.",
+        "Cell size, inner gap, and outer padding are independent.",
+        "Transparent, checkerboard, and solid backgrounds are supported.",
+        "Optional labels use asset names.",
+        "Oversized output can be split safely into multiple images."
+      ]
+    },
+    {
+      "id": "AUD-001",
+      "category": "Audio",
+      "title": "Add waveform and spectrogram inspection",
+      "description": "Visualize decoded audio with waveform, spectrogram, duration, sample rate, channels, bitrate, loop points, range selection, and optional normalization.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "WEM, OGG, and MP3 assets display technical metadata.",
+        "Waveform generation is cached and cancelable.",
+        "Long audio files use downsampled visualization data.",
+        "Selected ranges can be previewed and exported.",
+        "Loop metadata is displayed when available."
+      ]
+    },
+    {
+      "id": "AUD-002",
+      "category": "AudioDiff",
+      "title": "Add synchronized A/B audio comparison",
+      "description": "Compare OLD and NEW audio with shared position, matched volume, instant switching, synchronized loops, and duration or loudness deltas.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "OLD and NEW share one transport position.",
+        "Switching sources does not restart playback.",
+        "Volume normalization can be enabled or disabled.",
+        "Duration and approximate loudness differences are displayed."
+      ]
+    },
+    {
+      "id": "VIEW-001",
+      "category": "Viewer",
+      "title": "Add 3D diagnostic rendering modes",
+      "description": "Add wireframe, normals, UV checker, bone weights, skeleton overlay, bounds, viewport mesh isolation, and scene statistics.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Diagnostic modes can be enabled independently.",
+        "Users can select, isolate, and hide meshes from the viewport.",
+        "The HUD displays vertices, triangles, materials, meshes, and bones.",
+        "Modes release GPU and event resources when the view unloads.",
+        "Normal viewing performance is unaffected when diagnostics are disabled."
+      ]
+    },
+    {
+      "id": "VIEW-002",
+      "category": "Viewer",
+      "title": "Add an animation inspector",
+      "description": "Provide animated-joint inventory, precise timeline scrubbing, frame stepping, playback speed, keyframe data, and optional two-animation comparison.",
+      "priority": "medium",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Timeline supports precise seek and frame stepping.",
+        "Animated joints, duration, frame rate, and keyframe counts are visible.",
+        "Playback speed does not alter source timing metadata.",
+        "Two compatible animations can be compared when enabled."
+      ]
+    },
+    {
+      "id": "VIEW-003",
+      "category": "Viewer",
+      "title": "Evaluate glTF or GLB technical export",
+      "description": "Assess and implement model or scene export to glTF or GLB when LeagueToolkit exposes sufficient geometry, skeleton, material, and animation data.",
+      "priority": "low",
+      "impact": "medium",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "A feasibility spike documents supported and unsupported source data.",
+        "Export preserves mesh transforms and material assignments.",
+        "Skeleton and animation export is included only when structurally valid.",
+        "Unsupported data is reported instead of silently discarded."
+      ]
+    },
+    {
+      "id": "MON-002",
+      "category": "Storage",
+      "title": "Add a storage auditor",
+      "description": "Report disk usage for backups, history, Shadow Cache, thumbnails, temporary media, API cache, logs, and orphaned files with selective cleanup.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Usage is grouped by storage category.",
+        "Orphaned data is detected without deleting it automatically.",
+        "Users see estimated recoverable space before confirmation.",
+        "Cleanup can target individual categories.",
+        "Failures are reported without removing their references."
+      ]
+    },
+    {
+      "id": "MON-003",
+      "category": "Backups",
+      "title": "Verify and repair backup integrity",
+      "description": "Validate snapshot indexes, chunk accessibility, sizes, optional checksums, audio dependencies, and incomplete archives, then offer safe repair or removal.",
+      "priority": "high",
+      "impact": "high",
+      "effort": "high",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Validation works without accessing current LIVE or PBE content.",
+        "Missing indexes, chunks, and audio dependencies are reported separately.",
+        "Checksum verification is optional for large archives.",
+        "Repairs never replace archived content with current local content.",
+        "Irreparable snapshots require explicit confirmation before deletion."
+      ]
+    },
+    {
+      "id": "MON-004",
+      "category": "Backups",
+      "title": "Add configurable retention policies",
+      "description": "Automatically plan retention by version count, patch, disk budget, and protected favorites while providing a dry-run before deletion.",
+      "priority": "medium",
+      "impact": "medium",
+      "effort": "medium",
+      "status": "todo",
+      "acceptanceCriteria": [
+        "Policies support latest N versions, one per patch, and maximum disk usage.",
+        "Protected or favorite backups are never selected automatically.",
+        "A dry-run lists every proposed deletion and estimated recovered space.",
+        "Retention cleanup uses the same truthful deletion reporting as history cleanup."
+      ]
+    }
+  ]
+}
