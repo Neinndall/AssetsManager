@@ -18,8 +18,7 @@ namespace AssetsManager.Utils
             FrameworkElement element,
             string filePath,
             LogService logService,
-            CancellationToken cancellationToken = default,
-            IProgress<double> progress = null)
+            CancellationToken cancellationToken = default)
         {
             if (element.ActualWidth <= 0 || element.DesiredSize.Height <= 0)
             {
@@ -38,9 +37,8 @@ namespace AssetsManager.Utils
                 rtb.Render(element);
                 rtb.Freeze();
                 cancellationToken.ThrowIfCancellationRequested();
-                progress?.Report(0.25);
 
-                await SaveBitmapAsPngAsync(rtb, filePath, cancellationToken, progress);
+                await SaveBitmapAsPngAsync(rtb, filePath, cancellationToken);
 
                 logService.LogInteractiveSuccess($"Saved as PNG to {Path.GetFileName(filePath)}", filePath, Path.GetFileName(filePath));
             }
@@ -54,18 +52,16 @@ namespace AssetsManager.Utils
         public static async Task SaveBitmapAsPngAsync(
             BitmapSource bitmap,
             string filePath,
-            CancellationToken cancellationToken = default,
-            IProgress<double> progress = null)
+            CancellationToken cancellationToken = default)
         {
-            await SaveBitmapAsImageAsync(bitmap, filePath, ImageExportFormat.Png, cancellationToken, progress);
+            await SaveBitmapAsImageAsync(bitmap, filePath, ImageExportFormat.Png, cancellationToken);
         }
 
         public static async Task SaveBitmapAsImageAsync(
             BitmapSource bitmap,
             string filePath,
             ImageExportFormat format,
-            CancellationToken cancellationToken = default,
-            IProgress<double> progress = null)
+            CancellationToken cancellationToken = default)
         {
             if (bitmap == null) throw new ArgumentNullException(nameof(bitmap));
             ValidateDimensions(bitmap.PixelWidth, bitmap.PixelHeight);
@@ -77,7 +73,6 @@ namespace AssetsManager.Utils
                 exportBitmap.Freeze();
             }
 
-            progress?.Report(0.5);
             await Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -88,7 +83,6 @@ namespace AssetsManager.Utils
                 using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.SequentialScan);
                 encoder.Save(stream);
             }, cancellationToken);
-            progress?.Report(1.0);
         }
 
         public static long GetEstimatedBitmapBytes(int width, int height) => checked((long)width * height * 4);
