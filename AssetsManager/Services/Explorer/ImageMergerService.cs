@@ -292,12 +292,7 @@ namespace AssetsManager.Services.Explorer
             {
                 try
                 {
-                    using (var fileStream = new FileStream(saveFileDialog.FileName, FileMode.Create))
-                    {
-                        var encoder = new PngBitmapEncoder();
-                        encoder.Frames.Add(BitmapFrame.Create(image));
-                        encoder.Save(fileStream);
-                    }
+                    await ImageExportUtils.SaveBitmapAsPngAsync(image, saveFileDialog.FileName);
                     
                     var logService = _serviceProvider.GetRequiredService<LogService>();
                     var customMessageBox = _serviceProvider.GetRequiredService<CustomMessageBoxService>();

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
@@ -21,6 +24,7 @@ namespace AssetsManager.Utils
         private static readonly HashSet<string> GenericMaterialKeywords =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "body", "face", "head", "hair", "mask", "eyes", "leg" };
+        private static readonly ConditionalWeakTable<BitmapSource, BitmapSource> OpaqueTextureCache = new();
 
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
@@ -138,10 +142,16 @@ namespace AssetsManager.Utils
                 {
                     try
                     {
-                        textureToUse = new FormatConvertedBitmap(texture, PixelFormats.Bgr32, null, 0);
+                        textureToUse = OpaqueTextureCache.GetValue(texture, static source =>
+                        {
+                            var converted = new FormatConvertedBitmap(source, PixelFormats.Bgr32, null, 0);
+                            if (converted.CanFreeze) converted.Freeze();
+                            return converted;
+                        });
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        System.Diagnostics.Trace.TraceError($"Failed to prepare opaque viewer texture: {ex}");
                         textureToUse = texture;
                     }
                 }
@@ -187,10 +197,26 @@ namespace AssetsManager.Utils
 
         public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
         {
-            return LoadTexture(textureStream, extension, maxWidth, maxHeight);
+            return LoadTextureCore(textureStream, extension, maxWidth, maxHeight, null, null);
+        }
+
+        public static BitmapSource LoadViewerTexture(Stream textureStream, string extension, LogService logService, string source)
+        {
+            return LoadTextureCore(textureStream, extension, null, null, logService, source);
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension, int? maxWidth = null, int? maxHeight = null)
+        {
+            return LoadTextureCore(textureStream, extension, maxWidth, maxHeight, null, null);
+        }
+
+        private static BitmapSource LoadTextureCore(
+            Stream textureStream,
+            string extension,
+            int? maxWidth,
+            int? maxHeight,
+            LogService logService,
+            string source)
         {
             try
             {
@@ -234,8 +260,9 @@ namespace AssetsManager.Utils
                     return bitmapImage;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                logService?.LogError(ex, $"Failed to decode viewer texture: {source ?? extension ?? "unknown source"}");
                 return null;
             }
         }
@@ -254,28 +281,27 @@ namespace AssetsManager.Utils
                 }));
             }
 
-            // Mantener el buffer estable evita que WPF renderice pixeles de un array reutilizado.
-            using (Image<Bgra32> bgraImage = imageSharp.CloneAs<Bgra32>())
+            int bufferSize = checked(imageSharp.Width * imageSharp.Height * 4);
+            byte[] pixelBuffer = new byte[bufferSize];
+            imageSharp.CopyPixelDataTo(pixelBuffer);
+
+            for (int i = 0; i < pixelBuffer.Length; i += 4)
             {
-                int bufferSize = bgraImage.Width * bgraImage.Height * 4;
-                byte[] pixelBuffer = new byte[bufferSize];
-
-                bgraImage.CopyPixelDataTo(pixelBuffer);
-
-                int stride = bgraImage.Width * 4;
-
-                var bitmapSource = BitmapSource.Create(
-                    bgraImage.Width,
-                    bgraImage.Height,
-                    96, 96,
-                    PixelFormats.Bgra32,
-                    null,
-                    pixelBuffer,
-                    stride);
-
-                bitmapSource.Freeze();
-                return bitmapSource;
+                (pixelBuffer[i], pixelBuffer[i + 2]) = (pixelBuffer[i + 2], pixelBuffer[i]);
             }
+
+            int stride = imageSharp.Width * 4;
+            var bitmapSource = BitmapSource.Create(
+                imageSharp.Width,
+                imageSharp.Height,
+                96, 96,
+                PixelFormats.Bgra32,
+                null,
+                pixelBuffer,
+                stride);
+
+            bitmapSource.Freeze();
+            return bitmapSource;
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
@@ -299,33 +325,18 @@ namespace AssetsManager.Utils
             return LoadTexture(fileStream, extension, maxWidth, maxHeight);
         }
 
-        public static void SaveBitmapSourceAsImage(BitmapSource bitmapSource, string originalFileName, string destinationPath, ImageExportFormat format, Action<string> onFileSavedCallback)
+        public static async Task SaveBitmapSourceAsImageAsync(
+            BitmapSource bitmapSource,
+            string originalFileName,
+            string destinationPath,
+            ImageExportFormat format,
+            Action<string> onFileSavedCallback,
+            CancellationToken cancellationToken = default)
         {
-            BitmapEncoder encoder;
-            string extension;
-
-            switch (format)
-            {
-                case ImageExportFormat.Jpeg:
-                    encoder = new JpegBitmapEncoder { QualityLevel = 90 };
-                    extension = ".jpg";
-                    break;
-                case ImageExportFormat.Png:
-                default:
-                    encoder = new PngBitmapEncoder();
-                    extension = ".png";
-                    break;
-            }
-
-            encoder.Frames.Add(BitmapFrame.Create(bitmapSource));
-
+            string extension = format == ImageExportFormat.Jpeg ? ".jpg" : ".png";
             string fileName = Path.ChangeExtension(originalFileName, extension);
             string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
-            {
-                encoder.Save(fileStream);
-            }
+            await ImageExportUtils.SaveBitmapAsImageAsync(bitmapSource, filePath, format, cancellationToken);
             onFileSavedCallback?.Invoke(filePath);
         }
 

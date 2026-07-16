@@ -450,7 +450,7 @@ namespace AssetsManager.Services.Downloads
                 var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
                 if (bitmapSource != null)
                 {
-                    TextureUtils.SaveBitmapSourceAsImage(bitmapSource, node.Name, destinationPath, format, onFileSavedCallback);
+                    await TextureUtils.SaveBitmapSourceAsImageAsync(bitmapSource, node.Name, destinationPath, format, onFileSavedCallback, cancellationToken);
                 }
             }
         }

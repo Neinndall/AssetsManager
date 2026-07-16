@@ -17,6 +17,8 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Image exports now use less memory and remain responsive during encoding.
+  - Viewer textures now use less temporary memory while preserving their original quality.
   - Asset Tracker now shares one ten-candidate flow between manual and background checks.
   - Asset Tracker now persists per-ID CDN results and checks both JPG and PNG formats.
   - Simplified GitHub issue templates (Bug Report and Suggestion) to reduce input redundancy and improve user experience.
