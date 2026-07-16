@@ -790,8 +790,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 foreach (string variant in new[] { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal" })
                 {
                     yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}{variant}", strategy);
-                    for (int number = 0; number < 20000; number += 100)
-                        yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}{variant}_{number}", strategy);
                 }
             }
         }
