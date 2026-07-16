@@ -89,6 +89,7 @@ namespace AssetsManager.Services.Monitor
 
                 var folderInfo = _directoriesCreator.GetNewWadComparisonFolderInfo();
                 pendingArchivePath = folderInfo.PhysicalPath;
+                _logService.Log("Saving comparison history...");
                 await _wadPackagingService.SaveBackupAsync(diffs, oldPbePath, newPbePath, folderInfo.PhysicalPath, version, cancellationToken);
 
                 RegisterInHistory(folderInfo.FolderName, displayName, oldPbePath, newPbePath, version, comparisonKey);
