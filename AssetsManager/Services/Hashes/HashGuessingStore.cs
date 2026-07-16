@@ -152,6 +152,7 @@ namespace AssetsManager.Services.Hashes
                 using (var reader = File.Exists(targetPath) ? new StreamReader(targetPath) : null)
                 using (var writer = new StreamWriter(temporaryPath, false, new System.Text.UTF8Encoding(false)))
                 {
+                    writer.NewLine = "\n";
                     int additionIndex = 0;
                     string line;
                     while (reader != null && (line = reader.ReadLine()) != null)
