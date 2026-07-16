@@ -297,6 +297,7 @@ namespace AssetsManager.Services.Comparator
 
             var oldChunks = oldWad.Chunks;
             var newChunks = newWad.Chunks;
+            var unmatchedOldByChecksum = new Dictionary<ulong, Queue<WadChunk>>();
 
             foreach (var oldChunk in oldChunks.Values)
             {
@@ -304,8 +305,12 @@ namespace AssetsManager.Services.Comparator
 
                 if (!newChunks.TryGetValue(oldChunk.PathHash, out var newChunk))
                 {
-                    var oldPath = ResolveNameOptimized(oldChunk.PathHash, oldChunk, oldWad, cache);
-                    diffs.Add(new ChunkDiff { Type = ChunkDiffType.Removed, OldChunk = oldChunk, OldPath = oldPath, SourceWadFile = sourceWadFile });
+                    if (!unmatchedOldByChecksum.TryGetValue(oldChunk.Checksum, out var candidates))
+                    {
+                        candidates = new Queue<WadChunk>();
+                        unmatchedOldByChecksum.Add(oldChunk.Checksum, candidates);
+                    }
+                    candidates.Enqueue(oldChunk);
                 }
                 else if (oldChunk.Checksum != newChunk.Checksum)
                 {
@@ -316,24 +321,17 @@ namespace AssetsManager.Services.Comparator
                 ReportProgress(statusMsg);
             }
 
-            var oldChecksumMap = new Dictionary<ulong, ulong>();
-            foreach (var oldChunk in oldChunks.Values)
-            {
-                oldChecksumMap.TryAdd(oldChunk.Checksum, oldChunk.PathHash);
-            }
-
             foreach (var newChunk in newChunks.Values)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!oldChunks.ContainsKey(newChunk.PathHash))
                 {
                     var newPath = ResolveNameOptimized(newChunk.PathHash, newChunk, newWad, cache);
-                    ulong newChecksum = newChunk.Checksum;
-
-                    if (oldChecksumMap.TryGetValue(newChecksum, out ulong oldHash))
+                    if (unmatchedOldByChecksum.TryGetValue(newChunk.Checksum, out var candidates) && candidates.Count > 0)
                     {
-                        var oldPath = ResolveNameOptimized(oldHash, oldChunks[oldHash], oldWad, cache);
-                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunks[oldHash], NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
+                        var oldChunk = candidates.Dequeue();
+                        var oldPath = ResolveNameOptimized(oldChunk.PathHash, oldChunk, oldWad, cache);
+                        diffs.Add(new ChunkDiff { Type = ChunkDiffType.Renamed, OldChunk = oldChunk, NewChunk = newChunk, OldPath = oldPath, NewPath = newPath, SourceWadFile = sourceWadFile });
                     }
                     else
                     {
@@ -342,6 +340,16 @@ namespace AssetsManager.Services.Comparator
                 }
 
                 ReportProgress(statusMsg);
+            }
+
+            foreach (var candidates in unmatchedOldByChecksum.Values)
+            {
+                while (candidates.Count > 0)
+                {
+                    var oldChunk = candidates.Dequeue();
+                    var oldPath = ResolveNameOptimized(oldChunk.PathHash, oldChunk, oldWad, cache);
+                    diffs.Add(new ChunkDiff { Type = ChunkDiffType.Removed, OldChunk = oldChunk, OldPath = oldPath, SourceWadFile = sourceWadFile });
+                }
             }
 
             return diffs;
