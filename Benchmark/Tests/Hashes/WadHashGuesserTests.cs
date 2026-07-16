@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Utils;
@@ -16,6 +17,35 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 {
     public sealed class WadHashGuesserTests
     {
+        [Fact]
+        public async Task HashMergeWritesCdtbCompatibleLfWithoutBom()
+        {
+            string path = Path.GetTempFileName();
+            try
+            {
+                await File.WriteAllTextAsync(path,
+                    "0000000000000001 assets/a.bin\r\n0000000000000003 assets/c.bin\r\n");
+                var incoming = new Dictionary<ulong, string>
+                {
+                    [2] = "assets/b.bin"
+                };
+
+                await HashGuessingStore.MergeHashFileAsync(path, incoming, CancellationToken.None);
+
+                byte[] bytes = await File.ReadAllBytesAsync(path);
+                string content = Encoding.UTF8.GetString(bytes);
+                Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.GetPreamble()));
+                Assert.DoesNotContain('\r', content);
+                Assert.Equal(
+                    "0000000000000001 assets/a.bin\n0000000000000002 assets/b.bin\n0000000000000003 assets/c.bin\n",
+                    content);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         [Fact]
         public void GuessersOwnTheirDomainAndWadPattern()
         {
