@@ -267,7 +267,6 @@ namespace AssetsManager.Views
                 {
                     try
                     {
-                        _logService.Log("Saving comparison history...");
                         await _comparisonHistoryService.EnsureArchivedAsync(
                             serializableDiffs, oldPath, newPath, version, displayName);
                     }
