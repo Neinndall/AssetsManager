@@ -21,19 +21,23 @@ namespace AssetsManager.Services.Monitor
         private readonly AppSettings _appSettings;
         private readonly AssetWatcherService _assetWatcherService;
         private readonly LogService _logService;
-        private readonly HttpClient _httpClient;
+        private readonly AssetTrackerScannerService _assetTrackerScannerService;
 
         public ObservableRangeCollection<MonitoredAsset> MonitoredAssets { get; } = new ObservableRangeCollection<MonitoredAsset>();
 
         public event Action<AssetCategory> CategoryCheckStarted;
         public event Action<AssetCategory> CategoryCheckCompleted;
 
-        public MonitorService(AppSettings appSettings, AssetWatcherService assetWatcherService, LogService logService, HttpClient httpClient)
+        public MonitorService(
+            AppSettings appSettings,
+            AssetWatcherService assetWatcherService,
+            LogService logService,
+            AssetTrackerScannerService assetTrackerScannerService)
         {
             _appSettings = appSettings;
             _assetWatcherService = assetWatcherService;
             _logService = logService;
-            _httpClient = httpClient;
+            _assetTrackerScannerService = assetTrackerScannerService;
 
             LoadMonitoredAssets();
 
@@ -97,11 +101,8 @@ namespace AssetsManager.Services.Monitor
             AssetCategories = DefaultCategories.Get();
             foreach (var category in AssetCategories)
             {
-                if (_appSettings.AssetTrackerProgress.TryGetValue(category.Id, out long lastValid)) category.LastValid = lastValid;
-                if (_appSettings.AssetTrackerFailedIds.TryGetValue(category.Id, out var failedIds)) category.FailedUrls = new List<long>(failedIds);
                 if (_appSettings.AssetTrackerUserRemovedIds.TryGetValue(category.Id, out var removedIds)) category.UserRemovedUrls = new List<long>(removedIds);
-                if (_appSettings.AssetTrackerFoundIds.TryGetValue(category.Id, out var foundIds)) category.FoundUrls = new List<long>(foundIds);
-                if (_appSettings.AssetTrackerUrlOverrides.TryGetValue(category.Id, out var overrides)) category.FoundUrlOverrides = new Dictionary<long, string>(overrides);
+                if (_appSettings.AssetTrackerEntries.TryGetValue(category.Id, out var entries)) category.Entries = new Dictionary<long, AssetTrackerEntry>(entries);
             }
         }
 
@@ -109,100 +110,47 @@ namespace AssetsManager.Services.Monitor
         {
             if (category == null) return new List<TrackedAsset>();
 
-            return GenerateNewAssetList(category);
+            return GenerateAssetList(category);
         }
 
-        private List<TrackedAsset> GenerateNewAssetList(AssetCategory category)
+        private List<TrackedAsset> GenerateAssetList(AssetCategory category)
         {
-            var assets = new List<TrackedAsset>();
-            if (category == null) return assets;
+            var removed = new HashSet<long>(category.UserRemovedUrls);
+            var assets = category.Entries.Values
+                .Where(entry => entry.WasCdnProbed && !removed.Contains(entry.AssetId) && entry.State == TrackedAssetState.Available)
+                .OrderBy(entry => entry.AssetId)
+                .Select(entry => new TrackedAsset
+                {
+                    AssetId = entry.AssetId,
+                    Url = entry.Url ?? $"{category.BaseUrl}{entry.AssetId}.{category.Extension}",
+                    DisplayName = entry.AssetId.ToString(),
+                    State = entry.State,
+                    Thumbnail = entry.State == TrackedAssetState.Available ? entry.Url : null
+                })
+                .ToList();
 
-            // 1. Add all "OK" assets first, sorted by ID
-            var foundIds = new HashSet<long>(category.FoundUrls);
-            foundIds.ExceptWith(category.UserRemovedUrls);
-
-            foreach (long id in foundIds.OrderBy(i => i))
+            IReadOnlyList<long> candidateIds = _assetTrackerScannerService.BuildCandidateIds(category);
+            assets.AddRange(candidateIds.Select(id =>
             {
-                string url = category.FoundUrlOverrides.TryGetValue(id, out var overrideUrl) ? overrideUrl : $"{category.BaseUrl}{id}.{category.Extension}";
-                try
+                if (category.Entries.TryGetValue(id, out AssetTrackerEntry entry))
                 {
-                    string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
-                    if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {id}";
-                    assets.Add(new TrackedAsset
+                    return new TrackedAsset
                     {
-                        Url = url,
-                        DisplayName = displayName,
-                        Status = "OK",
-                        Thumbnail = url
-                    });
+                        AssetId = id,
+                        Url = entry.Url ?? $"{category.BaseUrl}{id}.{category.Extension}",
+                        DisplayName = id.ToString(),
+                        State = entry.State
+                    };
                 }
-                catch (UriFormatException) { /* Skip invalid URLs */ }
-            }
 
-            // 2. Prepare the list of 10 "Checkable" assets (Failed + Pending)
-            var checkableAssets = new List<TrackedAsset>();
-            var failedIds = new HashSet<long>(category.FailedUrls);
-            failedIds.ExceptWith(category.UserRemovedUrls);
-
-            foreach (long id in failedIds.OrderBy(i => i))
-            {
-                // We only show failed IDs that are equal to or greater than the Start ID
-                if (category.Start > 0 && id < category.Start) continue;
-
-                string url = $"{category.BaseUrl}{id}.{category.Extension}";
-                try
+                return new TrackedAsset
                 {
-                    string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
-                    if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {id}";
-                    checkableAssets.Add(new TrackedAsset
-                    {
-                        Url = url,
-                        DisplayName = displayName,
-                        Status = "Not Found",
-                        Thumbnail = url
-                    });
-                }
-                catch (UriFormatException) { /* Skip invalid URLs */ }
-            }
-
-            // 3. Fill up to 10 with "Pending"
-            int needed = 10 - checkableAssets.Count;
-            if (needed > 0)
-            {
-                long lastKnownId = 0;
-                if (category.Start > 0)
-                {
-                    lastKnownId = category.Start - 1;
-                }
-                else
-                {
-                    var allKnownIds = new HashSet<long>(foundIds);
-                    allKnownIds.UnionWith(failedIds);
-                    allKnownIds.UnionWith(category.UserRemovedUrls);
-                    if (allKnownIds.Any()) lastKnownId = allKnownIds.Max();
-                }
-
-                int count = 0;
-                while (count < needed)
-                {
-                    lastKnownId++;
-                    if (foundIds.Contains(lastKnownId) || failedIds.Contains(lastKnownId) || category.UserRemovedUrls.Contains(lastKnownId)) continue;
-
-                    string url = $"{category.BaseUrl}{lastKnownId}.{category.Extension}";
-                    try
-                    {
-                        string displayName = Path.GetFileNameWithoutExtension(new Uri(url).AbsolutePath);
-                        if (string.IsNullOrEmpty(displayName)) displayName = $"Asset ID: {lastKnownId}";
-                        checkableAssets.Add(new TrackedAsset { Url = url, DisplayName = displayName, Status = "Pending" });
-                        count++;
-                    }
-                    catch (UriFormatException) { /* Skip invalid URLs */ }
-                }
-            }
-
-            // 4. Add the checkable assets to the main list
-            assets.AddRange(checkableAssets);
-
+                    AssetId = id,
+                    Url = $"{category.BaseUrl}{id}.{category.Extension}",
+                    DisplayName = id.ToString(),
+                    State = TrackedAssetState.Pending
+                };
+            }));
             return assets;
         }
 
@@ -225,16 +173,14 @@ namespace AssetsManager.Services.Monitor
             }
 
             var existingIds = new HashSet<long>(currentAssets.Select(a => GetAssetIdFromUrl(a.Url) ?? -1));
-            var foundIds = new HashSet<long>(category.FoundUrls); // Get Found IDs
-            var failedIds = new HashSet<long>(category.FailedUrls);
-            var removedIds = new HashSet<long>(category.UserRemovedUrls); // Get removed IDs
+            var trackedIds = new HashSet<long>(category.Entries.Keys);
+            var removedIds = new HashSet<long>(category.UserRemovedUrls);
 
             int count = 0;
             while (count < amountToAdd)
             {
                 lastNumber++;
-                // Check against all lists to prevent duplicates
-                if (foundIds.Contains(lastNumber) || failedIds.Contains(lastNumber) || existingIds.Contains(lastNumber) || removedIds.Contains(lastNumber)) continue;
+                if (trackedIds.Contains(lastNumber) || existingIds.Contains(lastNumber) || removedIds.Contains(lastNumber)) continue;
 
                 var url = $"{category.BaseUrl}{lastNumber}.{category.Extension}";
                 try
@@ -257,62 +203,16 @@ namespace AssetsManager.Services.Monitor
             return match.Success && long.TryParse(match.Value, out long assetId) ? assetId : null;
         }
 
-        private async Task<(bool IsSuccess, string FoundUrl)> PerformCheckAsync(long id, AssetCategory category)
+        private async Task<AssetTrackerScanResult> ScanAndSaveAsync(
+            IEnumerable<long> idsToCheck,
+            AssetCategory category,
+            Action<string> onUpdatesFound = null,
+            CancellationToken cancellationToken = default)
         {
-            string primaryUrl = $"{category.BaseUrl}{id}.{category.Extension}";
-            using var request = new HttpRequestMessage(HttpMethod.Head, primaryUrl);
-            var response = await _httpClient.SendAsync(request);
-            if (response.IsSuccessStatusCode) return (true, primaryUrl);
-
-            if (category.Id == "3" || category.Id == "11")
-            {
-                string fallbackUrl = $"{category.BaseUrl}{id}.png";
-                using var fallbackRequest = new HttpRequestMessage(HttpMethod.Head, fallbackUrl);
-                var fallbackResponse = await _httpClient.SendAsync(fallbackRequest);
-                if (fallbackResponse.IsSuccessStatusCode) return (true, fallbackUrl);
-            }
-
-            return (false, null);
-        }
-
-        private async Task<(bool anyNewAssetFound, bool progressChanged)> _InternalCheckLogicAsync(IEnumerable<long> idsToCheck, AssetCategory category, Action<string> onUpdatesFound = null)
-        {
-            bool anyNewAssetFound = false;
-            bool progressChanged = false;
-            bool notificationSent = false;
-
-            foreach (long id in idsToCheck.OrderBy(i => i))
-            {
-                var (isSuccess, foundUrl) = await PerformCheckAsync(id, category);
-                if (isSuccess)
-                {
-                    if (!category.FoundUrls.Contains(id))
-                    {
-                        category.FoundUrls.Add(id);
-                        anyNewAssetFound = true;
-                        progressChanged = true;
-                        if (onUpdatesFound != null && !notificationSent)
-                        {
-                            onUpdatesFound.Invoke(category.Name);
-                            notificationSent = true;
-                        }
-                    }
-                    string primaryUrl = $"{category.BaseUrl}{id}.{category.Extension}";
-                    if (foundUrl != primaryUrl) { category.FoundUrlOverrides[id] = foundUrl; progressChanged = true; }
-                    if (category.FailedUrls.Remove(id)) progressChanged = true;
-                }
-                else
-                {
-                    if (!category.FailedUrls.Contains(id)) { category.FailedUrls.Add(id); progressChanged = true; }
-                }
-            }
-
-            if (progressChanged)
-            {
-                SaveCategoryProgress(category);
-            }
-
-            return (anyNewAssetFound, progressChanged);
+            AssetTrackerScanResult result = await _assetTrackerScannerService.ScanAsync(category, idsToCheck, cancellationToken);
+            SaveCategoryProgress(category);
+            if (result.NewDiscoveries > 0) onUpdatesFound?.Invoke(category.Name);
+            return result;
         }
 
         public async Task CheckAssetsAsync(List<TrackedAsset> assetsToCheck, AssetCategory category, CancellationToken cancellationToken)
@@ -328,7 +228,7 @@ namespace AssetsManager.Services.Monitor
                     return;
                 }
 
-                await _InternalCheckLogicAsync(ids, category);
+                await ScanAndSaveAsync(ids, category, cancellationToken: cancellationToken);
 
                 // After the core logic has run and updated the category, update the UI models
                 foreach (var asset in assetsToCheck)
@@ -338,14 +238,16 @@ namespace AssetsManager.Services.Monitor
                     long? assetId = GetAssetIdFromUrl(asset.Url);
                     if (!assetId.HasValue) continue;
 
-                    if (category.FoundUrls.Contains(assetId.Value))
+                    if (category.Entries.TryGetValue(assetId.Value, out AssetTrackerEntry entry))
                     {
-                        asset.Status = "OK";
-                        asset.Thumbnail = category.FoundUrlOverrides.TryGetValue(assetId.Value, out var url) ? url : asset.Url;
-                    }
-                    else
-                    {
-                        asset.Status = "Not Found";
+                        asset.AssetId = entry.AssetId;
+                        asset.State = entry.State;
+                        if (!string.IsNullOrWhiteSpace(entry.Url))
+                        {
+                            asset.Url = entry.Url;
+                            if (entry.State == TrackedAssetState.Available)
+                                asset.Thumbnail = entry.Url;
+                        }
                     }
                 }
                 CategoryCheckCompleted?.Invoke(category);
@@ -374,55 +276,24 @@ namespace AssetsManager.Services.Monitor
             bool anyNewAssetFound = false;
             foreach (var category in AssetCategories)
             {
-                if (await _CheckCategoryAsync(category, silent, onUpdatesFound)) anyNewAssetFound = true;
+                if (await CheckCategoryAsync(category, silent, onUpdatesFound)) anyNewAssetFound = true;
             }
             return anyNewAssetFound;
         }
 
-        private async Task<bool> _CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
+        private async Task<bool> CheckCategoryAsync(AssetCategory category, bool silent, Action<string> onUpdatesFound = null)
         {
             await Application.Current.Dispatcher.InvokeAsync(() => category.Status = CategoryStatus.Checking);
             try
             {
                 CategoryCheckStarted?.Invoke(category);
 
-                var idsToCheck = new HashSet<long>(category.FailedUrls);
-                idsToCheck.ExceptWith(category.UserRemovedUrls);
+                IReadOnlyList<long> idsToCheck = _assetTrackerScannerService.BuildCandidateIds(category);
 
-                int needed = 10 - idsToCheck.Count;
-                if (needed > 0)
-                {
-                    var allKnownIds = new HashSet<long>(category.FoundUrls);
-                    allKnownIds.UnionWith(category.FailedUrls);
-                    allKnownIds.UnionWith(category.UserRemovedUrls);
-
-                    long lastKnownId = 0;
-                    if (allKnownIds.Any())
-                    {
-                        lastKnownId = allKnownIds.Max();
-                    }
-                    
-                    // If the user has set a custom Start ID that is higher than what we found, use that.
-                    if (category.Start > 0 && (category.Start - 1) > lastKnownId)
-                    {
-                        lastKnownId = category.Start - 1;
-                    }
-
-                    int count = 0;
-                    while (count < needed)
-                    {
-                        lastKnownId++;
-                        if (allKnownIds.Contains(lastKnownId)) continue;
-
-                        idsToCheck.Add(lastKnownId);
-                        count++;
-                    }
-                }
-
-                var (anyNewAssetFound, _) = await _InternalCheckLogicAsync(idsToCheck, category, onUpdatesFound);
+                AssetTrackerScanResult result = await ScanAndSaveAsync(idsToCheck, category, onUpdatesFound);
 
                 CategoryCheckCompleted?.Invoke(category);
-                return anyNewAssetFound;
+                return result.NewDiscoveries > 0;
             }
             finally
             {
@@ -444,12 +315,8 @@ namespace AssetsManager.Services.Monitor
 
         private void SaveCategoryProgress(AssetCategory category)
         {
-            if (category.FoundUrls.Any()) category.LastValid = category.FoundUrls.Max();
-            _appSettings.AssetTrackerProgress[category.Id] = category.LastValid;
-            _appSettings.AssetTrackerFailedIds[category.Id] = category.FailedUrls;
             _appSettings.AssetTrackerUserRemovedIds[category.Id] = category.UserRemovedUrls;
-            _appSettings.AssetTrackerFoundIds[category.Id] = category.FoundUrls;
-            _appSettings.AssetTrackerUrlOverrides[category.Id] = category.FoundUrlOverrides;
+            _appSettings.AssetTrackerEntries[category.Id] = category.Entries;
             AppSettings.SaveSettings(_appSettings);
         }
 
@@ -458,57 +325,23 @@ namespace AssetsManager.Services.Monitor
             long? assetId = GetAssetIdFromUrl(assetToRemove.Url);
             if (!assetId.HasValue) return;
 
-            bool changed = false;
-            // Remove from found lists
-            if (category.FoundUrls.Remove(assetId.Value))
-            {
-                changed = true;
-            }
-            if (category.FoundUrlOverrides.Remove(assetId.Value))
-            {
-                changed = true;
-            }
-
-            // Add to the permanent user-removed list
-            if (!category.UserRemovedUrls.Contains(assetId.Value))
-            {
-                category.UserRemovedUrls.Add(assetId.Value);
-                changed = true;
-            }
-
-            if (changed)
-            {
-                SaveCategoryProgress(category);
-            }
+            if (category.UserRemovedUrls.Contains(assetId.Value)) return;
+            category.UserRemovedUrls.Add(assetId.Value);
+            SaveCategoryProgress(category);
         }
 
         public void RemoveAllFoundAssets(AssetCategory category)
         {
-            if (category == null || !category.FoundUrls.Any()) return;
+            if (category == null) return;
+            long[] foundIds = category.Entries.Values
+                .Where(entry => entry.State == TrackedAssetState.Available)
+                .Select(entry => entry.AssetId)
+                .ToArray();
+            if (foundIds.Length == 0) return;
 
-            bool changed = false;
-            var foundIds = new List<long>(category.FoundUrls);
-
-            foreach (var id in foundIds)
-            {
-                if (!category.UserRemovedUrls.Contains(id))
-                {
-                    category.UserRemovedUrls.Add(id);
-                    changed = true;
-                }
-            }
-
-            if (foundIds.Any())
-            {
-                category.FoundUrls.Clear();
-                category.FoundUrlOverrides.Clear();
-                changed = true;
-            }
-
-            if (changed)
-            {
-                SaveCategoryProgress(category);
-            }
+            foreach (long id in foundIds)
+                if (!category.UserRemovedUrls.Contains(id)) category.UserRemovedUrls.Add(id);
+            SaveCategoryProgress(category);
         }
 
         #endregion
