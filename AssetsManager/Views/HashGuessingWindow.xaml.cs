@@ -44,30 +44,43 @@ namespace AssetsManager.Views
 
         private async void UpdateUnknownCountAsync()
         {
-            if (DomainSelector == null || TxtUnknownCount == null) return;
+            if (DomainSelector == null || TxtUnknownCount == null || TxtUnknownBreakdown == null) return;
             try
             {
                 if (DomainSelector.SelectedIndex < 2)
                 {
                     var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
                     var summary = await _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None);
-                    TxtUnknownCount.Text = summary.Recent + summary.Historical == 0
-                        ? $"{summary.Current:N0} current"
-                        : $"{summary.Current:N0} current · {summary.Recent:N0} recent · {summary.Historical:N0} historical";
+                    TxtUnknownCount.Text = $"{summary.Total:N0} unresolved";
+                    TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0} · Historical: {summary.Historical:N0}";
                 }
                 else
                 {
                     var summary = await _binRstHashGuessingService.GetSummaryAsync(CancellationToken.None);
-                    TxtUnknownCount.Text = DomainSelector.SelectedIndex == 2
-                        ? $"{summary.BinTotal:N0} BIN unknowns"
-                        : $"{summary.RstTotal:N0} RST unknowns";
+                    if (DomainSelector.SelectedIndex == 2)
+                    {
+                        TxtUnknownCount.Text = $"{summary.BinTotal:N0} BIN unresolved";
+                        TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
+                    }
+                    else
+                    {
+                        TxtUnknownCount.Text = $"{summary.RstTotal:N0} RST unresolved";
+                        TxtUnknownBreakdown.Text = $"XXH3: {summary.RstXxh3:N0} · XXH64: {summary.RstXxh64:N0}";
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Hash Lab could not refresh the unknown hash count.");
                 TxtUnknownCount.Text = "Unknown";
+                TxtUnknownBreakdown.Text = string.Empty;
             }
+        }
+
+        private void ShowLiveUnknownCount(int remaining, int resolved)
+        {
+            TxtUnknownCount.Text = $"{remaining + resolved:N0} session targets";
+            TxtUnknownBreakdown.Text = $"Unresolved: {remaining:N0} · Resolved: {resolved:N0}";
         }
 
         private void ResultsListView_Loaded(object sender, RoutedEventArgs e)
@@ -195,6 +208,7 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
+                    ShowLiveUnknownCount(value.RemainingUnknowns, value.FoundMatches);
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
                     if (value.TotalWads > 0)
                     {
@@ -288,6 +302,15 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<InternalHashProgress>(value =>
                 {
+                    if (value.RemainingUnknowns.HasValue)
+                    {
+                        ShowLiveUnknownCount(value.RemainingUnknowns.Value, value.FoundMatches);
+                    }
+                    else
+                    {
+                        TxtUnknownCount.Text = "Scanning inventory";
+                        TxtUnknownBreakdown.Text = $"Parsed: {value.ProcessedFiles:N0} files";
+                    }
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
                     if (value.TotalWads > 0)
                     {

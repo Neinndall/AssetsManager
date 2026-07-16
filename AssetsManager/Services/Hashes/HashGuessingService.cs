@@ -67,6 +67,8 @@ namespace AssetsManager.Services.Hashes
                 var engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
                 int processedChunks = 0;
 
+                progress?.Report(engine.CreateProgress("Session inventory ready", 0, 0, wadPaths.Length));
+
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();

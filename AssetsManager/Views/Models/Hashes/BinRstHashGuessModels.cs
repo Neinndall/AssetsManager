@@ -97,6 +97,7 @@ namespace AssetsManager.Views.Models.Hashes
         public int TotalWads { get; init; }
         public int ProcessedFiles { get; init; }
         public int FoundMatches { get; init; }
+        public int? RemainingUnknowns { get; init; }
         public long CheckedCandidates { get; init; }
         public long DiscardedCandidates { get; init; }
         public double CandidatesPerSecond { get; init; }

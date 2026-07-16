@@ -180,6 +180,7 @@ namespace AssetsManager.Services.Hashes
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
+            progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
             string[] wads = EnumerateWadContainers(rootDirectory);
             var gamePaths = await LoadGamePathsAsync(cancellationToken);
             int scanned = 0;
@@ -333,6 +334,7 @@ namespace AssetsManager.Services.Hashes
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
+            progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
                 binKnown.AddRange((await _store.LoadKnownAsync(kind, cancellationToken)).Values);
@@ -416,6 +418,7 @@ namespace AssetsManager.Services.Hashes
             TotalWads = totalWads,
             ProcessedFiles = processedFiles,
             FoundMatches = matcher.Matches.Count,
+            RemainingUnknowns = matcher.Remaining,
             CheckedCandidates = matcher.CheckedCandidates,
             DiscardedCandidates = matcher.DiscardedCandidates,
             CandidatesPerSecond = matcher.CheckedCandidates / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001),

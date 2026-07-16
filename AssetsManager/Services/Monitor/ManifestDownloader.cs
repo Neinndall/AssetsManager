@@ -29,7 +29,6 @@ public class ManifestDownloader
     private readonly ConcurrentStack<Decompressor> _decompressorPool = new ConcurrentStack<Decompressor>();
 
     public event Action<string, int, int, string> ProgressChanged;
-    public event Action VerificationCompleted;
 
     public ManifestDownloader(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator, HashService hashService)
     {
@@ -231,10 +230,10 @@ public class ManifestDownloader
         _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
         _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
 
-        // Notify event subscribers that verification is completed. Any UI transitions/delays will be handled by the UI managers.
-        VerificationCompleted?.Invoke();
-
         if (!filesToPatch.Any()) return 0;
+
+        // Preserve the completed verification frame before the update phase replaces it.
+        await Task.Delay(200, cancellationToken);
 
         // Sequential UI Reporting: Sort files alphabetically to follow manifest/folder order
         var filesToPatchList = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
@@ -443,6 +442,19 @@ public class ManifestDownloader
                 finally { netSem.Release(); }
             });
             await Task.WhenAll(tasks);
+
+            if (completedChunks != totalChunks)
+            {
+                throw new InvalidOperationException($"Updating stopped after {completedChunks} of {totalChunks} chunks.");
+            }
+
+            var finalFile = filesToPatchList[^1];
+            int finalFileChunks = initialChunksPerFile[finalFile.PhysicalPath];
+            ProgressChanged?.Invoke(
+                "Updating",
+                totalChunks,
+                totalChunks,
+                $"{totalFilesToPatch} of {totalFilesToPatch} files: {finalFile.FileInfo.Name}|{finalFileChunks}/{finalFileChunks}");
         }
         catch (OperationCanceledException)
         {

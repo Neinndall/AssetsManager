@@ -116,7 +116,7 @@ namespace AssetsManager.Services.Core
         }
 
         /// <summary>
-        private async Task FinishOperation()
+        private async Task FinishOperation(int completionHoldMilliseconds = 100)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
             if (wasCancelled)
@@ -133,8 +133,8 @@ namespace AssetsManager.Services.Core
                     await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 }
 
-                // Give the user 100ms to visually register the completed progress before closing the window
-                await Task.Delay(100);
+                // Keep the final state visible long enough to be registered before closing.
+                await Task.Delay(completionHoldMilliseconds);
             }
 
             _taskCancellationManager.CompleteCurrentOperation();
@@ -319,12 +319,6 @@ namespace AssetsManager.Services.Core
             StartOperation("Versions Update", "Verifying", "Download", 0, "Preparing Manifests...");
         }
 
-        public async void OnVersionVerificationCompleted()
-        {
-            // Pause so the 100% Verifying state is visible in the UI before switching to Updating.
-            await Task.Delay(100);
-        }
-
         public void OnVersionDownloadProgressChanged(string taskName, int currentValue, int totalValue, string currentFile)
         {
             _owner.Dispatcher.Invoke(() =>
@@ -342,7 +336,7 @@ namespace AssetsManager.Services.Core
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
-            await FinishOperation();
+            await FinishOperation(200);
             
             await _owner.Dispatcher.InvokeAsync(() =>
             {

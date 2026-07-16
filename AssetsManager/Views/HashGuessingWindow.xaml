@@ -168,9 +168,10 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Centralized Unknowns" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
+                                <StackPanel Margin="0,0,8,0">
+                                    <TextBlock Text="Unresolved Hashes" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
                                     <TextBlock x:Name="TxtUnknownCount" Text="Loading..." FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0"/>
+                                    <TextBlock x:Name="TxtUnknownBreakdown" Text="Loading..." FontSize="9" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                                 <materialIcons:MaterialIcon Grid.Column="1" Kind="HelpCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>

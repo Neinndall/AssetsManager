@@ -75,6 +75,7 @@ namespace AssetsManager.Services.Hashes
                 TotalWads = totalWads,
                 ProcessedChunks = processedChunks,
                 FoundMatches = _matches.Count,
+                RemainingUnknowns = _unknownHashes.Count,
                 CurrentWad = stage,
                 CheckedCandidates = CheckedCandidates,
                 DiscardedCandidates = DiscardedCandidates,
