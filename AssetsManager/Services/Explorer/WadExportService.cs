@@ -158,7 +158,10 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
 
             byte[] fileBytes;
-            if (node.Type == NodeType.WemFile)
+            if (node.Type == NodeType.RealFile ||
+                (node.Type == NodeType.SoundBank && File.Exists(node.VirtualPath)))
+                fileBytes = await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken);
+            else if (node.Type == NodeType.WemFile)
                 fileBytes = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken);
             else
                 fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
