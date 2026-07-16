@@ -12,6 +12,7 @@ namespace AssetsManager.Services.Hashes.Guessers
     {
         private readonly object _sync = new();
         private Dictionary<ulong, string> _hashes;
+        private IReadOnlyList<string> _paths;
         private DateTime _lastWriteUtc;
         private long _length = -1;
         private long _revision;
@@ -30,6 +31,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .Where(path => path.Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 .ToDictionary(path => XxHash64Ext.Hash(path), path => path);
+            _paths = _hashes.Values.ToArray();
+            _revision = 1;
         }
 
         internal HashGuessDomain Domain { get; }
@@ -62,6 +65,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 _hashes = hashes;
+                _paths = hashes.Values.ToArray();
                 _revision++;
                 info.Refresh();
                 _lastWriteUtc = info.Exists ? info.LastWriteTimeUtc : default;
@@ -70,7 +74,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal IReadOnlyList<string> LoadPaths(bool force = false) => Load(force).Values.ToList();
+        internal IReadOnlyList<string> LoadPaths(bool force = false)
+        {
+            lock (_sync)
+            {
+                Load(force);
+                return _paths ?? Array.Empty<string>();
+            }
+        }
 
         internal static HashSet<ulong> LoadUnknownFromExport(string directory)
         {
@@ -87,6 +98,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             lock (_sync)
             {
                 _hashes = null;
+                _paths = null;
                 _lastWriteUtc = default;
                 _length = -1;
                 _revision++;

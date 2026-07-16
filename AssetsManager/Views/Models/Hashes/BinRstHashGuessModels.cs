@@ -97,6 +97,11 @@ namespace AssetsManager.Views.Models.Hashes
         public int TotalWads { get; init; }
         public int ProcessedFiles { get; init; }
         public int FoundMatches { get; init; }
+        public long CheckedCandidates { get; init; }
+        public long DiscardedCandidates { get; init; }
+        public double CandidatesPerSecond { get; init; }
+        public TimeSpan Elapsed { get; init; }
+        public long ManagedMemoryBytes { get; init; }
         public string CurrentStage { get; init; }
     }
 }

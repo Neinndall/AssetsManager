@@ -87,8 +87,7 @@ namespace AssetsManager.Services.Hashes
                             try
                             {
                                 using var dataOwner = wad.LoadChunkDecompressed(chunk);
-                                byte[] data = dataOwner.Span.ToArray();
-                                guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash);
+                                guesser.GrepWad(engine, dataOwner.DangerousGetArray(), resolvedChunkPath, wadPath, chunk.PathHash);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
@@ -101,14 +100,11 @@ namespace AssetsManager.Services.Hashes
                         _logService.LogError(ex, $"Hash Lab could not read WAD '{wadPath}'.");
                     }
 
-                    progress?.Report(new HashGuessProgress
-                    {
-                        ProcessedWads = wadIndex + 1,
-                        TotalWads = wadPaths.Length,
-                        ProcessedChunks = processedChunks,
-                        FoundMatches = engine.Matches.Count,
-                        CurrentWad = Path.GetFileName(wadPath)
-                    });
+                    progress?.Report(engine.CreateProgress(
+                        Path.GetFileName(wadPath),
+                        processedChunks,
+                        wadIndex + 1,
+                        wadPaths.Length));
                 }
 
                 var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
@@ -192,14 +188,7 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates++;
                     if (checkedCandidates % 1000 == 0)
                     {
-                        progress?.Report(new HashGuessProgress
-                        {
-                            ProcessedWads = 0,
-                            TotalWads = 0,
-                            ProcessedChunks = checkedCandidates,
-                            FoundMatches = engine.Matches.Count,
-                            CurrentWad = "Generating canonical paths"
-                        });
+                        progress?.Report(engine.CreateProgress("Generating canonical paths", checkedCandidates));
                     }
                     if (engine.RemainingUnknownCount == 0) break;
                 }
@@ -315,32 +304,17 @@ namespace AssetsManager.Services.Hashes
                 int checkedCandidates = 0;
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress
-                    {
-                        ProcessedChunks = checkedCandidates,
-                        FoundMatches = engine.Matches.Count,
-                        CurrentWad = "LCU Basic: basename substitution"
-                    });
+                    progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", checkedCandidates));
                     checkedCandidates += _lcuGuesser.SubstituteBasenames(engine, cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(new HashGuessProgress
-                    {
-                        ProcessedChunks = checkedCandidates,
-                        FoundMatches = engine.Matches.Count,
-                        CurrentWad = "LCU Basic: basename word substitution"
-                    });
+                    progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", checkedCandidates));
                     int progressOffset = checkedCandidates;
                     checkedCandidates += _lcuGuesser.SubstituteBasenameWords(
                         engine,
                         cancellationToken,
-                        progress: count => progress?.Report(new HashGuessProgress
-                        {
-                            ProcessedChunks = progressOffset + count,
-                            FoundMatches = engine.Matches.Count,
-                            CurrentWad = "LCU Basic: basename word substitution"
-                        }));
+                        progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", progressOffset + count)));
                 }
 
                 var phases = new (string Name, IEnumerable<HashGuessCandidate> Candidates)[]
@@ -352,14 +326,14 @@ namespace AssetsManager.Services.Hashes
 
                 foreach (var phase in phases)
                 {
-                    progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = $"LCU Basic: {phase.Name}" });
+                    progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", checkedCandidates));
                     foreach (var candidate in phase.Candidates)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         engine.Check(candidate.Path, candidate.Strategy, "LCU Basic");
                         checkedCandidates++;
                         if (checkedCandidates % 5000 == 0)
-                            progress?.Report(new HashGuessProgress { ProcessedChunks = checkedCandidates, FoundMatches = engine.Matches.Count, CurrentWad = $"LCU Basic: {phase.Name}" });
+                            progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", checkedCandidates));
                         if (engine.RemainingUnknownCount == 0) break;
                     }
 
@@ -448,12 +422,7 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates++;
                     if (checkedCandidates % 5000 == 0)
                     {
-                        progress?.Report(new HashGuessProgress
-                        {
-                            ProcessedChunks = checkedCandidates,
-                            FoundMatches = engine.Matches.Count,
-                            CurrentWad = "Generating locale and region variants"
-                        });
+                        progress?.Report(engine.CreateProgress("Generating locale and region variants", checkedCandidates));
                     }
                     if (engine.RemainingUnknownCount == 0) break;
                 }
@@ -512,12 +481,7 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates++;
                     if (checkedCandidates % 5000 == 0)
                     {
-                        progress?.Report(new HashGuessProgress
-                        {
-                            ProcessedChunks = checkedCandidates,
-                            FoundMatches = engine.Matches.Count,
-                            CurrentWad = $"Generating numeric variants ({checkedCandidates:N0}/{candidateBudget:N0})"
-                        });
+                        progress?.Report(engine.CreateProgress($"Generating numeric variants ({checkedCandidates:N0}/{candidateBudget:N0})", checkedCandidates));
                     }
                     if (engine.RemainingUnknownCount == 0) break;
                 }
