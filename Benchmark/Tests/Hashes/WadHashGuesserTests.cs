@@ -503,6 +503,21 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Contains(game.GuessCharacterFiles(new[] { "lux" }), candidate =>
                 candidate.Path == "data/characters/lux/skins/base/lux.skn");
             Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps.metal_19900");
+            Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps-dx11");
+            Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps-metal_19900");
+        }
+
+        [Theory]
+        [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11")]
+        [InlineData("assets/shaders/generated/shaders/test.ps_2_0-metal")]
+        public void WadGrepCoversHyphenatedShaderVariants(string expected)
+        {
+            var game = new GameHashGuesser();
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepFile(engine, data: Encoding.ASCII.GetBytes("SHADERS/test"));
+
+            AssertResolved(engine, expected);
         }
 
         [Fact]
