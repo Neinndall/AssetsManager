@@ -217,9 +217,11 @@ namespace AssetsManager.Views
                     }
                     else
                     {
-                        _viewModel.ProgressText = $"{value.ProcessedChunks:N0} checked";
+                        long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
+                        _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
-                    _viewModel.StatusText = $"Scanning {value.CurrentWad} · {value.ProcessedChunks:N0} checked · {value.FoundMatches:N0} matches · {value.CandidatesPerSecond:N0}/s · {value.DiscardedCandidates:N0} discarded · {value.Elapsed:mm\\:ss} · {value.ManagedMemoryBytes / (1024d * 1024):N0} MB";
+                    long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
+                    _viewModel.StatusText = $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
                 });
                 IProgress<HashGuessMatch> matchProgress = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu)
                     ? new Progress<HashGuessMatch>(match =>
@@ -319,12 +321,11 @@ namespace AssetsManager.Views
                     }
                     else
                     {
-                        _viewModel.ProgressText = $"{value.ProcessedFiles:N0} checked";
+                        long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
+                        _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
-                    string metrics = value.CheckedCandidates > 0
-                        ? $" · {value.CandidatesPerSecond:N0}/s · {value.DiscardedCandidates:N0} discarded · {value.Elapsed:mm\\:ss} · {value.ManagedMemoryBytes / 1048576d:N0} MB"
-                        : string.Empty;
-                    _viewModel.StatusText = $"{value.CurrentStage} · {value.ProcessedFiles:N0} files/candidates · {value.FoundMatches:N0} matches{metrics}";
+                    long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
+                    _viewModel.StatusText = $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
                 });
 
                 if (action == InternalHashAction.Inventory)

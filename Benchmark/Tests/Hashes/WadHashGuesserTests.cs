@@ -18,6 +18,29 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
     public sealed class WadHashGuesserTests
     {
         [Fact]
+        public async Task PersistedInventoryCanBeReusedWithoutScanningWads()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-hash-{Guid.NewGuid():N}");
+            try
+            {
+                var store = new HashGuessingStore(new DirectoriesCreator(root));
+                var pending = new HashSet<ulong> { 1, 2 };
+                var current = new HashSet<ulong> { 2 };
+                await store.SaveUnknownHashesAsync(HashGuessDomain.Lcu, pending, current, "LCU:patch", CancellationToken.None);
+
+                HashUnknownInventory inventory = await store.LoadUnknownInventoryAsync(HashGuessDomain.Lcu, CancellationToken.None);
+
+                Assert.Equal(pending, inventory.All);
+                Assert.Equal(current, inventory.Current);
+                Assert.Equal("LCU:patch", inventory.PatchFingerprint);
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+        }
+
+        [Fact]
         public async Task HashMergeWritesCdtbCompatibleLfWithoutBom()
         {
             string path = Path.GetTempFileName();
@@ -347,6 +370,38 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.DoesNotContain(fixedWidth, candidate => candidate.Path == "assets/test/icon002.dds");
             Assert.Contains(unpadded, candidate => candidate.Path == "assets/test/icon2.dds");
             Assert.DoesNotContain(unpadded, candidate => candidate.Path == "assets/test/icon02.dds");
+        }
+
+        [Fact]
+        public void GameBasicNumbersIncludeUnpaddedAndD2CdtbPasses()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/test/icon12.dds"
+            }));
+
+            var candidates = game.SubstituteBasicNumbers(3).Select(candidate => candidate.Path).ToHashSet();
+
+            Assert.Contains("assets/test/icon2.dds", candidates);
+            Assert.Contains("assets/test/icon02.dds", candidates);
+            Assert.DoesNotContain("assets/test/icon002.dds", candidates);
+        }
+
+        [Fact]
+        public void BinEntryBasenamesGenerateFilteredGameExtensionCandidates()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/test/source.dds",
+                "assets/shaders/source.glsl_100"
+            }));
+
+            var candidates = game.GuessFromBinEntryBasenames(new[] { "Characters/Ahri/Spells/Orb" })
+                .Select(candidate => candidate.Path)
+                .ToList();
+
+            Assert.Contains("orb.dds", candidates);
+            Assert.DoesNotContain("orb.glsl_100", candidates);
         }
 
         [Fact]
