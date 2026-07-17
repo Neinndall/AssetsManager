@@ -86,12 +86,11 @@ namespace AssetsManager.Utils
         {
             // Riot UIAutoAtlas layout (little-endian):
             // uint textureCount
-            // repeat textureCount times:
-            //   uint texturePathLength + UTF-8 texture path
-            //   uint spriteCount
-            //   repeat spriteCount times:
-            //     uint spriteNameLength + UTF-8 sprite name
-            //     5 x float32 metadata (20 bytes)
+            // repeat textureCount times: uint texturePathLength + UTF-8 texture path
+            // uint spriteCount
+            // repeat spriteCount times:
+            //   uint spriteNameLength + UTF-8 sprite name
+            //   5 x float32 metadata (20 bytes)
             //
             // No fixed magic. The WAD loader provides a truncated buffer (256 bytes),
             // so validate a minimum structural footprint: first texture path (must
@@ -100,19 +99,20 @@ namespace AssetsManager.Utils
             if (!TryReadUInt32(data, ref offset, out uint textureCount) || textureCount == 0 || textureCount > 256)
                 return false;
 
-            if (!TryReadLengthPrefixedUtf8(data, ref offset, out string texturePath))
-                return false;
+            for (uint i = 0; i < textureCount; i++)
+            {
+                if (!TryReadLengthPrefixedBytes(data, ref offset, out Span<byte> texturePath))
+                    return false;
 
-            if (!(texturePath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
-                  texturePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                  texturePath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)))
-                return false;
+                if (!HasImageExtension(texturePath))
+                    return false;
+            }
 
             if (!TryReadUInt32(data, ref offset, out uint spriteCount) || spriteCount == 0 || spriteCount > 1_000_000)
                 return false;
 
             // Validate at least one complete sprite entry
-            if (!TryReadLengthPrefixedUtf8(data, ref offset, out string spriteName) || string.IsNullOrWhiteSpace(spriteName))
+            if (!TryReadLengthPrefixedBytes(data, ref offset, out Span<byte> spriteName) || !ContainsNonWhitespace(spriteName))
                 return false;
 
             const int MetadataSize = 5 * sizeof(float);
@@ -138,34 +138,48 @@ namespace AssetsManager.Utils
             return true;
         }
 
-        private static bool TryReadLengthPrefixedUtf8(Span<byte> data, ref int offset, out string value)
+        private static bool TryReadLengthPrefixedBytes(Span<byte> data, ref int offset, out Span<byte> value)
         {
-            value = string.Empty;
+            value = default;
             if (!TryReadUInt32(data, ref offset, out uint byteLength) || byteLength == 0 || byteLength > 1_048_576)
                 return false;
 
             if (data.Length - offset < (int)byteLength)
                 return false;
 
-            Span<byte> bytes = data.Slice(offset, (int)byteLength);
+            value = data.Slice(offset, (int)byteLength);
             offset += (int)byteLength;
 
-            for (int i = 0; i < bytes.Length; i++)
+            for (int i = 0; i < value.Length; i++)
             {
-                if (bytes[i] == 0 || bytes[i] < 0x09)
+                if (value[i] == 0 || value[i] < 0x09)
                     return false;
             }
-
-            try
-            {
-                value = Encoding.UTF8.GetString(bytes);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return true;
         }
+
+        private static bool HasImageExtension(ReadOnlySpan<byte> path)
+        {
+            if (path.Length < 4 || path[^4] != '.') return false;
+            byte first = ToLowerAscii(path[^3]);
+            byte second = ToLowerAscii(path[^2]);
+            byte third = ToLowerAscii(path[^1]);
+            return (first == 't' && second == 'e' && third == 'x') ||
+                   (first == 'p' && second == 'n' && third == 'g') ||
+                   (first == 'd' && second == 'd' && third == 's');
+        }
+
+        private static bool ContainsNonWhitespace(ReadOnlySpan<byte> value)
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (value[i] > 0x20) return true;
+            }
+            return false;
+        }
+
+        private static byte ToLowerAscii(byte value) =>
+            value is >= (byte)'A' and <= (byte)'Z' ? (byte)(value + 32) : value;
 
         #endregion
 
