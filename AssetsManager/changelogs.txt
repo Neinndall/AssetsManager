@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - The main window now opens wider so dashboard status labels remain fully visible.
   - GAME Extended now tests BIN entry basenames against filtered GAME extensions.
   - Hash Guessing progress now presents phase, checked candidates, matches, and speed in one compact line.
   - GAME and LCU guessing suites now reuse the unknown inventory created by WAD Path GREP instead of rescanning WADs.
