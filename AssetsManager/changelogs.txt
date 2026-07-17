@@ -17,6 +17,9 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - GAME Extended now tests BIN entry basenames against filtered GAME extensions.
+  - Hash Guessing progress now presents phase, checked candidates, matches, and speed in one compact line.
+  - GAME and LCU guessing suites now reuse the unknown inventory created by WAD Path GREP instead of rescanning WADs.
   - Hash Guessing Lab now shows session targets, resolved hashes, and clear unresolved-history breakdowns.
   - Automated regression coverage now verifies Viewer scene disposal and media-preview cleanup lifecycles.
   - Hash Guessing now reuses indexed corpus data, reduces temporary buffers across GAME, LCU, BIN and RST, and shows live performance metrics.

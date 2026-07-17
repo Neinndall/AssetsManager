@@ -116,6 +116,33 @@ namespace AssetsManager.Services.Hashes
             return result;
         }
 
+        public async Task<HashUnknownInventory> LoadUnknownInventoryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
+        {
+            string suffix = domain == HashGuessDomain.Game ? "game" : "lcu";
+            string unknownPath = Path.Combine(_directoriesCreator.HashLabPath, $"unknowns.{suffix}.txt");
+            string metadataPath = Path.Combine(_directoriesCreator.HashLabPath, $"inventory.{suffix}.json");
+            if (!File.Exists(unknownPath) || !File.Exists(metadataPath)) return null;
+
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                var pending = await ReadHashSetAsync(unknownPath, cancellationToken);
+                await using var source = File.OpenRead(metadataPath);
+                var records = await JsonSerializer.DeserializeAsync<List<HashUnknownRecord>>(source, cancellationToken: cancellationToken)
+                    ?? new List<HashUnknownRecord>();
+                var current = records.Where(record => record.MissedPatchCount == 0 && pending.Contains(record.Hash))
+                    .Select(record => record.Hash)
+                    .ToHashSet();
+                string fingerprint = records.Select(record => record.LastObservedPatch)
+                    .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+                return new HashUnknownInventory { All = pending, Current = current, PatchFingerprint = fingerprint };
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
         public async Task<HashUnknownSummary> LoadUnknownSummaryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
         {
             string suffix = domain == HashGuessDomain.Game ? "game" : "lcu";
@@ -202,6 +229,17 @@ namespace AssetsManager.Services.Hashes
             using var reader = new StreamReader(path);
             while (await reader.ReadLineAsync(cancellationToken) != null) count++;
             return count;
+        }
+
+        private static async Task<HashSet<ulong>> ReadHashSetAsync(string path, CancellationToken cancellationToken)
+        {
+            var hashes = new HashSet<ulong>();
+            foreach (string line in await File.ReadAllLinesAsync(path, cancellationToken))
+            {
+                if (ulong.TryParse(line.Trim(), System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                    hashes.Add(hash);
+            }
+            return hashes;
         }
 
         public async Task SaveUnknownHashesAsync(

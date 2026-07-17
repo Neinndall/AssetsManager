@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Hashes
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly HashFile _gameHashFile;
         private readonly HashFile _lcuHashFile;
+        private readonly HashFile _binEntriesHashFile;
         private readonly GameHashGuesser _gameGuesser;
         private readonly LcuHashGuesser _lcuGuesser;
 
@@ -39,6 +40,7 @@ namespace AssetsManager.Services.Hashes
             _directoriesCreator = directoriesCreator;
             _gameHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.game.txt"));
             _lcuHashFile = new HashFile(HashGuessDomain.Lcu, Path.Combine(_directoriesCreator.HashesPath, "hashes.lcu.txt"));
+            _binEntriesHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.binentries.txt"));
             _gameGuesser = new GameHashGuesser(_gameHashFile, _logService);
             _lcuGuesser = new LcuHashGuesser(_lcuHashFile, _logService);
         }
@@ -169,10 +171,8 @@ namespace AssetsManager.Services.Hashes
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
-            HashGuesser guesser = CreateWadGuesser(domain);
             HashGuesser otherGuesser = CreateWadGuesser(domain == HashGuessDomain.Game ? HashGuessDomain.Lcu : HashGuessDomain.Game);
-            string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
@@ -218,7 +218,7 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashGuessRunResult> RunGameBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await PrepareInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, cancellationToken);
             var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>();
             results.Add(await RunCanonicalGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
@@ -252,7 +252,7 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashGuessRunResult> RunLcuBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await PrepareInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, cancellationToken);
             var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>
             {
@@ -276,8 +276,7 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunLcuAdvancedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
-            string[] wads = _lcuGuesser.FindWads(rootDirectory);
-            var inventory = await BuildUnknownInventoryAsync(HashGuessDomain.Lcu, wads, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, cancellationToken);
             var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
@@ -354,14 +353,14 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunGameExtendedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
-            string[] wads = _gameGuesser.FindWads(rootDirectory);
-            var inventory = await BuildUnknownInventoryAsync(HashGuessDomain.Game, wads, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, cancellationToken);
             var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(async () =>
             {
                 var engine = new HashGuessEngine(HashGuessDomain.Game, unknown);
-                int checkedCandidates = await _gameGuesser.RunExtendedAttacksAsync(engine, rootDirectory, progress, cancellationToken);
+                int checkedCandidates = await _gameGuesser.RunExtendedAttacksAsync(
+                    engine, rootDirectory, _binEntriesHashFile.LoadPaths(), progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken);
@@ -404,9 +403,7 @@ namespace AssetsManager.Services.Hashes
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
-            HashGuesser guesser = CreateWadGuesser(domain);
-            string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
@@ -461,9 +458,7 @@ namespace AssetsManager.Services.Hashes
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
-            HashGuesser guesser = CreateWadGuesser(domain);
-            string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = preparedInventory ?? await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             int numberLimit = domain == HashGuessDomain.Game ? 100 : 10_000;
@@ -475,7 +470,7 @@ namespace AssetsManager.Services.Hashes
 
                 IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
                     ? _lcuGuesser.SubstituteNumbers(numberLimit)
-                    : _gameGuesser.SubstituteNumbers(numberLimit);
+                    : _gameGuesser.SubstituteBasicNumbers(numberLimit);
                 foreach (HashGuessCandidate candidate in candidates)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -508,13 +503,23 @@ namespace AssetsManager.Services.Hashes
             };
         }
 
-        private Task<HashUnknownInventory> PrepareInventoryAsync(HashGuessDomain domain, string rootDirectory, CancellationToken cancellationToken)
+        private async Task<HashUnknownInventory> LoadPersistedInventoryAsync(
+            HashGuessDomain domain,
+            CancellationToken cancellationToken,
+            IReadOnlySet<ulong> sessionResolved = null)
         {
-            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
-                throw new DirectoryNotFoundException("The selected game directory does not exist.");
-            HashGuesser guesser = CreateWadGuesser(domain);
-            string[] wadPaths = guesser.FindWads(rootDirectory);
-            return BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            HashUnknownInventory inventory = await _store.LoadUnknownInventoryAsync(domain, cancellationToken);
+            if (inventory == null)
+                throw new InvalidOperationException($"Run {domain} WAD Path Grep first to build the unknown hash inventory.");
+
+            inventory.All.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+            inventory.Current.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+            if (sessionResolved != null)
+            {
+                inventory.All.ExceptWith(sessionResolved);
+                inventory.Current.ExceptWith(sessionResolved);
+            }
+            return inventory;
         }
 
         private static HashSet<ulong> CreateSessionPending(IEnumerable<ulong> hashes, ISet<ulong> sessionResolved)

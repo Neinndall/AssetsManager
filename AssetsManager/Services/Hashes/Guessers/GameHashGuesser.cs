@@ -99,6 +99,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
 
+        internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100) =>
+            SubstituteNumbers(maximum).Concat(SubstituteNumbers(maximum, digits: 2));
+
         internal IEnumerable<HashGuessCandidate> CheckBasenamePrefixes(IEnumerable<string> prefixes = null)
         {
             string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }).ToArray();
@@ -149,6 +152,26 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IEnumerable<HashGuessCandidate> GuessFromLcuHashes(HashGuesser lcuGuesser) =>
             GenerateCrossDomainCandidates(lcuGuesser, int.MaxValue);
+
+        internal IEnumerable<HashGuessCandidate> GuessFromBinEntryBasenames(IEnumerable<string> binEntryPaths)
+        {
+            var basenames = binEntryPaths.Select(Path.GetFileName)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value.ToLowerInvariant())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
+            var extensions = KnownPaths.Select(Path.GetExtension)
+                .Where(extension => extension.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(extension => !Regex.IsMatch(extension, @"(?:glsl|dx9|dx9sm3|dx11|metal)_", RegexOptions.IgnoreCase))
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
+
+            foreach (string extension in extensions)
+            foreach (string basename in basenames)
+                yield return new HashGuessCandidate(basename + extension, HashGuessStrategy.CrossDomainGame);
+        }
 
         internal IEnumerable<HashGuessCandidate> GuessCharacterFiles(IEnumerable<string> characters = null)
         {
@@ -347,6 +370,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal async Task<int> RunExtendedAttacksAsync(
             HashGuessEngine engine,
             string rootDirectory,
+            IEnumerable<string> binEntryPaths,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken)
         {
@@ -360,6 +384,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += CheckCandidates(engine, SubstituteCharacter(), "GAME character substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken);
+
+            if (engine.RemainingUnknownCount > 0)
+            {
+                progress?.Report(engine.CreateProgress("BIN entries to GAME", checkedCandidates));
+                checkedCandidates += CheckCandidates(engine, GuessFromBinEntryBasenames(binEntryPaths), "BIN entries to GAME", cancellationToken, progress, checkedCandidates);
+            }
 
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += SubstituteBasenameWords(engine, cancellationToken);
