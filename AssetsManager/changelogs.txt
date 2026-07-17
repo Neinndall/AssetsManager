@@ -71,6 +71,8 @@ Improvements
   - Optimized audio event name resolution for champions, skins, and maps by using direct pathing to skip deep recursive searches.
   - Updated vgmstream-cli to the latest version in resources for improved audio decoding.
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
+  - Explorer / Encrypted Texture Feedback
+    * Encrypted Riot esports textures are now identified explicitly in the preview panel instead of being reported as unsupported or failed files.
 
 Bug Fixes
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.

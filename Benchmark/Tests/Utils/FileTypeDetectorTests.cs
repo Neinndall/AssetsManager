@@ -9,6 +9,17 @@ namespace AssetsManager.BenchmarkTests.Utils
     public sealed class FileTypeDetectorTests
     {
         [Fact]
+        public void IsEncryptedRiotTexRecognizesEsportsTextureSignature()
+        {
+            ReadOnlySpan<byte> encryptedTex = new byte[] { 0xC9, 0xE3, 0x44, 0x26, 0x64, 0xBB, 0x01, 0x61 };
+            ReadOnlySpan<byte> regularTex = new byte[] { 0x54, 0x45, 0x58, 0x00 };
+
+            Assert.True(FileTypeDetector.IsEncryptedRiotTex(encryptedTex));
+            Assert.False(FileTypeDetector.IsEncryptedRiotTex(regularTex));
+            Assert.False(FileTypeDetector.IsEncryptedRiotTex(ReadOnlySpan<byte>.Empty));
+        }
+
+        [Fact]
         public void GuessExtensionRecognizesMultiTextureUiAtlas()
         {
             using var stream = new MemoryStream();
