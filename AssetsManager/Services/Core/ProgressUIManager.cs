@@ -116,7 +116,7 @@ namespace AssetsManager.Services.Core
         }
 
         /// <summary>
-        private async Task FinishOperation(int completionHoldMilliseconds = 100)
+        private async Task FinishOperation(int completionHoldMilliseconds = 150)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
             if (wasCancelled)
