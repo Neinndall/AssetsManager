@@ -264,13 +264,13 @@ namespace AssetsManager.Views
             catch (InvalidOperationException ex)
             {
                 _logService.LogWarning($"Hash guessing pre-validation warning: {ex.Message}");
-                _viewModel.StatusText = ex.Message;
+                _viewModel.StatusText = "Pre-validation failed. Run WAD Path Grep first.";
                 _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             catch (System.IO.DirectoryNotFoundException ex)
             {
                 _logService.LogWarning($"Hash guessing pre-validation warning: {ex.Message}");
-                _viewModel.StatusText = ex.Message;
+                _viewModel.StatusText = "Selected directory does not exist.";
                 _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             catch (Exception ex)
