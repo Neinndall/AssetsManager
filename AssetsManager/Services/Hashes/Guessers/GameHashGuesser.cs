@@ -391,8 +391,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             checkedCandidates += CheckCandidates(engine, SubstituteSkinNumbers(), "GAME skin number combinations", cancellationToken);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, GenerateExtensionCandidates(int.MaxValue), "GAME extension substitution", cancellationToken);
-            if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += CheckCandidates(engine, SubstituteCharacter(), "GAME character substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken);
@@ -446,13 +444,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken);
             checkedCandidates += RunEsportsBannersAttack(engine, rootDirectory, cancellationToken);
 
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("Focused Attack: GAME prefixes", checkedCandidates));
-                checkedCandidates += CheckCandidates(engine, CheckBasenamePrefixes(), "GAME basename prefixes", cancellationToken);
-                if (engine.RemainingUnknownCount > 0)
-                    checkedCandidates += CheckCandidates(engine, GuessShaderVariants(), "GAME shader variants", cancellationToken);
-            }
             if (engine.RemainingUnknownCount > 0)
             {
                 progress?.Report(engine.CreateProgress("GAME Cartesian Cross", checkedCandidates));

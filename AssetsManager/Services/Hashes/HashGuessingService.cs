@@ -225,6 +225,7 @@ namespace AssetsManager.Services.Hashes
             results.Add(await RunLanguageGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
             results.Add(await RunNumberGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
             results.Add(await RunGameCrossDomainGuessingAsync(rootDirectory, progress, cancellationToken, sessionResolved, inventory));
+            results.Add(await RunGameBasicSupplementalGuessingAsync(rootDirectory, progress, cancellationToken, sessionResolved, inventory));
 
             var matches = results.SelectMany(result => result.Matches)
                 .GroupBy(match => match.Hash)
@@ -245,6 +246,78 @@ namespace AssetsManager.Services.Hashes
                 Domain = HashGuessDomain.Game,
                 UnknownHashesAtStart = results.FirstOrDefault()?.UnknownHashesAtStart ?? 0,
                 ScannedChunks = results.Sum(result => result.ScannedChunks),
+                Matches = matches
+            };
+        }
+
+        private async Task<HashGuessRunResult> RunGameBasicSupplementalGuessingAsync(
+            string rootDirectory,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            ISet<ulong> sessionResolved,
+            HashUnknownInventory inventory)
+        {
+            var unknown = CreateSessionPending(inventory.All, sessionResolved);
+            int initial = unknown.Count;
+            var runResult = await Task.Run(() =>
+            {
+                var engine = new HashGuessEngine(HashGuessDomain.Game, unknown);
+                int checkedCandidates = 0;
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
+                    foreach (var candidate in _gameGuesser.CheckBasenamePrefixes())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: prefixes");
+                        checkedCandidates++;
+                        if (checkedCandidates % 5000 == 0)
+                            progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
+                    foreach (var candidate in _gameGuesser.GuessShaderVariants())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: shader variants");
+                        checkedCandidates++;
+                        if (checkedCandidates % 5000 == 0)
+                            progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
+                    foreach (var candidate in _gameGuesser.GenerateExtensionCandidates(int.MaxValue))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: extension substitution");
+                        checkedCandidates++;
+                        if (checkedCandidates % 5000 == 0)
+                            progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
+                }
+
+                var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
+                return (matches, checkedCandidates);
+            }, cancellationToken);
+
+            var matches = runResult.Item1;
+            int checkedCandidates = runResult.Item2;
+            sessionResolved?.UnionWith(matches.Select(match => match.Hash));
+            return new HashGuessRunResult
+            {
+                Domain = HashGuessDomain.Game,
+                UnknownHashesAtStart = initial,
+                ScannedChunks = checkedCandidates,
                 Matches = matches
             };
         }
