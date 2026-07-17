@@ -520,6 +520,37 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             AssertResolved(engine, expected);
         }
 
+        [Theory]
+        [InlineData("data/characters/ahri/spells/orb.luabin64")]
+        [InlineData("data/characters/ahri/npcscripts/orb.preload")]
+        [InlineData("data/shared/scripts/aicomponents/sharedlogic.preload")]
+        [InlineData("levels/map999/scripts/mutators/sharedlogic.luabin64")]
+        public void GameGrepParsesBinaryLuaManifest(string expected)
+        {
+            byte[] data;
+            using (var stream = new MemoryStream())
+            using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(Encoding.ASCII.GetBytes("LUAF"));
+                writer.Write(1u);
+                WriteManifestString(writer, "Ahri");
+                writer.Write(1u);
+                WriteManifestString(writer, "Orb");
+                writer.Write(1u);
+                WriteManifestString(writer, "SharedLogic");
+                writer.Write(1u);
+                writer.Write(0x0123456789abcdefUL);
+                writer.Flush();
+                data = stream.ToArray();
+            }
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepWad(engine, data, "data/all_lua_files.manifest", "scripts.wad.client", 1);
+
+            AssertResolved(engine, expected);
+        }
+
         [Fact]
         public void LcuJsonUsesCdtbBranchPrecedenceAndContinuesGeneralGrepAfterPluginMetadata()
         {
@@ -725,6 +756,13 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         private static HashGuessEngine CreateEngine(HashGuessDomain domain, string expected)
         {
             return new HashGuessEngine(domain, new HashSet<ulong> { XxHash64Ext.Hash(expected) });
+        }
+
+        private static void WriteManifestString(BinaryWriter writer, string value)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(value);
+            writer.Write((uint)bytes.Length);
+            writer.Write(bytes);
         }
 
         private static void AssertResolved(HashGuessEngine engine, string expected)

@@ -27,6 +27,16 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
+        private static readonly string[] LuaExtensions = { "luabin64", "preload" };
+        private static readonly string[] LuaCharacterPrefixes = { "", "spells/", "scripts/", "npcscripts", "npcscripts/" };
+        private static readonly string[] LuaCommonPaths =
+        {
+            "data/spells", "data/spells/modules", "data/scripts", "data/shared/scripts",
+            "data/shared/scripts/aicomponents", "data/shared/spells", "data/shared/npcscripts",
+            "data/shared/tft/common", "data/shared/tft/items", "data/shared/tft/traits",
+            "data/shared/spells/practicetool", "data/items", "data/items/spells",
+            "data/items/spells/modules", "data/buildingblocks", "data/shared/gamemodes"
+        };
         private static readonly byte[][] BinPrefixesA = ToAsciiPrefixes("ASSETS/");
         private static readonly byte[][] BinPrefixesC = ToAsciiPrefixes("COMMON/", "CHARACTERS/", "CLIENTSTATES/");
         private static readonly byte[][] BinPrefixesD = ToAsciiPrefixes("DATA/", "DATA_SOON/");
@@ -663,6 +673,13 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             if (data.Count == 0) yield break;
 
+            if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (HashGuessCandidate candidate in ExtractLuaManifestCandidates(data))
+                    yield return candidate;
+                yield break;
+            }
+
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
             if (extension is "bin" or "inibin")
             {
@@ -719,6 +736,71 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             foreach (HashGuessCandidate candidate in GrepFileCandidates(data))
                 yield return candidate;
+        }
+
+        private static IEnumerable<HashGuessCandidate> ExtractLuaManifestCandidates(ArraySegment<byte> data)
+        {
+            using var stream = new MemoryStream(data.Array, data.Offset, data.Count, false);
+            using var reader = new BinaryReader(stream, new UTF8Encoding(false, true), true);
+            if (stream.Length < 8) yield break;
+
+            reader.ReadBytes(4);
+            uint characterCount = ReadManifestCount(reader);
+            for (uint characterIndex = 0; characterIndex < characterCount; characterIndex++)
+            {
+                string character = ReadManifestString(reader).ToLowerInvariant();
+                uint childCount = ReadManifestCount(reader);
+                for (uint childIndex = 0; childIndex < childCount; childIndex++)
+                {
+                    string name = ReadManifestString(reader).ToLowerInvariant();
+                    foreach (string prefix in LuaCharacterPrefixes)
+                    foreach (string extension in LuaExtensions)
+                        yield return new HashGuessCandidate(
+                            $"data/characters/{character}/{prefix}{name}.{extension}",
+                            HashGuessStrategy.LuaManifest);
+                }
+            }
+
+            uint sharedCount = ReadManifestCount(reader);
+            for (uint sharedIndex = 0; sharedIndex < sharedCount; sharedIndex++)
+            {
+                string name = ReadManifestString(reader).ToLowerInvariant();
+                foreach (string prefix in LuaCommonPaths)
+                foreach (string extension in LuaExtensions)
+                    yield return new HashGuessCandidate($"{prefix}/{name}.{extension}", HashGuessStrategy.LuaManifest);
+
+                for (int map = 0; map < 1000; map++)
+                foreach (string prefix in new[] { string.Empty, "mutators/" })
+                    yield return new HashGuessCandidate(
+                        $"levels/map{map}/scripts/{prefix}{name}.luabin64",
+                        HashGuessStrategy.LuaManifest);
+            }
+
+            uint hashCount = ReadManifestCount(reader);
+            long hashBytes = checked((long)hashCount * sizeof(ulong));
+            if (hashBytes > stream.Length - stream.Position)
+                throw new InvalidDataException("Lua manifest hash table exceeds the available data.");
+        }
+
+        private static uint ReadManifestCount(BinaryReader reader)
+        {
+            const uint maximumCount = 1_000_000;
+            if (reader.BaseStream.Length - reader.BaseStream.Position < sizeof(uint))
+                throw new EndOfStreamException("Unexpected end of Lua manifest count.");
+            uint count = reader.ReadUInt32();
+            if (count > maximumCount)
+                throw new InvalidDataException($"Lua manifest count {count} exceeds the safety limit.");
+            return count;
+        }
+
+        private static string ReadManifestString(BinaryReader reader)
+        {
+            const uint maximumLength = 16_384;
+            uint length = ReadManifestCount(reader);
+            if (length > maximumLength || length > reader.BaseStream.Length - reader.BaseStream.Position)
+                throw new InvalidDataException($"Lua manifest string length {length} is invalid.");
+            byte[] bytes = reader.ReadBytes((int)length);
+            return new UTF8Encoding(false, true).GetString(bytes);
         }
 
         private static IEnumerable<HashGuessCandidate> GrepFileCandidates(ArraySegment<byte> data)
