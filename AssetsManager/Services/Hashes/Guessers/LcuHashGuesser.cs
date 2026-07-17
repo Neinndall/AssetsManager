@@ -279,8 +279,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         protected override IEnumerable<string> ExpandCandidate(HashGuessCandidate candidate)
         {
-            if (candidate.Strategy != HashGuessStrategy.LcuEmbeddedPath ||
-                candidate.Path.StartsWith("plugins/", StringComparison.Ordinal))
+            if (candidate.Strategy != HashGuessStrategy.LcuRelativeBasename)
             {
                 yield return candidate.Path;
                 yield break;
@@ -312,60 +311,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (!TryDecodeWadText(data, out string text))
                 text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
             var structuredCandidates = new List<HashGuessCandidate>();
-            bool stopAfterStructuredJson = false;
-
-            if (sourcePath.Equals("plugins/rcp-fe-lol-loot/global/default/trans.json", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    using var document = JsonDocument.Parse(data.AsMemory());
-                    foreach (JsonProperty property in document.RootElement.EnumerateObject())
-                    {
-                        structuredCandidates.Add(new HashGuessCandidate(
-                            $"plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/{property.Name.ToLowerInvariant()}.png",
-                            HashGuessStrategy.LcuPattern));
-                    }
-                    stopAfterStructuredJson = true;
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    LogInvalidJson("translation", sourcePath, exception);
-                }
-            }
-            else if (sourcePath.Equals("plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    using var document = JsonDocument.Parse(data.AsMemory());
-                    foreach (JsonElement element in document.RootElement.EnumerateArray())
-                    {
-                        if (!element.TryGetProperty("id", out JsonElement idProperty)) continue;
-                        int championId = idProperty.GetInt32();
-                        structuredCandidates.Add(new HashGuessCandidate(
-                            $"plugins/rcp-be-lol-game-data/global/default/v1/champions/{championId}.json",
-                            HashGuessStrategy.LcuPattern));
-                        structuredCandidates.Add(new HashGuessCandidate(
-                            $"plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/{championId}/metadata.json",
-                            HashGuessStrategy.LcuPattern));
-                    }
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    LogInvalidJson("champion summary", sourcePath, exception);
-                }
-            }
-
-            if (text.Contains("pluginDependencies", StringComparison.Ordinal) && text.Contains("name", StringComparison.Ordinal))
-                AddPluginDescriptionCandidates(data, sourcePath, structuredCandidates);
-
-            if (text.Contains("musicVolume", StringComparison.Ordinal) && text.Contains("files", StringComparison.Ordinal))
-            {
-                if (AddSplashCandidates(data, sourcePath, structuredCandidates))
-                    stopAfterStructuredJson = true;
-            }
-
-            if (text.Contains("recommendedItemDefaults", StringComparison.Ordinal))
-                AddRecommendedItemCandidates(data, sourcePath, structuredCandidates);
+            bool stopAfterStructuredJson = Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
+                                           ExtractCdtbJsonCandidates(data, sourcePath, structuredCandidates);
 
             foreach (HashGuessCandidate candidate in structuredCandidates)
                 yield return candidate;
@@ -414,7 +361,62 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (Match match in SourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
 
             foreach (string relativePath in relativePaths)
-                yield return new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuEmbeddedPath);
+                yield return new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuRelativeBasename);
+        }
+
+        private bool ExtractCdtbJsonCandidates(
+            ArraySegment<byte> data,
+            string sourcePath,
+            ICollection<HashGuessCandidate> candidates)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(data.AsMemory());
+                JsonElement root = document.RootElement;
+                if (sourcePath.Equals("plugins/rcp-fe-lol-loot/global/default/trans.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (JsonProperty property in root.EnumerateObject())
+                        candidates.Add(new HashGuessCandidate(
+                            $"plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/{property.Name}.png",
+                            HashGuessStrategy.LcuPattern));
+                    return true;
+                }
+                if (root.ValueKind == JsonValueKind.Object &&
+                    root.TryGetProperty("pluginDependencies", out _) && root.TryGetProperty("name", out _))
+                {
+                    AddPluginDescriptionCandidates(data, sourcePath, candidates);
+                }
+                else if (root.ValueKind == JsonValueKind.Object &&
+                         root.TryGetProperty("musicVolume", out _) && root.TryGetProperty("files", out _))
+                {
+                    AddSplashCandidates(data, sourcePath, candidates);
+                    return true;
+                }
+                else if (sourcePath.Equals("plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (JsonElement element in root.EnumerateArray())
+                    {
+                        if (!element.TryGetProperty("id", out JsonElement idProperty)) continue;
+                        string championId = idProperty.ToString();
+                        candidates.Add(new HashGuessCandidate(
+                            $"plugins/rcp-be-lol-game-data/global/default/v1/champions/{championId}.json",
+                            HashGuessStrategy.LcuPattern));
+                        candidates.Add(new HashGuessCandidate(
+                            $"plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/{championId}/metadata.json",
+                            HashGuessStrategy.LcuPattern));
+                    }
+                }
+                else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("recommendedItemDefaults", out _))
+                {
+                    AddRecommendedItemCandidates(data, sourcePath, candidates);
+                }
+                return false;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogInvalidJson("LCU", sourcePath, exception);
+                return false;
+            }
         }
 
         private void AddPluginDescriptionCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
