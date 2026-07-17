@@ -614,6 +614,7 @@ namespace AssetsManager.Views.Controls.Monitor
             MainTabControl.SelectedIndex = 2;
         }
 
+
         private async void RequestsPassRewards_Click(object sender, RoutedEventArgs e)
         {
             if (LogService != null) LogService.Log("Starting pass rewards fetch process...");
