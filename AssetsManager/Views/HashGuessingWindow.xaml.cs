@@ -261,6 +261,18 @@ namespace AssetsManager.Views
             {
                 _viewModel.StatusText = "Hash guessing cancelled.";
             }
+            catch (InvalidOperationException ex)
+            {
+                _logService.LogWarning($"Hash guessing pre-validation warning: {ex.Message}");
+                _viewModel.StatusText = ex.Message;
+                _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
+            catch (System.IO.DirectoryNotFoundException ex)
+            {
+                _logService.LogWarning($"Hash guessing pre-validation warning: {ex.Message}");
+                _viewModel.StatusText = ex.Message;
+                _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Hash guessing failed.");
