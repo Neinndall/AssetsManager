@@ -312,7 +312,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
             var structuredCandidates = new List<HashGuessCandidate>();
             bool stopAfterStructuredJson = Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
-                                           ExtractCdtbJsonCandidates(data, sourcePath, structuredCandidates);
+                                           ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
 
             foreach (HashGuessCandidate candidate in structuredCandidates)
                 yield return candidate;
@@ -364,7 +364,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuRelativeBasename);
         }
 
-        private bool ExtractCdtbJsonCandidates(
+        private bool ExtractStructuredJsonCandidates(
             ArraySegment<byte> data,
             string sourcePath,
             ICollection<HashGuessCandidate> candidates)
