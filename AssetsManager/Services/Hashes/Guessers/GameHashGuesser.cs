@@ -25,6 +25,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex ShaderIncludeRegex = new("#include \\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex LocaleRegex = new(@"(?<![a-z])(?:ar_ae|ar_eg|cs_cz|de_de|el_gr|en_au|en_gb|en_ph|en_pl|en_sg|en_us|es_ar|es_es|es_mx|fr_fr|hu_hu|id_id|it_it|ja_jp|ko_kr|ms_my|pl_pl|pt_br|ro_ro|ru_ru|th_th|tr_tr|vi_vn|vn_vn|zh_cn|zh_my|zh_tw)(?![a-z])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
+        private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private static readonly byte[][] BinPrefixesA = ToAsciiPrefixes("ASSETS/");
         private static readonly byte[][] BinPrefixesC = ToAsciiPrefixes("COMMON/", "CHARACTERS/", "CLIENTSTATES/");
@@ -815,7 +816,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             if (!path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase)) yield break;
-            foreach (string extension in new[] { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" })
+            foreach (string extension in ShaderExtensions)
             {
                 yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}", strategy);
                 foreach (string variant in ShaderVariants)
