@@ -594,7 +594,7 @@ namespace AssetsManager.Services.Hashes
 
             if (currentFingerprint != inventory.PatchFingerprint)
             {
-                throw new InvalidOperationException($"The game files have been updated (patch changed). You must run the WAD Path Grep first to rebuild the unknown hash inventory for this version.");
+                throw new InvalidOperationException($"Game patch changed. Run {domain} WAD Path Grep first to rebuild the unknown inventory.");
             }
 
             inventory.All.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
