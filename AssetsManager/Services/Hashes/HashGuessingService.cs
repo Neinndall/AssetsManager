@@ -172,7 +172,7 @@ namespace AssetsManager.Services.Hashes
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
             HashGuesser otherGuesser = CreateWadGuesser(domain == HashGuessDomain.Game ? HashGuessDomain.Lcu : HashGuessDomain.Game);
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
@@ -218,7 +218,7 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashGuessRunResult> RunGameBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
             var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>();
             results.Add(await RunCanonicalGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, sessionResolved, inventory));
@@ -325,7 +325,7 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashGuessRunResult> RunLcuBasicGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
             var sessionResolved = new HashSet<ulong>();
             var results = new List<HashGuessRunResult>
             {
@@ -349,7 +349,7 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunLcuAdvancedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
             var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
@@ -426,7 +426,7 @@ namespace AssetsManager.Services.Hashes
 
         public async Task<HashGuessRunResult> RunGameExtendedGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
             var unknown = inventory.All;
             int initial = unknown.Count;
             var runResult = await Task.Run(async () =>
@@ -476,7 +476,7 @@ namespace AssetsManager.Services.Hashes
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             var runResult = await Task.Run(() =>
@@ -531,7 +531,7 @@ namespace AssetsManager.Services.Hashes
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
 
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
+            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
             var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
             int unknownAtStart = unknownHashes.Count;
             int numberLimit = domain == HashGuessDomain.Game ? 100 : 10_000;
@@ -578,12 +578,24 @@ namespace AssetsManager.Services.Hashes
 
         private async Task<HashUnknownInventory> LoadPersistedInventoryAsync(
             HashGuessDomain domain,
+            string rootDirectory,
             CancellationToken cancellationToken,
             IReadOnlySet<ulong> sessionResolved = null)
         {
             HashUnknownInventory inventory = await _store.LoadUnknownInventoryAsync(domain, cancellationToken);
             if (inventory == null)
                 throw new InvalidOperationException($"Run {domain} WAD Path Grep first to build the unknown hash inventory.");
+
+            // Verify if the game patch has changed since the inventory was built
+            HashGuesser guesser = CreateWadGuesser(domain);
+            string[] wadPaths = guesser.FindWads(rootDirectory);
+            HashWadInventory wadInventory = await Task.Run(() => guesser.FromWads(wadPaths, cancellationToken), cancellationToken);
+            string currentFingerprint = $"{domain}:{wadInventory.ChunkCount}:{wadInventory.HashXor:x16}:{wadInventory.HashSum:x16}";
+
+            if (currentFingerprint != inventory.PatchFingerprint)
+            {
+                throw new InvalidOperationException($"The game files have been updated (patch changed). You must run the WAD Path Grep first to rebuild the unknown hash inventory for this version.");
+            }
 
             inventory.All.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
             inventory.Current.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
