@@ -42,7 +42,7 @@ The **Archive Explorer** includes advanced technical features for deep game data
 
 *   **Multi-Format Visualization**: High-fidelity previewers for a wide range of game formats:
     *   **3D Models**: Native rendering of `.skn`, `.sco`, `.scb` meshes and `.mapgeo` environments.
-    *   **Textures**: Instant preview of `.dds` and `.tex` files with transparency support.
+    *   **Textures**: Instant preview of `.dds` and `.tex` files with transparency support. Encrypted Riot esports textures are identified explicitly and require the corresponding decryption key before they can be decoded.
     *   **Audio**: Real-time playback of `.wem`, `.bnk`, and `.wpk` banks.
     *   **Code & Data**: Decompilation of `.luabin64` (Lua 5.1) and formatting of `.bin`, `.json`, `.xml`, `.svg`, and `.stringtable`.
 *   **Adaptive Engineering Toolbar**: A dual-panel architecture featuring a clean header for core actions and an expanded technical suite (Mode, Grid, Breadcrumb).

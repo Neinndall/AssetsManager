@@ -53,6 +53,15 @@ namespace AssetsManager.Services.Explorer
             public string DisplayName { get; }
         }
 
+        private sealed class EncryptedRiotTextureStatus
+        {
+            public static readonly EncryptedRiotTextureStatus Instance = new();
+
+            private EncryptedRiotTextureStatus()
+            {
+            }
+        }
+
         private Previewer _activeContentPreviewer = Previewer.None;
         private Previewer _activeImagePreviewer = Previewer.None;
         private readonly SemaphoreSlim _thumbnailLoadLimiter = new(4, 4);
@@ -293,6 +302,12 @@ namespace AssetsManager.Services.Explorer
         {
             ThrowIfPreviewIsObsolete(previewRequest);
 
+            if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) && FileTypeDetector.IsEncryptedRiotTex(data))
+            {
+                await ShowEncryptedRiotTexturePreviewAsync(previewRequest);
+                return;
+            }
+
             if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) || SupportedFileTypes.Textures.Contains(extension)) { await ShowTexturePreviewAsync(data, extension, previewRequest); }
             else if (SupportedFileTypes.Images.Contains(extension)) { await ShowImagePreviewAsync(data, extension, previewRequest); }
             else if (SupportedFileTypes.VectorImages.Contains(extension)) { await ShowSvgPreviewAsync(data, extension, previewRequest); }
@@ -438,7 +453,12 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.StatusPanel:
-                    if (content is string extension)
+                    if (content is EncryptedRiotTextureStatus)
+                    {
+                        _viewModel.ShowEncryptedRiotTexture();
+                        _activeImagePreviewer = Previewer.StatusPanel;
+                    }
+                    else if (content is string extension)
                     {
                         bool isImageExt = SupportedFileTypes.IsImage(extension);
 
@@ -551,6 +571,11 @@ namespace AssetsManager.Services.Explorer
         private async Task ShowUnsupportedPreviewAsync(string extension, PreviewRequest previewRequest)
         {
             await SetPreviewerAsync(Previewer.StatusPanel, extension, false, previewRequest);
+        }
+
+        private async Task ShowEncryptedRiotTexturePreviewAsync(PreviewRequest previewRequest)
+        {
+            await SetPreviewerAsync(Previewer.StatusPanel, EncryptedRiotTextureStatus.Instance, false, previewRequest);
         }
 
         private Task ShowPreviewErrorAsync(string extension, PreviewRequest previewRequest)

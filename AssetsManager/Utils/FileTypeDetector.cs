@@ -31,6 +31,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
         private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
+        private static readonly byte[] ENCRYPTED_RIOT_TEX_SIGNATURE = { 0xC9, 0xE3, 0x44, 0x26 };
         private static readonly byte[] WASM_SIGNATURE = { 0x00, 0x61, 0x73, 0x6d }; // "\0asm"
 
         private static readonly byte[] UNITYFS_SIGNATURE = { 0x55, 0x6E, 0x69, 0x74, 0x79, 0x46, 0x53 }; // "UnityFS"
@@ -80,6 +81,11 @@ namespace AssetsManager.Utils
             if (potentialText.Contains("body {") || potentialText.Contains("div {") || potentialText.Contains("a {")) return "css";
 
             return string.Empty;
+        }
+
+        public static bool IsEncryptedRiotTex(ReadOnlySpan<byte> data)
+        {
+            return data.StartsWith(ENCRYPTED_RIOT_TEX_SIGNATURE);
         }
 
         private static bool IsRiotBinaryAtlas(Span<byte> data)

@@ -14,6 +14,7 @@ namespace AssetsManager.Views.Models.Explorer
         Text,
         Media,
         Unsupported,
+        Encrypted,
         Error
     }
 
@@ -352,6 +353,13 @@ namespace AssetsManager.Views.Models.Explorer
             ImagePreviewState = PreviewState.Unsupported;
         }
 
+        public void ShowEncryptedRiotTexture()
+        {
+            ImagePreviewTitle = "Encrypted Riot texture";
+            ImagePreviewMessage = "This texture requires a Riot decryption key and cannot be previewed.";
+            ImagePreviewState = PreviewState.Encrypted;
+        }
+
         public void ShowContentError(string extension)
         {
             ContentPreviewTitle = "Preview error";
@@ -409,7 +417,7 @@ namespace AssetsManager.Views.Models.Explorer
 
         private static bool IsStatus(PreviewState state)
         {
-            return state == PreviewState.Unsupported || state == PreviewState.Error;
+            return state == PreviewState.Unsupported || state == PreviewState.Encrypted || state == PreviewState.Error;
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

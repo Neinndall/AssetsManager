@@ -58,5 +58,18 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
 
             Assert.Throws<System.ArgumentOutOfRangeException>(() => model.ShowContentPreview(PreviewState.Image));
         }
+
+        [Fact]
+        public void EncryptedRiotTexture_UsesSpecificImageStatus()
+        {
+            var model = new FilePreviewerModel();
+
+            model.ShowEncryptedRiotTexture();
+
+            Assert.Equal(PreviewState.Encrypted, model.ImagePreviewState);
+            Assert.True(model.IsImageStatusVisible);
+            Assert.Equal("Encrypted Riot texture", model.ImagePreviewTitle);
+            Assert.Equal("This texture requires a Riot decryption key and cannot be previewed.", model.ImagePreviewMessage);
+        }
     }
 }
