@@ -521,6 +521,45 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuJsonUsesCdtbBranchPrecedenceAndContinuesGeneralGrepAfterPluginMetadata()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/images/icon.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/existing.json" },
+                null);
+            const string json = "{\"pluginDependencies\":[],\"name\":\"rcp-fe-test\",\"musicVolume\":1,\"files\":{},\"asset\":\"images/icon.png\"}";
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes(json),
+                "plugins/rcp-fe-test/global/default/description.json",
+                "test.wad",
+                2);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuGrepCombinesPluginPrefixedBasenamesWithKnownDirectories()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/plugins/nested/file.js";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(
+                new[] { "plugins/rcp-fe-test/global/default/existing.json" },
+                null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("const file = \"plugins/nested/file.js\";"),
+                "plugins/rcp-fe-test/global/default/init.js",
+                "test.wad",
+                1);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void GameExplicitWordMethodsUseDirectoryWords()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
