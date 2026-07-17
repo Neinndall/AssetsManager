@@ -53,15 +53,6 @@ namespace AssetsManager.Services.Explorer
             public string DisplayName { get; }
         }
 
-        private sealed class EncryptedRiotTextureStatus
-        {
-            public static readonly EncryptedRiotTextureStatus Instance = new();
-
-            private EncryptedRiotTextureStatus()
-            {
-            }
-        }
-
         private Previewer _activeContentPreviewer = Previewer.None;
         private Previewer _activeImagePreviewer = Previewer.None;
         private readonly SemaphoreSlim _thumbnailLoadLimiter = new(4, 4);
@@ -304,7 +295,7 @@ namespace AssetsManager.Services.Explorer
 
             if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) && FileTypeDetector.IsEncryptedRiotTex(data))
             {
-                await ShowEncryptedRiotTexturePreviewAsync(previewRequest);
+                ShowEncryptedRiotTexturePreview(previewRequest);
                 return;
             }
 
@@ -453,12 +444,7 @@ namespace AssetsManager.Services.Explorer
                     break;
 
                 case Previewer.StatusPanel:
-                    if (content is EncryptedRiotTextureStatus)
-                    {
-                        _viewModel.ShowEncryptedRiotTexture();
-                        _activeImagePreviewer = Previewer.StatusPanel;
-                    }
-                    else if (content is string extension)
+                    if (content is string extension)
                     {
                         bool isImageExt = SupportedFileTypes.IsImage(extension);
 
@@ -573,9 +559,11 @@ namespace AssetsManager.Services.Explorer
             await SetPreviewerAsync(Previewer.StatusPanel, extension, false, previewRequest);
         }
 
-        private async Task ShowEncryptedRiotTexturePreviewAsync(PreviewRequest previewRequest)
+        private void ShowEncryptedRiotTexturePreview(PreviewRequest previewRequest)
         {
-            await SetPreviewerAsync(Previewer.StatusPanel, EncryptedRiotTextureStatus.Instance, false, previewRequest);
+            ThrowIfPreviewIsObsolete(previewRequest);
+            _viewModel.ShowEncryptedRiotTexture();
+            _activeImagePreviewer = Previewer.StatusPanel;
         }
 
         private Task ShowPreviewErrorAsync(string extension, PreviewRequest previewRequest)
