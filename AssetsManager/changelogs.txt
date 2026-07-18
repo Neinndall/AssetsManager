@@ -26,6 +26,7 @@ Improvements
   - GAME and LCU guessing suites now reuse the unknown inventory created by WAD Path GREP instead of rescanning WADs.
   - BIN inventory and content scans now discard non-GAME WAD containers centrally while RST scans retain full container coverage.
   - RST content guessing now resolves text sources from both GAME and LCU WAD path indexes.
+  - BIN and RST guessing now streams resolved hashes to the results list and preserves matches when a run is cancelled.
   - Hash Guessing Lab now shows session targets, resolved hashes, and clear unresolved-history breakdowns.
   - Automated regression coverage now verifies Viewer scene disposal and media-preview cleanup lifecycles.
   - Hash Guessing now reuses indexed corpus data, reduces temporary buffers across GAME, LCU, BIN and RST, and shows live performance metrics.

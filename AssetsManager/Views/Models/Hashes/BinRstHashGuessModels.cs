@@ -104,5 +104,6 @@ namespace AssetsManager.Views.Models.Hashes
         public TimeSpan Elapsed { get; init; }
         public long ManagedMemoryBytes { get; init; }
         public string CurrentStage { get; init; }
+        public IReadOnlyList<InternalHashGuessMatch> NewMatches { get; init; } = Array.Empty<InternalHashGuessMatch>();
     }
 }

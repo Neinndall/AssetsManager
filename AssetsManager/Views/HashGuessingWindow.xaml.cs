@@ -319,11 +319,20 @@ namespace AssetsManager.Views
             string internalDomain = includeBin ? "BIN" : "RST";
             _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash candidates...";
             _viewModel.Matches.Clear();
+            var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash)>();
 
             try
             {
                 var progress = new Progress<InternalHashProgress>(value =>
                 {
+                    if (value.NewMatches.Count > 0)
+                    {
+                        var newMatches = value.NewMatches
+                            .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash)))
+                            .Cast<object>()
+                            .ToList();
+                        if (newMatches.Count > 0) _viewModel.Matches.AddRange(newMatches);
+                    }
                     if (value.RemainingUnknowns.HasValue)
                     {
                         ShowLiveUnknownCount(value.RemainingUnknowns.Value, value.FoundMatches);
@@ -364,7 +373,9 @@ namespace AssetsManager.Views
                         InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
                         _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
                     };
-                    _viewModel.Matches.AddRange(result.Matches.Cast<object>());
+                    _viewModel.Matches.AddRange(result.Matches
+                        .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash)))
+                        .Cast<object>());
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} internal hashes resolved and saved.";
