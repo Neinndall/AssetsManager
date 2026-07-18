@@ -14,7 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
-    <PackageReference Include="Blake3" Version="2.2.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <ProjectReference Include="..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\LeagueToolkit.csproj" />

@@ -411,6 +411,201 @@ namespace BenchmarkApp
             }
 
             Console.WriteLine($"\n--- Resolved Files inside WADs ({resolvedCount} total) ---");
+            RemoveHashesFromFile(Path.Combine(hashesPath, "hashes.bintypes.txt"), corpus.Keys, 8);
+
+            // Insert them into unknowns txt files to simulate historical unknowns
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binentries.txt"),
+                localGrep.Select(x => x.Key.ToString("x8"))
+            );
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binfields.txt"),
+                practiceTool.Select(x => x.Key.ToString("x8"))
+            );
+            File.AppendAllLines(
+                Path.Combine(hashLabPath, "unknowns.binhashes.txt"),
+                representative.Select(x => x.Key.ToString("x8"))
+            );
+
+            return corpus;
+        }
+
+        private static void RemoveHashesFromFile(string path, IEnumerable<ulong> hashesToRemove, int width)
+        {
+            if (!File.Exists(path)) return;
+            var set = hashesToRemove.Select(h => h.ToString(width == 16 ? "x16" : "x8")).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var remainingLines = File.ReadLines(path)
+                .Where(line =>
+                {
+                    if (line.Length <= width) return true;
+                    string prefix = line[..width];
+                    return !set.Contains(prefix);
+                })
+                .ToList();
+            File.WriteAllLines(path, remainingLines);
+        }
+
+        private class ProgressTracker : IProgress<InternalHashProgress>
+        {
+            public int CheckedFiles { get; set; }
+            public void Report(InternalHashProgress value)
+            {
+                CheckedFiles = value.ProcessedFiles;
+                Console.Write($"\r -> [Progress] stage={value.CurrentStage} processed={value.ProcessedFiles} matches={value.FoundMatches}          ");
+            }
+        }
+
+        private static void CheckPluginsWads()
+        {
+            Console.WriteLine("Scanning Plugins folder for WADs containing BIN or RST signatures...");
+            string pluginsDir = Path.Combine(PbeDirectory, "LeagueClient", "Plugins");
+            if (!Directory.Exists(pluginsDir))
+            {
+                var dirs = Directory.GetDirectories(PbeDirectory, "*Plugins*", SearchOption.AllDirectories);
+                if (dirs.Length > 0) pluginsDir = dirs[0];
+            }
+
+            if (!Directory.Exists(pluginsDir))
+            {
+                Console.WriteLine($"Plugins directory not found at: {pluginsDir}");
+                return;
+            }
+
+            Console.WriteLine($"Searching in: {pluginsDir}");
+            var wads = Directory.EnumerateFiles(pluginsDir, "*.wad*", SearchOption.AllDirectories)
+                .Where(p => p.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Console.WriteLine($"Found {wads.Count} WAD files in Plugins.");
+            int totalBins = 0;
+            int totalRsts = 0;
+
+            foreach (var wadPath in wads)
+            {
+                try
+                {
+                    using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
+                    int bins = 0;
+                    int rsts = 0;
+                    foreach (var pair in wad.Chunks)
+                    {
+                        string sig = GetChunkSignature(wad, pair.Value);
+                        if (sig == "PROP" || sig == "PTCH") bins++;
+                        else if (sig.StartsWith("RST")) rsts++;
+                    }
+                    if (bins > 0 || rsts > 0)
+                    {
+                        Console.WriteLine($" -> {Path.GetFileName(wadPath)}: {bins} BINs, {rsts} RSTs");
+                        totalBins += bins;
+                        totalRsts += rsts;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error reading {Path.GetFileName(wadPath)}: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"Finished scanning. Total BINs in Plugins: {totalBins}, Total RSTs: {totalRsts}");
+        }
+
+        private static string GetChunkSignature(LeagueToolkit.Core.Wad.WadFile wad, LeagueToolkit.Core.Wad.WadChunk chunk)
+        {
+            try
+            {
+                using Stream stream = wad.OpenChunk(chunk);
+                byte[] buffer = new byte[4];
+                int read = stream.Read(buffer, 0, 4);
+                if (read < 3) return string.Empty;
+                if (read == 3) return System.Text.Encoding.ASCII.GetString(buffer, 0, 3);
+                return System.Text.Encoding.ASCII.GetString(buffer);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static async Task ListAllExtensionsAsync()
+        {
+            Console.WriteLine("Scanning PBE directory for all unique file extensions...");
+
+            // 1. Loose files on disk
+            var looseExtensions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var files = Directory.EnumerateFiles(PbeDirectory, "*.*", SearchOption.AllDirectories);
+            int looseCount = 0;
+            foreach (string file in files)
+            {
+                string ext = Path.GetExtension(file).ToLowerInvariant();
+                if (string.IsNullOrEmpty(ext)) ext = "[no_extension]";
+                looseExtensions[ext] = looseExtensions.GetValueOrDefault(ext) + 1;
+                looseCount++;
+            }
+
+            Console.WriteLine($"\n--- Loose Files on Disk ({looseCount} total) ---");
+            foreach (var pair in looseExtensions.OrderByDescending(x => x.Value))
+            {
+                Console.WriteLine($" {pair.Key}: {pair.Value}");
+            }
+
+            // 2. Files inside WAD containers
+            Console.WriteLine("\nLoading game paths to resolve WAD file names...");
+            var gamePaths = new Dictionary<ulong, string>();
+            string hashesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager", "hashes");
+            string wadHashesFile = Path.Combine(hashesFolder, "hashes.game.txt");
+            if (File.Exists(wadHashesFile))
+            {
+                foreach (string line in File.ReadLines(wadHashesFile))
+                {
+                    if (line.Length > 17 && line[16] == ' ')
+                    {
+                        if (ulong.TryParse(line[..16], System.Globalization.NumberStyles.HexNumber, null, out ulong hash))
+                        {
+                            gamePaths[hash] = line[17..].Trim();
+                        }
+                    }
+                }
+            }
+
+            Console.WriteLine($"Loaded {gamePaths.Count} resolved game paths.");
+
+            var wadExtensions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var wads = Directory.EnumerateFiles(PbeDirectory, "*.wad*", SearchOption.AllDirectories)
+                .Where(p => p.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || p.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Console.WriteLine($"Scanning {wads.Count} WAD containers...");
+            int resolvedCount = 0;
+            int unknownCount = 0;
+            var unknownSignatures = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string wadPath in wads)
+            {
+                try
+                {
+                    using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
+                    foreach (var pair in wad.Chunks)
+                    {
+                        if (gamePaths.TryGetValue(pair.Key, out string path))
+                        {
+                            string ext = Path.GetExtension(path).ToLowerInvariant();
+                            if (string.IsNullOrEmpty(ext)) ext = "[no_extension]";
+                            wadExtensions[ext] = wadExtensions.GetValueOrDefault(ext) + 1;
+                            resolvedCount++;
+                        }
+                        else
+                        {
+                            string sig = GetChunkSignature(wad, pair.Value);
+                            if (string.IsNullOrEmpty(sig)) sig = "[unknown_sig]";
+                            unknownSignatures[sig] = unknownSignatures.GetValueOrDefault(sig) + 1;
+                            unknownCount++;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            Console.WriteLine($"\n--- Resolved Files inside WADs ({resolvedCount} total) ---");
             foreach (var pair in wadExtensions.OrderByDescending(x => x.Value))
             {
                 Console.WriteLine($" {pair.Key}: {pair.Value}");

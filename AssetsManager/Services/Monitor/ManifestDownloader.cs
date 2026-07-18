@@ -129,7 +129,7 @@ public class ManifestDownloader
                     try 
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var physicalPath = Path.Combine(outputPath, file.Name.Replace("/", Path.DirectorySeparatorChar.ToString()));
+                        var physicalPath = Path.Combine(outputPath, file.Name.Replace('/', Path.DirectorySeparatorChar));
                         var fileInfo = new FileInfo(physicalPath);
                         bool fileExists = fileInfo.Exists;
                         var chunksByBundle = new Dictionary<ulong, List<ChunkDownloadTask>>();
@@ -167,7 +167,7 @@ public class ManifestDownloader
                                             int totalRead = 0;
                                             while (totalRead < (int)chunk.UncompressedSize)
                                             {
-                                                int read = await fs.ReadAsync(localData, totalRead, (int)chunk.UncompressedSize - totalRead, cancellationToken);
+                                                int read = await fs.ReadAsync(localData.AsMemory(totalRead, (int)chunk.UncompressedSize - totalRead), cancellationToken);
                                                 if (read == 0) break;
                                                 totalRead += read;
                                             }
@@ -290,15 +290,18 @@ public class ManifestDownloader
 
         try
         {
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var linkedToken = linkedCts.Token;
+
             var netSem = new SemaphoreSlim(10); 
             var cpuSem = new SemaphoreSlim(Math.Clamp(Environment.ProcessorCount, 1, 4));
 
             var tasks = bundlesToProcess.Select(async bundleEntry =>
             {
-                await netSem.WaitAsync(cancellationToken);
+                await netSem.WaitAsync(linkedToken);
                 try
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    linkedToken.ThrowIfCancellationRequested();
                     string url = $"{_bundleBaseUrl}/{bundleEntry.Key:X16}.bundle";
                     var sorted = bundleEntry.Value.OrderBy(t => t.Chunk.BundleOffset).ToList();
 
@@ -319,22 +322,22 @@ public class ManifestDownloader
                     Interlocked.Add(ref totalRequests, groups.Count);
                     foreach (var group in groups)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        linkedToken.ThrowIfCancellationRequested();
                         long start = (long)group[0].Chunk.BundleOffset;
                         long end = (long)(group.Last().Chunk.BundleOffset + group.Last().Chunk.CompressedSize - 1);
 
                         var req = new HttpRequestMessage(HttpMethod.Get, url);
                         req.Headers.Range = new RangeHeaderValue(start, end);
 
-                        using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                        using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, linkedToken);
                         resp.EnsureSuccessStatusCode();
 
-                        using var responseStream = await resp.Content.ReadAsStreamAsync(cancellationToken);
+                        using var responseStream = await resp.Content.ReadAsStreamAsync(linkedToken);
                         long currentStreamPos = start;
 
                         foreach (var t in group)
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
+                            linkedToken.ThrowIfCancellationRequested();
                             long gap = (long)t.Chunk.ChunkId == 0 ? 0 : (long)t.Chunk.BundleOffset - currentStreamPos; 
                             if (gap > 0)
                             {
@@ -345,7 +348,7 @@ public class ManifestDownloader
                                     long skipped = 0;
                                     while (skipped < gap)
                                     {
-                                        int read = await responseStream.ReadAsync(skipBuf, 0, (int)Math.Min(gap - skipped, skipSize), cancellationToken);
+                                        int read = await responseStream.ReadAsync(skipBuf.AsMemory(0, (int)Math.Min(gap - skipped, (long)skipBuf.Length)), linkedToken);
                                         if (read == 0) break;
                                         skipped += read;
                                     }
@@ -363,16 +366,16 @@ public class ManifestDownloader
                             {
                                 while (tRead < (int)t.Chunk.CompressedSize)
                                 {
-                                    int r = await responseStream.ReadAsync(comp, tRead, (int)t.Chunk.CompressedSize - tRead, cancellationToken);
+                                    int r = await responseStream.ReadAsync(comp.AsMemory(tRead, (int)t.Chunk.CompressedSize - tRead), linkedToken);
                                     if (r == 0) break;
                                     tRead += r;
                                 }
                                 Interlocked.Add(ref totalDownloaded, tRead + (gap > 0 ? gap : 0));
                                 currentStreamPos = (long)t.Chunk.BundleOffset + tRead;
 
-                                await cpuSem.WaitAsync(cancellationToken);
+                                await cpuSem.WaitAsync(linkedToken);
                                 try {
-                                    cancellationToken.ThrowIfCancellationRequested();
+                                    linkedToken.ThrowIfCancellationRequested();
                                     if (!_decompressorPool.TryPop(out var decompressor)) decompressor = new Decompressor();
                                     try {
                                         byte[] decompBuffer = ArrayPool<byte>.Shared.Rent((int)t.Chunk.UncompressedSize);
@@ -382,7 +385,7 @@ public class ManifestDownloader
                                                 throw new Exception($"Chunk decompression size mismatch. Expected {t.Chunk.UncompressedSize}, got {decompressedBytes}");
 
                                             Interlocked.Add(ref totalDecompressedBytes, (long)decompressedBytes);
-                                            ReadOnlySpan<byte> uncomp = decompBuffer.AsSpan(0, decompressedBytes);
+                                            ReadOnlyMemory<byte> uncomp = decompBuffer.AsMemory(0, decompressedBytes);
 
                                             foreach (var target in t.Targets)
                                             {
@@ -395,7 +398,7 @@ public class ManifestDownloader
                                                 }, LazyThreadSafetyMode.ExecutionAndPublication));
 
                                                 var handle = lazyHandle.Value;
-                                                RandomAccess.Write(handle, uncomp, (long)target.FileOffset);
+                                                await RandomAccess.WriteAsync(handle, uncomp, (long)target.FileOffset, linkedToken);
                                                 
                                                 int currentDoneChunks = Interlocked.Increment(ref completedChunks);
                                                 int rem = pendingPerFile.AddOrUpdate(target.PhysicalPath, 0, (k, v) => v - 1);
@@ -441,6 +444,7 @@ public class ManifestDownloader
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Bundle {bundleEntry.Key:X16} processing error");
+                    linkedCts.Cancel();
                     throw;
                 }
                 finally { netSem.Release(); }
