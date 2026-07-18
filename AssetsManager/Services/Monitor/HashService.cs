@@ -1,7 +1,6 @@
 using System;
 using System.Security.Cryptography;
 using AssetsManager.Views.Models.Monitor;
-using Blake3;
 
 namespace AssetsManager.Services.Monitor;
 
@@ -12,7 +11,7 @@ public class HashService
         ulong actualHash = type switch
         {
             HashType.Sha256 => HashSha256(data),
-            HashType.Blake3 => HashBlake3(data),
+            HashType.Blake3 => throw new NotSupportedException("Blake3 hash verification is no longer supported."),
             HashType.Hkdf => HashHkdf(data),
             _ => throw new NotSupportedException($"Hash type {type} is not supported.")
         };
@@ -25,13 +24,6 @@ public class HashService
         Span<byte> hash = stackalloc byte[32];
         SHA256.HashData(data, hash);
         return BitConverter.ToUInt64(hash);
-    }
-
-    private ulong HashBlake3(ReadOnlySpan<byte> data)
-    {
-        // Use the ultra-fast static method to avoid object allocation
-        var hash = Blake3.Hasher.Hash(data);
-        return BitConverter.ToUInt64(hash.AsSpan()[..8]);
     }
 
     private ulong HashHkdf(ReadOnlySpan<byte> data)
