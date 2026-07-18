@@ -397,32 +397,70 @@
                                     </Style>
                                 </StackPanel.Style>
                                 
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <Button Click="RunGrepLcu_Click" Margin="4,0,4,16" Padding="12">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                    <Setter Property="IsEnabled" Value="False"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <Grid HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Extract client paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                <!-- Keep extraction and the opt-in v1 resolver on one compact row. -->
+                                <UniformGrid Columns="2" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <StackPanel Margin="4,0,4,6">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                    </Grid>
-                                </Button>
+                                        <Button Click="RunGrepLcu_Click" Margin="4,0" Padding="12">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                            <Setter Property="IsEnabled" Value="False"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                    <TextBlock Text="Extract client paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
+
+                                    <StackPanel>
+                                        <StackPanel Margin="4,0,4,6">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialIcons:MaterialIcon Kind="FileCodeOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <TextBlock Text="LCU V1 PATHS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <Button Click="RunLcuV1Paths_Click" Margin="4,0" Padding="12">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                            <Setter Property="IsEnabled" Value="False"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <Grid HorizontalAlignment="Stretch">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCodeOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="LCU V1 Paths" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                    <TextBlock Text="Intensive word-pair and locale patterns" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Button>
+                                    </StackPanel>
+                                </UniformGrid>
 
                                 <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
                                     <materialIcons:MaterialIcon Kind="Lan" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -477,29 +515,6 @@
                                         </Grid>
                                     </Button>
 
-                                    <!-- LCU V1 Paths -->
-                                    <Button Click="RunLcuV1Paths_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCodeOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="LCU V1 Paths" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Intensive v1 word-pair and locale patterns" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
                                 </UniformGrid>
 
                                 <StackPanel Orientation="Horizontal" Margin="4,0,0,6">

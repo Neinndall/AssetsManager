@@ -707,7 +707,8 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         [Fact]
         public void LcuV1PathPatternsResolveLocalizedWordPairJson()
         {
-            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, Array.Empty<string>()), null);
+            const string defaultPath = "plugins/rcp-be-lol-game-data/global/default/v1/augment-lists.json";
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[] { defaultPath }), null);
             const string expected = "plugins/rcp-be-lol-game-data/global/de_de/v1/augment-lists.json";
             var engine = CreateEngine(HashGuessDomain.Lcu, expected);
 

@@ -236,8 +236,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .OrderBy(word => word.Length)
                 .ThenBy(word => word, StringComparer.Ordinal)
                 .ToArray();
-            string[] localeList = (locales ?? Locales.Prepend("default"))
+            string[] localeList = (locales ?? Locales)
                 .Where(locale => !string.IsNullOrWhiteSpace(locale))
+                .Where(locale => !locale.Equals("default", StringComparison.OrdinalIgnoreCase))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
@@ -256,8 +257,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progressClock.Restart();
             }
 
-            bool CheckForLocales(string fileName, string phase)
+            bool CheckDefaultThenLocales(string fileName, string phase)
             {
+                string defaultPath = $"{v1Prefix}default/v1/{fileName}";
+                cancellationToken.ThrowIfCancellationRequested();
+                bool hasDefaultEvidence = IsKnown(engine, defaultPath, HashGuessStrategy.LcuPattern, source);
+                if (checkedCandidates != int.MaxValue) checkedCandidates++;
+                Report(phase);
+                if (engine.RemainingUnknownCount == 0) return false;
+
+                // A localized path is only attempted after its default counterpart is known or resolved.
+                // This preserves the useful locale expansion without multiplying every word pair by all locales.
+                if (!hasDefaultEvidence) return true;
                 foreach (string locale in localeList)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -273,9 +284,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string a in wordList)
             {
                 // The non-TFT paths are first because they are both broadly useful and cheap to resolve early.
-                if (!CheckForLocales($"{a}.json", "single names") ||
-                    !CheckForLocales($"tft{a}.json", "TFT single names") ||
-                    !CheckForLocales($"tft{a}s.json", "TFT plural names"))
+                if (!CheckDefaultThenLocales($"{a}.json", "single names") ||
+                    !CheckDefaultThenLocales($"tft{a}.json", "TFT single names") ||
+                    !CheckDefaultThenLocales($"tft{a}s.json", "TFT plural names"))
                 {
                     Report("completed", force: true);
                     return checkedCandidates;
@@ -285,17 +296,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                 {
                     // These are the unique candidate sets from the 24 CDTB check_iter expressions.
                     // Because both words iterate over the full list, swapping a/b would only repeat work.
-                    if (!CheckForLocales($"{a}{b}s.json", "word pairs") ||
-                        !CheckForLocales($"{a}{b}n.json", "word pairs") ||
-                        !CheckForLocales($"{a}-{b}s.json", "word pairs") ||
-                        !CheckForLocales($"{a}-{b}.json", "word pairs") ||
-                        !CheckForLocales($"{a}{b}.json", "word pairs") ||
-                        !CheckForLocales($"{a}{b}", "word pairs") ||
-                        !CheckForLocales($"tft{a}{b}s.json", "TFT pairs") ||
-                        !CheckForLocales($"tft{a}-{b}s.json", "TFT pairs") ||
-                        !CheckForLocales($"tft{a}{b}.json", "TFT pairs") ||
-                        !CheckForLocales($"tft{a}-{b}.json", "TFT pairs") ||
-                        !CheckForLocales($"tft-{a}{b}.json", "TFT pairs"))
+                    if (!CheckDefaultThenLocales($"{a}{b}s.json", "word pairs") ||
+                        !CheckDefaultThenLocales($"{a}{b}n.json", "word pairs") ||
+                        !CheckDefaultThenLocales($"{a}-{b}s.json", "word pairs") ||
+                        !CheckDefaultThenLocales($"{a}-{b}.json", "word pairs") ||
+                        !CheckDefaultThenLocales($"{a}{b}.json", "word pairs") ||
+                        !CheckDefaultThenLocales($"{a}{b}", "word pairs") ||
+                        !CheckDefaultThenLocales($"tft{a}{b}s.json", "TFT pairs") ||
+                        !CheckDefaultThenLocales($"tft{a}-{b}s.json", "TFT pairs") ||
+                        !CheckDefaultThenLocales($"tft{a}{b}.json", "TFT pairs") ||
+                        !CheckDefaultThenLocales($"tft{a}-{b}.json", "TFT pairs") ||
+                        !CheckDefaultThenLocales($"tft-{a}{b}.json", "TFT pairs"))
                     {
                         Report("completed", force: true);
                         return checkedCandidates;

@@ -222,7 +222,9 @@ namespace AssetsManager.Views
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
                     long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
-                    _viewModel.StatusText = $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
+                    _viewModel.StatusText = value.TotalWads > 0
+                        ? $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s"
+                        : $"{value.CurrentWad} · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
                 });
                 IProgress<HashGuessMatch> matchProgress = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu)
                     ? new Progress<HashGuessMatch>(match =>
@@ -356,7 +358,9 @@ namespace AssetsManager.Views
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
                     long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
-                    _viewModel.StatusText = $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
+                    _viewModel.StatusText = value.TotalWads > 0
+                        ? $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s"
+                        : $"{value.CurrentStage} · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
                 });
 
                 if (action == InternalHashAction.Inventory)
