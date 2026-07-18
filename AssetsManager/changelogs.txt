@@ -16,6 +16,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Increased Hash Guessing Lab left configuration panel width for improved readability.
   - Version discovery and manifest parsing now use less memory, handle malformed server data safely, and cancel promptly.
   - Game client verification now uses less memory, runs fully in the background, keeps progress responsive, and uses measured CDN concurrency with bounded adaptive bundle ranges.
   - Relocated shader variants, extension substitutions, and prefix attacks to the Game Basic Suite for faster discovery.
