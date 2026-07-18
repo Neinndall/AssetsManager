@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Game client verification now uses less memory, runs fully in the background, keeps progress responsive, and uses measured CDN concurrency with bounded adaptive bundle ranges.
   - Relocated shader variants, extension substitutions, and prefix attacks to the Game Basic Suite for faster discovery.
   - Increased final progress hold delay from 100ms to 150ms for smoother visual transitions.
   - The main window now opens wider so dashboard status labels remain fully visible.
@@ -79,6 +80,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Game updates now reject corrupt server chunks and repair incorrect trailing file data safely.
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
   - GAME and LCU hash files now preserve CommunityDragon-compatible LF line endings when new matches are saved.
   - Version updates now display the completed verification and updating states before advancing or closing.

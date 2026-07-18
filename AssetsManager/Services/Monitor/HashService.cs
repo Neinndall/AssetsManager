@@ -1,45 +1,53 @@
 using System;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using AssetsManager.Views.Models.Monitor;
 using Blake3;
 
 namespace AssetsManager.Services.Monitor;
 
-public class HashService
+public sealed class HashService
 {
     public bool VerifyChunk(ReadOnlySpan<byte> data, ulong expectedChunkId, HashType type)
+        => ComputeChunkId(data, type) == expectedChunkId;
+
+    internal ulong ComputeChunkId(ReadOnlySpan<byte> data, HashType type)
     {
-        ulong actualHash = type switch
+        return type switch
         {
+            HashType.Sha512 => HashSha512(data),
             HashType.Sha256 => HashSha256(data),
             HashType.Blake3 => HashBlake3(data),
             HashType.Hkdf => HashHkdf(data),
             _ => throw new NotSupportedException($"Hash type {type} is not supported.")
         };
-
-        return actualHash == expectedChunkId;
     }
 
-    private ulong HashSha256(ReadOnlySpan<byte> data)
+    private static ulong HashSha512(ReadOnlySpan<byte> data)
     {
-        Span<byte> hash = stackalloc byte[32];
+        Span<byte> hash = stackalloc byte[SHA512.HashSizeInBytes];
+        SHA512.HashData(data, hash);
+        return BinaryPrimitives.ReadUInt64LittleEndian(hash);
+    }
+
+    private static ulong HashSha256(ReadOnlySpan<byte> data)
+    {
+        Span<byte> hash = stackalloc byte[SHA256.HashSizeInBytes];
         SHA256.HashData(data, hash);
-        return BitConverter.ToUInt64(hash);
+        return BinaryPrimitives.ReadUInt64LittleEndian(hash);
     }
 
-    private ulong HashBlake3(ReadOnlySpan<byte> data)
+    private static ulong HashBlake3(ReadOnlySpan<byte> data)
     {
-        // Use the ultra-fast static method to avoid object allocation
         var hash = Blake3.Hasher.Hash(data);
-        return BitConverter.ToUInt64(hash.AsSpan()[..8]);
+        return BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan());
     }
 
-    private ulong HashHkdf(ReadOnlySpan<byte> data)
+    private static ulong HashHkdf(ReadOnlySpan<byte> data)
     {
         Span<byte> key = stackalloc byte[32];
         SHA256.HashData(data, key);
-        
-        // Use stackalloc for fixed-size buffers to avoid Heap allocation (very fast)
+
         Span<byte> ipad = stackalloc byte[64];
         Span<byte> opad = stackalloc byte[64];
         ipad.Fill(0x36);
@@ -65,10 +73,9 @@ public class HashService
         Span<byte> result = stackalloc byte[8];
         buffer[..8].CopyTo(result);
 
-        // Pre-allocate loop buffers on stack
         Span<byte> iter1 = stackalloc byte[64 + 32];
         ipad.CopyTo(iter1);
-        
+
         Span<byte> iter2 = stackalloc byte[64 + 32];
         opad.CopyTo(iter2);
 
@@ -83,6 +90,6 @@ public class HashService
             for (int j = 0; j < 8; j++) result[j] ^= buffer[j];
         }
 
-        return BitConverter.ToUInt64(result);
+        return BinaryPrimitives.ReadUInt64LittleEndian(result);
     }
 }

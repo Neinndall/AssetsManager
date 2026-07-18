@@ -25,14 +25,14 @@ namespace AssetsManager.Services.Monitor
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
         private readonly DirectoriesCreator _directoriesCreator;
-        
+
         private readonly RmanService _rmanService;
         private readonly ManifestDownloader _manifestDownloader;
         private readonly RmanApiService _riotApiService;
 
         public VersionService(
-            LogService logService, 
-            HttpClient httpClient, 
+            LogService logService,
+            HttpClient httpClient,
             DirectoriesCreator directoriesCreator,
             RmanService rmanService,
             ManifestDownloader manifestDownloader,
@@ -41,7 +41,7 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
             _httpClient = httpClient;
             _directoriesCreator = directoriesCreator;
-            
+
             _rmanService = rmanService;
             _manifestDownloader = manifestDownloader;
             _riotApiService = riotApiService;
@@ -82,7 +82,7 @@ namespace AssetsManager.Services.Monitor
             await SaveClientVersionsAsync(versionInfo);
 
             _logService.LogSuccess("Version fetch process completed successfully.");
-            
+
             VersionDownloadCompleted?.Invoke("Fetching Versions", true, "Success");
         }
 
@@ -99,7 +99,7 @@ namespace AssetsManager.Services.Monitor
                     _directoriesCreator.CreateDirectory(tempDir);
 
                     var manifestBytes = await _httpClient.GetByteArrayAsync(url);
-                    var manifest = _rmanService.Parse(manifestBytes);
+                    var manifest = await Task.Run(() => _rmanService.Parse(manifestBytes));
 
                     await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, "LeagueClient.exe");
 
@@ -152,11 +152,11 @@ namespace AssetsManager.Services.Monitor
             {
                 // Instant notification to UI: This triggers "Verifying Files..." in ProgressUIManager
                 VersionDownloadStarted?.Invoke(taskName);
-                
+
                 _logService.Log($"Verifying/Updating {taskName}...");
 
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl, cancellationToken);
-                var manifest = _rmanService.Parse(manifestBytes);
+                var manifest = await Task.Run(() => _rmanService.Parse(manifestBytes), cancellationToken);
 
                 int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales, cancellationToken);
 
@@ -244,7 +244,7 @@ namespace AssetsManager.Services.Monitor
             {
                 // Focus on code-metadata.json as requested
                 string metadataName = "code-metadata.json";
-                
+
                 // 1. Check standard location (provided root is the client root containing Game subdirectory)
                 string metadataPath = Path.Combine(rootDirectory, "Game", metadataName);
                 if (File.Exists(metadataPath)) return await ExtractVersionFromFile(metadataPath);
