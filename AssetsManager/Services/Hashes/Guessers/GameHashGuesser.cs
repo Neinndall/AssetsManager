@@ -823,25 +823,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             int limit = data.Count;
             for (int offset = 0; offset < limit; offset++)
             {
-                byte[][] needles = ToUpperAscii(ByteAt(data, offset)) switch
-                {
-                    (byte)'A' => BinPrefixesA,
-                    (byte)'C' => BinPrefixesC,
-                    (byte)'D' => BinPrefixesD,
-                    (byte)'G' => BinPrefixesG,
-                    (byte)'L' => BinPrefixesL,
-                    (byte)'M' => BinPrefixesM,
-                    (byte)'P' => BinPrefixesP,
-                    (byte)'S' => BinPrefixesS,
-                    (byte)'U' => BinPrefixesU,
-                    _ => null
-                };
-                if (needles == null) continue;
+                byte firstByte = ToUpperAscii(ByteAt(data, offset));
 
-                bool matched = false;
-                foreach (byte[] prefix in needles)
+                foreach (byte[] prefix in GeneralPathPrefixes)
                 {
-                    if (offset + prefix.Length > limit) continue;
+                    if (prefix[0] != firstByte || offset + prefix.Length > limit) continue;
+
                     int prefixIndex = 1;
                     while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
                     if (prefixIndex != prefix.Length) continue;
@@ -851,10 +838,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     yield return (offset, end - offset);
 
                     offset = end - 1;
-                    matched = true;
                     break;
                 }
-                if (matched) continue;
             }
         }
 
