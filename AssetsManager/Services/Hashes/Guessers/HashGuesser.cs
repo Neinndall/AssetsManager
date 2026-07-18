@@ -166,8 +166,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             string sourceWadPath,
             ulong sourceChunkHash)
         {
-            foreach (string path in ExpandCandidate(candidate))
-                engine.Check(path, candidate.Strategy, sourceWadPath, sourceChunkHash);
+            CheckIter(engine, ExpandCandidate(candidate), candidate.Strategy, sourceWadPath, sourceChunkHash);
         }
 
         protected abstract IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath);
@@ -269,20 +268,56 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         internal bool Check(HashGuessEngine engine, string path, HashGuessStrategy strategy, string source = "Generated") =>
-            engine.Check(path, strategy, source);
+            engine.CheckExact(path, strategy, source);
 
         internal bool IsKnown(HashGuessEngine engine, string path, HashGuessStrategy strategy, string source = "Generated")
         {
-            string normalized = NormalizePath(path);
-            ulong hash = XxHash64Ext.Hash(normalized);
-            return engine.Check(normalized, strategy, source) || HashFile.Load().ContainsKey(hash);
+            ulong hash = XxHash64Ext.Hash(path);
+            return engine.CheckExact(path, strategy, source) || HashFile.Load().ContainsKey(hash);
         }
 
-        internal int CheckMany(HashGuessEngine engine, IEnumerable<string> paths, HashGuessStrategy strategy, string source = "Generated") =>
-            engine.CheckMany(paths, strategy, source);
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            HashGuessStrategy strategy,
+            string source = "Generated",
+            ulong sourceChunkHash = 0)
+        {
+            ArgumentNullException.ThrowIfNull(paths);
+            int checkedCount = 0;
+            foreach (string path in paths)
+            {
+                engine.CheckExact(path, strategy, source, sourceChunkHash);
+                checkedCount++;
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+            return checkedCount;
+        }
+
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<HashGuessCandidate> candidates,
+            string source,
+            CancellationToken cancellationToken,
+            Action<int> progress = null,
+            int progressInterval = 0)
+        {
+            ArgumentNullException.ThrowIfNull(candidates);
+            int checkedCount = 0;
+            foreach (HashGuessCandidate candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                engine.CheckExact(candidate.Path, candidate.Strategy, source);
+                checkedCount++;
+                if (progressInterval > 0 && checkedCount % progressInterval == 0)
+                    progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+            return checkedCount;
+        }
 
         internal int CheckTextList(HashGuessEngine engine, string text, HashGuessStrategy strategy, string source = "Text list") =>
-            CheckMany(engine, text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries), strategy, source);
+            CheckIter(engine, text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries), strategy, source);
 
         internal int CheckXdbgHashes(HashGuessEngine engine, string path, HashGuessStrategy strategy = HashGuessStrategy.EmbeddedPathGrep)
         {
@@ -292,7 +327,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .Select(line => line.Split('"'))
                 .Where(parts => parts.Length > 1)
                 .Select(parts => parts[1]);
-            return CheckMany(engine, candidates, strategy, "XDBG hashes");
+            return CheckIter(engine, candidates, strategy, "XDBG hashes");
         }
 
         internal int CheckBasenames(HashGuessEngine engine, IEnumerable<string> names, HashGuessStrategy strategy, string source, int candidateBudget = int.MaxValue)
@@ -391,7 +426,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (IReadOnlyList<string> combination in EnumerateWordCombinations(wordsList, newWordCount))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                engine.Check(prefix + string.Join(separator, combination) + suffix, HashGuessStrategy.WordlistVariant, source);
+                engine.CheckExact(prefix + string.Join(separator, combination) + suffix, HashGuessStrategy.WordlistVariant, source);
                 if (checkedCount > 0 && checkedCount % 5000 == 0)
                     progress?.Invoke(checkedCount);
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
@@ -418,7 +453,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string word in wordsList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                engine.Check(string.Format(format, word), HashGuessStrategy.WordlistVariant, "Word Insertion");
+                engine.CheckExact(string.Format(format, word), HashGuessStrategy.WordlistVariant, "Word Insertion");
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
             }
             return checkedCount;
@@ -436,7 +471,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string file = separator >= 0 ? path[(separator + 1)..] : path;
                 foreach (string prefix in prefixList)
                 {
-                    engine.Check(directory + prefix + file, HashGuessStrategy.PrefixVariant, "Prefix variant");
+                    engine.CheckExact(directory + prefix + file, HashGuessStrategy.PrefixVariant, "Prefix variant");
                     if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
                 }
             }

@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Hashes.Guessers
 {
@@ -66,15 +67,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
                 {
                     string prefix = path[..^4];
-                    foreach (string extension in new[] { ".dds", ".png", ".jpg" })
+                    foreach (string extension in new[] { ".png", ".jpg" })
                     {
                         yield return new HashGuessCandidate(basePath + prefix + extension, HashGuessStrategy.CrossDomainAsset);
                         if (CountCandidate(ref generated, candidateBudget)) yield break;
                     }
                 }
-                else if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                         path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                         path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                else if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 {
                     yield return new HashGuessCandidate(basePath + path, HashGuessStrategy.CrossDomainAsset);
                     if (CountCandidate(ref generated, candidateBudget)) yield break;
@@ -230,6 +229,8 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             string[] wordList = (words ?? BuildWordlist())
                 .Where(word => !string.IsNullOrWhiteSpace(word))
+                .Select(HashGuessEngine.NormalizePath)
+                .Where(word => word.Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 // Short, composable terms produce useful v1 names early (for example augment + list),
                 // while retaining the complete CDTB word corpus for exhaustive coverage.
@@ -239,8 +240,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             string[] localeList = (locales ?? Locales)
                 .Where(locale => !string.IsNullOrWhiteSpace(locale))
                 .Where(locale => !locale.Equals("default", StringComparison.OrdinalIgnoreCase))
+                .Select(locale => locale.ToLowerInvariant())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            IReadOnlyDictionary<ulong, string> knownHashes = HashFile.Load();
 
             const string v1Prefix = "plugins/rcp-be-lol-game-data/global/";
             const string source = "LCU v1 path patterns";
@@ -261,7 +264,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 string defaultPath = $"{v1Prefix}default/v1/{fileName}";
                 cancellationToken.ThrowIfCancellationRequested();
-                bool hasDefaultEvidence = IsKnown(engine, defaultPath, HashGuessStrategy.LcuPattern, source);
+                bool resolvedDefault = Check(engine, defaultPath, HashGuessStrategy.LcuPattern, source);
+                bool hasDefaultEvidence = resolvedDefault || knownHashes.ContainsKey(XxHash64Ext.Hash(defaultPath));
                 if (checkedCandidates != int.MaxValue) checkedCandidates++;
                 Report(phase);
                 if (engine.RemainingUnknownCount == 0) return false;
@@ -272,7 +276,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 foreach (string locale in localeList)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check($"{v1Prefix}{locale}/v1/{fileName}", HashGuessStrategy.LcuPattern, source);
+                    Check(engine, $"{v1Prefix}{locale}/v1/{fileName}", HashGuessStrategy.LcuPattern, source);
                     if (checkedCandidates != int.MaxValue) checkedCandidates++;
                     Report(phase);
                     if (engine.RemainingUnknownCount == 0) return false;
