@@ -48,6 +48,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IReadOnlyList<string> KnownPaths => Corpus.Paths;
 
+
         internal static HashSet<ulong> UnknownFromExport(string directory) =>
             HashFile.LoadUnknownFromExport(directory);
 
@@ -58,7 +59,26 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
                 throw new DirectoryNotFoundException("The selected game directory does not exist.");
-            return Directory.EnumerateFiles(rootDirectory, WadPattern, SearchOption.AllDirectories)
+
+            string searchPath = rootDirectory;
+            if (WadPattern == "*.wad")
+            {
+                string pluginsPath = Path.Combine(rootDirectory, "Plugins");
+                if (Directory.Exists(pluginsPath))
+                {
+                    searchPath = pluginsPath;
+                }
+            }
+            else if (WadPattern == "*.wad.client")
+            {
+                string gamePath = Path.Combine(rootDirectory, "Game");
+                if (Directory.Exists(gamePath))
+                {
+                    searchPath = gamePath;
+                }
+            }
+
+            return Directory.EnumerateFiles(searchPath, WadPattern, SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }

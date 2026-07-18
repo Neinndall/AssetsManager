@@ -76,6 +76,7 @@ Improvements
   - Explorer / Encrypted Texture Feedback
     * Encrypted Riot esports textures are now identified explicitly in the preview panel instead of being reported as unsupported or failed files.
   - Significantly accelerated hash guessing speed when scanning localized game client containers.
+  - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
