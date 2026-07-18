@@ -407,7 +407,11 @@ namespace AssetsManager.Services.Hashes
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
-        public async Task<HashGuessRunResult> RunLcuV1PathGuessingAsync(string rootDirectory, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
+        public async Task<HashGuessRunResult> RunLcuV1PathGuessingAsync(
+            string rootDirectory,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            IProgress<HashGuessMatch> matchProgress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
@@ -415,7 +419,8 @@ namespace AssetsManager.Services.Hashes
             int initial = unknown.Count;
             var runResult = await Task.Run(() =>
             {
-                var engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown);
+                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
+                var engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
                 int checkedCandidates = _lcuGuesser.RunV1PathPatterns(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
