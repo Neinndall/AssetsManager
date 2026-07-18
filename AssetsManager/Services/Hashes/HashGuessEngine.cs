@@ -1,7 +1,10 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.IO.Hashing;
+using System.Text;
 using System.Text.RegularExpressions;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
@@ -48,6 +51,53 @@ namespace AssetsManager.Services.Hashes
                 return false;
             }
 
+            AddMatch(hash, path, strategy, source, sourceChunkHash);
+            return true;
+        }
+
+        internal bool CheckCombined(
+            string directory,
+            string relativePath,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash)
+        {
+            CheckedCandidates++;
+            int directoryByteCount = Encoding.UTF8.GetByteCount(directory);
+            int relativeByteCount = Encoding.UTF8.GetByteCount(relativePath);
+            int byteCount = checked(directoryByteCount + 1 + relativeByteCount);
+            byte[] rented = null;
+            Span<byte> utf8 = byteCount <= 1024
+                ? stackalloc byte[byteCount]
+                : (rented = ArrayPool<byte>.Shared.Rent(byteCount));
+            try
+            {
+                int written = Encoding.UTF8.GetBytes(directory, utf8);
+                utf8[written++] = (byte)'/';
+                written += Encoding.UTF8.GetBytes(relativePath, utf8[written..]);
+                ulong hash = XxHash64.HashToUInt64(utf8[..written]);
+                if (!_unknownHashes.Remove(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                AddMatch(hash, string.Concat(directory, "/", relativePath), strategy, source, sourceChunkHash);
+                return true;
+            }
+            finally
+            {
+                if (rented != null) ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
+        private void AddMatch(
+            ulong hash,
+            string path,
+            HashGuessStrategy strategy,
+            string source,
+            ulong sourceChunkHash)
+        {
             var match = new HashGuessMatch
             {
                 Hash = hash,
@@ -59,7 +109,6 @@ namespace AssetsManager.Services.Hashes
             };
             _matches[hash] = match;
             _matchFound?.Invoke(match);
-            return true;
         }
 
         public HashGuessProgress CreateProgress(

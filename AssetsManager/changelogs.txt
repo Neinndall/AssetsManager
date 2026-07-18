@@ -57,7 +57,7 @@ Improvements
   - Advanced hash guessing now prioritizes proven Riot path combinations and avoids redundant candidate attacks.
   - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
   - LCU GREP now resolves relative, CSS, and HTML asset references from their Riot plugin context.
-  - GAME GREP and hash promotion now complete faster while preserving result coverage and file ordering.
+  - GAME and LCU WAD GREP now match CDTB parsing behavior with fewer redundant scans and temporary allocations.
   - GAME Extended now searches base filenames derived from Riot suffix variants.
   - Reduced memory pressure while creating WAD backups and made interrupted saves leave no incomplete history entry.
   - Accelerated Explorer tree loading for large WAD and local folder structures.

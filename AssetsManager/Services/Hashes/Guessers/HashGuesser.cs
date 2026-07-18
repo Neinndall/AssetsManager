@@ -155,9 +155,18 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             foreach (HashGuessCandidate candidate in ExtractCandidates(data, sourcePath))
             {
-                foreach (string path in ExpandCandidate(candidate))
-                    engine.Check(path, candidate.Strategy, sourceWadPath, sourceChunkHash);
+                CheckCandidate(engine, candidate, sourceWadPath, sourceChunkHash);
             }
+        }
+
+        protected virtual void CheckCandidate(
+            HashGuessEngine engine,
+            HashGuessCandidate candidate,
+            string sourceWadPath,
+            ulong sourceChunkHash)
+        {
+            foreach (string path in ExpandCandidate(candidate))
+                engine.Check(path, candidate.Strategy, sourceWadPath, sourceChunkHash);
         }
 
         protected abstract IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath);

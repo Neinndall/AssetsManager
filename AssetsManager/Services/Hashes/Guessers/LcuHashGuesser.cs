@@ -277,16 +277,25 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        protected override IEnumerable<string> ExpandCandidate(HashGuessCandidate candidate)
+        protected override void CheckCandidate(
+            HashGuessEngine engine,
+            HashGuessCandidate candidate,
+            string sourceWadPath,
+            ulong sourceChunkHash)
         {
             if (candidate.Strategy != HashGuessStrategy.LcuRelativeBasename)
             {
-                yield return candidate.Path;
-                yield break;
+                base.CheckCandidate(engine, candidate, sourceWadPath, sourceChunkHash);
+                return;
             }
 
             foreach (string directory in GetKnownDirectories())
-                yield return directory + "/" + candidate.Path;
+                engine.CheckCombined(
+                    directory,
+                    candidate.Path,
+                    candidate.Strategy,
+                    sourceWadPath,
+                    sourceChunkHash);
         }
 
         private IReadOnlyList<string> GetKnownDirectories()
@@ -310,14 +319,14 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (!TryDecodeWadText(data, out string text))
                 yield break;
-            var structuredCandidates = new List<HashGuessCandidate>();
-            bool stopAfterStructuredJson = Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
-                                           ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
-
-            foreach (HashGuessCandidate candidate in structuredCandidates)
-                yield return candidate;
-
-            if (stopAfterStructuredJson) yield break;
+            if (Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                var structuredCandidates = new List<HashGuessCandidate>();
+                bool stopAfterStructuredJson = ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
+                foreach (HashGuessCandidate candidate in structuredCandidates)
+                    yield return candidate;
+                if (stopAfterStructuredJson) yield break;
+            }
 
             foreach (Match match in PluginPathRegex.Matches(text))
                 yield return new HashGuessCandidate(NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath);
@@ -384,12 +393,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (root.ValueKind == JsonValueKind.Object &&
                     root.TryGetProperty("pluginDependencies", out _) && root.TryGetProperty("name", out _))
                 {
-                    AddPluginDescriptionCandidates(data, sourcePath, candidates);
+                    AddPluginDescriptionCandidates(root, candidates);
                 }
                 else if (root.ValueKind == JsonValueKind.Object &&
                          root.TryGetProperty("musicVolume", out _) && root.TryGetProperty("files", out _))
                 {
-                    AddSplashCandidates(data, sourcePath, candidates);
+                    AddSplashCandidates(root, candidates);
                     return true;
                 }
                 else if (sourcePath.Equals("plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json", StringComparison.OrdinalIgnoreCase))
@@ -408,7 +417,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
                 else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("recommendedItemDefaults", out _))
                 {
-                    AddRecommendedItemCandidates(data, sourcePath, candidates);
+                    AddRecommendedItemCandidates(root, candidates);
                 }
                 return false;
             }
@@ -419,76 +428,50 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private void AddPluginDescriptionCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private static void AddPluginDescriptionCandidates(JsonElement root, ICollection<HashGuessCandidate> candidates)
         {
-            try
-            {
-                using var document = JsonDocument.Parse(data.AsMemory());
-                if (!document.RootElement.TryGetProperty("name", out JsonElement nameProperty)) return;
-                string name = nameProperty.GetString()?.ToLowerInvariant();
-                if (string.IsNullOrEmpty(name)) return;
-                foreach (string subpath in new[] { "index.html", "init.js", "init.js.map", "bundle.js", "trans.json", "css/main.css", "license.json" })
-                    candidates.Add(new HashGuessCandidate($"plugins/{name}/global/default/{subpath}", HashGuessStrategy.LcuPattern));
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                LogInvalidJson("plugin metadata", sourcePath, exception);
-            }
+            if (!root.TryGetProperty("name", out JsonElement nameProperty)) return;
+            string name = nameProperty.GetString()?.ToLowerInvariant();
+            if (string.IsNullOrEmpty(name)) return;
+            foreach (string subpath in new[] { "index.html", "init.js", "init.js.map", "bundle.js", "trans.json", "css/main.css", "license.json" })
+                candidates.Add(new HashGuessCandidate($"plugins/{name}/global/default/{subpath}", HashGuessStrategy.LcuPattern));
         }
 
-        private bool AddSplashCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private static void AddSplashCandidates(JsonElement root, ICollection<HashGuessCandidate> candidates)
         {
-            try
+            if (!root.TryGetProperty("files", out JsonElement filesProperty) || filesProperty.ValueKind != JsonValueKind.Object)
+                return;
+
+            var filePaths = filesProperty.EnumerateObject()
+                .Select(property => property.Value.GetString()?.ToLowerInvariant() ?? string.Empty)
+                .ToList();
+            var splashNames = filePaths
+                .SelectMany(path => SplashNameRegex.Matches(path).Select(match => match.Groups[1].Value.ToLowerInvariant()))
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (string splashName in splashNames)
             {
-                using var document = JsonDocument.Parse(data.AsMemory());
-                if (!document.RootElement.TryGetProperty("files", out JsonElement filesProperty) || filesProperty.ValueKind != JsonValueKind.Object)
-                    return false;
-
-                var filePaths = filesProperty.EnumerateObject()
-                    .Select(property => property.Value.GetString()?.ToLowerInvariant() ?? string.Empty)
-                    .ToList();
-                var splashNames = filePaths
-                    .SelectMany(path => SplashNameRegex.Matches(path).Select(match => match.Groups[1].Value.ToLowerInvariant()))
-                    .ToHashSet(StringComparer.Ordinal);
-
-                foreach (string splashName in splashNames)
+                candidates.Add(new HashGuessCandidate(
+                    $"plugins/rcp-fe-lol-splash/global/default/splash-assets/{splashName}/config.json",
+                    HashGuessStrategy.LcuPattern));
+                foreach (string filePath in filePaths)
                 {
                     candidates.Add(new HashGuessCandidate(
-                        $"plugins/rcp-fe-lol-splash/global/default/splash-assets/{splashName}/config.json",
+                        $"plugins/rcp-fe-lol-splash/global/default/splash-assets/{splashName}/{filePath}",
                         HashGuessStrategy.LcuPattern));
-                    foreach (string filePath in filePaths)
-                    {
-                        candidates.Add(new HashGuessCandidate(
-                            $"plugins/rcp-fe-lol-splash/global/default/splash-assets/{splashName}/{filePath}",
-                            HashGuessStrategy.LcuPattern));
-                    }
                 }
-                return true;
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                LogInvalidJson("splash configuration", sourcePath, exception);
-                return false;
             }
         }
 
-        private void AddRecommendedItemCandidates(ArraySegment<byte> data, string sourcePath, ICollection<HashGuessCandidate> candidates)
+        private static void AddRecommendedItemCandidates(JsonElement root, ICollection<HashGuessCandidate> candidates)
         {
-            try
+            if (!root.TryGetProperty("recommendedItemDefaults", out JsonElement property) || property.ValueKind != JsonValueKind.Array)
+                return;
+            foreach (JsonElement value in property.EnumerateArray())
             {
-                using var document = JsonDocument.Parse(data.AsMemory());
-                if (!document.RootElement.TryGetProperty("recommendedItemDefaults", out JsonElement property) || property.ValueKind != JsonValueKind.Array)
-                    return;
-                foreach (JsonElement value in property.EnumerateArray())
-                {
-                    string path = value.GetString()?.ToLowerInvariant();
-                    if (!string.IsNullOrEmpty(path))
-                        candidates.Add(new HashGuessCandidate($"plugins/rcp-be-lol-game-data/global/default{path}", HashGuessStrategy.LcuPattern));
-                }
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                LogInvalidJson("recommended items", sourcePath, exception);
+                string path = value.GetString()?.ToLowerInvariant();
+                if (!string.IsNullOrEmpty(path))
+                    candidates.Add(new HashGuessCandidate($"plugins/rcp-be-lol-game-data/global/default{path}", HashGuessStrategy.LcuPattern));
             }
         }
 
@@ -522,7 +505,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private void LogInvalidJson(string kind, string sourcePath, Exception exception)
         {
-            _logService.LogDebug($"Hash Lab skipped invalid {kind} JSON '{sourcePath}': {exception.Message}");
+            _logService?.LogDebug($"Hash Lab skipped invalid {kind} JSON '{sourcePath}': {exception.Message}");
         }
     }
 }
