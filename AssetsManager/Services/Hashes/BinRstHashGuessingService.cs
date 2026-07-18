@@ -57,8 +57,8 @@ namespace AssetsManager.Services.Hashes
             ValidateRoot(rootDirectory);
             if (!includeBin && !includeRst) throw new ArgumentException("At least one internal hash domain must be selected.");
             await _resolver.LoadAllHashesAsync();
-            string[] wads = EnumerateWadContainers(rootDirectory);
-            var gamePaths = await LoadGamePathsAsync(cancellationToken);
+            string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
+            var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             var observed = CreateObservedSets();
             int scannedBins = 0, scannedRst = 0;
 
@@ -77,7 +77,7 @@ namespace AssetsManager.Services.Hashes
                             string path = null;
                             bool isBin = false;
                             bool isRst = false;
-                            if (gamePaths.TryGetValue(pair.Key, out path))
+                            if (wadPaths.TryGetValue(pair.Key, out path))
                             {
                                 isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                                 isRst = includeRst && path.EndsWith(".stringtable", StringComparison.OrdinalIgnoreCase);
@@ -181,8 +181,8 @@ namespace AssetsManager.Services.Hashes
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
             progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
-            string[] wads = EnumerateWadContainers(rootDirectory);
-            var gamePaths = await LoadGamePathsAsync(cancellationToken);
+            string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
+            var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             int scanned = 0;
 
             // Build a unified casing map and resolver for cross-dictionary bin hash resolution.
@@ -192,7 +192,7 @@ namespace AssetsManager.Services.Hashes
             var binResolver = new Dictionary<uint, string>();
             if (includeBin)
             {
-                foreach (string gp in gamePaths.Values)
+                foreach (string gp in wadPaths.Values)
                 {
                     foreach (string segment in gp.Split('/'))
                     {
@@ -228,7 +228,7 @@ namespace AssetsManager.Services.Hashes
                             string path = null;
                             bool isBin = false;
                             bool isText = false;
-                            if (gamePaths.TryGetValue(pair.Key, out path))
+                            if (wadPaths.TryGetValue(pair.Key, out path))
                             {
                                 isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                                 isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
@@ -340,7 +340,7 @@ namespace AssetsManager.Services.Hashes
                 binKnown.AddRange((await _store.LoadKnownAsync(kind, cancellationToken)).Values);
             var rst3 = (await _store.LoadKnownAsync(InternalHashKind.RstXxh3, cancellationToken)).Values.ToList();
             var rst64 = (await _store.LoadKnownAsync(InternalHashKind.RstXxh64, cancellationToken)).Values.ToList();
-            var gamePaths = (await LoadGamePathsAsync(cancellationToken)).Values;
+            var wadPaths = (await LoadWadPathsAsync(includeRst, cancellationToken)).Values;
             long checkedCandidates = 0;
 
             await Task.Run(() =>
@@ -348,7 +348,7 @@ namespace AssetsManager.Services.Hashes
                 if (includeBin)
                 {
                     CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionaries");
-                    CheckCandidates(gamePaths, InternalHashGuessStrategy.GamePath, "GAME paths");
+                    CheckCandidates(wadPaths, InternalHashGuessStrategy.GamePath, includeRst ? "GAME and LCU paths" : "GAME paths");
                 }
                 if (includeRst)
                 {
@@ -364,7 +364,7 @@ namespace AssetsManager.Services.Hashes
                     foreach (string val in binKnown) wordlist.AddName(val);
                     foreach (string val in rst3) wordlist.AddName(val);
                     foreach (string val in rst64) wordlist.AddName(val);
-                    foreach (string val in gamePaths) wordlist.AddName(val);
+                    foreach (string val in wadPaths) wordlist.AddName(val);
                     wordlist.FinalizeList();
 
                     CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
@@ -429,14 +429,15 @@ namespace AssetsManager.Services.Hashes
 
         private async Task EnsureInventoryAsync(string rootDirectory, bool includeBin, bool includeRst, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
         {
-            string[] wads = EnumerateWadContainers(rootDirectory);
-            string fingerprint = BuildFingerprint(wads);
             foreach (string domain in GetSelectedDomains(includeBin, includeRst))
             {
+                bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
+                string[] wads = EnumerateWadContainers(rootDirectory, isBinDomain, !isBinDomain);
+                string fingerprint = BuildFingerprint(wads);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
                 string stored = File.Exists(marker) ? (await File.ReadAllTextAsync(marker, cancellationToken)).Trim() : string.Empty;
                 if (!string.Equals(stored, fingerprint, StringComparison.Ordinal))
-                    await BuildInventoryAsync(rootDirectory, domain == "bin", domain == "rst", progress, cancellationToken);
+                    await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
             }
         }
 
@@ -446,12 +447,25 @@ namespace AssetsManager.Services.Hashes
             if (includeRst) yield return "rst";
         }
 
-        private static string[] EnumerateWadContainers(string rootDirectory) =>
-            Directory.EnumerateFiles(rootDirectory, "*.wad*", SearchOption.AllDirectories)
-                .Where(path => path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) ||
-                    path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
+        private static string[] EnumerateWadContainers(string rootDirectory, bool includeBin, bool includeRst)
+        {
+            string searchRoot = rootDirectory;
+            bool binOnly = includeBin && !includeRst;
+            if (binOnly)
+            {
+                string trimmedRoot = Path.TrimEndingDirectorySeparator(rootDirectory);
+                string gameDirectory = string.Equals(Path.GetFileName(trimmedRoot), "Game", StringComparison.OrdinalIgnoreCase)
+                    ? trimmedRoot
+                    : Path.Combine(trimmedRoot, "Game");
+                if (Directory.Exists(gameDirectory)) searchRoot = gameDirectory;
+            }
+
+            return Directory.EnumerateFiles(searchRoot, "*.wad*", SearchOption.AllDirectories)
+                .Where(path => path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
+                    (!binOnly && path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        }
 
         private async Task<CandidateMatcher> CreateMatcherAsync(bool includeBin, bool includeRst, CancellationToken cancellationToken)
         {
@@ -466,16 +480,22 @@ namespace AssetsManager.Services.Hashes
             return new CandidateMatcher(targets);
         }
 
-        private async Task<Dictionary<ulong, string>> LoadGamePathsAsync(CancellationToken cancellationToken)
+        private async Task<Dictionary<ulong, string>> LoadWadPathsAsync(bool includeLcu, CancellationToken cancellationToken)
         {
             var result = new Dictionary<ulong, string>();
-            string path = Path.Combine(_directories.HashesPath, "hashes.game.txt");
-            if (!File.Exists(path)) return result;
-            using var reader = new StreamReader(path);
-            while (await reader.ReadLineAsync(cancellationToken) is string line)
-                if (line.Length > 17 && ulong.TryParse(line.AsSpan(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash))
-                    result[hash] = line[17..];
+            await LoadFileAsync("hashes.game.txt");
+            if (includeLcu) await LoadFileAsync("hashes.lcu.txt");
             return result;
+
+            async Task LoadFileAsync(string fileName)
+            {
+                string path = Path.Combine(_directories.HashesPath, fileName);
+                if (!File.Exists(path)) return;
+                using var reader = new StreamReader(path);
+                while (await reader.ReadLineAsync(cancellationToken) is string line)
+                    if (line.Length > 17 && ulong.TryParse(line.AsSpan(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash))
+                        result.TryAdd(hash, line[17..]);
+            }
         }
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateObservedSets() => new()
