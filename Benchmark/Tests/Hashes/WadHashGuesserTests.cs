@@ -756,6 +756,31 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuV1WithoutLocalesResolvesOnlyTheDefaultPath()
+        {
+            string[] paths =
+            {
+                "plugins/rcp-be-lol-game-data/global/default/v1/augment-lists.json",
+                "plugins/rcp-be-lol-game-data/global/en_us/v1/augment-lists.json",
+                "plugins/rcp-be-lol-game-data/global/es_es/v1/augment-lists.json",
+                "plugins/rcp-be-lol-game-data/global/es_mx/v1/augment-lists.json"
+            };
+            var unknown = paths.Select(path => XxHash64Ext.Hash(path)).ToHashSet();
+            var engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown);
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, Array.Empty<string>()), null);
+
+            lcu.RunV1PathPatterns(
+                engine,
+                progress: null,
+                cancellationToken: CancellationToken.None,
+                words: new[] { "augment", "list" });
+
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(paths[0], match.Path);
+            Assert.Equal(3, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
         public void GameExplicitCdtbMethodsCoverTerminalCharactersPrefixesAndShaders()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

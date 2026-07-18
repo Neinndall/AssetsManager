@@ -237,7 +237,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .OrderBy(word => word.Length)
                 .ThenBy(word => word, StringComparer.Ordinal)
                 .ToArray();
-            string[] localeList = (locales ?? Locales)
+            // GREP already derives installed localized paths from their WAD contents.
+            // V1 guessing therefore stays on the default path unless a caller explicitly opts into locales.
+            string[] localeList = (locales ?? Array.Empty<string>())
                 .Where(locale => !string.IsNullOrWhiteSpace(locale))
                 .Where(locale => !locale.Equals("default", StringComparison.OrdinalIgnoreCase))
                 .Select(locale => locale.ToLowerInvariant())
