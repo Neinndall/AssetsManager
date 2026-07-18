@@ -454,9 +454,14 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 
             Assert.Contains("assets", game.DirectoryList());
             Assert.Contains("assets/ui", game.DirectoryList());
-            game.SubstituteBasenames(engine, CancellationToken.None);
+            int lastProgress = 0;
+            int checkedCandidates = game.SubstituteBasenames(
+                engine,
+                CancellationToken.None,
+                progress: count => lastProgress = count);
 
             AssertResolved(engine, expected);
+            Assert.Equal(checkedCandidates, lastProgress);
         }
 
         [Theory]

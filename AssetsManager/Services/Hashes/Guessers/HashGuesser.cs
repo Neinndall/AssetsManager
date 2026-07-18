@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -312,7 +313,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             int? maxNames = null,
             int? maxDirectories = null,
-            int candidateBudget = int.MaxValue)
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
             IEnumerable<string> names = Corpus.GetOrCreate("basenames", paths => paths.Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -325,13 +327,27 @@ namespace AssetsManager.Services.Hashes.Guessers
             var directoryList = directories.ToList();
 
             int checkedCount = 0;
+            int lastReportedCount = -1;
+            var progressClock = Stopwatch.StartNew();
             foreach (string name in names)
             foreach (string directory in directoryList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 engine.CheckCombined(directory, name, HashGuessStrategy.PluginVariant, "Basename substitution", 0);
-                if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
+                bool budgetReached = CountCandidate(ref checkedCount, candidateBudget);
+                if ((checkedCount & 0x3fff) == 0 && progressClock.ElapsedMilliseconds >= 100)
+                {
+                    progress?.Invoke(checkedCount);
+                    lastReportedCount = checkedCount;
+                    progressClock.Restart();
+                }
+                if (budgetReached || engine.RemainingUnknownCount == 0)
+                {
+                    if (lastReportedCount != checkedCount) progress?.Invoke(checkedCount);
+                    return checkedCount;
+                }
             }
+            if (lastReportedCount != checkedCount) progress?.Invoke(checkedCount);
             return checkedCount;
         }
 

@@ -444,7 +444,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (engine.RemainingUnknownCount > 0)
             {
                 progress?.Report(engine.CreateProgress("GAME Cartesian Cross", checkedCandidates));
-                checkedCandidates += SubstituteBasenames(engine, cancellationToken);
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteBasenames(
+                    engine,
+                    cancellationToken,
+                    progress: count => progress?.Report(engine.CreateProgress("GAME Cartesian Cross", progressOffset + count)));
             }
             return checkedCandidates;
         }

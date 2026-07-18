@@ -391,7 +391,11 @@ namespace AssetsManager.Services.Hashes
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", checkedCandidates));
-                    checkedCandidates += _lcuGuesser.SubstituteBasenames(engine, cancellationToken);
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteBasenames(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", progressOffset + count)));
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
