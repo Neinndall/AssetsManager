@@ -84,6 +84,15 @@ namespace AssetsManager.Services.Hashes
                             cancellationToken.ThrowIfCancellationRequested();
                             processedChunks++;
 
+                            if (processedChunks % 100 == 0)
+                            {
+                                progress?.Report(engine.CreateProgress(
+                                    Path.GetFileName(wadPath),
+                                    processedChunks,
+                                    wadIndex,
+                                    wadPaths.Length));
+                            }
+
                             string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
                             if (guesser.ShouldSkip(chunkExt)) continue;
