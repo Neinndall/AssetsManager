@@ -76,6 +76,7 @@ Improvements
   - Explorer / Encrypted Texture Feedback
     * Encrypted Riot esports textures are now identified explicitly in the preview panel instead of being reported as unsupported or failed files.
   - Significantly accelerated hash guessing speed when scanning localized game client containers.
+  - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
@@ -117,6 +118,7 @@ Bug Fixes
   - Fixed UI freezing (Not Responding) during long hash guessing sessions by executing calculations asynchronously in background threads.
   - Fixed LCU hash guessing executing redundant search operations on non-text binary files.
   - Fixed Cancel button styling in the Hash Guessing window to match the secondary button design.
+  - Fixed WAD Grep UI progress freezes on massive LCU WAD files by updating progress periodically inside the chunk loop.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
