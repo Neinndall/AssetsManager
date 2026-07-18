@@ -29,6 +29,7 @@ Improvements
   - BIN and RST guessing now streams resolved hashes to the results list and preserves matches when a run is cancelled.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.
+  - LCU V1 Paths now avoids generating locale variants already discoverable from installed WADs.
   - Generated hash paths now use exact matching with shared batch processing and avoid repeated hash-file access.
   - LCU V1 Paths now displays resolved hashes immediately while guessing continues.
   - Hash Guessing Lab now shows session targets, resolved hashes, and clear unresolved-history breakdowns.
