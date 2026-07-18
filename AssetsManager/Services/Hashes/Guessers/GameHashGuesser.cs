@@ -34,14 +34,19 @@ namespace AssetsManager.Services.Hashes.Guessers
             "data/items/spells/modules", "data/buildingblocks", "data/shared/gamemodes"
         };
         private static readonly byte[][] BinPrefixesA = ToAsciiPrefixes("ASSETS/");
-        private static readonly byte[][] BinPrefixesC = ToAsciiPrefixes("COMMON/", "CHARACTERS/", "CLIENTSTATES/");
-        private static readonly byte[][] BinPrefixesD = ToAsciiPrefixes("DATA/", "DATA_SOON/");
-        private static readonly byte[][] BinPrefixesG = ToAsciiPrefixes("GAMEPLAY/", "GLOBAL/");
-        private static readonly byte[][] BinPrefixesL = ToAsciiPrefixes("LEVELS/", "LOADOUTS/");
-        private static readonly byte[][] BinPrefixesM = ToAsciiPrefixes("MAPS/");
-        private static readonly byte[][] BinPrefixesP = ToAsciiPrefixes("PATCHING/");
-        private static readonly byte[][] BinPrefixesS = ToAsciiPrefixes("SHADERS/");
-        private static readonly byte[][] BinPrefixesU = ToAsciiPrefixes("UX/", "UIAUTOATLAS/");
+        private static readonly byte[][] BinPrefixesC = ToAsciiPrefixes("Common/");
+        private static readonly byte[][] BinPrefixesD = ToAsciiPrefixes("DATA/", "DATA_SOON/", "DATA_Soon/");
+        private static readonly byte[][] BinPrefixesG = ToAsciiPrefixes("Gameplay/", "Global/");
+        private static readonly byte[][] BinPrefixesL = ToAsciiPrefixes("LEVELS/", "Loadouts/");
+        private static readonly byte[][] BinPrefixesU = ToAsciiPrefixes("UX/", "UIAutoAtlas/");
+        private static readonly byte[][] WadBinPrefixesA = ToAsciiPrefixes("ASSETS/");
+        private static readonly byte[][] WadBinPrefixesC = ToAsciiPrefixes("Characters/", "ClientStates/");
+        private static readonly byte[][] WadBinPrefixesD = ToAsciiPrefixes("DATA/");
+        private static readonly byte[][] WadBinPrefixesG = ToAsciiPrefixes("Gameplay/");
+        private static readonly byte[][] WadBinPrefixesL = ToAsciiPrefixes("Loadouts/");
+        private static readonly byte[][] WadBinPrefixesM = ToAsciiPrefixes("Maps/");
+        private static readonly byte[][] WadBinPrefixesP = ToAsciiPrefixes("Patching/");
+        private static readonly byte[][] WadBinPrefixesS = ToAsciiPrefixes("Shaders/");
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
         {
             "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm", "anm", "skl", "skn",
@@ -453,7 +458,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        private static int CheckCandidates(
+        private int CheckCandidates(
             HashGuessEngine engine,
             IEnumerable<HashGuessCandidate> candidates,
             string source,
@@ -461,17 +466,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             IProgress<HashGuessProgress> progress = null,
             int progressOffset = 0)
         {
-            int checkedCount = 0;
-            foreach (HashGuessCandidate candidate in candidates)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                engine.Check(candidate.Path, candidate.Strategy, source);
-                checkedCount++;
-                if (checkedCount % 5000 == 0)
-                    progress?.Report(engine.CreateProgress(source, progressOffset + checkedCount));
-                if (engine.RemainingUnknownCount == 0) break;
-            }
-            return checkedCount;
+            return CheckIter(
+                engine,
+                candidates,
+                source,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(source, progressOffset + count)),
+                5000);
         }
 
         internal async Task<int> GuessChromaGroupsAsync(
@@ -517,7 +518,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         string suffix = string.Concat(combination.SelectMany(value => value).OrderBy(value => value, StringComparer.Ordinal));
-                        engine.Check("data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
+                        Check(engine, "data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
                         generated++;
                         if (engine.RemainingUnknownCount == 0) return generated;
                     }
@@ -596,7 +597,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     for (int length = 1; length <= skins.Count; length++)
                     foreach (IEnumerable<string> combination in GetCombinations(skins, length))
                     {
-                        engine.Check($"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                        Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
                         generated++;
                         if (engine.RemainingUnknownCount == 0) return generated;
                     }
@@ -654,7 +655,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCandidates = 0;
             foreach (HashGuessCandidate candidate in GrepFileCandidates(data))
             {
-                engine.Check(candidate.Path, candidate.Strategy, string.IsNullOrWhiteSpace(path) ? source : path);
+                Check(engine, candidate.Path, candidate.Strategy, string.IsNullOrWhiteSpace(path) ? source : path);
                 checkedCandidates++;
                 if (engine.RemainingUnknownCount == 0) break;
             }
@@ -682,7 +683,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (length <= 0 || offset + length > data.Count) continue;
                     if (!TryDecodeAscii(data, offset, length, out string decodedPath)) continue;
                     string path = NormalizePath(decodedPath);
-                    foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.BinLengthPath))
+                    foreach (HashGuessCandidate candidate in ExpandBinPath(path, HashGuessStrategy.BinLengthPath))
                         yield return candidate;
                 }
                 yield break;
@@ -698,8 +699,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                     string path = NormalizePath(match.Groups[1].Value);
                     if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                     {
-                        foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.PreloadReference))
-                            yield return candidate;
+                        string prefix = path[..^4];
+                        yield return new HashGuessCandidate(path, HashGuessStrategy.PreloadReference);
+                        yield return new HashGuessCandidate(prefix + ".luabin", HashGuessStrategy.LuaVariant);
+                        yield return new HashGuessCandidate(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
                     }
                     else if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
                     {
@@ -830,7 +833,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var emitted = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in paths)
-            foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.EmbeddedPathGrep))
+            foreach (HashGuessCandidate candidate in ExpandGrepFilePath(path, HashGuessStrategy.EmbeddedPathGrep))
                 if (emitted.Add(candidate.Path)) yield return candidate;
         }
 
@@ -839,14 +842,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             int limit = data.Count;
             for (int offset = 0; offset < limit; offset++)
             {
-                byte[][] prefixes = GetPrefixes(ToUpperAscii(ByteAt(data, offset)));
+                byte[][] prefixes = GetPrefixes(ByteAt(data, offset));
                 if (prefixes == null) continue;
                 foreach (byte[] prefix in prefixes)
                 {
                     if (offset + prefix.Length > limit) continue;
 
                     int prefixIndex = 1;
-                    while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
+                    while (prefixIndex < prefix.Length && ByteAt(data, offset + prefixIndex) == prefix[prefixIndex]) prefixIndex++;
                     if (prefixIndex != prefix.Length) continue;
 
                     int end = offset + prefix.Length;
@@ -866,35 +869,44 @@ namespace AssetsManager.Services.Hashes.Guessers
                 >= (byte)'a' and <= (byte)'z' or
                 (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-';
 
-        private static IEnumerable<HashGuessCandidate> ExpandGamePath(string path, HashGuessStrategy strategy)
+        private static IEnumerable<HashGuessCandidate> ExpandBinPath(string path, HashGuessStrategy strategy)
         {
             if (path.Length == 0) yield break;
-            yield return new HashGuessCandidate(path, strategy);
-
-            if (path.Contains("data_soon/", StringComparison.OrdinalIgnoreCase))
-                yield return new HashGuessCandidate(Regex.Replace(path, "data_soon/", "data/", RegexOptions.IgnoreCase), strategy);
 
             if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
             {
+                yield return new HashGuessCandidate(path, strategy);
                 yield return new HashGuessCandidate($"assets/{path}", strategy);
                 yield return new HashGuessCandidate($"data/{path}", strategy);
+                yield break;
             }
 
             if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             {
                 string prefix = path[..^4];
+                yield return new HashGuessCandidate(path, strategy);
                 yield return new HashGuessCandidate(prefix + ".luabin", HashGuessStrategy.LuaVariant);
                 yield return new HashGuessCandidate(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
                 yield return new HashGuessCandidate(prefix + ".preload", HashGuessStrategy.LuaVariant);
+                yield break;
             }
-            else if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+
+            if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase))
             {
-                yield return new HashGuessCandidate(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
+                foreach (string extension in ShaderExtensions)
+                {
+                    yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}", strategy);
+                    foreach (string variant in ShaderVariants)
+                        yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}{variant}", strategy);
+                }
+                yield break;
             }
-            else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
+
+            if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
             {
                 yield return new HashGuessCandidate($"data/{path}.mapgeo", strategy);
                 yield return new HashGuessCandidate($"data/{path}.materials.bin", strategy);
+                yield break;
             }
 
             if (path.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
@@ -902,6 +914,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 path.StartsWith("loadouts/", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("maps/", StringComparison.OrdinalIgnoreCase))
             {
+                yield return new HashGuessCandidate(path, strategy);
                 int separator = path.LastIndexOf('/');
                 if (separator > 0)
                 {
@@ -911,36 +924,58 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (parentSeparator > 0)
                         yield return new HashGuessCandidate(parent[..parentSeparator], strategy);
                 }
+                yield break;
             }
 
-            if (!path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase)) yield break;
-            foreach (string extension in ShaderExtensions)
+            yield return new HashGuessCandidate(path, strategy);
+            if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                yield return new HashGuessCandidate(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
+        }
+
+        private static IEnumerable<HashGuessCandidate> ExpandGrepFilePath(string path, HashGuessStrategy strategy)
+        {
+            if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             {
-                yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}", strategy);
-                foreach (string variant in ShaderVariants)
-                {
-                    yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}{variant}", strategy);
-                }
+                string prefix = path[..^4];
+                yield return new HashGuessCandidate(path, strategy);
+                yield return new HashGuessCandidate(prefix + ".luabin", HashGuessStrategy.LuaVariant);
+                yield return new HashGuessCandidate(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
+                yield return new HashGuessCandidate(prefix + ".preload", HashGuessStrategy.LuaVariant);
+                yield break;
             }
+            yield return new HashGuessCandidate(path, strategy);
         }
 
         private static IEnumerable<int> FindBinPathOffsets(ArraySegment<byte> data)
         {
             for (int offset = 0; offset < data.Count; offset++)
             {
-                byte[][] needles = GetPrefixes(ToUpperAscii(ByteAt(data, offset)));
+                byte[][] needles = GetWadBinPrefixes(ByteAt(data, offset));
                 if (needles == null) continue;
                 foreach (byte[] needle in needles)
                 {
                     if (offset + needle.Length > data.Count) continue;
                     int index = 1;
-                    while (index < needle.Length && ToUpperAscii(ByteAt(data, offset + index)) == needle[index]) index++;
+                    while (index < needle.Length && ByteAt(data, offset + index) == needle[index]) index++;
                     if (index != needle.Length) continue;
                     yield return offset;
                     break;
                 }
             }
         }
+
+        private static byte[][] GetWadBinPrefixes(byte firstByte) => firstByte switch
+        {
+            (byte)'A' => WadBinPrefixesA,
+            (byte)'C' => WadBinPrefixesC,
+            (byte)'D' => WadBinPrefixesD,
+            (byte)'G' => WadBinPrefixesG,
+            (byte)'L' => WadBinPrefixesL,
+            (byte)'M' => WadBinPrefixesM,
+            (byte)'P' => WadBinPrefixesP,
+            (byte)'S' => WadBinPrefixesS,
+            _ => null
+        };
 
         private static byte[][] GetPrefixes(byte firstByte) => firstByte switch
         {
@@ -949,9 +984,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             (byte)'D' => BinPrefixesD,
             (byte)'G' => BinPrefixesG,
             (byte)'L' => BinPrefixesL,
-            (byte)'M' => BinPrefixesM,
-            (byte)'P' => BinPrefixesP,
-            (byte)'S' => BinPrefixesS,
             (byte)'U' => BinPrefixesU,
             _ => null
         };
@@ -976,10 +1008,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (character > 0x7F) return false;
             return true;
         }
-
-        private static byte ToUpperAscii(byte value) => value is >= (byte)'a' and <= (byte)'z'
-            ? (byte)(value - ('a' - 'A'))
-            : value;
 
         private static byte ByteAt(ArraySegment<byte> data, int index) => data.Array[data.Offset + index];
 

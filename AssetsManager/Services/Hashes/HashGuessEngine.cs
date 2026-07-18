@@ -36,9 +36,21 @@ namespace AssetsManager.Services.Hashes
 
         public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {
-            CheckedCandidates++;
             string path = NormalizePath(candidate);
             if (path.Length == 0)
+            {
+                CheckedCandidates++;
+                DiscardedCandidates++;
+                return false;
+            }
+
+            return CheckExact(path, strategy, source, sourceChunkHash);
+        }
+
+        internal bool CheckExact(string path, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
+        {
+            CheckedCandidates++;
+            if (string.IsNullOrEmpty(path))
             {
                 DiscardedCandidates++;
                 return false;
@@ -132,18 +144,6 @@ namespace AssetsManager.Services.Hashes
                 Elapsed = elapsed,
                 ManagedMemoryBytes = GC.GetTotalMemory(false)
             };
-        }
-
-        public int CheckMany(IEnumerable<string> candidates, HashGuessStrategy strategy, string source = "Generated")
-        {
-            int checkedCandidates = 0;
-            foreach (string candidate in candidates)
-            {
-                Check(candidate, strategy, source);
-                checkedCandidates++;
-                if (_unknownHashes.Count == 0) break;
-            }
-            return checkedCandidates;
         }
 
         public static IReadOnlyList<string> BuildWordlist(IEnumerable<string> paths)

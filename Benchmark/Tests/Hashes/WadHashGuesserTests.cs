@@ -406,11 +406,27 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.png", lcuCandidates);
             Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.jpg", lcuCandidates);
             Assert.Contains("plugins/rcp-be-lol-game-data/global/default/data/game/config.json", lcuCandidates);
+            Assert.DoesNotContain("plugins/rcp-be-lol-game-data/global/default/assets/game/source.dds", lcuCandidates);
+            Assert.DoesNotContain("plugins/rcp-be-lol-game-data/global/default/assets/game/already.png", lcuCandidates);
 
             var gameCandidates = game.GuessFromLcuHashes(lcu).Select(candidate => candidate.Path).ToHashSet();
             Assert.Contains("assets/client/icon.dds", gameCandidates);
             Assert.Contains("assets/client/icon.tex", gameCandidates);
             Assert.Contains("data/client/config.json", gameCandidates);
+        }
+
+        [Theory]
+        [InlineData("PROP", true, "bin")]
+        [InlineData("PreLoad", true, "preload")]
+        [InlineData("  {\"value\":1}", true, "json")]
+        [InlineData("  {\"value\":1}", false, "")]
+        public void UnknownChunkExtensionsAreInferredWithoutAnotherWadRead(string content, bool detectJson, string expected)
+        {
+            byte[] data = Encoding.UTF8.GetBytes(content);
+
+            string extension = HashGuessingService.InferChunkExtension(data, detectJson);
+
+            Assert.Equal(expected, extension);
         }
 
         [Fact]
@@ -503,7 +519,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.True(game.IsKnown(new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>()), "assets/known.bin", HashGuessStrategy.WordlistVariant));
 
             var manyEngine = CreateEngine(HashGuessDomain.Game, many);
-            game.CheckMany(manyEngine, new[] { "assets/missing.bin", many }, HashGuessStrategy.WordlistVariant);
+            game.CheckIter(manyEngine, new[] { "assets/missing.bin", many }, HashGuessStrategy.WordlistVariant);
             AssertResolved(manyEngine, many);
 
             var textEngine = CreateEngine(HashGuessDomain.Game, text);
@@ -530,6 +546,23 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 new[] { "new" },
                 CancellationToken.None);
             AssertResolved(insertionEngine, inserted);
+        }
+
+        [Fact]
+        public void CheckIterHashesEachPathExactlyLikeCdtb()
+        {
+            const string exactPath = "assets/UI/MixedCase.bin";
+            var game = new GameHashGuesser();
+            var exactEngine = CreateEngine(HashGuessDomain.Game, exactPath);
+
+            game.CheckIter(exactEngine, new[] { exactPath }, HashGuessStrategy.WordlistVariant);
+
+            AssertResolved(exactEngine, exactPath);
+
+            var lowerCaseEngine = CreateEngine(HashGuessDomain.Game, exactPath.ToLowerInvariant());
+            game.CheckIter(lowerCaseEngine, new[] { exactPath }, HashGuessStrategy.WordlistVariant);
+            Assert.Empty(lowerCaseEngine.Matches);
+            Assert.Equal(1, lowerCaseEngine.RemainingUnknownCount);
         }
 
         [Fact]
@@ -749,8 +782,13 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         {
             var game = new GameHashGuesser();
             var engine = CreateEngine(HashGuessDomain.Game, expected);
+            byte[] path = Encoding.ASCII.GetBytes("Shaders/test");
+            byte[] data = new byte[path.Length + 2];
+            data[0] = (byte)path.Length;
+            data[1] = (byte)(path.Length >> 8);
+            path.CopyTo(data, 2);
 
-            game.GrepFile(engine, data: Encoding.ASCII.GetBytes("SHADERS/test"));
+            game.GrepWad(engine, data, "data/test.bin", "test.wad.client", 1);
 
             AssertResolved(engine, expected);
         }
@@ -847,7 +885,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         [Fact]
         public void GameGrepFileUsesByteOffsetsAndSupportsFileOrData()
         {
-            const string shortened = "assets/test.lua";
+            const string shortened = "ASSETS/test.lua";
             const string expected = "assets/test.luabin64";
             byte[] full = Encoding.ASCII.GetBytes(shortened + "trail");
             byte[] utf8Prefix = Encoding.UTF8.GetBytes("é");

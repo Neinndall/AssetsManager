@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
@@ -10,6 +11,7 @@ using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
+using LeagueToolkit.Utils;
 
 namespace AssetsManager.Services.Hashes
 {
@@ -68,6 +70,7 @@ namespace AssetsManager.Services.Hashes
                     matchProgress is null ? null : matchProgress.Report;
                 var engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
                 int processedChunks = 0;
+                var inferredExtensions = new Dictionary<ulong, string>();
 
                 progress?.Report(engine.CreateProgress("Session inventory ready", 0, 0, wadPaths.Length));
 
@@ -98,12 +101,22 @@ namespace AssetsManager.Services.Hashes
 
                             string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
+                            if (chunkExt.Length == 0 && inferredExtensions.TryGetValue(chunk.PathHash, out string cachedExtension))
+                                chunkExt = cachedExtension;
                             if (guesser.ShouldSkip(chunkExt)) continue;
 
                             try
                             {
                                 using var dataOwner = wad.LoadChunkDecompressed(chunk);
-                                guesser.GrepWad(engine, dataOwner.DangerousGetArray(), resolvedChunkPath, wadPath, chunk.PathHash);
+                                ArraySegment<byte> data = dataOwner.DangerousGetArray();
+                                if (chunkExt.Length == 0)
+                                {
+                                    chunkExt = InferChunkExtension(data, domain == HashGuessDomain.Lcu);
+                                    inferredExtensions[chunk.PathHash] = chunkExt;
+                                    if (guesser.ShouldSkip(chunkExt)) continue;
+                                    if (chunkExt.Length > 0) resolvedChunkPath += "." + chunkExt;
+                                }
+                                guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
@@ -140,6 +153,27 @@ namespace AssetsManager.Services.Hashes
                 ScannedChunks = processedChunks,
                 Matches = resultMatches
             };
+        }
+
+        internal static string InferChunkExtension(ArraySegment<byte> data, bool detectJson)
+        {
+            ReadOnlySpan<byte> bytes = data.AsSpan();
+            string extension = LeagueFile.GetExtension(LeagueFile.GetFileType(bytes));
+            if (extension.Length > 0 || !detectJson) return extension;
+
+            int offset = 0;
+            while (offset < bytes.Length && bytes[offset] is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n') offset++;
+            if (offset >= bytes.Length || bytes[offset] is not ((byte)'{' or (byte)'[')) return string.Empty;
+            try
+            {
+                using JsonDocument document = JsonDocument.Parse(
+                    new ReadOnlyMemory<byte>(data.Array, data.Offset, data.Count));
+                return "json";
+            }
+            catch (JsonException)
+            {
+                return string.Empty;
+            }
         }
 
         public async Task SaveMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
@@ -190,22 +224,18 @@ namespace AssetsManager.Services.Hashes
             var runResult = await Task.Run(() =>
             {
                 var engine = new HashGuessEngine(domain, unknownHashes);
-                int checkedCandidates = 0;
+                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
 
                 IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
                     ? _lcuGuesser.GuessFromGameHashes(otherGuesser)
                     : _gameGuesser.GenerateCanonicalCandidates(otherGuesser);
-                foreach (HashGuessCandidate candidate in candidates)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check(candidate.Path, candidate.Strategy, "Generated canonical pattern");
-                    checkedCandidates++;
-                    if (checkedCandidates % 1000 == 0)
-                    {
-                        progress?.Report(engine.CreateProgress("Generating canonical paths", checkedCandidates));
-                    }
-                    if (engine.RemainingUnknownCount == 0) break;
-                }
+                int checkedCandidates = guesser.CheckIter(
+                    engine,
+                    candidates,
+                    "Generated canonical pattern",
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress("Generating canonical paths", count)),
+                    1000);
 
                 var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (resultMatches, checkedCandidates, engine.UnknownHashes);
@@ -279,43 +309,40 @@ namespace AssetsManager.Services.Hashes
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
-                    foreach (var candidate in _gameGuesser.CheckBasenamePrefixes())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: prefixes");
-                        checkedCandidates++;
-                        if (checkedCandidates % 5000 == 0)
-                            progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
-                        if (engine.RemainingUnknownCount == 0) break;
-                    }
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.CheckIter(
+                        engine,
+                        _gameGuesser.CheckBasenamePrefixes(),
+                        "GAME Basic: prefixes",
+                        cancellationToken,
+                        count => progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", progressOffset + count)),
+                        5000);
                 }
 
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
-                    foreach (var candidate in _gameGuesser.GuessShaderVariants())
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: shader variants");
-                        checkedCandidates++;
-                        if (checkedCandidates % 5000 == 0)
-                            progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
-                        if (engine.RemainingUnknownCount == 0) break;
-                    }
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.CheckIter(
+                        engine,
+                        _gameGuesser.GuessShaderVariants(),
+                        "GAME Basic: shader variants",
+                        cancellationToken,
+                        count => progress?.Report(engine.CreateProgress("GAME Basic: shader variants", progressOffset + count)),
+                        5000);
                 }
 
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
-                    foreach (var candidate in _gameGuesser.GenerateExtensionCandidates(int.MaxValue))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        engine.Check(candidate.Path, candidate.Strategy, "GAME Basic: extension substitution");
-                        checkedCandidates++;
-                        if (checkedCandidates % 5000 == 0)
-                            progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
-                        if (engine.RemainingUnknownCount == 0) break;
-                    }
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.CheckIter(
+                        engine,
+                        _gameGuesser.GenerateExtensionCandidates(int.MaxValue),
+                        "GAME Basic: extension substitution",
+                        cancellationToken,
+                        count => progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", progressOffset + count)),
+                        5000);
                 }
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
@@ -438,15 +465,14 @@ namespace AssetsManager.Services.Hashes
                 foreach (var phase in phases)
                 {
                     progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", checkedCandidates));
-                    foreach (var candidate in phase.Candidates)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        engine.Check(candidate.Path, candidate.Strategy, "LCU Basic");
-                        checkedCandidates++;
-                        if (checkedCandidates % 5000 == 0)
-                            progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", checkedCandidates));
-                        if (engine.RemainingUnknownCount == 0) break;
-                    }
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.CheckIter(
+                        engine,
+                        phase.Candidates,
+                        "LCU Basic",
+                        cancellationToken,
+                        count => progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", progressOffset + count)),
+                        5000);
 
                     if (engine.RemainingUnknownCount == 0) break;
                 }
@@ -519,22 +545,18 @@ namespace AssetsManager.Services.Hashes
             var runResult = await Task.Run(() =>
             {
                 var engine = new HashGuessEngine(domain, unknownHashes);
-                int checkedCandidates = 0;
+                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
 
                 IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
                     ? _lcuGuesser.SubstituteRegionLang()
                     : _gameGuesser.SubstituteLang();
-                foreach (HashGuessCandidate candidate in candidates)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check(candidate.Path, candidate.Strategy, "Generated locale or region variant");
-                    checkedCandidates++;
-                    if (checkedCandidates % 5000 == 0)
-                    {
-                        progress?.Report(engine.CreateProgress("Generating locale and region variants", checkedCandidates));
-                    }
-                    if (engine.RemainingUnknownCount == 0) break;
-                }
+                int checkedCandidates = guesser.CheckIter(
+                    engine,
+                    candidates,
+                    "Generated locale or region variant",
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress("Generating locale and region variants", count)),
+                    5000);
 
                 var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (resultMatches, checkedCandidates, engine.UnknownHashes);
@@ -576,22 +598,18 @@ namespace AssetsManager.Services.Hashes
             var runResult = await Task.Run(() =>
             {
                 var engine = new HashGuessEngine(domain, unknownHashes);
-                int checkedCandidates = 0;
+                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
 
                 IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
                     ? _lcuGuesser.SubstituteNumbers(numberLimit)
                     : _gameGuesser.SubstituteBasicNumbers(numberLimit);
-                foreach (HashGuessCandidate candidate in candidates)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    engine.Check(candidate.Path, candidate.Strategy, "Generated numeric variant");
-                    checkedCandidates++;
-                    if (checkedCandidates % 5000 == 0)
-                    {
-                        progress?.Report(engine.CreateProgress($"Generating numeric variants ({checkedCandidates:N0}/{candidateBudget:N0})", checkedCandidates));
-                    }
-                    if (engine.RemainingUnknownCount == 0) break;
-                }
+                int checkedCandidates = guesser.CheckIter(
+                    engine,
+                    candidates,
+                    "Generated numeric variant",
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress($"Generating numeric variants ({count:N0}/{candidateBudget:N0})", count)),
+                    5000);
 
                 var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (resultMatches, checkedCandidates, engine.UnknownHashes);
