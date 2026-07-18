@@ -136,7 +136,8 @@ namespace AssetsManager.Services.Hashes
                     }
                     progress?.Report(new InternalHashProgress
                     {
-                        ProcessedWads = index + 1, TotalWads = wads.Length,
+                        ProcessedWads = index + 1,
+                        TotalWads = wads.Length,
                         ProcessedFiles = scannedBins + scannedRst,
                         CurrentStage = includeBin ? "Building BIN inventory" : "Building RST inventory"
                     });
@@ -163,8 +164,10 @@ namespace AssetsManager.Services.Hashes
             _log.LogSuccess($"Internal Hash Lab inventory completed: {scannedBins} BIN and {scannedRst} RST files parsed.");
             return new InternalHashInventory
             {
-                Unknowns = unknowns, PatchFingerprint = fingerprint,
-                ScannedBins = scannedBins, ScannedStringTables = scannedRst
+                Unknowns = unknowns,
+                PatchFingerprint = fingerprint,
+                ScannedBins = scannedBins,
+                ScannedStringTables = scannedRst
             };
         }
 
@@ -213,90 +216,92 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            await Task.Run(() =>
+            try
             {
-                for (int index = 0; index < wads.Length && matcher.Remaining > 0; index++)
+                await Task.Run(() =>
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    string wadPath = wads[index];
-                    try
+                    for (int index = 0; index < wads.Length && matcher.Remaining > 0; index++)
                     {
-                        using var wad = new WadFile(wadPath);
-                        foreach (var pair in wad.Chunks)
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string wadPath = wads[index];
+                        try
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            string path = null;
-                            bool isBin = false;
-                            bool isText = false;
-                            if (wadPaths.TryGetValue(pair.Key, out path))
+                            using var wad = new WadFile(wadPath);
+                            foreach (var pair in wad.Chunks)
                             {
-                                isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
-                                isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
-                                if (!isBin && !isText)
+                                cancellationToken.ThrowIfCancellationRequested();
+                                string path = null;
+                                bool isBin = false;
+                                bool isText = false;
+                                if (wadPaths.TryGetValue(pair.Key, out path))
                                 {
-                                    string sig = GetChunkSignature(wad, pair.Value);
-                                    if (sig == "PROP" || sig == "PTCH")
+                                    isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                                    isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
+                                    if (!isBin && !isText)
                                     {
-                                        isBin = true;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (includeBin)
-                                {
-                                    string sig = GetChunkSignature(wad, pair.Value);
-                                    if (sig == "PROP" || sig == "PTCH")
-                                    {
-                                        isBin = true;
-                                        path = $"[unknown_bin_{pair.Key:x16}]";
-                                    }
-                                }
-                            }
-                            if (!isBin && !isText) continue;
-                            try
-                            {
-                                using var data = wad.LoadChunkDecompressed(pair.Value);
-                                if (isBin)
-                                {
-                                    ArraySegment<byte> buffer = data.DangerousGetArray();
-                                    using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
-                                    var tree = new BinTree(stream);
-                                    
-                                    // 1. Visit raw string values inside the bin
-                                    VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
-                                    
-                                    // 2. Perform "double work": reconstruct the cased path of the bin, resolve known hashes,
-                                    // and generate combinations (simulating scanning the resolved .bin.json)
-                                    if (binResolver.Count > 0)
-                                    {
-                                        string casedBasePath = ReconstructCasedPath(path, casingMap);
-                                        VisitBinResolvedNamesAndPaths(tree, casedBasePath, binResolver, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+                                        string sig = GetChunkSignature(wad, pair.Value);
+                                        if (sig == "PROP" || sig == "PTCH")
+                                        {
+                                            isBin = true;
+                                        }
                                     }
                                 }
                                 else
                                 {
-                                    CheckTextCandidates(data.Memory.Span, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, path, wadPath, path));
+                                    if (includeBin)
+                                    {
+                                        string sig = GetChunkSignature(wad, pair.Value);
+                                        if (sig == "PROP" || sig == "PTCH")
+                                        {
+                                            isBin = true;
+                                            path = $"[unknown_bin_{pair.Key:x16}]";
+                                        }
+                                    }
                                 }
-                                scanned++;
-                            }
-                            catch (Exception ex) when (ex is not OperationCanceledException)
-                            {
-                                _log.LogDebug($"Internal Hash Lab content scan skipped '{path}': {ex.Message}");
+                                if (!isBin && !isText) continue;
+                                try
+                                {
+                                    using var data = wad.LoadChunkDecompressed(pair.Value);
+                                    if (isBin)
+                                    {
+                                        ArraySegment<byte> buffer = data.DangerousGetArray();
+                                        using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
+                                        var tree = new BinTree(stream);
+
+                                        // 1. Visit raw string values inside the bin
+                                        VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+
+                                        // 2. Perform "double work": reconstruct the cased path of the bin, resolve known hashes,
+                                        // and generate combinations (simulating scanning the resolved .bin.json)
+                                        if (binResolver.Count > 0)
+                                        {
+                                            string casedBasePath = ReconstructCasedPath(path, casingMap);
+                                            VisitBinResolvedNamesAndPaths(tree, casedBasePath, binResolver, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+                                        }
+                                    }
+                                    else
+                                    {
+                                        CheckTextCandidates(data.Memory.Span, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, path, wadPath, path));
+                                    }
+                                    scanned++;
+                                }
+                                catch (Exception ex) when (ex is not OperationCanceledException)
+                                {
+                                    _log.LogDebug($"Internal Hash Lab content scan skipped '{path}': {ex.Message}");
+                                }
                             }
                         }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _log.LogError(ex, $"Internal Hash Lab could not scan WAD '{wadPath}'.");
+                        }
+                        progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN and text content", scanned, index + 1, wads.Length));
                     }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _log.LogError(ex, $"Internal Hash Lab could not scan WAD '{wadPath}'.");
-                    }
-                    progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN and text content", scanned, index + 1, wads.Length));
-                }
-            }, cancellationToken);
+                }, cancellationToken);
 
-            if (matcher.Remaining > 0)
-            {
-                var filesToScan = Directory.EnumerateFiles(rootDirectory, "*.*", SearchOption.AllDirectories)
+                if (matcher.Remaining > 0)
+                {
+                    var filesToScan = Directory.EnumerateFiles(rootDirectory, "*.*", SearchOption.AllDirectories)
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
@@ -304,22 +309,30 @@ namespace AssetsManager.Services.Hashes
                     })
                     .ToList();
 
-                foreach (string file in filesToScan)
-                {
-                    if (matcher.Remaining == 0) break;
-                    cancellationToken.ThrowIfCancellationRequested();
-                    try
+                    foreach (string file in filesToScan)
                     {
-                        await ScanTextFileAsync(file, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, file, null, file), cancellationToken);
-                        scanned++;
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _log.LogDebug($"Internal Hash Lab content scan skipped local file '{file}': {ex.Message}");
+                        if (matcher.Remaining == 0) break;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        try
+                        {
+                            await ScanTextFileAsync(file, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, file, null, file), cancellationToken);
+                            scanned++;
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _log.LogDebug($"Internal Hash Lab content scan skipped local file '{file}': {ex.Message}");
+                        }
                     }
                 }
+                progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", scanned));
+                return await CompleteRunAsync(matcher, initial, scanned);
             }
-            return await CompleteRunAsync(matcher, initial, scanned, cancellationToken);
+            catch (OperationCanceledException)
+            {
+                progress?.Report(CreateProgress(matcher, stopwatch, "Saving matches found before cancellation", scanned));
+                await PersistCancelledMatchesAsync(matcher);
+                throw;
+            }
         }
 
         public async Task<InternalHashRunResult> RunStructuralGuessingAsync(
@@ -343,67 +356,99 @@ namespace AssetsManager.Services.Hashes
             var wadPaths = (await LoadWadPathsAsync(includeRst, cancellationToken)).Values;
             long checkedCandidates = 0;
 
-            await Task.Run(() =>
+            try
             {
-                if (includeBin)
+                await Task.Run(() =>
                 {
-                    CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionaries");
-                    CheckCandidates(wadPaths, InternalHashGuessStrategy.GamePath, includeRst ? "GAME and LCU paths" : "GAME paths");
-                }
-                if (includeRst)
-                {
-                    CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionary keys");
-                    CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
-                    CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
-                }
-
-                // Run advanced structural candidate generation
-                if (matcher.Remaining > 0)
-                {
-                    var wordlist = new TokenWordlist();
-                    foreach (string val in binKnown) wordlist.AddName(val);
-                    foreach (string val in rst3) wordlist.AddName(val);
-                    foreach (string val in rst64) wordlist.AddName(val);
-                    foreach (string val in wadPaths) wordlist.AddName(val);
-                    wordlist.FinalizeList();
-
-                    CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
-                }
-
-                void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source)
-                {
-                    foreach (string candidate in candidates)
+                    if (includeBin)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        matcher.Check(candidate, strategy, source);
-                        checkedCandidates++;
-                        if ((checkedCandidates & 0x3ffff) == 0)
-                            progress?.Report(CreateProgress(matcher, stopwatch, source,
-                                checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
-                        if (matcher.Remaining == 0) break;
+                        CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionaries");
+                        CheckCandidates(wadPaths, InternalHashGuessStrategy.GamePath, includeRst ? "GAME and LCU paths" : "GAME paths");
                     }
-                }
-            }, cancellationToken);
+                    if (includeRst)
+                    {
+                        CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionary keys");
+                        CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
+                        CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
+                    }
 
-            return await CompleteRunAsync(matcher, initial, checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates, cancellationToken);
+                    // Run advanced structural candidate generation
+                    if (matcher.Remaining > 0)
+                    {
+                        var wordlist = new TokenWordlist();
+                        foreach (string val in binKnown) wordlist.AddName(val);
+                        foreach (string val in rst3) wordlist.AddName(val);
+                        foreach (string val in rst64) wordlist.AddName(val);
+                        foreach (string val in wadPaths) wordlist.AddName(val);
+                        wordlist.FinalizeList();
+
+                        CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
+                    }
+
+                    void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source)
+                    {
+                        foreach (string candidate in candidates)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            matcher.Check(candidate, strategy, source);
+                            checkedCandidates++;
+                            if ((checkedCandidates & 0x3ffff) == 0)
+                                progress?.Report(CreateProgress(matcher, stopwatch, source,
+                                    checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
+                            if (matcher.Remaining == 0) break;
+                        }
+                    }
+                }, cancellationToken);
+
+                int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
+                progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", checkedCount));
+                return await CompleteRunAsync(matcher, initial, checkedCount);
+            }
+            catch (OperationCanceledException)
+            {
+                int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
+                progress?.Report(CreateProgress(matcher, stopwatch, "Saving matches found before cancellation", checkedCount));
+                await PersistCancelledMatchesAsync(matcher);
+                throw;
+            }
         }
 
-        private async Task<InternalHashRunResult> CompleteRunAsync(CandidateMatcher matcher, int initial, int scanned, CancellationToken cancellationToken)
+        private async Task<InternalHashRunResult> CompleteRunAsync(CandidateMatcher matcher, int initial, int scanned)
         {
             var matches = matcher.Matches.OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
-            cancellationToken.ThrowIfCancellationRequested();
+            await PersistMatchesAsync(matches);
+            _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} values resolved from {initial} unknown hashes.");
+            return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
+        }
+
+        private async Task PersistCancelledMatchesAsync(CandidateMatcher matcher)
+        {
+            if (matcher.Matches.Count == 0) return;
+            try
+            {
+                await PersistMatchesAsync(matcher.Matches);
+                _log.LogSuccess($"Internal Hash Lab saved {matcher.Matches.Count} matches found before cancellation.");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Internal Hash Lab could not save matches found before cancellation.");
+            }
+        }
+
+        private async Task PersistMatchesAsync(IEnumerable<InternalHashGuessMatch> matches)
+        {
+            var materialized = matches as IReadOnlyCollection<InternalHashGuessMatch> ?? matches.ToList();
+            if (materialized.Count == 0) return;
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
             try
             {
-                await _persistence.CommitInternalMatchesAsync(matches, CancellationToken.None);
+                await _persistence.CommitInternalMatchesAsync(materialized, CancellationToken.None);
             }
             finally
             {
                 HashResolverService._hashFileAccessLock.Release();
             }
-            if (matches.Count > 0) await _resolver.ForceReloadHashesAsync();
-            _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} values resolved from {initial} unknown hashes.");
-            return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
+            await _resolver.ForceReloadHashesAsync();
         }
 
         private static InternalHashProgress CreateProgress(
@@ -413,19 +458,20 @@ namespace AssetsManager.Services.Hashes
             int processedFiles,
             int processedWads = 0,
             int totalWads = 0) => new()
-        {
-            ProcessedWads = processedWads,
-            TotalWads = totalWads,
-            ProcessedFiles = processedFiles,
-            FoundMatches = matcher.Matches.Count,
-            RemainingUnknowns = matcher.Remaining,
-            CheckedCandidates = matcher.CheckedCandidates,
-            DiscardedCandidates = matcher.DiscardedCandidates,
-            CandidatesPerSecond = matcher.CheckedCandidates / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001),
-            Elapsed = stopwatch.Elapsed,
-            ManagedMemoryBytes = GC.GetTotalMemory(false),
-            CurrentStage = stage
-        };
+            {
+                ProcessedWads = processedWads,
+                TotalWads = totalWads,
+                ProcessedFiles = processedFiles,
+                FoundMatches = matcher.Matches.Count,
+                RemainingUnknowns = matcher.Remaining,
+                CheckedCandidates = matcher.CheckedCandidates,
+                DiscardedCandidates = matcher.DiscardedCandidates,
+                CandidatesPerSecond = matcher.CheckedCandidates / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001),
+                Elapsed = stopwatch.Elapsed,
+                ManagedMemoryBytes = GC.GetTotalMemory(false),
+                CurrentStage = stage,
+                NewMatches = matcher.TakePendingMatches()
+            };
 
         private async Task EnsureInventoryAsync(string rootDirectory, bool includeBin, bool includeRst, IProgress<InternalHashProgress> progress, CancellationToken cancellationToken)
         {
@@ -500,9 +546,12 @@ namespace AssetsManager.Services.Hashes
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateObservedSets() => new()
         {
-            [InternalHashKind.BinEntries] = new(), [InternalHashKind.BinFields] = new(),
-            [InternalHashKind.BinTypes] = new(), [InternalHashKind.BinHashes] = new(),
-            [InternalHashKind.RstXxh3] = new(), [InternalHashKind.RstXxh64] = new()
+            [InternalHashKind.BinEntries] = new(),
+            [InternalHashKind.BinFields] = new(),
+            [InternalHashKind.BinTypes] = new(),
+            [InternalHashKind.BinHashes] = new(),
+            [InternalHashKind.RstXxh3] = new(),
+            [InternalHashKind.RstXxh64] = new()
         };
 
         private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed)
@@ -826,19 +875,19 @@ namespace AssetsManager.Services.Hashes
         private static IEnumerable<string> SplitCamelCaseAndSymbols(string input)
         {
             if (string.IsNullOrWhiteSpace(input)) yield break;
-            
+
             var segments = input.Split(new[] { '/', '\\', '.', '_', '-', ' ', ':', '[', ']' }, StringSplitOptions.RemoveEmptyEntries);
             foreach (var segment in segments)
             {
                 yield return segment.ToLowerInvariant();
-                
+
                 int lastStart = 0;
                 for (int i = 1; i < segment.Length; i++)
                 {
                     bool isUpper = char.IsUpper(segment[i]);
                     bool isDigit = char.IsDigit(segment[i]);
                     bool prevLower = char.IsLower(segment[i - 1]);
-                    
+
                     if ((isUpper || isDigit) && prevLower)
                     {
                         yield return segment[lastStart..i].ToLowerInvariant();
@@ -996,7 +1045,7 @@ namespace AssetsManager.Services.Hashes
             // 4. Prefix & Suffix addition
             string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
             string[] suffixes = { "s", "es", "list", "map", "array", "hash", "id", "name", "type", "file", "path", "vector", "color", "override", "data", "config", "event", "trigger" };
-            
+
             foreach (string token in topTokens.Take(500))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -1034,7 +1083,7 @@ namespace AssetsManager.Services.Hashes
                 for (int j = 0; j < combTokens.Count; j++)
                 {
                     if (i == j) continue;
-                    
+
                     string comb1 = combTokens[i] + combTokens[j];
                     if (Emit(comb1))
                     {
@@ -1073,16 +1122,25 @@ namespace AssetsManager.Services.Hashes
             return word + "s";
         }
 
-        private sealed class CandidateMatcher
+        internal sealed class CandidateMatcher
         {
             private const ulong Rst38Mask = (1UL << 38) - 1;
             private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
             private readonly Dictionary<(InternalHashKind Kind, ulong Hash), InternalHashGuessMatch> _matches = new();
+            private readonly List<InternalHashGuessMatch> _pendingMatches = new();
             public CandidateMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) => _targets = targets;
             public IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
             public int Remaining => _targets.Values.Sum(values => values.Count);
             public long CheckedCandidates { get; private set; }
             public long DiscardedCandidates { get; private set; }
+
+            public IReadOnlyList<InternalHashGuessMatch> TakePendingMatches()
+            {
+                if (_pendingMatches.Count == 0) return Array.Empty<InternalHashGuessMatch>();
+                InternalHashGuessMatch[] matches = _pendingMatches.ToArray();
+                _pendingMatches.Clear();
+                return matches;
+            }
 
             public void Check(string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
             {
@@ -1132,12 +1190,20 @@ namespace AssetsManager.Services.Hashes
             private void Check32(InternalHashKind kind, uint hash, string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
             {
                 if (!_targets[kind].Remove(hash)) return;
-                _matches[(kind, hash)] = new InternalHashGuessMatch
+                var match = new InternalHashGuessMatch
                 {
-                    Hash = hash, LookupHash = hash, HashBits = 32, Value = value,
-                    Kind = kind, Strategy = strategy, Source = source,
-                    SourceWad = sourceWad, SourceBin = sourceBin
+                    Hash = hash,
+                    LookupHash = hash,
+                    HashBits = 32,
+                    Value = value,
+                    Kind = kind,
+                    Strategy = strategy,
+                    Source = source,
+                    SourceWad = sourceWad,
+                    SourceBin = sourceBin
                 };
+                _matches[(kind, hash)] = match;
+                _pendingMatches.Add(match);
             }
 
             private void CheckRst(InternalHashKind kind, ulong fullHash, string value, InternalHashGuessStrategy strategy, string source, IEnumerable<int> bitOptions, string sourceWad = null, string sourceBin = null)
@@ -1146,12 +1212,20 @@ namespace AssetsManager.Services.Hashes
                 {
                     ulong lookup = bits == 64 ? fullHash : fullHash & ((1UL << bits) - 1);
                     if (!_targets[kind].Remove(lookup)) continue;
-                    _matches[(kind, fullHash)] = new InternalHashGuessMatch
+                    var match = new InternalHashGuessMatch
                     {
-                        Hash = fullHash, LookupHash = lookup, HashBits = bits, Value = value,
-                        Kind = kind, Strategy = strategy, Source = source,
-                        SourceWad = sourceWad, SourceBin = sourceBin
+                        Hash = fullHash,
+                        LookupHash = lookup,
+                        HashBits = bits,
+                        Value = value,
+                        Kind = kind,
+                        Strategy = strategy,
+                        Source = source,
+                        SourceWad = sourceWad,
+                        SourceBin = sourceBin
                     };
+                    _matches[(kind, fullHash)] = match;
+                    _pendingMatches.Add(match);
                     break;
                 }
             }
