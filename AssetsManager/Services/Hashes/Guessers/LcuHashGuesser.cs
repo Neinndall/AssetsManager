@@ -309,7 +309,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (data.Count == 0) yield break;
 
             if (!TryDecodeWadText(data, out string text))
-                text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
+                yield break;
             var structuredCandidates = new List<HashGuessCandidate>();
             bool stopAfterStructuredJson = Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
                                            ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
