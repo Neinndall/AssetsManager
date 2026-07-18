@@ -11,7 +11,6 @@ public class HashService
         ulong actualHash = type switch
         {
             HashType.Sha256 => HashSha256(data),
-            HashType.Blake3 => throw new NotSupportedException("Blake3 hash verification is no longer supported."),
             HashType.Hkdf => HashHkdf(data),
             _ => throw new NotSupportedException($"Hash type {type} is not supported.")
         };

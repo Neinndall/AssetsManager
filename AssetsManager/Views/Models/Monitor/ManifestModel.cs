@@ -7,8 +7,7 @@ public enum HashType : byte
 {
     Sha512 = 1,
     Sha256 = 2,
-    Hkdf = 3,
-    Blake3 = 4
+    Hkdf = 3
 }
 
 public class RmanManifest
