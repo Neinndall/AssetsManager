@@ -705,6 +705,23 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuV1PathPatternsResolveLocalizedWordPairJson()
+        {
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, Array.Empty<string>()), null);
+            const string expected = "plugins/rcp-be-lol-game-data/global/de_de/v1/augment-lists.json";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+
+            lcu.RunV1PathPatterns(
+                engine,
+                progress: null,
+                cancellationToken: CancellationToken.None,
+                words: new[] { "augment", "list" },
+                locales: new[] { "de_de" });
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void GameExplicitCdtbMethodsCoverTerminalCharactersPrefixesAndShaders()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]

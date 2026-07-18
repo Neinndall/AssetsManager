@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -214,6 +215,96 @@ namespace AssetsManager.Services.Hashes.Guessers
             return RunBasenameWordSubstitution(
                 engine, partyImages, imageWords, 1, 2, cancellationToken, int.MaxValue,
                 "LCU parties PNG word-pair substitution");
+        }
+
+        // Dedicated, opt-in coverage for the v1 check_iter patterns used by CDTB tooling.
+        // It deliberately stays out of Basic and Advanced because its wordlist cross-product is expensive.
+        internal int RunV1PathPatterns(
+            HashGuessEngine engine,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            IEnumerable<string> words = null,
+            IEnumerable<string> locales = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+
+            string[] wordList = (words ?? BuildWordlist())
+                .Where(word => !string.IsNullOrWhiteSpace(word))
+                .Distinct(StringComparer.Ordinal)
+                // Short, composable terms produce useful v1 names early (for example augment + list),
+                // while retaining the complete CDTB word corpus for exhaustive coverage.
+                .OrderBy(word => word.Length)
+                .ThenBy(word => word, StringComparer.Ordinal)
+                .ToArray();
+            string[] localeList = (locales ?? Locales.Prepend("default"))
+                .Where(locale => !string.IsNullOrWhiteSpace(locale))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            const string v1Prefix = "plugins/rcp-be-lol-game-data/global/";
+            const string source = "LCU v1 path patterns";
+            int checkedCandidates = 0;
+            int lastReported = -1;
+            var progressClock = Stopwatch.StartNew();
+
+            void Report(string phase, bool force = false)
+            {
+                if (!force && ((checkedCandidates & 0x3fff) != 0 || progressClock.ElapsedMilliseconds < 100)) return;
+                if (lastReported == checkedCandidates) return;
+                progress?.Report(engine.CreateProgress($"LCU V1 Paths: {phase}", checkedCandidates));
+                lastReported = checkedCandidates;
+                progressClock.Restart();
+            }
+
+            bool CheckForLocales(string fileName, string phase)
+            {
+                foreach (string locale in localeList)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    engine.Check($"{v1Prefix}{locale}/v1/{fileName}", HashGuessStrategy.LcuPattern, source);
+                    if (checkedCandidates != int.MaxValue) checkedCandidates++;
+                    Report(phase);
+                    if (engine.RemainingUnknownCount == 0) return false;
+                }
+                return true;
+            }
+
+            Report("preparing", force: true);
+            foreach (string a in wordList)
+            {
+                // The non-TFT paths are first because they are both broadly useful and cheap to resolve early.
+                if (!CheckForLocales($"{a}.json", "single names") ||
+                    !CheckForLocales($"tft{a}.json", "TFT single names") ||
+                    !CheckForLocales($"tft{a}s.json", "TFT plural names"))
+                {
+                    Report("completed", force: true);
+                    return checkedCandidates;
+                }
+
+                foreach (string b in wordList)
+                {
+                    // These are the unique candidate sets from the 24 CDTB check_iter expressions.
+                    // Because both words iterate over the full list, swapping a/b would only repeat work.
+                    if (!CheckForLocales($"{a}{b}s.json", "word pairs") ||
+                        !CheckForLocales($"{a}{b}n.json", "word pairs") ||
+                        !CheckForLocales($"{a}-{b}s.json", "word pairs") ||
+                        !CheckForLocales($"{a}-{b}.json", "word pairs") ||
+                        !CheckForLocales($"{a}{b}.json", "word pairs") ||
+                        !CheckForLocales($"{a}{b}", "word pairs") ||
+                        !CheckForLocales($"tft{a}{b}s.json", "TFT pairs") ||
+                        !CheckForLocales($"tft{a}-{b}s.json", "TFT pairs") ||
+                        !CheckForLocales($"tft{a}{b}.json", "TFT pairs") ||
+                        !CheckForLocales($"tft{a}-{b}.json", "TFT pairs") ||
+                        !CheckForLocales($"tft-{a}{b}.json", "TFT pairs"))
+                    {
+                        Report("completed", force: true);
+                        return checkedCandidates;
+                    }
+                }
+            }
+
+            Report("completed", force: true);
+            return checkedCandidates;
         }
 
         private static bool IsFrontendJsonPath(string path) =>
