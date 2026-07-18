@@ -226,7 +226,8 @@ namespace AssetsManager.Views
                         ? $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s"
                         : $"{value.CurrentWad} · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
                 });
-                IProgress<HashGuessMatch> matchProgress = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu)
+                IProgress<HashGuessMatch> matchProgress =
+                    (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu || mode == HashGuessMode.LcuV1Paths)
                     ? new Progress<HashGuessMatch>(match =>
                     {
                         if (displayedMatchHashes.Add(match.Hash))
@@ -242,7 +243,7 @@ namespace AssetsManager.Views
                     HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token),
                     HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token),
                     HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token),
-                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
