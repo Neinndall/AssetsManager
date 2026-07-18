@@ -119,7 +119,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         internal IEnumerable<HashGuessCandidate> GenerateLcuExtensionCandidates(int candidateBudget = int.MaxValue) =>
-            GenerateExtensionCandidates(KnownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)), candidateBudget);
+            GenerateExtensionCandidates(KnownPaths, candidateBudget);
 
         internal IEnumerable<HashGuessCandidate> GeneratePatternCandidates()
         {

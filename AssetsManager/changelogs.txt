@@ -58,6 +58,7 @@ Improvements
   - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
   - LCU GREP now resolves relative, CSS, and HTML asset references from their Riot plugin context.
   - GAME and LCU WAD GREP now match CDTB parsing behavior with fewer redundant scans and temporary allocations.
+  - GAME and LCU Basic guessing now avoids duplicate candidate passes while preserving CDTB search coverage.
   - GAME Extended now searches base filenames derived from Riot suffix variants.
   - Reduced memory pressure while creating WAD backups and made interrupted saves leave no incomplete history entry.
   - Accelerated Explorer tree loading for large WAD and local folder structures.

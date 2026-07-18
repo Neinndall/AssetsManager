@@ -102,20 +102,31 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
 
-        internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100) =>
-            SubstituteNumbers(maximum).Concat(SubstituteNumbers(maximum, digits: 2));
+        internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
+        {
+            foreach (HashGuessCandidate candidate in SubstituteNumbers(maximum))
+                yield return candidate;
+
+            // Two-digit values above 9 are identical to their unpadded form.
+            foreach (HashGuessCandidate candidate in SubstituteNumbers(Math.Min(maximum, 10), digits: 2))
+                yield return candidate;
+        }
 
         internal IEnumerable<HashGuessCandidate> CheckBasenamePrefixes(IEnumerable<string> prefixes = null)
         {
             string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }).ToArray();
+            var candidates = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in KnownPaths)
             {
                 int separator = path.LastIndexOf('/');
                 string directory = separator >= 0 ? path[..(separator + 1)] : string.Empty;
                 string basename = separator >= 0 ? path[(separator + 1)..] : path;
                 foreach (string prefix in values)
-                    yield return new HashGuessCandidate(directory + prefix + basename, HashGuessStrategy.PrefixVariant);
+                    candidates.Add(directory + prefix + basename);
             }
+
+            foreach (string candidate in candidates.OrderBy(path => path, StringComparer.Ordinal))
+                yield return new HashGuessCandidate(candidate, HashGuessStrategy.PrefixVariant);
         }
 
         internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken) =>
@@ -149,6 +160,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (CountCandidate(ref generated, candidateBudget)) yield break;
                 if (extension is "json" or "dds") continue;
                 yield return new HashGuessCandidate(path + ".dds", HashGuessStrategy.CrossDomainGame);
+                if (CountCandidate(ref generated, candidateBudget)) yield break;
+                yield return new HashGuessCandidate(path + ".tex", HashGuessStrategy.CrossDomainGame);
                 if (CountCandidate(ref generated, candidateBudget)) yield break;
             }
         }
@@ -342,14 +355,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         internal int RunCrossDomainAttacks(HashGuessEngine engine, HashGuesser lcuGuesser, CancellationToken cancellationToken)
-        {
-            int checkedCandidates = CheckCandidates(engine, GuessFromLcuHashes(lcuGuesser), "LCU to GAME", cancellationToken);
-            if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, GenerateExtensionCandidates(int.MaxValue), "GAME extension substitution", cancellationToken);
-            if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, GeneratePrefixAndShaderCandidates(), "GAME prefix or shader variant", cancellationToken);
-            return checkedCandidates;
-        }
+            => CheckCandidates(engine, GuessFromLcuHashes(lcuGuesser), "LCU to GAME", cancellationToken);
 
         internal int RunEsportsBannersAttack(HashGuessEngine engine, string rootDirectory, CancellationToken cancellationToken)
         {
