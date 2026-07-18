@@ -75,6 +75,7 @@ Improvements
   - Viewer / Map Geometry Camera: Optimized map geometry (.mapgeo) camera viewport to render an isometric top-down gameplay view at a 50-degree angle and 0.55x distance multiplier, ensuring the entire map is perfectly framed and centered.
   - Explorer / Encrypted Texture Feedback
     * Encrypted Riot esports textures are now identified explicitly in the preview panel instead of being reported as unsupported or failed files.
+  - Significantly accelerated hash guessing speed when scanning localized game client containers.
 
 Bug Fixes
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
@@ -114,6 +115,8 @@ Bug Fixes
   - Fixed duplicate unsupported format preview screens appearing when clearing the search filter.
   - Fixed application crash when opening the Hash Guessing Lab due to a missing button style or duplicate column definitions.
   - Fixed UI freezing (Not Responding) during long hash guessing sessions by executing calculations asynchronously in background threads.
+  - Fixed LCU hash guessing executing redundant search operations on non-text binary files.
+  - Fixed Cancel button styling in the Hash Guessing window to match the secondary button design.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
