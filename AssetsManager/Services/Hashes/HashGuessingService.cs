@@ -79,10 +79,21 @@ namespace AssetsManager.Services.Hashes
                     try
                     {
                         using var wad = new WadFile(wadPath);
+                        int chunkIndex = 0;
                         foreach (var chunk in wad.Chunks.Values)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             processedChunks++;
+                            chunkIndex++;
+
+                            if (chunkIndex % 100 == 0)
+                            {
+                                progress?.Report(engine.CreateProgress(
+                                    $"{Path.GetFileName(wadPath)} ({chunkIndex}/{wad.Chunks.Count})",
+                                    processedChunks,
+                                    wadIndex,
+                                    wadPaths.Length));
+                            }
 
                             string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
