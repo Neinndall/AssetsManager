@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
+using System.Threading;
 
 namespace AssetsManager.Views.Models.Monitor;
 
@@ -24,6 +25,8 @@ public class RmanManifest
 
     public void BuildChunkLookup()
     {
+        if (Volatile.Read(ref _chunkLookup) != null) return;
+
         lock (_lookupLock)
         {
             if (_chunkLookup != null) return;
@@ -38,20 +41,27 @@ public class RmanManifest
                 for (int j = 0; j < bundle.Chunks.Count; j++)
                 {
                     var chunk = bundle.Chunks[j];
-                    lookup[chunk.ChunkId] = chunk;
+                    if (!lookup.TryAdd(chunk.ChunkId, chunk)
+                        && lookup[chunk.ChunkId].UncompressedSize != chunk.UncompressedSize)
+                    {
+                        throw new InvalidDataException(
+                            $"Chunk {chunk.ChunkId:X16} has inconsistent uncompressed sizes across bundles.");
+                    }
                 }
             }
-            _chunkLookup = lookup;
+            Volatile.Write(ref _chunkLookup, lookup);
         }
     }
 
     public RmanChunk GetChunk(ulong chunkId)
     {
-        if (_chunkLookup == null)
+        Dictionary<ulong, RmanChunk> lookup = Volatile.Read(ref _chunkLookup);
+        if (lookup == null)
         {
             BuildChunkLookup();
+            lookup = Volatile.Read(ref _chunkLookup);
         }
-        return _chunkLookup.TryGetValue(chunkId, out var chunk) ? chunk : null;
+        return lookup.TryGetValue(chunkId, out var chunk) ? chunk : null;
     }
 }
 

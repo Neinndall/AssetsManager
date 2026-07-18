@@ -54,13 +54,13 @@ namespace AssetsManager.Services.Monitor
             VersionDownloadProgressChanged?.Invoke(taskName, current, total, fileName);
         }
 
-        public async Task FetchAllVersionsAsync()
+        public async Task FetchAllVersionsAsync(CancellationToken cancellationToken = default)
         {
             _logService.Log("Starting get versions from league client and game client...");
 
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
 
-            var riotVersions = await _riotApiService.FetchVersionsAsync();
+            var riotVersions = await _riotApiService.FetchVersionsAsync(cancellationToken);
 
             if (!riotVersions.Any())
             {
@@ -70,23 +70,26 @@ namespace AssetsManager.Services.Monitor
 
             foreach (var v in riotVersions.Where(x => x.Product == "Game Client"))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var path = Path.Combine(_directoriesCreator.VersionsPath, "PBE1", "windows", v.Category);
                 _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{v.Version}.txt");
-                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, v.ManifestUrl);
+                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, v.ManifestUrl, cancellationToken);
             }
 
             var pluginConfigs = riotVersions.Where(x => x.Product == "League Client").Select(x => x.ManifestUrl).ToList();
-            var versionInfo = await DownloadAndExtractVersionAsync(pluginConfigs);
+            var versionInfo = await DownloadAndExtractVersionAsync(pluginConfigs, cancellationToken);
 
-            await SaveClientVersionsAsync(versionInfo);
+            await SaveClientVersionsAsync(versionInfo, cancellationToken);
 
             _logService.LogSuccess("Version fetch process completed successfully.");
 
             VersionDownloadCompleted?.Invoke("Fetching Versions", true, "Success");
         }
 
-        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(List<string> manifestUrls)
+        private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(
+            List<string> manifestUrls,
+            CancellationToken cancellationToken)
         {
             var versions = new List<(string region, string os, string version, string url)>();
             string tempDir = Path.Combine(_directoriesCreator.AppDirectory, "TempVersions");
@@ -95,13 +98,20 @@ namespace AssetsManager.Services.Monitor
             {
                 try
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
                     _directoriesCreator.CreateDirectory(tempDir);
 
-                    var manifestBytes = await _httpClient.GetByteArrayAsync(url);
-                    var manifest = await Task.Run(() => _rmanService.Parse(manifestBytes));
+                    var manifestBytes = await _httpClient.GetByteArrayAsync(url, cancellationToken);
+                    var manifest = await Task.Run(
+                        () => _rmanService.Parse(manifestBytes, cancellationToken),
+                        cancellationToken);
 
-                    await _manifestDownloader.DownloadManifestAsync(manifest, tempDir, "LeagueClient.exe");
+                    await _manifestDownloader.DownloadManifestAsync(
+                        manifest,
+                        tempDir,
+                        "LeagueClient.exe",
+                        cancellationToken: cancellationToken);
 
                     string exePath = Path.Combine(tempDir, "LeagueClient.exe");
                     if (File.Exists(exePath))
@@ -109,6 +119,10 @@ namespace AssetsManager.Services.Monitor
                         var version = FileVersionInfo.GetVersionInfo(exePath).FileVersion;
                         if (version != null) versions.Add(("PBE1", "windows", version, url));
                     }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -123,15 +137,18 @@ namespace AssetsManager.Services.Monitor
             return versions;
         }
 
-        private async Task SaveClientVersionsAsync(List<(string region, string os, string version, string url)> versions)
+        private async Task SaveClientVersionsAsync(
+            List<(string region, string os, string version, string url)> versions,
+            CancellationToken cancellationToken)
         {
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
             foreach (var (region, os, version, url) in versions)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var path = Path.Combine(_directoriesCreator.VersionsPath, region, os, "league-client");
                 _directoriesCreator.CreateDirectory(path);
                 var filePath = Path.Combine(path, $"{version}.txt");
-                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, url);
+                if (!File.Exists(filePath)) await File.WriteAllTextAsync(filePath, url, cancellationToken);
             }
         }
 
@@ -156,7 +173,9 @@ namespace AssetsManager.Services.Monitor
                 _logService.Log($"Verifying/Updating {taskName}...");
 
                 var manifestBytes = await _httpClient.GetByteArrayAsync(manifestUrl, cancellationToken);
-                var manifest = await Task.Run(() => _rmanService.Parse(manifestBytes), cancellationToken);
+                var manifest = await Task.Run(
+                    () => _rmanService.Parse(manifestBytes, cancellationToken),
+                    cancellationToken);
 
                 int updatedCount = await _manifestDownloader.DownloadManifestAsync(manifest, targetDirectory, null, locales, cancellationToken);
 
