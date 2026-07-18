@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Core
             {
                 _taskCancellationManager.OperationStateChanged -= TaskCancellationManager_OperationStateChanged;
             }
-            
+
             CloseProgressWindow();
             _statusBarViewModel = null;
             _owner = null;
@@ -87,9 +87,9 @@ namespace AssetsManager.Services.Core
                     HeaderIcon = icon,
                     HeaderTitle = headerText
                 };
-                
+
                 _progressDetailsWindow.ViewModel.OperationVerb = verb;
-                
+
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
                 _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
                 // _progressDetailsWindow.Show(); // Ventana en segundo plano por defecto, el usuario la abre si quiere
@@ -163,15 +163,15 @@ namespace AssetsManager.Services.Core
 
                 // PROTECT CANCELLATION STATE: If we are cancelling, don't let other progress messages 
                 // overwrite the "Cancelling Task..." message, except for the "Ready" reset.
-                if (_taskCancellationManager.IsCancelling && 
-                    message != _taskCancellationManager.CancellationMessage && 
+                if (_taskCancellationManager.IsCancelling &&
+                    message != _taskCancellationManager.CancellationMessage &&
                     message != "Ready")
                 {
                     return;
                 }
 
                 _statusBarViewModel.StatusText = message;
-                
+
                 if (completed >= 0 && total > 0)
                 {
                     double percentage = (double)completed / total * 100;
@@ -214,7 +214,7 @@ namespace AssetsManager.Services.Core
 
         public void ShowDetails()
         {
-             if (_progressDetailsWindow != null)
+            if (_progressDetailsWindow != null)
             {
                 if (!_progressDetailsWindow.IsVisible) _progressDetailsWindow.Show();
                 _progressDetailsWindow.Activate();
@@ -321,15 +321,14 @@ namespace AssetsManager.Services.Core
 
         public void OnVersionDownloadProgressChanged(string taskName, int currentValue, int totalValue, string currentFile)
         {
-            _owner.Dispatcher.Invoke(() =>
+            _ = _owner.Dispatcher.InvokeAsync(() =>
             {
                 if (_progressDetailsWindow != null)
                 {
-                    _progressDetailsWindow.ViewModel.OperationVerb = taskName; // Cambia dinámicamente entre Verifying y Updating
+                    _progressDetailsWindow.ViewModel.OperationVerb = taskName;
                 }
+                UpdateOperation($"{taskName} {currentFile}", currentValue, totalValue, currentFile);
             });
-            // data.CurrentFile already contains "X of Y files: name", so we just prepend the TaskName
-            UpdateOperation($"{taskName} {currentFile}", currentValue, totalValue, currentFile);
         }
 
         public async void OnVersionDownloadCompleted(string taskName, bool success, string message)
@@ -337,10 +336,10 @@ namespace AssetsManager.Services.Core
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
             await FinishOperation(200);
-            
+
             await _owner.Dispatcher.InvokeAsync(() =>
             {
-                if (!success && !wasCancelled) 
+                if (!success && !wasCancelled)
                 {
                     _customMessageBoxService.ShowError("Error", message, _owner);
                 }
