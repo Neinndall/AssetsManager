@@ -820,18 +820,41 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private static IEnumerable<(int Offset, int Length)> FindGeneralPathRanges(ArraySegment<byte> data)
         {
-            for (int offset = 0; offset < data.Count; offset++)
-            foreach (byte[] prefix in GeneralPathPrefixes)
+            int limit = data.Count;
+            for (int offset = 0; offset < limit; offset++)
             {
-                if (offset + prefix.Length > data.Count) continue;
-                int prefixIndex = 0;
-                while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
-                if (prefixIndex != prefix.Length) continue;
+                byte[][] needles = ToUpperAscii(ByteAt(data, offset)) switch
+                {
+                    (byte)'A' => BinPrefixesA,
+                    (byte)'C' => BinPrefixesC,
+                    (byte)'D' => BinPrefixesD,
+                    (byte)'G' => BinPrefixesG,
+                    (byte)'L' => BinPrefixesL,
+                    (byte)'M' => BinPrefixesM,
+                    (byte)'P' => BinPrefixesP,
+                    (byte)'S' => BinPrefixesS,
+                    (byte)'U' => BinPrefixesU,
+                    _ => null
+                };
+                if (needles == null) continue;
 
-                int end = offset + prefix.Length;
-                while (end < data.Count && IsGeneralPathByte(ByteAt(data, end))) end++;
-                yield return (offset, end - offset);
-                break;
+                bool matched = false;
+                foreach (byte[] prefix in needles)
+                {
+                    if (offset + prefix.Length > limit) continue;
+                    int prefixIndex = 1;
+                    while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
+                    if (prefixIndex != prefix.Length) continue;
+
+                    int end = offset + prefix.Length;
+                    while (end < limit && IsGeneralPathByte(ByteAt(data, end))) end++;
+                    yield return (offset, end - offset);
+
+                    offset = end - 1;
+                    matched = true;
+                    break;
+                }
+                if (matched) continue;
             }
         }
 
