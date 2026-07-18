@@ -128,6 +128,26 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void ComposedPathHashingMatchesRegularUtf8HashingWithoutLengthLimits()
+        {
+            string[] relativePaths = { "imágenes/icono-é.js", new string('a', 1_100) + ".json" };
+            foreach (string relativePath in relativePaths)
+            {
+                const string directory = "plugins/rcp-fe-test/global/default";
+                string expected = directory + "/" + relativePath;
+                var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+
+                Assert.True(engine.CheckCombined(
+                    directory,
+                    relativePath,
+                    HashGuessStrategy.LcuRelativeBasename,
+                    "test.wad",
+                    1));
+                AssertResolved(engine, expected);
+            }
+        }
+
+        [Fact]
         public void WadGrepDoesNotRunNumberedShaderAttack()
         {
             const string numberedShader = "assets/shaders/generated/shaders/test.ps_2_0.dx11_100";
@@ -214,6 +234,116 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.True(HashGuesser.TryDecodeWadText(text, out string decoded));
             Assert.Equal("café", decoded);
             Assert.False(HashGuesser.TryDecodeWadText(new byte[] { 0xff, 0xfe }, out _));
+        }
+
+        [Fact]
+        public void LcuGrepSkipsTheWholeChunkWhenUtf8IsInvalid()
+        {
+            const string hiddenPath = "plugins/rcp-fe-test/global/default/hidden.js";
+            byte[] path = Encoding.ASCII.GetBytes(hiddenPath);
+            byte[] data = new byte[path.Length + 1];
+            data[0] = 0xFF;
+            path.CopyTo(data, 1);
+            var engine = CreateEngine(HashGuessDomain.Lcu, hiddenPath);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(engine, data, "init.js", "test.wad", 1);
+
+            Assert.Equal(1, engine.RemainingUnknownCount);
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void LcuMalformedJsonContinuesGeneralGrepWithoutAConfiguredLogger()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/hidden.js";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+            byte[] data = Encoding.UTF8.GetBytes("{\"broken\":,\"path\":\"plugins/rcp-fe-test/global/default/hidden.js\"}");
+
+            guesser.GrepWad(engine, data, "broken.json", "test.wad", 1);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameFallbackMatchesCdtbNonOverlappingRanges()
+        {
+            const string nestedPath = "data/nested.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, nestedPath);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepFile(engine, data: Encoding.ASCII.GetBytes("ASSETS/root/DATA/nested.bin"));
+
+            Assert.Equal(1, engine.RemainingUnknownCount);
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
+        {
+            const string barePrefix = "assets/";
+            var engine = CreateEngine(HashGuessDomain.Game, barePrefix);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepFile(engine, data: Encoding.ASCII.GetBytes("ASSETS/\0"));
+
+            Assert.Equal(1, engine.RemainingUnknownCount);
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void GameBinGrepRejectsNonAsciiPathsLikeCdtb()
+        {
+            const string replacementPath = "assets/test?.bin";
+            byte[] path = Encoding.ASCII.GetBytes("ASSETS/test?.bin");
+            path[11] = 0xFF;
+            byte[] data = new byte[path.Length + 2];
+            data[0] = (byte)path.Length;
+            path.CopyTo(data, 2);
+            var engine = CreateEngine(HashGuessDomain.Game, replacementPath);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepWad(engine, data, "data/test.bin", "test.wad.client", 1);
+
+            Assert.Equal(1, engine.RemainingUnknownCount);
+            Assert.Empty(engine.Matches);
+        }
+
+        [Fact]
+        public void GamePreloadUsesCdtbExclusiveBranchingForTroyReferences()
+        {
+            const string rawTroy = "particles/test.troy";
+            const string expected = "data/shared/particles/particles/test.troybin";
+            byte[] data = Encoding.ASCII.GetBytes("Name=\"particles/test.troy\"");
+            var expectedEngine = CreateEngine(HashGuessDomain.Game, expected);
+            var rawEngine = CreateEngine(HashGuessDomain.Game, rawTroy);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepWad(expectedEngine, data, "data/shared/test.preload", "test.wad.client", 1);
+            guesser.GrepWad(rawEngine, data, "data/shared/test.preload", "test.wad.client", 1);
+
+            AssertResolved(expectedEngine, expected);
+            Assert.Equal(1, rawEngine.RemainingUnknownCount);
+            Assert.Empty(rawEngine.Matches);
+        }
+
+        [Fact]
+        public void GamePreloadAddsOnlyTheContextualPreloadForOrdinaryNames()
+        {
+            const string rawName = "logic/test";
+            const string expected = "data/shared/logic/test.preload";
+            byte[] data = Encoding.ASCII.GetBytes("Name=\"logic/test\"");
+            var expectedEngine = CreateEngine(HashGuessDomain.Game, expected);
+            var rawEngine = CreateEngine(HashGuessDomain.Game, rawName);
+            var guesser = new GameHashGuesser();
+
+            guesser.GrepWad(expectedEngine, data, "data/shared/test.preload", "test.wad.client", 1);
+            guesser.GrepWad(rawEngine, data, "data/shared/test.preload", "test.wad.client", 1);
+
+            AssertResolved(expectedEngine, expected);
+            Assert.Equal(1, rawEngine.RemainingUnknownCount);
+            Assert.Empty(rawEngine.Matches);
         }
 
         [Fact]

@@ -17,10 +17,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 {
     internal sealed class GameHashGuesser : HashGuesser
     {
-        private static readonly Regex PathRegex = new(
-            @"(?:assets|common|data|data_soon|gameplay|global|levels|loadouts|ux|uiautoatlas|characters|shaders|maps|clientstates|patching)/[0-9a-z_./ -]+",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
         private static readonly Regex PreloadNameRegex = new("Name=\\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex ShaderIncludeRegex = new("#include \\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex LocaleRegex = new(@"(?<![a-z])(?:ar_ae|ar_eg|cs_cz|de_de|el_gr|en_au|en_gb|en_ph|en_pl|en_sg|en_us|es_ar|es_es|es_mx|fr_fr|hu_hu|id_id|it_it|ja_jp|ko_kr|ms_my|pl_pl|pt_br|ro_ro|ru_ru|th_th|tr_tr|vi_vn|vn_vn|zh_cn|zh_my|zh_tw)(?![a-z])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -46,11 +42,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly byte[][] BinPrefixesP = ToAsciiPrefixes("PATCHING/");
         private static readonly byte[][] BinPrefixesS = ToAsciiPrefixes("SHADERS/");
         private static readonly byte[][] BinPrefixesU = ToAsciiPrefixes("UX/", "UIAUTOATLAS/");
-        private static readonly byte[][] GeneralPathPrefixes = ToAsciiPrefixes(
-            "ASSETS/", "COMMON/", "DATA/", "DATA_SOON/", "GAMEPLAY/", "GLOBAL/", "LEVELS/",
-            "LOADOUTS/", "UX/", "UIAUTOATLAS/", "CHARACTERS/", "SHADERS/", "MAPS/",
-            "CLIENTSTATES/", "PATCHING/");
-
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
         {
             "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm", "anm", "skl", "skn",
@@ -679,45 +670,60 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (offset < 2) continue;
                     int length = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
                     if (length <= 0 || offset + length > data.Count) continue;
-                    string path = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
+                    if (!TryDecodeAscii(data, offset, length, out string decodedPath)) continue;
+                    string path = NormalizePath(decodedPath);
                     foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.BinLengthPath))
                         yield return candidate;
                 }
                 yield break;
             }
 
-            if (!TryDecodeWadText(data, out string text))
-                text = Encoding.ASCII.GetString(data.Array, data.Offset, data.Count);
             if (extension == "preload")
             {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
                 foreach (Match match in PreloadNameRegex.Matches(text))
                 {
+                    if (!IsAscii(match.Groups[1].Value)) continue;
                     string path = NormalizePath(match.Groups[1].Value);
-                    foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.PreloadReference))
-                        yield return candidate;
-
-                    if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
+                    if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (HashGuessCandidate candidate in ExpandGamePath(path, HashGuessStrategy.PreloadReference))
+                            yield return candidate;
+                    }
+                    else if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
+                    {
                         yield return new HashGuessCandidate($"data/shared/particles/{path[..^5]}.troybin", HashGuessStrategy.PreloadReference);
-                    if (!string.IsNullOrEmpty(directory))
+                    }
+                    else if (!string.IsNullOrEmpty(directory))
+                    {
                         yield return new HashGuessCandidate(directory + "/" + path + ".preload", HashGuessStrategy.PreloadReference);
+                    }
                 }
                 yield break;
             }
 
             if (extension is "hls" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0")
             {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                if (string.IsNullOrEmpty(directory)) yield break;
                 foreach (Match match in ShaderIncludeRegex.Matches(text))
+                {
+                    if (!IsAscii(match.Groups[1].Value)) continue;
                     yield return new HashGuessCandidate(NormalizePath(Path.Combine(directory, match.Groups[1].Value)), HashGuessStrategy.ShaderInclude);
+                }
                 yield break;
             }
 
             if (extension == "atlas")
             {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
                 string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                if (string.IsNullOrEmpty(directory)) yield break;
                 foreach (string line in text.Split('\n'))
                 {
+                    if (!IsAscii(line)) continue;
                     string candidate = NormalizePath(Path.Combine(directory, line.Trim()));
                     if (candidate.Length > 0)
                         yield return new HashGuessCandidate(candidate, HashGuessStrategy.AtlasReference);
@@ -823,11 +829,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             int limit = data.Count;
             for (int offset = 0; offset < limit; offset++)
             {
-                byte firstByte = ToUpperAscii(ByteAt(data, offset));
-
-                foreach (byte[] prefix in GeneralPathPrefixes)
+                byte[][] prefixes = GetPrefixes(ToUpperAscii(ByteAt(data, offset)));
+                if (prefixes == null) continue;
+                foreach (byte[] prefix in prefixes)
                 {
-                    if (prefix[0] != firstByte || offset + prefix.Length > limit) continue;
+                    if (offset + prefix.Length > limit) continue;
 
                     int prefixIndex = 1;
                     while (prefixIndex < prefix.Length && ToUpperAscii(ByteAt(data, offset + prefixIndex)) == prefix[prefixIndex]) prefixIndex++;
@@ -835,6 +841,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                     int end = offset + prefix.Length;
                     while (end < limit && IsGeneralPathByte(ByteAt(data, end))) end++;
+                    if (end == offset + prefix.Length) continue;
                     yield return (offset, end - offset);
 
                     offset = end - 1;
@@ -907,34 +914,57 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private static IReadOnlyList<int> FindBinPathOffsets(ArraySegment<byte> data)
+        private static IEnumerable<int> FindBinPathOffsets(ArraySegment<byte> data)
         {
-            var offsets = new HashSet<int>();
             for (int offset = 0; offset < data.Count; offset++)
             {
-                byte[][] needles = ToUpperAscii(ByteAt(data, offset)) switch
-                {
-                    (byte)'A' => BinPrefixesA,
-                    (byte)'C' => BinPrefixesC,
-                    (byte)'D' => BinPrefixesD,
-                    (byte)'G' => BinPrefixesG,
-                    (byte)'L' => BinPrefixesL,
-                    (byte)'M' => BinPrefixesM,
-                    (byte)'P' => BinPrefixesP,
-                    (byte)'S' => BinPrefixesS,
-                    (byte)'U' => BinPrefixesU,
-                    _ => null
-                };
+                byte[][] needles = GetPrefixes(ToUpperAscii(ByteAt(data, offset)));
                 if (needles == null) continue;
                 foreach (byte[] needle in needles)
                 {
                     if (offset + needle.Length > data.Count) continue;
                     int index = 1;
                     while (index < needle.Length && ToUpperAscii(ByteAt(data, offset + index)) == needle[index]) index++;
-                    if (index == needle.Length) offsets.Add(offset);
+                    if (index != needle.Length) continue;
+                    yield return offset;
+                    break;
                 }
             }
-            return offsets.OrderBy(offset => offset).ToList();
+        }
+
+        private static byte[][] GetPrefixes(byte firstByte) => firstByte switch
+        {
+            (byte)'A' => BinPrefixesA,
+            (byte)'C' => BinPrefixesC,
+            (byte)'D' => BinPrefixesD,
+            (byte)'G' => BinPrefixesG,
+            (byte)'L' => BinPrefixesL,
+            (byte)'M' => BinPrefixesM,
+            (byte)'P' => BinPrefixesP,
+            (byte)'S' => BinPrefixesS,
+            (byte)'U' => BinPrefixesU,
+            _ => null
+        };
+
+        private static bool TryDecodeAscii(ArraySegment<byte> data, int offset, int length, out string value)
+        {
+            for (int index = 0; index < length; index++)
+            {
+                if (ByteAt(data, offset + index) > 0x7F)
+                {
+                    value = string.Empty;
+                    return false;
+                }
+            }
+            value = Encoding.ASCII.GetString(data.Array, data.Offset + offset, length);
+            return true;
+        }
+
+        private static bool IsAscii(string value)
+        {
+            foreach (char character in value)
+                if (character > 0x7F) return false;
+            return true;
         }
 
         private static byte ToUpperAscii(byte value) => value is >= (byte)'a' and <= (byte)'z'

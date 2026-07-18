@@ -93,6 +93,9 @@ namespace AssetsManager.Services.Hashes
                                     wadPaths.Length));
                             }
 
+                            // CDTB type 2 entries are redirects and contain no searchable file payload.
+                            if (chunk.Compression == WadChunkCompression.Satellite) continue;
+
                             string resolvedChunkPath = _hashResolverService.ResolveHash(chunk.PathHash);
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
                             if (guesser.ShouldSkip(chunkExt)) continue;
