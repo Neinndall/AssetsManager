@@ -168,6 +168,7 @@ namespace AssetsManager.Views
         private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
         private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
         private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
+        private async void RunLcuV1Paths_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuV1Paths);
         private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
         private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
         private async void RunInternalStructural_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Structural);
@@ -239,6 +240,7 @@ namespace AssetsManager.Views
                     HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token),
                     HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token),
                     HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token),
                     HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
@@ -401,7 +403,7 @@ namespace AssetsManager.Views
             }
         }
 
-        private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced }
+        private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced, LcuV1Paths }
         private enum InternalHashAction { Inventory, Content, Structural }
     }
 }

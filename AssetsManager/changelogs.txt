@@ -28,6 +28,7 @@ Improvements
   - RST content guessing now resolves text sources from both GAME and LCU WAD path indexes.
   - BIN and RST guessing now streams resolved hashes to the results list and preserves matches when a run is cancelled.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
+  - Added a separate LCU V1 Paths resolver for CDTB-compatible word-pair patterns across client locales.
   - Hash Guessing Lab now shows session targets, resolved hashes, and clear unresolved-history breakdowns.
   - Automated regression coverage now verifies Viewer scene disposal and media-preview cleanup lifecycles.
   - Hash Guessing now reuses indexed corpus data, reduces temporary buffers across GAME, LCU, BIN and RST, and shows live performance metrics.

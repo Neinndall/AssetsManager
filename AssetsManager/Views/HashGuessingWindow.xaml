@@ -476,6 +476,30 @@
                                             </StackPanel>
                                         </Grid>
                                     </Button>
+
+                                    <!-- LCU V1 Paths -->
+                                    <Button Click="RunLcuV1Paths_Click" Margin="4" Padding="12">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="IsEnabled" Value="False"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <Grid HorizontalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCodeOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="LCU V1 Paths" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                                <TextBlock Text="Intensive v1 word-pair and locale patterns" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
                                 </UniformGrid>
 
                                 <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
