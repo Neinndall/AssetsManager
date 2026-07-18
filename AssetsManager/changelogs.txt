@@ -10,13 +10,13 @@ New Features
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
   - Added independent BIN and RST hash guessing with local inventory, content scanning, structural strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.
-  - BIN differences now show only semantic object and property changes with resolved paths.
   - Added centralized and persistent tracking of unknown hashes in hash_lab/unknowns.txt, merging historical unknowns with live WAD scans.
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
   - Enhanced numeric variant guessing to support padded formats (2-digit D2 and 3-digit D3 layouts).
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Version discovery and manifest parsing now use less memory, handle malformed server data safely, and cancel promptly.
   - Game client verification now uses less memory, runs fully in the background, keeps progress responsive, and uses measured CDN concurrency with bounded adaptive bundle ranges.
   - Relocated shader variants, extension substitutions, and prefix attacks to the Game Basic Suite for faster discovery.
   - Increased final progress hold delay from 100ms to 150ms for smoother visual transitions.
