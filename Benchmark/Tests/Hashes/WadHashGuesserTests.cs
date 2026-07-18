@@ -387,6 +387,48 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void CrossDomainBasicCandidatesContainEveryCdtbRule()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/game/source.dds",
+                "data/game/config.json",
+                "assets/game/already.png"
+            }));
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "plugins/rcp-be-lol-game-data/global/default/assets/client/icon.png",
+                "plugins/rcp-be-lol-game-data/global/default/data/client/config.json",
+                "plugins/rcp-be-lol-game-data/global/default/assets/client/already.dds"
+            }), null);
+
+            var lcuCandidates = lcu.GuessFromGameHashes(game).Select(candidate => candidate.Path).ToHashSet();
+            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.png", lcuCandidates);
+            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.jpg", lcuCandidates);
+            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/data/game/config.json", lcuCandidates);
+
+            var gameCandidates = game.GuessFromLcuHashes(lcu).Select(candidate => candidate.Path).ToHashSet();
+            Assert.Contains("assets/client/icon.dds", gameCandidates);
+            Assert.Contains("assets/client/icon.tex", gameCandidates);
+            Assert.Contains("data/client/config.json", gameCandidates);
+        }
+
+        [Fact]
+        public void GameCrossDomainPhaseDoesNotRepeatOtherBasicAttacks()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/game/source.dds" }));
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "plugins/rcp-be-lol-game-data/global/default/assets/client/icon.png"
+            }), null);
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/unrelated.bin");
+
+            int checkedCandidates = game.RunCrossDomainAttacks(engine, lcu, CancellationToken.None);
+
+            Assert.Equal(3, checkedCandidates);
+        }
+
+        [Fact]
         public void CommonNumberAndExtensionStrategiesRemainAvailableToBothDomains()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
@@ -518,6 +560,20 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameBasicNumbersDoNotRepeatEquivalentTwoDigitCandidates()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/test/icon12.dds"
+            }));
+
+            var candidates = game.SubstituteBasicNumbers(100).Select(candidate => candidate.Path).ToList();
+
+            Assert.Equal(110, candidates.Count);
+            Assert.Equal(candidates.Count, candidates.Distinct(StringComparer.Ordinal).Count());
+        }
+
+        [Fact]
         public void BinEntryBasenamesGenerateFilteredGameExtensionCandidates()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
@@ -547,8 +603,34 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 candidate.Path == "plugins/rcp-fe-two/global/en_us/assets/icon.png");
             Assert.Contains(lcu.SubstituteRegionLang(), candidate =>
                 candidate.Path == "plugins/rcp-fe-one/pbe/default/assets/icon.png");
+            Assert.Contains(lcu.SubstituteRegionLang(), candidate =>
+                candidate.Path == "plugins/rcp-fe-one/global/default/assets/icon.png");
             Assert.Contains(lcu.GuessPatterns(), candidate =>
                 candidate.Path == "plugins/rcp-fe-lol-perks/global/default/images/construct/8000/environment.jpg");
+        }
+
+        [Fact]
+        public void LcuExtensionSubstitutionUsesEveryKnownPathLikeCdtb()
+        {
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "root/source.one",
+                "plugins/rcp-fe-test/global/default/asset.two"
+            }), null);
+
+            var candidates = lcu.GenerateLcuExtensionCandidates().Select(candidate => candidate.Path).ToHashSet();
+
+            Assert.Contains("root/source.two", candidates);
+        }
+
+        [Fact]
+        public void GameBasenamePrefixesAreDeduplicatedLikeCdtbSet()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/ui/icon.png" }));
+
+            var candidates = game.CheckBasenamePrefixes(new[] { "2x_", "2x_" }).Select(candidate => candidate.Path).ToList();
+
+            Assert.Equal("assets/ui/2x_icon.png", Assert.Single(candidates));
         }
 
         [Fact]

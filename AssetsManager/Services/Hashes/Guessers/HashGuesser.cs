@@ -210,15 +210,13 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             int generated = 0;
             var orderedFormats = formats.OrderBy(path => path, StringComparer.Ordinal).ToList();
+            foreach (string format in orderedFormats)
             for (int value = 0; value < numberLimit; value++)
             {
-                foreach (string format in orderedFormats)
+                foreach (string candidate in FormatNumberVariants(format, value, effectiveDigits, includeCommonPadding))
                 {
-                    foreach (string candidate in FormatNumberVariants(format, value, effectiveDigits, includeCommonPadding))
-                    {
-                        yield return new HashGuessCandidate(candidate, HashGuessStrategy.NumberVariant);
-                        if (CountCandidate(ref generated, candidateBudget)) yield break;
-                    }
+                    yield return new HashGuessCandidate(candidate, HashGuessStrategy.NumberVariant);
+                    if (CountCandidate(ref generated, candidateBudget)) yield break;
                 }
             }
         }
@@ -303,7 +301,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string name in names.Select(NormalizePath).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal))
             foreach (string directory in directories)
             {
-                engine.Check(directory + "/" + name, strategy, source);
+                engine.CheckCombined(directory, name, strategy, source, 0);
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
             }
             return checkedCount;
@@ -331,7 +329,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string directory in directoryList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                engine.Check(directory + "/" + name, HashGuessStrategy.PluginVariant, "Basename substitution");
+                engine.CheckCombined(directory, name, HashGuessStrategy.PluginVariant, "Basename substitution", 0);
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
             }
             return checkedCount;
