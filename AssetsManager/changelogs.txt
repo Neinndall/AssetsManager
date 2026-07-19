@@ -18,6 +18,7 @@ New Features
 Improvements
   - Increased Hash Guessing Lab left configuration panel width for improved readability.
   - Enabled text wrapping and custom line spacing for the unknown hashes breakdown label.
+  - Extended cancellation match preservation to GAME and LCU guessing domains.
   - Version discovery and manifest parsing now use less memory, handle malformed server data safely, and cancel promptly.
   - Game client verification now uses less memory, runs fully in the background, keeps progress responsive, and uses measured CDN concurrency with bounded adaptive bundle ranges.
   - Relocated shader variants, extension substitutions, and prefix attacks to the Game Basic Suite for faster discovery.
