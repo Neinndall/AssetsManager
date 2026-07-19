@@ -49,6 +49,17 @@ namespace AssetsManager.Services.Hashes
             return result;
         }
 
+        public async Task<HashSet<ulong>> LoadCurrentUnknownAsync(InternalHashKind kind, CancellationToken cancellationToken)
+        {
+            var result = new HashSet<ulong>();
+            string path = GetCurrentPath(kind);
+            if (!File.Exists(path)) return result;
+            using var reader = new StreamReader(path);
+            while (await reader.ReadLineAsync(cancellationToken) is string line)
+                if (ulong.TryParse(line.Trim(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash)) result.Add(hash);
+            return result;
+        }
+
         public async Task SaveInventoryAsync(
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> observed,
             string patchFingerprint,
@@ -85,12 +96,12 @@ namespace AssetsManager.Services.Hashes
 
         public async Task SaveMatchesAsync(IEnumerable<InternalHashGuessMatch> matches, CancellationToken cancellationToken)
         {
-            var groups = matches.GroupBy(match => match.Kind).ToList();
-            if (groups.Count == 0) return;
+            var materialized = matches.Where(match => match.IsVerified).ToList();
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                await SaveResearchAsync(groups.SelectMany(group => group), cancellationToken);
+                await SaveResearchAsync(materialized, cancellationToken);
+                var groups = materialized.GroupBy(match => match.Kind).ToList();
                 foreach (var group in groups)
                 {
                     var incoming = group.GroupBy(match => match.Hash).ToDictionary(g => g.Key, g => g.Last().Value);
@@ -121,7 +132,9 @@ namespace AssetsManager.Services.Hashes
             if (File.Exists(path))
             {
                 await using var input = File.OpenRead(path);
-                existing = await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(input, cancellationToken: cancellationToken) ?? new();
+                existing = (await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(input, cancellationToken: cancellationToken) ?? new())
+                    .Where(match => match.IsVerified)
+                    .ToList();
             }
             var merged = existing.Concat(incoming).GroupBy(match => new { match.Kind, match.Hash })
                 .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())

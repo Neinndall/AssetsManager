@@ -22,6 +22,29 @@ namespace AssetsManager.Services.Hashes
 {
     public sealed class BinRstHashGuessingService
     {
+        private static readonly HashSet<uint> NamedEntryTypes = new[]
+        {
+            "StaticMaterialDef", "UISceneData", "UiElementEffectAmmoData", "UiElementEffectAnimatedRotatingIconData",
+            "UiElementEffectAnimationData", "UiElementEffectArcFillData", "UiElementEffectCircleMaskCooldownData",
+            "UiElementEffectCircleMaskDesaturateData", "UiElementEffectCooldownData", "UiElementEffectCooldownRadialData",
+            "UiElementEffectCustomMaterialData", "UiElementEffectData", "UiElementEffectDesaturateData",
+            "UiElementEffectFillPercentageData", "UiElementEffectGlowConstantData", "UiElementEffectGlowData",
+            "UiElementEffectGlowingRotatingIconData", "UiElementGroupButtonData", "UiElementGroupData", "UiElementGroupFramedData",
+            "UiElementGroupManagedLayoutData", "UiElementGroupMeterData", "UiElementGroupSliderData", "UiElementIconData",
+            "UiElementParticleSystemData", "UiElementRegionData", "UiElementScissorRegionData", "UiElementSpineAnimationData",
+            "UiElementTextData", "UiSceneViewPaneData"
+        }.Select(Fnv1a.HashLower).ToHashSet();
+
+        private static readonly Dictionary<uint, uint> DirectEntryFields = new()
+        {
+            [Fnv1a.HashLower("ContextualActionData")] = Fnv1a.HashLower("mObjectPath"),
+            [Fnv1a.HashLower("CustomShaderDef")] = Fnv1a.HashLower("objectPath"),
+            [Fnv1a.HashLower("MapContainer")] = Fnv1a.HashLower("mapPath"),
+            [Fnv1a.HashLower("RewardGroup")] = Fnv1a.HashLower("internalName"),
+            [Fnv1a.HashLower("VfxSystemDefinitionData")] = Fnv1a.HashLower("particlePath"),
+            [Fnv1a.HashLower("Sequence")] = Fnv1a.HashLower("path")
+        };
+
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
         private const int NumericBudget = 5_000_000;
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
@@ -144,7 +167,8 @@ namespace AssetsManager.Services.Hashes
                 }
             }, cancellationToken);
 
-            string fingerprint = BuildFingerprint(wads);
+            string inventoryDomain = includeBin ? "bin" : "rst";
+            string fingerprint = BuildFingerprint(wads, inventoryDomain);
             var selectedObserved = observed.Where(pair =>
                 (includeBin && pair.Key is not (InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64)) ||
                 (includeRst && pair.Key is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64))
@@ -152,7 +176,7 @@ namespace AssetsManager.Services.Hashes
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
             try
             {
-                await _persistence.CommitInternalInventoryAsync(selectedObserved, fingerprint, includeBin ? "bin" : "rst", CancellationToken.None);
+                await _persistence.CommitInternalInventoryAsync(selectedObserved, fingerprint, inventoryDomain, CancellationToken.None);
             }
             finally
             {
@@ -188,34 +212,6 @@ namespace AssetsManager.Services.Hashes
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             int scanned = 0;
 
-            // Build a unified casing map and resolver for cross-dictionary bin hash resolution.
-            // This allows us to reconstruct the proper uppercase/lowercase path names of files
-            // and combine them with resolved fields/types to recreate the original string representations.
-            var casingMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var binResolver = new Dictionary<uint, string>();
-            if (includeBin)
-            {
-                foreach (string gp in wadPaths.Values)
-                {
-                    foreach (string segment in gp.Split('/'))
-                    {
-                        if (segment.Length > 0)
-                        {
-                            casingMap.TryAdd(segment, segment);
-                        }
-                    }
-                }
-
-                foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
-                {
-                    foreach (var pair in await _store.LoadKnownAsync(kind, cancellationToken))
-                    {
-                        uint key = unchecked((uint)pair.Key);
-                        binResolver.TryAdd(key, pair.Value);
-                    }
-                }
-            }
-
             try
             {
                 await Task.Run(() =>
@@ -235,8 +231,8 @@ namespace AssetsManager.Services.Hashes
                                 bool isText = false;
                                 if (wadPaths.TryGetValue(pair.Key, out path))
                                 {
-                                    isBin = path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
-                                    isText = IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
+                                    isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                                    isText = includeRst && IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
                                     if (!isBin && !isText)
                                     {
                                         string sig = GetChunkSignature(wad, pair.Value);
@@ -247,7 +243,7 @@ namespace AssetsManager.Services.Hashes
                                     }
                                 }
                                 else
-                                {
+                               {
                                     if (includeBin)
                                     {
                                         string sig = GetChunkSignature(wad, pair.Value);
@@ -266,18 +262,7 @@ namespace AssetsManager.Services.Hashes
                                     {
                                         ArraySegment<byte> buffer = data.DangerousGetArray();
                                         using var stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
-                                        var tree = new BinTree(stream);
-
-                                        // 1. Visit raw string values inside the bin
-                                        VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
-
-                                        // 2. Perform "double work": reconstruct the cased path of the bin, resolve known hashes,
-                                        // and generate combinations (simulating scanning the resolved .bin.json)
-                                        if (binResolver.Count > 0)
-                                        {
-                                            string casedBasePath = ReconstructCasedPath(path, casingMap);
-                                            VisitBinResolvedNamesAndPaths(tree, casedBasePath, binResolver, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
-                                        }
+                                        ScanBinContextualMatches(stream, matcher, path, wadPath, _resolver);
                                     }
                                     else
                                     {
@@ -299,7 +284,7 @@ namespace AssetsManager.Services.Hashes
                     }
                 }, cancellationToken);
 
-                if (matcher.Remaining > 0)
+                if (includeRst && matcher.Remaining > 0)
                 {
                     var filesToScan = Directory.EnumerateFiles(rootDirectory, "*.*", SearchOption.AllDirectories)
                     .Where(file =>
@@ -347,6 +332,11 @@ namespace AssetsManager.Services.Hashes
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
             progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
+            if (includeBin && !includeRst)
+            {
+                _log.LogWarning("BIN structural guessing is disabled because it cannot provide same-BIN literal evidence.");
+                return await CompleteRunAsync(matcher, initial, 0);
+            }
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
                 binKnown.AddRange((await _store.LoadKnownAsync(kind, cancellationToken)).Values);
@@ -359,11 +349,6 @@ namespace AssetsManager.Services.Hashes
             {
                 await Task.Run(() =>
                 {
-                    if (includeBin)
-                    {
-                        CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionaries");
-                        CheckCandidates(wadPaths, InternalHashGuessStrategy.GamePath, includeRst ? "GAME and LCU paths" : "GAME paths");
-                    }
                     if (includeRst)
                     {
                         CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionary keys");
@@ -412,7 +397,7 @@ namespace AssetsManager.Services.Hashes
         }
 
         private async Task HandleCancelledRunAsync(
-            CandidateMatcher matcher,
+            LocalEvidenceMatcher matcher,
             Stopwatch stopwatch,
             IProgress<InternalHashProgress> progress,
             int processedFiles)
@@ -421,21 +406,21 @@ namespace AssetsManager.Services.Hashes
             await PersistCancelledMatchesAsync(matcher);
         }
 
-        private async Task<InternalHashRunResult> CompleteRunAsync(CandidateMatcher matcher, int initial, int scanned)
+        private async Task<InternalHashRunResult> CompleteRunAsync(LocalEvidenceMatcher matcher, int initial, int scanned)
         {
             var matches = matcher.Matches.OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
             await PersistMatchesAsync(matches);
-            _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} values resolved from {initial} unknown hashes.");
+            _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} locally verified values from {initial} unknown hashes.");
             return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
         }
 
-        private async Task PersistCancelledMatchesAsync(CandidateMatcher matcher)
+        private async Task PersistCancelledMatchesAsync(LocalEvidenceMatcher matcher)
         {
             if (matcher.Matches.Count == 0) return;
             try
             {
                 await PersistMatchesAsync(matcher.Matches);
-                _log.LogSuccess($"Internal Hash Lab saved {matcher.Matches.Count} matches found before cancellation.");
+                _log.LogSuccess($"Internal Hash Lab preserved {matcher.Matches.Count} findings found before cancellation.");
             }
             catch (Exception ex)
             {
@@ -446,7 +431,6 @@ namespace AssetsManager.Services.Hashes
         private async Task PersistMatchesAsync(IEnumerable<InternalHashGuessMatch> matches)
         {
             var materialized = matches as IReadOnlyCollection<InternalHashGuessMatch> ?? matches.ToList();
-            if (materialized.Count == 0) return;
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
             try
             {
@@ -456,11 +440,11 @@ namespace AssetsManager.Services.Hashes
             {
                 HashResolverService._hashFileAccessLock.Release();
             }
-            await _resolver.ForceReloadHashesAsync();
+            if (materialized.Count > 0) await _resolver.ForceReloadHashesAsync();
         }
 
         private static InternalHashProgress CreateProgress(
-            CandidateMatcher matcher,
+            LocalEvidenceMatcher matcher,
             Stopwatch stopwatch,
             string stage,
             int processedFiles,
@@ -487,7 +471,7 @@ namespace AssetsManager.Services.Hashes
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
                 string[] wads = EnumerateWadContainers(rootDirectory, isBinDomain, !isBinDomain);
-                string fingerprint = BuildFingerprint(wads);
+                string fingerprint = BuildFingerprint(wads, domain);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
                 string stored = File.Exists(marker) ? (await File.ReadAllTextAsync(marker, cancellationToken)).Trim() : string.Empty;
                 if (!string.Equals(stored, fingerprint, StringComparison.Ordinal))
@@ -521,17 +505,22 @@ namespace AssetsManager.Services.Hashes
                 .ToArray();
         }
 
-        private async Task<CandidateMatcher> CreateMatcherAsync(bool includeBin, bool includeRst, CancellationToken cancellationToken)
+        private async Task<LocalEvidenceMatcher> CreateMatcherAsync(bool includeBin, bool includeRst, CancellationToken cancellationToken)
         {
             var targets = new Dictionary<InternalHashKind, HashSet<ulong>>();
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
             {
                 bool isRst = kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64;
-                targets[kind] = (isRst ? includeRst : includeBin)
-                    ? await _store.LoadUnknownAsync(kind, cancellationToken)
-                    : new HashSet<ulong>();
+                if (isRst)
+                    targets[kind] = includeRst
+                        ? await _store.LoadUnknownAsync(kind, cancellationToken)
+                        : new HashSet<ulong>();
+                else
+                    targets[kind] = includeBin
+                        ? await _store.LoadCurrentUnknownAsync(kind, cancellationToken)
+                        : new HashSet<ulong>();
             }
-            return new CandidateMatcher(targets);
+            return new LocalEvidenceMatcher(targets);
         }
 
         private async Task<Dictionary<ulong, string>> LoadWadPathsAsync(bool includeLcu, CancellationToken cancellationToken)
@@ -565,6 +554,11 @@ namespace AssetsManager.Services.Hashes
         private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed)
         {
             var tree = new BinTree(stream);
+            ReadBinInventory(tree, observed);
+        }
+
+        internal static void ReadBinInventory(BinTree tree, Dictionary<InternalHashKind, HashSet<ulong>> observed)
+        {
             foreach (var pair in tree.Objects)
             {
                 if (pair.Key != 0) observed[InternalHashKind.BinEntries].Add(pair.Key);
@@ -584,6 +578,7 @@ namespace AssetsManager.Services.Hashes
             switch (property)
             {
                 case BinTreeHash hash when hash.Value != 0: observed[InternalHashKind.BinHashes].Add(hash.Value); break;
+                case BinTreeObjectLink link when link.Value != 0: observed[InternalHashKind.BinEntries].Add(link.Value); break;
                 case BinTreeStruct structure:
                     if (structure.ClassHash != 0) observed[InternalHashKind.BinTypes].Add(structure.ClassHash);
                     foreach (var child in structure.Properties.Values) VisitBinProperty(child, observed);
@@ -628,117 +623,229 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static string ReconstructCasedPath(string path, Dictionary<string, string> casingMap)
+        private static void ScanBinContextualMatches(Stream stream, LocalEvidenceMatcher matcher, string path, string wadPath, HashResolverService resolver)
         {
-            if (string.IsNullOrEmpty(path)) return string.Empty;
-
-            string clean = path;
-            if (clean.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                clean = clean[..^4];
-            if (clean.StartsWith("[unknown_bin_", StringComparison.OrdinalIgnoreCase))
-                return string.Empty;
-
-            var segments = clean.Split('/');
-            for (int i = 0; i < segments.Length; i++)
+            var tree = new BinTree(stream);
+            var localTargets = new Dictionary<InternalHashKind, HashSet<ulong>>();
+            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
             {
-                if (casingMap.TryGetValue(segments[i], out string cased))
-                {
-                    segments[i] = cased;
-                }
-                else if (segments[i].Length > 0)
-                {
-                    // Fallback capitalization if segment is not found in known game paths
-                    segments[i] = char.ToUpper(segments[i][0]) + segments[i][1..];
-                }
+                localTargets[kind] = new HashSet<ulong>();
             }
-            return string.Join('/', segments);
+            ReadBinInventory(tree, localTargets);
+
+            // Add hashes of all literal strings in the BIN tree to localTargets
+            VisitBinStrings(tree, value =>
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    uint hash = Fnv1a.HashLower(value.Trim());
+                    localTargets[InternalHashKind.BinHashes].Add(hash);
+                    localTargets[InternalHashKind.BinFields].Add(hash);
+                    localTargets[InternalHashKind.BinEntries].Add(hash);
+                }
+            });
+
+            MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
+            VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
         }
 
-        /// <summary>
-        /// Collects raw strings and resolved known hashes from the BinTree, and evaluates
-        /// combined path candidates (recreating the .bin.json structure).
-        /// </summary>
-        private static void VisitBinResolvedNamesAndPaths(BinTree tree, string casedBasePath, Dictionary<uint, string> resolver, Action<string> check)
+        internal static void MatchBinContextualEvidence(
+            BinTree tree,
+            LocalEvidenceMatcher matcher,
+            string path,
+            string wadPath = null,
+            HashResolverService resolver = null)
         {
-            var plainStrings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Collect plain strings
-            VisitBinStrings(tree, val => { if (!string.IsNullOrWhiteSpace(val)) plainStrings.Add(val.Trim()); });
-
-            // Collect resolved names of objects, classes, fields, and values
             foreach (var pair in tree.Objects)
             {
-                if (pair.Key != 0 && resolver.TryGetValue(unchecked((uint)pair.Key), out string entryName))
-                    resolvedNames.Add(entryName);
-                if (pair.Value.ClassHash != 0 && resolver.TryGetValue(pair.Value.ClassHash, out string className))
-                    resolvedNames.Add(className);
-                foreach (var property in pair.Value.Properties.Values)
-                    CollectResolvedPropertyNames(property, resolver, resolvedNames);
+                BinTreeObject item = pair.Value;
+                MatchEntry(pair.Key, pair.Value);
+                foreach (BinTreeProperty property in item.Properties.Values)
+                    Visit(property);
             }
             foreach (var item in tree.DataOverrides)
+                Visit(item.Property);
+
+            void MatchEntry(uint entryHash, BinTreeObject item)
             {
-                if (item.ObjectPathHash != 0 && resolver.TryGetValue(unchecked((uint)item.ObjectPathHash), out string overrideName))
-                    resolvedNames.Add(overrideName);
-                CollectResolvedPropertyNames(item.Property, resolver, resolvedNames);
+                if (NamedEntryTypes.Contains(item.ClassHash)) MatchEntryFromString(entryHash, item, "name");
+                if (DirectEntryFields.TryGetValue(item.ClassHash, out uint directField)) MatchEntryFromFieldHash(entryHash, item, directField);
+
+                if (item.ClassHash is uint classHash)
+                {
+                    if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
+                        MatchEntryPattern(entryHash, item, "mCharacterName", value => $"Characters/{value}/CharacterRecords/Root");
+                    else if (classHash == Fnv1a.HashLower("GameFontDescription"))
+                        MatchEntryPattern(entryHash, item, "name", value => $"UX/Fonts/Descriptions/{value}");
+                    else if (classHash == Fnv1a.HashLower("TFTRoundData"))
+                        MatchEntryPattern(entryHash, item, "mName", value => $"Maps/Shipping/Map22/Rounds/{value}");
+                    else if (classHash == Fnv1a.HashLower("TftItemData"))
+                        MatchEntryPattern(entryHash, item, "mName", value => $"Maps/Shipping/Map22/Items/{value}");
+                    else if (classHash == Fnv1a.HashLower("TftSetData"))
+                        MatchEntryPattern(entryHash, item, "name", value => $"Maps/Shipping/Map22/Sets/{value}");
+                    else if (classHash == Fnv1a.HashLower("TooltipFormat"))
+                        MatchEntryPattern(entryHash, item, "mObjectName", value => $"UX/Tooltips/{value}");
+                    else if (classHash == Fnv1a.HashLower("X3DSharedConstantBufferDef"))
+                        MatchEntryPattern(entryHash, item, "name", value => $"Shaders/SharedData/{value}");
+                    else if (classHash == Fnv1a.HashLower("ItemData"))
+                        MatchEntryFromU32(entryHash, item, "itemID", value => $"Items/{value}");
+                    else if (classHash == Fnv1a.HashLower("SummonerEmote"))
+                        MatchEntryFromU32(entryHash, item, "summonerEmoteId", value => $"Loadouts/SummonerEmotes/{value}");
+                    else if (classHash == Fnv1a.HashLower("TftMapSkin"))
+                    {
+                        if (TryGetString(item.Properties, "mapContainer", out string mapContainer))
+                            MatchObservedEntry(entryHash, $"Loadouts/TFTMapSkins/{mapContainer[(mapContainer.LastIndexOf('/') + 1)..]}");
+                        MatchAnyEntryString(item, "speciesLink");
+                    }
+                    else if (classHash == Fnv1a.HashLower("SpellObject"))
+                        MatchSpellObject(entryHash, item);
+                    else if (classHash == Fnv1a.HashLower("ScriptCheat"))
+                        MatchEntryFromCandidates(entryHash, item, "mName", new[] { "TFT", "Cherry", "Slime", "Strawberry", "Ultbook" }
+                            .Select(mode => (Func<string, string>)(value => $"Cheats/GameModes/{mode}/{value}")));
+                    else if (classHash == Fnv1a.HashLower("TftTraitData"))
+                        MatchEntryFromCandidates(entryHash, item, "mName", Enumerable.Range(1, 29)
+                            .Select(set => (Func<string, string>)(value => $"Maps/Shipping/Map22/Sets/TFTSet{set}/Traits/{value}")));
+                    else if (classHash == Fnv1a.HashLower("MapSkin"))
+                        MatchEntryFromCandidates(entryHash, item, "name", new[] { 11, 12, 21, 22, 30, 33, 35 }
+                            .Select(map => (Func<string, string>)(value => $"Maps/Shipping/Map{map}/MapSkins/{value}")));
+                    else if (classHash == Fnv1a.HashLower("AugmentData"))
+                        MatchEntryPattern(entryHash, item, "AugmentNameId", value => $"Maps/ModeSpecificData/Augments/{value}");
+                    else if (classHash == Fnv1a.HashLower("CompanionData"))
+                        MatchAnyEntryString(item, "speciesLink");
+                    else if (classHash == Fnv1a.HashLower("ViewControllerSet"))
+                        MatchStringsInField(item, "SpecifiedGameModes");
+                    else if (classHash == Fnv1a.HashLower("ViewControllerList"))
+                        foreach (BinTreeProperty property in item.Properties.Values) VisitStrings(property, MatchAnyEntry);
+                    else if (classHash == Fnv1a.HashLower("ResourceResolver") || classHash == Fnv1a.HashLower("GlobalResourceResolver"))
+                        MatchHashLinkMap(item, "resourceMap");
+                    else if (classHash == Fnv1a.HashLower("MapContainer"))
+                        MatchHashLinkMap(item, "chunks");
+                }
             }
 
-            // Reconstruct and check combined candidates
-            if (!string.IsNullOrEmpty(casedBasePath))
+            void MatchSpellObject(uint entryHash, BinTreeObject item)
             {
-                // BasePath/PlainString
-                foreach (string s in plainStrings)
+                if (TryGetString(item.Properties, "mScriptName", out string name))
                 {
-                    check($"{casedBasePath}/{s}");
+                    var candidates = new List<string> { $"Items/Spells/{name}", $"Shared/Spells/{name}" };
+                    candidates.AddRange(new[] { 11, 12, 21, 22, 30, 33, 35 }.Select(map => $"Maps/Shipping/Map{map}/Spells/{name}"));
+                    int digitCount = name.TakeWhile(char.IsAsciiDigit).Count();
+                    if (digitCount > 0) candidates.Add($"Items/{name[..digitCount]}/Spells/{name}");
+                    foreach (string candidate in candidates)
+                        if (MatchObservedEntry(entryHash, candidate)) break;
                 }
 
-                // BasePath/ResolvedName
-                foreach (string r in resolvedNames)
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mSpell"), out BinTreeProperty spellProperty) && spellProperty is BinTreeStruct spell &&
+                    spell.Properties.TryGetValue(Fnv1a.HashLower("DataValues"), out BinTreeProperty valuesProperty) && valuesProperty is BinTreeContainer values)
                 {
-                    check($"{casedBasePath}/{r}");
+                    foreach (BinTreeProperty value in values.Elements)
+                        if (value is BinTreeStruct dataValue && TryGetString(dataValue.Properties, "name", out string dataName))
+                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, dataName, path, wadPath);
                 }
+            }
 
-                // BasePath/ResolvedName/PlainString
-                foreach (string r in resolvedNames)
+            void MatchHashLinkMap(BinTreeObject item, string field)
+            {
+                if (resolver == null || !item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) || property is not BinTreeMap map) return;
+                foreach (var pair in map)
                 {
-                    foreach (string s in plainStrings)
+                    if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
+                    string target = resolver.ResolveBinEntry(link.Value);
+                    if (string.Equals(target, link.Value.ToString("x8"), StringComparison.Ordinal)) continue;
+                    if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value)) continue;
+                    int slash = target.LastIndexOf('/');
+                    if (slash < 0) continue;
+                    string basename = target[(slash + 1)..];
+                    if (matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename, path, wadPath, key.Value) ||
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename + "_BV2", path, wadPath, key.Value)) continue;
+                    if (basename.Contains("Base_", StringComparison.Ordinal))
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename.Replace("Base_", "", StringComparison.Ordinal), path, wadPath, key.Value);
+                    for (int skin = 1; skin < 30; skin++)
                     {
-                        check($"{casedBasePath}/{r}/{s}");
+                        string prefix = $"Skin{skin:00}_";
+                        if (basename.Contains(prefix, StringComparison.Ordinal))
+                        {
+                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, basename.Replace(prefix, "", StringComparison.Ordinal), path, wadPath, key.Value);
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        private static void CollectResolvedPropertyNames(BinTreeProperty property, Dictionary<uint, string> resolver, HashSet<string> resolvedNames)
-        {
-            if (property.NameHash != 0 && resolver.TryGetValue(property.NameHash, out string fieldName))
-                resolvedNames.Add(fieldName);
-            switch (property)
+            void MatchEntryFromString(uint entryHash, BinTreeObject item, string field) => MatchEntryFromFieldHash(entryHash, item, Fnv1a.HashLower(field));
+            void MatchEntryFromFieldHash(uint entryHash, BinTreeObject item, uint field)
             {
-                case BinTreeHash hash when hash.Value != 0:
-                    if (resolver.TryGetValue(hash.Value, out string hashName))
-                        resolvedNames.Add(hashName);
-                    break;
-                case BinTreeStruct structure:
-                    if (structure.ClassHash != 0 && resolver.TryGetValue(structure.ClassHash, out string structClass))
-                        resolvedNames.Add(structClass);
-                    foreach (var child in structure.Properties.Values)
-                        CollectResolvedPropertyNames(child, resolver, resolvedNames);
-                    break;
-                case BinTreeContainer container:
-                    foreach (var child in container.Elements)
-                        CollectResolvedPropertyNames(child, resolver, resolvedNames);
-                    break;
-                case BinTreeOptional option when option.Value != null:
-                    CollectResolvedPropertyNames(option.Value, resolver, resolvedNames);
-                    break;
-                case BinTreeMap map:
-                    foreach (var child in map)
-                    {
-                        CollectResolvedPropertyNames(child.Key, resolver, resolvedNames);
-                        CollectResolvedPropertyNames(child.Value, resolver, resolvedNames);
-                    }
-                    break;
+                if (item.Properties.TryGetValue(field, out BinTreeProperty property) && property is BinTreeString text)
+                    MatchObservedEntry(entryHash, text.Value);
+            }
+            void MatchEntryPattern(uint entryHash, BinTreeObject item, string field, Func<string, string> format)
+            {
+                if (TryGetString(item.Properties, field, out string value)) MatchObservedEntry(entryHash, format(value));
+            }
+            void MatchEntryFromU32(uint entryHash, BinTreeObject item, string field, Func<uint, string> format)
+            {
+                if (item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) && property is BinTreeU32 value)
+                    MatchObservedEntry(entryHash, format(value.Value));
+            }
+            void MatchEntryFromCandidates(uint entryHash, BinTreeObject item, string field, IEnumerable<Func<string, string>> formats)
+            {
+                if (!TryGetString(item.Properties, field, out string value)) return;
+                foreach (Func<string, string> format in formats) if (MatchObservedEntry(entryHash, format(value))) break;
+            }
+            void MatchAnyEntryString(BinTreeObject item, string field)
+            {
+                if (TryGetString(item.Properties, field, out string value)) MatchAnyEntry(value);
+            }
+            void MatchStringsInField(BinTreeObject item, string field)
+            {
+                if (item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property)) VisitStrings(property, MatchAnyEntry);
+            }
+            bool MatchObservedEntry(uint hash, string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath, hash);
+            void MatchAnyEntry(string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath);
+
+            void Visit(BinTreeProperty property)
+            {
+                switch (property)
+                {
+                    case BinTreeStruct structure:
+                        foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements) Visit(child);
+                        break;
+                    case BinTreeOptional option when option.Value != null:
+                        Visit(option.Value);
+                        break;
+                    case BinTreeMap map:
+                        foreach (var child in map) { Visit(child.Key); Visit(child.Value); }
+                        break;
+                }
+            }
+
+            static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value)
+            {
+                if (properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) && property is BinTreeString text)
+                {
+                    value = text.Value;
+                    return true;
+                }
+                value = null;
+                return false;
+            }
+
+            static void VisitStrings(BinTreeProperty property, Action<string> check)
+            {
+                switch (property)
+                {
+                    case BinTreeString text: check(text.Value); break;
+                    case BinTreeStruct structure:
+                        foreach (BinTreeProperty child in structure.Properties.Values) VisitStrings(child, check);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements) VisitStrings(child, check);
+                        break;
+                    case BinTreeOptional option when option.Value != null: VisitStrings(option.Value, check); break;
+                }
             }
         }
 
@@ -844,7 +951,7 @@ namespace AssetsManager.Services.Hashes
             path.EndsWith(".log", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".info", StringComparison.OrdinalIgnoreCase);
 
-        private static string BuildFingerprint(IEnumerable<string> paths)
+        private static string BuildFingerprint(IEnumerable<string> paths, string domain)
         {
             ulong xor = 0, sum = 0;
             long count = 0;
@@ -854,7 +961,8 @@ namespace AssetsManager.Services.Hashes
                 ulong value = unchecked((ulong)info.Length ^ (ulong)info.LastWriteTimeUtc.Ticks);
                 xor ^= value; sum = unchecked(sum + value); count++;
             }
-            return $"internal:{count}:{xor:x16}:{sum:x16}";
+            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "2" : "1";
+            return $"internal:{domain}:v{schema}:{count}:{xor:x16}:{sum:x16}";
         }
 
         private static void ValidateRoot(string rootDirectory)
@@ -1130,13 +1238,13 @@ namespace AssetsManager.Services.Hashes
             return word + "s";
         }
 
-        internal sealed class CandidateMatcher
+        internal sealed class LocalEvidenceMatcher
         {
             private const ulong Rst38Mask = (1UL << 38) - 1;
             private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
             private readonly Dictionary<(InternalHashKind Kind, ulong Hash), InternalHashGuessMatch> _matches = new();
             private readonly List<InternalHashGuessMatch> _pendingMatches = new();
-            public CandidateMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) => _targets = targets;
+            public LocalEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) => _targets = targets;
             public IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
             public int Remaining => _targets.Values.Sum(values => values.Count);
             public long CheckedCandidates { get; private set; }
@@ -1150,7 +1258,13 @@ namespace AssetsManager.Services.Hashes
                 return matches;
             }
 
-            public void Check(string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
+            public void Check(
+                string value,
+                InternalHashGuessStrategy strategy,
+                string source,
+                string sourceWad = null,
+                string sourceBin = null,
+                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
             {
                 CheckedCandidates++;
                 if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
@@ -1165,14 +1279,18 @@ namespace AssetsManager.Services.Hashes
                 bool gamePath = strategy == InternalHashGuessStrategy.GamePath;
                 if (content || crossDictionary || gamePath)
                 {
-                    if (candidate.Contains('/'))
-                        Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin);
-                    Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin);
+                    bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin");
+                    if (!isAssetPath)
+                    {
+                        if (candidate.Contains('/'))
+                            Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+                        Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+                    }
                 }
                 if ((content || crossDictionary) && IsIdentifier(candidate))
                 {
-                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin);
-                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin);
+                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
                 }
 
                 if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
@@ -1187,6 +1305,41 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
+            internal bool CheckContextualCandidate(
+                InternalHashKind kind,
+                string value,
+                string source,
+                string sourceWad = null,
+                uint? observedHash = null)
+            {
+                CheckedCandidates++;
+                if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                string candidate = value.Trim().ToLowerInvariant();
+                uint computedHash = Fnv1a.HashLower(candidate);
+                if (observedHash.HasValue && computedHash != observedHash.Value)
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                int before = _matches.Count;
+                Check32(
+                    kind,
+                    computedHash,
+                    candidate,
+                    InternalHashGuessStrategy.BinContent,
+                    source,
+                    sourceWad,
+                    source,
+                    true);
+                return _matches.Count != before;
+            }
+
             private static bool IsIdentifier(string value)
             {
                 if (value.Length == 0 || value.Length > 128 || !(char.IsLetter(value[0]) || value[0] == '_')) return false;
@@ -1195,9 +1348,29 @@ namespace AssetsManager.Services.Hashes
                 return true;
             }
 
-            private void Check32(InternalHashKind kind, uint hash, string value, InternalHashGuessStrategy strategy, string source, string sourceWad = null, string sourceBin = null)
+            private static bool HasLocalEvidence(
+                uint hash,
+                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets)
             {
-                if (!_targets[kind].Remove(hash)) return;
+                if (localTargets == null) return false;
+                return (localTargets.TryGetValue(InternalHashKind.BinEntries, out var entries) && entries.Contains(hash)) ||
+                       (localTargets.TryGetValue(InternalHashKind.BinHashes, out var hashes) && hashes.Contains(hash)) ||
+                       (localTargets.TryGetValue(InternalHashKind.BinFields, out var fields) && fields.Contains(hash)) ||
+                       (localTargets.TryGetValue(InternalHashKind.BinTypes, out var types) && types.Contains(hash));
+            }
+
+            private void Check32(
+                InternalHashKind kind,
+                uint hash,
+                string value,
+                InternalHashGuessStrategy strategy,
+                string source,
+                string sourceWad,
+                string sourceBin,
+                bool hasLocalEvidence)
+            {
+                if (!hasLocalEvidence || !_targets[kind].Remove(hash)) return;
+                var key = (kind, (ulong)hash);
                 var match = new InternalHashGuessMatch
                 {
                     Hash = hash,
@@ -1208,9 +1381,10 @@ namespace AssetsManager.Services.Hashes
                     Strategy = strategy,
                     Source = source,
                     SourceWad = sourceWad,
-                    SourceBin = sourceBin
+                    SourceBin = sourceBin,
+                    IsVerified = true
                 };
-                _matches[(kind, hash)] = match;
+                _matches[key] = match;
                 _pendingMatches.Add(match);
             }
 
@@ -1230,7 +1404,8 @@ namespace AssetsManager.Services.Hashes
                         Strategy = strategy,
                         Source = source,
                         SourceWad = sourceWad,
-                        SourceBin = sourceBin
+                        SourceBin = sourceBin,
+                        IsVerified = true
                     };
                     _matches[(kind, fullHash)] = match;
                     _pendingMatches.Add(match);

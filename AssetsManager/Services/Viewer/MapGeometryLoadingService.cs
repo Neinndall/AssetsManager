@@ -90,7 +90,7 @@ namespace AssetsManager.Services.Viewer
                 {
                     foreach (var kvp in materialsBin.Objects)
                     {
-                        string resolvedName = _hashResolverService.ResolveBinHashGeneral(kvp.Key);
+                        string resolvedName = _hashResolverService.ResolveBinEntry(kvp.Key);
                         if (!resolvedMaterials.ContainsKey(resolvedName))
                         {
                             resolvedMaterials[resolvedName] = kvp.Value;
@@ -147,7 +147,7 @@ namespace AssetsManager.Services.Viewer
                         if (resolvedMaterials.TryGetValue(materialName, out var materialObject))
                         {
                             var samplerValuesKvp = materialObject.Properties.FirstOrDefault(propKvp =>
-                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
+                                _hashResolverService.ResolveBinField(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
                             );
 
                             if (samplerValuesKvp.Value is BinTreeContainer samplerValuesContainer && samplerValuesContainer.Elements.Any())
@@ -157,7 +157,7 @@ namespace AssetsManager.Services.Viewer
                                     if (samplerElement is BinTreeStruct samplerObject)
                                     {
                                         var textureNamePropKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                            _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
+                                            _hashResolverService.ResolveBinField(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
                                         );
 
                                         if (textureNamePropKvp.Value is BinTreeString textureNameString &&
@@ -167,7 +167,7 @@ namespace AssetsManager.Services.Viewer
                                              textureNameString.Value.Equals("NoiseTexture", StringComparison.OrdinalIgnoreCase)))
                                         {
                                             var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                                _hashResolverService.ResolveBinHashGeneral(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
+                                                _hashResolverService.ResolveBinField(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
                                             );
 
                                             if (texturePathKvp.Value is BinTreeString tps && !string.IsNullOrEmpty(tps.Value))

@@ -322,7 +322,7 @@ namespace AssetsManager.Views
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
             string internalDomain = includeBin ? "BIN" : "RST";
-            _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash candidates...";
+            _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
             _viewModel.Matches.Clear();
             var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash)>();
 
@@ -385,7 +385,7 @@ namespace AssetsManager.Views
                         .Cast<object>());
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
-                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} internal hashes resolved and saved.";
+                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} verified.";
                 }
             }
             catch (OperationCanceledException)
