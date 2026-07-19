@@ -8,7 +8,7 @@ New Features
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
-  - Added independent BIN and RST hash guessing with local inventory, content scanning, structural strategies, and automatic persistence.
+  - Added independent BIN and RST hash discovery with typed local inventories, same-file BIN evidence, contextual RST strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.
   - Added centralized and persistent tracking of unknown hashes in hash_lab/unknowns.txt, merging historical unknowns with live WAD scans.
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
@@ -60,10 +60,11 @@ Improvements
   - Hash guessing now isolates GAME and LCU WAD discovery while preserving shared unknown tracking and expanded path coverage.
   - Hash Guessing Lab results list columns now automatically resize to perfectly fit the window width.
   - Expanded local files scanning to support additional game assets (audio, animations, models, and scripts).
-  - Optimized BIN structural candidate generation to run significantly faster with minimal CPU and RAM overhead.
+  - BIN Local GREP now uses CDragon-compatible class, attribute, and typed-relation hooks inside parsed PROP/PTCH trees.
   - Hash Guessing Lab now separates GAME, LCU, BIN, and RST domains with categorized results and patch-aware inventories.
   - BIN and RST inventories now refresh independently and present dedicated actions with consistent strategy icons.
-  - BIN guessing now exposes local, exported-content and structural searches separately.
+  - BIN guessing now targets only current-patch unknowns while preserving historical inventories for diagnostics.
+  - BIN inventory schema changes now invalidate stale markers and trigger one automatic rebuild.
   - Hash guessing now generates wordlists faster with lower memory usage and updates large result sets in one batch.
   - Advanced hash guessing now prioritizes proven Riot path combinations and avoids redundant candidate attacks.
   - Hash Guessing Lab now separates current, recent, and historical unknowns across patches.
@@ -92,6 +93,10 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Removed synthetic BIN path reconstruction, cross-dictionary structural attacks, and unrelated JSON, CSS, JavaScript, text, and executable scans from BIN guessing.
+  - BIN guessing now rejects same-file coincidences without a proven structural relationship and automatically purges legacy unverified research records.
+  - BIN inventory now classifies nested ObjectLink values as BIN Entries, matching CDragon's typed hash visitor.
+  - BIN JSON now keeps fields, types, entries, and hash values isolated so cross-domain collisions cannot produce incorrect names.
   - Game updates now reject corrupt server chunks and repair incorrect trailing file data safely.
   - Extensionless UI atlas assets now export with their correct `.atlas` extension.
   - GAME and LCU hash files now preserve CommunityDragon-compatible LF line endings when new matches are saved.

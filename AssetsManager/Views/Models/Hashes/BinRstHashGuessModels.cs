@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Models.Hashes
         public string Source { get; init; }
         public string SourceWad { get; init; }
         public string SourceBin { get; init; }
+        public bool IsVerified { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
@@ -48,7 +49,7 @@ namespace AssetsManager.Views.Models.Hashes
             _ => "RST XXH64"
         };
         public string Path => Value;
-        public string StrategyText => Strategy.ToString();
+        public string StrategyText => $"{Strategy} · Verified";
         public string SourceWadPath
         {
             get

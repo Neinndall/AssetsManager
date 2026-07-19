@@ -32,7 +32,7 @@ namespace AssetsManager.Services.Parsers
                 writer.WriteStartObject();
                 foreach (var prop in set.Value.Properties)
                 {
-                    writer.WritePropertyName(_hashResolver.ResolveBinHashGeneral(prop.Key));
+                    writer.WritePropertyName(_hashResolver.ResolveBinField(prop.Key));
                     WriteValue(writer, prop.Value);
                 }
                 writer.WriteEndObject();
