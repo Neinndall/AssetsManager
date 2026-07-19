@@ -329,8 +329,7 @@ namespace AssetsManager.Services.Hashes
             }
             catch (OperationCanceledException)
             {
-                progress?.Report(CreateProgress(matcher, stopwatch, "Saving matches found before cancellation", scanned));
-                await PersistCancelledMatchesAsync(matcher);
+                await HandleCancelledRunAsync(matcher, stopwatch, progress, scanned);
                 throw;
             }
         }
@@ -407,10 +406,19 @@ namespace AssetsManager.Services.Hashes
             catch (OperationCanceledException)
             {
                 int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
-                progress?.Report(CreateProgress(matcher, stopwatch, "Saving matches found before cancellation", checkedCount));
-                await PersistCancelledMatchesAsync(matcher);
+                await HandleCancelledRunAsync(matcher, stopwatch, progress, checkedCount);
                 throw;
             }
+        }
+
+        private async Task HandleCancelledRunAsync(
+            CandidateMatcher matcher,
+            Stopwatch stopwatch,
+            IProgress<InternalHashProgress> progress,
+            int processedFiles)
+        {
+            progress?.Report(CreateProgress(matcher, stopwatch, "Saving matches found before cancellation", processedFiles));
+            await PersistCancelledMatchesAsync(matcher);
         }
 
         private async Task<InternalHashRunResult> CompleteRunAsync(CandidateMatcher matcher, int initial, int scanned)
