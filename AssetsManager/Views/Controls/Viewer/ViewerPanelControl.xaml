@@ -264,7 +264,7 @@
                              <!-- Inspector Navigation (sub-tabs) -->
                              <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                      Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                 <UniformGrid Columns="5" Height="36">
+                                  <UniformGrid Columns="4" Height="36">
                                      <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
                                          <StackPanel Orientation="Horizontal">
                                              <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
