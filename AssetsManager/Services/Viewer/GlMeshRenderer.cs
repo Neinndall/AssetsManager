@@ -7,6 +7,8 @@ using System.Windows.Media.Media3D;
 using Silk.NET.OpenGL;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Utils;
+using System.Linq;
 
 namespace AssetsManager.Services.Viewer
 {
@@ -164,7 +166,8 @@ namespace AssetsManager.Services.Viewer
                     buffers.Texture = 0;
                 }
 
-                if (!string.IsNullOrEmpty(part.SelectedTextureName) && part.AllTextures.TryGetValue(part.SelectedTextureName, out var bitmap))
+                var bitmap = TextureUtils.ResolveTexture(part.AllTextures, part.SelectedTextureName);
+                if (bitmap != null)
                 {
                     buffers.Texture = UploadTexture(bitmap);
                     buffers.LoadedTextureKey = part.SelectedTextureName;

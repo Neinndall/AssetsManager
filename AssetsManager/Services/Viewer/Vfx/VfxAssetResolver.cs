@@ -30,6 +30,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 return null;
 
             string baseName = Path.GetFileNameWithoutExtension(texturePath);
+            string cleanBaseName = PathUtils.TruncateAtDot(baseName);
             string originalExt = Path.GetExtension(texturePath);
             string championName = Path.GetFileName(searchDirectory);
 
@@ -43,10 +44,26 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             foreach (var ext in uniqueExts)
             {
-                string candidateName = baseName + ext;
+                string candidateName = cleanBaseName + ext;
 
                 string targetPath = Path.Combine(searchDirectory, candidateName);
                 if (File.Exists(targetPath)) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(targetPath));
+
+                if (baseName != cleanBaseName)
+                {
+                    string targetPathOriginal = Path.Combine(searchDirectory, baseName + ext);
+                    if (File.Exists(targetPathOriginal)) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(targetPathOriginal));
+                }
+
+                if (Directory.Exists(searchDirectory))
+                {
+                    try
+                    {
+                        var fuzzyMatches = Directory.GetFiles(searchDirectory, cleanBaseName + ".*" + ext, SearchOption.TopDirectoryOnly);
+                        if (fuzzyMatches.Length > 0) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(fuzzyMatches[0]));
+                    }
+                    catch { }
+                }
 
                 string wadRoot = ResolveWadRoot(searchDirectory);
                 if (!string.IsNullOrEmpty(wadRoot) && Directory.Exists(wadRoot))
@@ -74,6 +91,19 @@ namespace AssetsManager.Services.Viewer.Vfx
                         {
                             string directPath = Path.Combine(folder, candidateName);
                             if (File.Exists(directPath)) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(directPath));
+
+                            if (baseName != cleanBaseName)
+                            {
+                                string directPathOriginal = Path.Combine(folder, baseName + ext);
+                                if (File.Exists(directPathOriginal)) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(directPathOriginal));
+                            }
+
+                            try
+                            {
+                                var fuzzyMatches = Directory.GetFiles(folder, cleanBaseName + ".*" + ext, SearchOption.TopDirectoryOnly);
+                                if (fuzzyMatches.Length > 0) return Cache(texturePath, searchDirectory, TextureUtils.LoadTextureFromFile(fuzzyMatches[0]));
+                            }
+                            catch { }
                         }
                     }
 
@@ -83,6 +113,23 @@ namespace AssetsManager.Services.Viewer.Vfx
                         if (files.Length > 0)
                         {
                             var loaded = TextureUtils.LoadTextureFromFile(files[0]);
+                            if (loaded != null) return Cache(texturePath, searchDirectory, loaded);
+                        }
+
+                        if (baseName != cleanBaseName)
+                        {
+                            var filesOriginal = Directory.GetFiles(wadRoot, baseName + ext, SearchOption.AllDirectories);
+                            if (filesOriginal.Length > 0)
+                            {
+                                var loaded = TextureUtils.LoadTextureFromFile(filesOriginal[0]);
+                                if (loaded != null) return Cache(texturePath, searchDirectory, loaded);
+                            }
+                        }
+
+                        var fuzzyFiles = Directory.GetFiles(wadRoot, cleanBaseName + ".*" + ext, SearchOption.AllDirectories);
+                        if (fuzzyFiles.Length > 0)
+                        {
+                            var loaded = TextureUtils.LoadTextureFromFile(fuzzyFiles[0]);
                             if (loaded != null) return Cache(texturePath, searchDirectory, loaded);
                         }
                     }

@@ -119,18 +119,28 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
+        public static BitmapSource ResolveTexture(Dictionary<string, BitmapSource> allTextures, string selectedTextureName)
+        {
+            if (allTextures == null || string.IsNullOrEmpty(selectedTextureName))
+                return null;
+
+            if (allTextures.TryGetValue(selectedTextureName, out BitmapSource texture))
+                return texture;
+
+            string fullKey = allTextures.Keys
+                .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), selectedTextureName, StringComparison.OrdinalIgnoreCase));
+            if (fullKey != null)
+                allTextures.TryGetValue(fullKey, out texture);
+
+            return texture;
+        }
+
         public static void UpdateMaterial(ModelPart modelPart)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
 
-            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
-            {
-                string fullKey = modelPart.AllTextures.Keys
-                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
-                if (fullKey != null)
-                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
-            }
+            BitmapSource texture = ResolveTexture(modelPart.AllTextures, modelPart.SelectedTextureName);
 
             if (texture != null)
             {

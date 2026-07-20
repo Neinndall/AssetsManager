@@ -33,7 +33,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private ViewerType _currentMode;
 
         public SknLoadingService SknLoadingService { get; set; }
-        public ScoLoadingService ScoLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public ChromaScannerService ChromaScannerService { get; set; }
         public LogService LogService { get; set; }
@@ -584,20 +583,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
-                if (extension == ".sco" || extension == ".scb")
+                if (string.IsNullOrEmpty(texturePath))
                 {
-                    newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath), cancellationToken);
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(texturePath))
-                    {
-                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
-                    }
-                    else
-                    {
-                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
-                    }
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
                 }
             }
             catch (System.OperationCanceledException)

@@ -39,7 +39,6 @@ namespace AssetsManager.Views
             ViewportControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
  
             PanelControl.SknLoadingService = serviceProvider.GetRequiredService<SknLoadingService>();
-            PanelControl.ScoLoadingService = serviceProvider.GetRequiredService<ScoLoadingService>();
             PanelControl.MapGeometryLoadingService = serviceProvider.GetRequiredService<MapGeometryLoadingService>();
             PanelControl.ChromaScannerService = serviceProvider.GetRequiredService<ChromaScannerService>();
             PanelControl.LogService = _logService;
