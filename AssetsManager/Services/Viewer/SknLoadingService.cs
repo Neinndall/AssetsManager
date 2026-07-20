@@ -133,7 +133,7 @@ namespace AssetsManager.Services.Viewer
             string modelName,
             IReadOnlyDictionary<string, string> materialTextureOverrides)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             string skinName = modelName.Split('.')[0];
             var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
 

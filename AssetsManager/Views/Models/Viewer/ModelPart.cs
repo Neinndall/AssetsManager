@@ -40,7 +40,7 @@ namespace AssetsManager.Views.Models.Viewer
                 _allTextures = value;
                 if (_allTextures != null)
                 {
-                    AvailableTextureNames.ReplaceRange(_allTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+                    AvailableTextureNames.ReplaceRange(_allTextures.Keys);
                 }
                 else
                 {
@@ -58,9 +58,8 @@ namespace AssetsManager.Views.Models.Viewer
             get => _selectedTextureName;
             set
             {
-                string normalized = PathUtils.TruncateAtDot(value);
-                if (_selectedTextureName == normalized) return;
-                _selectedTextureName = normalized;
+                if (_selectedTextureName == value) return;
+                _selectedTextureName = value;
                 TextureUtils.UpdateMaterial(this);
                 OnPropertyChanged();
             }
