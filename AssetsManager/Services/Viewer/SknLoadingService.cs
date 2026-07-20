@@ -133,7 +133,7 @@ namespace AssetsManager.Services.Viewer
             string modelName,
             IReadOnlyDictionary<string, string> materialTextureOverrides)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             string skinName = modelName.Split('.')[0];
             var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
 
@@ -408,8 +408,15 @@ namespace AssetsManager.Services.Viewer
                     {
                         if (prop.Value is BinTreeString str)
                         {
-                            if (slotName == null) slotName = str.Value;
-                            else texPath = str.Value;
+                            string val = str.Value;
+                            if (val.Contains('/') || val.Contains('\\') || val.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) || val.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                            {
+                                texPath = val;
+                            }
+                            else
+                            {
+                                slotName = val;
+                            }
                         }
                     }
 
@@ -437,8 +444,8 @@ namespace AssetsManager.Services.Viewer
 
         private static string NormalizeAndMatchKey(string texPath, List<string> availableKeys)
         {
-            string fileName = Path.GetFileNameWithoutExtension(
-                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar));
+            string fileName = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(
+                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
             return availableKeys.FirstOrDefault(k => k.Equals(fileName, StringComparison.OrdinalIgnoreCase));
         }
 
