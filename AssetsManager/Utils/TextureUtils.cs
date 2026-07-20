@@ -124,14 +124,7 @@ namespace AssetsManager.Utils
             if (allTextures == null || string.IsNullOrEmpty(selectedTextureName))
                 return null;
 
-            if (allTextures.TryGetValue(selectedTextureName, out BitmapSource texture))
-                return texture;
-
-            string fullKey = allTextures.Keys
-                .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), selectedTextureName, StringComparison.OrdinalIgnoreCase));
-            if (fullKey != null)
-                allTextures.TryGetValue(fullKey, out texture);
-
+            allTextures.TryGetValue(selectedTextureName, out BitmapSource texture);
             return texture;
         }
 

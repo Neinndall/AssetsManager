@@ -114,7 +114,7 @@ namespace AssetsManager.Services.Viewer
                         BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(texPath), _logService, texPath);
                         if (loadedTex != null)
                         {
-                            string textureKey = Path.GetFileNameWithoutExtension(texPath);
+                            string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texPath));
                             loadedTextures[textureKey] = loadedTex;
                         }
                     }
