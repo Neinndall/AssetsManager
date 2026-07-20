@@ -408,15 +408,8 @@ namespace AssetsManager.Services.Viewer
                     {
                         if (prop.Value is BinTreeString str)
                         {
-                            string val = str.Value;
-                            if (val.Contains('/') || val.Contains('\\') || val.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) || val.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                            {
-                                texPath = val;
-                            }
-                            else
-                            {
-                                slotName = val;
-                            }
+                            if (slotName == null) slotName = str.Value;
+                            else texPath = str.Value;
                         }
                     }
 
