@@ -12,7 +12,7 @@ namespace AssetsManager.Views.Helpers
 {
     public static class SceneElements
     {
-        public const double GroundLevel = 2000;
+        public const double GroundLevel = 1000;
         private const double GroundLogoElevation = 2.0;
         public const int SceneTextureMaxSize = 2048;
 

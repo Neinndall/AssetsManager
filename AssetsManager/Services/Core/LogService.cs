@@ -8,10 +8,11 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Serilog;
+using AssetsManager.Services.Viewer.Vfx;
 
 namespace AssetsManager.Services.Core
 {
-    public class LogService
+    public class LogService : ILogSink
     {
         private RichTextBox _outputRichTextBox;
         private readonly Dispatcher _dispatcher;

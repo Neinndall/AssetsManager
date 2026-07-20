@@ -64,6 +64,12 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isRenderSectionExpanded = false;
         private string _modelsSearchText = string.Empty;
         private string _animationsSearchText = string.Empty;
+        private string _vfxSearchText = string.Empty;
+        private List<string> _allVfxSystems = new();
+        private List<string> _filteredVfxSystems = new();
+
+        private string _selectedImagePath = string.Empty;
+        private string _selectedImageName = string.Empty;
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
@@ -230,10 +236,55 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
+        public string VfxSearchText
+        {
+            get => _vfxSearchText;
+            set
+            {
+                var v = value ?? string.Empty;
+                if (_vfxSearchText != v)
+                {
+                    _vfxSearchText = v;
+                    OnPropertyChanged();
+                    UpdateFilteredVfx();
+                }
+            }
+        }
+
         public bool HasModelsSearchText => !string.IsNullOrWhiteSpace(_modelsSearchText);
         public bool HasAnimationsSearchText => !string.IsNullOrWhiteSpace(_animationsSearchText);
 
         public IEnumerable<SceneModel> FilteredModels => _filteredModelsList;
+        public IEnumerable<string> FilteredVfxSystems => _filteredVfxSystems;
+
+        public string SelectedImagePath
+        {
+            get => _selectedImagePath;
+            set
+            {
+                if (_selectedImagePath != value)
+                {
+                    _selectedImagePath = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasSelectedImage));
+                }
+            }
+        }
+
+        public string SelectedImageName
+        {
+            get => _selectedImageName;
+            set
+            {
+                if (_selectedImageName != value)
+                {
+                    _selectedImageName = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool HasSelectedImage => !string.IsNullOrEmpty(_selectedImagePath);
 
         public IEnumerable<AnimationModel> FilteredAnimations => _filteredAnimationsList;
 
@@ -265,6 +316,27 @@ namespace AssetsManager.Views.Models.Viewer
                     a.Name.IndexOf(_animationsSearchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
             }
             OnPropertyChanged(nameof(FilteredAnimations));
+        }
+
+        public void SetVfxSystems(IEnumerable<string> systems)
+        {
+            _allVfxSystems = systems?.ToList() ?? new List<string>();
+            UpdateFilteredVfx();
+        }
+
+        private void UpdateFilteredVfx()
+        {
+            if (string.IsNullOrWhiteSpace(_vfxSearchText))
+            {
+                _filteredVfxSystems = _allVfxSystems.ToList();
+            }
+            else
+            {
+                _filteredVfxSystems = _allVfxSystems.Where(n =>
+                    n != null &&
+                    n.IndexOf(_vfxSearchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+            }
+            OnPropertyChanged(nameof(FilteredVfxSystems));
         }
 
         public int MeshPartCount => _selectedModelParts?.Count ?? 0;

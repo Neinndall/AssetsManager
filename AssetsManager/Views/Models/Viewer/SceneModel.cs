@@ -101,6 +101,7 @@ namespace AssetsManager.Views.Models.Viewer
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
+        public string SkinBinPath { get; set; }
 
         private bool _isVisible = true;
         public bool IsVisible

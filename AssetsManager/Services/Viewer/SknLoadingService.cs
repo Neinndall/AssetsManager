@@ -50,7 +50,12 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                var model = await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                if (model != null)
+                {
+                    model.SkinBinPath = TryResolveSkinBinPath(filePath, textureDirectoryPath);
+                }
+                return model;
             }
             catch (Exception ex)
             {
@@ -77,7 +82,12 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, null);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                var model = await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                if (model != null)
+                {
+                    model.SkinBinPath = TryResolveSkinBinPath(filePath, null);
+                }
+                return model;
             }
             catch (Exception ex)
             {
@@ -453,9 +463,11 @@ namespace AssetsManager.Services.Viewer
                 {
                     string championName = parts[0];
                     string skinFolder = parts[2];
-                    string skinBinName = GetSkinBinName(skinFolder);
+                    string skinsDirectory = Path.Combine(rootPath, "data", "characters", championName, "skins");
+                    string skinBinName = GetSkinBinName(skinsDirectory, skinFolder, championName);
                     if (!string.IsNullOrWhiteSpace(skinBinName))
                     {
+                        if (File.Exists(skinBinName)) return skinBinName;
                         string resolvedPath = Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
                         if (File.Exists(resolvedPath)) return resolvedPath;
                     }
@@ -480,9 +492,11 @@ namespace AssetsManager.Services.Viewer
                     if (j + 1 >= pathParts.Length) continue;
 
                     string skinFolder = pathParts[j + 1];
-                    string skinBinName = GetSkinBinName(skinFolder);
+                    string skinsDirectory = Path.Combine(foundDataDir, "characters", championName, "skins");
+                    string skinBinName = GetSkinBinName(skinsDirectory, skinFolder, championName);
                     if (string.IsNullOrWhiteSpace(skinBinName)) continue;
 
+                    if (File.Exists(skinBinName)) return skinBinName;
                     string candidate = Path.Combine(foundDataDir, "characters", championName, "skins", skinBinName);
                     if (File.Exists(candidate)) return candidate;
                     break;
@@ -492,20 +506,50 @@ namespace AssetsManager.Services.Viewer
             return null;
         }
 
-        private static string GetSkinBinName(string skinFolder)
+        private static string GetSkinBinName(string skinsDirectory, string skinFolder, string championName)
         {
-            if (string.IsNullOrWhiteSpace(skinFolder))
+            if (string.IsNullOrWhiteSpace(skinsDirectory) || !Directory.Exists(skinsDirectory))
             {
                 return null;
             }
 
-            if (skinFolder.Equals("base", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(skinFolder))
             {
-                return "skin0.bin";
+                if (skinFolder.Equals("base", StringComparison.OrdinalIgnoreCase))
+                {
+                    string baseBin = Path.Combine(skinsDirectory, "skin0.bin");
+                    if (File.Exists(baseBin)) return baseBin;
+                }
+
+                Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    string skinBin = Path.Combine(skinsDirectory, $"skin{int.Parse(match.Groups[1].Value)}.bin");
+                    if (File.Exists(skinBin)) return skinBin;
+                }
             }
 
-            Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
-            return match.Success ? $"skin{int.Parse(match.Groups[1].Value)}.bin" : null;
+            // Fallbacks for packed bins: <champ>_multi_skins_*.bin, <champ>*_skins.bin, then any *.bin.
+            try
+            {
+                var bins = Directory.GetFiles(skinsDirectory, "*.bin", SearchOption.TopDirectoryOnly);
+                string champLower = championName?.ToLowerInvariant() ?? string.Empty;
+
+                string multi = bins.FirstOrDefault(b =>
+                    Path.GetFileName(b).IndexOf("multi_skins", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (multi != null) return multi;
+
+                string champSkins = bins.FirstOrDefault(b =>
+                    champLower.Length > 0 &&
+                    Path.GetFileName(b).StartsWith(champLower, StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetFileName(b).IndexOf("_skins", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (champSkins != null) return champSkins;
+
+                if (bins.Length > 0) return bins[0];
+            }
+            catch { }
+
+            return null;
         }
 
         private static string NormalizeMaterialKey(string materialName)

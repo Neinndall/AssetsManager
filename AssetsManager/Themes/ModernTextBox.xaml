@@ -176,7 +176,7 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
         <Setter Property="CaretBrush" Value="White"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="10,2"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">

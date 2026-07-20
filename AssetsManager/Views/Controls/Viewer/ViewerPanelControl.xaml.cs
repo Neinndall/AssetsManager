@@ -12,6 +12,10 @@ using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Audio;
+using AssetsManager.Services.Formatting;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
 using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Views.Helpers;
@@ -268,6 +272,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RotationXLock.IsChecked = false;
             RotationYLock.IsChecked = false;
             RotationZLock.IsChecked = false;
+
             ScaleLock.IsChecked = false;
         }
 
@@ -950,6 +955,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TabMeshes_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabTransform_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabAnimations_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabSfx_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
 
         // ===== Hero & Inspector update helpers =====
 
@@ -992,6 +998,85 @@ namespace AssetsManager.Views.Controls.Viewer
                 InspectorCounterText.Text = "A";
                 if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
             }
+            else if (TabVfx != null && TabVfx.IsChecked == true)
+            {
+                InspectorCounterText.Text = "V";
+                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "VFX systems list";
+            }
         }
+
+        private void TabVfx_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+
+        public void SetVfxSystems(List<string> systems)
+        {
+            _viewModel.SetVfxSystems(systems);
+        }
+
+        private void VfxSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
+        {
+            if (sender is SearchBoxControl searchBox)
+            {
+                _viewModel.VfxSearchText = searchBox.Text;
+            }
+        }
+
+        private void VfxListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count > 0 && e.AddedItems[0] is string systemName)
+            {
+                Viewport?.PlayVfxSystem(systemName);
+            }
+        }
+
+        private void ToggleProjectExplorer_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowViewModel != null)
+            {
+                WindowViewModel.IsProjectExplorerVisible = !WindowViewModel.IsProjectExplorerVisible;
+            }
+        }
+
+        public void ShowImagePreview(string filePath)
+        {
+            try
+            {
+                var bmp = TextureUtils.LoadTextureFromFile(filePath);
+                if (bmp != null)
+                {
+                    PreviewImageSource.Source = bmp;
+                    _viewModel.SelectedImagePath = filePath;
+                    _viewModel.SelectedImageName = System.IO.Path.GetFileName(filePath);
+                }
+                else
+                {
+                    LogService.LogWarning($"[IMAGE PREVIEW] TextureUtils returned null for: {filePath}. The format might not be supported or is corrupted.");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
+            }
+        }
+
+        private void CloseImagePreview_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedImagePath = string.Empty;
+            _viewModel.SelectedImageName = string.Empty;
+            PreviewImageSource.Source = null;
+        }
+
+        public void LoadAnimationDirectly(string filePath)
+        {
+            try
+            {
+                LoadAnimation(filePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to load animation: {filePath}");
+                CustomMessageBoxService.ShowError("Load Error", $"Failed to load animation file: {ex.Message}", Window.GetWindow(this));
+            }
+        }
+
     }
 }

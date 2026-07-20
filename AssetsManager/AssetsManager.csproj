@@ -19,6 +19,8 @@
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <ProjectReference Include="..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\LeagueToolkit.csproj" />
     <PackageReference Include="Material.Icons.WPF" Version="2.4.1" />
+    <PackageReference Include="Silk.NET.OpenGL" Version="2.21.0" />
+    <PackageReference Include="OpenTK.GLWpfControl" Version="4.3.6" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

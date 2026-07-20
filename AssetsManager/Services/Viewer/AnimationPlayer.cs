@@ -211,6 +211,66 @@ namespace AssetsManager.Services.Viewer
             }
         }
 
+        public Matrix4x4 GetBoneTransform(string boneName, uint boneHash, RigResource skeleton)
+        {
+            if (skeleton == null || _boneTransforms == null) return Matrix4x4.Identity;
+
+            if (!string.IsNullOrEmpty(boneName))
+            {
+                for (int i = 0; i < skeleton.Joints.Count; i++)
+                {
+                    if (string.Equals(skeleton.Joints[i].Name, boneName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (i < _boneTransforms.Length)
+                        {
+                            return _boneTransforms[i];
+                        }
+                    }
+                }
+            }
+
+            if (boneHash != 0)
+            {
+                for (int i = 0; i < skeleton.Joints.Count; i++)
+                {
+                    string jName = skeleton.Joints[i].Name;
+                    if (Fnv1a(jName) == boneHash || ElfLower(jName) == boneHash)
+                    {
+                        if (i < _boneTransforms.Length)
+                        {
+                            return _boneTransforms[i];
+                        }
+                    }
+                }
+            }
+
+            return Matrix4x4.Identity;
+        }
+
+        private static uint Fnv1a(string input)
+        {
+            uint hash = 0x811c9dc5;
+            foreach (char c in input.ToLowerInvariant())
+            {
+                hash ^= c;
+                hash *= 0x01000193;
+            }
+            return hash;
+        }
+
+        private static uint ElfLower(string s)
+        {
+            uint h = 0;
+            foreach (char c in s.ToLowerInvariant())
+            {
+                h = (h << 4) + (byte)c;
+                uint t = h & 0xF0000000;
+                if (t != 0) h ^= t >> 24;
+                h &= ~t;
+            }
+            return h;
+        }
+
         public void Dispose()
         {
             if (_isDisposed) return;
