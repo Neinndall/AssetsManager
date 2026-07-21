@@ -102,15 +102,16 @@ namespace AssetsManager.Views.Helpers
             Material3D skyDownMaterial = (skyDownTexture != null) ? new DiffuseMaterial(new ImageBrush(skyDownTexture)) : new DiffuseMaterial(new SolidColorBrush(Colors.DarkGray)); // Fallback color
             if (skyDownTexture == null) logService.LogError($"Failed to load sky_down texture from {skyDownTexturePath}. Using solid color fallback.");
 
-            // 2. Create a single, canonical plane geometry. By default, its front face points towards +Z.
+            // Slightly oversized to eliminate seam gaps between adjacent faces
+            double overlap = size * 0.002;
             var planeMesh = new MeshGeometry3D
             {
                 Positions = new Point3DCollection()
                 {
-                    new Point3D(-size, -size, 0), // Bottom-left
-                    new Point3D(size, -size, 0),  // Bottom-right
-                    new Point3D(size, size, 0),   // Top-right
-                    new Point3D(-size, size, 0)    // Top-left
+                    new Point3D(-size - overlap, -size - overlap, 0), // Bottom-left
+                    new Point3D(size + overlap, -size - overlap, 0), // Bottom-right
+                    new Point3D(size + overlap, size + overlap, 0), // Top-right
+                    new Point3D(-size - overlap, size + overlap, 0) // Top-left
                 },
                 TriangleIndices = new Int32Collection() { 0, 1, 2, 0, 2, 3 },
                 TextureCoordinates = new PointCollection()
