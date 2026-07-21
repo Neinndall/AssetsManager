@@ -1,26 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
     /// <summary>
-    /// CPU particle simulator (M36) — turns a parsed VfxSystemDefinition into live particles
-    /// each frame: emitters spawn at their rate, particles integrate velocity + acceleration, and
-    /// size/colour are driven by the birth values times their over-life multiplier curves.
-    /// Deterministic-ish (seeded RNG) and GL-free, so it can be unit-tested headlessly.
-    /// One instance drives one placed system.
+    /// Maintains deterministic, graphics-independent playback state for one placed effect graph.
     /// </summary>
-    public sealed class VfxParticleSimulator
+    public sealed class VfxPlaybackRuntime
     {
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
         {
             public required VfxEmitterDefinition Def { get; init; }
+            public int SourceOrder { get; init; }
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
+            public int TextureWidth, TextureHeight;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
             public object PendingTexture;
@@ -37,15 +34,15 @@ namespace AssetsManager.Services.Viewer.Vfx
             internal bool BurstDone;                // for isSingleParticle
             internal readonly List<Particle> Particles = new();
 
-            /// <summary>Packed instance data for the renderer: 18 floats per particle:
-            /// position, size, color, rotation/frame, age/velocity, and Euler rotation.</summary>
+            /// <summary>Packed instance data for the renderer: position, 3D scale, color,
+            /// rotation/frame, age/velocity, and Euler rotation.</summary>
             public float[] Instances = System.Array.Empty<float>();
             public int InstanceCount;
 
             // Mesh-primitive emitters (0 = billboard)
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
-            public float[] MeshInterleaved;      // cached pos3+uv2 stream, re-skinned per frame (M48)
+            public float[] MeshInterleaved;
             /// <summary>Emitter age in seconds — drives UV scroll + wing-flap animation time.</summary>
             public float EmitterAge => Age;
         }
@@ -54,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             public Vector3 Pos, Vel, BirthAccel, BirthOrbitalVelocity, BirthDrag;
             public float Age, Life;
-            public Vector2 BirthSize;   // absolute (birthScale0 xy)
+            public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
             public float Rot, RotVel;
@@ -86,7 +83,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        public VfxParticleSimulator(int seed = 1234) => _rng = new Random(seed);
+        public VfxPlaybackRuntime(int seed = 1234) => _rng = new Random(seed);
 
         /// <summary>Configure from a system placed at worldPos. Only visual emitters are simulated.</summary>
         public void SetSystem(VfxSystemDefinition system, Vector3 worldPos, bool includeNonVisual = false)
@@ -99,12 +96,14 @@ namespace AssetsManager.Services.Viewer.Vfx
             _worldTransform = worldTransform;
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
                 _inverseWorldTransform = Matrix4x4.Identity;
-            foreach (var e in system.Emitters)
+            for (int emitterIndex = 0; emitterIndex < system.Emitters.Count; emitterIndex++)
             {
+                var e = system.Emitters[emitterIndex];
                 if (!includeNonVisual && !e.IsVisual) continue;
                 _emitters.Add(new EmitterState
                 {
                     Def = e,
+                    SourceOrder = emitterIndex,
                     BasePos = Vector3.Transform(e.EmitterPosition, worldTransform),
                     PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
                     PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
@@ -112,6 +111,17 @@ namespace AssetsManager.Services.Viewer.Vfx
                 });
             }
             Reset();
+        }
+
+        public void ApplyRenderOrder()
+        {
+            _emitters.Sort((left, right) =>
+            {
+                int leftPass = (left.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
+                int rightPass = (right.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
+                int passOrder = leftPass.CompareTo(rightPass);
+                return passOrder != 0 ? passOrder : left.SourceOrder.CompareTo(right.SourceOrder);
+            });
         }
 
         private static Vector3 SafeNormal(Vector3 value, Vector3 fallback)
@@ -249,7 +259,10 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthDrag = birthDrag,
                 Age = 0f,
                 Life = life,
-                BirthSize = new Vector2(birthScale.X, birthScale.Y == 0 ? birthScale.X : birthScale.Y),
+                BirthSize = new Vector3(
+                    birthScale.X,
+                    birthScale.Y == 0 ? birthScale.X : birthScale.Y,
+                    birthScale.Z == 0 ? birthScale.X : birthScale.Z),
                 BirthColor = d.BirthColor.SampleBirth(_rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
                 Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
@@ -266,7 +279,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             var d = s.Def;
             int n = s.Particles.Count;
-            if (s.Instances.Length < n * 18) s.Instances = new float[Math.Max(n * 18, 72)];
+            if (s.Instances.Length < n * 19) s.Instances = new float[Math.Max(n * 19, 76)];
             var buf = s.Instances;
             int k = 0;
             for (int i = 0; i < n; i++)
@@ -302,6 +315,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = p.Age;
                 buf[k++] = p.Vel.X; buf[k++] = p.Vel.Y; buf[k++] = p.Vel.Z;
                 buf[k++] = p.Rot; buf[k++] = p.BirthRotation.Y; buf[k++] = p.BirthRotation.Z;
+                buf[k++] = p.BirthSize.Z * scaleMul.Z;
             }
             s.InstanceCount = n;
         }

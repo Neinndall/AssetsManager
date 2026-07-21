@@ -12,8 +12,15 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// Parses VfxSystemDefinitionData objects out of a companion .bin and exposes
     /// them keyed by object path-hash.
     /// </summary>
-    public static class VfxSystemResolver
+    public static class VfxGraphParser
     {
+        private static BinTree ParseTree(byte[] data)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            using var stream = new MemoryStream(data, writable: false);
+            return new BinTree(stream);
+        }
+
         private static class HashAlgorithms
         {
             public static uint Fnv1a(string text)
@@ -50,6 +57,13 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_isSingle      = HashAlgorithms.Fnv1a("isSingleParticle");
         private static readonly uint F_disabled      = HashAlgorithms.Fnv1a("disabled");
         private static readonly uint F_blendMode     = HashAlgorithms.Fnv1a("blendMode");
+        private static readonly uint F_renderPass    = HashAlgorithms.Fnv1a("pass");
+        private static readonly uint F_alphaRef      = HashAlgorithms.Fnv1a("alphaRef");
+        private static readonly uint F_texAddress    = HashAlgorithms.Fnv1a("texAddressModeBase");
+        private static readonly uint F_uvScrollClamp = HashAlgorithms.Fnv1a("uvScrollClamp");
+        private static readonly uint F_textureFlipU  = HashAlgorithms.Fnv1a("TextureFlipU");
+        private static readonly uint F_textureFlipV  = HashAlgorithms.Fnv1a("TextureFlipV");
+        private static readonly uint F_disableCull   = HashAlgorithms.Fnv1a("disableBackfaceCull");
         private static readonly uint F_birthScale0   = HashAlgorithms.Fnv1a("birthScale0");
         private static readonly uint F_scale0        = HashAlgorithms.Fnv1a("scale0");
         private static readonly uint F_birthColor    = HashAlgorithms.Fnv1a("birthColor");
@@ -117,13 +131,24 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_resourceMap = HashAlgorithms.Fnv1a("resourceMap");
         private static readonly uint F_mResourceMap = HashAlgorithms.Fnv1a("mResourceMap");
 
+        /// <summary>Parses one physical BIN once and projects every VFX concern from the same tree.</summary>
+        internal static VfxBinDocument ParseDocument(byte[] data)
+        {
+            BinTree tree = ParseTree(data);
+            return new VfxBinDocument(
+                ExtractAll(tree),
+                ExtractAnimationClips(tree),
+                ExtractResourceMap(tree),
+                tree.Dependencies.ToArray());
+        }
+
         /// <summary>Extract effect-key hash to VfxSystemDefinitionData object hash mapping.</summary>
-        public static IReadOnlyDictionary<uint, uint> ExtractResourceMap(byte[] bin)
+        public static IReadOnlyDictionary<uint, uint> ExtractResourceMap(byte[] data)
+            => ExtractResourceMap(ParseTree(data));
+
+        private static IReadOnlyDictionary<uint, uint> ExtractResourceMap(BinTree tree)
         {
             var map = new Dictionary<uint, uint>();
-            BinTree tree;
-            try { tree = SafeBinTree.Parse(bin); }
-            catch { return map; }
             foreach (var o in tree.Objects.Values)
             {
                 if (o.ClassHash != ResolverClass) continue;
@@ -146,27 +171,22 @@ namespace AssetsManager.Services.Viewer.Vfx
         /// <summary>Extract linked-bin dependencies.</summary>
         public static IReadOnlyList<string> ExtractDependencies(byte[] bin)
         {
-            try { return SafeBinTree.Parse(bin).Dependencies; }
-            catch { return Array.Empty<string>(); }
+            return ParseTree(bin).Dependencies.ToArray();
         }
 
         /// <summary>Parse every VfxSystemDefinitionData in the bin, keyed by object path-hash.</summary>
         public static IReadOnlyDictionary<uint, VfxSystemDefinition> ExtractAll(byte[] materialsBin)
+            => ExtractAll(ParseTree(materialsBin));
+
+        private static IReadOnlyDictionary<uint, VfxSystemDefinition> ExtractAll(BinTree bin)
         {
             var map = new Dictionary<uint, VfxSystemDefinition>();
-            BinTree bin;
-            try { bin = SafeBinTree.Parse(materialsBin); }
-            catch { return map; }
 
             foreach (var o in bin.Objects.Values)
             {
                 if (o.ClassHash != SystemClass) continue;
-                try
-                {
-                    var sys = ParseSystem(o);
-                    if (sys is not null) map[o.PathHash] = sys;
-                }
-                catch { /* skip malformed system */ }
+                var system = ParseSystem(o);
+                if (system is not null) map[o.PathHash] = system;
             }
             return map;
         }
@@ -283,7 +303,15 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Distortion: distortion,
                 ParticleColorTexturePath: GetString(p, F_particleColorTex),
                 ColorLookUpTypeX: GetU8(p, F_colorLookUpX),
-                ColorLookUpTypeY: GetU8(p, F_colorLookUpY));
+                ColorLookUpTypeY: GetU8(p, F_colorLookUpY),
+                RenderState: new VfxEmitterRenderState(
+                    RenderPass: GetI16(p, F_renderPass) ?? 0,
+                    AlphaReference: (byte)(GetU8(p, F_alphaRef) ?? 5),
+                    TextureAddressMode: GetU8(p, F_texAddress) ?? 0,
+                    ClampUvScroll: GetBool(p, F_uvScrollClamp),
+                    FlipU: GetBool(p, F_textureFlipU),
+                    FlipV: GetBool(p, F_textureFlipV),
+                    DisableBackfaceCull: GetBool(p, F_disableCull)));
         }
 
         private static VfxSpawnShape ReadSpawnShape(IReadOnlyDictionary<uint, BinTreeProperty> emitterProps)
@@ -517,12 +545,15 @@ namespace AssetsManager.Services.Viewer.Vfx
                 existing.AnimationName = clip.AnimationName;
         }
 
+        private static int? GetI16(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
+            => Get(p, hash) is BinTreeI16 value ? value.Value : null;
+
         public static IReadOnlyDictionary<string, VfxAnimationClip> ExtractAnimationClips(byte[] materialsBin)
+            => ExtractAnimationClips(ParseTree(materialsBin));
+
+        private static IReadOnlyDictionary<string, VfxAnimationClip> ExtractAnimationClips(BinTree bin)
         {
             var map = new Dictionary<string, VfxAnimationClip>(StringComparer.OrdinalIgnoreCase);
-            BinTree bin;
-            try { bin = SafeBinTree.Parse(materialsBin); }
-            catch { return map; }
 
             uint f_clipDataMap = HashAlgorithms.Fnv1a("mClipDataMap");
             uint class_atomic = HashAlgorithms.Fnv1a("atomicClipData");

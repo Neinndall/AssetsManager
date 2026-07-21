@@ -5,9 +5,14 @@ using System.Numerics;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
+    internal sealed record VfxBinDocument(
+        IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
+        IReadOnlyDictionary<string, VfxAnimationClip> AnimationClips,
+        IReadOnlyDictionary<uint, uint> ResourceMap,
+        IReadOnlyList<string> Dependencies);
+
     /// <summary>
-    /// A parsed League VFX system (M36) — one VfxSystemDefinitionData and its emitters, enough to
-    /// actually simulate/preview the particles.
+    /// Domain graph for a League VFX system and its emitter nodes.
     /// </summary>
     public sealed record VfxSystemDefinition(
         uint PathHash,
@@ -64,12 +69,26 @@ namespace AssetsManager.Services.Viewer.Vfx
         VfxDistortionDefinition Distortion = null,
         string ParticleColorTexturePath = null,
         int? ColorLookUpTypeX = null,
-        int? ColorLookUpTypeY = null)
+        int? ColorLookUpTypeY = null,
+        VfxEmitterRenderState RenderState = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
             !string.IsNullOrEmpty(TextureMultPath) || !string.IsNullOrEmpty(MeshPath) ||
             Distortion is { NormalMapTexturePath.Length: > 0 });
+    }
+
+    public sealed record VfxEmitterRenderState(
+        int RenderPass,
+        byte AlphaReference,
+        int TextureAddressMode,
+        bool ClampUvScroll,
+        bool FlipU,
+        bool FlipV,
+        bool DisableBackfaceCull)
+    {
+        public static readonly VfxEmitterRenderState Default = new(0, 5, 0, false, false, false, false);
+        public float AlphaCutoff => AlphaReference / 255f;
     }
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>

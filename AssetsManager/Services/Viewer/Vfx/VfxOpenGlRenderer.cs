@@ -2,21 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
     /// <summary>
-    /// Draws simulated VFX particles as camera-facing, textured billboards using hardware instancing.
-    /// Re-implemented in Safe C# using Spans instead of unsafe pointer arithmetic.
+    /// Draws effect billboards and mesh primitives from prepared playback state.
     /// </summary>
-    public sealed class VfxParticleRenderer : IDisposable
+    public sealed class VfxOpenGlRenderer : IDisposable
     {
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo;
-        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTex, _uUvScrollRate;
+        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uUvScrollRate;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uUvScrollRateMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
         private int _uDirectionOriented, _uArbitraryQuad;
+        private int _uAlphaCutoff, _uFlipU, _uFlipV, _uClampUv;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward;
         private int _instCapFloats;
         private bool _ready;
@@ -28,7 +29,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
         private DrawElementsDelegate _drawElements = null!;
 
-        private const int Stride = 18;
+        private const int Stride = 19;
         private bool _gles;
 
         public void Initialize(GL gl)
@@ -39,13 +40,14 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
             }
-            bool gles = ShaderUtil.DetectGles(gl);
+            bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _gles = gles;
-            _program = ShaderUtil.CreateProgram(gl, gles, Vert, Frag);
+            _program = GlShaderCompiler.CreateProgram(gl, gles, Vert, Frag);
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uCamRight = gl.GetUniformLocation(_program, "uCamRight");
             _uCamUp = gl.GetUniformLocation(_program, "uCamUp");
             _uTexDiv = gl.GetUniformLocation(_program, "uTexDiv");
+            _uTexSize = gl.GetUniformLocation(_program, "uTexSize");
             _uTex = gl.GetUniformLocation(_program, "uTex");
             _uTexMult = gl.GetUniformLocation(_program, "uTexMult");
             _uHasTexMult = gl.GetUniformLocation(_program, "uHasTexMult");
@@ -59,6 +61,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uDistortionStrength = gl.GetUniformLocation(_program, "uDistortionStrength");
             _uDirectionOriented = gl.GetUniformLocation(_program, "uDirectionOriented");
             _uArbitraryQuad = gl.GetUniformLocation(_program, "uArbitraryQuad");
+            _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
+            _uFlipU = gl.GetUniformLocation(_program, "uFlipU");
+            _uFlipV = gl.GetUniformLocation(_program, "uFlipV");
+            _uClampUv = gl.GetUniformLocation(_program, "uClampUv");
             _uPlacementRight = gl.GetUniformLocation(_program, "uPlacementRight");
             _uPlacementUp = gl.GetUniformLocation(_program, "uPlacementUp");
             _uPlacementForward = gl.GetUniformLocation(_program, "uPlacementForward");
@@ -142,7 +148,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
 
-        public void Render(VfxParticleSimulator sim, Matrix4x4 viewProj, Matrix4x4 view)
+        public void Render(VfxPlaybackRuntime sim, Matrix4x4 viewProj, Matrix4x4 view)
         {
             if (!_ready || sim.LiveParticleCount == 0) return;
 
@@ -197,6 +203,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 else _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
+                _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
                 _gl.Uniform2(_uUvScrollRate, es.Def.UvScrollRate.X, es.Def.UvScrollRate.Y);
                 _gl.Uniform1(_uHasTexMult, es.TextureMult != 0 ? 1 : 0);
                 var multDiv = es.Def.TextureMultTexDiv;
@@ -204,6 +211,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform2(_uUvScrollRateMult, es.Def.TextureMultUvScrollRate.X, es.Def.TextureMultUvScrollRate.Y);
                 _gl.Uniform1(_uDirectionOriented, es.Def.IsDirectionOriented ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, es.Def.IsArbitraryQuad ? 1 : 0);
+                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+                _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
+                _gl.Uniform1(_uFlipU, renderState.FlipU ? 1 : 0);
+                _gl.Uniform1(_uFlipV, renderState.FlipV ? 1 : 0);
+                _gl.Uniform1(_uClampUv, renderState.ClampUvScroll ? 1 : 0);
                 _gl.Uniform1(_uIsDistortion, isDistortion ? 1 : 0);
                 _gl.Uniform1(_uDistortionStrength, es.Def.Distortion?.Strength ?? 0f);
                 _gl.Uniform3(_uPlacementRight, es.PlacementRight.X, es.PlacementRight.Y, es.PlacementRight.Z);
@@ -211,6 +223,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform3(_uPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(TextureTarget.Texture2D, es.Texture);
+                ApplyAddressMode(renderState.TextureAddressMode);
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
@@ -244,18 +257,24 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static bool IsAdditive(int blendMode) => blendMode is 0 or 1 or 4 or 5;
 
+        private void ApplyAddressMode(int addressMode)
+        {
+            var wrap = addressMode switch
+            {
+                1 => TextureWrapMode.ClampToEdge,
+                2 => TextureWrapMode.MirroredRepeat,
+                _ => TextureWrapMode.Repeat,
+            };
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)wrap);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)wrap);
+        }
+
         public void ClearTextures()
         {
             if (!_ready) return;
             foreach (var t in _ownedTextures) _gl.DeleteTexture(t);
             _ownedTextures.Clear();
-            foreach (var (vao, vbo, ebo) in _ownedMeshes)
-            {
-                _gl.DeleteVertexArray(vao);
-                _gl.DeleteBuffer(vbo);
-                if (ebo != 0) _gl.DeleteBuffer(ebo);
-            }
-            _ownedMeshes.Clear();
+            ReleaseMeshes();
             _whiteTex = 0;
         }
 
@@ -268,6 +287,9 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.DeleteBuffer(_instVbo);
             _gl.DeleteVertexArray(_vao);
             _gl.DeleteProgram(_program);
+            if (_meshProgram != 0) _gl.DeleteProgram(_meshProgram);
+            _meshProgram = 0;
+            ReleaseMeshes();
             if (_sceneTexture != 0) _gl.DeleteTexture(_sceneTexture);
             _sceneTexture = 0;
             _sceneWidth = _sceneHeight = 0;
@@ -278,13 +300,14 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muViewProj, _muWorldPos, _muScale, _muRot, _muColor, _muTex, _muUvOffset;
         private int _muTexMult, _muHasTexMult, _muUvOffsetMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
+        private int _muAlphaCutoff, _muFlipU, _muFlipV;
         private uint _whiteTex;
 
         private void EnsureMeshProgram()
         {
             if (_meshProgram == 0)
             {
-                _meshProgram = ShaderUtil.CreateProgram(_gl, _gles, MeshVert, MeshFrag);
+                _meshProgram = GlShaderCompiler.CreateProgram(_gl, _gles, MeshVert, MeshFrag);
                 _muViewProj = _gl.GetUniformLocation(_meshProgram, "uViewProj");
                 _muWorldPos = _gl.GetUniformLocation(_meshProgram, "uWorldPos");
                 _muScale = _gl.GetUniformLocation(_meshProgram, "uScale");
@@ -298,14 +321,27 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muPlacementRight = _gl.GetUniformLocation(_meshProgram, "uPlacementRight");
                 _muPlacementUp = _gl.GetUniformLocation(_meshProgram, "uPlacementUp");
                 _muPlacementForward = _gl.GetUniformLocation(_meshProgram, "uPlacementForward");
+                _muAlphaCutoff = _gl.GetUniformLocation(_meshProgram, "uAlphaCutoff");
+                _muFlipU = _gl.GetUniformLocation(_meshProgram, "uFlipU");
+                _muFlipV = _gl.GetUniformLocation(_meshProgram, "uFlipV");
             }
             if (_whiteTex == 0) _whiteTex = UploadTexture(new byte[] { 255, 255, 255, 255 }, 1, 1);
         }
 
-        public void UploadEmitterMesh(VfxParticleSimulator.EmitterState es, float[] positions, float[] uvs, uint[] indices = null)
+        public void UploadEmitterMesh(VfxPlaybackRuntime.EmitterState es, float[] positions, float[] uvs, uint[] indices = null)
         {
             if (!_ready) return;
             EnsureMeshProgram();
+            if (_meshCache.TryGetValue(positions, out var cached))
+            {
+                es.MeshVao = cached.Vao;
+                es.MeshVbo = cached.Vbo;
+                es.MeshEbo = cached.Ebo;
+                es.MeshVertexCount = cached.VertexCount;
+                es.MeshIndexCount = cached.IndexCount;
+                es.MeshInterleaved = cached.Interleaved;
+                return;
+            }
             int verts = positions.Length / 3;
             var inter = new float[verts * 5];
             for (int i = 0; i < verts; i++)
@@ -338,11 +374,37 @@ namespace AssetsManager.Services.Viewer.Vfx
             es.MeshVertexCount = verts;
             es.MeshIndexCount = indices?.Length ?? 0;
             es.MeshInterleaved = inter;
-            _ownedMeshes.Add((vao, vbo, ebo));
+            _meshCache[positions] = new MeshGpuResource(
+                vao,
+                vbo,
+                ebo,
+                verts,
+                indices?.Length ?? 0,
+                inter);
         }
-        private readonly List<(uint Vao, uint Vbo, uint Ebo)> _ownedMeshes = new();
+        private readonly Dictionary<float[], MeshGpuResource> _meshCache =
+            new(ReferenceEqualityComparer.Instance);
 
-        public void UpdateEmitterMeshPositions(VfxParticleSimulator.EmitterState es, float[] positions)
+        private sealed record MeshGpuResource(
+            uint Vao,
+            uint Vbo,
+            uint Ebo,
+            int VertexCount,
+            int IndexCount,
+            float[] Interleaved);
+
+        private void ReleaseMeshes()
+        {
+            foreach (var mesh in _meshCache.Values)
+            {
+                _gl.DeleteVertexArray(mesh.Vao);
+                _gl.DeleteBuffer(mesh.Vbo);
+                if (mesh.Ebo != 0) _gl.DeleteBuffer(mesh.Ebo);
+            }
+            _meshCache.Clear();
+        }
+
+        public void UpdateEmitterMeshPositions(VfxPlaybackRuntime.EmitterState es, float[] positions)
         {
             if (!_ready || es.MeshVbo == 0 || es.MeshInterleaved is not { } inter) return;
             int verts = Math.Min(es.MeshVertexCount, positions.Length / 3);
@@ -357,7 +419,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
-        private void RenderMeshEmitter(VfxParticleSimulator.EmitterState es, Matrix4x4 viewProj)
+        private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
@@ -371,12 +433,19 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _whiteTex);
+            var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+            ApplyAddressMode(renderState.TextureAddressMode);
+            _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
+            _gl.Uniform1(_muFlipU, renderState.FlipU ? 1 : 0);
+            _gl.Uniform1(_muFlipV, renderState.FlipV ? 1 : 0);
             if (es.TextureMult != 0)
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
+            if (renderState.DisableBackfaceCull) _gl.Disable(EnableCap.CullFace);
+            else _gl.Enable(EnableCap.CullFace);
             if (IsAdditive(es.Def.BlendMode)) _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
             else _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
@@ -388,9 +457,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 int o = i * Stride;
                 _gl.Uniform3(_muWorldPos, es.Instances[o], es.Instances[o + 1], es.Instances[o + 2]);
-                float rawScale = es.Instances[o + 3];
-                float sc = MathF.Abs(rawScale) < 0.01f ? MathF.CopySign(0.01f, rawScale == 0f ? 1f : rawScale) : rawScale;
-                _gl.Uniform1(_muScale, sc);
+                float scaleX = ClampScale(es.Instances[o + 3]);
+                float scaleY = ClampScale(es.Instances[o + 4]);
+                float scaleZ = ClampScale(es.Instances[o + 18]);
+                _gl.Uniform3(_muScale, scaleX, scaleY, scaleZ);
                 _gl.Uniform1(_muRot, es.Instances[o + 9]);
                 _gl.Uniform4(_muColor, es.Instances[o + 5], es.Instances[o + 6], es.Instances[o + 7], es.Instances[o + 8]);
                 
@@ -407,27 +477,36 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindVertexArray(_vao);
         }
 
+        private static float ClampScale(float value)
+            => MathF.Abs(value) < 0.01f ? MathF.CopySign(0.01f, value == 0f ? 1f : value) : value;
+
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
 uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
-uniform float uScale;
+uniform vec3 uScale;
 uniform float uRot;
 uniform vec2 uUvOffset;
 uniform vec2 uUvOffsetMult;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
+uniform int uFlipU;
+uniform int uFlipV;
 out vec2 vUv;
 out vec2 vUvMult;
 void main(){
     float s = sin(uRot); float c = cos(uRot);
-    vec3 local = vec3(aPos.x * c - aPos.z * s, aPos.y, aPos.x * s + aPos.z * c) * uScale;
+    vec3 scaled = aPos * uScale;
+    vec3 local = vec3(scaled.x * c - scaled.z * s, scaled.y, scaled.x * s + scaled.z * c);
     vec3 p = uPlacementRight * local.x + uPlacementUp * local.y + uPlacementForward * local.z + uWorldPos;
     gl_Position = uViewProj * vec4(p, 1.0);
-    vUv = aUv + uUvOffset;
-    vUvMult = aUv + uUvOffsetMult;
+    vec2 baseUv = aUv;
+    if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
+    if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
+    vUv = baseUv + uUvOffset;
+    vUvMult = baseUv + uUvOffsetMult;
 }";
 
         private const string MeshFrag = @"
@@ -437,10 +516,12 @@ uniform sampler2D uTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
 uniform vec4 uColor;
+uniform float uAlphaCutoff;
 out vec4 fragColor;
 void main(){
     vec4 texel = texture(uTex, vUv);
     if (uHasTexMult != 0) texel *= texture(uTexMult, vUvMult);
+    if (texel.a * uColor.a <= uAlphaCutoff) discard;
     fragColor = texel * uColor;
 }";
 
@@ -456,11 +537,15 @@ uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
 uniform vec2 uTexDiv;
+uniform vec2 uTexSize;
 uniform vec2 uUvScrollRate;
 uniform vec2 uTexDivMult;
 uniform vec2 uUvScrollRateMult;
 uniform int uDirectionOriented;
 uniform int uArbitraryQuad;
+uniform int uFlipU;
+uniform int uFlipV;
+uniform int uClampUv;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
@@ -499,8 +584,17 @@ void main(){
     float frame = floor(aRotFrame.y + 0.0001);
     float fx = mod(frame, cols);
     float fy = floor(frame / cols);
-    vUv = (vec2(fx, fy) + vec2(cell.x, 1.0 - cell.y)) / vec2(cols, rows)
-        + uUvScrollRate * aAgeVelX.x;
+    vec2 localUv = vec2(cell.x, 1.0 - cell.y);
+    if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
+    if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
+    vec2 halfTexel = 0.5 / max(uTexSize, vec2(1.0));
+    vec2 atlasUv = (vec2(fx, fy) + localUv) / vec2(cols, rows);
+    vec2 cellMin = vec2(fx, fy) / vec2(cols, rows) + halfTexel;
+    vec2 cellMax = vec2(fx + 1.0, fy + 1.0) / vec2(cols, rows) - halfTexel;
+    atlasUv = clamp(atlasUv, cellMin, cellMax);
+    vec2 scroll = uUvScrollRate * aAgeVelX.x;
+    if (uClampUv != 0) scroll = clamp(scroll, -localUv, vec2(1.0) - localUv);
+    vUv = atlasUv + scroll;
     vUvMult = vec2(cell.x, 1.0 - cell.y) / max(uTexDivMult, vec2(1.0))
         + uUvScrollRateMult * aAgeVelX.x;
     vColor = aColor;
@@ -518,10 +612,12 @@ uniform sampler2D uDistortionTex;
 uniform sampler2D uSceneTex;
 uniform vec2 uViewportSize;
 uniform float uDistortionStrength;
+uniform float uAlphaCutoff;
 out vec4 fragColor;
 void main(){
     vec4 t = texture(uTex, vUv);
     if (uHasTexMult != 0) t *= texture(uTexMult, vUvMult);
+    if (t.a * vColor.a <= uAlphaCutoff) discard;
     if (uIsDistortion != 0) {
         vec4 normalSample = texture(uDistortionTex, vUv);
         float mask = normalSample.a * t.a * vColor.a;

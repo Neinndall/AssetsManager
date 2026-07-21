@@ -6,7 +6,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using Silk.NET.OpenGL;
 using AssetsManager.Views.Models.Viewer;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Utils;
 using System.Linq;
 
@@ -62,8 +62,8 @@ namespace AssetsManager.Services.Viewer
             {
                 _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
             }
-            bool gles = ShaderUtil.DetectGles(gl);
-            _program = ShaderUtil.CreateProgram(gl, gles, MeshVert, MeshFrag);
+            bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
+            _program = GlShaderCompiler.CreateProgram(gl, gles, MeshVert, MeshFrag);
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uWorld = gl.GetUniformLocation(_program, "uWorld");
             _uTex = gl.GetUniformLocation(_program, "uTex");

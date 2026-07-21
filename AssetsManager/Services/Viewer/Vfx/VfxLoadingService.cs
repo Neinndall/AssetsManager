@@ -3,17 +3,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Threading;
+using System.Threading.Tasks;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
     /// <summary>
-    /// Loads the full VFX/animation graph for a model from an extracted project folder.
-    /// Replicates the dependency-walk strategy: it follows each bin's declared dependencies
-    /// (relative to the WAD root), queues every skin bin and the champion root bin, and extracts
-    /// VfxSystemDefinition objects, animation clips and the effectKey -> objectHash resource map.
+    /// Loads a model's complete effect catalog and prepares every referenced emitter resource.
     /// </summary>
-    public sealed class VfxProjectLoader
+    public sealed class VfxLoadingService
     {
+        private readonly VfxResourceResolver _resources = new();
+        private readonly SemaphoreSlim _catalogGate = new(1, 1);
+
         public sealed class Bundle
         {
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
@@ -21,7 +26,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Dictionary<uint, uint> ResourceMap { get; } = new();
         }
 
-        public Bundle Load(string skinBinPath, ILogSink log)
+        public Bundle Load(string skinBinPath, LogService log)
         {
             var bundle = new Bundle();
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath)) return bundle;
@@ -50,24 +55,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 string animBinPath = Path.Combine(charFolder, "animations", skinName + ".bin");
                 Enqueue(animBinPath);
 
-                // Only load VFX data for the selected skin: the skin's own bin plus the fused
-                // "multi_skins_*" bins that include this skin (e.g. skin0 -> lulu_multi_skins_skin0_*).
-                // Scanning every skin/bin would load every other skin's VFX into the base model.
-                string animationsDir = Path.Combine(charFolder, "animations");
-                if (Directory.Exists(animationsDir))
-                {
-                    foreach (var extra in Directory.GetFiles(animationsDir, "*.bin", SearchOption.TopDirectoryOnly))
-                        if (Path.GetFileName(extra).IndexOf(skinName, StringComparison.OrdinalIgnoreCase) >= 0)
-                            Enqueue(extra);
-                }
-
-                string skinsDir = Path.Combine(charFolder, "skins");
-                if (Directory.Exists(skinsDir))
-                {
-                    foreach (var extra in Directory.GetFiles(skinsDir, "*.bin", SearchOption.TopDirectoryOnly))
-                        if (Path.GetFileName(extra).IndexOf(skinName, StringComparison.OrdinalIgnoreCase) >= 0)
-                            Enqueue(extra);
-                }
+                // The selected skin BIN is the source of truth. Its dependency table identifies
+                // the champion, animation and shared multi-skin BINs without confusing skin1 with skin11.
+                // Explicit fallbacks keep older extractions that omitted dependency metadata usable.
                 string champRootBin = Path.Combine(charFolder, charName + ".bin");
                 Enqueue(champRootBin);
 
@@ -79,16 +69,17 @@ namespace AssetsManager.Services.Viewer.Vfx
                     {
                         if (!File.Exists(currentBinPath)) continue;
                         byte[] fileBytes = File.ReadAllBytes(currentBinPath);
+                        VfxBinDocument document = VfxGraphParser.ParseDocument(fileBytes);
 
-                        foreach (var kv in VfxSystemResolver.ExtractAll(fileBytes))
+                        foreach (var kv in document.Systems)
                             bundle.Systems.TryAdd(kv.Key, kv.Value);
-                        foreach (var kv in VfxSystemResolver.ExtractAnimationClips(fileBytes))
+                        foreach (var kv in document.AnimationClips)
                             MergeClip(bundle.Clips, kv.Key, kv.Value);
-                        foreach (var kv in VfxSystemResolver.ExtractResourceMap(fileBytes))
+                        foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
 
                         string currentDir = Path.GetDirectoryName(currentBinPath);
-                        foreach (var dep in VfxSystemResolver.ExtractDependencies(fileBytes))
+                        foreach (var dep in document.Dependencies)
                         {
                             if (string.IsNullOrEmpty(dep)) continue;
                             string relativeDepPath = dep
@@ -104,15 +95,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                                 if (File.Exists(fullDepPath)) { Enqueue(fullDepPath); enqueued = true; break; }
                             }
 
-                            if (!enqueued && !string.IsNullOrEmpty(wadRoot) && Directory.Exists(wadRoot))
+                            if (!enqueued)
                             {
-                                try
-                                {
-                                    string fileName = Path.GetFileName(relativeDepPath);
-                                    var matches = Directory.GetFiles(wadRoot, fileName, SearchOption.AllDirectories);
-                                    if (matches.Length > 0) Enqueue(matches[0]);
-                                }
-                                catch { }
+                                string resolvedDependency = _resources.ResolveBin(dep, currentDir ?? searchFolder);
+                                if (resolvedDependency != null) Enqueue(resolvedDependency);
+                                else log?.Log($"VFX BIN dependency missing: {dep}.");
                             }
                         }
                     }
@@ -130,6 +117,98 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
 
             return bundle;
+        }
+
+        public async Task<Bundle> LoadAsync(string skinBinPath, LogService log, CancellationToken cancellationToken = default)
+        {
+            await _catalogGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await Task.Run(() => Load(skinBinPath, log), cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _catalogGate.Release();
+            }
+        }
+
+        public VfxPlaybackRuntime PreparePlayback(
+            VfxSystemDefinition definition,
+            string searchDirectory,
+            Matrix4x4 transform,
+            int seed,
+            LogService log)
+        {
+            ArgumentNullException.ThrowIfNull(definition);
+            var runtime = new VfxPlaybackRuntime(seed);
+            runtime.SetSystem(definition, transform);
+
+            foreach (var emitter in runtime.Emitters)
+            {
+                BitmapSource texture = _resources.ResolveTexture(emitter.Def.TexturePath, searchDirectory);
+                if (texture != null)
+                {
+                    emitter.PendingTexture = texture;
+                    if (emitter.Def.UseTextureAspect)
+                    {
+                        float cellWidth = texture.PixelWidth / Math.Max(1f, emitter.Def.TexDiv.X);
+                        float cellHeight = texture.PixelHeight / Math.Max(1f, emitter.Def.TexDiv.Y);
+                        if (cellHeight > 0f)
+                            emitter.SpriteAspect = Math.Clamp(cellWidth / cellHeight, 0.05f, 20f);
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(emitter.Def.TexturePath))
+                {
+                    log?.Log($"VFX resource missing: {emitter.Def.TexturePath} ({definition.Name}/{emitter.Def.Name}).");
+                }
+
+                emitter.PendingTextureMult = _resources.ResolveTexture(emitter.Def.TextureMultPath, searchDirectory);
+                emitter.PendingDistortionTexture = _resources.ResolveTexture(
+                    emitter.Def.Distortion?.NormalMapTexturePath,
+                    searchDirectory);
+
+                BitmapSource gradient = _resources.ResolveTexture(
+                    emitter.Def.ParticleColorTexturePath,
+                    searchDirectory);
+                if (gradient != null) ApplyColorGradient(emitter, gradient);
+
+                if (emitter.Def.IsMeshPrimitive && !string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                {
+                    emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
+                    if (emitter.PendingMesh == null)
+                        log?.Log($"VFX mesh missing: {emitter.Def.MeshPath} ({definition.Name}/{emitter.Def.Name}).");
+                }
+            }
+
+            runtime.ApplyRenderOrder();
+
+            return runtime;
+        }
+
+        public void ClearCaches() => _resources.ClearCaches();
+
+        private static void ApplyColorGradient(VfxPlaybackRuntime.EmitterState emitter, BitmapSource bitmap)
+        {
+            if (bitmap.Format != PixelFormats.Bgra32)
+            {
+                var converted = new FormatConvertedBitmap();
+                converted.BeginInit();
+                converted.Source = bitmap;
+                converted.DestinationFormat = PixelFormats.Bgra32;
+                converted.EndInit();
+                bitmap = converted;
+            }
+
+            int width = bitmap.PixelWidth;
+            int height = bitmap.PixelHeight;
+            var pixels = new byte[width * height * 4];
+            bitmap.CopyPixels(pixels, width * 4, 0);
+            for (int offset = 0; offset < pixels.Length; offset += 4)
+                (pixels[offset], pixels[offset + 2]) = (pixels[offset + 2], pixels[offset]);
+
+            emitter.ColorGradient = pixels;
+            emitter.ColorGradientW = width;
+            emitter.ColorGradientH = height;
         }
 
         /// <summary>
@@ -171,10 +250,4 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
     }
 
-    /// <summary>Minimal logging contract to avoid a hard dependency on LogService in the loader.</summary>
-    public interface ILogSink
-    {
-        void Log(string message);
-        void LogError(Exception ex, string message);
-    }
 }

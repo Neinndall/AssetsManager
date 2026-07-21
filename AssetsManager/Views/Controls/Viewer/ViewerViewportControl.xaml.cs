@@ -15,12 +15,14 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
 using OpenTK.Wpf;
 using System.Numerics;
+using System.Threading.Tasks;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -39,15 +41,13 @@ namespace AssetsManager.Views.Controls.Viewer
         public Viewport3D Viewport3D => _dummyViewport;
         public Viewport3D Viewport => Viewport3D;
 
-        private VfxParticleRenderer _vfxRenderer;
-        private uint _whiteTex;
-        private readonly List<VfxParticleSimulator> _vfxSims = new();
-        private readonly List<VfxAnimationEvent> _pendingVfxEvents = new();
+        private VfxOpenGlRenderer _vfxRenderer;
+        private readonly List<VfxPlaybackRuntime> _vfxSims = new();
         private readonly Dictionary<SceneModel, Dictionary<string, VfxAnimationClip>> _modelVfxClips = new();
         private readonly Dictionary<SceneModel, Dictionary<uint, VfxSystemDefinition>> _modelVfxDefs = new();
         private readonly Dictionary<SceneModel, IReadOnlyDictionary<uint, uint>> _modelVfxResourceMap = new();
         private readonly Dictionary<BitmapSource, uint> _vfxTextureCache = new();
-        private readonly VfxAssetResolver _vfxResolver = new();
+        private readonly VfxLoadingService _vfxLoadingService = new();
         private IAnimationAsset _lastActiveAnimation;
         private double _lastActiveAnimationTime = 0;
         private readonly AmbientLight GlobalAmbientLight = new AmbientLight();
@@ -88,12 +88,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer = new GlMeshRenderer();
                 _meshRenderer.Initialize(_gl);
 
-                _vfxRenderer = new VfxParticleRenderer();
+                _vfxRenderer = new VfxOpenGlRenderer();
                 _vfxRenderer.Initialize(_gl);
-                _whiteTex = _vfxRenderer.UploadTexture(new byte[] { 255, 255, 255, 255 }, 1, 1);
 
                 _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, ShaderUtil.DetectGles(_gl), 1000f);
+                _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
             }
             catch (Exception ex)
             {
@@ -203,6 +202,8 @@ namespace AssetsManager.Views.Controls.Viewer
                                 _vfxTextureCache[bmp] = tex;
                             }
                             es.Texture = tex;
+                            es.TextureWidth = bmp.PixelWidth;
+                            es.TextureHeight = bmp.PixelHeight;
                             es.PendingTexture = null;
                         }
                         if (es.PendingTextureMult is BitmapSource bmpMult)
@@ -498,14 +499,13 @@ namespace AssetsManager.Views.Controls.Viewer
  
                 _vfxRenderer?.Dispose();
                 _vfxRenderer = null;
-                _whiteTex = 0;
 
                 _vfxSims.Clear();
                 _modelVfxClips.Clear();
                 _modelVfxDefs.Clear();
                 _modelVfxResourceMap.Clear();
                 _vfxTextureCache.Clear();
-                _vfxResolver.ClearCaches();
+                _vfxLoadingService.ClearCaches();
             }
             catch (Exception ex)
             {
@@ -705,7 +705,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void RemoveModel(SceneModel model)
         {
-            if (model == _activeSceneModel)
+            bool removingActiveModel = model == _activeSceneModel;
+            if (removingActiveModel)
             {
                 if (_viewModel.IsAutoRotateActive)
                 {
@@ -721,6 +722,14 @@ namespace AssetsManager.Views.Controls.Viewer
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
             _lastModelUpdates.Remove(model);
+            _modelVfxDefs.Remove(model);
+            _modelVfxClips.Remove(model);
+            _modelVfxResourceMap.Remove(model);
+            if (removingActiveModel)
+            {
+                _vfxSims.Clear();
+                Panel?.SetVfxSystems(new List<string>());
+            }
             if (_modelPlayers.TryGetValue(model, out var player))
             {
                 player.Dispose();
@@ -1416,13 +1425,14 @@ namespace AssetsManager.Views.Controls.Viewer
             return null;
         }
 
-        private void LoadVfxForModel(SceneModel model)
+        private async void LoadVfxForModel(SceneModel model)
         {
             if (model == null || string.IsNullOrEmpty(model.SkinBinPath) || !File.Exists(model.SkinBinPath)) return;
 
             try
             {
-                var bundle = new VfxProjectLoader().Load(model.SkinBinPath, LogService);
+                var bundle = await _vfxLoadingService.LoadAsync(model.SkinBinPath, LogService);
+                if (_isCleanedUp || !_loadedModels.Contains(model)) return;
 
                 var systems = bundle.Systems;
                 var clips = bundle.Clips;
@@ -1434,13 +1444,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 LogService.Log($"Loaded {systems.Count} VFX systems and {clips.Count} animation clips for '{model.Name}'.");
 
-                if (Panel != null)
-                {
-                    Panel.Dispatcher.Invoke(() =>
-                    {
-                        Panel.SetVfxSystems(systems.Values.Select(s => s.Name).Distinct().OrderBy(n => n).ToList());
-                    });
-                }
+                Panel?.SetVfxSystems(systems.Values.Select(s => s.Name).Distinct().OrderBy(n => n).ToList());
             }
             catch (Exception ex)
             {
@@ -1505,7 +1509,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             foreach (var ev in clip.ParticleEvents)
             {
-                uint keyHash = ev.EffectHash != 0 ? ev.EffectHash : VfxAssetResolver.Fnv1a(ev.EffectName);
+                uint keyHash = ev.EffectHash != 0 ? ev.EffectHash : VfxResourceResolver.Fnv1a(ev.EffectName);
                 VfxSystemDefinition def = null;
                 if (resMap != null && resMap.TryGetValue(keyHash, out var objHash))
                 {
@@ -1515,113 +1519,22 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     def = defs.Values.FirstOrDefault(d =>
                         (!string.IsNullOrEmpty(ev.EffectName) && string.Equals(d.Name, ev.EffectName, StringComparison.OrdinalIgnoreCase)) ||
-                        (ev.EffectHash != 0 && (d.PathHash == ev.EffectHash || VfxAssetResolver.Fnv1a(d.Name) == ev.EffectHash)));
+                        (ev.EffectHash != 0 && (d.PathHash == ev.EffectHash || VfxResourceResolver.Fnv1a(d.Name) == ev.EffectHash)));
                 }
 
                 if (def == null) continue;
 
-                var emitterTextures = new List<BitmapSource>();
-                var emitterMultTextures = new List<BitmapSource>();
-                var emitterDistortionTextures = new List<BitmapSource>();
-                var emitterColorGradients = new List<byte[]>();
-                var emitterColorGradW = new List<int>();
-                var emitterColorGradH = new List<int>();
-
-                foreach (var emitter in def.Emitters)
-                {
-                    emitterTextures.Add(_vfxResolver.ResolveTexture(emitter.TexturePath, charFolder));
-                    emitterMultTextures.Add(_vfxResolver.ResolveTexture(emitter.TextureMultPath, charFolder));
-                    emitterDistortionTextures.Add(_vfxResolver.ResolveTexture(emitter.Distortion?.NormalMapTexturePath, charFolder));
-
-                    var bmpColor = _vfxResolver.ResolveTexture(emitter.ParticleColorTexturePath, charFolder);
-                    if (bmpColor != null)
-                    {
-                        if (bmpColor.Format != System.Windows.Media.PixelFormats.Bgra32)
-                        {
-                            var conv = new System.Windows.Media.Imaging.FormatConvertedBitmap();
-                            conv.BeginInit();
-                            conv.Source = bmpColor;
-                            conv.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
-                            conv.EndInit();
-                            bmpColor = conv;
-                        }
-                        int w = bmpColor.PixelWidth;
-                        int h = bmpColor.PixelHeight;
-                        byte[] pixels = new byte[w * h * 4];
-                        bmpColor.CopyPixels(pixels, w * 4, 0);
-                        // WPF gives BGRA; simulator SampleGradient expects RGBA — swap B↔R
-                        for (int px = 0; px < pixels.Length; px += 4)
-                            (pixels[px], pixels[px + 2]) = (pixels[px + 2], pixels[px]);
-                        emitterColorGradients.Add(pixels);
-                        emitterColorGradW.Add(w);
-                        emitterColorGradH.Add(h);
-                    }
-                    else
-                    {
-                        emitterColorGradients.Add(null);
-                        emitterColorGradW.Add(0);
-                        emitterColorGradH.Add(0);
-                    }
-                }
-
                 int seed = HashCode.Combine(def.PathHash, ev.StartFrame);
-                var sim = new VfxParticleSimulator(seed);
-                sim.SetSystem(def, Matrix4x4.Identity, includeNonVisual: true);
+                var sim = _vfxLoadingService.PreparePlayback(
+                    def,
+                    charFolder,
+                    Matrix4x4.Identity,
+                    seed,
+                    LogService);
 
                 float fps = animation.Fps > 1f && animation.Fps < 240f ? animation.Fps : 30f;
                 float startDelay = MathF.Max(0f, ev.StartFrame) / fps;
                 sim.SetStartDelay(startDelay);
-
-                for (int i = 0; i < def.Emitters.Count; i++)
-                {
-                    var es = sim.Emitters[i];
-
-                    var img = emitterTextures[i];
-                    if (img == null)
-                    {
-                        es.Texture = _whiteTex;
-                    }
-                    else
-                    {
-                        es.PendingTexture = img;
-                        if (es.Def.UseTextureAspect)
-                        {
-                            float cellWidth = img.PixelWidth / Math.Max(1f, es.Def.TexDiv.X);
-                            float cellHeight = img.PixelHeight / Math.Max(1f, es.Def.TexDiv.Y);
-                            if (cellHeight > 0f) es.SpriteAspect = Math.Clamp(cellWidth / cellHeight, 0.05f, 20f);
-                        }
-                    }
-
-                    var multImg = emitterMultTextures[i];
-                    if (multImg != null)
-                    {
-                        es.PendingTextureMult = multImg;
-                    }
-
-                    var distImg = emitterDistortionTextures[i];
-                    if (distImg != null)
-                    {
-                        es.PendingDistortionTexture = distImg;
-                    }
-
-                    var colorGrad = emitterColorGradients[i];
-                    if (colorGrad != null)
-                    {
-                        es.ColorGradient = colorGrad;
-                        es.ColorGradientW = emitterColorGradW[i];
-                        es.ColorGradientH = emitterColorGradH[i];
-                    }
-
-                    // Resolve .scb/.sco mesh primitive for mesh-type emitters
-                    if (es.Def.IsMeshPrimitive && !string.IsNullOrEmpty(es.Def.MeshPath))
-                    {
-                        var meshData = _vfxResolver.ResolveMesh(es.Def.MeshPath, charFolder);
-                        if (meshData != null)
-                        {
-                            es.PendingMesh = meshData;
-                        }
-                    }
-                }
 
                 sim.UserTag = ev;
                 _vfxSims.Add(sim);
@@ -1658,84 +1571,16 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxSims.Clear();
 
             string charFolder = Path.GetDirectoryName(Path.GetDirectoryName(_activeSceneModel.SkinBinPath));
-            var emitterTextures = new List<BitmapSource>();
-            var emitterMultTextures = new List<BitmapSource>();
-            var emitterDistortionTextures = new List<BitmapSource>();
-            var emitterColorGradients = new List<byte[]>();
-            var emitterColorGradW = new List<int>();
-            var emitterColorGradH = new List<int>();
-
-            foreach (var emitter in def.Emitters)
-            {
-                emitterTextures.Add(_vfxResolver.ResolveTexture(emitter.TexturePath, charFolder));
-                emitterMultTextures.Add(_vfxResolver.ResolveTexture(emitter.TextureMultPath, charFolder));
-                emitterDistortionTextures.Add(_vfxResolver.ResolveTexture(emitter.Distortion?.NormalMapTexturePath, charFolder));
-
-                var bmpColor = _vfxResolver.ResolveTexture(emitter.ParticleColorTexturePath, charFolder);
-                if (bmpColor != null)
-                {
-                    if (bmpColor.Format != System.Windows.Media.PixelFormats.Bgra32)
-                    {
-                        var conv = new System.Windows.Media.Imaging.FormatConvertedBitmap();
-                        conv.BeginInit();
-                        conv.Source = bmpColor;
-                        conv.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
-                        conv.EndInit();
-                        bmpColor = conv;
-                    }
-                    int w = bmpColor.PixelWidth;
-                    int h = bmpColor.PixelHeight;
-                    byte[] pixels = new byte[w * h * 4];
-                    bmpColor.CopyPixels(pixels, w * 4, 0);
-                    // WPF gives BGRA; simulator SampleGradient expects RGBA — swap B↔R
-                    for (int px = 0; px < pixels.Length; px += 4)
-                        (pixels[px], pixels[px + 2]) = (pixels[px + 2], pixels[px]);
-                    emitterColorGradients.Add(pixels);
-                    emitterColorGradW.Add(w);
-                    emitterColorGradH.Add(h);
-                }
-                else
-                {
-                    emitterColorGradients.Add(null);
-                    emitterColorGradW.Add(0);
-                    emitterColorGradH.Add(0);
-                }
-            }
-
-            var sim = new VfxParticleSimulator(1234);
-            sim.SetSystem(def, Matrix4x4.CreateTranslation(new Vector3((float)_activeSceneModel.PositionX, (float)_activeSceneModel.PositionY, (float)_activeSceneModel.PositionZ)), includeNonVisual: true);
-
-            for (int i = 0; i < def.Emitters.Count; i++)
-            {
-                var es = sim.Emitters[i];
-                var img = emitterTextures[i];
-                if (img == null) es.Texture = _whiteTex;
-                else
-                {
-                    es.PendingTexture = img;
-                    if (es.Def.UseTextureAspect)
-                    {
-                        float cellWidth = img.PixelWidth / Math.Max(1f, es.Def.TexDiv.X);
-                        float cellHeight = img.PixelHeight / Math.Max(1f, es.Def.TexDiv.Y);
-                        if (cellHeight > 0f) es.SpriteAspect = Math.Clamp(cellWidth / cellHeight, 0.05f, 20f);
-                    }
-                }
-                if (emitterMultTextures[i] != null) es.PendingTextureMult = emitterMultTextures[i];
-                if (emitterDistortionTextures[i] != null) es.PendingDistortionTexture = emitterDistortionTextures[i];
-                es.ColorGradient = emitterColorGradients[i];
-                es.ColorGradientW = emitterColorGradW[i];
-                es.ColorGradientH = emitterColorGradH[i];
-
-                // Resolve .scb/.sco mesh primitive for mesh-type emitters
-                if (es.Def.IsMeshPrimitive && !string.IsNullOrEmpty(es.Def.MeshPath))
-                {
-                    var meshData = _vfxResolver.ResolveMesh(es.Def.MeshPath, charFolder);
-                    if (meshData != null)
-                    {
-                        es.PendingMesh = meshData;
-                    }
-                }
-            }
+            var transform = Matrix4x4.CreateTranslation(new Vector3(
+                (float)_activeSceneModel.PositionX,
+                (float)_activeSceneModel.PositionY,
+                (float)_activeSceneModel.PositionZ));
+            var sim = _vfxLoadingService.PreparePlayback(
+                def,
+                charFolder,
+                transform,
+                HashCode.Combine(def.PathHash, systemName),
+                LogService);
 
             _vfxSims.Add(sim);
             LogService.Log($"Playing VFX system manually: {systemName}");

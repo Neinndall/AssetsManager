@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Utils.Rendering;
 
 namespace AssetsManager.Services.Viewer
 {
-    /// <summary>Editor ground grid + axes. Shares the ES/desktop shader path via <see cref="ShaderUtil"/>.</summary>
+    /// <summary>Editor ground grid and directional axes.</summary>
     public sealed class GridRenderer : IDisposable
     {
         private GL _gl;
@@ -32,7 +32,7 @@ void main() { FragColor = uColor; }";
         public void Initialize(GL gl, bool gles, float yHeight = 0f)
         {
             _gl = gl;
-            _program = ShaderUtil.CreateProgram(gl, gles, VertexBody, FragmentBody);
+            _program = GlShaderCompiler.CreateProgram(gl, gles, VertexBody, FragmentBody);
             _uMvp = _gl.GetUniformLocation(_program, "uMvp");
             _uColor = _gl.GetUniformLocation(_program, "uColor");
 
