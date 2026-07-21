@@ -24,7 +24,6 @@ namespace AssetsManager.Utils
         private static readonly HashSet<string> GenericMaterialKeywords =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-        private static readonly ConditionalWeakTable<BitmapSource, BitmapSource> OpaqueTextureCache = new();
 
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
@@ -138,32 +137,7 @@ namespace AssetsManager.Utils
             if (texture != null)
             {
                 var materialGroup = new MaterialGroup();
-
-                // Force Bgr32 format for opaque parts to prevent WPF from placing them in the transparent rendering pass
-                BitmapSource textureToUse = texture;
-                if (!modelPart.IsTransparent && texture.Format != PixelFormats.Bgr32)
-                {
-                    try
-                    {
-                        textureToUse = OpaqueTextureCache.GetValue(texture, static source =>
-                        {
-                            var converted = new FormatConvertedBitmap(source, PixelFormats.Bgr32, null, 0);
-                            if (converted.CanFreeze) converted.Freeze();
-                            return converted;
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Trace.TraceError($"Failed to prepare opaque viewer texture: {ex}");
-                        textureToUse = texture;
-                    }
-                }
-
-                var imageBrush = CreateViewerTextureBrush(textureToUse);
-                if (modelPart.IsTransparent)
-                {
-                    imageBrush.Opacity = 0.99; // Force WPF to place this in the transparent pass
-                }
+                var imageBrush = CreateViewerTextureBrush(texture);
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
                 modelPart.Geometry.Material = materialGroup;

@@ -110,6 +110,7 @@ namespace AssetsManager.Services.Viewer
 
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
+            _gl.Disable(EnableCap.Blend);
 
             foreach (var part in model.Parts)
             {
@@ -124,18 +125,6 @@ namespace AssetsManager.Services.Viewer
                 uint tex = buffers.Texture != 0 ? buffers.Texture : _whiteTex;
                 _gl.BindTexture(TextureTarget.Texture2D, tex);
 
-                if (part.IsTransparent)
-                {
-                    _gl.Enable(EnableCap.Blend);
-                    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                    _gl.DepthMask(false);
-                }
-                else
-                {
-                    _gl.Disable(EnableCap.Blend);
-                    _gl.DepthMask(true);
-                }
-
                 if (_drawElements != null)
                 {
                     _drawElements((uint)PrimitiveType.Triangles, buffers.IndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
@@ -144,8 +133,6 @@ namespace AssetsManager.Services.Viewer
 
             _gl.BindVertexArray(0);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.DepthMask(true);
-            _gl.Disable(EnableCap.Blend);
         }
 
         private GlPartBuffers EnsureBuffers(ModelPart part, SceneModel model)

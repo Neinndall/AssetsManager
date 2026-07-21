@@ -215,9 +215,6 @@ namespace AssetsManager.Services.Viewer
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
 
-                var opaqueParts = new List<ModelPart>();
-                var transparentParts = new List<ModelPart>();
-
                 foreach (var data in dataList)
                 {
                     var positionsCol = new Point3DCollection(data.Positions);
@@ -237,26 +234,6 @@ namespace AssetsManager.Services.Viewer
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
-                    // Check for transparency using clean keyword-based classification of material name
-                    bool isTransparent = false;
-                    if (!string.IsNullOrEmpty(data.MaterialName))
-                    {
-                        string lowerMat = data.MaterialName.ToLowerInvariant();
-                        if (lowerMat.Contains("eye") || 
-                            lowerMat.Contains("glass") || 
-                            lowerMat.Contains("trans") || 
-                            lowerMat.Contains("alpha") ||
-                            lowerMat.Contains("vfx") ||
-                            lowerMat.Contains("overlay") ||
-                            lowerMat.Contains("wing") ||
-                            lowerMat.Contains("shadow") ||
-                            lowerMat.Contains("decal") ||
-                            lowerMat.Contains("glow"))
-                        {
-                            isTransparent = true;
-                        }
-                    }
-
                     var modelPart = new ModelPart
                     {
                         Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
@@ -265,35 +242,14 @@ namespace AssetsManager.Services.Viewer
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.TexturePath,
-                        Geometry = geometryModel,
-                        IsTransparent = isTransparent
+                        Geometry = geometryModel
                     };
 
                     modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
-                    if (isTransparent)
-                    {
-                        transparentParts.Add(modelPart);
-                    }
-                    else
-                    {
-                        opaqueParts.Add(modelPart);
-                    }
-                }
-
-                // Add opaque parts first to prevent depth-buffer transparency issues
-                foreach (var part in opaqueParts)
-                {
-                    parts.Add(part);
-                    sceneModel.RootVisual.Children.Add(part.Visual);
-                }
-
-                // Add transparent parts last
-                foreach (var part in transparentParts)
-                {
-                    parts.Add(part);
-                    sceneModel.RootVisual.Children.Add(part.Visual);
+                    parts.Add(modelPart);
+                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
 
                 sceneModel.Parts.AddRange(parts);
