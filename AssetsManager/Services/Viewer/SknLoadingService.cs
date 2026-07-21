@@ -233,7 +233,6 @@ namespace AssetsManager.Services.Viewer
                     {
                         string lowerMat = data.MaterialName.ToLowerInvariant();
                         if (lowerMat.Contains("eye") || 
-                            lowerMat.Contains("hair") || 
                             lowerMat.Contains("glass") || 
                             lowerMat.Contains("trans") || 
                             lowerMat.Contains("alpha") ||
