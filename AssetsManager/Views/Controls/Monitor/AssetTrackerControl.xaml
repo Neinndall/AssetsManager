@@ -160,7 +160,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Width="220" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Top">
+                    <Border Width="220" Background="{StaticResource CardBackground}" CornerRadius="16" Margin="14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" VerticalAlignment="Top">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="15" ShadowDepth="4" Opacity="0.2" Color="Black"/>
                         </Border.Effect>

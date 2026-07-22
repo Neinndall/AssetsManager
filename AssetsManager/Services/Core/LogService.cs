@@ -91,37 +91,37 @@ namespace AssetsManager.Services.Core
 
         public void LogWarning(string message)
         {
-            _logger.Warning(message);
+            _logger?.Warning(message);
             WriteLog(new LogEntry(message, LogLevel.Warning));
         }
 
         public void LogError(string message)
         {
-            _logger.Error(message);
+            _logger?.Error(message);
             WriteLog(new LogEntry(message, LogLevel.Error));
         }
 
         public void LogSuccess(string message)
         {
-            _logger.Information(message);
+            _logger?.Information(message);
             WriteLog(new LogEntry(message, LogLevel.Success));
         }
 
         public void LogDebug(string message)
         {
-            _logger.Debug(message);
+            _logger?.Debug(message);
             WriteLog(new LogEntry(message, LogLevel.Debug));
         }
 
         public void LogError(Exception ex, string message)
         {
-            _logger.Error(ex, message);
+            _logger?.Error(ex, message);
             WriteLog(new LogEntry(message, LogLevel.Error, ex));
         }
 
         public void LogCritical(Exception ex, string message)
         {
-            _logger.Fatal(ex, message);
+            _logger?.Fatal(ex, message);
             // This method now only logs to the fatal error file, not to the UI.
         }
 

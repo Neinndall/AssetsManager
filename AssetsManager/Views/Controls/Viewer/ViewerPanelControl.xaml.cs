@@ -38,6 +38,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public ViewerProjectExplorerControl ProjectExplorer { get; set; }
 
         // Peer Controls (Direct communication)
         public ViewerWindowModel WindowViewModel { get; set; }
@@ -264,6 +265,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _viewModel.AnimationModels.Clear();
             }
+
+            TriggerVfxLoadingForSelectedModel();
 
             PositionXLock.IsChecked = false;
             PositionYLock.IsChecked = false;
@@ -1042,5 +1045,36 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void TabVfx_Checked(object sender, RoutedEventArgs e)
+        {
+            UpdateInspectorInfo();
+            TriggerVfxLoadingForSelectedModel();
+        }
+
+        private void TriggerVfxLoadingForSelectedModel()
+        {
+            var selectedModel = _viewModel.SelectedModel;
+            if (selectedModel != null && !string.IsNullOrEmpty(selectedModel.FilePath))
+            {
+                string filePath = selectedModel.FilePath;
+                string projectRoot = ProjectExplorer?.CurrentRootFolder;
+
+                Task.Run(async () =>
+                {
+                    var vfxDataService = new VfxDataService(LogService);
+                    var vfxSystems = await vfxDataService.LoadVfxSystemsForModelAsync(filePath, projectRoot);
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        _viewModel.VfxSystems.ReplaceRange(vfxSystems);
+                        Viewport?.SetVfxSystems(vfxSystems);
+                    });
+                });
+            }
+            else
+            {
+                _viewModel.VfxSystems.Clear();
+                Viewport?.SetVfxSystems(null);
+            }
+        }
     }
 }

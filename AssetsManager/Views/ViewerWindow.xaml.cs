@@ -45,6 +45,7 @@ namespace AssetsManager.Views
             PanelControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
+            PanelControl.ProjectExplorer = ProjectExplorer;
  
             ChromaSelectionOverlay.ScannerService = serviceProvider.GetRequiredService<ChromaScannerService>();
 
@@ -55,6 +56,7 @@ namespace AssetsManager.Views
 
             ViewportControl.Panel = PanelControl;
 
+            PanelControl.ProjectExplorer = ProjectExplorer;
             ChromaSelectionOverlay.ParentPanel = PanelControl;
 
             // Project Explorer event wiring

@@ -26,6 +26,7 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
         public string SourceType { get; set; } = "Model"; // "Model" or "Chroma"
+        public string FilePath { get; set; } = string.Empty;
         public SkinnedMesh SkinnedMesh { get; set; }
         public ModelVisual3D RootVisual { get; set; }
 

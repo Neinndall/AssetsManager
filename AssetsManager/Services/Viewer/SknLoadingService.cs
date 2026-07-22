@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides, filePath);
             }
             catch (Exception ex)
             {
@@ -77,7 +77,7 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, null);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides, filePath);
             }
             catch (Exception ex)
             {
@@ -121,7 +121,8 @@ namespace AssetsManager.Services.Viewer
             SkinnedMesh skinnedMesh,
             Dictionary<string, BitmapSource> loadedTextures,
             string modelName,
-            IReadOnlyDictionary<string, string> materialTextureOverrides)
+            IReadOnlyDictionary<string, string> materialTextureOverrides,
+            string filePath = "")
         {
             var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             string skinName = modelName.Split('.')[0];
@@ -201,7 +202,7 @@ namespace AssetsManager.Services.Viewer
 
             return await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh };
+                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh, FilePath = filePath };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
 

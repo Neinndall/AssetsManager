@@ -25,6 +25,11 @@ namespace BenchmarkApp
                 CheckPluginsWads();
                 return;
             }
+            if (args.Length > 0 && args[0] == "vfx-audit")
+            {
+                AuditVfxBins();
+                return;
+            }
             if (args.Length > 0 && args[0] == "list-extensions")
             {
                 await ListAllExtensionsAsync();
@@ -420,6 +425,27 @@ namespace BenchmarkApp
             foreach (var pair in unknownSignatures.OrderByDescending(x => x.Value))
             {
                 Console.WriteLine($" {pair.Key}: {pair.Value}");
+            }
+        }
+
+        private static void AuditVfxBins()
+        {
+            var logService = new AssetsManager.Services.Core.LogService(null);
+            var service = new AssetsManager.Services.Viewer.VfxDataService(logService);
+
+            string sknPath = @"C:\Users\danielpriego\Desktop\Aurora.wad.client\assets\characters\aurora\skins\base\aurora_base.skn";
+            string rootPath = @"C:\Users\danielpriego\Desktop\Aurora.wad.client";
+
+            Console.WriteLine($"Testing VfxDataService.LoadVfxSystemsForModel...");
+            Console.WriteLine($"sknPath: {sknPath}");
+            Console.WriteLine($"rootPath: {rootPath}");
+
+            var systems = service.LoadVfxSystemsForModel(sknPath, rootPath);
+            Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {systems.Count}");
+
+            foreach (var sys in systems.Take(20))
+            {
+                Console.WriteLine($" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count} | Enabled: {sys.IsEnabled}");
             }
         }
     }
