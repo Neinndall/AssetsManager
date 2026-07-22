@@ -97,6 +97,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX systems can now be selected without crashing the playback panel.
   - Viewer VFX now evaluates authored birth curves, trail geometry, UV scrolling, and erosion channels correctly.
   - Removed synthetic BIN path reconstruction, cross-dictionary structural attacks, and unrelated JSON, CSS, JavaScript, text, and executable scans from BIN guessing.
   - BIN guessing now rejects same-file coincidences without a proven structural relationship and automatically purges legacy unverified research records.

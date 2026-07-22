@@ -1056,9 +1056,9 @@
                         </Grid.ColumnDefinitions>
                         <Slider x:Name="AnimationSlider" Grid.Column="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" Thumb.DragStarted="AnimationSlider_DragStarted" Thumb.DragCompleted="AnimationSlider_DragCompleted" ValueChanged="AnimationSlider_ValueChanged" Height="14" Style="{StaticResource HUDSliderStyle}"/>
                         <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
-                            <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                            <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
                             <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                            <Run Text="{Binding TotalDuration, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
+                            <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource TextMuted}"/>
                         </TextBlock>
                     </Grid>
 
@@ -1150,7 +1150,7 @@
                         <StackPanel>
                             <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
                             <TextBlock FontSize="9" Foreground="{StaticResource TextMuted}">
-                                <Run Text="{Binding EmitterCount}"/><Run Text=" emitters · "/><Run Text="{Binding FrameRateText}"/>
+                                <Run Text="{Binding EmitterCount, Mode=OneWay}"/><Run Text=" emitters · "/><Run Text="{Binding FrameRateText, Mode=OneWay}"/>
                             </TextBlock>
                         </StackPanel>
                     </DockPanel>
@@ -1169,9 +1169,9 @@
                                 ValueChanged="VfxSlider_ValueChanged"
                                 Height="14" Style="{StaticResource HUDSliderStyle}"/>
                         <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
-                            <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                            <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
                             <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                            <Run Text="{Binding DurationText}" Foreground="{StaticResource TextMuted}"/>
+                            <Run Text="{Binding DurationText, Mode=OneWay}" Foreground="{StaticResource TextMuted}"/>
                         </TextBlock>
                     </Grid>
 
