@@ -113,7 +113,7 @@ Bug Fixes
   - Fixed selected Explorer and comparison results keeping their NEW, MODIFIED, and REMOVED colors.
   - Fixed archived single-WAD comparisons saving empty snapshots that could not be previewed.
   - Fixed new asset extraction from a single WAD comparison using invalid duplicate WAD paths.
-  - Fixed texture and data saves ignoring the Original export preference.
+  - Explorer SAVE now applies SMART conversion to complete selected folders independently of asset-extraction preferences.
   - Fixed Comparison Gallery memory growth, recycled thumbnail loading, and SVG previews after closing or filtering results.
   - Fixed archived Zstd chunk previews without requiring auxiliary metadata.
   - Fixed Versions list scrolling when the pointer is over a version entry.

@@ -33,6 +33,16 @@ namespace AssetsManager.Services.Downloads
         private readonly AudioConversionService _audioConversionService;
         private readonly WadNodeLoaderService _wadNodeLoaderService;
 
+        private readonly record struct ExportFormats(
+            WadExportMode AudioMode,
+            AudioExportFormat AudioTarget,
+            ImageExportFormat Image,
+            DataExportFormat Data)
+        {
+            public static ExportFormats ExplorerSmart(AudioExportFormat audio) => new(
+                WadExportMode.Smart, audio, ImageExportFormat.Png, DataExportFormat.Json);
+        }
+
         public event Action<int> ExtractionStarted;
         public event Action<int, int, string> ExtractionProgressChanged;
         public event Action ExtractionCompleted;
@@ -87,6 +97,11 @@ namespace AssetsManager.Services.Downloads
 
             string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
             int extractedCount = 0;
+            var exportFormats = new ExportFormats(
+                WadExportMode.Original,
+                AudioExportFormat.Ogg,
+                _appSettings.ImageExportFormat,
+                _appSettings.DataExportFormat);
 
             _logService.Log($"Starting extraction of {totalFiles} new assets.");
 
@@ -128,7 +143,7 @@ namespace AssetsManager.Services.Downloads
                     }
                     else
                     {
-                        await ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null);
+                        await ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null, exportFormats);
                     }
                 }
 
@@ -230,7 +245,7 @@ namespace AssetsManager.Services.Downloads
                             string fileName = Path.GetFileName(path);
                             SavingProgressChanged?.Invoke(processedCount, totalFiles, fileName);
                             onFileSavedCallback?.Invoke(path);
-                        });
+                        }, ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
                 }
             }
             catch (OperationCanceledException)
@@ -331,7 +346,7 @@ namespace AssetsManager.Services.Downloads
 
         #region Smart Export Logic & Handlers
 
-        private async Task ExportSmartAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task ExportSmartAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, ExportFormats formats)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -350,7 +365,7 @@ namespace AssetsManager.Services.Downloads
                 foreach (var child in node.Children)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await ExportSmartAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                    await ExportSmartAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback, formats);
                 }
                 return;
             }
@@ -358,6 +373,7 @@ namespace AssetsManager.Services.Downloads
             if (node.Type == NodeType.AudioEvent)
             {
                 if (node.IsTechnicalNode) return;
+                if (formats.AudioMode == WadExportMode.Original) return;
 
                 string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
                 _directoriesCreator.CreateDirectory(eventPath);
@@ -369,7 +385,7 @@ namespace AssetsManager.Services.Downloads
                         cancellationToken.ThrowIfCancellationRequested();
                         if (childNode.Type == NodeType.WemFile)
                         {
-                            await HandleWemFileAsync(childNode, currentPath, cancellationToken, onFileSavedCallback);
+                            await HandleWemFileAsync(childNode, currentPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
                         }
                         else if (childNode.Type == NodeType.VirtualDirectory)
                         {
@@ -392,13 +408,20 @@ namespace AssetsManager.Services.Downloads
                 case ".bnk":
                     if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count > 0)
                     {
-                        await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback);
+                        if (formats.AudioMode == WadExportMode.Smart)
+                        {
+                            await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
+                        }
+                        else
+                        {
+                            await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                        }
                     }
                     break;
 
                 case ".tex":
                 case ".dds":
-                    await HandleTextureFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleTextureFile(node, destinationPath, formats.Image, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".bin":
@@ -406,23 +429,37 @@ namespace AssetsManager.Services.Downloads
                 case ".css":
                 case ".troybin":
                 case ".preload":
-                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), cancellationToken, onFileSavedCallback);
+                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), formats.Data, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".luabin64":
-                    await HandleLuaFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleLuaFile(node, destinationPath, formats.Data, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".js":
-                    await HandleJsFile(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    await HandleJsFile(node, destinationPath, formats.Data, cancellationToken, onFileSavedCallback);
                     break;
 
                 case ".wem":
-                    await HandleWemFileAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    if (formats.AudioMode == WadExportMode.Smart)
+                    {
+                        await HandleWemFileAsync(node, destinationPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
+                    }
+                    else
+                    {
+                        await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    }
                     break;
 
                 case ".ogg":
-                    await HandleStandardAudioFileAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    if (formats.AudioMode == WadExportMode.Smart)
+                    {
+                        await HandleStandardAudioFileAsync(node, destinationPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
+                    }
+                    else
+                    {
+                        await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
+                    }
                     break;
 
                 default:
@@ -432,10 +469,8 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, ImageExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            var format = _appSettings.ImageExportFormat;
-
             if (format == ImageExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
@@ -455,9 +490,9 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (_appSettings.DataExportFormat == DataExportFormat.Original)
+            if (format == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -474,9 +509,9 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (_appSettings.DataExportFormat == DataExportFormat.Original)
+            if (format == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -492,9 +527,9 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            if (_appSettings.DataExportFormat == DataExportFormat.Original)
+            if (format == DataExportFormat.Original)
             {
                 await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
                 return;
@@ -511,12 +546,11 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(filePath);
         }
 
-        private async Task HandleStandardAudioFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleStandardAudioFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat targetFormat, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
             if (fileBytes == null) return;
 
-            var targetFormat = _appSettings.AudioExportFormat;
             string currentExtension = Path.GetExtension(node.Name).ToLower();
             
             if (targetFormat != AudioExportFormat.Ogg || currentExtension != ".ogg")
@@ -537,12 +571,11 @@ namespace AssetsManager.Services.Downloads
             onFileSavedCallback?.Invoke(fallbackPath);
         }
 
-        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             var wemData = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken);
             if (wemData == null) return;
 
-            var format = _appSettings.AudioExportFormat;
             byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
             if (convertedData != null)
             {
@@ -553,7 +586,7 @@ namespace AssetsManager.Services.Downloads
             }
         }
 
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
+        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, AudioExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
             var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
             if (linkedBank == null) return;
@@ -585,7 +618,6 @@ namespace AssetsManager.Services.Downloads
 
                 if (wemData != null)
                 {
-                    var format = _appSettings.AudioExportFormat;
                     byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
                     if (convertedData != null)
                     {
