@@ -44,7 +44,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 await VersionService.FetchAllVersionsAsync();
                 if (_viewModel != null)
                 {
-                    await _viewModel.LoadVersionFilesAsync();
+                    await _viewModel.LoadVersionFilesAsync(preservePage: true);
                 }
             }
             else
@@ -207,9 +207,9 @@ namespace AssetsManager.Views.Controls.Monitor
                     _viewModel.AllLeagueClientVersions.Remove(versionFile);
                     _viewModel.AllLoLGameClientVersions.Remove(versionFile);
                 }
-                // Recalculate total pages and update views after deletion
-                _viewModel.LeagueClientPaginator.SetFullList(_viewModel.AllLeagueClientVersions);
-                _viewModel.LoLGameClientPaginator.SetFullList(_viewModel.AllLoLGameClientVersions);
+                // Recalculate total pages and update views after deletion preserving current page
+                _viewModel.LeagueClientPaginator.SetFullList(_viewModel.AllLeagueClientVersions, preservePage: true);
+                _viewModel.LoLGameClientPaginator.SetFullList(_viewModel.AllLoLGameClientVersions, preservePage: true);
             }
         }
     }

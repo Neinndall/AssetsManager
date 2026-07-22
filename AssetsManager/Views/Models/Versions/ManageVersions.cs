@@ -66,7 +66,7 @@ namespace AssetsManager.Views.Models.Versions
             Paginator = isGame ? (IPaginationModel)LoLGameClientPaginator : (IPaginationModel)LeagueClientPaginator;
         }
 
-        public async Task LoadVersionFilesAsync()
+        public async Task LoadVersionFilesAsync(bool preservePage = false)
         {
             if (_versionService != null)
             {
@@ -76,8 +76,8 @@ namespace AssetsManager.Views.Models.Versions
                 var gameClientCategories = new[] { "lol-game-client" };
                 AllLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
-                LeagueClientPaginator.SetFullList(AllLeagueClientVersions);
-                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions);
+                LeagueClientPaginator.SetFullList(AllLeagueClientVersions, preservePage);
+                LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions, preservePage);
             }
         }
 

@@ -82,10 +82,11 @@ namespace AssetsManager.Views.Models.Shared
         private string _pageInfo;
         public string PageInfo => _pageInfo ??= $"{CurrentPage} / {TotalPages}";
 
-        public void SetFullList(IEnumerable<T> fullList)
+        public void SetFullList(IEnumerable<T> fullList, bool preservePage = false)
         {
+            int savedPage = preservePage ? CurrentPage : 1;
             _fullList = fullList?.ToList() ?? new List<T>();
-            CurrentPage = 1;
+            _currentPage = savedPage;
             UpdatePaging();
         }
 
