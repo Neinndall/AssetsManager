@@ -15,11 +15,18 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isLoadingVisible = false;
         private string _loadingTitle = "Loading...";
         private string _loadingDescription = "Please wait.";
+        private bool _isProjectExplorerVisible = false;
 
         public bool IsLoadingVisible
         {
             get => _isLoadingVisible;
             set { if (_isLoadingVisible != value) { _isLoadingVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsProjectExplorerVisible
+        {
+            get => _isProjectExplorerVisible;
+            set { if (_isProjectExplorerVisible != value) { _isProjectExplorerVisible = value; OnPropertyChanged(); } }
         }
 
         public string LoadingTitle

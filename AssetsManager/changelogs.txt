@@ -138,6 +138,9 @@ Bug Fixes
   - Fixed LCU hash guessing executing redundant search operations on non-text binary files.
   - Fixed Cancel button styling in the Hash Guessing window to match the secondary button design.
   - Fixed WAD Grep UI progress freezes on massive LCU WAD files by updating progress periodically inside the chunk loop.
+  - Fixed 3D viewer model rendering as completely white when loading models containing custom file extensions.
+  - Fixed a texture mismatch issue where models could load incorrect textures (such as Ahri textures on Locke) due to dictionary property ordering.
+  - Removed legacy static mesh loader (ScoLoadingService) and its associated file formats (.sco and .scb) to clean up the codebase.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

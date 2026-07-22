@@ -26,16 +26,16 @@ namespace AssetsManager.Views.Converters
             { ".info", MaterialIconKind.FileDocumentOutline },
             { ".ini", MaterialIconKind.FileCogOutline },
             { ".stringtable", MaterialIconKind.Translate },
-            { ".png", MaterialIconKind.ImageOutline },
-            { ".jpg", MaterialIconKind.ImageOutline },
-            { ".jpeg", MaterialIconKind.ImageOutline },
-            { ".gif", MaterialIconKind.ImageOutline },
-            { ".ico", MaterialIconKind.ImageOutline },
-            { ".bmp", MaterialIconKind.ImageOutline },
-            { ".tga", MaterialIconKind.ImageOutline },
+            { ".png", MaterialIconKind.FileImageOutline },
+            { ".jpg", MaterialIconKind.FileImageOutline },
+            { ".jpeg", MaterialIconKind.FileImageOutline },
+            { ".gif", MaterialIconKind.FileImageOutline },
+            { ".ico", MaterialIconKind.FileImageOutline },
+            { ".bmp", MaterialIconKind.FileImageOutline },
+            { ".tga", MaterialIconKind.FileImageOutline },
             { ".svg", MaterialIconKind.Svg },
-            { ".dds", MaterialIconKind.Texture },
-            { ".tex", MaterialIconKind.Texture },
+            { ".dds", MaterialIconKind.FileImageOutline },
+            { ".tex", MaterialIconKind.FileImageOutline },
             { ".webm", MaterialIconKind.MoviePlayOutline },
             { ".ogg", MaterialIconKind.MusicNoteOutline },
             { ".wem", MaterialIconKind.MusicNoteOutline },
@@ -43,18 +43,31 @@ namespace AssetsManager.Views.Converters
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".troybin", MaterialIconKind.StarFourPoints },
             { ".preload", MaterialIconKind.FormatListBulleted },
-            { ".skl", MaterialIconKind.HumanMale }, 
-            { ".skn", MaterialIconKind.HumanMale },
+            { ".skl", MaterialIconKind.SitemapOutline }, 
+            { ".skn", MaterialIconKind.CubeOutline },
             { ".sco", MaterialIconKind.CubeOutline },
             { ".scb", MaterialIconKind.CubeOutline },
-            { ".mapgeo", MaterialIconKind.CubeOutline },
-            { ".anm", MaterialIconKind.Animation },
+            { ".mapgeo", MaterialIconKind.Map },
+            { ".anm", MaterialIconKind.AnimationPlay },
             { ".wpk", MaterialIconKind.FolderMusicOutline },
             { ".bnk", MaterialIconKind.FolderMusicOutline },
             { ".wasm", MaterialIconKind.CodeBraces },
             { ".bundle", MaterialIconKind.PackageVariant },
             { ".assetbundle", MaterialIconKind.PackageVariant },
         };
+
+        public static MaterialIconKind GetExtensionIcon(string extension)
+        {
+            if (string.IsNullOrEmpty(extension))
+            {
+                return MaterialIconKind.FileOutline;
+            }
+            if (KnownExtensions.TryGetValue(extension, out var icon))
+            {
+                return icon;
+            }
+            return MaterialIconKind.FileOutline;
+        }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {

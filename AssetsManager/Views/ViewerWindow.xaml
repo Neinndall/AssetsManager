@@ -29,20 +29,20 @@
 
                         <!-- Action Cards -->
                         <UniformGrid Columns="3" HorizontalAlignment="Center">
-                            <!-- Load Model Card -->
+                            <!-- Open Project Folder Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
-                                    Click="OpenFile_Click"
+                                    Click="OpenProjectFolder_Click"
                                     Width="180" Height="160">
                                 <StackPanel>
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
-                                        <materialIcons:MaterialIcon Kind="CubeOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Model"
+                                    <TextBlock Text="Load Project"
                                                FontWeight="SemiBold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn, sco and scb"
+                                    <TextBlock Text="Explore and visualize models"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"
@@ -132,31 +132,54 @@
                 </StackPanel>
             </Grid>
 
-            <!-- MAIN CONTENT (Viewport + Panel) -->
+            <!-- MAIN CONTENT (Viewport + Panel + Project Explorer) -->
             <Grid x:Name="MainContentGrid" Visibility="{Binding ViewModel.IsMainContentVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/>
+                    <ColumnDefinition Width="*"/>    <!-- Col 0: Viewport & Content Browser -->
+                    <ColumnDefinition Width="Auto"/> <!-- Col 1: Panel Splitter -->
+                    <ColumnDefinition Width="360" MinWidth="280" MaxWidth="450"/> <!-- Col 2: Controls Panel -->
                 </Grid.ColumnDefinitions>
 
-                <!-- Column 0: Viewport -->
-                <viewer:ViewerViewportControl Grid.Column="0" x:Name="ViewportControl">
-                    <viewer:ViewerViewportControl.Style>
-                        <Style TargetType="viewer:ViewerViewportControl">
-                            <Setter Property="Margin" Value="0"/>
-                            <Setter Property="Grid.ColumnSpan" Value="1"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
-                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
-                                    <Setter Property="Margin" Value="0,0,4,0"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </viewer:ViewerViewportControl.Style>
-                </viewer:ViewerViewportControl>
+                <!-- Left section: Viewport (top) and Project Explorer (bottom) -->
+                <Grid Grid.Column="0" x:Name="LeftSectionGrid">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition x:Name="ProjectExplorerRow" Height="220" MinHeight="120" MaxHeight="400"/>
+                    </Grid.RowDefinitions>
 
-                <!-- Column 1: Splitter -->
+                    <!-- Row 0: Viewport -->
+                    <viewer:ViewerViewportControl Grid.Row="0" x:Name="ViewportControl">
+                        <viewer:ViewerViewportControl.Style>
+                            <Style TargetType="viewer:ViewerViewportControl">
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="Grid.RowSpan" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
+                                        <Setter Property="Grid.RowSpan" Value="3"/>
+                                        <Setter Property="Margin" Value="0,0,4,0"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </viewer:ViewerViewportControl.Style>
+                    </viewer:ViewerViewportControl>
+
+                    <!-- Horizontal GridSplitter (resizes Viewport and Project Explorer) -->
+                    <GridSplitter Grid.Row="1"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center"
+                                  Height="4"
+                                  Background="Transparent"
+                                  ResizeBehavior="PreviousAndNext"
+                                  ResizeDirection="Rows"
+                                  Visibility="{Binding IsProjectExplorerVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+                    <!-- Project Explorer / Content Browser Panel (Row 2) -->
+                    <viewer:ViewerProjectExplorerControl Grid.Row="2" x:Name="ProjectExplorer"
+                                                         Visibility="{Binding IsProjectExplorerVisible, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                </Grid>
+
+                <!-- Panel GridSplitter (resizes Left Section and PanelControl) -->
                 <GridSplitter Grid.Column="1"
                               x:Name="MainGridSplitter"
                               HorizontalAlignment="Center"

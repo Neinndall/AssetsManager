@@ -12,6 +12,10 @@ using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Audio;
+using AssetsManager.Services.Formatting;
+using AssetsManager.Views.Models.Audio;
+using AssetsManager.Views.Models.Explorer;
 using Material.Icons;
 using System.Threading.Tasks;
 using AssetsManager.Views.Helpers;
@@ -29,7 +33,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private ViewerType _currentMode;
 
         public SknLoadingService SknLoadingService { get; set; }
-        public ScoLoadingService ScoLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public ChromaScannerService ChromaScannerService { get; set; }
         public LogService LogService { get; set; }
@@ -268,6 +271,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RotationXLock.IsChecked = false;
             RotationYLock.IsChecked = false;
             RotationZLock.IsChecked = false;
+
             ScaleLock.IsChecked = false;
         }
 
@@ -579,20 +583,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
-                if (extension == ".sco" || extension == ".scb")
+                if (string.IsNullOrEmpty(texturePath))
                 {
-                    newModel = await Task.Run(() => ScoLoadingService.LoadModel(modelPath), cancellationToken);
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(texturePath))
-                    {
-                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
-                    }
-                    else
-                    {
-                        newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
-                    }
+                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
                 }
             }
             catch (System.OperationCanceledException)
@@ -950,6 +947,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TabMeshes_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabTransform_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabAnimations_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
+        private void TabSfx_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
 
         // ===== Hero & Inspector update helpers =====
 
@@ -993,5 +991,56 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
             }
         }
+
+        private void ToggleProjectExplorer_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowViewModel != null)
+            {
+                WindowViewModel.IsProjectExplorerVisible = !WindowViewModel.IsProjectExplorerVisible;
+            }
+        }
+
+        public void ShowImagePreview(string filePath)
+        {
+            try
+            {
+                var bmp = TextureUtils.LoadTextureFromFile(filePath);
+                if (bmp != null)
+                {
+                    PreviewImageSource.Source = bmp;
+                    _viewModel.SelectedImagePath = filePath;
+                    _viewModel.SelectedImageName = System.IO.Path.GetFileName(filePath);
+                }
+                else
+                {
+                    LogService.LogWarning($"[IMAGE PREVIEW] TextureUtils returned null for: {filePath}. The format might not be supported or is corrupted.");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
+            }
+        }
+
+        private void CloseImagePreview_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedImagePath = string.Empty;
+            _viewModel.SelectedImageName = string.Empty;
+            PreviewImageSource.Source = null;
+        }
+
+        public void LoadAnimationDirectly(string filePath)
+        {
+            try
+            {
+                LoadAnimation(filePath);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to load animation: {filePath}");
+                CustomMessageBoxService.ShowError("Load Error", $"Failed to load animation file: {ex.Message}", Window.GetWindow(this));
+            }
+        }
+
     }
 }

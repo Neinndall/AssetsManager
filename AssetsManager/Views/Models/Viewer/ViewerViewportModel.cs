@@ -20,7 +20,8 @@ namespace AssetsManager.Views.Models.Viewer
         private double _lightRotation = 0; // Phi
         private double _lightHeight = 0;   // Theta
         private double _fieldOfView = 45;
-        private bool _isGroundVisible = true;
+        private bool _isGroundVisible = false;
+        private bool _isGridVisible = true;
         private string _sceneDisplayName = "No model loaded";
 
         public bool IsFpsVisible
@@ -64,6 +65,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _isGroundVisible;
             set { if (_isGroundVisible != value) { _isGroundVisible = value; OnPropertyChanged(); } }
+        }
+
+        public bool IsGridVisible
+        {
+            get => _isGridVisible;
+            set { if (_isGridVisible != value) { _isGridVisible = value; OnPropertyChanged(); } }
         }
 
         public string SceneDisplayName
@@ -112,7 +119,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         // --- Environment Properties ---
         private bool _isTransparentBg = false;
-        private bool _showSkybox = true;
+        private bool _showSkybox = false;
 
         public bool IsTransparentBg
         {
@@ -148,9 +155,10 @@ namespace AssetsManager.Views.Models.Viewer
             LightRotation = 0;
             LightHeight = 0;
             FieldOfView = 45;
-            IsGroundVisible = true;
+            IsGroundVisible = false;
+            IsGridVisible = true;
             IsTransparentBg = false;
-            ShowSkybox = true;
+            ShowSkybox = false;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

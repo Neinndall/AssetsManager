@@ -104,7 +104,7 @@ namespace AssetsManager.Services.Viewer
                         BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(texPath), _logService, texPath);
                         if (loadedTex != null)
                         {
-                            string textureKey = Path.GetFileNameWithoutExtension(texPath);
+                            string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texPath));
                             loadedTextures[textureKey] = loadedTex;
                         }
                     }
@@ -123,7 +123,7 @@ namespace AssetsManager.Services.Viewer
             string modelName,
             IReadOnlyDictionary<string, string> materialTextureOverrides)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys.Select(k => PathUtils.TruncateAtDot(k)));
+            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             string skinName = modelName.Split('.')[0];
             var colorTextureKeys = TextureUtils.GetColorTextureCandidates(loadedTextures.Keys);
 
@@ -205,9 +205,6 @@ namespace AssetsManager.Services.Viewer
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
 
-                var opaqueParts = new List<ModelPart>();
-                var transparentParts = new List<ModelPart>();
-
                 foreach (var data in dataList)
                 {
                     var positionsCol = new Point3DCollection(data.Positions);
@@ -227,26 +224,6 @@ namespace AssetsManager.Services.Viewer
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
-                    // Check for transparency using clean keyword-based classification of material name
-                    bool isTransparent = false;
-                    if (!string.IsNullOrEmpty(data.MaterialName))
-                    {
-                        string lowerMat = data.MaterialName.ToLowerInvariant();
-                        if (lowerMat.Contains("eye") || 
-                            lowerMat.Contains("glass") || 
-                            lowerMat.Contains("trans") || 
-                            lowerMat.Contains("alpha") ||
-                            lowerMat.Contains("vfx") ||
-                            lowerMat.Contains("overlay") ||
-                            lowerMat.Contains("wing") ||
-                            lowerMat.Contains("shadow") ||
-                            lowerMat.Contains("decal") ||
-                            lowerMat.Contains("glow"))
-                        {
-                            isTransparent = true;
-                        }
-                    }
-
                     var modelPart = new ModelPart
                     {
                         Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
@@ -255,35 +232,14 @@ namespace AssetsManager.Services.Viewer
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.TexturePath,
-                        Geometry = geometryModel,
-                        IsTransparent = isTransparent
+                        Geometry = geometryModel
                     };
 
                     modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
-                    if (isTransparent)
-                    {
-                        transparentParts.Add(modelPart);
-                    }
-                    else
-                    {
-                        opaqueParts.Add(modelPart);
-                    }
-                }
-
-                // Add opaque parts first to prevent depth-buffer transparency issues
-                foreach (var part in opaqueParts)
-                {
-                    parts.Add(part);
-                    sceneModel.RootVisual.Children.Add(part.Visual);
-                }
-
-                // Add transparent parts last
-                foreach (var part in transparentParts)
-                {
-                    parts.Add(part);
-                    sceneModel.RootVisual.Children.Add(part.Visual);
+                    parts.Add(modelPart);
+                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
 
                 sceneModel.Parts.AddRange(parts);
@@ -426,8 +382,8 @@ namespace AssetsManager.Services.Viewer
 
         private static string NormalizeAndMatchKey(string texPath, List<string> availableKeys)
         {
-            string fileName = Path.GetFileNameWithoutExtension(
-                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar));
+            string fileName = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(
+                texPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
             return availableKeys.FirstOrDefault(k => k.Equals(fileName, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -452,9 +408,11 @@ namespace AssetsManager.Services.Viewer
                 {
                     string championName = parts[0];
                     string skinFolder = parts[2];
-                    string skinBinName = GetSkinBinName(skinFolder);
+                    string skinsDirectory = Path.Combine(rootPath, "data", "characters", championName, "skins");
+                    string skinBinName = GetSkinBinName(skinsDirectory, skinFolder, championName);
                     if (!string.IsNullOrWhiteSpace(skinBinName))
                     {
+                        if (File.Exists(skinBinName)) return skinBinName;
                         string resolvedPath = Path.Combine(rootPath, "data", "characters", championName, "skins", skinBinName);
                         if (File.Exists(resolvedPath)) return resolvedPath;
                     }
@@ -479,9 +437,11 @@ namespace AssetsManager.Services.Viewer
                     if (j + 1 >= pathParts.Length) continue;
 
                     string skinFolder = pathParts[j + 1];
-                    string skinBinName = GetSkinBinName(skinFolder);
+                    string skinsDirectory = Path.Combine(foundDataDir, "characters", championName, "skins");
+                    string skinBinName = GetSkinBinName(skinsDirectory, skinFolder, championName);
                     if (string.IsNullOrWhiteSpace(skinBinName)) continue;
 
+                    if (File.Exists(skinBinName)) return skinBinName;
                     string candidate = Path.Combine(foundDataDir, "characters", championName, "skins", skinBinName);
                     if (File.Exists(candidate)) return candidate;
                     break;
@@ -491,20 +451,50 @@ namespace AssetsManager.Services.Viewer
             return null;
         }
 
-        private static string GetSkinBinName(string skinFolder)
+        private static string GetSkinBinName(string skinsDirectory, string skinFolder, string championName)
         {
-            if (string.IsNullOrWhiteSpace(skinFolder))
+            if (string.IsNullOrWhiteSpace(skinsDirectory) || !Directory.Exists(skinsDirectory))
             {
                 return null;
             }
 
-            if (skinFolder.Equals("base", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(skinFolder))
             {
-                return "skin0.bin";
+                if (skinFolder.Equals("base", StringComparison.OrdinalIgnoreCase))
+                {
+                    string baseBin = Path.Combine(skinsDirectory, "skin0.bin");
+                    if (File.Exists(baseBin)) return baseBin;
+                }
+
+                Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    string skinBin = Path.Combine(skinsDirectory, $"skin{int.Parse(match.Groups[1].Value)}.bin");
+                    if (File.Exists(skinBin)) return skinBin;
+                }
             }
 
-            Match match = Regex.Match(skinFolder, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
-            return match.Success ? $"skin{int.Parse(match.Groups[1].Value)}.bin" : null;
+            // Fallbacks for packed bins: <champ>_multi_skins_*.bin, <champ>*_skins.bin, then any *.bin.
+            try
+            {
+                var bins = Directory.GetFiles(skinsDirectory, "*.bin", SearchOption.TopDirectoryOnly);
+                string champLower = championName?.ToLowerInvariant() ?? string.Empty;
+
+                string multi = bins.FirstOrDefault(b =>
+                    Path.GetFileName(b).IndexOf("multi_skins", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (multi != null) return multi;
+
+                string champSkins = bins.FirstOrDefault(b =>
+                    champLower.Length > 0 &&
+                    Path.GetFileName(b).StartsWith(champLower, StringComparison.OrdinalIgnoreCase) &&
+                    Path.GetFileName(b).IndexOf("_skins", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (champSkins != null) return champSkins;
+
+                if (bins.Length > 0) return bins[0];
+            }
+            catch { }
+
+            return null;
         }
 
         private static string NormalizeMaterialKey(string materialName)

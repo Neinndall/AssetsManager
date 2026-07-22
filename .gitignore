@@ -1,3 +1,7 @@
 # Ignorar carpetas de compilación
 bin/
 obj/
+
+# Local planning and build metadata
+TO-DO.json
+build.txt

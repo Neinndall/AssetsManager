@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
@@ -24,7 +23,6 @@ namespace AssetsManager.Utils
         private static readonly HashSet<string> GenericMaterialKeywords =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-        private static readonly ConditionalWeakTable<BitmapSource, BitmapSource> OpaqueTextureCache = new();
 
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
@@ -119,48 +117,26 @@ namespace AssetsManager.Utils
             return defaultTextureKey;
         }
 
+        public static BitmapSource ResolveTexture(Dictionary<string, BitmapSource> allTextures, string selectedTextureName)
+        {
+            if (allTextures == null || string.IsNullOrEmpty(selectedTextureName))
+                return null;
+
+            allTextures.TryGetValue(selectedTextureName, out BitmapSource texture);
+            return texture;
+        }
+
         public static void UpdateMaterial(ModelPart modelPart)
         {
             if (modelPart.Geometry == null || string.IsNullOrEmpty(modelPart.SelectedTextureName))
                 return;
 
-            if (!modelPart.AllTextures.TryGetValue(modelPart.SelectedTextureName, out BitmapSource texture))
-            {
-                string fullKey = modelPart.AllTextures.Keys
-                    .FirstOrDefault(k => string.Equals(PathUtils.TruncateAtDot(k), modelPart.SelectedTextureName, StringComparison.OrdinalIgnoreCase));
-                if (fullKey != null)
-                    modelPart.AllTextures.TryGetValue(fullKey, out texture);
-            }
+            BitmapSource texture = ResolveTexture(modelPart.AllTextures, modelPart.SelectedTextureName);
 
             if (texture != null)
             {
                 var materialGroup = new MaterialGroup();
-
-                // Force Bgr32 format for opaque parts to prevent WPF from placing them in the transparent rendering pass
-                BitmapSource textureToUse = texture;
-                if (!modelPart.IsTransparent && texture.Format != PixelFormats.Bgr32)
-                {
-                    try
-                    {
-                        textureToUse = OpaqueTextureCache.GetValue(texture, static source =>
-                        {
-                            var converted = new FormatConvertedBitmap(source, PixelFormats.Bgr32, null, 0);
-                            if (converted.CanFreeze) converted.Freeze();
-                            return converted;
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Trace.TraceError($"Failed to prepare opaque viewer texture: {ex}");
-                        textureToUse = texture;
-                    }
-                }
-
-                var imageBrush = CreateViewerTextureBrush(textureToUse);
-                if (modelPart.IsTransparent)
-                {
-                    imageBrush.Opacity = 0.99; // Force WPF to place this in the transparent pass
-                }
+                var imageBrush = CreateViewerTextureBrush(texture);
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
                 modelPart.Geometry.Material = materialGroup;

@@ -14,24 +14,164 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
+using OpenTK.Wpf;
+using System.Numerics;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
     public partial class ViewerViewportControl : UserControl, IDisposable
     {
+        private Silk.NET.OpenGL.GL _gl;
+        private GlMeshRenderer _meshRenderer;
+        private GridRenderer _gridRenderer;
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
 
+        private readonly Viewport3D _dummyViewport = new Viewport3D
+        {
+            Camera = new PerspectiveCamera(new Point3D(0, 1130, 280), new Vector3D(0, -0.14, -0.99), new Vector3D(0, 0.99, -0.14), 45)
+        };
+        public Viewport3D Viewport3D => _dummyViewport;
         public Viewport3D Viewport => Viewport3D;
+
+        private readonly AmbientLight GlobalAmbientLight = new AmbientLight();
+        private readonly DirectionalLight StudioLight = new DirectionalLight();
+        private readonly DirectionalLight FillLight = new DirectionalLight();
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
+
+        [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr wglGetProcAddress(string procName);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr LoadLibrary(string lpszLib);
+
+        private static readonly IntPtr OpenGLModule = LoadLibrary("opengl32.dll");
+
+        private static IntPtr GetOpenGLProcAddress(string procName)
+        {
+            var addr = wglGetProcAddress(procName);
+            if (addr == IntPtr.Zero)
+            {
+                addr = GetProcAddress(OpenGLModule, procName);
+            }
+            return addr;
+        }
+
+        private void OpenTkControl_Ready()
+        {
+            try
+            {
+                _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
+                _meshRenderer = new GlMeshRenderer();
+                _meshRenderer.Initialize(_gl);
+
+                _gridRenderer = new GridRenderer();
+                _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, "Failed to initialize Silk.NET OpenGL context.");
+            }
+        }
+
+        private void OpenTkControl_Render(TimeSpan delta)
+        {
+            if (_gl == null || _meshRenderer == null) return;
+
+            // Clear color based on transparent background setting
+            if (_viewModel.IsTransparentBg)
+            {
+                _gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            }
+            else
+            {
+                // Clear to standard dark theme color (#18181b)
+                _gl.ClearColor(0.094f, 0.094f, 0.106f, 1.0f);
+            }
+
+            _gl.Clear((uint)(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit));
+
+            // 1. Get perspective camera from viewport to build View/Projection matrices
+            var camera = Viewport3D.Camera as PerspectiveCamera;
+            if (camera == null) return;
+
+            // 2. Build camera matrices
+            var eye = new Vector3((float)camera.Position.X, (float)camera.Position.Y, (float)camera.Position.Z);
+            var lookDir = new Vector3((float)camera.LookDirection.X, (float)camera.LookDirection.Y, (float)camera.LookDirection.Z);
+            var target = eye + lookDir;
+            var up = new Vector3((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
+            var view = Matrix4x4.CreateLookAt(eye, target, up);
+
+            float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
+            float aspect = (float)(OpenTkControl.ActualWidth / OpenTkControl.ActualHeight);
+            if (float.IsNaN(aspect) || aspect <= 0) aspect = 1.0f;
+            var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspect, 10f, 10000f);
+            var viewProj = view * proj;
+
+            // 3. Setup lighting from view model settings
+            float phi = (float)(_viewModel.LightRotation * (Math.PI / 180.0));
+            float theta = (float)(_viewModel.LightHeight * (Math.PI / 180.0));
+            
+            // Key Light (StudioLight)
+            float x = MathF.Cos(theta) * MathF.Sin(phi);
+            float y = MathF.Sin(theta);
+            float z = MathF.Cos(theta) * MathF.Cos(phi);
+            var lightDir1 = new Vector3(-x, -y, -z);
+            
+            // Fill Light (FillLight - opposite)
+            var lightDir2 = new Vector3(x, y, -z);
+
+            float ambientVal = (float)(_viewModel.AmbientIntensity / 100.0);
+            var ambientColor = new Vector3(ambientVal, ambientVal, ambientVal);
+
+            float keyIntensity = 0.0f;
+            float fillIntensity = 0.0f;
+            if (_viewModel.AmbientIntensity < 95)
+            {
+                keyIntensity = (float)((100.0 - _viewModel.AmbientIntensity) / 100.0);
+                fillIntensity = keyIntensity * 0.5f;
+            }
+
+            var lightColor1 = new Vector3(keyIntensity, keyIntensity, keyIntensity);
+            var lightColor2 = new Vector3(fillIntensity, fillIntensity, fillIntensity);
+
+            // 4. Render loaded models
+            foreach (var model in _loadedModels)
+            {
+                _meshRenderer.Render(model, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+            }
+
+            // Render ground if visible
+            if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
+            {
+                _meshRenderer.Render(_groundModel, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+            }
+
+            // Render 3D Ground Grid if visible
+            if (_gridRenderer != null && _viewModel.IsGridVisible)
+            {
+                _gridRenderer.Render(viewProj);
+            }
+
+            // Render skybox if visible
+            if (_skyModel != null && _viewModel.ShowSkybox)
+            {
+                _meshRenderer.Render(_skyModel, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+            }
+
+        }
 
         private CustomCameraController _cameraController;
         private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
@@ -61,6 +201,8 @@ namespace AssetsManager.Views.Controls.Viewer
         // Environment references
         private ModelVisual3D _skyVisual;
         private ModelVisual3D _groundVisual;
+        private SceneModel _groundModel;
+        private SceneModel _skyModel;
 
         public ViewerViewportControl()
         {
@@ -114,6 +256,14 @@ namespace AssetsManager.Views.Controls.Viewer
             _modelPlayers.Clear();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
 
+            var settings = new GLWpfControlSettings
+            {
+                MajorVersion = 3,
+                MinorVersion = 3,
+                Profile = OpenTK.Windowing.Common.ContextProfile.Core
+            };
+            OpenTkControl.Start(settings);
+
             // Self-healing subscription to the rendering loop
             CompositionTarget.Rendering -= CompositionTarget_Rendering;
             CompositionTarget.Rendering += CompositionTarget_Rendering;
@@ -127,6 +277,81 @@ namespace AssetsManager.Views.Controls.Viewer
             Cleanup();
         }
 
+        private SceneModel BuildSceneModelFromVisual(ModelVisual3D visual, string name)
+        {
+            if (visual == null) return null;
+            var sceneModel = new SceneModel { Name = name, IsVisible = true };
+            
+            void ExtractGeometryModels(Model3D model, Transform3D parentTransform)
+            {
+                Transform3D combined = Transform3D.Identity;
+                if (parentTransform != null && parentTransform != Transform3D.Identity)
+                {
+                    if (model.Transform != null && model.Transform != Transform3D.Identity)
+                    {
+                        var group = new Transform3DGroup();
+                        group.Children.Add(model.Transform);
+                        group.Children.Add(parentTransform);
+                        combined = group;
+                    }
+                    else
+                    {
+                        combined = parentTransform;
+                    }
+                }
+                else if (model.Transform != null && model.Transform != Transform3D.Identity)
+                {
+                    combined = model.Transform;
+                }
+
+                if (model is GeometryModel3D geomModel)
+                {
+                    if (geomModel.Geometry is MeshGeometry3D mesh)
+                    {
+                        var transformedMesh = new MeshGeometry3D();
+                        transformedMesh.TriangleIndices = mesh.TriangleIndices;
+                        transformedMesh.TextureCoordinates = mesh.TextureCoordinates;
+                        transformedMesh.Normals = mesh.Normals;
+                        
+                        foreach (var pos in mesh.Positions)
+                        {
+                            transformedMesh.Positions.Add(combined.Transform(pos));
+                        }
+                        
+                        var part = new ModelPart
+                        {
+                            Name = name + "_" + sceneModel.Parts.Count,
+                            Geometry = new GeometryModel3D(transformedMesh, geomModel.Material),
+                            IsVisible = true
+                        };
+                        
+                        if (geomModel.Material is DiffuseMaterial diffuse && diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
+                        {
+                            string texName = "tex_" + part.Name;
+                            part.AllTextures[texName] = bitmap;
+                            part.SelectedTextureName = texName;
+                        }
+                        
+                        sceneModel.Parts.Add(part);
+                    }
+                }
+                else if (model is Model3DGroup group)
+                {
+                    foreach (var child in group.Children)
+                    {
+                        ExtractGeometryModels(child, combined);
+                    }
+                }
+            }
+            
+            if (visual.Content != null)
+            {
+                ExtractGeometryModels(visual.Content, visual.Transform ?? Transform3D.Identity);
+            }
+            
+            return sceneModel;
+        }
+
         public void SetupScene(bool isMapGeometry)
         {
             if (isMapGeometry)
@@ -137,6 +362,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     Viewport.Children.Remove(_groundVisual);
                 _skyVisual = null;
                 _groundVisual = null;
+                _groundModel = null;
+                _skyModel = null;
                 return;
             }
 
@@ -149,12 +376,14 @@ namespace AssetsManager.Views.Controls.Viewer
                     AppSettings?.GroundLogoOpacity ?? 1.0);
                 Viewport.Children.Add(_groundVisual);
             }
+            _groundModel = BuildSceneModelFromVisual(_groundVisual, "Ground");
 
             if (_skyVisual == null)
             {
                 _skyVisual = SceneElements.CreateSidePlanes(LogService);
                 Viewport.Children.Add(_skyVisual);
             }
+            _skyModel = BuildSceneModelFromVisual(_skyVisual, "Skybox");
 
             // Ensure initial state is applied
             SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
@@ -191,6 +420,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _skyVisual = null;
                 _groundVisual = null;
+                // Liberar el renderizador de OpenGL
+                _meshRenderer?.Dispose();
+                _meshRenderer = null;
+ 
+                _gridRenderer?.Dispose();
+                _gridRenderer = null;
+ 
             }
             catch (Exception ex)
             {
@@ -388,7 +624,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void RemoveModel(SceneModel model)
         {
-            if (model == _activeSceneModel)
+            bool removingActiveModel = model == _activeSceneModel;
+            if (removingActiveModel)
             {
                 if (_viewModel.IsAutoRotateActive)
                 {
@@ -538,6 +775,7 @@ namespace AssetsManager.Views.Controls.Viewer
                         }
                         else if (!model.IsAnimationPaused)
                         {
+                            double oldTime = model.AnimationTime;
                             model.AnimationTime += deltaTime * speed;
 
                             var duration = model.CurrentAnimation.Duration;
@@ -586,6 +824,7 @@ namespace AssetsManager.Views.Controls.Viewer
                             );
                         }
                     }
+
                 }
 
                 if (_activeSceneModel != null && _activeSceneModel.CurrentAnimation != null)
@@ -618,7 +857,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetCamera(bool smooth = true)
         {
             bool isMap = Panel?.ViewModel?.IsMapMode == true;
-            double baselineY = isMap ? 0 : (IsDiffMode ? 0 : 2000);
+            double baselineY = 1000;
             
             Point3D position;
             Vector3D lookDirection;
@@ -648,7 +887,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // Fallback coordinates
-            position = isMap ? new Point3D(0.00, 2386.00, 670.00) : new Point3D(0.00, 130.00 + baselineY, 280.00);
+            position = isMap ? new Point3D(0.00, 1386.00, 670.00) : new Point3D(0.00, 130.00 + baselineY, 280.00);
             lookDirection = isMap ? new Vector3D(0.00, -250.00, -650.00) : new Vector3D(0.00, -40.00, -280.00);
 
             if (smooth)
@@ -670,7 +909,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
 
             // Compute dynamic target center and distance if model is available
-            double baselineY = Panel?.ViewModel?.IsMapMode == true || IsDiffMode ? 0 : 2000;
+            double baselineY = 1000;
             Point3D targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             double distance = 300.00;
 
@@ -1042,5 +1281,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             return null;
         }
+
     }
 }

@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -28,34 +29,11 @@
         <!-- Clipping Border (Thickness 0 to avoid double borders) -->
         <Border CornerRadius="0" ClipToBounds="True" BorderThickness="0">
             <Grid>
-                <!-- 3D VIEWPORT -->
-                <Viewport3D x:Name="Viewport3D"
-                            ClipToBounds="True"
-                            SnapsToDevicePixels="False"
-                            UseLayoutRounding="False"
-                            RenderOptions.EdgeMode="Unspecified"
-                            RenderOptions.BitmapScalingMode="HighQuality">
-                    <Viewport3D.Camera>
-                        <PerspectiveCamera Position="0,2386,670"
-                                           LookDirection="0,-250,-650"
-                                           UpDirection="0,1,0"
-                                           FieldOfView="45"
-                                           NearPlaneDistance="0.1"
-                                           FarPlaneDistance="100000"/>
-                    </Viewport3D.Camera>
-                    <ModelVisual3D>
-                        <ModelVisual3D.Content>
-                            <Model3DGroup>
-                                <!-- Default 'Flat' Lighting (As it was before) -->
-                                <AmbientLight x:Name="GlobalAmbientLight" Color="White"/>
-                                
-                                <!-- Studio Lights (Off by default) -->
-                                <DirectionalLight x:Name="StudioLight" Color="Black" Direction="-1,-1,-1"/>
-                                <DirectionalLight x:Name="FillLight" Color="Black" Direction="1,1,1"/>
-                            </Model3DGroup>
-                        </ModelVisual3D.Content>
-                    </ModelVisual3D>
-                </Viewport3D>
+                <!-- 3D VIEWPORT (Silk.NET OpenGL) -->
+                <glWpfControl:GLWpfControl x:Name="OpenTkControl"
+                                           ClipToBounds="True"
+                                           Ready="OpenTkControl_Ready"
+                                           Render="OpenTkControl_Render"/>
 
                 <Border x:Name="CameraInputSurface" Background="Transparent"/>
 

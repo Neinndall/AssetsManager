@@ -165,7 +165,6 @@ namespace AssetsManager
 
       // Models Services
       services.AddSingleton<SknLoadingService>();
-      services.AddSingleton<ScoLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
       services.AddSingleton<ChromaScannerService>();
 

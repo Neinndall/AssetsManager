@@ -40,6 +40,11 @@ namespace AssetsManager.Views.Helpers
             // Initialize targets
             if (_viewport.Camera is ProjectionCamera camera)
             {
+                if (camera.IsFrozen)
+                {
+                    camera = (ProjectionCamera)camera.Clone();
+                    _viewport.Camera = camera;
+                }
                 _targetPosition = camera.Position;
                 _targetLookDirection = camera.LookDirection;
                 _targetUpDirection = camera.UpDirection;
@@ -162,14 +167,14 @@ namespace AssetsManager.Views.Helpers
             if (e.LeftButton == MouseButtonState.Pressed)
             {
                 _isRotating = true;
-                _lastMousePosition = e.GetPosition(_viewport);
+                _lastMousePosition = e.GetPosition(_inputSurface);
                 _inputSurface.Cursor = System.Windows.Input.Cursors.SizeAll;
                 _inputSurface.CaptureMouse();
             }
             else if (e.RightButton == MouseButtonState.Pressed)
             {
                 _isPanning = true;
-                _lastMousePosition = e.GetPosition(_viewport);
+                _lastMousePosition = e.GetPosition(_inputSurface);
                 _inputSurface.Cursor = System.Windows.Input.Cursors.Hand;
                 _inputSurface.CaptureMouse();
             }
@@ -201,7 +206,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (_isRotating && e.LeftButton == MouseButtonState.Pressed)
             {
-                var currentMousePosition = e.GetPosition(_viewport);
+                var currentMousePosition = e.GetPosition(_inputSurface);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
                 double sensitivity = 0.5;
@@ -220,7 +225,7 @@ namespace AssetsManager.Views.Helpers
             }
             else if (_isPanning && e.RightButton == MouseButtonState.Pressed)
             {
-                var currentMousePosition = e.GetPosition(_viewport);
+                var currentMousePosition = e.GetPosition(_inputSurface);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
                 Pan(delta);
