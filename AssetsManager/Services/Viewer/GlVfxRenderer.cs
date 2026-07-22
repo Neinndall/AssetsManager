@@ -10,6 +10,9 @@ namespace AssetsManager.Services.Viewer
 {
     public sealed class GlVfxRenderer : IDisposable
     {
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct ParticleVertex
         {
@@ -27,6 +30,7 @@ namespace AssetsManager.Services.Viewer
         private uint _ebo;
         private uint _whiteTex;
         private bool _ready;
+        private DrawElementsDelegate _drawElements = null!;
 
         private VfxSystemModel _activeSystem;
         private bool _isPlaying;
@@ -35,6 +39,19 @@ namespace AssetsManager.Services.Viewer
         private readonly Dictionary<VfxEmitterModel, List<VfxParticleInstance>> _particlePools = new();
         private readonly Dictionary<VfxEmitterModel, float> _spawnAccumulators = new();
         private readonly Random _rand = new();
+
+        internal int LiveParticleCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (var particles in _particlePools.Values)
+                {
+                    count += particles.Count;
+                }
+                return count;
+            }
+        }
 
         private const string VertShader = @"
             layout(location = 0) in vec3 aPos;
@@ -64,6 +81,13 @@ namespace AssetsManager.Services.Viewer
         public void Initialize(GL gl)
         {
             _gl = gl;
+            var drawElementsAddress = gl.Context.GetProcAddress("glDrawElements");
+            if (drawElementsAddress == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("OpenGL glDrawElements is unavailable in the active context.");
+            }
+            _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(drawElementsAddress);
+
             bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _program = GlShaderCompiler.CreateProgram(gl, gles, VertShader, FragShader);
 
@@ -128,7 +152,7 @@ namespace AssetsManager.Services.Viewer
 
         public void Update(float deltaTime)
         {
-            if (!_ready || !_isPlaying || _activeSystem == null) return;
+            if (!_isPlaying || _activeSystem == null) return;
 
             deltaTime *= (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
 
@@ -288,8 +312,11 @@ namespace AssetsManager.Services.Viewer
             _gl.EnableVertexAttribArray(2);
             _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, stride, 5 * sizeof(float));
 
-            nint indexOffset = 0;
-            _gl.DrawElements(PrimitiveType.Triangles, (uint)indices.Count, DrawElementsType.UnsignedShort, in indexOffset);
+            // With an element buffer bound, the last argument is a byte offset into that
+            // buffer. Silk's `in nint` overload passes the address of the local variable
+            // instead, which OpenGL interprets as a huge invalid offset. Use the native
+            // entry point just like GlMeshRenderer and pass the real zero offset.
+            _drawElements((uint)PrimitiveType.Triangles, indices.Count, (uint)DrawElementsType.UnsignedShort, IntPtr.Zero);
 
             _gl.BindVertexArray(0);
         }

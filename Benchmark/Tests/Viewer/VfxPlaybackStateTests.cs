@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -32,6 +33,32 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
 
             Assert.Same(system, panel.SelectedVfxSystem);
             Assert.Equal(nameof(ViewerPanelModel.SelectedVfxSystem), changedProperty);
+        }
+
+        [Fact]
+        public void PlayingSystemGeneratesParticlesWithoutGraphicsContext()
+        {
+            var system = new VfxSystemModel();
+            system.Emitters.Add(new VfxEmitterModel
+            {
+                EmissionRate = 10f,
+                Lifetime = 1f
+            });
+            using var renderer = new GlVfxRenderer();
+
+            renderer.SetVfxSystem(system);
+            renderer.Play();
+            renderer.Update(0.11f);
+
+            Assert.Equal(1, renderer.LiveParticleCount);
+
+            renderer.Pause();
+            renderer.Update(1f);
+            Assert.Equal(1, renderer.LiveParticleCount);
+
+            renderer.Play();
+            renderer.Stop();
+            Assert.Equal(0, renderer.LiveParticleCount);
         }
     }
 }

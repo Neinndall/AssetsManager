@@ -1164,25 +1164,43 @@
                                 Width="32" Height="32" Margin="0,0,6,0"
                                 Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
                                 ToolTip="Play / Pause VFX" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Width="16" Height="16" Foreground="White">
-                                <materialIcons:MaterialIcon.Style>
-                                    <Style TargetType="materialIcons:MaterialIcon">
-                                        <Setter Property="Kind" Value="Play"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                                <Setter Property="Kind" Value="Pause"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </materialIcons:MaterialIcon.Style>
-                            </materialIcons:MaterialIcon>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
                         </Button>
 
                         <Button Grid.Column="1" Click="VfxStopButton_Click"
                                 Width="32" Height="32" Margin="0,0,12,0"
-                                Background="{StaticResource AccentRed}" BorderThickness="0" Cursor="Hand"
-                                ToolTip="Stop and reset VFX" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="Stop" Width="14" Height="14" Foreground="White"/>
+                                ToolTip="Pause / Resume VFX" VerticalAlignment="Center" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Square" CornerRadius="4" Background="#E53935">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
                         </Button>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

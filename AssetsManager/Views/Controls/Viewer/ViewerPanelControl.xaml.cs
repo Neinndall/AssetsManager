@@ -1124,6 +1124,23 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.SelectedVfxSystem = vfxSystem;
             }
 
+            if (vfxSystem.IsPlaying)
+            {
+                vfxSystem.IsPlaying = false;
+                Viewport?.PauseVfx();
+            }
+            else
+            {
+                Viewport?.StopVfx();
+                vfxSystem.IsPlaying = true;
+                Viewport?.PlayVfx();
+            }
+        }
+
+        private void VfxStopButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not VfxSystemModel vfxSystem) return;
+
             vfxSystem.IsPlaying = !vfxSystem.IsPlaying;
             if (vfxSystem.IsPlaying)
             {
@@ -1135,16 +1152,13 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void VfxStopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not VfxSystemModel vfxSystem) return;
-            vfxSystem.IsPlaying = false;
-            Viewport?.StopVfx();
-        }
-
         private void CloseVfxPlayer_Click(object sender, RoutedEventArgs e)
         {
-            VfxStopButton_Click(sender, e);
+            if ((sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem)
+            {
+                vfxSystem.IsPlaying = false;
+            }
+            Viewport?.StopVfx();
             _viewModel.SelectedVfxSystem = null;
         }
 
