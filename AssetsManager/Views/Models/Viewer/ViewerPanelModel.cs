@@ -64,9 +64,6 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isRenderSectionExpanded = false;
         private string _modelsSearchText = string.Empty;
         private string _animationsSearchText = string.Empty;
-        private string _vfxSearchText = string.Empty;
-        private List<string> _allVfxSystems = new();
-        private List<string> _filteredVfxSystems = new();
 
         private string _selectedImagePath = string.Empty;
         private string _selectedImageName = string.Empty;
@@ -236,26 +233,10 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public string VfxSearchText
-        {
-            get => _vfxSearchText;
-            set
-            {
-                var v = value ?? string.Empty;
-                if (_vfxSearchText != v)
-                {
-                    _vfxSearchText = v;
-                    OnPropertyChanged();
-                    UpdateFilteredVfx();
-                }
-            }
-        }
-
         public bool HasModelsSearchText => !string.IsNullOrWhiteSpace(_modelsSearchText);
         public bool HasAnimationsSearchText => !string.IsNullOrWhiteSpace(_animationsSearchText);
 
         public IEnumerable<SceneModel> FilteredModels => _filteredModelsList;
-        public IEnumerable<string> FilteredVfxSystems => _filteredVfxSystems;
 
         public string SelectedImagePath
         {
@@ -318,27 +299,6 @@ namespace AssetsManager.Views.Models.Viewer
             OnPropertyChanged(nameof(FilteredAnimations));
         }
 
-        public void SetVfxSystems(IEnumerable<string> systems)
-        {
-            _allVfxSystems = systems?.ToList() ?? new List<string>();
-            UpdateFilteredVfx();
-        }
-
-        private void UpdateFilteredVfx()
-        {
-            if (string.IsNullOrWhiteSpace(_vfxSearchText))
-            {
-                _filteredVfxSystems = _allVfxSystems.ToList();
-            }
-            else
-            {
-                _filteredVfxSystems = _allVfxSystems.Where(n =>
-                    n != null &&
-                    n.IndexOf(_vfxSearchText, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-            }
-            OnPropertyChanged(nameof(FilteredVfxSystems));
-        }
-
         public int MeshPartCount => _selectedModelParts?.Count ?? 0;
 
         public bool HasSelectedModel => _selectedModel != null;
@@ -384,14 +344,6 @@ namespace AssetsManager.Views.Models.Viewer
         public void ShowMainContent()
         {
             IsMainContentVisible = true;
-        }
-
-        /// <summary>
-        /// Switches the UI to the Empty/Landing state.
-        /// </summary>
-        public void ShowEmptyState()
-        {
-            IsMainContentVisible = false;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

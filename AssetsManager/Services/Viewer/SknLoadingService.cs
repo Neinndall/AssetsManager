@@ -50,12 +50,7 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, textureDirectoryPath);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                var model = await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
-                if (model != null)
-                {
-                    model.SkinBinPath = TryResolveSkinBinPath(filePath, textureDirectoryPath);
-                }
-                return model;
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
             }
             catch (Exception ex)
             {
@@ -82,12 +77,7 @@ namespace AssetsManager.Services.Viewer
                 var materialTextureOverrides = LoadMaterialTextureOverrides(filePath, loadedTextures.Keys, null);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                var model = await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
-                if (model != null)
-                {
-                    model.SkinBinPath = TryResolveSkinBinPath(filePath, null);
-                }
-                return model;
+                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextureOverrides);
             }
             catch (Exception ex)
             {

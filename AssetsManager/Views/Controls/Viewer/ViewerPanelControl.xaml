@@ -264,7 +264,7 @@
                              <!-- Inspector Navigation (sub-tabs) -->
                              <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                      Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                  <UniformGrid Columns="4" Height="36">
+                                  <UniformGrid Columns="3" Height="36">
                                      <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
                                          <StackPanel Orientation="Horizontal">
                                              <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
@@ -281,12 +281,6 @@
                                          <StackPanel Orientation="Horizontal">
                                              <materialIcons:MaterialIcon Kind="AnimationPlay" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                              <TextBlock Text="ANIM" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                         </StackPanel>
-                                     </RadioButton>
-                                     <RadioButton x:Name="TabVfx" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="VFX Systems" Checked="TabVfx_Checked">
-                                         <StackPanel Orientation="Horizontal">
-                                             <materialIcons:MaterialIcon Kind="AutoFix" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                             <TextBlock Text="VFX" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
                                          </StackPanel>
                                      </RadioButton>
                                   </UniformGrid>
@@ -745,43 +739,6 @@
                                             </ListBox.ItemTemplate>
                                         </ListBox>
                                     </Grid>
-                                </Grid>
-
-                                <!-- VFX Systems Panel -->
-                                <Grid x:Name="VfxPanel"
-                                      Visibility="{Binding IsChecked, ElementName=TabVfx, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    
-                                    <Border Grid.Row="0" Margin="0,0,0,8">
-                                        <shared:SearchBoxControl x:Name="VfxSearchBox" SearchTextChanged="VfxSearchBox_SearchTextChanged" Tag="Search VFX systems..."/>
-                                    </Border>
-
-                                    <ListBox x:Name="VfxListBox" Grid.Row="1"
-                                             ItemsSource="{Binding FilteredVfxSystems}"
-                                             ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
-                                             Margin="0,0,0,8"
-                                             SelectionChanged="VfxListBox_SelectionChanged">
-                                        <ListBox.Template>
-                                            <ControlTemplate TargetType="ListBox">
-                                                <ItemsPresenter />
-                                            </ControlTemplate>
-                                        </ListBox.Template>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="4,2">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <materialIcons:MaterialIcon Kind="AutoFix" Width="14" Height="14" Foreground="{StaticResource AccentPurple}" Margin="4,0,8,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
                                 </Grid>
 
                             </Grid>

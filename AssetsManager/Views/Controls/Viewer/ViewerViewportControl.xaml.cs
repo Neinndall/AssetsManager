@@ -13,7 +13,6 @@ using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
-using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
@@ -22,7 +21,6 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
 using OpenTK.Wpf;
 using System.Numerics;
-using System.Threading.Tasks;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
@@ -41,16 +39,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public Viewport3D Viewport3D => _dummyViewport;
         public Viewport3D Viewport => Viewport3D;
 
-        private VfxOpenGlRenderer _vfxRenderer;
-        private readonly List<VfxPlaybackGraphRuntime> _vfxSims = new();
-        private readonly Dictionary<SceneModel, Dictionary<string, VfxAnimationClip>> _modelVfxClips = new();
-        private readonly Dictionary<SceneModel, Dictionary<uint, VfxSystemDefinition>> _modelVfxDefs = new();
-        private readonly Dictionary<SceneModel, IReadOnlyDictionary<uint, uint>> _modelVfxResourceMap = new();
-        private readonly Dictionary<SceneModel, Task> _modelVfxLoadTasks = new();
-        private readonly Dictionary<BitmapSource, uint> _vfxTextureCache = new();
-        private readonly VfxLoadingService _vfxLoadingService = new();
-        private IAnimationAsset _lastActiveAnimation;
-        private double _lastActiveAnimationTime = 0;
         private readonly AmbientLight GlobalAmbientLight = new AmbientLight();
         private readonly DirectionalLight StudioLight = new DirectionalLight();
         private readonly DirectionalLight FillLight = new DirectionalLight();
@@ -88,9 +76,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 _meshRenderer = new GlMeshRenderer();
                 _meshRenderer.Initialize(_gl);
-
-                _vfxRenderer = new VfxOpenGlRenderer();
-                _vfxRenderer.Initialize(_gl);
 
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
@@ -186,77 +171,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer.Render(_skyModel, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
-            // 5. Render active particle systems
-            if (_vfxRenderer != null && _vfxSims.Count > 0)
-            {
-                for (int i = 0; i < _vfxSims.Count; i++)
-                {
-                    var graph = _vfxSims[i];
-                    for (int runtimeIndex = 0; runtimeIndex < graph.Runtimes.Count; runtimeIndex++)
-                    {
-                        VfxPlaybackRuntime runtime = graph.Runtimes[runtimeIndex];
-                        for (int j = 0; j < runtime.Emitters.Count; j++)
-                        {
-                        var es = runtime.Emitters[j];
-                        if (es.PendingTexture is BitmapSource bmp)
-                        {
-                            if (!_vfxTextureCache.TryGetValue(bmp, out var tex))
-                            {
-                                tex = UploadBitmapToGl(bmp);
-                                _vfxTextureCache[bmp] = tex;
-                            }
-                            es.Texture = tex;
-                            es.TextureWidth = bmp.PixelWidth;
-                            es.TextureHeight = bmp.PixelHeight;
-                            es.PendingTexture = null;
-                        }
-                        if (es.PendingTextureMult is BitmapSource bmpMult)
-                        {
-                            if (!_vfxTextureCache.TryGetValue(bmpMult, out var tex))
-                            {
-                                tex = UploadBitmapToGl(bmpMult);
-                                _vfxTextureCache[bmpMult] = tex;
-                            }
-                            es.TextureMult = tex;
-                            es.PendingTextureMult = null;
-                        }
-                        if (es.PendingDistortionTexture is BitmapSource bmpDist)
-                        {
-                            if (!_vfxTextureCache.TryGetValue(bmpDist, out var tex))
-                            {
-                                tex = UploadBitmapToGl(bmpDist);
-                                _vfxTextureCache[bmpDist] = tex;
-                            }
-                            es.DistortionTexture = tex;
-                            es.PendingDistortionTexture = null;
-                        }
-                        if (es.PendingErosionTexture is BitmapSource bmpErosion)
-                        {
-                            if (!_vfxTextureCache.TryGetValue(bmpErosion, out var tex))
-                            {
-                                tex = UploadBitmapToGl(bmpErosion);
-                                _vfxTextureCache[bmpErosion] = tex;
-                            }
-                            es.ErosionTexture = tex;
-                            es.PendingErosionTexture = null;
-                        }
-                        if (es.PendingMesh != null)
-                        {
-                            var meshData = es.PendingMesh.Value;
-                            _vfxRenderer.UploadEmitterMesh(es, meshData.Positions, meshData.Uvs, meshData.Indices);
-                            es.PendingMesh = null;
-                        }
-                        }
-                    }
-                }
-
-                _vfxRenderer.CaptureScene((uint)OpenTkControl.ActualWidth, (uint)OpenTkControl.ActualHeight);
-                for (int i = 0; i < _vfxSims.Count; i++)
-                {
-                    foreach (VfxPlaybackRuntime runtime in _vfxSims[i].Runtimes)
-                        _vfxRenderer.Render(runtime, viewProj, view);
-                }
-            }
         }
 
         private CustomCameraController _cameraController;
@@ -513,16 +427,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gridRenderer?.Dispose();
                 _gridRenderer = null;
  
-                _vfxRenderer?.Dispose();
-                _vfxRenderer = null;
-
-                _vfxSims.Clear();
-                _modelVfxClips.Clear();
-                _modelVfxDefs.Clear();
-                _modelVfxResourceMap.Clear();
-                _modelVfxLoadTasks.Clear();
-                _vfxTextureCache.Clear();
-                _vfxLoadingService.ClearCaches();
             }
             catch (Exception ex)
             {
@@ -704,8 +608,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     Viewport.Children.Add(model.RootVisual);
             }
             
-            _ = EnsureVfxLoadedAsync(model);
-
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
@@ -739,15 +641,6 @@ namespace AssetsManager.Views.Controls.Viewer
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
             _lastModelUpdates.Remove(model);
-            _modelVfxDefs.Remove(model);
-            _modelVfxClips.Remove(model);
-            _modelVfxResourceMap.Remove(model);
-            _modelVfxLoadTasks.Remove(model);
-            if (removingActiveModel)
-            {
-                _vfxSims.Clear();
-                Panel?.SetVfxSystems(new List<string>());
-            }
             if (_modelPlayers.TryGetValue(model, out var player))
             {
                 player.Dispose();
@@ -932,60 +825,6 @@ namespace AssetsManager.Views.Controls.Viewer
                         }
                     }
 
-                    // Synchronize active model VFX (runs even if static/paused/no animation)
-                    if (model == _activeSceneModel)
-                    {
-                        bool isSeekOrLoop = _lastActiveAnimation != model.CurrentAnimation || 
-                                            model.AnimationTime < _lastActiveAnimationTime || 
-                                            Math.Abs(model.AnimationTime - _lastActiveAnimationTime) > 0.2;
-                        
-                        _lastActiveAnimationTime = model.AnimationTime;
-
-                        if (isSeekOrLoop)
-                        {
-                            _lastActiveAnimation = model.CurrentAnimation;
-                            SetActiveAnimationVfx(model, model.CurrentAnimation);
-                        }
-
-                        // Update VFX attachment positions
-                        for (int idxSim = 0; idxSim < _vfxSims.Count; idxSim++)
-                        {
-                            var sim = _vfxSims[idxSim];
-                            Matrix4x4 attachMatrix = Matrix4x4.Identity;
-                            if (sim.UserTag is VfxAnimationEvent ev && model.Skeleton != null)
-                            {
-                                var player = GetPlayerForModel(model);
-                                attachMatrix = player.GetBoneTransform(ev.BoneName, ev.BoneHash, model.Skeleton);
-                            }
-                            else if (!(sim.UserTag is VfxAnimationEvent) && model.Skeleton != null)
-                            {
-                                var player = GetPlayerForModel(model);
-                                string boneName = model.Skeleton.Joints.Any(j => string.Equals(j.Name, "C_BUFFVERT", StringComparison.OrdinalIgnoreCase)) ? "C_BUFFVERT" : "Root";
-                                attachMatrix = player.GetBoneTransform(boneName, 0, model.Skeleton);
-                            }
-
-                            // Apply model transform
-                            var rotX = Matrix4x4.CreateRotationX((float)(model.RotationX * Math.PI / 180f));
-                            var rotY = Matrix4x4.CreateRotationY((float)(model.RotationY * Math.PI / 180f));
-                            var rotZ = Matrix4x4.CreateRotationZ((float)(model.RotationZ * Math.PI / 180f));
-                            var scale = Matrix4x4.CreateScale((float)model.Scale);
-                            var trans = Matrix4x4.CreateTranslation((float)model.PositionX, (float)model.PositionY, (float)model.PositionZ);
-                            var modelWorld = scale * rotX * rotY * rotZ * trans;
-
-                            sim.SetTransform(attachMatrix * modelWorld);
-                            
-                            if (!(sim.UserTag is VfxAnimationEvent))
-                            {
-                                // Manual VFX previews update in real-time, ignoring the animation pause/speed
-                                sim.Update((float)deltaTime);
-                            }
-                            else if (!model.IsAnimationPaused)
-                            {
-                                // Animation-tied VFX events only update when animation is playing
-                                sim.Update((float)(deltaTime * speed));
-                            }
-                        }
-                    }
                 }
 
                 if (_activeSceneModel != null && _activeSceneModel.CurrentAnimation != null)
@@ -1441,184 +1280,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
             return null;
-        }
-
-        private Task EnsureVfxLoadedAsync(SceneModel model)
-        {
-            if (model == null || _modelVfxDefs.ContainsKey(model)) return Task.CompletedTask;
-            if (_modelVfxLoadTasks.TryGetValue(model, out Task existingTask)) return existingTask;
-
-            Task loadTask = LoadVfxForModelAsync(model);
-            _modelVfxLoadTasks[model] = loadTask;
-            return loadTask;
-        }
-
-        private async Task LoadVfxForModelAsync(SceneModel model)
-        {
-            if (model == null || string.IsNullOrEmpty(model.SkinBinPath) || !File.Exists(model.SkinBinPath)) return;
-
-            try
-            {
-                var bundle = await _vfxLoadingService.LoadAsync(model.SkinBinPath, LogService);
-                if (_isCleanedUp || !_loadedModels.Contains(model)) return;
-
-                var systems = bundle.Systems;
-                var clips = bundle.Clips;
-                var combinedResMap = bundle.ResourceMap;
-
-                _modelVfxDefs[model] = systems;
-                _modelVfxClips[model] = clips;
-                _modelVfxResourceMap[model] = combinedResMap;
-
-                LogService.Log($"Loaded {systems.Count} VFX systems and {clips.Count} animation clips for '{model.Name}'.");
-
-                Panel?.SetVfxSystems(systems.Values.Select(s => s.Name).Distinct().OrderBy(n => n).ToList());
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"Failed to load VFX files for model {model.Name}");
-            }
-        }
-
-        private void SetActiveAnimationVfx(SceneModel model, IAnimationAsset animation)
-        {
-            _vfxSims.Clear();
-
-            if (animation == null || !_modelVfxClips.TryGetValue(model, out var clips) || !_modelVfxDefs.TryGetValue(model, out var defs))
-            {
-                return;
-            }
-
-            var animData = model.Animations.FirstOrDefault(a => a.AnimationAsset == animation);
-            if (animData == null) return;
-
-            string animFileName = Path.GetFileName(animData.Name.Replace('\\', '/'));
-            string animNameWithoutExt = Path.GetFileNameWithoutExtension(animFileName);
-
-            VfxAnimationClip clip = null;
-            if (!clips.TryGetValue(animFileName, out clip) && !clips.TryGetValue(animNameWithoutExt, out clip))
-            {
-                // Also match against the referenced .anm path inside each clip (modern mClipDataMap entries).
-                string animNameLower = animNameWithoutExt.ToLowerInvariant();
-                var matchingKey = clips.Keys.FirstOrDefault(k =>
-                    k.Equals(animFileName, StringComparison.OrdinalIgnoreCase) ||
-                    k.Equals(animNameWithoutExt, StringComparison.OrdinalIgnoreCase) ||
-                    animFileName.Contains(k, StringComparison.OrdinalIgnoreCase) ||
-                    k.Contains(animNameWithoutExt, StringComparison.OrdinalIgnoreCase));
-
-                if (matchingKey == null)
-                {
-                    matchingKey = clips.Keys.FirstOrDefault(k =>
-                    {
-                        var c = clips[k];
-                        string refName = Path.GetFileNameWithoutExtension(c.AnimationName.Replace('\\', '/'));
-                        return !string.IsNullOrEmpty(refName) &&
-                               (refName.Equals(animNameWithoutExt, StringComparison.OrdinalIgnoreCase) ||
-                                refName.Equals(animFileName, StringComparison.OrdinalIgnoreCase) ||
-                                animNameLower.Contains(refName.ToLowerInvariant()) ||
-                                refName.ToLowerInvariant().Contains(animNameLower));
-                    });
-                }
-
-                if (matchingKey != null)
-                {
-                    clip = clips[matchingKey];
-                }
-            }
-
-            if (clip == null)
-            {
-                LogService.Log($"No VFX clip matched animation '{animNameWithoutExt}'.");
-                return;
-            }
-
-            var resMap = _modelVfxResourceMap.TryGetValue(model, out var rm) ? rm : null;
-            string charFolder = Path.GetDirectoryName(Path.GetDirectoryName(model.SkinBinPath));
-
-            foreach (var ev in clip.ParticleEvents)
-            {
-                uint keyHash = ev.EffectHash != 0 ? ev.EffectHash : VfxResourceResolver.Fnv1a(ev.EffectName);
-                VfxSystemDefinition def = null;
-                if (resMap != null && resMap.TryGetValue(keyHash, out var objHash))
-                {
-                    defs.TryGetValue(objHash, out def);
-                }
-                if (def == null)
-                {
-                    def = defs.Values.FirstOrDefault(d =>
-                        (!string.IsNullOrEmpty(ev.EffectName) && string.Equals(d.Name, ev.EffectName, StringComparison.OrdinalIgnoreCase)) ||
-                        (ev.EffectHash != 0 && (d.PathHash == ev.EffectHash || VfxResourceResolver.Fnv1a(d.Name) == ev.EffectHash)));
-                }
-
-                if (def == null) continue;
-
-                int seed = HashCode.Combine(def.PathHash, ev.StartFrame);
-                var sim = _vfxLoadingService.PreparePlaybackGraph(
-                    def,
-                    defs,
-                    resMap ?? new Dictionary<uint, uint>(),
-                    charFolder,
-                    Matrix4x4.Identity,
-                    seed,
-                    LogService);
-
-                float fps = animation.Fps > 1f && animation.Fps < 240f ? animation.Fps : 30f;
-                float startDelay = MathF.Max(0f, ev.StartFrame) / fps;
-                sim.SetStartDelay(startDelay);
-
-                sim.UserTag = ev;
-                _vfxSims.Add(sim);
-            }
-        }
-
-        private uint UploadBitmapToGl(BitmapSource bitmap)
-        {
-            if (bitmap.Format != System.Windows.Media.PixelFormats.Bgra32)
-            {
-                var converted = new System.Windows.Media.Imaging.FormatConvertedBitmap();
-                converted.BeginInit();
-                converted.Source = bitmap;
-                converted.DestinationFormat = System.Windows.Media.PixelFormats.Bgra32;
-                converted.EndInit();
-                bitmap = converted;
-            }
-            int width = bitmap.PixelWidth;
-            int height = bitmap.PixelHeight;
-            int stride = width * 4;
-            byte[] pixelData = new byte[height * stride];
-            bitmap.CopyPixels(new Int32Rect(0, 0, width, height), pixelData, stride, 0);
-            return _vfxRenderer.UploadTexture(pixelData, width, height);
-        }
-
-        public void PlayVfxSystem(string systemName)
-        {
-            if (_activeSceneModel == null) return;
-
-            if (!_modelVfxDefs.TryGetValue(_activeSceneModel, out var defs)) return;
-            var def = defs.Values.FirstOrDefault(d => string.Equals(d.Name, systemName, StringComparison.OrdinalIgnoreCase));
-            if (def == null) return;
-
-            _vfxSims.Clear();
-
-            string charFolder = Path.GetDirectoryName(Path.GetDirectoryName(_activeSceneModel.SkinBinPath));
-            var transform = Matrix4x4.CreateTranslation(new Vector3(
-                (float)_activeSceneModel.PositionX,
-                (float)_activeSceneModel.PositionY,
-                (float)_activeSceneModel.PositionZ));
-            var resourceMap = _modelVfxResourceMap.TryGetValue(_activeSceneModel, out var map)
-                ? map
-                : new Dictionary<uint, uint>();
-            var sim = _vfxLoadingService.PreparePlaybackGraph(
-                def,
-                defs,
-                resourceMap,
-                charFolder,
-                transform,
-                HashCode.Combine(def.PathHash, systemName),
-                LogService);
-
-            _vfxSims.Add(sim);
-            LogService.Log($"Playing VFX system manually: {systemName}");
         }
 
     }

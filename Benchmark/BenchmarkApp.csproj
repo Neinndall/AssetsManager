@@ -9,9 +9,6 @@
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="VfxDump\**" />
-    <EmbeddedResource Remove="VfxDump\**" />
-    <None Remove="VfxDump\**" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="Blake3" Version="2.2.0" PrivateAssets="all" />
     <PackageReference Include="xunit" Version="2.9.3" />

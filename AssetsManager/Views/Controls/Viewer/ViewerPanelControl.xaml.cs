@@ -990,34 +990,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 InspectorCounterText.Text = "A";
                 if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
             }
-            else if (TabVfx != null && TabVfx.IsChecked == true)
-            {
-                InspectorCounterText.Text = "V";
-                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "VFX systems list";
-            }
-        }
-
-        private void TabVfx_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
-
-        public void SetVfxSystems(List<string> systems)
-        {
-            _viewModel.SetVfxSystems(systems);
-        }
-
-        private void VfxSearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
-        {
-            if (sender is SearchBoxControl searchBox)
-            {
-                _viewModel.VfxSearchText = searchBox.Text;
-            }
-        }
-
-        private void VfxListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (e.AddedItems.Count > 0 && e.AddedItems[0] is string systemName)
-            {
-                Viewport?.PlayVfxSystem(systemName);
-            }
         }
 
         private void ToggleProjectExplorer_Click(object sender, RoutedEventArgs e)
