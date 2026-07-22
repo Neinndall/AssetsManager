@@ -102,7 +102,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         bool ParticleIsLocalOrientation = false,
         bool IsFollowingTerrain = false,
         bool IsGroundLayer = false,
-        bool IsUniformScale = false)
+        bool IsUniformScale = false,
+        Vector2 EmitterUvScrollRate = default,
+        VfxTrailDefinition Trail = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
@@ -131,7 +133,15 @@ namespace AssetsManager.Services.Viewer.Vfx
         VfxCurveF Drive,
         float FeatherIn,
         float FeatherOut,
-        int AddressMode);
+        int AddressMode,
+        VfxCurve4? ChannelMixer = null);
+
+    public sealed record VfxTrailDefinition(
+        VfxCurve3 BirthTilingSize,
+        int SmoothingMode,
+        int Mode,
+        int MaxAddedPerFrame,
+        float Cutoff);
 
     public sealed record VfxChildSystemReference(string Name, uint SystemHash, uint EffectKey);
 
@@ -177,7 +187,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         float Height = 0f,
         byte Flags = 0)
     {
-        public Vector3 SampleOffset(Random rng)
+        public Vector3 SampleOffset(Random rng, float t = 0f)
         {
             var offset = Kind switch
             {
@@ -187,14 +197,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                     SignedUnit(rng) * Size.Z * 0.5f),
                 VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius),
                 VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height),
-                _ => EmitOffset.SampleBirth(rng)
+                _ => EmitOffset.SampleBirth(t, rng)
             };
             int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
             for (int i = 0; i < count; i++)
             {
                 var axis = RotationAxes[i];
                 if (axis.LengthSquared() <= 1e-8f) continue;
-                float radians = RotationAngles[i].SampleBirth(rng) * (MathF.PI / 180f);
+                float radians = RotationAngles[i].SampleBirth(t, rng) * (MathF.PI / 180f);
                 offset = Vector3.Transform(offset,
                     Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), radians));
             }
@@ -240,8 +250,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
         /// <summary>Birth-time value: exact per-particle randomisation via the probability table when present.</summary>
         public float SampleBirth(Random rng)
+            => SampleBirth(0f, rng);
+
+        public float SampleBirth(float t, Random rng)
         {
-            float value = Sample(0f);
+            float value = Sample(t);
             return Prob is { Length: > 0 } && !Prob[0].IsEmpty
                 ? value * Prob[0].Sample((float)rng.NextDouble())
                 : value;
@@ -259,8 +272,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
 
         public Vector2 SampleBirth(Random rng)
+            => SampleBirth(0f, rng);
+
+        public Vector2 SampleBirth(float t, Random rng)
         {
-            var value = Sample(0f);
+            var value = Sample(t);
             if (Prob is not { Length: > 0 }) return value;
             return new Vector2(
                 Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample((float)rng.NextDouble()) : value.X,
@@ -280,8 +296,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
         /// <summary>Birth-time value with per-component probability tables (independent rolls, Riot-style).</summary>
         public Vector3 SampleBirth(Random rng)
+            => SampleBirth(0f, rng);
+
+        public Vector3 SampleBirth(float t, Random rng)
         {
-            var v = Sample(0f);
+            var v = Sample(t);
             if (Prob is not { Length: > 0 }) return v;
             return new Vector3(
                 Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample((float)rng.NextDouble()) : v.X,
@@ -301,8 +320,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector4.Lerp(a, b, f));
         }
         public Vector4 SampleBirth(Random rng)
+            => SampleBirth(0f, rng);
+
+        public Vector4 SampleBirth(float t, Random rng)
         {
-            var v = Sample(0f);
+            var v = Sample(t);
             if (Prob is not { Length: > 0 }) return v;
             return new Vector4(
                 Prob.Length > 0 && !Prob[0].IsEmpty ? v.X * Prob[0].Sample((float)rng.NextDouble()) : v.X,

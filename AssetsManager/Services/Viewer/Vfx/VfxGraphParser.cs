@@ -102,6 +102,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_direction     = HashAlgorithms.Fnv1a("isDirectionOriented");
         private static readonly uint F_texture       = HashAlgorithms.Fnv1a("texture");
         private static readonly uint F_textureMult   = HashAlgorithms.Fnv1a("textureMult");
+        private static readonly uint F_emitterUvScroll = HashAlgorithms.Fnv1a("emitterUvScrollRate");
         private static readonly uint F_texDiv        = HashAlgorithms.Fnv1a("texDiv");
         private static readonly uint F_texDivMult    = HashAlgorithms.Fnv1a("texDivMult");
         private static readonly uint F_numFrames     = HashAlgorithms.Fnv1a("numFrames");
@@ -130,6 +131,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_erosionFeatherIn = HashAlgorithms.Fnv1a("erosionFeatherIn");
         private static readonly uint F_erosionFeatherOut = HashAlgorithms.Fnv1a("erosionFeatherOut");
         private static readonly uint F_erosionMapAddressMode = HashAlgorithms.Fnv1a("erosionMapAddressMode");
+        private static readonly uint F_erosionMapChannelMixer = HashAlgorithms.Fnv1a("erosionMapChannelMixer");
         private static readonly uint F_childParticleSet = HashAlgorithms.Fnv1a("childParticleSetDefinition");
         private static readonly uint F_childrenIdentifiers = HashAlgorithms.Fnv1a("childrenIdentifiers");
         private static readonly uint F_childEmitOnDeath = HashAlgorithms.Fnv1a("childEmitOnDeath");
@@ -169,6 +171,12 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_birthUvScroll = HashAlgorithms.Fnv1a("birthUvScrollRate");
         private static readonly uint F_meshSkeleton  = 0x90595a15; // VfxMeshDefinitionData skeleton field
         private static readonly uint F_meshAnim      = HashAlgorithms.Fnv1a("mAnimationName");
+        private static readonly uint F_trailDefinition = HashAlgorithms.Fnv1a("mTrail");
+        private static readonly uint F_trailBirthTilingSize = HashAlgorithms.Fnv1a("mBirthTilingSize");
+        private static readonly uint F_trailSmoothingMode = HashAlgorithms.Fnv1a("mSmoothingMode");
+        private static readonly uint F_trailMode = HashAlgorithms.Fnv1a("mMode");
+        private static readonly uint F_trailMaxAddedPerFrame = HashAlgorithms.Fnv1a("mMaxAddedPerFrame");
+        private static readonly uint F_trailCutoff = HashAlgorithms.Fnv1a("mCutoff");
 
         // primitive class hashes we treat as "mesh"
         private static readonly uint PrimMesh = HashAlgorithms.Fnv1a("VfxPrimitiveMesh");
@@ -295,11 +303,23 @@ namespace AssetsManager.Services.Viewer.Vfx
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
             string meshPath = null, meshSkl = null, meshAnm = null;
+            VfxTrailDefinition trail = null;
             if (isMesh && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
             {
                 meshPath = GetString(md.Properties, F_simpleMesh) ?? GetString(md.Properties, F_meshName);
                 meshSkl = GetString(md.Properties, F_meshSkeleton);
                 meshAnm = GetString(md.Properties, F_meshAnim);
+            }
+            if (primitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail &&
+                prim is BinTreeStruct trailPrimitive &&
+                Get(trailPrimitive.Properties, F_trailDefinition) is BinTreeStruct trailData)
+            {
+                trail = new VfxTrailDefinition(
+                    ReadCurve3(trailData.Properties, F_trailBirthTilingSize) ?? VfxCurve3.Const(Vector3.Zero),
+                    GetU8(trailData.Properties, F_trailSmoothingMode) ?? 0,
+                    GetU8(trailData.Properties, F_trailMode) ?? 0,
+                    GetI32(trailData.Properties, F_trailMaxAddedPerFrame) ?? 0,
+                    GetF32(trailData.Properties, F_trailCutoff) ?? 0f);
             }
 
             string textureMultPath = null;
@@ -330,7 +350,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                     ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Zero,
                     GetF32(ep, F_erosionFeatherIn) ?? 0f,
                     GetF32(ep, F_erosionFeatherOut) ?? 0f,
-                    GetU8(ep, F_erosionMapAddressMode) ?? 0);
+                    GetU8(ep, F_erosionMapAddressMode) ?? 0,
+                    ReadCurve4(ep, F_erosionMapChannelMixer));
             }
             VfxChildParticleSetDefinition childParticleSet = ReadChildParticleSet(p);
             VfxFieldCollectionDefinition fields = ReadFields(p);
@@ -405,7 +426,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ParticleIsLocalOrientation: GetBool(p, F_particleIsLocalOrientation),
                 IsFollowingTerrain: GetBool(p, F_isFollowingTerrain),
                 IsGroundLayer: GetBool(p, F_isGroundLayer),
-                IsUniformScale: GetBool(p, F_isUniformScale));
+                IsUniformScale: GetBool(p, F_isUniformScale),
+                EmitterUvScrollRate: GetVec2(p, F_emitterUvScroll) ?? Vector2.Zero,
+                Trail: trail);
         }
 
         private static VfxFieldCollectionDefinition ReadFields(
@@ -756,6 +779,9 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static int? GetI16(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeI16 value ? value.Value : null;
+
+        private static int? GetI32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
+            => Get(p, hash) is BinTreeI32 value ? value.Value : null;
 
         public static IReadOnlyDictionary<string, VfxAnimationClip> ExtractAnimationClips(byte[] materialsBin)
             => ExtractAnimationClips(ParseTree(materialsBin));

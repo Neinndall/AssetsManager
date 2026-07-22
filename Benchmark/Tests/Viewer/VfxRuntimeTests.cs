@@ -60,6 +60,82 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void BirthColorDynamicsUseEmitterTimeAtParticleCreation()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(10f),
+                EmitterLifetime = 1f,
+                BirthColor = new VfxCurve4(
+                    Vector4.Zero,
+                    new[] { 0f, 1f },
+                    new[] { new Vector4(1f, 1f, 1f, 0f), Vector4.One })
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "color", "color", new[] { emitter }), Vector3.Zero);
+
+            for (int i = 0; i < 5; i++) simulator.Update(0.1f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(5, state.InstanceCount);
+            int last = (state.InstanceCount - 1) * VfxPlaybackRuntime.InstanceStride;
+            Assert.InRange(state.Instances[last + 8], 0.499f, 0.501f);
+        }
+
+        [Fact]
+        public void CameraTrailUsesBirthScaleForWidthAndSegmentDistanceForLength()
+        {
+            var emitter = CreateEmitter(new Vector3(2f, 9f, 1f), VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(10f),
+                EmitterLifetime = 1f,
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                IsMeshPrimitive = false,
+                EmitterPosition = new VfxCurve3(
+                    Vector3.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) })
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.1f);
+            simulator.Update(0.1f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(1, state.InstanceCount);
+            Assert.Equal(2f, state.Instances[3], 3);
+            Assert.Equal(1f, state.Instances[4], 3);
+        }
+
+        [Fact]
+        public void ErosionChannelMixerIsPreservedPerParticle()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                AlphaErosion = new VfxAlphaErosionDefinition(
+                    "erosion.tex",
+                    VfxCurveF.Zero,
+                    0f,
+                    0f,
+                    0,
+                    VfxCurve4.Const(new Vector4(0f, 1f, 0f, 0f)))
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "erosion", "erosion", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(0f, state.Instances[25]);
+            Assert.Equal(1f, state.Instances[26]);
+            Assert.Equal(0f, state.Instances[27]);
+            Assert.Equal(0f, state.Instances[28]);
+        }
+
+        [Fact]
         public void PlaybackGraphResolvesAndCreatesChildSystem()
         {
             var childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with

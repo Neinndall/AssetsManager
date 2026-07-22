@@ -9,7 +9,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxPlaybackRuntime
     {
-        public const int InstanceStride = 25;
+        public const int InstanceStride = 29;
 
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
@@ -212,7 +212,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 if (d.IsSingleParticle)
                 {
-                    if (!s.BurstDone) { Spawn(s); s.BurstDone = true; }
+                    if (!s.BurstDone) { Spawn(s, emitterT); s.BurstDone = true; }
                 }
                 else
                 {
@@ -220,7 +220,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     s.SpawnAccum += rate * dt;
                     while (s.SpawnAccum >= 1f && s.Particles.Count < MaxParticlesPerEmitter)
                     {
-                        Spawn(s);
+                        Spawn(s, emitterT);
                         s.SpawnAccum -= 1f;
                     }
                     if (s.Particles.Count >= MaxParticlesPerEmitter) s.SpawnAccum = 0f;
@@ -265,20 +265,20 @@ namespace AssetsManager.Services.Viewer.Vfx
                 s.BurstDone = false;
         }
 
-        private void Spawn(EmitterState s)
+        private void Spawn(EmitterState s, float emitterT)
         {
             var d = s.Def;
-            float sampledLife = d.ParticleLifetime.SampleBirth(_rng);
+            float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng);
             float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
-            var birthScale = d.BirthScale.SampleBirth(_rng);
-            var vel = d.BirthVelocity?.SampleBirth(_rng) ?? Vector3.Zero;
-            var birthAccel = d.BirthAcceleration?.SampleBirth(_rng) ?? Vector3.Zero;
-            var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(_rng) ?? Vector3.Zero;
-            var birthDrag = d.BirthDrag?.SampleBirth(_rng) ?? Vector3.Zero;
-            var birthRotation = d.BirthRotation?.SampleBirth(_rng) ?? Vector3.Zero;
-            var rotVel = d.BirthRotationalVelocity?.SampleBirth(_rng) ?? Vector3.Zero;
+            var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
+            var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
 
-            var localOffset = d.SpawnShape?.SampleOffset(_rng) ?? Vector3.Zero;
+            var localOffset = d.SpawnShape?.SampleOffset(_rng, emitterT) ?? Vector3.Zero;
             var worldOffset = Vector3.TransformNormal(localOffset, _worldTransform);
             vel = Vector3.TransformNormal(vel, _worldTransform);
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
@@ -293,15 +293,15 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Age = 0f,
                 Life = life,
                 BirthSize = birthScale,
-                BirthColor = d.BirthColor.SampleBirth(_rng),
+                BirthColor = d.BirthColor.SampleBirth(emitterT, _rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
-                BirthUvOffset = d.BirthUvOffset?.SampleBirth(_rng) ?? Vector2.Zero,
+                BirthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero,
                 Rot = birthRotation.X * (MathF.PI / 180f),
                 RotVel = rotVel.X * (MathF.PI / 180f),
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
                     ? _rng.Next(d.NumFrames)
                     : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
-                FrameRate = d.BirthFrameRate?.SampleBirth(_rng) ?? d.FrameRate ?? 0f,
+                FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng) ?? d.FrameRate ?? 0f,
                 ColorRandom = (float)_rng.NextDouble(),
             });
             ParticleLifecycle?.Invoke(this, d, s.Particles[^1].Pos, false);
@@ -341,6 +341,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
+                float sizeY = p.BirthSize.Y * scaleMul.Y;
                 Vector3 direction = p.Vel;
                 if (isTrail)
                 {
@@ -351,13 +352,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                     {
                         position = (start + p.Pos) * 0.5f;
                         direction = segment;
-                        sizeX = length;
+                        sizeY = length;
                     }
                 }
                 if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
                 buf[k++] = sizeX;
-                buf[k++] = p.BirthSize.Y * scaleMul.Y;
+                buf[k++] = sizeY;
                 buf[k++] = col.X; buf[k++] = col.Y; buf[k++] = col.Z; buf[k++] = col.W;
                 buf[k++] = p.Rot;
                 buf[k++] = frame;
@@ -376,6 +377,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = uvScale.X; buf[k++] = uvScale.Y;
                 buf[k++] = uvRotation;
                 buf[k++] = d.AlphaErosion?.Drive.Sample(t) ?? 0f;
+                Vector4 erosionMixer = d.AlphaErosion?.ChannelMixer?.Sample(t) ?? new Vector4(1f, 0f, 0f, 0f);
+                buf[k++] = erosionMixer.X; buf[k++] = erosionMixer.Y;
+                buf[k++] = erosionMixer.Z; buf[k++] = erosionMixer.W;
             }
             s.InstanceCount = instanceCount;
         }
