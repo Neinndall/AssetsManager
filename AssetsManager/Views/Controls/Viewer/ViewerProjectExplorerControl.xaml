@@ -32,10 +32,10 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="2,0,4,0"/>
-                        <TextBlock Text="PROJECT" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" Margin="2,1,4,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="PROJECTS" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <Button Click="ChangeFolder_Click" Style="{StaticResource SmallTextButtonStyle}" Content="OPEN" FontSize="9" Padding="4,1" VerticalAlignment="Center"/>
-                        <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="8,0"/>
+                        <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="8,0" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Breadcrumbs display -->

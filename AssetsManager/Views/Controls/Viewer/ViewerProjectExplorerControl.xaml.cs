@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -27,8 +28,9 @@ namespace AssetsManager.Views.Controls.Viewer
         public event EventHandler CloseRequested;
 
         private string _currentRootFolder;
+        private ProjectExplorerNode _currentFolderNode;
         private readonly List<ProjectExplorerNode> _allNodes = new List<ProjectExplorerNode>();
-        private readonly List<ProjectExplorerNode> _folderOnlyNodes = new List<ProjectExplorerNode>();
+        private readonly ObservableCollection<ProjectExplorerNode> _folderOnlyNodes = new ObservableCollection<ProjectExplorerNode>();
         
         private readonly SolidColorBrush _folderBrush = new SolidColorBrush(Color.FromRgb(255, 179, 0)); // Accent Orange/Gold
         private readonly SolidColorBrush _modelBrush = new SolidColorBrush(Color.FromRgb(3, 169, 244));  // Accent DodgerBlue
@@ -48,22 +50,38 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (string.IsNullOrEmpty(rootPath) || !Directory.Exists(rootPath)) return;
 
-            _currentRootFolder = rootPath;
+            var normalizedRootPath = new DirectoryInfo(rootPath).FullName;
+            var existingRoot = _allNodes.FirstOrDefault(node =>
+                string.Equals(node.FullPath, normalizedRootPath, StringComparison.OrdinalIgnoreCase));
 
-            ScanDirectory(rootPath);
-            ApplyFilter(string.Empty);
-
-            if (_folderOnlyNodes.Count > 0)
+            if (existingRoot != null)
             {
-                NavigateToFolder(_allNodes[0]);
+                _currentRootFolder = existingRoot.FullPath;
+                SearchBox.Text = string.Empty;
+                ApplyFilter(string.Empty);
+                NavigateToFolder(existingRoot);
+                return;
             }
+
+            var rootNode = ScanDirectory(normalizedRootPath);
+            if (rootNode == null) return;
+
+            _currentRootFolder = normalizedRootPath;
+            _allNodes.Add(rootNode);
+
+            var foldersOnlyRoot = CopyFolderStructureOnly(rootNode);
+            if (foldersOnlyRoot != null)
+            {
+                _folderOnlyNodes.Add(foldersOnlyRoot);
+            }
+
+            SearchBox.Text = string.Empty;
+            ApplyFilter(string.Empty);
+            NavigateToFolder(rootNode);
         }
 
-        private void ScanDirectory(string rootPath)
+        private ProjectExplorerNode ScanDirectory(string rootPath)
         {
-            _allNodes.Clear();
-            _folderOnlyNodes.Clear();
-
             var rootNode = new ProjectExplorerNode
             {
                 Name = Path.GetFileName(rootPath),
@@ -74,18 +92,8 @@ namespace AssetsManager.Views.Controls.Viewer
             };
 
             BuildTree(rootPath, rootNode);
-            
-            if (rootNode.Children.Count > 0 || Directory.GetFiles(rootPath).Length > 0)
-            {
-                _allNodes.Add(rootNode);
-                
-                // Create a duplicate tree for TreeView displaying folders only
-                var foldersOnlyRoot = CopyFolderStructureOnly(rootNode);
-                if (foldersOnlyRoot != null)
-                {
-                    _folderOnlyNodes.Add(foldersOnlyRoot);
-                }
-            }
+
+            return rootNode.Children.Count > 0 ? rootNode : null;
         }
 
         private ProjectExplorerNode CopyFolderStructureOnly(ProjectExplorerNode node)
@@ -219,7 +227,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (string.IsNullOrEmpty(filter))
             {
                 FoldersTreeView.ItemsSource = _folderOnlyNodes;
-                if (_allNodes.Count > 0) NavigateToFolder(_allNodes[0]);
+                if (_currentFolderNode != null) NavigateToFolder(_currentFolderNode);
                 return;
             }
 
@@ -236,7 +244,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // Also search flat files in the right side ListBox if filter is active
             var flatSearchResults = new List<ProjectExplorerNode>();
-            FindFlatMatchingFiles(_allNodes[0], filter.ToLowerInvariant(), flatSearchResults);
+            foreach (var rootNode in _allNodes)
+            {
+                FindFlatMatchingFiles(rootNode, filter.ToLowerInvariant(), flatSearchResults);
+            }
             FilesListBox.ItemsSource = flatSearchResults;
         }
 
@@ -297,12 +308,23 @@ namespace AssetsManager.Views.Controls.Viewer
             if (e.NewValue is ProjectExplorerNode node)
             {
                 // Find original node with files in _allNodes
-                var originalNode = FindNodeByPath(_allNodes[0], node.FullPath);
+                var originalNode = FindNodeByPath(node.FullPath);
                 if (originalNode != null)
                 {
                     NavigateToFolder(originalNode);
                 }
             }
+        }
+
+        private ProjectExplorerNode FindNodeByPath(string path)
+        {
+            foreach (var rootNode in _allNodes)
+            {
+                var found = FindNodeByPath(rootNode, path);
+                if (found != null) return found;
+            }
+
+            return null;
         }
 
         private ProjectExplorerNode FindNodeByPath(ProjectExplorerNode root, string path)
@@ -313,6 +335,19 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 var found = FindNodeByPath(child, path);
                 if (found != null) return found;
+            }
+
+            return null;
+        }
+
+        private ProjectExplorerNode FindParentNode(ProjectExplorerNode target)
+        {
+            foreach (var rootNode in _allNodes)
+            {
+                if (ReferenceEquals(rootNode, target)) return null;
+
+                var parent = FindParentNode(rootNode, target);
+                if (parent != null) return parent;
             }
 
             return null;
@@ -334,6 +369,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (folderNode == null || folderNode.IsFile) return;
 
+            _currentFolderNode = folderNode;
             FilesListBox.ItemsSource = folderNode.Children;
             UpdateBreadcrumbs(folderNode);
         }
@@ -348,7 +384,7 @@ namespace AssetsManager.Views.Controls.Viewer
             while (current != null)
             {
                 path.Insert(0, current);
-                current = FindParentNode(_allNodes[0], current);
+                current = FindParentNode(current);
             }
 
             for (int i = 0; i < path.Count; i++)
