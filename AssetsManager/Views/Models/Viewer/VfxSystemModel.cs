@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using AssetsManager.Services.Viewer.Vfx;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -10,9 +12,22 @@ namespace AssetsManager.Views.Models.Viewer
         public string Name { get; set; } = string.Empty;
         public string ParticlePath { get; set; } = string.Empty;
         public List<VfxEmitterModel> Emitters { get; set; } = new();
+        public VfxSystemDefinition Definition { get; set; }
+        public IReadOnlyDictionary<uint, VfxSystemDefinition> SystemCatalog { get; set; }
+            = new Dictionary<uint, VfxSystemDefinition>();
+        public IReadOnlyDictionary<uint, uint> ResourceMap { get; set; }
+            = new Dictionary<uint, uint>();
+        public string SearchDirectory { get; set; } = string.Empty;
+        public int EmitterCount => Definition?.Emitters.Count ?? Emitters.Count;
+        public double TotalDuration { get; set; }
+        public bool HasFiniteDuration => !double.IsInfinity(TotalDuration) && TotalDuration > 0;
+        public double TimelineMaximum => HasFiniteDuration ? TotalDuration : 1.0;
+        public string DurationText => HasFiniteDuration ? $"{TotalDuration:F1}s" : "LOOP";
+        public string FrameRateText { get; set; } = "Realtime";
 
         private bool _isPlaying;
         private double _speed = 1.0;
+        private double _currentTime;
 
         public bool IsPlaying
         {
@@ -24,6 +39,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _speed;
             set => SetField(ref _speed, value);
+        }
+
+        public double CurrentTime
+        {
+            get => _currentTime;
+            set => SetField(ref _currentTime, Math.Max(0, value));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

@@ -1,337 +1,230 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Runtime.InteropServices;
-using Silk.NET.OpenGL;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Models.Viewer;
-using AssetsManager.Utils.Rendering;
+using Silk.NET.OpenGL;
 
 namespace AssetsManager.Services.Viewer
 {
+    /// <summary>
+    /// UI-facing playback adapter for the authored VFX graph runtime.
+    /// Resource decoding stays on the loader side and all GL uploads happen on
+    /// the active viewport context during Render.
+    /// </summary>
     public sealed class GlVfxRenderer : IDisposable
     {
-        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ParticleVertex
-        {
-            public Vector3 Position;
-            public Vector2 TexCoord;
-            public Vector4 Color;
-        }
-
-        private GL _gl = null!;
-        private uint _program;
-        private int _uViewProj;
-        private int _uTex;
-        private uint _vao;
-        private uint _vbo;
-        private uint _ebo;
-        private uint _whiteTex;
-        private bool _ready;
-        private DrawElementsDelegate _drawElements = null!;
-
+        private readonly LogService _logService;
+        private readonly VfxLoadingService _loadingService = new();
+        private readonly Dictionary<BitmapSource, uint> _textureCache = new();
+        private VfxOpenGlRenderer _renderer;
+        private VfxPlaybackGraphRuntime _graph;
         private VfxSystemModel _activeSystem;
+        private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private bool _isPlaying;
-        private Vector3 _worldAnchor;
-        private float _worldScale = 1.0f;
-        private readonly Dictionary<VfxEmitterModel, List<VfxParticleInstance>> _particlePools = new();
-        private readonly Dictionary<VfxEmitterModel, float> _spawnAccumulators = new();
-        private readonly Random _rand = new();
+        private bool _ready;
+        private uint _viewportWidth;
+        private uint _viewportHeight;
+
+        public GlVfxRenderer(LogService logService = null)
+        {
+            _logService = logService;
+        }
 
         internal int LiveParticleCount
         {
             get
             {
                 int count = 0;
-                foreach (var particles in _particlePools.Values)
+                if (_graph == null) return count;
+                foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
                 {
-                    count += particles.Count;
+                    count += runtime.LiveParticleCount;
                 }
                 return count;
             }
         }
 
-        private const string VertShader = @"
-            layout(location = 0) in vec3 aPos;
-            layout(location = 1) in vec2 aTexCoord;
-            layout(location = 2) in vec4 aColor;
-            uniform mat4 uViewProj;
-            out vec2 vTexCoord;
-            out vec4 vColor;
-            void main() {
-                vTexCoord = aTexCoord;
-                vColor = aColor;
-                gl_Position = uViewProj * vec4(aPos, 1.0);
-            }
-        ";
-
-        private const string FragShader = @"
-            in vec2 vTexCoord;
-            in vec4 vColor;
-            uniform sampler2D uTex;
-            out vec4 FragColor;
-            void main() {
-                vec4 texColor = texture(uTex, vTexCoord);
-                FragColor = texColor * vColor;
-            }
-        ";
-
         public void Initialize(GL gl)
         {
-            _gl = gl;
-            var drawElementsAddress = gl.Context.GetProcAddress("glDrawElements");
-            if (drawElementsAddress == IntPtr.Zero)
-            {
-                throw new InvalidOperationException("OpenGL glDrawElements is unavailable in the active context.");
-            }
-            _drawElements = Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(drawElementsAddress);
-
-            bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
-            _program = GlShaderCompiler.CreateProgram(gl, gles, VertShader, FragShader);
-
-            _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
-            _uTex = gl.GetUniformLocation(_program, "uTex");
-
-            _vao = gl.GenVertexArray();
-            _vbo = gl.GenBuffer();
-            _ebo = gl.GenBuffer();
-
-            // Create 1x1 white texture fallback
-            _whiteTex = gl.GenTexture();
-            gl.BindTexture(TextureTarget.Texture2D, _whiteTex);
-            byte[] white = { 255, 255, 255, 255 };
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, new ReadOnlySpan<byte>(white));
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-            gl.BindTexture(TextureTarget.Texture2D, 0);
-
+            _renderer = new VfxOpenGlRenderer();
+            _renderer.Initialize(gl);
             _ready = true;
         }
 
         public void SetVfxSystem(VfxSystemModel system)
         {
-            _activeSystem = system;
             _isPlaying = false;
-            _particlePools.Clear();
-            _spawnAccumulators.Clear();
+            _activeSystem = system;
+            _graph = null;
+            if (system != null) system.CurrentTime = 0;
 
-            if (system != null)
+            if (_ready)
             {
-                foreach (var emitter in system.Emitters)
-                {
-                    _particlePools[emitter] = new List<VfxParticleInstance>();
-                    _spawnAccumulators[emitter] = 0.0f;
-                }
+                _renderer.ClearTextures();
+                _textureCache.Clear();
+            }
+
+            if (system?.Definition != null)
+            {
+                _graph = _loadingService.PreparePlaybackGraph(
+                    system.Definition,
+                    system.SystemCatalog,
+                    system.ResourceMap,
+                    system.SearchDirectory,
+                    _worldTransform,
+                    HashCode.Combine(system.Definition.PathHash, system.Name),
+                    _logService);
             }
         }
 
-        public void Play() => _isPlaying = _activeSystem != null;
+        public void Play()
+        {
+            if (_graph != null) _isPlaying = true;
+        }
 
         public void Pause() => _isPlaying = false;
-
-        public void SetWorldTransform(Vector3 position, float scale)
-        {
-            _worldAnchor = position;
-            _worldScale = Math.Max(0.01f, scale);
-        }
 
         public void Stop()
         {
             _isPlaying = false;
-            foreach (var particles in _particlePools.Values)
-            {
-                particles.Clear();
-            }
-            foreach (var emitter in new List<VfxEmitterModel>(_spawnAccumulators.Keys))
-            {
-                _spawnAccumulators[emitter] = 0.0f;
-            }
+            _graph?.Reset();
+            if (_activeSystem != null) _activeSystem.CurrentTime = 0;
+        }
+
+        public void SetWorldTransform(Vector3 position, float scale)
+        {
+            float safeScale = Math.Max(0.01f, scale);
+            _worldTransform = Matrix4x4.CreateScale(safeScale) * Matrix4x4.CreateTranslation(position);
+            _graph?.SetTransform(_worldTransform);
+        }
+
+        public void SetViewportSize(double width, double height)
+        {
+            _viewportWidth = (uint)Math.Max(0, width);
+            _viewportHeight = (uint)Math.Max(0, height);
         }
 
         public void Update(float deltaTime)
         {
-            if (!_isPlaying || _activeSystem == null) return;
+            if (!_isPlaying || _graph == null || _activeSystem == null) return;
+            float speed = (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
+            float elapsed = deltaTime * speed;
+            _graph.Update(elapsed);
+            _activeSystem.CurrentTime += elapsed;
 
-            deltaTime *= (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
-
-            foreach (var kvp in _particlePools)
+            if (_activeSystem.HasFiniteDuration &&
+                (_graph.IsComplete || _activeSystem.CurrentTime >= _activeSystem.TotalDuration))
             {
-                var emitter = kvp.Key;
-                var particles = kvp.Value;
+                _graph.Reset();
+                _activeSystem.CurrentTime = 0;
+            }
+        }
 
-                // 1. Update existing particles
-                for (int i = particles.Count - 1; i >= 0; i--)
+        public void Seek(double seconds)
+        {
+            if (_graph == null || _activeSystem == null || !_activeSystem.HasFiniteDuration) return;
+            double target = Math.Clamp(seconds, 0, _activeSystem.TotalDuration);
+            _graph.Reset();
+            double simulated = 0;
+            const float step = 1f / 60f;
+            while (simulated + step < target)
+            {
+                _graph.Update(step);
+                simulated += step;
+            }
+            float remainder = (float)(target - simulated);
+            if (remainder > 0) _graph.Update(remainder);
+            _activeSystem.CurrentTime = target;
+        }
+
+        public void Render(Matrix4x4 viewProjection, Matrix4x4 view)
+        {
+            if (!_ready || _graph == null) return;
+
+            UploadPendingResources();
+            _renderer.CaptureScene(_viewportWidth, _viewportHeight);
+            foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
+            {
+                _renderer.Render(runtime, viewProjection, view);
+            }
+        }
+
+        private void UploadPendingResources()
+        {
+            foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
+            {
+                foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
                 {
-                    var p = particles[i];
-                    p.Age += deltaTime;
-                    if (!p.IsAlive)
+                    UploadTexture(ref emitter.PendingTexture, texture =>
                     {
-                        particles.RemoveAt(i);
-                        continue;
-                    }
-
-                    p.Velocity += emitter.Acceleration * deltaTime;
-                    p.Position += p.Velocity * deltaTime;
-                    float lifeRatio = Math.Clamp(p.Age / p.MaxLifetime, 0.0f, 1.0f);
-                    p.Color = Vector4.Lerp(emitter.StartColor, emitter.EndColor, lifeRatio);
-                }
-
-                // 2. Spawn new particles
-                if (emitter.EmissionRate > 0)
-                {
-                    _spawnAccumulators[emitter] += deltaTime;
-                    float spawnInterval = 1.0f / emitter.EmissionRate;
-                    while (_spawnAccumulators[emitter] >= spawnInterval)
-                    {
-                        _spawnAccumulators[emitter] -= spawnInterval;
-                        if (particles.Count < 500) // cap per emitter
+                        emitter.Texture = texture;
+                        if (emitter.PendingTexture is BitmapSource bitmap)
                         {
-                            particles.Add(SpawnParticle(emitter));
+                            emitter.TextureWidth = bitmap.PixelWidth;
+                            emitter.TextureHeight = bitmap.PixelHeight;
                         }
+                    });
+                    UploadTexture(ref emitter.PendingTextureMult, texture => emitter.TextureMult = texture);
+                    UploadTexture(ref emitter.PendingDistortionTexture, texture => emitter.DistortionTexture = texture);
+                    UploadTexture(ref emitter.PendingErosionTexture, texture => emitter.ErosionTexture = texture);
+
+                    if (emitter.PendingMesh is { } mesh)
+                    {
+                        _renderer.UploadEmitterMesh(emitter, mesh.Positions, mesh.Uvs, mesh.Indices);
+                        emitter.PendingMesh = null;
                     }
                 }
             }
         }
 
-        private VfxParticleInstance SpawnParticle(VfxEmitterModel emitter)
+        private void UploadTexture(ref object pending, Action<uint> assign)
         {
-            float rx = (float)(_rand.NextDouble() * 20.0 - 10.0);
-            float ry = (float)(_rand.NextDouble() * 20.0 - 10.0);
-            float rz = (float)(_rand.NextDouble() * 20.0 - 10.0);
-
-            return new VfxParticleInstance
+            if (pending is not BitmapSource bitmap) return;
+            if (!_textureCache.TryGetValue(bitmap, out uint texture))
             {
-                Position = new Vector3(rx, ry + 90.0f, rz),
-                Velocity = emitter.InitialVelocity + new Vector3(rx * 0.1f, 12.0f + ry * 0.1f, rz * 0.1f),
-                Scale = emitter.InitialScale * (0.8f + (float)_rand.NextDouble() * 0.4f),
-                Color = emitter.StartColor,
-                Age = 0.0f,
-                MaxLifetime = emitter.Lifetime > 0 ? emitter.Lifetime : 1.5f,
-                Rotation = (float)(_rand.NextDouble() * Math.PI * 2)
-            };
+                texture = UploadBitmap(bitmap);
+                _textureCache[bitmap] = texture;
+            }
+            assign(texture);
+            pending = null;
         }
 
-        public void Render(Matrix4x4 viewProj, Matrix4x4 viewMatrix)
+        private uint UploadBitmap(BitmapSource bitmap)
         {
-            if (!_ready || _particlePools.Count == 0) return;
-
-            // Extract camera Right and Up vectors for billboard alignment
-            Vector3 camRight = new Vector3(viewMatrix.M11, viewMatrix.M21, viewMatrix.M31);
-            Vector3 camUp = new Vector3(viewMatrix.M12, viewMatrix.M22, viewMatrix.M32);
-
-            _gl.UseProgram(_program);
-            _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
-
-            _gl.Enable(EnableCap.Blend);
-            _gl.DepthMask(false); // don't write particles to depth buffer
-
-            _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.Texture2D, _whiteTex);
-            _gl.Uniform1(_uTex, 0);
-
-            var vertices = new List<ParticleVertex>();
-            var indices = new List<ushort>();
-
-            foreach (var kvp in _particlePools)
+            if (bitmap.Format != PixelFormats.Bgra32)
             {
-                var emitter = kvp.Key;
-                var particles = kvp.Value;
-                if (particles.Count == 0) continue;
-
-                // Set Blend Mode
-                if (emitter.BlendMode == 1) // Additive
-                {
-                    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
-                }
-                else // AlphaBlend
-                {
-                    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                }
-
-                vertices.Clear();
-                indices.Clear();
-
-                foreach (var p in particles)
-                {
-                    ushort baseIndex = (ushort)vertices.Count;
-                    float halfSize = p.Scale.X * 10.0f * _worldScale;
-                    Vector3 worldPosition = _worldAnchor + p.Position * _worldScale;
-
-                    Vector3 p0 = worldPosition + (-camRight - camUp) * halfSize;
-                    Vector3 p1 = worldPosition + (camRight - camUp) * halfSize;
-                    Vector3 p2 = worldPosition + (camRight + camUp) * halfSize;
-                    Vector3 p3 = worldPosition + (-camRight + camUp) * halfSize;
-
-                    vertices.Add(new ParticleVertex { Position = p0, TexCoord = new Vector2(0, 0), Color = p.Color });
-                    vertices.Add(new ParticleVertex { Position = p1, TexCoord = new Vector2(1, 0), Color = p.Color });
-                    vertices.Add(new ParticleVertex { Position = p2, TexCoord = new Vector2(1, 1), Color = p.Color });
-                    vertices.Add(new ParticleVertex { Position = p3, TexCoord = new Vector2(0, 1), Color = p.Color });
-
-                    indices.Add(baseIndex);
-                    indices.Add((ushort)(baseIndex + 1));
-                    indices.Add((ushort)(baseIndex + 2));
-                    indices.Add(baseIndex);
-                    indices.Add((ushort)(baseIndex + 2));
-                    indices.Add((ushort)(baseIndex + 3));
-                }
-
-                UploadAndDrawQuadMesh(vertices, indices);
+                var converted = new FormatConvertedBitmap();
+                converted.BeginInit();
+                converted.Source = bitmap;
+                converted.DestinationFormat = PixelFormats.Bgra32;
+                converted.EndInit();
+                bitmap = converted;
             }
 
-            _gl.DepthMask(true);
-            _gl.Disable(EnableCap.Blend);
-        }
-
-        private void UploadAndDrawQuadMesh(List<ParticleVertex> vertices, List<ushort> indices)
-        {
-            if (vertices.Count == 0 || indices.Count == 0) return;
-
-            _gl.BindVertexArray(_vao);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-
-            var vertArray = vertices.ToArray();
-            _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertArray.Length * 9 * sizeof(float)), new ReadOnlySpan<ParticleVertex>(vertArray), BufferUsageARB.StreamDraw);
-
-            _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
-            var indexArray = indices.ToArray();
-            _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(indexArray.Length * sizeof(ushort)), new ReadOnlySpan<ushort>(indexArray), BufferUsageARB.StreamDraw);
-
-            uint stride = 9 * sizeof(float); // 3 (pos) + 2 (uv) + 4 (col)
-
-            // Pos (0)
-            _gl.EnableVertexAttribArray(0);
-            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, 0);
-
-            // TexCoord (1)
-            _gl.EnableVertexAttribArray(1);
-            _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, stride, 3 * sizeof(float));
-
-            // Color (2)
-            _gl.EnableVertexAttribArray(2);
-            _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, stride, 5 * sizeof(float));
-
-            // With an element buffer bound, the last argument is a byte offset into that
-            // buffer. Silk's `in nint` overload passes the address of the local variable
-            // instead, which OpenGL interprets as a huge invalid offset. Use the native
-            // entry point just like GlMeshRenderer and pass the real zero offset.
-            _drawElements((uint)PrimitiveType.Triangles, indices.Count, (uint)DrawElementsType.UnsignedShort, IntPtr.Zero);
-
-            _gl.BindVertexArray(0);
+            int width = bitmap.PixelWidth;
+            int height = bitmap.PixelHeight;
+            int stride = width * 4;
+            var pixels = new byte[height * stride];
+            bitmap.CopyPixels(new Int32Rect(0, 0, width, height), pixels, stride, 0);
+            return _renderer.UploadTexture(pixels, width, height);
         }
 
         public void Dispose()
         {
-            if (_ready && _gl != null)
+            if (_ready)
             {
-                _gl.DeleteVertexArray(_vao);
-                _gl.DeleteBuffer(_vbo);
-                _gl.DeleteBuffer(_ebo);
-                _gl.DeleteTexture(_whiteTex);
-                _gl.DeleteProgram(_program);
+                _renderer.Dispose();
                 _ready = false;
             }
+            _textureCache.Clear();
+            _loadingService.ClearCaches();
+            _graph = null;
+            _activeSystem = null;
         }
     }
 }

@@ -2,380 +2,309 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Numerics;
-using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
-using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Viewer;
-
 using System.Threading.Tasks;
+using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer
 {
-    public class VfxDataService
+    /// <summary>
+    /// Discovers the BIN graph associated with a model and exposes authored VFX
+    /// systems without fabricating fallback emitters.
+    /// </summary>
+    public sealed class VfxDataService
     {
         private readonly LogService _logService;
-        private readonly HashResolverService _hashResolver;
 
         public VfxDataService(LogService logService, HashResolverService hashResolver = null)
         {
             _logService = logService;
-            _hashResolver = hashResolver;
+            _ = hashResolver;
         }
 
-        public Task<List<VfxSystemModel>> LoadVfxSystemsForModelAsync(string modelFilePath, string projectRootFolder = null)
+        public Task<List<VfxSystemModel>> LoadVfxSystemsForModelAsync(
+            string modelFilePath,
+            string projectRootFolder = null)
+            => Task.Run(() => LoadVfxSystemsForModel(modelFilePath, projectRootFolder));
+
+        public List<VfxSystemModel> LoadVfxSystemsForModel(
+            string modelFilePath,
+            string projectRootFolder = null)
         {
-            return Task.Run(() => LoadVfxSystemsForModel(modelFilePath, projectRootFolder));
-        }
+            if (string.IsNullOrWhiteSpace(modelFilePath)) return new List<VfxSystemModel>();
 
-        public List<VfxSystemModel> LoadVfxSystemsForModel(string modelFilePath, string projectRootFolder = null)
-        {
-            var systems = new List<VfxSystemModel>();
-            if (string.IsNullOrWhiteSpace(modelFilePath)) return systems;
+            string searchRoot = ResolveSearchRoot(modelFilePath, projectRootFolder);
+            string skinTag = ExtractSkinTag(modelFilePath);
+            var candidates = DiscoverBinCandidates(modelFilePath, searchRoot, skinTag);
+            var systems = new Dictionary<uint, VfxSystemDefinition>();
+            var resourceMap = new Dictionary<uint, uint>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var queue = new Queue<string>(candidates);
 
-            var binFilesToScan = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _logService?.LogDebug(
+                $"[VFX] Graph scan found {queue.Count} initial BIN candidate(s) for '{skinTag}'.");
 
-            if (modelFilePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) && File.Exists(modelFilePath))
+            while (queue.Count > 0 && visited.Count < 512)
             {
-                binFilesToScan.Add(Path.GetFullPath(modelFilePath));
-            }
+                string binPath = queue.Dequeue();
+                if (!File.Exists(binPath)) continue;
+                binPath = Path.GetFullPath(binPath);
+                if (!visited.Add(binPath)) continue;
 
-            // Build candidate directories from modelFilePath (both original and assets->data mapped)
-            var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            string currentDir = Path.GetDirectoryName(modelFilePath);
-            int levels = 0;
-            while (!string.IsNullOrEmpty(currentDir) && Directory.Exists(currentDir) && levels < 6)
-            {
-                candidateDirs.Add(currentDir);
-                if (currentDir.Contains("\\assets\\", StringComparison.OrdinalIgnoreCase))
-                {
-                    candidateDirs.Add(currentDir.Replace("\\assets\\", "\\data\\", StringComparison.OrdinalIgnoreCase));
-                }
-                if (currentDir.Contains("/assets/", StringComparison.OrdinalIgnoreCase))
-                {
-                    candidateDirs.Add(currentDir.Replace("/assets/", "/data/", StringComparison.OrdinalIgnoreCase));
-                }
-
-                string parent = Path.GetDirectoryName(currentDir);
-                if (parent == currentDir || string.IsNullOrEmpty(parent)) break;
-                currentDir = parent;
-                levels++;
-            }
-
-            // Auto-detect WAD root folder from modelFilePath if not explicitly provided
-            if (string.IsNullOrEmpty(projectRootFolder))
-            {
-                string dir = Path.GetDirectoryName(modelFilePath);
-                while (!string.IsNullOrEmpty(dir))
-                {
-                    if (Directory.Exists(Path.Combine(dir, "data")) || Directory.Exists(Path.Combine(dir, "assets")))
-                    {
-                        projectRootFolder = dir;
-                        break;
-                    }
-                    string parent = Path.GetDirectoryName(dir);
-                    if (parent == dir) break;
-                    dir = parent;
-                }
-            }
-
-            if (!string.IsNullOrEmpty(projectRootFolder) && Directory.Exists(projectRootFolder))
-            {
-                candidateDirs.Add(projectRootFolder);
-                string dataFolder = Path.Combine(projectRootFolder, "data");
-                if (Directory.Exists(dataFolder)) candidateDirs.Add(dataFolder);
-            }
-
-            // Scan candidate directories for .bin files relevant to the active skin
-            string targetSkinTag = ExtractSkinTag(modelFilePath);
-
-            foreach (var dir in candidateDirs)
-            {
-                if (!Directory.Exists(dir)) continue;
                 try
                 {
-                    var bins = Directory.GetFiles(dir, "*.bin", SearchOption.AllDirectories);
-                    foreach (var bin in bins)
+                    VfxBinDocument document = VfxGraphParser.ParseDocument(File.ReadAllBytes(binPath));
+                    foreach (var pair in document.Systems)
                     {
-                        if (IsBinRelevantToSkin(bin, targetSkinTag))
-                        {
-                            binFilesToScan.Add(Path.GetFullPath(bin));
-                        }
+                        systems.TryAdd(pair.Key, pair.Value);
+                    }
+                    foreach (var pair in document.ResourceMap)
+                    {
+                        resourceMap.TryAdd(pair.Key, pair.Value);
+                    }
+
+                    foreach (string dependency in document.Dependencies)
+                    {
+                        string resolved = ResolveDependency(dependency, searchRoot, Path.GetDirectoryName(binPath));
+                        if (resolved != null && !visited.Contains(resolved)) queue.Enqueue(resolved);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, $"[VFX] Failed to parse graph BIN: {binPath}");
+                }
             }
 
-            _logService?.LogDebug($"[VFX] Targeted scan found {binFilesToScan.Count} BIN candidate(s) for skin '{targetSkinTag}' ('{Path.GetFileName(modelFilePath)}').");
-
-            foreach (string binFile in binFilesToScan)
-            {
-                var parsed = LoadVfxSystemsFromBin(binFile);
-                systems.AddRange(parsed);
-            }
-
-            return systems;
-        }
-
-        private static string ExtractSkinTag(string modelFilePath)
-        {
-            if (string.IsNullOrWhiteSpace(modelFilePath)) return "skin0";
-
-            var match = System.Text.RegularExpressions.Regex.Match(modelFilePath, @"skin(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (match.Success)
-            {
-                return match.Value.ToLower();
-            }
-
-            if (modelFilePath.Contains("base", StringComparison.OrdinalIgnoreCase))
-            {
-                return "skin0";
-            }
-
-            return "skin0";
-        }
-
-        private static bool IsBinRelevantToSkin(string binPath, string targetSkinTag)
-        {
-            string fileName = Path.GetFileNameWithoutExtension(binPath).ToLower();
-
-            // Extract all skin tags present in the filename (e.g. skin0, skin1, skin20)
-            var matches = System.Text.RegularExpressions.Regex.Matches(fileName, @"skin(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (matches.Count > 0)
-            {
-                // If the BIN filename specifies skin tags, it must include targetSkinTag (e.g. skin0)
-                return matches.Cast<System.Text.RegularExpressions.Match>()
-                              .Any(m => string.Equals(m.Value, targetSkinTag, StringComparison.OrdinalIgnoreCase));
-            }
-
-            // Base champion bin (e.g. aurora.bin or root.bin)
-            return true;
+            var models = CreateModels(systems, resourceMap, searchRoot);
+            _logService?.LogSuccess(
+                $"[VFX] Loaded {models.Count} authored systems with {models.Sum(model => model.Emitters.Count)} emitters from {visited.Count} BIN file(s).");
+            return models;
         }
 
         public List<VfxSystemModel> LoadVfxSystemsFromBin(string binFilePath)
         {
-            var systems = new List<VfxSystemModel>();
-
-            if (string.IsNullOrEmpty(binFilePath) || !File.Exists(binFilePath))
-            {
-                _logService.LogDebug($"[VFX] BIN file for VFX loading not found: {binFilePath}");
-                return systems;
-            }
+            if (string.IsNullOrWhiteSpace(binFilePath) || !File.Exists(binFilePath))
+                return new List<VfxSystemModel>();
 
             try
             {
-                using var stream = File.OpenRead(binFilePath);
-                var binTree = new BinTree(stream);
-
-                _logService.LogDebug($"[VFX] Processing BIN file '{Path.GetFileName(binFilePath)}' with {binTree.Objects.Count} object(s)...");
-
-                foreach (var kvp in binTree.Objects)
-                {
-                    var obj = kvp.Value;
-                    string resolvedClassName = _hashResolver?.ResolveBinHashGeneral(obj.ClassHash);
-
-                    // ClassHash 0x45CD899F or 0x79BD121D or resolved name represent VfxSystemDefinitionData in BIN files
-                    bool isVfxSystem = resolvedClassName == "VfxSystemDefinitionData" ||
-                                       obj.ClassHash == 0x45CD899F ||
-                                       obj.ClassHash == 0x79BD121D || 
-                                       obj.Properties.ContainsKey(0x868EB76A) || // Emitters container
-                                       obj.Properties.ContainsKey(0xDF6B357F) || 
-                                       obj.Properties.ContainsKey(0x9EB3DC85);
-
-                    if (!isVfxSystem) continue;
-
-                    var systemModel = ParseVfxSystemObject(obj, kvp.Key);
-                    if (systemModel != null)
-                    {
-                        // Ensure at least 1 emitter is active for visualization
-                        if (systemModel.Emitters.Count == 0)
-                        {
-                            systemModel.Emitters.Add(new VfxEmitterModel
-                            {
-                                Name = "MainEmitter",
-                                Lifetime = 1.5f,
-                                EmissionRate = 12.0f,
-                                StartColor = new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                                EndColor = new Vector4(0.9f, 0.4f, 0.1f, 0.0f),
-                                BlendMode = 1 // Additive
-                            });
-                        }
-                        systems.Add(systemModel);
-                        _logService.LogDebug($"[VFX] Extracted VFX System '{systemModel.Name}' with {systemModel.Emitters.Count} emitter(s).");
-                    }
-                }
-
-                _logService.LogSuccess($"[VFX] Total VFX Systems extracted from '{Path.GetFileName(binFilePath)}': {systems.Count}");
+                VfxBinDocument document = VfxGraphParser.ParseDocument(File.ReadAllBytes(binFilePath));
+                return CreateModels(
+                    new Dictionary<uint, VfxSystemDefinition>(document.Systems),
+                    new Dictionary<uint, uint>(document.ResourceMap),
+                    Path.GetDirectoryName(binFilePath));
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"[VFX] Failed to parse VFX systems from BIN: {binFilePath}");
+                _logService?.LogError(ex, $"[VFX] Failed to parse graph BIN: {binFilePath}");
+                return new List<VfxSystemModel>();
             }
-
-            return systems;
         }
 
-        private VfxSystemModel ParseVfxSystemObject(BinTreeObject obj, uint pathHash)
+        private static List<VfxSystemModel> CreateModels(
+            Dictionary<uint, VfxSystemDefinition> systems,
+            Dictionary<uint, uint> resourceMap,
+            string searchDirectory)
         {
-            var system = new VfxSystemModel
+            return systems.Values
+                .OrderBy(system => system.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(system => new VfxSystemModel
+                {
+                    Name = string.IsNullOrWhiteSpace(system.Name) ? $"Vfx_{system.PathHash:X8}" : system.Name,
+                    ParticlePath = system.ParticlePath ?? string.Empty,
+                    Definition = system,
+                    SystemCatalog = systems,
+                    ResourceMap = resourceMap,
+                    SearchDirectory = searchDirectory ?? string.Empty,
+                    Emitters = system.Emitters.Select(ToPanelEmitter).ToList(),
+                    TotalDuration = ComputeDuration(system, systems, resourceMap, new HashSet<uint>(), 0),
+                    FrameRateText = DescribeFrameRate(system)
+                })
+                .ToList();
+        }
+
+        private static double ComputeDuration(
+            VfxSystemDefinition system,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> catalog,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            HashSet<uint> path,
+            int depth)
+        {
+            if (depth >= 8 || !path.Add(system.PathHash)) return double.PositiveInfinity;
+            double systemEnd = 0;
+
+            foreach (VfxEmitterDefinition emitter in system.Emitters.Where(item => !item.Disabled))
             {
-                Name = $"Vfx_{pathHash:X8}"
+                if (emitter.EmitterLifetime is null)
+                {
+                    path.Remove(system.PathHash);
+                    return double.PositiveInfinity;
+                }
+
+                double particleLifetime = Math.Max(
+                    emitter.ParticleLifetime.Constant,
+                    emitter.ParticleLifetime.Values?.DefaultIfEmpty(0f).Max() ?? 0f);
+                double emitterEnd = emitter.TimeBeforeFirstEmission + emitter.EmitterLifetime.Value +
+                    Math.Max(0, particleLifetime) + Math.Max(emitter.ParticleLinger, emitter.EmitterLinger);
+
+                if (emitter.ChildParticleSet is { Children.Count: > 0 } children)
+                {
+                    foreach (VfxChildSystemReference child in children.Children)
+                    {
+                        uint childHash = child.SystemHash;
+                        if (childHash == 0 && child.EffectKey != 0)
+                            resourceMap.TryGetValue(child.EffectKey, out childHash);
+                        if (!catalog.TryGetValue(childHash, out VfxSystemDefinition childSystem)) continue;
+
+                        double childDuration = ComputeDuration(childSystem, catalog, resourceMap, path, depth + 1);
+                        if (double.IsInfinity(childDuration))
+                        {
+                            path.Remove(system.PathHash);
+                            return double.PositiveInfinity;
+                        }
+                        emitterEnd += childDuration;
+                    }
+                }
+
+                systemEnd = Math.Max(systemEnd, emitterEnd);
+            }
+
+            path.Remove(system.PathHash);
+            return Math.Max(0, systemEnd);
+        }
+
+        private static string DescribeFrameRate(VfxSystemDefinition system)
+        {
+            float[] rates = system.Emitters
+                .Where(emitter => emitter.NumFrames > 1)
+                .Select(emitter => emitter.BirthFrameRate?.Constant ?? emitter.FrameRate ?? 0f)
+                .Where(rate => rate > 0f)
+                .Select(rate => MathF.Round(rate, 2))
+                .Distinct()
+                .ToArray();
+            return rates.Length switch
+            {
+                0 => "Realtime",
+                1 => $"{rates[0]:0.##} FPS",
+                _ => "Variable FPS"
             };
-
-            foreach (var prop in obj.Properties)
-            {
-                if (prop.Value is BinTreeString strProp)
-                {
-                    if (prop.Key == 0xECF1C6BC || prop.Key == 0xE7638138 || prop.Key == 0x7D3C5230 || string.IsNullOrEmpty(system.ParticlePath))
-                    {
-                        system.ParticlePath = strProp.Value;
-                        if (!string.IsNullOrWhiteSpace(strProp.Value))
-                        {
-                            system.Name = Path.GetFileNameWithoutExtension(strProp.Value);
-                        }
-                    }
-                }
-                else if (prop.Value is BinTreeContainer container)
-                {
-                    foreach (var elem in container.Elements)
-                    {
-                        if (elem is BinTreeStruct emitterStruct)
-                        {
-                            var emitter = ParseEmitterStruct(emitterStruct);
-                            if (emitter != null)
-                            {
-                                system.Emitters.Add(emitter);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return system;
         }
 
-        private VfxEmitterModel ParseEmitterStruct(BinTreeStruct emitterStruct)
+        private static VfxEmitterModel ToPanelEmitter(VfxEmitterDefinition emitter)
         {
-            var emitter = new VfxEmitterModel
+            return new VfxEmitterModel
             {
-                Name = "Emitter"
+                Name = emitter.Name ?? "Emitter",
+                TexturePath = emitter.TexturePath ?? string.Empty,
+                MeshPath = emitter.MeshPath ?? string.Empty,
+                Lifetime = Math.Max(0.05f, emitter.ParticleLifetime.Constant),
+                Duration = emitter.EmitterLifetime ?? 0f,
+                Delay = emitter.TimeBeforeFirstEmission,
+                EmissionRate = Math.Max(0f, emitter.Rate.Constant),
+                InitialVelocity = emitter.BirthVelocity?.Constant ?? default,
+                Acceleration = emitter.Acceleration?.Constant ?? default,
+                InitialScale = emitter.BirthScale.Constant,
+                StartColor = emitter.BirthColor.Constant,
+                BlendMode = emitter.BlendMode,
+                NumFrames = (ushort)Math.Clamp(emitter.NumFrames, 1, ushort.MaxValue),
+                IsLooping = emitter.EmitterLifetime is null
             };
+        }
 
-            foreach (var prop in emitterStruct.Properties)
+        private static HashSet<string> DiscoverBinCandidates(
+            string modelFilePath,
+            string searchRoot,
+            string skinTag)
+        {
+            var bins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (modelFilePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase) && File.Exists(modelFilePath))
+                bins.Add(Path.GetFullPath(modelFilePath));
+
+            var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string current = Path.GetDirectoryName(modelFilePath);
+            for (int level = 0; level < 6 && !string.IsNullOrWhiteSpace(current); level++)
             {
-                switch (prop.Value)
+                if (Directory.Exists(current)) directories.Add(current);
+                current = Path.GetDirectoryName(current);
+            }
+            if (Directory.Exists(searchRoot)) directories.Add(searchRoot);
+
+            foreach (string directory in directories)
+            {
+                try
                 {
-                    case BinTreeString strVal:
-                        AssignEmitterStringProperty(emitter, prop.Key, strVal.Value);
-                        break;
-
-                    case BinTreeStruct nestedStruct:
-                        AssignEmitterNestedStructProperty(emitter, prop.Key, nestedStruct);
-                        break;
-
-                    case BinTreeOptional optVal:
-                        if (optVal.Value is BinTreeF32 f32Opt)
-                        {
-                            emitter.Duration = f32Opt.Value;
-                        }
-                        break;
-
-                    case BinTreeF32 f32Val:
-                        AssignEmitterFloatProperty(emitter, prop.Key, f32Val.Value);
-                        break;
-
-                    case BinTreeU16 u16Val:
-                        if (prop.Key == 0x2A2E2F82 || prop.Key == 0x94677E59) // numFrames
-                        {
-                            emitter.NumFrames = u16Val.Value;
-                        }
-                        break;
-
-                    case BinTreeU8 u8Val:
-                        if (prop.Key == 0x748B4783 || prop.Key == 0x16F4FBA9) // blendMode
-                        {
-                            emitter.BlendMode = u8Val.Value;
-                        }
-                        break;
-                }
-            }
-
-            return emitter;
-        }
-
-        private void AssignEmitterStringProperty(VfxEmitterModel emitter, uint key, string val)
-        {
-            if (string.IsNullOrWhiteSpace(val)) return;
-
-            // Common property hashes & key substrings
-            string lower = val.ToLowerInvariant();
-            if (lower.EndsWith(".dds") || lower.EndsWith(".png") || lower.EndsWith(".tex") || lower.Contains("textures/"))
-            {
-                emitter.TexturePath = val;
-            }
-            else if (lower.EndsWith(".scb") || lower.EndsWith(".sco") || lower.EndsWith(".skn") || lower.Contains("meshes/"))
-            {
-                emitter.MeshPath = val;
-            }
-            else if (val.StartsWith("BUFFBONE", StringComparison.OrdinalIgnoreCase) ||
-                     val.StartsWith("C_", StringComparison.OrdinalIgnoreCase) ||
-                     val.StartsWith("L_", StringComparison.OrdinalIgnoreCase) ||
-                     val.StartsWith("R_", StringComparison.OrdinalIgnoreCase) ||
-                     val.Equals("root", StringComparison.OrdinalIgnoreCase))
-            {
-                emitter.AttachToBone = val;
-            }
-        }
-
-        private void AssignEmitterFloatProperty(VfxEmitterModel emitter, uint key, float val)
-        {
-            if (val <= 0) return;
-            // Delay or Duration or Rate heuristics
-            if (emitter.Lifetime <= 1.0f && val > 0.05f && val < 30.0f)
-            {
-                emitter.Lifetime = val;
-            }
-        }
-
-        private void AssignEmitterNestedStructProperty(VfxEmitterModel emitter, uint key, BinTreeStruct nestedStruct)
-        {
-            // ValueFloat or ValueVector3 or FlexType
-            foreach (var prop in nestedStruct.Properties)
-            {
-                if (prop.Value is BinTreeF32 f32)
-                {
-                    if (f32.Value > 0 && emitter.Lifetime == 1.0f)
+                    foreach (string bin in Directory.EnumerateFiles(directory, "*.bin", SearchOption.AllDirectories))
                     {
-                        emitter.Lifetime = f32.Value;
+                        if (IsBinRelevantToSkin(bin, skinTag)) bins.Add(Path.GetFullPath(bin));
                     }
                 }
-                else if (prop.Value is BinTreeStruct vecStruct)
+                catch (UnauthorizedAccessException)
                 {
-                    // Vector3/Vector4 extraction
-                    var vec = ExtractVector3(vecStruct);
-                    if (vec != Vector3.Zero && emitter.InitialVelocity == Vector3.Zero)
-                    {
-                        emitter.InitialVelocity = vec;
-                    }
+                }
+                catch (IOException)
+                {
                 }
             }
+            return bins;
         }
 
-        private Vector3 ExtractVector3(BinTreeStruct structProp)
+        private static string ResolveDependency(string dependency, string searchRoot, string currentDirectory)
         {
-            float x = 0, y = 0, z = 0;
-            foreach (var p in structProp.Properties)
+            if (string.IsNullOrWhiteSpace(dependency)) return null;
+            string relative = dependency.Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+            foreach (string root in new[] { searchRoot, currentDirectory })
             {
-                if (p.Value is BinTreeF32 fVal)
+                if (string.IsNullOrWhiteSpace(root)) continue;
+                string candidate = Path.Combine(root, relative);
+                if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+
+                if (relative.StartsWith($"data{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+                    relative.StartsWith($"assets{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (x == 0) x = fVal.Value;
-                    else if (y == 0) y = fVal.Value;
-                    else if (z == 0) z = fVal.Value;
+                    candidate = Path.Combine(root, relative[(relative.IndexOf(Path.DirectorySeparatorChar) + 1)..]);
+                    if (File.Exists(candidate)) return Path.GetFullPath(candidate);
                 }
             }
-            return new Vector3(x, y, z);
+            return null;
+        }
+
+        private static string ResolveSearchRoot(string modelFilePath, string projectRootFolder)
+        {
+            if (!string.IsNullOrWhiteSpace(projectRootFolder) && Directory.Exists(projectRootFolder))
+                return Path.GetFullPath(projectRootFolder);
+
+            string directory = Path.GetDirectoryName(modelFilePath);
+            while (!string.IsNullOrWhiteSpace(directory))
+            {
+                if (Directory.Exists(Path.Combine(directory, "data")) ||
+                    Directory.Exists(Path.Combine(directory, "assets")))
+                    return directory;
+                directory = Path.GetDirectoryName(directory);
+            }
+            return Path.GetDirectoryName(modelFilePath) ?? string.Empty;
+        }
+
+        private static string ExtractSkinTag(string path)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(
+                path ?? string.Empty,
+                @"skin(\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success ? match.Value.ToLowerInvariant() : "skin0";
+        }
+
+        private static bool IsBinRelevantToSkin(string binPath, string skinTag)
+        {
+            string name = Path.GetFileNameWithoutExtension(binPath);
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                name,
+                @"skin(\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return matches.Count == 0 || matches.Cast<System.Text.RegularExpressions.Match>()
+                .Any(match => string.Equals(match.Value, skinTag, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

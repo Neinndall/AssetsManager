@@ -78,7 +78,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer = new GlMeshRenderer();
                 _meshRenderer.Initialize(_gl);
 
-                _vfxRenderer = new GlVfxRenderer();
+                _vfxRenderer = new GlVfxRenderer(LogService);
                 _vfxRenderer.Initialize(_gl);
 
                 _gridRenderer = new GridRenderer();
@@ -187,6 +187,7 @@ namespace AssetsManager.Views.Controls.Viewer
                             (float)_activeSceneModel.PositionZ),
                         (float)_activeSceneModel.Scale);
                 }
+                _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
                 _vfxRenderer.Update((float)delta.TotalSeconds);
                 _vfxRenderer.Render(viewProj, view);
             }
@@ -722,6 +723,8 @@ namespace AssetsManager.Views.Controls.Viewer
         public void PauseVfx() => _vfxRenderer?.Pause();
 
         public void StopVfx() => _vfxRenderer?.Stop();
+
+        public void SeekVfx(TimeSpan time) => _vfxRenderer?.Seek(time.TotalSeconds);
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {

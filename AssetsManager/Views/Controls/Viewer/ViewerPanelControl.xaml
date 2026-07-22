@@ -1149,9 +1149,31 @@
                         <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="Creation" Width="14" Height="14" Foreground="{StaticResource AccentYellow}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <StackPanel>
                             <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Emitters.Count, StringFormat={}{0} emitters}" FontSize="9" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock FontSize="9" Foreground="{StaticResource TextMuted}">
+                                <Run Text="{Binding EmitterCount}"/><Run Text=" emitters · "/><Run Text="{Binding FrameRateText}"/>
+                            </TextBlock>
                         </StackPanel>
                     </DockPanel>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="VfxTimelineSlider" Grid.Column="0"
+                                Maximum="{Binding TimelineMaximum}"
+                                Value="{Binding CurrentTime, Mode=TwoWay}"
+                                IsEnabled="{Binding HasFiniteDuration}"
+                                Thumb.DragStarted="VfxSlider_DragStarted"
+                                Thumb.DragCompleted="VfxSlider_DragCompleted"
+                                ValueChanged="VfxSlider_ValueChanged"
+                                Height="14" Style="{StaticResource HUDSliderStyle}"/>
+                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
+                            <Run Text="{Binding CurrentTime, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
+                            <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
+                            <Run Text="{Binding DurationText}" Foreground="{StaticResource TextMuted}"/>
+                        </TextBlock>
+                    </Grid>
 
                     <Grid VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>

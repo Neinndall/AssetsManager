@@ -1152,6 +1152,32 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private bool _isVfxSliderDragging;
+
+        private void VfxSlider_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
+        {
+            _isVfxSliderDragging = true;
+        }
+
+        private void VfxSlider_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+        {
+            _isVfxSliderDragging = false;
+            if ((sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem)
+            {
+                Viewport?.SeekVfx(TimeSpan.FromSeconds(vfxSystem.CurrentTime));
+            }
+        }
+
+        private void VfxSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_isVfxSliderDragging &&
+                (sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem &&
+                vfxSystem.HasFiniteDuration)
+            {
+                Viewport?.SeekVfx(TimeSpan.FromSeconds(e.NewValue));
+            }
+        }
+
         private void CloseVfxPlayer_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem)
