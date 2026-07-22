@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
+             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Viewer"
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="900">
@@ -111,9 +112,7 @@
                          Margin="4"
                          Background="Transparent"
                          BorderThickness="0"
-                         Style="{StaticResource SmoothScrollListBox}"
-                         SelectionChanged="FilesListBox_SelectionChanged"
-                         MouseDoubleClick="FilesListBox_MouseDoubleClick">
+                         Style="{StaticResource SmoothScrollListBox}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel Orientation="Horizontal" Margin="2"/>
@@ -122,6 +121,7 @@
                     
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
+                            <Setter Property="helpers:SelectionBehavior.EnableUnifiedSelection" Value="True"/>
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="BorderThickness" Value="0"/>
                             <Setter Property="Padding" Value="4"/>
@@ -145,6 +145,8 @@
                                     </ControlTemplate>
                                 </Setter.Value>
                             </Setter>
+                            <EventSetter Event="helpers:SelectionBehavior.PrimaryAction"
+                                         Handler="SelectionBehavior_PrimaryAction"/>
                         </Style>
                     </ListBox.ItemContainerStyle>
 

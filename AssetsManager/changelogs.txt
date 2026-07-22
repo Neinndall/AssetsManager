@@ -16,6 +16,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer project folders now open with a single click in the Content Browser.
   - Increased Hash Guessing Lab left configuration panel width for improved readability.
   - Enabled text wrapping and custom line spacing for the unknown hashes breakdown label.
   - Extended cancellation match preservation to GAME and LCU guessing domains.

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Material.Icons;
@@ -393,28 +392,21 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void FilesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void SelectionBehavior_PrimaryAction(object sender, RoutedEventArgs e)
         {
-            if (FilesListBox.SelectedItem is ProjectExplorerNode node && node.IsFile)
+            if (e.OriginalSource is not ListBoxItem item ||
+                item.DataContext is not ProjectExplorerNode node)
             {
-                // Single click on file triggers ModelSelected (useful for image previews)
-                ModelSelected?.Invoke(this, node.FullPath);
+                return;
             }
-        }
 
-        private void FilesListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (FilesListBox.SelectedItem is ProjectExplorerNode node)
+            if (node.IsFile)
             {
-                if (!node.IsFile)
-                {
-                    NavigateToFolder(node);
-                }
-                else
-                {
-                    ModelSelected?.Invoke(this, node.FullPath);
-                }
+                ModelSelected?.Invoke(this, node.FullPath);
+                return;
             }
+
+            NavigateToFolder(node);
         }
 
         private void CloseExplorer_Click(object sender, RoutedEventArgs e)
