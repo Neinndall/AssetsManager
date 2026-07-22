@@ -4,6 +4,7 @@ HOTFIX UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows each GREP match as soon as it is discovered.
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.

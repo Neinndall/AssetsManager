@@ -73,22 +73,15 @@ namespace AssetsManager.Views.Models.Viewer
         private string _selectedImageName = string.Empty;
 
         private readonly ObservableRangeCollection<VfxSystemModel> _vfxSystems = new();
-        private bool _isVfxSectionExpanded = true;
-        private bool _isVfxEnabled = true;
+        private VfxSystemModel _selectedVfxSystem;
 
         public ObservableRangeCollection<VfxSystemModel> VfxSystems => _vfxSystems;
         public bool HasVfxSystems => _vfxSystems.Any();
 
-        public bool IsVfxSectionExpanded
+        public VfxSystemModel SelectedVfxSystem
         {
-            get => _isVfxSectionExpanded;
-            set { if (_isVfxSectionExpanded != value) { _isVfxSectionExpanded = value; OnPropertyChanged(); } }
-        }
-
-        public bool IsVfxEnabled
-        {
-            get => _isVfxEnabled;
-            set { if (_isVfxEnabled != value) { _isVfxEnabled = value; OnPropertyChanged(); } }
+            get => _selectedVfxSystem;
+            set { if (_selectedVfxSystem != value) { _selectedVfxSystem = value; OnPropertyChanged(); } }
         }
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;

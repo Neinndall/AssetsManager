@@ -1,14 +1,39 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    public class VfxSystemModel
+    public class VfxSystemModel : INotifyPropertyChanged
     {
         public string Name { get; set; } = string.Empty;
         public string ParticlePath { get; set; } = string.Empty;
-        public bool IsEnabled { get; set; } = true;
         public List<VfxEmitterModel> Emitters { get; set; } = new();
+
+        private bool _isPlaying;
+        private double _speed = 1.0;
+
+        public bool IsPlaying
+        {
+            get => _isPlaying;
+            set => SetField(ref _isPlaying, value);
+        }
+
+        public double Speed
+        {
+            get => _speed;
+            set => SetField(ref _speed, value);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void SetField<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public class VfxEmitterModel

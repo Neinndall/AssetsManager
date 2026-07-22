@@ -29,7 +29,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
         private GlVfxRenderer _vfxRenderer;
-        private VfxDataService _vfxDataService;
         private GridRenderer _gridRenderer;
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -81,11 +80,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _vfxRenderer = new GlVfxRenderer();
                 _vfxRenderer.Initialize(_gl);
-
-                if (LogService != null)
-                {
-                    _vfxDataService = new VfxDataService(LogService);
-                }
 
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
@@ -442,6 +436,9 @@ namespace AssetsManager.Views.Controls.Viewer
  
                 _gridRenderer?.Dispose();
                 _gridRenderer = null;
+
+                _vfxRenderer?.Dispose();
+                _vfxRenderer = null;
  
             }
             catch (Exception ex)
@@ -704,12 +701,18 @@ namespace AssetsManager.Views.Controls.Viewer
             _activeSceneModel = model;
         }
 
-        public void SetVfxSystems(List<VfxSystemModel> vfxSystems)
+        public void SelectVfxSystem(VfxSystemModel vfxSystem)
         {
             if (_vfxRenderer == null) return;
-            _vfxRenderer.SetVfxSystems(vfxSystems ?? new List<VfxSystemModel>());
-            LogService?.LogSuccess($"[VFX] Loaded {vfxSystems?.Count ?? 0} VFX system(s) for active model into Viewport.");
+            _vfxRenderer.SetVfxSystem(vfxSystem);
+            LogService?.LogDebug($"[VFX] Selected VFX system '{vfxSystem?.Name ?? "none"}'.");
         }
+
+        public void PlayVfx() => _vfxRenderer?.Play();
+
+        public void PauseVfx() => _vfxRenderer?.Pause();
+
+        public void StopVfx() => _vfxRenderer?.Stop();
 
         private void CompositionTarget_Rendering(object sender, System.EventArgs e)
         {

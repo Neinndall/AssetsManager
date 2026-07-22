@@ -28,18 +28,19 @@ namespace AssetsManager.Services.Viewer
         private uint _whiteTex;
         private bool _ready;
 
-        private readonly List<VfxSystemModel> _activeSystems = new();
+        private VfxSystemModel _activeSystem;
+        private bool _isPlaying;
         private readonly Dictionary<VfxEmitterModel, List<VfxParticleInstance>> _particlePools = new();
         private readonly Dictionary<VfxEmitterModel, float> _spawnAccumulators = new();
         private readonly Random _rand = new();
 
         private const string VertShader = @"
-            attribute vec3 aPos;
-            attribute vec2 aTexCoord;
-            attribute vec4 aColor;
+            layout(location = 0) in vec3 aPos;
+            layout(location = 1) in vec2 aTexCoord;
+            layout(location = 2) in vec4 aColor;
             uniform mat4 uViewProj;
-            varying vec2 vTexCoord;
-            varying vec4 vColor;
+            out vec2 vTexCoord;
+            out vec4 vColor;
             void main() {
                 vTexCoord = aTexCoord;
                 vColor = aColor;
@@ -48,12 +49,13 @@ namespace AssetsManager.Services.Viewer
         ";
 
         private const string FragShader = @"
-            varying vec2 vTexCoord;
-            varying vec4 vColor;
+            in vec2 vTexCoord;
+            in vec4 vColor;
             uniform sampler2D uTex;
+            out vec4 FragColor;
             void main() {
-                vec4 texColor = texture2D(uTex, vTexCoord);
-                gl_FragColor = texColor * vColor;
+                vec4 texColor = texture(uTex, vTexCoord);
+                FragColor = texColor * vColor;
             }
         ";
 
@@ -82,29 +84,45 @@ namespace AssetsManager.Services.Viewer
             _ready = true;
         }
 
-        public void SetVfxSystems(List<VfxSystemModel> systems)
+        public void SetVfxSystem(VfxSystemModel system)
         {
-            _activeSystems.Clear();
+            _activeSystem = system;
+            _isPlaying = false;
             _particlePools.Clear();
             _spawnAccumulators.Clear();
 
-            if (systems != null)
+            if (system != null)
             {
-                _activeSystems.AddRange(systems);
-                foreach (var sys in systems)
+                foreach (var emitter in system.Emitters)
                 {
-                    foreach (var emitter in sys.Emitters)
-                    {
-                        _particlePools[emitter] = new List<VfxParticleInstance>();
-                        _spawnAccumulators[emitter] = 0.0f;
-                    }
+                    _particlePools[emitter] = new List<VfxParticleInstance>();
+                    _spawnAccumulators[emitter] = 0.0f;
                 }
+            }
+        }
+
+        public void Play() => _isPlaying = _activeSystem != null;
+
+        public void Pause() => _isPlaying = false;
+
+        public void Stop()
+        {
+            _isPlaying = false;
+            foreach (var particles in _particlePools.Values)
+            {
+                particles.Clear();
+            }
+            foreach (var emitter in new List<VfxEmitterModel>(_spawnAccumulators.Keys))
+            {
+                _spawnAccumulators[emitter] = 0.0f;
             }
         }
 
         public void Update(float deltaTime)
         {
-            if (!_ready || _activeSystems.Count == 0) return;
+            if (!_ready || !_isPlaying || _activeSystem == null) return;
+
+            deltaTime *= (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
 
             foreach (var kvp in _particlePools)
             {
@@ -261,7 +279,8 @@ namespace AssetsManager.Services.Viewer
             _gl.EnableVertexAttribArray(2);
             _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, stride, 5 * sizeof(float));
 
-            _gl.DrawElements(PrimitiveType.Triangles, (uint)indices.Count, DrawElementsType.UnsignedShort, 0);
+            nint indexOffset = 0;
+            _gl.DrawElements(PrimitiveType.Triangles, (uint)indices.Count, DrawElementsType.UnsignedShort, in indexOffset);
 
             _gl.BindVertexArray(0);
         }

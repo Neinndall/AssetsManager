@@ -27,7 +27,7 @@ namespace BenchmarkApp
             }
             if (args.Length > 0 && args[0] == "vfx-audit")
             {
-                AuditVfxBins();
+                AuditVfxBins(args.Skip(1).ToArray());
                 return;
             }
             if (args.Length > 0 && args[0] == "list-extensions")
@@ -428,13 +428,20 @@ namespace BenchmarkApp
             }
         }
 
-        private static void AuditVfxBins()
+        private static void AuditVfxBins(string[] args)
         {
-            var logService = new AssetsManager.Services.Core.LogService(null);
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: vfx-audit <model.skn> <project-root>");
+                return;
+            }
+
+            using var logger = new LoggerConfiguration().CreateLogger();
+            var logService = new AssetsManager.Services.Core.LogService(logger);
             var service = new AssetsManager.Services.Viewer.VfxDataService(logService);
 
-            string sknPath = @"C:\Users\danielpriego\Desktop\Aurora.wad.client\assets\characters\aurora\skins\base\aurora_base.skn";
-            string rootPath = @"C:\Users\danielpriego\Desktop\Aurora.wad.client";
+            string sknPath = Path.GetFullPath(args[0]);
+            string rootPath = Path.GetFullPath(args[1]);
 
             Console.WriteLine($"Testing VfxDataService.LoadVfxSystemsForModel...");
             Console.WriteLine($"sknPath: {sknPath}");
@@ -445,7 +452,7 @@ namespace BenchmarkApp
 
             foreach (var sys in systems.Take(20))
             {
-                Console.WriteLine($" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count} | Enabled: {sys.IsEnabled}");
+                Console.WriteLine($" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count}");
             }
         }
     }
