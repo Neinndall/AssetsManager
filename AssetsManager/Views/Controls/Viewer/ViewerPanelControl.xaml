@@ -791,19 +791,22 @@
                                              </ListBox.Template>
                                              <ListBox.ItemTemplate>
                                                  <DataTemplate>
-                                                     <Border Padding="10,8" Margin="0,0,0,4" Background="{StaticResource CardBackground}" CornerRadius="8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                                         <Grid>
-                                                             <Grid.ColumnDefinitions>
-                                                                 <ColumnDefinition Width="Auto"/>
-                                                                 <ColumnDefinition Width="*"/>
-                                                             </Grid.ColumnDefinitions>
-                                                             <materialIcons:MaterialIcon Grid.Column="0" Kind="Creation" Width="14" Height="14" Foreground="{StaticResource AccentYellow}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                                 <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                                 <TextBlock Text="{Binding Emitters.Count, StringFormat={}{0} Emitters}" FontSize="8.5" Foreground="{StaticResource TextMuted}"/>
-                                                             </StackPanel>
-                                                         </Grid>
-                                                     </Border>
+                                                     <Grid>
+                                                         <Grid.ColumnDefinitions>
+                                                             <ColumnDefinition Width="*"/>
+                                                             <ColumnDefinition Width="Auto"/>
+                                                         </Grid.ColumnDefinitions>
+
+                                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                             <materialIcons:MaterialIcon Kind="Creation" Width="14" Height="14" Foreground="{StaticResource AccentYellow}" Margin="4,0,4,0" VerticalAlignment="Center"/>
+                                                             <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="4,0,6,0" VerticalAlignment="Center"/>
+                                                             <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                                                                 <TextBlock Text="VFX" Foreground="{StaticResource TextMuted}" FontSize="8" FontWeight="Black"/>
+                                                             </Border>
+                                                         </StackPanel>
+
+                                                         <TextBlock Grid.Column="1" Text="{Binding Emitters.Count, StringFormat={}{0} emitters}" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                                     </Grid>
                                                  </DataTemplate>
                                              </ListBox.ItemTemplate>
                                          </ListBox>

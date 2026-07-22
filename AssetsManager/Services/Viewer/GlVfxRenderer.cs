@@ -30,6 +30,8 @@ namespace AssetsManager.Services.Viewer
 
         private VfxSystemModel _activeSystem;
         private bool _isPlaying;
+        private Vector3 _worldAnchor;
+        private float _worldScale = 1.0f;
         private readonly Dictionary<VfxEmitterModel, List<VfxParticleInstance>> _particlePools = new();
         private readonly Dictionary<VfxEmitterModel, float> _spawnAccumulators = new();
         private readonly Random _rand = new();
@@ -105,6 +107,12 @@ namespace AssetsManager.Services.Viewer
 
         public void Pause() => _isPlaying = false;
 
+        public void SetWorldTransform(Vector3 position, float scale)
+        {
+            _worldAnchor = position;
+            _worldScale = Math.Max(0.01f, scale);
+        }
+
         public void Stop()
         {
             _isPlaying = false;
@@ -165,14 +173,14 @@ namespace AssetsManager.Services.Viewer
 
         private VfxParticleInstance SpawnParticle(VfxEmitterModel emitter)
         {
-            float rx = (float)(_rand.NextDouble() * 0.4 - 0.2);
-            float ry = (float)(_rand.NextDouble() * 0.4 - 0.2);
-            float rz = (float)(_rand.NextDouble() * 0.4 - 0.2);
+            float rx = (float)(_rand.NextDouble() * 20.0 - 10.0);
+            float ry = (float)(_rand.NextDouble() * 20.0 - 10.0);
+            float rz = (float)(_rand.NextDouble() * 20.0 - 10.0);
 
             return new VfxParticleInstance
             {
-                Position = new Vector3(rx, ry + 1.0f, rz), // Center around character height
-                Velocity = emitter.InitialVelocity + new Vector3(rx, ry + 0.5f, rz),
+                Position = new Vector3(rx, ry + 90.0f, rz),
+                Velocity = emitter.InitialVelocity + new Vector3(rx * 0.1f, 12.0f + ry * 0.1f, rz * 0.1f),
                 Scale = emitter.InitialScale * (0.8f + (float)_rand.NextDouble() * 0.4f),
                 Color = emitter.StartColor,
                 Age = 0.0f,
@@ -224,12 +232,13 @@ namespace AssetsManager.Services.Viewer
                 foreach (var p in particles)
                 {
                     ushort baseIndex = (ushort)vertices.Count;
-                    float halfSize = p.Scale.X * 0.15f;
+                    float halfSize = p.Scale.X * 10.0f * _worldScale;
+                    Vector3 worldPosition = _worldAnchor + p.Position * _worldScale;
 
-                    Vector3 p0 = p.Position + (-camRight - camUp) * halfSize;
-                    Vector3 p1 = p.Position + (camRight - camUp) * halfSize;
-                    Vector3 p2 = p.Position + (camRight + camUp) * halfSize;
-                    Vector3 p3 = p.Position + (-camRight + camUp) * halfSize;
+                    Vector3 p0 = worldPosition + (-camRight - camUp) * halfSize;
+                    Vector3 p1 = worldPosition + (camRight - camUp) * halfSize;
+                    Vector3 p2 = worldPosition + (camRight + camUp) * halfSize;
+                    Vector3 p3 = worldPosition + (-camRight + camUp) * halfSize;
 
                     vertices.Add(new ParticleVertex { Position = p0, TexCoord = new Vector2(0, 0), Color = p.Color });
                     vertices.Add(new ParticleVertex { Position = p1, TexCoord = new Vector2(1, 0), Color = p.Color });

@@ -178,6 +178,15 @@ namespace AssetsManager.Views.Controls.Viewer
             // Render active VFX particles
             if (_vfxRenderer != null)
             {
+                if (_activeSceneModel != null)
+                {
+                    _vfxRenderer.SetWorldTransform(
+                        new Vector3(
+                            (float)_activeSceneModel.PositionX,
+                            (float)_activeSceneModel.PositionY,
+                            (float)_activeSceneModel.PositionZ),
+                        (float)_activeSceneModel.Scale);
+                }
                 _vfxRenderer.Update((float)delta.TotalSeconds);
                 _vfxRenderer.Render(viewProj, view);
             }
