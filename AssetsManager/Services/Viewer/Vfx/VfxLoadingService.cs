@@ -166,6 +166,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 emitter.PendingDistortionTexture = _resources.ResolveTexture(
                     emitter.Def.Distortion?.NormalMapTexturePath,
                     searchDirectory);
+                emitter.PendingErosionTexture = _resources.ResolveTexture(
+                    emitter.Def.AlphaErosion?.TexturePath,
+                    searchDirectory);
 
                 BitmapSource gradient = _resources.ResolveTexture(
                     emitter.Def.ParticleColorTexturePath,
@@ -183,6 +186,29 @@ namespace AssetsManager.Services.Viewer.Vfx
             runtime.ApplyRenderOrder();
 
             return runtime;
+        }
+
+        public VfxPlaybackGraphRuntime PreparePlaybackGraph(
+            VfxSystemDefinition definition,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            Matrix4x4 transform,
+            int seed,
+            LogService log)
+        {
+            return new VfxPlaybackGraphRuntime(
+                definition,
+                transform,
+                seed,
+                systems,
+                resourceMap,
+                (childDefinition, childTransform, childSeed) => PreparePlayback(
+                    childDefinition,
+                    searchDirectory,
+                    childTransform,
+                    childSeed,
+                    log));
         }
 
         public void ClearCaches() => _resources.ClearCaches();

@@ -15,7 +15,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".bin"
+            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".skn", ".bin"
         };
 
         private readonly string _root;

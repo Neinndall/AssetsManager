@@ -11,7 +11,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     internal sealed class VfxResourceResolver
     {
         private static readonly string[] TextureExtensions = { ".tex", ".dds", ".png", ".tga" };
-        private static readonly string[] MeshExtensions = { ".scb", ".sco" };
+        private static readonly string[] MeshExtensions = { ".scb", ".sco", ".skn" };
         private static readonly string[] BinExtensions = { ".bin" };
 
         private readonly Dictionary<string, VfxResourceIndex> _indexes = new(StringComparer.OrdinalIgnoreCase);
@@ -117,6 +117,9 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static (float[] Positions, float[] Uvs, uint[] Indices)? DecodeMesh(string path)
         {
+            if (path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase))
+                return DecodeSkinnedMesh(path);
+
             using var stream = File.OpenRead(path);
             var source = path.EndsWith(".sco", StringComparison.OrdinalIgnoreCase)
                 ? LeagueToolkit.Core.Mesh.StaticMesh.ReadAscii(stream)
@@ -147,6 +150,38 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
 
             return (positions, uvs, indices);
+        }
+
+        private static (float[] Positions, float[] Uvs, uint[] Indices)? DecodeSkinnedMesh(string path)
+        {
+            using var mesh = LeagueToolkit.Core.Mesh.SkinnedMesh.ReadFromSimpleSkin(path);
+            var sourcePositions = mesh.VerticesView
+                .GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name)
+                .AsVector3Array();
+            var sourceUvs = mesh.VerticesView
+                .GetAccessor(LeagueToolkit.Core.Memory.VertexElement.TEXCOORD_0.Name)
+                .AsVector2Array();
+
+            var positions = new float[sourcePositions.Count * 3];
+            var uvs = new float[sourceUvs.Count * 2];
+            for (int index = 0; index < sourcePositions.Count; index++)
+            {
+                var position = sourcePositions[index];
+                positions[index * 3] = position.X;
+                positions[index * 3 + 1] = position.Y;
+                positions[index * 3 + 2] = position.Z;
+            }
+            for (int index = 0; index < sourceUvs.Count; index++)
+            {
+                var uv = sourceUvs[index];
+                uvs[index * 2] = uv.X;
+                uvs[index * 2 + 1] = uv.Y;
+            }
+
+            var indices = new uint[mesh.Indices.Count];
+            for (int index = 0; index < indices.Length; index++)
+                indices[index] = mesh.Indices[index];
+            return indices.Length == 0 ? null : (positions, uvs, indices);
         }
 
         private static string CreateKey(string path, string directory)

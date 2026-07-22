@@ -5,6 +5,21 @@ using System.Numerics;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
+    public enum VfxPrimitiveKind
+    {
+        CameraQuad,
+        CameraUnitQuad,
+        ArbitraryQuad,
+        Mesh,
+        AttachedMesh,
+        CameraTrail,
+        ArbitraryTrail,
+        Ray,
+        Beam,
+        PlanarProjection,
+        Unsupported
+    }
+
     internal sealed record VfxBinDocument(
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
         IReadOnlyDictionary<string, VfxAnimationClip> AnimationClips,
@@ -41,7 +56,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         VfxCurve3? BirthVelocity,       // initial velocity
         VfxCurve3? Acceleration,        // worldAcceleration (gravity/wind)
         VfxCurve3? BirthRotationalVelocity,
-        Vector3 EmitterPosition,        // offset of this emitter within the system
+        VfxCurve3 EmitterPosition,      // animated offset of this emitter within the system
         string TexturePath,            // particle sprite (.dds/.tex)
         Vector2 TexDiv,                 // flipbook grid (cols, rows); (1,1) = single frame
         int NumFrames,
@@ -70,7 +85,24 @@ namespace AssetsManager.Services.Viewer.Vfx
         string ParticleColorTexturePath = null,
         int? ColorLookUpTypeX = null,
         int? ColorLookUpTypeY = null,
-        VfxEmitterRenderState RenderState = null)
+        VfxEmitterRenderState RenderState = null,
+        VfxPrimitiveKind PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+        VfxCurve3? VelocityOverLife = null,
+        VfxCurve3? RotationOverLife = null,
+        VfxCurve2? BirthUvOffset = null,
+        VfxCurve2? UvScale = null,
+        VfxCurveF? UvRotation = null,
+        VfxAlphaErosionDefinition AlphaErosion = null,
+        VfxChildParticleSetDefinition ChildParticleSet = null,
+        VfxFieldCollectionDefinition Fields = null,
+        byte ParticleLingerType = 0,
+        float EmitterLinger = 0f,
+        bool IsEmitterSpace = false,
+        bool IsLocalOrientation = false,
+        bool ParticleIsLocalOrientation = false,
+        bool IsFollowingTerrain = false,
+        bool IsGroundLayer = false,
+        bool IsUniformScale = false)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
@@ -94,18 +126,69 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
 
+    public sealed record VfxAlphaErosionDefinition(
+        string TexturePath,
+        VfxCurveF Drive,
+        float FeatherIn,
+        float FeatherOut,
+        int AddressMode);
+
+    public sealed record VfxChildSystemReference(string Name, uint SystemHash, uint EffectKey);
+
+    public sealed record VfxChildParticleSetDefinition(
+        IReadOnlyList<VfxChildSystemReference> Children,
+        bool EmitOnDeath,
+        VfxCurveF Probability,
+        VfxCurve3 RelativeOffset,
+        int InheritanceMode);
+
+    public sealed record VfxAccelerationField(VfxCurve3 Acceleration, bool LocalSpace);
+    public sealed record VfxAttractionField(VfxCurveF Acceleration, VfxCurve3 Position, VfxCurveF Radius);
+    public sealed record VfxDragField(VfxCurveF Strength, VfxCurve3 Position, VfxCurveF Radius);
+    public sealed record VfxOrbitalField(VfxCurve3 Direction, bool LocalSpace);
+    public sealed record VfxNoiseField(VfxCurveF Frequency, VfxCurveF VelocityDelta, VfxCurve3 Position, VfxCurveF Radius, Vector3 AxisFraction);
+    public sealed record VfxFieldCollectionDefinition(
+        IReadOnlyList<VfxAccelerationField> Acceleration,
+        IReadOnlyList<VfxAttractionField> Attraction,
+        IReadOnlyList<VfxDragField> Drag,
+        IReadOnlyList<VfxOrbitalField> Orbital,
+        IReadOnlyList<VfxNoiseField> Noise);
+
     /// <summary>
     /// Authored particle spawn volume. EmitOffset is randomized by its ValueVector3
     /// probability tables, then the authored axis/angle rotations are applied in order.
     /// </summary>
+    public enum VfxSpawnShapeKind
+    {
+        Legacy,
+        Point,
+        Box,
+        Sphere,
+        Cylinder
+    }
+
     public sealed record VfxSpawnShape(
+        VfxSpawnShapeKind Kind,
         VfxCurve3 EmitOffset,
         IReadOnlyList<Vector3> RotationAxes,
-        IReadOnlyList<VfxCurveF> RotationAngles)
+        IReadOnlyList<VfxCurveF> RotationAngles,
+        Vector3 Size = default,
+        float Radius = 0f,
+        float Height = 0f,
+        byte Flags = 0)
     {
         public Vector3 SampleOffset(Random rng)
         {
-            var offset = EmitOffset.SampleBirth(rng);
+            var offset = Kind switch
+            {
+                VfxSpawnShapeKind.Box => new Vector3(
+                    SignedUnit(rng) * Size.X * 0.5f,
+                    SignedUnit(rng) * Size.Y * 0.5f,
+                    SignedUnit(rng) * Size.Z * 0.5f),
+                VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius),
+                VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height),
+                _ => EmitOffset.SampleBirth(rng)
+            };
             int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
             for (int i = 0; i < count; i++)
             {
@@ -116,6 +199,27 @@ namespace AssetsManager.Services.Viewer.Vfx
                     Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), radians));
             }
             return offset;
+        }
+
+        private static float SignedUnit(Random rng) => (float)(rng.NextDouble() * 2d - 1d);
+
+        private static Vector3 SampleSphere(Random rng, float radius)
+        {
+            float z = SignedUnit(rng);
+            float angle = (float)(rng.NextDouble() * Math.Tau);
+            float radial = MathF.Sqrt(MathF.Max(0f, 1f - z * z));
+            float distance = radius * MathF.Cbrt((float)rng.NextDouble());
+            return new Vector3(radial * MathF.Cos(angle), z, radial * MathF.Sin(angle)) * distance;
+        }
+
+        private static Vector3 SampleCylinder(Random rng, float radius, float height)
+        {
+            float angle = (float)(rng.NextDouble() * Math.Tau);
+            float distance = radius * MathF.Sqrt((float)rng.NextDouble());
+            return new Vector3(
+                MathF.Cos(angle) * distance,
+                SignedUnit(rng) * height * 0.5f,
+                MathF.Sin(angle) * distance);
         }
     }
 
@@ -144,6 +248,26 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
         public static readonly VfxCurveF Zero = new(0f, null, null);
         public static VfxCurveF Const(float v) => new(v, null, null);
+    }
+
+    public readonly record struct VfxCurve2(Vector2 Constant, float[] Times, Vector2[] Values, VfxProbTable[] Prob = null)
+    {
+        public Vector2 Sample(float t)
+        {
+            if (Times is null || Values is null || Times.Length == 0) return Constant;
+            return VfxCurve.Interp(Times, Values, t, static (a, b, f) => Vector2.Lerp(a, b, f));
+        }
+
+        public Vector2 SampleBirth(Random rng)
+        {
+            var value = Sample(0f);
+            if (Prob is not { Length: > 0 }) return value;
+            return new Vector2(
+                Prob.Length > 0 && !Prob[0].IsEmpty ? value.X * Prob[0].Sample((float)rng.NextDouble()) : value.X,
+                Prob.Length > 1 && !Prob[1].IsEmpty ? value.Y * Prob[1].Sample((float)rng.NextDouble()) : value.Y);
+        }
+
+        public static VfxCurve2 Const(Vector2 value) => new(value, null, null);
     }
 
     /// <summary>A Vector3 value that is either constant or an animation curve over normalised age.</summary>

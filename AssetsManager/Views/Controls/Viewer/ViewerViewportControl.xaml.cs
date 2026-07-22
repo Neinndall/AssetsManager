@@ -42,10 +42,11 @@ namespace AssetsManager.Views.Controls.Viewer
         public Viewport3D Viewport => Viewport3D;
 
         private VfxOpenGlRenderer _vfxRenderer;
-        private readonly List<VfxPlaybackRuntime> _vfxSims = new();
+        private readonly List<VfxPlaybackGraphRuntime> _vfxSims = new();
         private readonly Dictionary<SceneModel, Dictionary<string, VfxAnimationClip>> _modelVfxClips = new();
         private readonly Dictionary<SceneModel, Dictionary<uint, VfxSystemDefinition>> _modelVfxDefs = new();
         private readonly Dictionary<SceneModel, IReadOnlyDictionary<uint, uint>> _modelVfxResourceMap = new();
+        private readonly Dictionary<SceneModel, Task> _modelVfxLoadTasks = new();
         private readonly Dictionary<BitmapSource, uint> _vfxTextureCache = new();
         private readonly VfxLoadingService _vfxLoadingService = new();
         private IAnimationAsset _lastActiveAnimation;
@@ -190,10 +191,13 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 for (int i = 0; i < _vfxSims.Count; i++)
                 {
-                    var sim = _vfxSims[i];
-                    for (int j = 0; j < sim.Emitters.Count; j++)
+                    var graph = _vfxSims[i];
+                    for (int runtimeIndex = 0; runtimeIndex < graph.Runtimes.Count; runtimeIndex++)
                     {
-                        var es = sim.Emitters[j];
+                        VfxPlaybackRuntime runtime = graph.Runtimes[runtimeIndex];
+                        for (int j = 0; j < runtime.Emitters.Count; j++)
+                        {
+                        var es = runtime.Emitters[j];
                         if (es.PendingTexture is BitmapSource bmp)
                         {
                             if (!_vfxTextureCache.TryGetValue(bmp, out var tex))
@@ -226,11 +230,22 @@ namespace AssetsManager.Views.Controls.Viewer
                             es.DistortionTexture = tex;
                             es.PendingDistortionTexture = null;
                         }
+                        if (es.PendingErosionTexture is BitmapSource bmpErosion)
+                        {
+                            if (!_vfxTextureCache.TryGetValue(bmpErosion, out var tex))
+                            {
+                                tex = UploadBitmapToGl(bmpErosion);
+                                _vfxTextureCache[bmpErosion] = tex;
+                            }
+                            es.ErosionTexture = tex;
+                            es.PendingErosionTexture = null;
+                        }
                         if (es.PendingMesh != null)
                         {
                             var meshData = es.PendingMesh.Value;
                             _vfxRenderer.UploadEmitterMesh(es, meshData.Positions, meshData.Uvs, meshData.Indices);
                             es.PendingMesh = null;
+                        }
                         }
                     }
                 }
@@ -238,7 +253,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _vfxRenderer.CaptureScene((uint)OpenTkControl.ActualWidth, (uint)OpenTkControl.ActualHeight);
                 for (int i = 0; i < _vfxSims.Count; i++)
                 {
-                    _vfxRenderer.Render(_vfxSims[i], viewProj, view);
+                    foreach (VfxPlaybackRuntime runtime in _vfxSims[i].Runtimes)
+                        _vfxRenderer.Render(runtime, viewProj, view);
                 }
             }
         }
@@ -330,7 +346,7 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 MajorVersion = 3,
                 MinorVersion = 3,
-                GraphicsProfile = OpenTK.Windowing.Common.ContextProfile.Core
+                Profile = OpenTK.Windowing.Common.ContextProfile.Core
             };
             OpenTkControl.Start(settings);
 
@@ -504,6 +520,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _modelVfxClips.Clear();
                 _modelVfxDefs.Clear();
                 _modelVfxResourceMap.Clear();
+                _modelVfxLoadTasks.Clear();
                 _vfxTextureCache.Clear();
                 _vfxLoadingService.ClearCaches();
             }
@@ -687,7 +704,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     Viewport.Children.Add(model.RootVisual);
             }
             
-            LoadVfxForModel(model);
+            _ = EnsureVfxLoadedAsync(model);
 
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
@@ -725,6 +742,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _modelVfxDefs.Remove(model);
             _modelVfxClips.Remove(model);
             _modelVfxResourceMap.Remove(model);
+            _modelVfxLoadTasks.Remove(model);
             if (removingActiveModel)
             {
                 _vfxSims.Clear();
@@ -1425,7 +1443,17 @@ namespace AssetsManager.Views.Controls.Viewer
             return null;
         }
 
-        private async void LoadVfxForModel(SceneModel model)
+        private Task EnsureVfxLoadedAsync(SceneModel model)
+        {
+            if (model == null || _modelVfxDefs.ContainsKey(model)) return Task.CompletedTask;
+            if (_modelVfxLoadTasks.TryGetValue(model, out Task existingTask)) return existingTask;
+
+            Task loadTask = LoadVfxForModelAsync(model);
+            _modelVfxLoadTasks[model] = loadTask;
+            return loadTask;
+        }
+
+        private async Task LoadVfxForModelAsync(SceneModel model)
         {
             if (model == null || string.IsNullOrEmpty(model.SkinBinPath) || !File.Exists(model.SkinBinPath)) return;
 
@@ -1525,8 +1553,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (def == null) continue;
 
                 int seed = HashCode.Combine(def.PathHash, ev.StartFrame);
-                var sim = _vfxLoadingService.PreparePlayback(
+                var sim = _vfxLoadingService.PreparePlaybackGraph(
                     def,
+                    defs,
+                    resMap ?? new Dictionary<uint, uint>(),
                     charFolder,
                     Matrix4x4.Identity,
                     seed,
@@ -1575,8 +1605,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 (float)_activeSceneModel.PositionX,
                 (float)_activeSceneModel.PositionY,
                 (float)_activeSceneModel.PositionZ));
-            var sim = _vfxLoadingService.PreparePlayback(
+            var resourceMap = _modelVfxResourceMap.TryGetValue(_activeSceneModel, out var map)
+                ? map
+                : new Dictionary<uint, uint>();
+            var sim = _vfxLoadingService.PreparePlaybackGraph(
                 def,
+                defs,
+                resourceMap,
                 charFolder,
                 transform,
                 HashCode.Combine(def.PathHash, systemName),
@@ -1585,7 +1620,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _vfxSims.Add(sim);
             LogService.Log($"Playing VFX system manually: {systemName}");
         }
-
 
     }
 }

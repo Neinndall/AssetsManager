@@ -9,6 +9,8 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxPlaybackRuntime
     {
+        public const int InstanceStride = 25;
+
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
         {
@@ -20,9 +22,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             public int TextureWidth, TextureHeight;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
+            public uint ErosionTexture;
             public object PendingTexture;
             public object PendingTextureMult;
             public object PendingDistortionTexture;
+            public object PendingErosionTexture;
             /// <summary>Pending mesh data (positions, uvs, indices) for deferred GL upload of .scb/.sco mesh primitives.</summary>
             public (float[] Positions, float[] Uvs, uint[] Indices)? PendingMesh;
             // CPU copy of particleColorTexture (RGBA8, top-left origin).
@@ -54,6 +58,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
+            public Vector2 BirthUvOffset;
             public float Rot, RotVel;
             public float StartFrame, FrameRate;
             public float ColorRandom;   // stable per-particle 0..1 roll for the colour-gradient variant axis
@@ -66,17 +71,31 @@ namespace AssetsManager.Services.Viewer.Vfx
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
+        public event Action<VfxPlaybackRuntime, VfxEmitterDefinition, Vector3, bool> ParticleLifecycle;
         private const int MaxParticlesPerEmitter = 4000;
 
         public void SetTransform(Matrix4x4 worldTransform)
         {
+            Matrix4x4 previousInverse = _inverseWorldTransform;
+            Matrix4x4 emitterSpaceDelta = previousInverse * worldTransform;
             _worldTransform = worldTransform;
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
                 _inverseWorldTransform = Matrix4x4.Identity;
 
             foreach (var es in _emitters)
             {
-                es.BasePos = Vector3.Transform(es.Def.EmitterPosition, worldTransform);
+                if (es.Def.IsEmitterSpace && es.Particles.Count > 0)
+                {
+                    for (int particleIndex = 0; particleIndex < es.Particles.Count; particleIndex++)
+                    {
+                        Particle particle = es.Particles[particleIndex];
+                        particle.Pos = Vector3.Transform(particle.Pos, emitterSpaceDelta);
+                        particle.Vel = Vector3.TransformNormal(particle.Vel, emitterSpaceDelta);
+                        particle.BirthAccel = Vector3.TransformNormal(particle.BirthAccel, emitterSpaceDelta);
+                        es.Particles[particleIndex] = particle;
+                    }
+                }
+                es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), worldTransform);
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ);
@@ -104,7 +123,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 {
                     Def = e,
                     SourceOrder = emitterIndex,
-                    BasePos = Vector3.Transform(e.EmitterPosition, worldTransform),
+                    BasePos = Vector3.Transform(e.EmitterPosition.Sample(0f), worldTransform),
                     PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX),
                     PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY),
                     PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ),
@@ -127,20 +146,17 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static Vector3 SafeNormal(Vector3 value, Vector3 fallback)
             => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
 
+        private static float EmitterTime(EmitterState state)
+        {
+            VfxEmitterDefinition definition = state.Def;
+            return definition.EmitterLifetime is > 0f
+                ? Math.Clamp((state.Age - definition.TimeBeforeFirstEmission) / definition.EmitterLifetime.Value, 0f, 1f)
+                : 0f;
+        }
+
         /// <summary>Move the whole system WITHOUT resetting live particles.</summary>
         public void SetWorldTransform(Matrix4x4 worldTransform)
-        {
-            _worldTransform = worldTransform;
-            if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
-                _inverseWorldTransform = Matrix4x4.Identity;
-            foreach (var s in _emitters)
-            {
-                s.BasePos = Vector3.Transform(s.Def.EmitterPosition, worldTransform);
-                s.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX);
-                s.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY);
-                s.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ);
-            }
-        }
+            => SetTransform(worldTransform);
 
         public void Reset()
         {
@@ -150,6 +166,15 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private float _startDelay;
         public void SetStartDelay(float seconds) => _startDelay = MathF.Max(0f, seconds);
+
+        public Vector3 TransformOffset(Vector3 localOffset)
+            => Vector3.TransformNormal(localOffset, _worldTransform);
+
+        public bool IsComplete
+            => _emitters.Count == 0 || _emitters.TrueForAll(state =>
+                state.Def.EmitterLifetime is { } lifetime &&
+                state.Age > state.Def.TimeBeforeFirstEmission + lifetime &&
+                state.Particles.Count == 0);
 
         public void Update(float dt)
         {
@@ -177,6 +202,8 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             var d = s.Def;
             s.Age += dt;
+            float emitterT = EmitterTime(s);
+            s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), _worldTransform);
 
             // spawn
             bool emitting = s.Age >= d.TimeBeforeFirstEmission
@@ -189,9 +216,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
                 else
                 {
-                    float emitterT = d.EmitterLifetime is > 0f
-                        ? Math.Clamp((s.Age - d.TimeBeforeFirstEmission) / d.EmitterLifetime.Value, 0f, 1f)
-                        : 0f;
                     float rate = MathF.Max(0f, d.Rate.Sample(emitterT));
                     s.SpawnAccum += rate * dt;
                     while (s.SpawnAccum >= 1f && s.Particles.Count < MaxParticlesPerEmitter)
@@ -208,15 +232,24 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 var p = s.Particles[i];
                 p.Age += dt;
-                if (p.Age >= p.Life) { s.Particles.RemoveAt(i); continue; }
+                if (p.Age >= p.Life)
+                {
+                    ParticleLifecycle?.Invoke(this, d, p.Pos, true);
+                    s.Particles.RemoveAt(i);
+                    continue;
+                }
                 float particleT = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
                 var worldAccel = d.Acceleration?.Sample(particleT) ?? Vector3.Zero;
                 worldAccel = Vector3.TransformNormal(worldAccel, _worldTransform);
+                Vector3 fieldDrag = Vector3.Zero;
+                ApplyFields(d.Fields, particleT, p.Age, p.Pos, ref worldAccel, ref fieldDrag);
                 p.Vel += (p.BirthAccel + worldAccel) * dt;
                 var dragOverLife = d.DragOverLife?.Sample(particleT) ?? Vector3.Zero;
-                var drag = Vector3.Max(Vector3.Zero, p.BirthDrag + dragOverLife);
+                var drag = Vector3.Max(Vector3.Zero, p.BirthDrag + dragOverLife + fieldDrag);
                 p.Vel *= new Vector3(MathF.Exp(-drag.X * dt), MathF.Exp(-drag.Y * dt), MathF.Exp(-drag.Z * dt));
-                p.Pos += p.Vel * dt;
+                var authoredVelocity = d.VelocityOverLife?.Sample(particleT) ?? Vector3.Zero;
+                authoredVelocity = Vector3.TransformNormal(authoredVelocity, _worldTransform);
+                p.Pos += (p.Vel + authoredVelocity) * dt;
                 if (p.BirthOrbitalVelocity.LengthSquared() > 1e-8f)
                 {
                     var localRelative = Vector3.TransformNormal(p.Pos - s.BasePos, _inverseWorldTransform);
@@ -259,13 +292,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthDrag = birthDrag,
                 Age = 0f,
                 Life = life,
-                BirthSize = new Vector3(
-                    birthScale.X,
-                    birthScale.Y == 0 ? birthScale.X : birthScale.Y,
-                    birthScale.Z == 0 ? birthScale.X : birthScale.Z),
+                BirthSize = birthScale,
                 BirthColor = d.BirthColor.SampleBirth(_rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
-                Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
+                BirthUvOffset = d.BirthUvOffset?.SampleBirth(_rng) ?? Vector2.Zero,
+                Rot = birthRotation.X * (MathF.PI / 180f),
                 RotVel = rotVel.X * (MathF.PI / 180f),
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
                     ? _rng.Next(d.NumFrames)
@@ -273,16 +304,20 @@ namespace AssetsManager.Services.Viewer.Vfx
                 FrameRate = d.BirthFrameRate?.SampleBirth(_rng) ?? d.FrameRate ?? 0f,
                 ColorRandom = (float)_rng.NextDouble(),
             });
+            ParticleLifecycle?.Invoke(this, d, s.Particles[^1].Pos, false);
         }
 
         private void BuildInstances(EmitterState s)
         {
             var d = s.Def;
             int n = s.Particles.Count;
-            if (s.Instances.Length < n * 19) s.Instances = new float[Math.Max(n * 19, 76)];
+            bool isTrail = d.PrimitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail;
+            int instanceCount = isTrail ? Math.Max(0, n - 1) : n;
+            if (s.Instances.Length < instanceCount * InstanceStride)
+                s.Instances = new float[Math.Max(instanceCount * InstanceStride, InstanceStride * 4)];
             var buf = s.Instances;
             int k = 0;
-            for (int i = 0; i < n; i++)
+            for (int i = isTrail ? 1 : 0; i < n; i++)
             {
                 var p = s.Particles[i];
                 float t = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
@@ -304,20 +339,97 @@ namespace AssetsManager.Services.Viewer.Vfx
                         ? (p.StartFrame + p.Age * p.FrameRate) % d.NumFrames
                         : (p.StartFrame + t * d.NumFrames) % d.NumFrames);
 
-                buf[k++] = p.Pos.X; buf[k++] = p.Pos.Y; buf[k++] = p.Pos.Z;
+                Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
+                Vector3 direction = p.Vel;
+                if (isTrail)
+                {
+                    Vector3 start = s.Particles[i - 1].Pos;
+                    Vector3 segment = p.Pos - start;
+                    float length = segment.Length();
+                    if (length > 1e-5f)
+                    {
+                        position = (start + p.Pos) * 0.5f;
+                        direction = segment;
+                        sizeX = length;
+                    }
+                }
                 if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
+                buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
                 buf[k++] = sizeX;
                 buf[k++] = p.BirthSize.Y * scaleMul.Y;
                 buf[k++] = col.X; buf[k++] = col.Y; buf[k++] = col.Z; buf[k++] = col.W;
                 buf[k++] = p.Rot;
                 buf[k++] = frame;
                 buf[k++] = p.Age;
-                buf[k++] = p.Vel.X; buf[k++] = p.Vel.Y; buf[k++] = p.Vel.Z;
-                buf[k++] = p.Rot; buf[k++] = p.BirthRotation.Y; buf[k++] = p.BirthRotation.Z;
+                buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
+                Vector3 lifeRotation = d.RotationOverLife?.Sample(t) ?? Vector3.Zero;
+                lifeRotation *= MathF.PI / 180f;
+                buf[k++] = p.Rot + lifeRotation.X;
+                buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
+                buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
                 buf[k++] = p.BirthSize.Z * scaleMul.Z;
+                Vector2 uvOffset = p.BirthUvOffset;
+                Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
+                float uvRotation = (d.UvRotation?.Sample(t) ?? 0f) * (MathF.PI / 180f);
+                buf[k++] = uvOffset.X; buf[k++] = uvOffset.Y;
+                buf[k++] = uvScale.X; buf[k++] = uvScale.Y;
+                buf[k++] = uvRotation;
+                buf[k++] = d.AlphaErosion?.Drive.Sample(t) ?? 0f;
             }
-            s.InstanceCount = n;
+            s.InstanceCount = instanceCount;
+        }
+
+        private void ApplyFields(
+            VfxFieldCollectionDefinition fields,
+            float particleT,
+            float age,
+            Vector3 particlePosition,
+            ref Vector3 acceleration,
+            ref Vector3 drag)
+        {
+            if (fields is null) return;
+            foreach (var field in fields.Acceleration)
+            {
+                Vector3 value = field.Acceleration.Sample(particleT);
+                acceleration += field.LocalSpace ? Vector3.TransformNormal(value, _worldTransform) : value;
+            }
+            foreach (var field in fields.Attraction)
+            {
+                Vector3 center = Vector3.Transform(field.Position.Sample(particleT), _worldTransform);
+                Vector3 delta = center - particlePosition;
+                float radius = field.Radius.Sample(particleT);
+                if ((radius <= 0f || delta.LengthSquared() <= radius * radius) && delta.LengthSquared() > 1e-8f)
+                    acceleration += Vector3.Normalize(delta) * field.Acceleration.Sample(particleT);
+            }
+            foreach (var field in fields.Drag)
+            {
+                Vector3 center = Vector3.Transform(field.Position.Sample(particleT), _worldTransform);
+                float radius = field.Radius.Sample(particleT);
+                if (radius <= 0f || Vector3.DistanceSquared(center, particlePosition) <= radius * radius)
+                    drag += new Vector3(MathF.Max(0f, field.Strength.Sample(particleT)));
+            }
+            foreach (var field in fields.Orbital)
+            {
+                Vector3 direction = field.Direction.Sample(particleT);
+                if (field.LocalSpace) direction = Vector3.TransformNormal(direction, _worldTransform);
+                Vector3 radial = particlePosition - Vector3.Transform(Vector3.Zero, _worldTransform);
+                if (direction.LengthSquared() > 1e-8f && radial.LengthSquared() > 1e-8f)
+                    acceleration += Vector3.Cross(Vector3.Normalize(direction), Vector3.Normalize(radial)) * direction.Length();
+            }
+            foreach (var field in fields.Noise)
+            {
+                Vector3 center = Vector3.Transform(field.Position.Sample(particleT), _worldTransform);
+                float radius = field.Radius.Sample(particleT);
+                if (radius > 0f && Vector3.DistanceSquared(center, particlePosition) > radius * radius) continue;
+                float frequency = field.Frequency.Sample(particleT);
+                float amplitude = field.VelocityDelta.Sample(particleT);
+                Vector3 wave = new(
+                    MathF.Sin((particlePosition.Y + age) * frequency),
+                    MathF.Sin((particlePosition.Z + age * 1.37f) * frequency),
+                    MathF.Sin((particlePosition.X + age * 1.91f) * frequency));
+                acceleration += wave * field.AxisFraction * amplitude;
+            }
         }
 
         private static float LookupCoord(int type, float age, float speed, float random) => type switch

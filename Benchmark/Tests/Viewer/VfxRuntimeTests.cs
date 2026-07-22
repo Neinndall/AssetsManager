@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx;
@@ -23,6 +24,77 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Equal(2f, state.Instances[3]);
             Assert.Equal(3f, state.Instances[4]);
             Assert.Equal(4f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void MeshInstancesPreserveAuthoredZeroScaleComponents()
+        {
+            var emitter = CreateEmitter(new Vector3(7f, 0f, 7f), VfxEmitterRenderState.Default);
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "ground", "ground", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(7f, state.Instances[3]);
+            Assert.Equal(0f, state.Instances[4]);
+            Assert.Equal(7f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void UniformScaleFlagDoesNotOverwriteAuthoredBirthScaleAxes()
+        {
+            var emitter = CreateEmitter(new Vector3(100f, 230f, 0f), VfxEmitterRenderState.Default) with
+            {
+                IsUniformScale = true
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "stars", "stars", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(100f, state.Instances[3]);
+            Assert.Equal(230f, state.Instances[4]);
+            Assert.Equal(0f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void PlaybackGraphResolvesAndCreatesChildSystem()
+        {
+            var childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            var parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Const(1f),
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child };
+            var graph = new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                systems,
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+
+            Assert.Equal(2, graph.Runtimes.Count);
+            Assert.Same(childEmitter, graph.Runtimes[1].Emitters[0].Def);
         }
 
         [Fact]
@@ -107,7 +179,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                 BirthVelocity: null,
                 Acceleration: null,
                 BirthRotationalVelocity: null,
-                EmitterPosition: Vector3.Zero,
+                EmitterPosition: VfxCurve3.Const(Vector3.Zero),
                 TexturePath: "mesh.tex",
                 TexDiv: Vector2.One,
                 NumFrames: 1,

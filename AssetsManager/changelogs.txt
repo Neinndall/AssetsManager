@@ -16,6 +16,8 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer VFX now reproduces linked child systems and preserves the authored scale of every emitter.
+  - Viewer VFX now supports additional particle shapes, meshes, motion fields, erosion and orientation data from skin BIN files.
   - Viewer VFX loading now follows each skin BIN dependency graph, including Windows-truncated multi-skin BIN names, without mixing similarly numbered skins.
   - Viewer VFX now resolves shared assets once and renders atlases, transparency and SCB effects without white rectangular fallbacks.
   - Increased Hash Guessing Lab left configuration panel width for improved readability.
