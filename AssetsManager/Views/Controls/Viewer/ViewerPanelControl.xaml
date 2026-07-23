@@ -264,32 +264,26 @@
                              <!-- Inspector Navigation (sub-tabs) -->
                               <Border Margin="0,0,0,12" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
                                       Visibility="{Binding HasSelectedModel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                   <UniformGrid Columns="4" Height="36">
-                                      <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
-                                          <StackPanel Orientation="Horizontal">
-                                              <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                              <TextBlock Text="MESH" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                          </StackPanel>
-                                      </RadioButton>
-                                      <RadioButton x:Name="TabTransform" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Transform" Checked="TabTransform_Checked">
-                                          <StackPanel Orientation="Horizontal">
-                                              <materialIcons:MaterialIcon Kind="AxisArrow" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                              <TextBlock Text="POSE" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                          </StackPanel>
-                                      </RadioButton>
-                                      <RadioButton x:Name="TabAnimations" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations" Checked="TabAnimations_Checked">
-                                          <StackPanel Orientation="Horizontal">
-                                              <materialIcons:MaterialIcon Kind="AnimationPlay" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                              <TextBlock Text="ANIM" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                          </StackPanel>
-                                      </RadioButton>
-                                      <RadioButton x:Name="TabVfx" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="VFX Particle Systems" Checked="TabVfx_Checked">
-                                          <StackPanel Orientation="Horizontal">
-                                              <materialIcons:MaterialIcon Kind="Sparkles" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                              <TextBlock Text="VFX" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
-                                          </StackPanel>
-                                      </RadioButton>
-                                   </UniformGrid>
+                                    <UniformGrid Columns="3" Height="36">
+                                       <RadioButton x:Name="TabMeshes" IsChecked="True" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures &amp; Meshes" Checked="TabMeshes_Checked">
+                                           <StackPanel Orientation="Horizontal">
+                                               <materialIcons:MaterialIcon Kind="TextureBox" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                               <TextBlock Text="MESH" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                           </StackPanel>
+                                       </RadioButton>
+                                       <RadioButton x:Name="TabTransform" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Transform" Checked="TabTransform_Checked">
+                                           <StackPanel Orientation="Horizontal">
+                                               <materialIcons:MaterialIcon Kind="AxisArrow" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                               <TextBlock Text="POSE" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                           </StackPanel>
+                                       </RadioButton>
+                                       <RadioButton x:Name="TabAnimations" GroupName="InspectorTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Animations" Checked="TabAnimations_Checked">
+                                           <StackPanel Orientation="Horizontal">
+                                               <materialIcons:MaterialIcon Kind="AnimationPlay" Width="13" Height="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                               <TextBlock Text="ANIM" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                           </StackPanel>
+                                       </RadioButton>
+                                    </UniformGrid>
                               </Border>
 
                              <!-- Image Preview Card -->
@@ -746,73 +740,6 @@
                                         </ListBox>
                                     </Grid>
                                 </Grid>
-
-                                 <!-- VFX PARTICLE SYSTEMS -->
-                                 <Grid x:Name="VfxPanel"
-                                       Visibility="{Binding IsChecked, ElementName=TabVfx, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                     <StackPanel>
-                                         <Border Padding="12,10" Margin="0,0,0,8" Background="{StaticResource CardBackground}" CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                                             <Grid>
-                                                 <Grid.ColumnDefinitions>
-                                                     <ColumnDefinition Width="*"/>
-                                                     <ColumnDefinition Width="Auto"/>
-                                                 </Grid.ColumnDefinitions>
-                                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                     <materialIcons:MaterialIcon Kind="Sparkles" Width="16" Height="16" Foreground="{StaticResource AccentYellow}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                                     <StackPanel VerticalAlignment="Center">
-                                                         <TextBlock Text="VFX Library" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                         <TextBlock Text="Select one system to open its player" FontSize="9" Foreground="{StaticResource TextMuted}"/>
-                                                     </StackPanel>
-                                                 </StackPanel>
-                                                 <Border Grid.Column="1" Background="{StaticResource HoverColor}" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
-                                                     <TextBlock Text="{Binding VfxSystems.Count}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentYellow}"/>
-                                                 </Border>
-                                             </Grid>
-                                         </Border>
-                                         <Border Background="{StaticResource CardBackground}" CornerRadius="10" 
-                                                 BorderBrush="{StaticResource BorderColor}" BorderThickness="1" 
-                                                 Padding="14,16" Margin="0,0,0,8"
-                                                 Visibility="{Binding HasVfxSystems, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                                             <StackPanel HorizontalAlignment="Center">
-                                                 <materialIcons:MaterialIcon Kind="Sparkles" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.5"/>
-                                                 <TextBlock Text="No VFX systems active" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                                                 <TextBlock Text="Select a champion model to load VFX" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.7" Margin="0,2,0,0"/>
-                                             </StackPanel>
-                                         </Border>
-                                         <ListBox x:Name="VfxSystemsListBox"
-                                                  ItemsSource="{Binding VfxSystems}"
-                                                  SelectedItem="{Binding SelectedVfxSystem, Mode=TwoWay}"
-                                                  ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
-                                                  Visibility="{Binding HasVfxSystems, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                             <ListBox.Template>
-                                                 <ControlTemplate TargetType="ListBox">
-                                                     <ItemsPresenter/>
-                                                 </ControlTemplate>
-                                             </ListBox.Template>
-                                             <ListBox.ItemTemplate>
-                                                 <DataTemplate>
-                                                     <Grid>
-                                                         <Grid.ColumnDefinitions>
-                                                             <ColumnDefinition Width="*"/>
-                                                             <ColumnDefinition Width="Auto"/>
-                                                         </Grid.ColumnDefinitions>
-
-                                                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                                             <materialIcons:MaterialIcon Kind="Creation" Width="14" Height="14" Foreground="{StaticResource AccentYellow}" Margin="4,0,4,0" VerticalAlignment="Center"/>
-                                                             <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimary}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="4,0,6,0" VerticalAlignment="Center"/>
-                                                             <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
-                                                                 <TextBlock Text="VFX" Foreground="{StaticResource TextMuted}" FontSize="8" FontWeight="Black"/>
-                                                             </Border>
-                                                         </StackPanel>
-
-                                                         <TextBlock Grid.Column="1" Text="{Binding Emitters.Count, StringFormat={}{0} emitters}" FontSize="8.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                                                     </Grid>
-                                                 </DataTemplate>
-                                             </ListBox.ItemTemplate>
-                                         </ListBox>
-                                     </StackPanel>
-                                 </Grid>
-
                             </Grid>
                         </StackPanel>
                     </StackPanel>
@@ -1127,117 +1054,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- ============================================ -->
-            <!-- VFX PLAYER (sticky above Bottom Dock)        -->
-            <!-- ============================================ -->
-            <Border Grid.Row="2" x:Name="VfxControlsPanel"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}"
-                    BorderThickness="0,1,0,1"
-                    Padding="14,12"
-                    Margin="14,8,14,10"
-                    CornerRadius="12"
-                    DataContext="{Binding SelectedItem, ElementName=VfxSystemsListBox}"
-                    Visibility="{Binding SelectedItem, ElementName=VfxSystemsListBox, Converter={StaticResource NullToVisibilityConverter}}">
-                <StackPanel>
-                    <DockPanel LastChildFill="True" Margin="0,0,0,10">
-                        <Button DockPanel.Dock="Right"
-                                Click="CloseVfxPlayer_Click"
-                                Style="{StaticResource SmallCloseButtonStyle}"
-                                Width="24" Height="24"
-                                ToolTip="Close VFX player"/>
-                        <materialIcons:MaterialIcon DockPanel.Dock="Left" Kind="Creation" Width="14" Height="14" Foreground="{StaticResource AccentYellow}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <StackPanel>
-                            <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock FontSize="9" Foreground="{StaticResource TextMuted}">
-                                <Run Text="{Binding EmitterCount, Mode=OneWay}"/><Run Text=" emitters · "/><Run Text="{Binding FrameRateText, Mode=OneWay}"/>
-                            </TextBlock>
-                        </StackPanel>
-                    </DockPanel>
 
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Slider x:Name="VfxTimelineSlider" Grid.Column="0"
-                                Maximum="{Binding TimelineMaximum}"
-                                Value="{Binding CurrentTime, Mode=TwoWay}"
-                                IsEnabled="{Binding HasFiniteDuration}"
-                                Thumb.DragStarted="VfxSlider_DragStarted"
-                                Thumb.DragCompleted="VfxSlider_DragCompleted"
-                                ValueChanged="VfxSlider_ValueChanged"
-                                Height="14" Style="{StaticResource HUDSliderStyle}"/>
-                        <TextBlock Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="10" FontWeight="Bold">
-                            <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F1}s}" Foreground="{StaticResource AccentBrush}"/>
-                            <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
-                            <Run Text="{Binding DurationText, Mode=OneWay}" Foreground="{StaticResource TextMuted}"/>
-                        </TextBlock>
-                    </Grid>
-
-                    <Grid VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Button Grid.Column="0" Click="VfxPlayPauseButton_Click"
-                                Width="32" Height="32" Margin="0,0,6,0"
-                                Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
-                                ToolTip="Play / Pause VFX" VerticalAlignment="Center">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Circle" CornerRadius="16" Background="{TemplateBinding Background}">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Circle" Property="Opacity" Value="0.85"/>
-                                        </Trigger>
-                                        <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="Circle" Property="Opacity" Value="0.7"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="White"/>
-                        </Button>
-
-                        <Button Grid.Column="1" Click="VfxStopButton_Click"
-                                Width="32" Height="32" Margin="0,0,12,0"
-                                ToolTip="Pause / Resume VFX" VerticalAlignment="Center" Cursor="Hand">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Square" CornerRadius="4" Background="#E53935">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Square" Property="Opacity" Value="0.88"/>
-                                        </Trigger>
-                                        <Trigger Property="IsPressed" Value="True">
-                                            <Setter TargetName="Square" Property="Opacity" Value="0.75"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                            <materialIcons:MaterialIcon Kind="{Binding IsPlaying, Converter={StaticResource BooleanToMaterialIconConverter}, ConverterParameter='Stop,Pause'}" Width="14" Height="14" Foreground="White"/>
-                        </Button>
-
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Speed" FontSize="9.5" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <Slider Minimum="0.25" Maximum="2"
-                                    Value="{Binding Speed, Mode=TwoWay}"
-                                    IsMoveToPointEnabled="True" IsSnapToTickEnabled="False"
-                                    VerticalAlignment="Center" Height="12" MinWidth="80"
-                                    ToolTip="VFX playback speed"
-                                    Style="{StaticResource HUDSliderStyle}"/>
-                            <TextBlock Text="{Binding Speed, StringFormat={}{0:F2}x}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="38" TextAlignment="Right"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
 
             <!-- ============================================ -->
             <!-- BOTTOM DOCK (Quick Actions)                 -->

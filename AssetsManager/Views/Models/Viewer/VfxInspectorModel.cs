@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Viewer.Vfx;
@@ -191,6 +192,35 @@ namespace AssetsManager.Views.Models.Viewer
             set { _activeParticleCount = value; OnPropertyChanged(); }
         }
 
+        private int _indexNumber;
+        private Brush _trackBrush = Brushes.MediumTurquoise;
+        private Thickness _trackMargin;
+        private double _trackWidth = 100;
+
+        public int IndexNumber
+        {
+            get => _indexNumber;
+            set { _indexNumber = value; OnPropertyChanged(); }
+        }
+
+        public Brush TrackBrush
+        {
+            get => _trackBrush;
+            set { _trackBrush = value; OnPropertyChanged(); }
+        }
+
+        public Thickness TrackMargin
+        {
+            get => _trackMargin;
+            set { _trackMargin = value; OnPropertyChanged(); }
+        }
+
+        public double TrackWidth
+        {
+            get => _trackWidth;
+            set { _trackWidth = value; OnPropertyChanged(); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string prop = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
@@ -324,13 +354,45 @@ namespace AssetsManager.Views.Models.Viewer
     }
 
     /// <summary>
+    /// Item model representing a skin selection option inside the VFX Studio.
+    /// </summary>
+    public class VfxSkinItem : INotifyPropertyChanged
+    {
+        private string _displayName;
+        private string _binPath;
+        private int _skinIndex;
+
+        public string DisplayName
+        {
+            get => _displayName;
+            set { _displayName = value; OnPropertyChanged(); }
+        }
+
+        public string BinPath
+        {
+            get => _binPath;
+            set { _binPath = value; OnPropertyChanged(); }
+        }
+
+        public int SkinIndex
+        {
+            get => _skinIndex;
+            set { _skinIndex = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string prop = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+    }
+
+    /// <summary>
     /// Primary view model for the VFX Inspector & Diagnostic Studio window.
     /// Manages root directory scanning, system selection, emitter live controls, and diagnostics.
     /// </summary>
     public class VfxInspectorModel : INotifyPropertyChanged
     {
         private string _rootPath;
-        private string _selectedBin;
+        private VfxSkinItem _selectedSkin;
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
         private bool _isPlaying;
@@ -342,7 +404,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isWireframe;
         private string _statusText = "Ready";
 
-        public ObservableCollection<string> DetectedBins { get; } = new();
+        public ObservableCollection<VfxSkinItem> DetectedSkins { get; } = new();
         public ObservableCollection<VfxSystemDiagnosticItem> Systems { get; } = new();
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
@@ -355,10 +417,10 @@ namespace AssetsManager.Views.Models.Viewer
             set { _rootPath = value; OnPropertyChanged(); }
         }
 
-        public string SelectedBin
+        public VfxSkinItem SelectedSkin
         {
-            get => _selectedBin;
-            set { _selectedBin = value; OnPropertyChanged(); }
+            get => _selectedSkin;
+            set { _selectedSkin = value; OnPropertyChanged(); }
         }
 
         public string SearchQuery
@@ -388,8 +450,19 @@ namespace AssetsManager.Views.Models.Viewer
         public double TotalDuration
         {
             get => _totalDuration;
-            set { _totalDuration = value; OnPropertyChanged(); }
+            set
+            {
+                _totalDuration = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(QuarterDuration));
+                OnPropertyChanged(nameof(HalfDuration));
+                OnPropertyChanged(nameof(ThreeQuarterDuration));
+            }
         }
+
+        public double QuarterDuration => _totalDuration * 0.25;
+        public double HalfDuration => _totalDuration * 0.5;
+        public double ThreeQuarterDuration => _totalDuration * 0.75;
 
         public float Speed
         {

@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using Vector = System.Windows.Vector;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer;
@@ -56,14 +57,6 @@ namespace AssetsManager.Views.Dialogs
                 RenderContinuously = true
             };
             OpenTkControl.Start(settings);
-
-            // Auto-detect Samira test directory if available
-            string defaultSamiraPath = @"C:\Users\danielpriego\Downloads\Workspace\AssetsManager\Samira.wad.client";
-            if (Directory.Exists(defaultSamiraPath))
-            {
-                _model.RootPath = defaultSamiraPath;
-                ScanRootDirectory(defaultSamiraPath);
-            }
         }
 
         #region OpenTK OpenGL Viewport Initialization & Rendering
@@ -152,40 +145,54 @@ namespace AssetsManager.Views.Dialogs
             _gridRenderer?.Render(viewProj);
 
             _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-            _vfxRenderer.Update(dt);
+            if (_model.IsPlaying && !_isUserSeeking)
+            {
+                _vfxRenderer.Update(dt);
+            }
             _vfxRenderer.Render(viewProj, view);
 
             _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
-            if (_model.IsPlaying && _vfxRenderer.ActiveSystem != null)
+            if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer.ActiveSystem != null)
             {
                 _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
             }
+            Dispatcher.InvokeAsync(UpdatePlayheadPosition);
         }
 
         #endregion
 
-        #region Camera Interaction
+        #region Camera Interaction (Matching CustomCameraController)
 
         private void OpenTkControl_MouseDown(object sender, MouseButtonEventArgs e)
         {
             _lastMousePos = e.GetPosition(OpenTkControl);
-            if (e.LeftButton == MouseButtonState.Pressed) _isMouseDragging = true;
-            if (e.RightButton == MouseButtonState.Pressed) _isRightDragging = true;
-            OpenTkControl.CaptureMouse();
+
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                _isMouseDragging = true;
+                OpenTkControl.Cursor = Cursors.SizeAll;
+                OpenTkControl.CaptureMouse();
+            }
+            else if (e.RightButton == MouseButtonState.Pressed)
+            {
+                _isRightDragging = true;
+                OpenTkControl.Cursor = Cursors.Hand;
+                OpenTkControl.CaptureMouse();
+            }
         }
 
         private void OpenTkControl_MouseMove(object sender, MouseEventArgs e)
         {
             Point current = e.GetPosition(OpenTkControl);
-            System.Windows.Vector diff = current - _lastMousePos;
+            Vector diff = current - _lastMousePos;
             _lastMousePos = current;
 
-            if (_isMouseDragging)
+            if (_isMouseDragging && e.LeftButton == MouseButtonState.Pressed)
             {
                 _camYaw += (float)diff.X * 0.4f;
                 _camPitch = Math.Clamp(_camPitch - (float)diff.Y * 0.4f, -85f, 85f);
             }
-            else if (_isRightDragging)
+            else if (_isRightDragging && e.RightButton == MouseButtonState.Pressed)
             {
                 float panSpeed = _camDistance * 0.002f;
                 _camTarget.X -= (float)diff.X * panSpeed;
@@ -195,14 +202,33 @@ namespace AssetsManager.Views.Dialogs
 
         private void OpenTkControl_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            _isMouseDragging = false;
-            _isRightDragging = false;
-            OpenTkControl.ReleaseMouseCapture();
+            if (e.LeftButton == MouseButtonState.Released && _isMouseDragging)
+            {
+                _isMouseDragging = false;
+                OpenTkControl.Cursor = Cursors.Arrow;
+                OpenTkControl.ReleaseMouseCapture();
+            }
+            if (e.RightButton == MouseButtonState.Released && _isRightDragging)
+            {
+                _isRightDragging = false;
+                OpenTkControl.Cursor = Cursors.Arrow;
+                OpenTkControl.ReleaseMouseCapture();
+            }
         }
 
         private void OpenTkControl_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            float delta = e.Delta > 0 ? -30f : 30f;
+            float speedMultiplier = 1.0f;
+            if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
+            {
+                speedMultiplier = 5.0f; // Turbo Mode (Matching CustomCameraController)
+            }
+            else if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
+            {
+                speedMultiplier = 0.2f; // Precision Mode (Matching CustomCameraController)
+            }
+
+            float delta = (e.Delta > 0 ? -30f : 30f) * speedMultiplier;
             _camDistance = Math.Clamp(_camDistance + delta, 10f, 5000f);
         }
 
@@ -243,58 +269,84 @@ namespace AssetsManager.Views.Dialogs
 
             try
             {
-                _model.DetectedBins.Clear();
+                _model.DetectedSkins.Clear();
                 _model.Systems.Clear();
-                _model.LogMessages.Clear();
-
-                _model.LogMessages.Add($"[SCAN] Scanning ROOT directory: {rootFolder}");
 
                 var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
                 
-                // Prioritize skin BINs (skin0.bin, skin1.bin...) which are the primary VFX source of truth
-                var skinBins = binFiles
-                    .Where(b => b.Contains($"{Path.DirectorySeparatorChar}skins{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(b => b)
+                // Filter strictly for skin BINs inside /skins/ directory
+                var skinBinFiles = binFiles
+                    .Where(b => b.Contains($"{Path.DirectorySeparatorChar}skins{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+                                b.Contains("/skins/", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                var otherBins = binFiles
-                    .Where(b => !skinBins.Contains(b))
-                    .OrderBy(b => b)
-                    .ToList();
+                var skinItems = new List<VfxSkinItem>();
 
-                foreach (var bin in skinBins.Concat(otherBins))
+                foreach (var binPath in skinBinFiles)
                 {
-                    string relative = Path.GetRelativePath(rootFolder, bin);
-                    _model.DetectedBins.Add(relative);
+                    string fileName = Path.GetFileNameWithoutExtension(binPath);
+                    int skinIndex = ExtractSkinIndex(fileName);
+                    string displayName = skinIndex == 0 ? "Skin Base" : (skinIndex > 0 ? $"Skin {skinIndex}" : fileName);
+
+                    skinItems.Add(new VfxSkinItem
+                    {
+                        DisplayName = displayName,
+                        BinPath = binPath,
+                        SkinIndex = skinIndex < 0 ? 999 : skinIndex
+                    });
                 }
 
-                _model.LogMessages.Add($"[SCAN] Found {binFiles.Length} .bin files ({skinBins.Count} Skin BINs prioritized).");
-
-                // Auto-select Samira skin0.bin or first skin BIN
-                string preferred = _model.DetectedBins.FirstOrDefault(b => b.EndsWith("skin0.bin", StringComparison.OrdinalIgnoreCase))
-                                ?? _model.DetectedBins.FirstOrDefault(b => b.Contains(@"\skins\", StringComparison.OrdinalIgnoreCase))
-                                ?? _model.DetectedBins.FirstOrDefault();
-
-                if (preferred != null)
+                // Sort by skin index (0, 1, 2...)
+                foreach (var item in skinItems.OrderBy(s => s.SkinIndex))
                 {
-                    _model.SelectedBin = preferred;
-                    LoadBinFile(Path.Combine(rootFolder, preferred));
+                    _model.DetectedSkins.Add(item);
                 }
 
-                _model.StatusText = $"Scanned {binFiles.Length} BIN files in {Path.GetFileName(rootFolder)}.";
+                // Fallback: If no /skins/*.bin files were found (e.g. non-standard folder), show general BIN files cleanly
+                if (_model.DetectedSkins.Count == 0)
+                {
+                    foreach (var binPath in binFiles.OrderBy(b => b))
+                    {
+                        string fileName = Path.GetFileName(binPath);
+                        _model.DetectedSkins.Add(new VfxSkinItem
+                        {
+                            DisplayName = fileName,
+                            BinPath = binPath,
+                            SkinIndex = 0
+                        });
+                    }
+                }
+
+                // Auto-select Skin Base (index 0) or first skin item
+                var preferredSkin = _model.DetectedSkins.FirstOrDefault(s => s.SkinIndex == 0) 
+                                 ?? _model.DetectedSkins.FirstOrDefault();
+
+                if (preferredSkin != null)
+                {
+                    _model.SelectedSkin = preferredSkin;
+                    LoadBinFile(preferredSkin.BinPath);
+                }
+
+                _model.StatusText = $"Scanned {_model.DetectedSkins.Count} skins in {Path.GetFileName(rootFolder)}.";
             }
             catch (Exception ex)
             {
-                _model.LogMessages.Add($"[ERROR] Failed to scan ROOT: {ex.Message}");
+                _logService?.LogError(ex, "Failed to scan ROOT directory");
             }
+        }
+
+        private static int ExtractSkinIndex(string skinName)
+        {
+            if (string.IsNullOrEmpty(skinName)) return -1;
+            string digits = new string(skinName.Where(char.IsDigit).ToArray());
+            return int.TryParse(digits, out int val) ? val : -1;
         }
 
         private void BinSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_model.SelectedBin != null && !string.IsNullOrWhiteSpace(_model.RootPath))
+            if (_model.SelectedSkin != null)
             {
-                string fullBinPath = Path.Combine(_model.RootPath, _model.SelectedBin);
-                LoadBinFile(fullBinPath);
+                LoadBinFile(_model.SelectedSkin.BinPath);
             }
         }
 
@@ -477,8 +529,109 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
 
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+
             _model.StatusText = $"Inspecting {systemItem.Name} ({_model.Emitters.Count} emitters).";
         }
+
+        #region Timeline Deck Mechanics
+
+        private void TracksCanvasContainer_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateTimelineTrackMetrics();
+            UpdatePlayheadPosition();
+        }
+
+        private void UpdateTimelineTrackMetrics()
+        {
+            if (_model == null || TracksCanvasContainer == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+
+            Brush[] palette = new Brush[]
+            {
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00E676")), // Teal / Green
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#00D1FF")), // Cyan
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#5C85FF")), // Slate Blue
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF6B35")), // Coral / Orange
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FFD600")), // Amber / Gold
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A855F7")), // Purple
+                new SolidColorBrush((Color)ColorConverter.ConvertFromString("#EC4899"))  // Pink
+            };
+
+            int idx = 1;
+            foreach (var emitter in _model.Emitters)
+            {
+                emitter.IndexNumber = idx;
+                emitter.TrackBrush = palette[(idx - 1) % palette.Length];
+
+                double delay = emitter.EmitterDef?.TimeBeforeFirstEmission ?? 0;
+                double emitLife = emitter.EmitterDef?.EmitterLifetime ?? 1.5;
+                double partLife = emitter.EmitterDef?.ParticleLifetime.Sample(0.5f) ?? 1.0;
+                double duration = emitLife + partLife;
+
+                double leftMargin = Math.Clamp((delay / totalDur) * availableWidth, 0, Math.Max(0, availableWidth - 10));
+                double barWidth = Math.Clamp((duration / totalDur) * availableWidth, 10, Math.Max(10, availableWidth - leftMargin));
+
+                emitter.TrackMargin = new Thickness(leftMargin, 0, 0, 0);
+                emitter.TrackWidth = barWidth;
+
+                idx++;
+            }
+        }
+
+        private void UpdatePlayheadPosition()
+        {
+            if (_model == null || TracksCanvasContainer == null || PlayheadLine == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+            double ratio = Math.Clamp(_model.CurrentTime / totalDur, 0.0, 1.0);
+            double posX = ratio * availableWidth;
+
+            PlayheadLine.X1 = posX;
+            PlayheadLine.X2 = posX;
+            Canvas.SetLeft(PlayheadHandle, posX - 4);
+        }
+
+        private bool _isTimelineDragging;
+
+        private void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isTimelineDragging = true;
+            UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+        }
+
+        private void TimelineGrid_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isTimelineDragging && e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
+            }
+        }
+
+        private void TimelineGrid_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isTimelineDragging = false;
+        }
+
+        private void UpdateSeekFromTimeline(double mouseX)
+        {
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0 || _model == null) return;
+
+            double ratio = Math.Clamp(mouseX / availableWidth, 0.0, 1.0);
+            double seekTime = ratio * _model.TotalDuration;
+
+            _model.CurrentTime = seekTime;
+            _vfxRenderer?.Seek(seekTime);
+        }
+
+        #endregion
 
         private static string GetBlendModeName(int blendMode) => blendMode switch
         {
@@ -525,31 +678,43 @@ namespace AssetsManager.Views.Dialogs
                 {
                     InspectSystem(_model.SelectedSystem);
                 }
-                else if (_vfxRenderer.ActiveSystem.CurrentTime >= _model.TotalDuration)
-                {
-                    _vfxRenderer.Stop();
-                    _vfxRenderer.Play();
-                    _model.IsPlaying = true;
-                }
                 else
                 {
+                    _vfxRenderer.Stop();
                     _vfxRenderer.Play();
                     _model.IsPlaying = true;
                 }
             }
         }
 
-        private void Pause_Click(object sender, RoutedEventArgs e)
+        private void StopResume_Click(object sender, RoutedEventArgs e)
         {
-            _vfxRenderer?.Pause();
-            _model.IsPlaying = false;
-        }
-
-        private void Stop_Click(object sender, RoutedEventArgs e)
-        {
-            _vfxRenderer?.Stop();
-            _model.IsPlaying = false;
-            _model.CurrentTime = 0;
+            if (_model.IsPlaying)
+            {
+                _vfxRenderer?.Pause();
+                _model.IsPlaying = false;
+            }
+            else
+            {
+                if (_model.SelectedSystem != null)
+                {
+                    if (_vfxRenderer == null || _vfxRenderer.ActiveSystem == null)
+                    {
+                        InspectSystem(_model.SelectedSystem);
+                    }
+                    else if (_vfxRenderer.ActiveSystem.CurrentTime >= _model.TotalDuration)
+                    {
+                        _vfxRenderer.Stop();
+                        _vfxRenderer.Play();
+                        _model.IsPlaying = true;
+                    }
+                    else
+                    {
+                        _vfxRenderer.Play();
+                        _model.IsPlaying = true;
+                    }
+                }
+            }
         }
 
         private bool _isUserSeeking;
@@ -649,6 +814,101 @@ namespace AssetsManager.Views.Dialogs
             Clipboard.SetText(reportText);
             _model.LogMessages.Add("[DEBUG EXPORT] Reporte completo de depuración copiado al Portapapeles.");
             MessageBox.Show("¡Reporte de Depuración Completo copiado al Portapapeles de Windows!\n\nPuedes pegarlo directamente en la conversación para que analicemos cualquier anomalía visual.", "VFX Inspector", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        #endregion
+
+        #region Table Last Column Auto-Stretch (Hash Lab Technique)
+
+        private bool _isUpdatingTableColumns;
+
+        private void TableListView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ListView listView)
+            {
+                Dispatcher.BeginInvoke(() => UpdateLastColumnWidth(listView), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+        }
+
+        private void TableListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (sender is ListView listView)
+            {
+                UpdateLastColumnWidth(listView);
+            }
+        }
+
+        private void TableListView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (sender is ListView listView && e.NewValue is true)
+            {
+                Dispatcher.BeginInvoke(() => UpdateLastColumnWidth(listView), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+        }
+
+        private void TableColumnHeader_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (!_isUpdatingTableColumns && sender is GridViewColumnHeader header)
+            {
+                var listView = FindAncestor<ListView>(header);
+                if (listView != null)
+                {
+                    UpdateLastColumnWidth(listView);
+                }
+            }
+        }
+
+        private void UpdateLastColumnWidth(ListView listView)
+        {
+            if (_isUpdatingTableColumns || listView?.View is not GridView gridView || gridView.Columns.Count < 2)
+                return;
+
+            var scrollViewer = FindScrollViewer(listView);
+            if (scrollViewer == null || scrollViewer.ViewportWidth <= 0)
+                return;
+
+            double precedingWidth = 0;
+            for (int i = 0; i < gridView.Columns.Count - 1; i++)
+            {
+                precedingWidth += gridView.Columns[i].ActualWidth;
+            }
+
+            double lastWidth = Math.Max(80, scrollViewer.ViewportWidth - precedingWidth);
+            var lastColumn = gridView.Columns[gridView.Columns.Count - 1];
+
+            if (Math.Abs(lastColumn.Width - lastWidth) < 0.5)
+                return;
+
+            _isUpdatingTableColumns = true;
+            try
+            {
+                lastColumn.Width = lastWidth;
+            }
+            finally
+            {
+                _isUpdatingTableColumns = false;
+            }
+        }
+
+        private static T FindAncestor<T>(DependencyObject current) where T : DependencyObject
+        {
+            while (current != null && current is not T)
+            {
+                current = VisualTreeHelper.GetParent(current);
+            }
+            return current as T;
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject element)
+        {
+            if (element is ScrollViewer scrollViewer) return scrollViewer;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
+            {
+                var result = FindScrollViewer(VisualTreeHelper.GetChild(element, i));
+                if (result != null) return result;
+            }
+            return null;
         }
 
         #endregion

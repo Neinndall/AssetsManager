@@ -53,10 +53,6 @@ namespace AssetsManager.Views.Models.Viewer
                 OnPropertyChanged(nameof(HasMultipleAnimations));
                 UpdateFilteredAnimations();
             };
-            _vfxSystems.CollectionChanged += (_, __) =>
-            {
-                OnPropertyChanged(nameof(HasVfxSystems));
-            };
         }
 
         // --- Navigation State (Control Deck v3.3) ---
@@ -71,18 +67,6 @@ namespace AssetsManager.Views.Models.Viewer
 
         private string _selectedImagePath = string.Empty;
         private string _selectedImageName = string.Empty;
-
-        private readonly ObservableRangeCollection<VfxSystemModel> _vfxSystems = new();
-        private VfxSystemModel _selectedVfxSystem;
-
-        public ObservableRangeCollection<VfxSystemModel> VfxSystems => _vfxSystems;
-        public bool HasVfxSystems => _vfxSystems.Any();
-
-        public VfxSystemModel SelectedVfxSystem
-        {
-            get => _selectedVfxSystem;
-            set { if (_selectedVfxSystem != value) { _selectedVfxSystem = value; OnPropertyChanged(); } }
-        }
 
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;

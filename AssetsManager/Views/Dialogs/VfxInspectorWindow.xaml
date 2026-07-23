@@ -8,11 +8,11 @@
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
-        Height="850" Width="1400"
+        Height="900" Width="1400"
         MinWidth="1100" MinHeight="700"
-        WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="True"
         Background="{StaticResource SidebarBackground}"
-        HeaderTitle="VFX Inspector &amp; Diagnostic Studio"
+        HeaderTitle="VFX Studio"
         HeaderIcon="Sparkles"
         Style="{StaticResource HudWindowStyle}">
 
@@ -20,100 +20,86 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
         <converters:CountToVisibilityConverter x:Key="CountToVis"/>
-
-        <!-- GridView Row Style with GridViewRowPresenter so columns render properly -->
-        <Style x:Key="ModernGridViewItem" TargetType="ListViewItem">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-            <Setter Property="MinHeight" Value="28"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListViewItem">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="4,2">
-                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" 
-                                                  VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="{StaticResource CardBackground}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
-    <Grid Margin="12">
+    <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0: Top Toolbar / ROOT Selector -->
-            <RowDefinition Height="*"/>    <!-- 1: Main Diagnostic Area -->
+            <RowDefinition Height="*"/>    <!-- 1: Main Management Area -->
             <RowDefinition Height="Auto"/> <!-- 2: Bottom Status Bar -->
         </Grid.RowDefinitions>
 
-        <!-- 0. TOP TOOLBAR: ROOT Directory & Skin BIN selection -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="10" 
-                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,10">
+        <!-- 0. TOP TOOLBAR: Unified Capsule with ROOT & BIN selection -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="24,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/> <!-- ROOT Label -->
-                    <ColumnDefinition Width="*"/>    <!-- ROOT Path TextBox -->
-                    <ColumnDefinition Width="Auto"/> <!-- Browse Button -->
-                    <ColumnDefinition Width="Auto"/> <!-- BIN Label -->
-                    <ColumnDefinition Width="280"/>  <!-- BIN Selector ComboBox -->
-                    <ColumnDefinition Width="Auto"/> <!-- Scan / Reload Button -->
+                    <ColumnDefinition Width="Auto"/> <!-- Title / Metadata -->
+                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- ROOT Path, BIN selector, Scan button -->
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                    <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
-                    <TextBlock Text="ROOT Path:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                <!-- Left: Title & Subtitle -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="VFX MANAGEMENT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Champion VFX &amp; Emitter Control Deck" FontSize="10" Foreground="{StaticResource TextPrimary}" Opacity="0.8"/>
                 </StackPanel>
 
-                <TextBox Grid.Column="1" x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" 
-                         Background="{StaticResource SidebarBackground}" Foreground="{StaticResource TextPrimary}" 
-                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="8,6" FontSize="12"
-                         VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
+                <!-- Right: Path & BIN Selection Tools Capsule -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="6" Padding="10,4" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- ROOT Path -->
+                            <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="18" Height="18" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="ROOT Path:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" 
+                                     Style="{StaticResource ModernTextBox}" Height="32" Padding="10,0" VerticalContentAlignment="Center" FontSize="11" Width="300"
+                                     VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
+                            <Button Click="BrowseRoot_Click" 
+                                    Style="{StaticResource BrowseButtonStyle}" Width="32" Height="32" Padding="0" Margin="6,0,12,0" ToolTip="Browse ROOT Directory">
+                                <materialIcons:MaterialIcon Kind="FolderOpen" Width="16" Height="16"/>
+                            </Button>
 
-                <Button Grid.Column="2" Content="Browse..." Click="BrowseRoot_Click" 
-                        Style="{StaticResource SecondaryButton}" Margin="8,0,16,0" Padding="12,6"/>
+                            <!-- SEPARATOR -->
+                            <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="4,0,12,0" VerticalAlignment="Center" Opacity="0.8"/>
 
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                    <materialIcons:MaterialIcon Kind="FileCodeOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0"/>
-                    <TextBlock Text="Skin BIN:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                            <!-- Skin Selector -->
+                            <materialIcons:MaterialIcon Kind="PaletteOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Skin:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="BinComboBox" ItemsSource="{Binding DetectedSkins}" SelectedItem="{Binding SelectedSkin, Mode=TwoWay}"
+                                      SelectionChanged="BinSelector_SelectionChanged" Style="{StaticResource ModernComboBox}"
+                                      Width="180" Height="32" FontSize="11" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="2,0">
+                                            <materialIcons:MaterialIcon Kind="Palette" Width="14" Height="14" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+
+                            <!-- Scan & Load Button -->
+                            <Button Click="ReloadRoot_Click" Style="{StaticResource PrimaryButton}" Padding="12,5">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialIcons:MaterialIcon Kind="Refresh" Width="15" Height="15" Foreground="White" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Scan &amp; Load" FontWeight="SemiBold" FontSize="11"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
-
-                <ComboBox Grid.Column="4" ItemsSource="{Binding DetectedBins}" SelectedItem="{Binding SelectedBin, Mode=TwoWay}"
-                          SelectionChanged="BinSelector_SelectionChanged" Background="{StaticResource SidebarBackground}" 
-                          Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderColor}" 
-                          Padding="8,6" VerticalAlignment="Center" Margin="0,0,12,0"/>
-
-                <Button Grid.Column="5" Click="ReloadRoot_Click" Style="{StaticResource PrimaryButton}" Padding="14,6">
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Foreground="White" Margin="0,0,6,0"/>
-                        <TextBlock Text="Scan &amp; Load" FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
             </Grid>
         </Border>
 
-        <!-- 1. MAIN DIAGNOSTIC WORKSPACE -->
-        <Grid Grid.Row="1">
+        <!-- 1. MAIN MANAGEMENT WORKSPACE -->
+        <Grid Grid.Row="1" Margin="16,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340"/> <!-- Left: Systems List -->
                 <ColumnDefinition Width="8"/>   <!-- Splitter -->
-                <ColumnDefinition Width="*"/>   <!-- Right: 3D Viewport & Auditing Tabs -->
+                <ColumnDefinition Width="*"/>   <!-- Right: 3D Viewport & Systems Breakdown -->
             </Grid.ColumnDefinitions>
 
-            <!-- LEFT PANEL: VFX Systems Tree / List -->
+            <!-- LEFT PANEL: VFX Systems List -->
             <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" 
                     BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                 <Grid Margin="12">
@@ -128,7 +114,7 @@
                             <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
                             <TextBlock Text="VFX SYSTEMS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
                         </StackPanel>
-                        <TextBlock Text="Select a system definition to inspect" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                        <TextBlock Text="Select a system definition to load" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
                     </StackPanel>
 
                     <!-- Search Filter -->
@@ -156,24 +142,13 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListViewItem">
                                             <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8" Margin="0,0,0,4">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="Auto"/>
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <StackPanel Grid.Column="0">
-                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                            <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emisores: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
-                                                            <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
-                                                        </StackPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                        <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
+                                                        <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
                                                     </StackPanel>
-
-                                                    <Border Grid.Column="1" Background="#2200E676" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="Bold" Foreground="{Binding StatusBrush}"/>
-                                                    </Border>
-                                                </Grid>
+                                                </StackPanel>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -194,25 +169,49 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="Transparent"/>
 
-            <!-- RIGHT PANEL: Diagnostics Workspace (3D Viewport + Tabs) -->
+            <!-- RIGHT PANEL: 3D Viewport & Inspection Tabs -->
             <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="10" 
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <TabControl Background="Transparent" BorderThickness="0" Margin="6">
-                    <TabControl.Resources>
-                        <Style TargetType="TabItem">
-                            <Setter Property="HeaderTemplate">
-                                <Setter.Value>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold" Padding="12,6"/>
-                                    </DataTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </TabControl.Resources>
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- Tab Capsule Bar -->
+                        <RowDefinition Height="*"/>    <!-- Active Content Panel -->
+                    </Grid.RowDefinitions>
 
-                    <!-- TAB 1: 3D REAL-TIME VIEWPORT -->
-                    <TabItem Header="3D Live Viewport">
-                        <Grid Margin="0,6,0,0">
+                    <!-- Segmented Tab Capsule Bar (Matching Hash Lab / Control Deck Style) -->
+                    <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,10">
+                        <UniformGrid Columns="4" Height="36">
+                            <RadioButton x:Name="TabViewport" IsChecked="True" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="3D Live Viewport">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="CubeOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="3D LIVE VIEWPORT" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TabEmitters" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Emitters Breakdown">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="EMITTERS BREAKDOWN" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TabTextures" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Textures Audit">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="TextureBox" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="TEXTURES" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TabMeshes" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Meshes Audit">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="VectorTriangle" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="MESHES (.scb/.sco)" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                        </UniformGrid>
+                    </Border>
+
+                    <!-- Active View Content Panels -->
+                    <Grid Grid.Row="1">
+                        <!-- TAB 1: 3D REAL-TIME VIEWPORT -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabViewport, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*"/>    <!-- OpenTK OpenGL Canvas -->
                                 <RowDefinition Height="Auto"/> <!-- Viewport Controls Bar -->
@@ -238,197 +237,543 @@
                                             <TextBlock Text="{Binding SelectedSystem.Name, FallbackValue='No system selected'}" FontWeight="Bold" FontSize="12" Foreground="White"/>
                                             <TextBlock Text="{Binding LiveParticleCount, StringFormat='{} | Particles: {0}'}" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0"/>
                                         </StackPanel>
+                                     </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Unified Bottom Timeline & Control Deck (Matching ej.png) -->
+                            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="10" 
+                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,8,0,0" Padding="14,12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- Time Ruler Header -->
+                                        <RowDefinition Height="Auto"/> <!-- Master VFX System Bar + Emitters Timeline Grid -->
+                                        <RowDefinition Height="Auto"/> <!-- Separator & Bottom Transport Bar -->
+                                    </Grid.RowDefinitions>
+
+                                    <!-- 1. TIME RULER HEADER (Top of timeline) -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200"/> <!-- Name Column Header -->
+                                            <ColumnDefinition Width="*"/>   <!-- Time Ruler Ticks -->
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon Kind="LayersOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
+                                            <TextBlock Text="EMITTERS / LAYERS" FontSize="10.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}"/>
+                                        </StackPanel>
+
+                                        <Grid Grid.Column="1" Margin="8,0,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="0.00s" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding QuarterDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding HalfDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding TotalDuration, StringFormat={}{0:F2}s}" FontSize="9.5" FontFamily="Consolas" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                    </Grid>
+
+                                    <!-- 2. TIMELINE TRACKS (Master System + Emitters - Clean layout without black container) -->
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="180" Margin="0,0,0,10">
+                                        <Grid x:Name="TimelineInteractiveGrid" Background="Transparent"
+                                              PreviewMouseDown="TimelineGrid_PreviewMouseDown"
+                                              PreviewMouseMove="TimelineGrid_PreviewMouseMove"
+                                              PreviewMouseUp="TimelineGrid_PreviewMouseUp">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="200"/> <!-- Names & Toggles Column -->
+                                                <ColumnDefinition Width="*"/>   <!-- Tracks Canvas Column -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Left Column: Master System Name + Emitters List -->
+                                            <StackPanel Grid.Column="0">
+                                                <!-- Row #0: Master VFX System Name (Green Accent) -->
+                                                <Grid Height="26" Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="20"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <materialIcons:MaterialIcon Grid.Column="0" Kind="AutoAwesome" Width="13" Height="13" Foreground="#22C55E" VerticalAlignment="Center"/>
+                                                    <TextBlock Grid.Column="1" Text="{Binding SelectedSystem.Name, FallbackValue='VFX System'}" FontSize="11" FontWeight="Bold" Foreground="#22C55E" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </Grid>
+
+                                                <!-- Emitter Rows -->
+                                                <ItemsControl ItemsSource="{Binding Emitters}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid Height="24" Margin="0,2">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="20"/>
+                                                                    <ColumnDefinition Width="18"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center"/>
+                                                                <TextBlock Grid.Column="1" Text="{Binding IndexNumber}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                                <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+
+                                            <!-- Right Column: Master Track Bar + Emitter Tracks Bars + Sweeping Red Playhead Line -->
+                                            <Grid Grid.Column="1" Margin="8,0" x:Name="TracksCanvasContainer" SizeChanged="TracksCanvasContainer_SizeChanged">
+                                                <StackPanel>
+                                                    <!-- Row #0: Master VFX System Bar (Solid Green Bar across entire duration) -->
+                                                    <Grid Height="26" Margin="0,2">
+                                                        <Border Background="#1F22C55E" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="4" Height="16" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                                                            <Border Background="#22C55E" CornerRadius="3" Opacity="0.85"/>
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- Emitter Bars Stack -->
+                                                    <ItemsControl ItemsSource="{Binding Emitters}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Height="24" Margin="0,2">
+                                                                    <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
+                                                                            Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
+                                                                        <Border.Effect>
+                                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
+                                                                        </Border.Effect>
+                                                                    </Border>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+
+                                                <!-- Playhead Needle Overlay Canvas -->
+                                                <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False">
+                                                    <!-- Vertical Red Line sweeping across timeline -->
+                                                    <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                          Stroke="#FF4D4D" StrokeThickness="2"/>
+                                                    <!-- Yellow Playhead Handle Indicator -->
+                                                    <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
+                                                             Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"/>
+                                                </Canvas>
+                                            </Grid>
+                                        </Grid>
+                                    </ScrollViewer>
+
+                                    <!-- 3. BOTTOM TRANSPORT CONTROLS BAR (Play, Stop/Resume, Slider, Speed, BG) -->
+                                    <Border Grid.Row="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,4,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/> <!-- Play & Stop/Resume Buttons -->
+                                                <ColumnDefinition Width="*"/>    <!-- Main Time Slider & Readout -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Speed Selector -->
+                                                <ColumnDefinition Width="Auto"/> <!-- Background Selector -->
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Transport Action Buttons -->
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,5" ToolTip="Play / Restart">
+                                                    <materialIcons:MaterialIcon Kind="Play" Width="15" Height="15" Foreground="{StaticResource AccentGreen}"/>
+                                                </Button>
+                                                <Button Click="StopResume_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,0,0" Padding="8,5" ToolTip="Stop / Resume">
+                                                    <materialIcons:MaterialIcon Width="15" Height="15">
+                                                        <materialIcons:MaterialIcon.Style>
+                                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                                <Setter Property="Kind" Value="Pause"/>
+                                                                <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                                                        <Setter Property="Kind" Value="Stop"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialIcons:MaterialIcon.Style>
+                                                    </materialIcons:MaterialIcon>
+                                                </Button>
+                                            </StackPanel>
+
+                                            <!-- Slider + Time Readout -->
+                                            <Grid Grid.Column="1" Margin="0,0,14,0" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Grid.Column="0" Minimum="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" 
+                                                        ValueChanged="TimeSlider_ValueChanged" 
+                                                        PreviewMouseDown="TimeSlider_PreviewMouseDown"
+                                                        PreviewMouseUp="TimeSlider_PreviewMouseUp"
+                                                        VerticalAlignment="Center" Height="14"
+                                                        Style="{StaticResource HUDSliderStyle}"/>
+                                                <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" FontFamily="Consolas">
+                                                    <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource AccentBrush}"/>
+                                                    <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
+                                                    <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource TextMuted}"/>
+                                                </TextBlock>
+                                            </Grid>
+
+                                            <!-- Speed Selector -->
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="75" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
+                                                    <ComboBoxItem Content="0.25x" Tag="0.25"/>
+                                                    <ComboBoxItem Content="1.0x" Tag="1.0"/>
+                                                    <ComboBoxItem Content="1.5x" Tag="1.5"/>
+                                                    <ComboBoxItem Content="2.0x" Tag="2.0"/>
+                                                </ComboBox>
+                                            </StackPanel>
+
+                                            <!-- BG Mode Selector -->
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                                <ComboBox x:Name="BgComboBox" Style="{StaticResource ModernComboBox}" Width="95" Height="26" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0">
+                                                    <ComboBoxItem Content="Dark"/>
+                                                    <ComboBoxItem Content="Light"/>
+                                                    <ComboBoxItem Content="Transparent"/>
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </Grid>
                                     </Border>
                                 </Grid>
                             </Border>
-
-                            <!-- Viewport Playback Control Bar -->
-                            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" 
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,8,0,0" Padding="12,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/> <!-- Play/Pause/Stop -->
-                                        <ColumnDefinition Width="*"/>    <!-- Progress Slider -->
-                                        <ColumnDefinition Width="Auto"/> <!-- Speed Selector -->
-                                        <ColumnDefinition Width="Auto"/> <!-- Background Mode -->
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                        <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" ToolTip="Play">
-                                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="{StaticResource AccentGreen}"/>
-                                        </Button>
-                                        <Button Click="Pause_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" ToolTip="Pause">
-                                            <materialIcons:MaterialIcon Kind="Pause" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
-                                        </Button>
-                                        <Button Click="Stop_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Padding="8,4" ToolTip="Restart">
-                                            <materialIcons:MaterialIcon Kind="Stop" Width="16" Height="16" Foreground="{StaticResource AccentRed}"/>
-                                        </Button>
-                                    </StackPanel>
-
-                                    <Grid Grid.Column="1" Margin="10,0">
-                                        <Slider Minimum="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" 
-                                                ValueChanged="TimeSlider_ValueChanged" 
-                                                PreviewMouseDown="TimeSlider_PreviewMouseDown"
-                                                PreviewMouseUp="TimeSlider_PreviewMouseUp"
-                                                VerticalAlignment="Center"/>
-                                    </Grid>
-
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
-                                        <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <ComboBox x:Name="SpeedComboBox" Width="70" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
-                                            <ComboBoxItem Content="0.25x" Tag="0.25"/>
-                                            <ComboBoxItem Content="1.0x" Tag="1.0"/>
-                                            <ComboBoxItem Content="1.5x" Tag="1.5"/>
-                                            <ComboBoxItem Content="2.0x" Tag="2.0"/>
-                                        </ComboBox>
-                                    </StackPanel>
-
-                                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                                        <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                        <ComboBox x:Name="BgComboBox" Width="90" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0" Margin="0,0,10,0">
-                                            <ComboBoxItem Content="Dark"/>
-                                            <ComboBoxItem Content="Light"/>
-                                            <ComboBoxItem Content="Transparent"/>
-                                        </ComboBox>
-                                        <Button Click="CopyDebugReport_Click" Style="{StaticResource SecondaryButton}" Padding="8,4" ToolTip="Copiar Informe Completo de Depuración de VFX">
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialIcons:MaterialIcon Kind="ContentCopy" Width="14" Height="14" Foreground="#00E5FF" Margin="0,0,4,0"/>
-                                                <TextBlock Text="Copiar Debug" FontSize="11" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Button>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
                         </Grid>
-                    </TabItem>
 
-                    <!-- TAB 2: EMITTERS BREAKDOWN & LIVE TOGGLING -->
-                    <TabItem Header="Emitters Breakdown">
-                        <Grid Margin="0,6,0,0">
-                            <ListView ItemsSource="{Binding Emitters}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
-                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                        <!-- TAB 2: EMITTERS BREAKDOWN -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabEmitters, Converter={StaticResource BoolToVis}}">
+                            <ListView x:Name="EmittersListView" ItemsSource="{Binding Emitters}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="Active" Width="60">
+                                    <GridView AllowsColumnReorder="False">
+                                        <GridViewColumn Width="50">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumnHeader Content="Active"/>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" HorizontalAlignment="Center"/>
+                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Center"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Emitter Name" DisplayMemberBinding="{Binding Name}" Width="200"/>
-                                        <GridViewColumn Header="Texture Path" DisplayMemberBinding="{Binding TexturePath}" Width="240"/>
-                                        <GridViewColumn Header="Tex Status" Width="100">
+
+                                        <GridViewColumn Header="Emitter Name" Width="160">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding TextureStatus}" Foreground="{Binding TextureStatusBrush}" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="11.5" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Mesh Path (.scb)" DisplayMemberBinding="{Binding MeshPath}" Width="200"/>
-                                        <GridViewColumn Header="Mesh Status" Width="100">
+
+                                        <GridViewColumn Header="Texture Path" Width="200">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding MeshStatus}" Foreground="{Binding MeshStatusBrush}" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding TexturePath}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Blend Mode" DisplayMemberBinding="{Binding BlendMode}" Width="110"/>
-                                        <GridViewColumn Header="SubUV (texDiv)" DisplayMemberBinding="{Binding TexDiv}" Width="100"/>
+
+                                        <GridViewColumn Header="Tex Status" Width="85">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding TextureStatus}" Foreground="{Binding TextureStatusBrush}" FontWeight="Bold" FontSize="10.5"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Mesh Path (.scb)" Width="180">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding MeshPath}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Mesh Status" Width="85">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding MeshStatus}" Foreground="{Binding MeshStatusBrush}" FontWeight="Bold" FontSize="10.5"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Blend Mode" Width="95">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding BlendMode}" FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentBrush}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="SubUV (texDiv)" Width="100">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding TexDiv}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
                         </Grid>
-                    </TabItem>
 
-                    <!-- TAB 3: TEXTURES AUDIT -->
-                    <TabItem Header="Textures Audit">
-                        <Grid Margin="0,6,0,0">
-                            <ListView ItemsSource="{Binding Textures}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
-                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                        <!-- TAB 3: TEXTURES -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabTextures, Converter={StaticResource BoolToVis}}">
+                            <ListView x:Name="TexturesListView" ItemsSource="{Binding Textures}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
-                                    <GridView>
+                                    <GridView AllowsColumnReorder="False">
                                         <GridViewColumn Header="Preview" Width="70">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <Border Width="48" Height="48" CornerRadius="4" Background="#111" ClipToBounds="True">
+                                                    <Border Width="40" Height="40" CornerRadius="6" Background="#0A0A0E" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" ClipToBounds="True" HorizontalAlignment="Center">
                                                         <Image Source="{Binding ImagePreview}" Stretch="UniformToFill"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Authored Path" DisplayMemberBinding="{Binding AuthoredPath}" Width="320"/>
+
+                                        <GridViewColumn Header="Authored Path" Width="300">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding AuthoredPath}" FontFamily="Consolas" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
                                         <GridViewColumn Header="Status" Width="100">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold"/>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold" FontSize="10.5"/>
+                                                    </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Size" Width="100">
+
+                                        <GridViewColumn Header="Dimensions" Width="110">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Width, StringFormat='{}{0} x '}" Foreground="{StaticResource TextPrimary}">
-                                                        <Run Text="{Binding Height}"/>
-                                                    </TextBlock>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextPrimary}">
+                                                            <Run Text="{Binding Width, Mode=OneWay}"/><Run Text=" × "/><Run Text="{Binding Height, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                    </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="SubUV Grid" DisplayMemberBinding="{Binding TexDiv}" Width="100"/>
-                                        <GridViewColumn Header="Resolved Disk Path" DisplayMemberBinding="{Binding ResolvedPath}" Width="350"/>
+
+                                        <GridViewColumn Header="SubUV Grid" Width="100">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding TexDiv}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Resolved Disk Path" Width="380">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding ResolvedPath}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
                         </Grid>
-                    </TabItem>
 
-                    <!-- TAB 4: MESHES AUDIT (.scb / .sco / .skn) -->
-                    <TabItem Header="Meshes Audit (.scb/.sco)">
-                        <Grid Margin="0,6,0,0">
-                            <ListView ItemsSource="{Binding Meshes}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
-                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                        <!-- TAB 4: MESHES (.scb / .sco / .skn) -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BoolToVis}}">
+                            <ListView x:Name="MeshesListView" ItemsSource="{Binding Meshes}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
-                                    <GridView>
-                                        <GridViewColumn Header="Format" DisplayMemberBinding="{Binding Format}" Width="80"/>
-                                        <GridViewColumn Header="Authored Path" DisplayMemberBinding="{Binding AuthoredPath}" Width="320"/>
-                                        <GridViewColumn Header="Status" Width="110">
+                                    <GridView AllowsColumnReorder="False">
+                                        <GridViewColumn Header="Format" Width="90">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold"/>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding Format}" FontWeight="Bold" FontSize="10" Foreground="{StaticResource AccentOrange}"/>
+                                                    </Border>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Vertices" DisplayMemberBinding="{Binding VertexCount}" Width="100"/>
-                                        <GridViewColumn Header="Faces" DisplayMemberBinding="{Binding FaceCount}" Width="100"/>
-                                        <GridViewColumn Header="Resolved Path" DisplayMemberBinding="{Binding ResolvedPath}" Width="380"/>
+
+                                        <GridViewColumn Header="Authored Path" Width="300">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding AuthoredPath}" FontFamily="Consolas" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Status" Width="100">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource HoverColor}" CornerRadius="5" Padding="8,2" HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold" FontSize="10.5"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Vertices" Width="90">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding VertexCount}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Faces" Width="90">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding FaceCount}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+
+                                        <GridViewColumn Header="Resolved Path" Width="380">
+                                            <GridViewColumn.HeaderContainerStyle>
+                                                <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
+                                                    <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
+                                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                </Style>
+                                            </GridViewColumn.HeaderContainerStyle>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding ResolvedPath}" FontFamily="Consolas" FontSize="10.5" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
                         </Grid>
-                    </TabItem>
-
-                    <!-- TAB 5: DIAGNOSTIC LOG -->
-                    <TabItem Header="Diagnostic Log">
-                        <Grid Margin="0,6,0,0">
-                            <ListBox ItemsSource="{Binding LogMessages}" Background="#0D0D12" Foreground="#00FF66" 
-                                     FontFamily="Consolas" FontSize="11" BorderThickness="0" Padding="8"/>
-                        </Grid>
-                    </TabItem>
-                </TabControl>
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
 
-        <!-- 2. BOTTOM STATUS BAR -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="6" 
-                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,10,0,0" Padding="12,6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="LoL VFX Diagnostic Engine v1.0" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
-            </Grid>
+        <!-- 2. BOTTOM STATUS BAR (With bottom rounding) -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
+            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextSecondary}" FontSize="11" VerticalAlignment="Center"/>
         </Border>
     </Grid>
 </base:HudWindow>

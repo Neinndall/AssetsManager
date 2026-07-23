@@ -48,8 +48,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
         private AnimationModel _currentlyPlayingAnimation;
-        private VfxSystemModel _activeVfxSystem;
-        private int _vfxLoadVersion;
         private bool _isCleanedUp;
 
         public ViewerPanelControl()
@@ -104,10 +102,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (e.PropertyName == nameof(ViewerPanelModel.SelectedModel))
             {
                 HandleSelectedModelChanged();
-            }
-            else if (e.PropertyName == nameof(ViewerPanelModel.SelectedVfxSystem))
-            {
-                HandleSelectedVfxSystemChanged();
             }
             else if (e.PropertyName == nameof(ViewerPanelModel.IsAnimationSyncEnabled))
             {
@@ -255,7 +249,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _viewModel.SelectedModelParts = null;
                 _viewModel.AnimationModels.Clear();
                 _viewModel.SelectedAnimation = null;
-                ClearVfxLibrary();
                 return;
             }
 
@@ -271,12 +264,6 @@ namespace AssetsManager.Views.Controls.Viewer
             else
             {
                 _viewModel.AnimationModels.Clear();
-            }
-
-            ClearVfxLibrary();
-            if (TabVfx?.IsChecked == true)
-            {
-                _ = LoadVfxLibraryForSelectedModelAsync();
             }
 
             PositionXLock.IsChecked = false;
@@ -362,7 +349,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.LoadedModels.Clear();
 
             _currentlyPlayingAnimation = null;
-            ClearVfxLibrary();
 
             _viewModel.SelectedModelParts = null; // MVVM Cleanup
             _viewModel.SelectedModel = null;
@@ -961,11 +947,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void TabEnvironment_Checked(object sender, RoutedEventArgs e) => UpdateHeroSubtitle();
         private void TabMeshes_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabTransform_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
-        private void TabAnimations_Checked(object sender, RoutedEventArgs e)
-        {
-            _viewModel.SelectedVfxSystem = null;
-            UpdateInspectorInfo();
-        }
+        private void TabAnimations_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
         private void TabSfx_Checked(object sender, RoutedEventArgs e) => UpdateInspectorInfo();
 
         // ===== Hero & Inspector update helpers =====
@@ -1008,11 +990,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 InspectorCounterText.Text = "A";
                 if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Animations playback";
-            }
-            else if (TabVfx != null && TabVfx.IsChecked == true)
-            {
-                InspectorCounterText.Text = "V";
-                if (InspectorSubtitleText != null) InspectorSubtitleText.Text = "Particle VFX playback";
             }
         }
 
@@ -1064,142 +1041,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 LogService.LogError(ex, $"Failed to load animation: {filePath}");
                 CustomMessageBoxService.ShowError("Load Error", $"Failed to load animation file: {ex.Message}", Window.GetWindow(this));
             }
-        }
-
-        private void TabVfx_Checked(object sender, RoutedEventArgs e)
-        {
-            _viewModel.SelectedAnimation = null;
-            UpdateInspectorInfo();
-            _ = LoadVfxLibraryForSelectedModelAsync();
-        }
-
-        private async Task LoadVfxLibraryForSelectedModelAsync()
-        {
-            var selectedModel = _viewModel.SelectedModel;
-            if (selectedModel == null || string.IsNullOrEmpty(selectedModel.FilePath))
-            {
-                ClearVfxLibrary();
-                return;
-            }
-
-            int loadVersion = ++_vfxLoadVersion;
-            string filePath = selectedModel.FilePath;
-            string projectRoot = ProjectExplorer?.CurrentRootFolder;
-
-            try
-            {
-                var vfxDataService = new VfxDataService(LogService);
-                var vfxSystems = await vfxDataService.LoadVfxSystemsForModelAsync(filePath, projectRoot);
-                if (loadVersion != _vfxLoadVersion || _viewModel.SelectedModel?.FilePath != filePath)
-                {
-                    return;
-                }
-
-                _viewModel.VfxSystems.ReplaceRange(vfxSystems);
-            }
-            catch (Exception ex)
-            {
-                LogService?.LogError(ex, $"[VFX] Failed to load VFX library for model: {filePath}");
-            }
-        }
-
-        private void HandleSelectedVfxSystemChanged()
-        {
-            if (_activeVfxSystem != null)
-            {
-                _activeVfxSystem.IsPlaying = false;
-            }
-
-            Viewport?.StopVfx();
-            _activeVfxSystem = _viewModel.SelectedVfxSystem;
-            Viewport?.SelectVfxSystem(_activeVfxSystem);
-        }
-
-        private void VfxPlayPauseButton_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not VfxSystemModel vfxSystem) return;
-
-            if (_activeVfxSystem != vfxSystem)
-            {
-                _viewModel.SelectedVfxSystem = vfxSystem;
-            }
-
-            if (vfxSystem.IsPlaying)
-            {
-                vfxSystem.IsPlaying = false;
-                Viewport?.PauseVfx();
-            }
-            else
-            {
-                Viewport?.StopVfx();
-                vfxSystem.IsPlaying = true;
-                Viewport?.PlayVfx();
-            }
-        }
-
-        private void VfxStopButton_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not VfxSystemModel vfxSystem) return;
-
-            vfxSystem.IsPlaying = !vfxSystem.IsPlaying;
-            if (vfxSystem.IsPlaying)
-            {
-                Viewport?.PlayVfx();
-            }
-            else
-            {
-                Viewport?.PauseVfx();
-            }
-        }
-
-        private bool _isVfxSliderDragging;
-
-        private void VfxSlider_DragStarted(object sender, System.Windows.Controls.Primitives.DragStartedEventArgs e)
-        {
-            _isVfxSliderDragging = true;
-        }
-
-        private void VfxSlider_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
-        {
-            _isVfxSliderDragging = false;
-            if ((sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem)
-            {
-                Viewport?.SeekVfx(TimeSpan.FromSeconds(vfxSystem.CurrentTime));
-            }
-        }
-
-        private void VfxSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_isVfxSliderDragging &&
-                (sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem &&
-                vfxSystem.HasFiniteDuration)
-            {
-                Viewport?.SeekVfx(TimeSpan.FromSeconds(e.NewValue));
-            }
-        }
-
-        private void CloseVfxPlayer_Click(object sender, RoutedEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is VfxSystemModel vfxSystem)
-            {
-                vfxSystem.IsPlaying = false;
-            }
-            Viewport?.StopVfx();
-            _viewModel.SelectedVfxSystem = null;
-        }
-
-        private void ClearVfxLibrary()
-        {
-            _vfxLoadVersion++;
-            if (_activeVfxSystem != null)
-            {
-                _activeVfxSystem.IsPlaying = false;
-            }
-            Viewport?.StopVfx();
-            Viewport?.SelectVfxSystem(null);
-            _activeVfxSystem = null;
-            _viewModel.SelectedVfxSystem = null;
-            _viewModel.VfxSystems.Clear();
         }
     }
 }
