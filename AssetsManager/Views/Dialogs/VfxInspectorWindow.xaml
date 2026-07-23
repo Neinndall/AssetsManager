@@ -1,0 +1,434 @@
+<base:HudWindow x:Class="AssetsManager.Views.Dialogs.VfxInspectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+        xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
+        xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+        xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
+        mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
+        Height="850" Width="1400"
+        MinWidth="1100" MinHeight="700"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
+        Background="{StaticResource SidebarBackground}"
+        HeaderTitle="VFX Inspector &amp; Diagnostic Studio"
+        HeaderIcon="Sparkles"
+        Style="{StaticResource HudWindowStyle}">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <converters:CountToVisibilityConverter x:Key="CountToVis"/>
+
+        <!-- GridView Row Style with GridViewRowPresenter so columns render properly -->
+        <Style x:Key="ModernGridViewItem" TargetType="ListViewItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="4,2">
+                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" 
+                                                  VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 0: Top Toolbar / ROOT Selector -->
+            <RowDefinition Height="*"/>    <!-- 1: Main Diagnostic Area -->
+            <RowDefinition Height="Auto"/> <!-- 2: Bottom Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 0. TOP TOOLBAR: ROOT Directory & Skin BIN selection -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="10" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="14,10" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- ROOT Label -->
+                    <ColumnDefinition Width="*"/>    <!-- ROOT Path TextBox -->
+                    <ColumnDefinition Width="Auto"/> <!-- Browse Button -->
+                    <ColumnDefinition Width="Auto"/> <!-- BIN Label -->
+                    <ColumnDefinition Width="280"/>  <!-- BIN Selector ComboBox -->
+                    <ColumnDefinition Width="Auto"/> <!-- Scan / Reload Button -->
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <materialIcons:MaterialIcon Kind="FolderSearchOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0"/>
+                    <TextBlock Text="ROOT Path:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <TextBox Grid.Column="1" x:Name="RootPathTextBox" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" 
+                         Background="{StaticResource SidebarBackground}" Foreground="{StaticResource TextPrimary}" 
+                         BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Padding="8,6" FontSize="12"
+                         VerticalAlignment="Center" KeyDown="RootPathTextBox_KeyDown"/>
+
+                <Button Grid.Column="2" Content="Browse..." Click="BrowseRoot_Click" 
+                        Style="{StaticResource SecondaryButton}" Margin="8,0,16,0" Padding="12,6"/>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <materialIcons:MaterialIcon Kind="FileCodeOutline" Width="18" Height="18" Foreground="{StaticResource AccentOrange}" Margin="0,0,6,0"/>
+                    <TextBlock Text="Skin BIN:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <ComboBox Grid.Column="4" ItemsSource="{Binding DetectedBins}" SelectedItem="{Binding SelectedBin, Mode=TwoWay}"
+                          SelectionChanged="BinSelector_SelectionChanged" Background="{StaticResource SidebarBackground}" 
+                          Foreground="{StaticResource TextPrimary}" BorderBrush="{StaticResource BorderColor}" 
+                          Padding="8,6" VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                <Button Grid.Column="5" Click="ReloadRoot_Click" Style="{StaticResource PrimaryButton}" Padding="14,6">
+                    <StackPanel Orientation="Horizontal">
+                        <materialIcons:MaterialIcon Kind="Refresh" Width="16" Height="16" Foreground="White" Margin="0,0,6,0"/>
+                        <TextBlock Text="Scan &amp; Load" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- 1. MAIN DIAGNOSTIC WORKSPACE -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340"/> <!-- Left: Systems List -->
+                <ColumnDefinition Width="8"/>   <!-- Splitter -->
+                <ColumnDefinition Width="*"/>   <!-- Right: 3D Viewport & Auditing Tabs -->
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT PANEL: VFX Systems Tree / List -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="10" 
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <Grid Margin="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- Header -->
+                        <RowDefinition Height="Auto"/> <!-- Search Box -->
+                        <RowDefinition Height="*"/>    <!-- Systems ListView -->
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Margin="0,0,0,10">
+                        <StackPanel Orientation="Horizontal">
+                            <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0"/>
+                            <TextBlock Text="VFX SYSTEMS" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                        </StackPanel>
+                        <TextBlock Text="Select a system definition to inspect" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+                    </StackPanel>
+
+                    <!-- Search Filter -->
+                    <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="6" 
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,10" Padding="6,4">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Magnify" Width="16" Height="16" Foreground="{StaticResource TextMuted}" Margin="4,0,6,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                                     Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}" 
+                                     FontSize="12" VerticalAlignment="Center" TextChanged="SearchQuery_TextChanged"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Systems List -->
+                    <ListView Grid.Row="2" ItemsSource="{Binding Systems}" SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
+                              SelectionChanged="SystemsListView_SelectionChanged" Background="Transparent" BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListViewItem">
+                                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8" Margin="0,0,0,4">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                            <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emisores: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
+                                                            <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <Border Grid.Column="1" Background="#2200E676" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" FontSize="10" FontWeight="Bold" Foreground="{Binding StatusBrush}"/>
+                                                    </Border>
+                                                </Grid>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#1AFFFFFF"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" Background="Transparent"/>
+
+            <!-- RIGHT PANEL: Diagnostics Workspace (3D Viewport + Tabs) -->
+            <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="10" 
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <TabControl Background="Transparent" BorderThickness="0" Margin="6">
+                    <TabControl.Resources>
+                        <Style TargetType="TabItem">
+                            <Setter Property="HeaderTemplate">
+                                <Setter.Value>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontSize="12" FontWeight="SemiBold" Padding="12,6"/>
+                                    </DataTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </TabControl.Resources>
+
+                    <!-- TAB 1: 3D REAL-TIME VIEWPORT -->
+                    <TabItem Header="3D Live Viewport">
+                        <Grid Margin="0,6,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>    <!-- OpenTK OpenGL Canvas -->
+                                <RowDefinition Height="Auto"/> <!-- Viewport Controls Bar -->
+                            </Grid.RowDefinitions>
+
+                            <!-- OpenTK WPF Control -->
+                            <Border Grid.Row="0" CornerRadius="8" ClipToBounds="True" Background="#0A0A0E" 
+                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                                <Grid>
+                                    <glWpfControl:GLWpfControl x:Name="OpenTkControl" 
+                                                         Ready="OpenTkControl_Ready" 
+                                                         Render="OpenTkControl_Render"
+                                                         MouseDown="OpenTkControl_MouseDown"
+                                                         MouseMove="OpenTkControl_MouseMove"
+                                                         MouseUp="OpenTkControl_MouseUp"
+                                                         MouseWheel="OpenTkControl_MouseWheel"/>
+
+                                    <!-- HUD Overlay in Viewport -->
+                                    <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12" 
+                                            Background="#CC12131A" CornerRadius="6" Padding="10,6" IsHitTestVisible="False">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Kind="EyeOutline" Width="16" Height="16" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding SelectedSystem.Name, FallbackValue='No system selected'}" FontWeight="Bold" FontSize="12" Foreground="White"/>
+                                            <TextBlock Text="{Binding LiveParticleCount, StringFormat='{} | Particles: {0}'}" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="6,0,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Viewport Playback Control Bar -->
+                            <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="8" 
+                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,8,0,0" Padding="12,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/> <!-- Play/Pause/Stop -->
+                                        <ColumnDefinition Width="*"/>    <!-- Progress Slider -->
+                                        <ColumnDefinition Width="Auto"/> <!-- Speed Selector -->
+                                        <ColumnDefinition Width="Auto"/> <!-- Background Mode -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <Button Click="Play_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" ToolTip="Play">
+                                            <materialIcons:MaterialIcon Kind="Play" Width="16" Height="16" Foreground="{StaticResource AccentGreen}"/>
+                                        </Button>
+                                        <Button Click="Pause_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,6,0" Padding="8,4" ToolTip="Pause">
+                                            <materialIcons:MaterialIcon Kind="Pause" Width="16" Height="16" Foreground="{StaticResource AccentOrange}"/>
+                                        </Button>
+                                        <Button Click="Stop_Click" Style="{StaticResource SecondaryButton}" Margin="0,0,12,0" Padding="8,4" ToolTip="Restart">
+                                            <materialIcons:MaterialIcon Kind="Stop" Width="16" Height="16" Foreground="{StaticResource AccentRed}"/>
+                                        </Button>
+                                    </StackPanel>
+
+                                    <Grid Grid.Column="1" Margin="10,0">
+                                        <Slider Minimum="0" Maximum="{Binding TotalDuration}" Value="{Binding CurrentTime, Mode=TwoWay}" 
+                                                ValueChanged="TimeSlider_ValueChanged" 
+                                                PreviewMouseDown="TimeSlider_PreviewMouseDown"
+                                                PreviewMouseUp="TimeSlider_PreviewMouseUp"
+                                                VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                                        <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ComboBox x:Name="SpeedComboBox" Width="70" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
+                                            <ComboBoxItem Content="0.25x" Tag="0.25"/>
+                                            <ComboBoxItem Content="1.0x" Tag="1.0"/>
+                                            <ComboBoxItem Content="1.5x" Tag="1.5"/>
+                                            <ComboBoxItem Content="2.0x" Tag="2.0"/>
+                                        </ComboBox>
+                                    </StackPanel>
+
+                                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                        <TextBlock Text="BG:" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <ComboBox x:Name="BgComboBox" Width="90" SelectionChanged="BgMode_SelectionChanged" SelectedIndex="0" Margin="0,0,10,0">
+                                            <ComboBoxItem Content="Dark"/>
+                                            <ComboBoxItem Content="Light"/>
+                                            <ComboBoxItem Content="Transparent"/>
+                                        </ComboBox>
+                                        <Button Click="CopyDebugReport_Click" Style="{StaticResource SecondaryButton}" Padding="8,4" ToolTip="Copiar Informe Completo de Depuración de VFX">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialIcons:MaterialIcon Kind="ContentCopy" Width="14" Height="14" Foreground="#00E5FF" Margin="0,0,4,0"/>
+                                                <TextBlock Text="Copiar Debug" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- TAB 2: EMITTERS BREAKDOWN & LIVE TOGGLING -->
+                    <TabItem Header="Emitters Breakdown">
+                        <Grid Margin="0,6,0,0">
+                            <ListView ItemsSource="{Binding Emitters}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
+                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Active" Width="60">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" HorizontalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Emitter Name" DisplayMemberBinding="{Binding Name}" Width="200"/>
+                                        <GridViewColumn Header="Texture Path" DisplayMemberBinding="{Binding TexturePath}" Width="240"/>
+                                        <GridViewColumn Header="Tex Status" Width="100">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding TextureStatus}" Foreground="{Binding TextureStatusBrush}" FontWeight="Bold"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Mesh Path (.scb)" DisplayMemberBinding="{Binding MeshPath}" Width="200"/>
+                                        <GridViewColumn Header="Mesh Status" Width="100">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding MeshStatus}" Foreground="{Binding MeshStatusBrush}" FontWeight="Bold"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Blend Mode" DisplayMemberBinding="{Binding BlendMode}" Width="110"/>
+                                        <GridViewColumn Header="SubUV (texDiv)" DisplayMemberBinding="{Binding TexDiv}" Width="100"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- TAB 3: TEXTURES AUDIT -->
+                    <TabItem Header="Textures Audit">
+                        <Grid Margin="0,6,0,0">
+                            <ListView ItemsSource="{Binding Textures}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
+                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Preview" Width="70">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Width="48" Height="48" CornerRadius="4" Background="#111" ClipToBounds="True">
+                                                        <Image Source="{Binding ImagePreview}" Stretch="UniformToFill"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Authored Path" DisplayMemberBinding="{Binding AuthoredPath}" Width="320"/>
+                                        <GridViewColumn Header="Status" Width="100">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Size" Width="100">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Width, StringFormat='{}{0} x '}" Foreground="{StaticResource TextPrimary}">
+                                                        <Run Text="{Binding Height}"/>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="SubUV Grid" DisplayMemberBinding="{Binding TexDiv}" Width="100"/>
+                                        <GridViewColumn Header="Resolved Disk Path" DisplayMemberBinding="{Binding ResolvedPath}" Width="350"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- TAB 4: MESHES AUDIT (.scb / .sco / .skn) -->
+                    <TabItem Header="Meshes Audit (.scb/.sco)">
+                        <Grid Margin="0,6,0,0">
+                            <ListView ItemsSource="{Binding Meshes}" ItemContainerStyle="{StaticResource ModernGridViewItem}" 
+                                      Foreground="{StaticResource TextPrimary}" Background="Transparent" BorderThickness="0">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Header="Format" DisplayMemberBinding="{Binding Format}" Width="80"/>
+                                        <GridViewColumn Header="Authored Path" DisplayMemberBinding="{Binding AuthoredPath}" Width="320"/>
+                                        <GridViewColumn Header="Status" Width="110">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn Header="Vertices" DisplayMemberBinding="{Binding VertexCount}" Width="100"/>
+                                        <GridViewColumn Header="Faces" DisplayMemberBinding="{Binding FaceCount}" Width="100"/>
+                                        <GridViewColumn Header="Resolved Path" DisplayMemberBinding="{Binding ResolvedPath}" Width="380"/>
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                        </Grid>
+                    </TabItem>
+
+                    <!-- TAB 5: DIAGNOSTIC LOG -->
+                    <TabItem Header="Diagnostic Log">
+                        <Grid Margin="0,6,0,0">
+                            <ListBox ItemsSource="{Binding LogMessages}" Background="#0D0D12" Foreground="#00FF66" 
+                                     FontFamily="Consolas" FontSize="11" BorderThickness="0" Padding="8"/>
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+
+        <!-- 2. BOTTOM STATUS BAR -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="6" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,10,0,0" Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="LoL VFX Diagnostic Engine v1.0" Foreground="{StaticResource TextMuted}" FontSize="11" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</base:HudWindow>

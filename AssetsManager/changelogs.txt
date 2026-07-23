@@ -17,6 +17,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Enhanced BIN and Lua hash guessing accuracy with strict syntax validation and binary script manifest decoding.
   - Manage Versions / Preserved active page selection when refreshing version manifests via Fetch Versions.
   - Viewer Content Browser now keeps multiple opened WAD projects as separate roots and aligns the project toolbar consistently.
   - Viewer project folders now open with a single click in the Content Browser.
@@ -97,6 +98,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX textures now animate their authored UV movement, rotation, and multiplier transforms throughout particle playback.
   - Viewer VFX systems can now be selected without crashing the playback panel.
   - Viewer VFX now evaluates authored birth curves, trail geometry, UV scrolling, and erosion channels correctly.
   - Removed synthetic BIN path reconstruction, cross-dictionary structural attacks, and unrelated JSON, CSS, JavaScript, text, and executable scans from BIN guessing.

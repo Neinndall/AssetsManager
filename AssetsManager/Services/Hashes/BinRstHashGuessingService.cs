@@ -45,6 +45,13 @@ namespace AssetsManager.Services.Hashes
             [Fnv1a.HashLower("Sequence")] = Fnv1a.HashLower("path")
         };
 
+        private static readonly string[] Common3DBones =
+        {
+            "Root", "Buffbone_C", "Buffbone_Glb_Center_Loc", "Buffbone_Glb_Layout_Loc", "Buffbone_Glb_Overhead_Loc",
+            "Buffbone_Glb_Ground_Loc", "L_Hand", "R_Hand", "L_Foot", "R_Foot", "L_Arm", "R_Arm", "Head", "Spine",
+            "Spine1", "Spine2", "Chest", "Neck", "Weapon", "L_Weapon", "R_Weapon", "Wing_L", "Wing_R", "Tail", "Pelvis"
+        };
+
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
         private const int NumericBudget = 5_000_000;
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
@@ -355,6 +362,7 @@ namespace AssetsManager.Services.Hashes
                         CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
                         CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
                     }
+                    CheckCandidates(Common3DBones, InternalHashGuessStrategy.CrossDictionary, "Common 3D Skeleton Bones");
 
                     // Run advanced structural candidate generation
                     if (matcher.Remaining > 0)
@@ -488,19 +496,19 @@ namespace AssetsManager.Services.Hashes
         private static string[] EnumerateWadContainers(string rootDirectory, bool includeBin, bool includeRst)
         {
             string searchRoot = rootDirectory;
-            bool binOnly = includeBin && !includeRst;
-            if (binOnly)
-            {
-                string trimmedRoot = Path.TrimEndingDirectorySeparator(rootDirectory);
-                string gameDirectory = string.Equals(Path.GetFileName(trimmedRoot), "Game", StringComparison.OrdinalIgnoreCase)
-                    ? trimmedRoot
-                    : Path.Combine(trimmedRoot, "Game");
-                if (Directory.Exists(gameDirectory)) searchRoot = gameDirectory;
-            }
+            string trimmedRoot = Path.TrimEndingDirectorySeparator(rootDirectory);
+            string gameDirectory = string.Equals(Path.GetFileName(trimmedRoot), "Game", StringComparison.OrdinalIgnoreCase)
+                ? trimmedRoot
+                : Path.Combine(trimmedRoot, "Game");
+            if (Directory.Exists(gameDirectory)) searchRoot = gameDirectory;
 
             return Directory.EnumerateFiles(searchRoot, "*.wad*", SearchOption.AllDirectories)
-                .Where(path => path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
-                    (!binOnly && path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase)))
+                .Where(path =>
+                {
+                    if (includeBin && path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase)) return true;
+                    if (includeRst && (path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))) return true;
+                    return false;
+                })
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -633,15 +641,25 @@ namespace AssetsManager.Services.Hashes
             }
             ReadBinInventory(tree, localTargets);
 
-            // Add hashes of all literal strings in the BIN tree to localTargets
+            // Add hashes of literal strings in the BIN tree to localTargets categorized by domain syntax
             VisitBinStrings(tree, value =>
             {
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    uint hash = Fnv1a.HashLower(value.Trim());
+                    string trimmed = value.Trim();
+                    uint hash = Fnv1a.HashLower(trimmed);
                     localTargets[InternalHashKind.BinHashes].Add(hash);
-                    localTargets[InternalHashKind.BinFields].Add(hash);
-                    localTargets[InternalHashKind.BinEntries].Add(hash);
+
+                    if (LocalEvidenceMatcher.IsIdentifier(trimmed))
+                    {
+                        localTargets[InternalHashKind.BinFields].Add(hash);
+                        localTargets[InternalHashKind.BinTypes].Add(hash);
+                    }
+
+                    if (trimmed.Contains('/'))
+                    {
+                        localTargets[InternalHashKind.BinEntries].Add(hash);
+                    }
                 }
             });
 
@@ -899,6 +917,10 @@ namespace AssetsManager.Services.Hashes
         {
             string candidate = Encoding.ASCII.GetString(data.Slice(offset, length)).Trim();
             if (candidate.Length >= 5) check(candidate);
+            if (candidate.StartsWith("@V", StringComparison.Ordinal) && candidate.Length > 3)
+            {
+                check(candidate[2..]);
+            }
         }
 
         private static async Task ScanTextFileAsync(string path, Action<string> check, CancellationToken cancellationToken)
@@ -1267,7 +1289,7 @@ namespace AssetsManager.Services.Hashes
                 IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
             {
                 CheckedCandidates++;
-                if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
+                if (string.IsNullOrWhiteSpace(value) || value.Length < 3 || value.Length > 512)
                 {
                     DiscardedCandidates++;
                     return;
@@ -1340,7 +1362,7 @@ namespace AssetsManager.Services.Hashes
                 return _matches.Count != before;
             }
 
-            private static bool IsIdentifier(string value)
+            internal static bool IsIdentifier(string value)
             {
                 if (value.Length == 0 || value.Length > 128 || !(char.IsLetter(value[0]) || value[0] == '_')) return false;
                 for (int index = 1; index < value.Length; index++)

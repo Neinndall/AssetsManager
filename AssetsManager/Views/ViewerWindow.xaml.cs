@@ -82,6 +82,15 @@ namespace AssetsManager.Views
         private void OpenChromaFile_Click(object sender, RoutedEventArgs e) => PanelControl.OpenChromaFolder();
         private async void OpenGeometryFile_Click(object sender, RoutedEventArgs e) => await PanelControl.OpenMapGeometry();
 
+        private void OpenVfxInspector_Click(object sender, RoutedEventArgs e)
+        {
+            var window = new AssetsManager.Views.Dialogs.VfxInspectorWindow(_logService)
+            {
+                Owner = Window.GetWindow(this)
+            };
+            window.ShowDialog();
+        }
+
         private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
         {
             var folderBrowser = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select extracted WAD root folder" };

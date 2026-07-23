@@ -136,6 +136,61 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void ParticleUvTransformsEvolveAcrossLifetimeForBaseAndMultiplierTextures()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BirthUvOffset = VfxCurve2.Const(new Vector2(0.1f, 0.2f)),
+                BirthUvScrollRateCurve = VfxCurve2.Const(new Vector2(2f, 0f)),
+                ParticleUvScrollRate = VfxCurve2.Const(new Vector2(4f, 0f)),
+                BirthUvRotateRate = VfxCurveF.Const(90f),
+                ParticleUvRotateRate = VfxCurveF.Const(30f),
+                TextureMultBirthUvOffset = VfxCurve2.Const(new Vector2(0.1f, 0f)),
+                TextureMultBirthUvScrollRate = VfxCurve2.Const(new Vector2(0.2f, 0f)),
+                TextureMultParticleUvScroll = VfxCurve2.Const(new Vector2(0.4f, 0f)),
+                TextureMultUvScale = VfxCurve2.Const(new Vector2(0.5f, 0.75f)),
+                TextureMultUvRotation = VfxCurveF.Const(10f),
+                TextureMultBirthUvRotateRate = VfxCurveF.Const(20f),
+                TextureMultParticleUvRotate = VfxCurveF.Const(40f)
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "uv", "uv", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.1f);
+            simulator.Update(0.1f);
+            simulator.Update(0.05f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(1.6f, state.Instances[19], 3);
+            Assert.Equal(0.2f, state.Instances[20], 3);
+            Assert.Equal(MathF.PI / 6f, state.Instances[23], 3);
+            Assert.Equal(0.25f, state.Instances[29], 3);
+            Assert.Equal(0.5f, state.Instances[31], 3);
+            Assert.Equal(0.75f, state.Instances[32], 3);
+            Assert.Equal(25f * MathF.PI / 180f, state.Instances[33], 3);
+        }
+
+        [Fact]
+        public void IntegratedParticleUvRateAccumulatesTheAuthoredCurve()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                ParticleLifetime = VfxCurveF.Const(2f),
+                ParticleUvScrollRate = new VfxCurve2(
+                    Vector2.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector2.Zero, new Vector2(4f, 0f) })
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "integrated-uv", "integrated-uv", new[] { emitter }), Vector3.Zero);
+
+            for (int step = 0; step < 5; step++) simulator.Update(0.1f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(0.25f, state.Instances[19], 3);
+        }
+
+        [Fact]
         public void PlaybackGraphResolvesAndCreatesChildSystem()
         {
             var childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -145,6 +200,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
             var parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
+                TexturePath = string.Empty,
                 ChildParticleSet = new VfxChildParticleSetDefinition(
                     new[] { new VfxChildSystemReference("child", 2, 0) },
                     false,

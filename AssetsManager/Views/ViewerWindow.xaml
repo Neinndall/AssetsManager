@@ -28,7 +28,7 @@
                         </StackPanel>
 
                         <!-- Action Cards -->
-                        <UniformGrid Columns="3" HorizontalAlignment="Center">
+                        <UniformGrid Columns="4" HorizontalAlignment="Center">
                             <!-- Open Project Folder Card -->
                             <Button Style="{StaticResource SelectionCardButtonStyle}"
                                     Click="OpenProjectFolder_Click"
@@ -89,6 +89,29 @@
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="Import mapgeo"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextMuted}"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- VFX Inspector Card -->
+                            <Button Style="{StaticResource SelectionCardButtonStyle}"
+                                    Click="OpenVfxInspector_Click"
+                                    Width="180" Height="160">
+                                <StackPanel>
+                                    <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
+                                        <materialIcons:MaterialIcon Kind="Sparkles" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="VFX Studio"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Inspect &amp; debug champion VFX"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"

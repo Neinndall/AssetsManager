@@ -95,14 +95,22 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static string FindAssetRoot(string directory)
         {
             var current = new DirectoryInfo(Path.GetFullPath(directory));
+            string best = null;
             while (current != null)
             {
+                if (current.Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
+                    (Directory.Exists(Path.Combine(current.FullName, "assets")) && Directory.Exists(Path.Combine(current.FullName, "data"))))
+                {
+                    return current.FullName;
+                }
                 if (Directory.Exists(Path.Combine(current.FullName, "assets")) ||
                     Directory.Exists(Path.Combine(current.FullName, "data")))
-                    return current.FullName;
+                {
+                    best ??= current.FullName;
+                }
                 current = current.Parent;
             }
-            return null;
+            return best;
         }
 
         private static string[] OrderedExtensions(string authoredPath, IReadOnlyList<string> supported)

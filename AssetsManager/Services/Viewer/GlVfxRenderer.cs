@@ -49,6 +49,8 @@ namespace AssetsManager.Services.Viewer
             }
         }
 
+        public VfxSystemModel ActiveSystem => _activeSystem;
+
         public void Initialize(GL gl)
         {
             _renderer = new VfxOpenGlRenderer();
@@ -84,7 +86,7 @@ namespace AssetsManager.Services.Viewer
 
         public void Play()
         {
-            if (_graph != null) _isPlaying = true;
+            _isPlaying = true;
         }
 
         public void Pause() => _isPlaying = false;
@@ -117,8 +119,7 @@ namespace AssetsManager.Services.Viewer
             _graph.Update(elapsed);
             _activeSystem.CurrentTime += elapsed;
 
-            if (_activeSystem.HasFiniteDuration &&
-                (_graph.IsComplete || _activeSystem.CurrentTime >= _activeSystem.TotalDuration))
+            if (_graph.IsComplete || (_activeSystem.HasFiniteDuration && _activeSystem.CurrentTime >= _activeSystem.TotalDuration))
             {
                 _graph.Reset();
                 _activeSystem.CurrentTime = 0;
@@ -127,8 +128,9 @@ namespace AssetsManager.Services.Viewer
 
         public void Seek(double seconds)
         {
-            if (_graph == null || _activeSystem == null || !_activeSystem.HasFiniteDuration) return;
-            double target = Math.Clamp(seconds, 0, _activeSystem.TotalDuration);
+            if (_graph == null || _activeSystem == null) return;
+            double maxDuration = _activeSystem.HasFiniteDuration ? _activeSystem.TotalDuration : 10.0;
+            double target = Math.Clamp(seconds, 0, maxDuration);
             _graph.Reset();
             double simulated = 0;
             const float step = 1f / 60f;

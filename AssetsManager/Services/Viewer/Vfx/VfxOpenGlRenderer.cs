@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
@@ -12,15 +13,15 @@ namespace AssetsManager.Services.Viewer.Vfx
     public sealed class VfxOpenGlRenderer : IDisposable
     {
         private GL _gl = null!;
-        private uint _program, _vao, _quadVbo, _instVbo;
+        private uint _program, _vao, _quadVbo, _instVbo, _fallbackWhiteTexture;
         private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uUvScrollRate, _uEmitterUvOffset;
-        private int _uTexMult, _uHasTexMult, _uTexDivMult, _uUvScrollRateMult;
+        private int _uTexMult, _uHasTexMult, _uTexDivMult, _uUvScrollRateMult, _uFlipVMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
         private int _uDirectionOriented, _uArbitraryQuad;
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uFlipU, _uFlipV, _uClampUv;
         private int _uErosionTex, _uHasErosion, _uErosionFeatherIn, _uErosionFeatherOut;
-        private int _uPlacementRight, _uPlacementUp, _uPlacementForward;
+        private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
         private int _instCapFloats;
         private bool _ready;
         private readonly List<uint> _ownedTextures = new();
@@ -55,6 +56,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uHasTexMult = gl.GetUniformLocation(_program, "uHasTexMult");
             _uTexDivMult = gl.GetUniformLocation(_program, "uTexDivMult");
             _uUvScrollRateMult = gl.GetUniformLocation(_program, "uUvScrollRateMult");
+            _uFlipVMult = gl.GetUniformLocation(_program, "uFlipVMult");
             _uUvScrollRate = gl.GetUniformLocation(_program, "uUvScrollRate");
             _uEmitterUvOffset = gl.GetUniformLocation(_program, "uEmitterUvOffset");
             _uIsDistortion = gl.GetUniformLocation(_program, "uIsDistortion");
@@ -103,8 +105,31 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.EnableVertexAttribArray(7); gl.VertexAttribPointer(7, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(19 * sizeof(float)));
             gl.EnableVertexAttribArray(8); gl.VertexAttribPointer(8, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(21 * sizeof(float)));
             gl.EnableVertexAttribArray(9); gl.VertexAttribPointer(9, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(23 * sizeof(float)));
+            _uIsDistortion = gl.GetUniformLocation(_program, "uIsDistortion");
+            _uDistortionTex = gl.GetUniformLocation(_program, "uDistortionTex");
+            _uSceneTex = gl.GetUniformLocation(_program, "uSceneTex");
+            _uViewportSize = gl.GetUniformLocation(_program, "uViewportSize");
+            _uDistortionStrength = gl.GetUniformLocation(_program, "uDistortionStrength");
+            _uDirectionOriented = gl.GetUniformLocation(_program, "uDirectionOriented");
+            _uArbitraryQuad = gl.GetUniformLocation(_program, "uArbitraryQuad");
+            _uPrimitiveKind = gl.GetUniformLocation(_program, "uPrimitiveKind");
+            _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
+            _uFlipU = gl.GetUniformLocation(_program, "uFlipU");
+            _uFlipV = gl.GetUniformLocation(_program, "uFlipV");
+            _uClampUv = gl.GetUniformLocation(_program, "uClampUv");
+            _uErosionTex = gl.GetUniformLocation(_program, "uErosionTex");
+            _uHasErosion = gl.GetUniformLocation(_program, "uHasErosion");
+            _uErosionFeatherIn = gl.GetUniformLocation(_program, "uErosionFeatherIn");
+            _uErosionFeatherOut = gl.GetUniformLocation(_program, "uErosionFeatherOut");
+            _uPlacementRight = gl.GetUniformLocation(_program, "uPlacementRight");
+            _uPlacementUp = gl.GetUniformLocation(_program, "uPlacementUp");
+            _uPlacementForward = gl.GetUniformLocation(_program, "uPlacementForward");
+            _uIsGroundLayer = gl.GetUniformLocation(_program, "uIsGroundLayer");
             gl.EnableVertexAttribArray(10); gl.VertexAttribPointer(10, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(24 * sizeof(float)));
             gl.EnableVertexAttribArray(11); gl.VertexAttribPointer(11, 4, VertexAttribPointerType.Float, false, bstride, new IntPtr(25 * sizeof(float)));
+            gl.EnableVertexAttribArray(12); gl.VertexAttribPointer(12, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(29 * sizeof(float)));
+            gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(31 * sizeof(float)));
+            gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
 
             gl.VertexAttribDivisor(1, 1);
             gl.VertexAttribDivisor(2, 1);
@@ -117,14 +142,33 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.VertexAttribDivisor(9, 1);
             gl.VertexAttribDivisor(10, 1);
             gl.VertexAttribDivisor(11, 1);
+            gl.VertexAttribDivisor(12, 1);
+            gl.VertexAttribDivisor(13, 1);
+            gl.VertexAttribDivisor(14, 1);
 
             gl.BindVertexArray(0);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+
+            byte[] whitePixel = { 255, 255, 255, 255 };
+            _fallbackWhiteTexture = gl.GenTexture();
+            gl.BindTexture(TextureTarget.Texture2D, _fallbackWhiteTexture);
+            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, 1, 1, 0, PixelFormat.Rgba, PixelType.UnsignedByte, new ReadOnlySpan<byte>(whitePixel));
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            gl.BindTexture(TextureTarget.Texture2D, 0);
+            _ownedTextures.Add(_fallbackWhiteTexture);
+
             _ready = true;
         }
 
+        private readonly Dictionary<uint, bool> _texHasAlpha = new();
+
         public uint UploadTexture(byte[] rgba, int width, int height)
         {
+            int n = width * height, varied = 0;
+            for (int i = 3; i < rgba.Length; i += 4) if (rgba[i] < 250) varied++;
+            bool hasAlpha = varied > n / 100;
+
             uint tex = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, tex);
 
@@ -138,6 +182,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _ownedTextures.Add(tex);
+            _texHasAlpha[tex] = hasAlpha;
             return tex;
         }
 
@@ -198,8 +243,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (es.InstanceCount == 0) continue;
+                if (es.Texture == 0 && !es.Def.IsMeshPrimitive) continue;
                 if (es.MeshVao != 0) { RenderMeshEmitter(es, viewProj); continue; }
-                if (es.Texture == 0) continue;
                 bool isDistortion = es.Def.Distortion is not null;
                 if (isDistortion && (es.DistortionTexture == 0 || _sceneTexture == 0)) continue;
 
@@ -218,24 +263,27 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
 
                 if (isDistortion) _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                else if (IsAdditive(es.Def.BlendMode)) _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
+                else if (IsAdditiveFor(es.Def.BlendMode, es.Texture)) _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
+                else if (es.Def.BlendMode == 2) _gl.BlendFunc(BlendingFactor.DstColor, BlendingFactor.Zero);
                 else _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
                 _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
-                _gl.Uniform2(_uUvScrollRate, es.Def.UvScrollRate.X, es.Def.UvScrollRate.Y);
+                _gl.Uniform2(_uUvScrollRate, 0f, 0f);
                 Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
                 _gl.Uniform1(_uHasTexMult, es.TextureMult != 0 ? 1 : 0);
                 var multDiv = es.Def.TextureMultTexDiv;
                 _gl.Uniform2(_uTexDivMult, multDiv.X <= 0 ? 1f : multDiv.X, multDiv.Y <= 0 ? 1f : multDiv.Y);
-                _gl.Uniform2(_uUvScrollRateMult, es.Def.TextureMultUvScrollRate.X, es.Def.TextureMultUvScrollRate.Y);
+                _gl.Uniform2(_uUvScrollRateMult, 0f, 0f);
+                _gl.Uniform1(_uFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
                 bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind is
                     VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Ray or VfxPrimitiveKind.Beam;
                 bool arbitrary = es.Def.IsArbitraryQuad || es.Def.ParticleIsLocalOrientation || es.Def.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
+                _gl.Uniform1(_uIsGroundLayer, (es.Def.IsGroundLayer || es.Def.IsFollowingTerrain || es.Def.PrimitiveKind == VfxPrimitiveKind.PlanarProjection) ? 1 : 0);
                 _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
                 var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
@@ -251,18 +299,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform3(_uPlacementUp, es.PlacementUp.X, es.PlacementUp.Y, es.PlacementUp.Z);
                 _gl.Uniform3(_uPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
                 _gl.ActiveTexture(TextureUnit.Texture0);
-                _gl.BindTexture(TextureTarget.Texture2D, es.Texture);
+                _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _fallbackWhiteTexture);
                 ApplyAddressMode(renderState.TextureAddressMode);
                 if (es.TextureMult != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture1);
                     _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
+                    ApplyAddressMode(es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
-                }
-                if (isDistortion)
-                {
-                    _gl.ActiveTexture(TextureUnit.Texture2);
-                    _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
                     _gl.ActiveTexture(TextureUnit.Texture3);
                     _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
                     _gl.ActiveTexture(TextureUnit.Texture0);
@@ -292,7 +336,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
-        private static bool IsAdditive(int blendMode) => blendMode is 0 or 1 or 4 or 5;
+        private static bool IsAdditive(int blendMode) => blendMode is 1 or 3 or 4 or 5;
+
+        private bool IsAdditiveFor(int blendMode, uint texture) =>
+            blendMode is 3 or 0
+                ? !(_texHasAlpha.TryGetValue(texture, out var hasAlpha) && hasAlpha)
+                : IsAdditive(blendMode);
 
         private void ApplyAddressMode(int addressMode)
         {
@@ -335,7 +384,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private uint _meshProgram;
         private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muUvOffset, _muEmitterUvOffset;
-        private int _muTexMult, _muHasTexMult, _muUvOffsetMult;
+        private int _muTexMult, _muHasTexMult, _muTexDivMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult, _muFlipVMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muFlipU, _muFlipV;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
@@ -357,7 +406,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
                 _muTexMult = _gl.GetUniformLocation(_meshProgram, "uTexMult");
                 _muHasTexMult = _gl.GetUniformLocation(_meshProgram, "uHasTexMult");
+                _muTexDivMult = _gl.GetUniformLocation(_meshProgram, "uTexDivMult");
                 _muUvOffsetMult = _gl.GetUniformLocation(_meshProgram, "uUvOffsetMult");
+                _muUvScaleMult = _gl.GetUniformLocation(_meshProgram, "uUvScaleMult");
+                _muUvRotationMult = _gl.GetUniformLocation(_meshProgram, "uUvRotationMult");
+                _muFlipVMult = _gl.GetUniformLocation(_meshProgram, "uFlipVMult");
                 _muPlacementRight = _gl.GetUniformLocation(_meshProgram, "uPlacementRight");
                 _muPlacementUp = _gl.GetUniformLocation(_meshProgram, "uPlacementUp");
                 _muPlacementForward = _gl.GetUniformLocation(_meshProgram, "uPlacementForward");
@@ -478,6 +531,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muErosionTex, 4);
             _gl.Uniform1(_muHasTexMult, es.TextureMult != 0 ? 1 : 0);
+            Vector2 textureMultTexDiv = es.Def.TextureMultTexDiv;
+            _gl.Uniform2(
+                _muTexDivMult,
+                textureMultTexDiv.X <= 0f ? 1f : textureMultTexDiv.X,
+                textureMultTexDiv.Y <= 0f ? 1f : textureMultTexDiv.Y);
             _gl.Uniform1(_muHasErosion, es.ErosionTexture != 0 ? 1 : 0);
             _gl.Uniform1(_muErosionFeatherIn, es.Def.AlphaErosion?.FeatherIn ?? 0f);
             _gl.Uniform1(_muErosionFeatherOut, es.Def.AlphaErosion?.FeatherOut ?? 0f);
@@ -495,6 +553,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
+                ApplyAddressMode(es.Def.TextureMultAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (es.ErosionTexture != 0)
@@ -508,12 +567,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (IsAdditive(es.Def.BlendMode)) _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
             else _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-            var scroll = es.Def.UvScrollRate * es.Age;
-            _gl.Uniform2(_muUvOffset, scroll.X, scroll.Y);
+            _gl.Uniform2(_muUvOffset, 0f, 0f);
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
-            var scrollMult = es.Def.TextureMultUvScrollRate * es.Age;
-            _gl.Uniform2(_muUvOffsetMult, scrollMult.X, scrollMult.Y);
+            _gl.Uniform1(_muFlipVMult, es.Def.TextureMultFlipV ? 1 : 0);
             for (int i = 0; i < es.InstanceCount; i++)
             {
                 int o = i * Stride;
@@ -533,6 +590,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_muUvRotation, es.Instances[o + 23]);
                 _gl.Uniform1(_muErosionDrive, es.Instances[o + 24]);
                 _gl.Uniform4(_muErosionMixer, es.Instances[o + 25], es.Instances[o + 26], es.Instances[o + 27], es.Instances[o + 28]);
+                _gl.Uniform2(_muUvOffsetMult, es.Instances[o + 29], es.Instances[o + 30]);
+                _gl.Uniform2(_muUvScaleMult, es.Instances[o + 31], es.Instances[o + 32]);
+                _gl.Uniform1(_muUvRotationMult, es.Instances[o + 33]);
 
                 if (es.MeshIndexCount > 0)
                 {
@@ -560,11 +620,15 @@ uniform vec3 uRotation;
 uniform vec2 uUvOffset;
 uniform vec2 uEmitterUvOffset;
 uniform vec2 uUvOffsetMult;
+uniform vec2 uUvScaleMult;
+uniform float uUvRotationMult;
+uniform vec2 uTexDivMult;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
 uniform int uFlipU;
 uniform int uFlipV;
+uniform int uFlipVMult;
 uniform vec2 uBirthUvOffset;
 uniform vec2 uUvScale;
 uniform float uUvRotation;
@@ -572,12 +636,12 @@ out vec2 vUv;
 out vec2 vUvMult;
 void main(){
     vec3 scaled = aPos * uScale;
-    float sx = sin(uRotation.x); float cx = cos(uRotation.x);
-    float sy = sin(uRotation.y); float cy = cos(uRotation.y);
     float sz = sin(uRotation.z); float cz = cos(uRotation.z);
-    vec3 local = vec3(scaled.x, scaled.y * cx - scaled.z * sx, scaled.y * sx + scaled.z * cx);
+    vec3 local = vec3(scaled.x * cz - scaled.y * sz, scaled.x * sz + scaled.y * cz, scaled.z);
+    float sx = sin(uRotation.x); float cx = cos(uRotation.x);
+    local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
+    float sy = sin(uRotation.y); float cy = cos(uRotation.y);
     local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
-    local = vec3(local.x * cz - local.y * sz, local.x * sz + local.y * cz, local.z);
     vec3 p = uPlacementRight * local.x + uPlacementUp * local.y + uPlacementForward * local.z + uWorldPos;
     gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
@@ -589,7 +653,14 @@ void main(){
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
     vUv = baseUv + uUvOffset + uEmitterUvOffset;
-    vUvMult = baseUv + uUvOffsetMult + uEmitterUvOffset;
+    vec2 multUv = aUv;
+    vec2 centeredMultUv = (multUv - vec2(0.5)) * uUvScaleMult;
+    float multSin = sin(uUvRotationMult); float multCos = cos(uUvRotationMult);
+    centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,
+                          centeredMultUv.x * multSin + centeredMultUv.y * multCos);
+    multUv = centeredMultUv + vec2(0.5) + uUvOffsetMult;
+    if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
+    vUvMult = multUv / max(uTexDivMult, vec2(1.0)) + uEmitterUvOffset;
 }";
 
         private const string MeshFrag = @"
@@ -632,6 +703,9 @@ layout(location=8) in vec2 aUvScale;
 layout(location=9) in float aUvRotation;
 layout(location=10) in float aErosionDrive;
 layout(location=11) in vec4 aErosionMixer;
+layout(location=12) in vec2 aUvOffsetMult;
+layout(location=13) in vec2 aUvScaleMult;
+layout(location=14) in float aUvRotationMult;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
@@ -643,9 +717,11 @@ uniform vec2 uTexDivMult;
 uniform vec2 uUvScrollRateMult;
 uniform int uDirectionOriented;
 uniform int uArbitraryQuad;
+uniform int uIsGroundLayer;
 uniform int uPrimitiveKind;
 uniform int uFlipU;
 uniform int uFlipV;
+uniform int uFlipVMult;
 uniform int uClampUv;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
@@ -656,37 +732,45 @@ out vec4 vColor;
 out float vErosionDrive;
 out vec4 vErosionMixer;
 vec3 rotateEuler(vec3 p, vec3 r){
-    float sx = sin(r.x); float cx = cos(r.x);
-    float sy = sin(r.y); float cy = cos(r.y);
     float sz = sin(r.z); float cz = cos(r.z);
+    p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
+    float sx = sin(r.x); float cx = cos(r.x);
     p = vec3(p.x, p.y * cx - p.z * sx, p.y * sx + p.z * cx);
-    p = vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
-    return vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
+    float sy = sin(r.y); float cy = cos(r.y);
+    return vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
 }
 void main(){
     float rotation = uArbitraryQuad != 0 ? 0.0 : aRotFrame.x;
-    if (uDirectionOriented != 0) {
-        float vx = dot(aAgeVelX.yzw, uCamRight);
-        float vy = dot(aAgeVelX.yzw, uCamUp);
-        if (abs(vx) + abs(vy) > 0.0001) rotation = atan(-vx, vy);
-    }
-    float s = sin(rotation);
-    float c = cos(rotation);
-    vec2 rc = vec2(aCorner.x * c - aCorner.y * s, aCorner.x * s + aCorner.y * c);
     vec3 localRight = rotateEuler(vec3(1.0, 0.0, 0.0), aRotation);
     vec3 localUp = rotateEuler(vec3(0.0, 1.0, 0.0), aRotation);
     vec3 placedRight = uPlacementRight * localRight.x + uPlacementUp * localRight.y + uPlacementForward * localRight.z;
     vec3 placedUp = uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z;
     vec3 right = uArbitraryQuad != 0 ? placedRight : uCamRight;
     vec3 up = uArbitraryQuad != 0 ? placedUp : uCamUp;
+
+    if (uDirectionOriented != 0) {
+        vec3 vel = aAgeVelX.yzw;
+        float lenSq = dot(vel, vel);
+        if (lenSq > 0.0001) {
+            vec3 dir = vel * inversesqrt(lenSq);
+            vec3 side = cross(dir, uCamRight);
+            if (dot(side, side) < 0.0001) side = cross(dir, uCamUp);
+            right = normalize(side);
+            up = dir;
+        } else {
+            float vx = dot(vel, uCamRight);
+            float vy = dot(vel, uCamUp);
+            if (abs(vx) + abs(vy) > 0.0001) rotation = atan(-vx, vy);
+        }
+    }
+
+    float s = sin(rotation);
+    float c = cos(rotation);
+    vec2 rc = vec2(aCorner.x * c - aCorner.y * s, aCorner.x * s + aCorner.y * c);
     vec3 world;
-    if (uPrimitiveKind == 7) {
-        // A ray is authored from its emitter origin towards its endpoint. Treating it
-        // as a centred billboard discards half of its length and leaves spotlights suspended.
-        vec3 rayDirection = uCamRight * cos(aRotFrame.x) - uCamUp * sin(aRotFrame.x);
-        vec3 raySide = uCamRight * sin(aRotFrame.x) + uCamUp * cos(aRotFrame.x);
+    if (uPrimitiveKind == 7 || uPrimitiveKind == 8) {
         float alongRay = aCorner.y + 0.5;
-        world = aCenter + rayDirection * (alongRay * aSize.y) + raySide * (aCorner.x * aSize.x);
+        world = aCenter + up * (alongRay * aSize.y) + right * (rc.x * aSize.x);
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
@@ -713,8 +797,14 @@ void main(){
     vec2 scroll = uUvScrollRate * aAgeVelX.x;
     if (uClampUv != 0) scroll = clamp(scroll, -localUv, vec2(1.0) - localUv);
     vUv = atlasUv + scroll + uEmitterUvOffset;
-    vUvMult = vec2(cell.x, 1.0 - cell.y) / max(uTexDivMult, vec2(1.0))
-        + uUvScrollRateMult * aAgeVelX.x;
+    vec2 multUv = vec2(cell.x, 1.0 - cell.y);
+    vec2 centeredMultUv = (multUv - vec2(0.5)) * aUvScaleMult;
+    float multSin = sin(aUvRotationMult); float multCos = cos(aUvRotationMult);
+    centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,
+                          centeredMultUv.x * multSin + centeredMultUv.y * multCos);
+    multUv = centeredMultUv + vec2(0.5) + aUvOffsetMult;
+    if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
+    vUvMult = multUv / max(uTexDivMult, vec2(1.0)) + uUvScrollRateMult * aAgeVelX.x;
     vColor = aColor;
     vErosionDrive = aErosionDrive;
     vErosionMixer = aErosionMixer;

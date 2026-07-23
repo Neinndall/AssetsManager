@@ -108,6 +108,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             string value = path.Replace('\\', '/').TrimStart('/');
             if (value.StartsWith("data/", StringComparison.OrdinalIgnoreCase)) value = value[5..];
+            if (value.StartsWith("assets/", StringComparison.OrdinalIgnoreCase)) value = value[7..];
             return value;
         }
 

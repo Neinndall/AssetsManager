@@ -110,17 +110,26 @@ namespace AssetsManager.Services.Viewer
         {
             return systems.Values
                 .OrderBy(system => system.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(system => new VfxSystemModel
+                .Select(system =>
                 {
-                    Name = string.IsNullOrWhiteSpace(system.Name) ? $"Vfx_{system.PathHash:X8}" : system.Name,
-                    ParticlePath = system.ParticlePath ?? string.Empty,
-                    Definition = system,
-                    SystemCatalog = systems,
-                    ResourceMap = resourceMap,
-                    SearchDirectory = searchDirectory ?? string.Empty,
-                    Emitters = system.Emitters.Select(ToPanelEmitter).ToList(),
-                    TotalDuration = ComputeDuration(system, systems, resourceMap, new HashSet<uint>(), 0),
-                    FrameRateText = DescribeFrameRate(system)
+                    string displayName = system.Name;
+                    if ((string.IsNullOrWhiteSpace(displayName) || displayName.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                        && !string.IsNullOrWhiteSpace(system.ParticlePath))
+                    {
+                        displayName = Path.GetFileName(system.ParticlePath);
+                    }
+                    return new VfxSystemModel
+                    {
+                        Name = string.IsNullOrWhiteSpace(displayName) ? $"Vfx_{system.PathHash:X8}" : displayName,
+                        ParticlePath = system.ParticlePath ?? string.Empty,
+                        Definition = system,
+                        SystemCatalog = systems,
+                        ResourceMap = resourceMap,
+                        SearchDirectory = searchDirectory ?? string.Empty,
+                        Emitters = system.Emitters.Select(ToPanelEmitter).ToList(),
+                        TotalDuration = ComputeDuration(system, systems, resourceMap, new HashSet<uint>(), 0),
+                        FrameRateText = DescribeFrameRate(system)
+                    };
                 })
                 .ToList();
         }

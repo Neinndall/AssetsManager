@@ -58,6 +58,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_timeBefore    = HashAlgorithms.Fnv1a("timeBeforeFirstEmission");
         private static readonly uint F_isSingle      = HashAlgorithms.Fnv1a("isSingleParticle");
         private static readonly uint F_disabled      = HashAlgorithms.Fnv1a("disabled");
+        private static readonly uint F_rateIsPeriod  = HashAlgorithms.Fnv1a("rateIsPeriod");
+        private static readonly uint F_birthTimePeriod = HashAlgorithms.Fnv1a("birthTimePeriod");
+        private static readonly uint F_isLoop        = HashAlgorithms.Fnv1a("isLoop");
         private static readonly uint F_blendMode     = HashAlgorithms.Fnv1a("blendMode");
         private static readonly uint F_renderPass    = HashAlgorithms.Fnv1a("pass");
         private static readonly uint F_alphaRef      = HashAlgorithms.Fnv1a("alphaRef");
@@ -110,6 +113,17 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_birthFrameRate= HashAlgorithms.Fnv1a("birthFrameRate");
         private static readonly uint F_frameRate     = HashAlgorithms.Fnv1a("frameRate");
         private static readonly uint F_birthUvScrollMult = HashAlgorithms.Fnv1a("birthUvScrollRateMult");
+        private static readonly uint F_birthUvOffsetMult = HashAlgorithms.Fnv1a("birthUVOffsetMult");
+        private static readonly uint F_particleUvScroll = HashAlgorithms.Fnv1a("particleUVScrollRate");
+        private static readonly uint F_particleUvRotate = HashAlgorithms.Fnv1a("particleUVRotateRate");
+        private static readonly uint F_birthUvRotate = HashAlgorithms.Fnv1a("birthUvRotateRate");
+        private static readonly uint F_particleUvScrollMult = HashAlgorithms.Fnv1a("ParticleIntegratedUvScrollMult");
+        private static readonly uint F_particleUvRotateMult = HashAlgorithms.Fnv1a("ParticleIntegratedUvRotateMult");
+        private static readonly uint F_birthUvRotateMult = HashAlgorithms.Fnv1a("birthUvRotateRateMult");
+        private static readonly uint F_uvScaleMult = HashAlgorithms.Fnv1a("uvScaleMult");
+        private static readonly uint F_uvRotationMult = HashAlgorithms.Fnv1a("UvRotationMult");
+        private static readonly uint F_texAddressMult = HashAlgorithms.Fnv1a("texAddressModeMult");
+        private static readonly uint F_textureMultFlipV = HashAlgorithms.Fnv1a("TextureMultFilpV");
         private static readonly uint F_birthUvOffset = HashAlgorithms.Fnv1a("birthUVOffset");
         private static readonly uint F_uvScale       = HashAlgorithms.Fnv1a("uvScale");
         private static readonly uint F_uvRotation    = HashAlgorithms.Fnv1a("uvRotation");
@@ -240,9 +254,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         public static IReadOnlyList<string> ExtractDependencies(byte[] bin)
         {
             return ParseTree(bin).Dependencies.ToArray();
-        }
-
-        /// <summary>Parse every VfxSystemDefinitionData in the bin, keyed by object path-hash.</summary>
+        }        /// <summary>Parse every VfxSystemDefinitionData in the bin, keyed by object path-hash.</summary>
         public static IReadOnlyDictionary<uint, VfxSystemDefinition> ExtractAll(byte[] materialsBin)
             => ExtractAll(ParseTree(materialsBin));
 
@@ -285,7 +297,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var legacy = Get(p, F_legacySimple) as BinTreeStruct;
             var legacyBirthScale = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyBirthScale);
             var birthScale = ReadCurve3(p, F_birthScale0)
-                ?? (legacyBirthScale is { } lbs ? ScalarSizeCurve(lbs) : VfxCurve3.Const(Vector3.Zero));
+                ?? (legacyBirthScale is { } lbs ? ScalarSizeCurve(lbs) : VfxCurve3.Const(new Vector3(15f, 15f, 15f)));
             var scaleOverLife = ReadCurve3(p, F_scale0);
             if (scaleOverLife is null && legacy is not null && ReadCurveF(legacy.Properties, F_legacyScale) is { } legacyScale)
                 scaleOverLife = ScalarScaleCurve(legacyScale);
@@ -295,7 +307,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var birthRotationalVelocity = ReadCurve3(p, F_birthRotVel0);
             if (birthRotationalVelocity is null && legacy is not null && ReadCurveF(legacy.Properties, F_legacyBirthRotVel) is { } legacyRotVel)
                 birthRotationalVelocity = ScalarRotationCurve(legacyRotVel);
-            var birthColor = ReadCurve4(p, F_birthColor) ?? VfxCurve4.Const(Vector4.Zero);
+            var birthColor = ReadCurve4(p, F_birthColor) ?? VfxCurve4.Const(Vector4.One);
 
             p.TryGetValue(F_primitive, out var prim);
             uint primitiveClass = prim is BinTreeStruct primitive ? primitive.ClassHash : PrimCameraQuad;
@@ -324,12 +336,32 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             string textureMultPath = null;
             Vector2 textureMultTexDiv = Vector2.One, textureMultUvScroll = Vector2.Zero;
+            VfxCurve2? textureMultBirthUvOffset = null;
+            VfxCurve2? textureMultBirthUvScroll = null;
+            VfxCurve2? textureMultParticleUvScroll = null;
+            VfxCurve2? textureMultUvScale = null;
+            VfxCurveF? textureMultUvRotation = null;
+            VfxCurveF? textureMultBirthUvRotate = null;
+            VfxCurveF? textureMultParticleUvRotate = null;
+            int textureMultAddressMode = 0;
+            bool textureMultFlipV = false;
             if (Get(p, F_textureMult) is BinTreeStruct textureMult)
             {
                 textureMultPath = GetString(textureMult.Properties, F_textureMult);
                 textureMultTexDiv = ReadValueVec2(Get(textureMult.Properties, F_texDivMult)) ?? Vector2.One;
-                textureMultUvScroll = ReadValueVec2(Get(textureMult.Properties, F_birthUvScrollMult)) ?? Vector2.Zero;
+                textureMultBirthUvScroll = ReadCurve2(textureMult.Properties, F_birthUvScrollMult);
+                textureMultUvScroll = textureMultBirthUvScroll?.Constant ?? Vector2.Zero;
+                textureMultBirthUvOffset = ReadCurve2(textureMult.Properties, F_birthUvOffsetMult);
+                textureMultParticleUvScroll = ReadCurve2(textureMult.Properties, F_particleUvScrollMult);
+                textureMultUvScale = ReadCurve2(textureMult.Properties, F_uvScaleMult);
+                textureMultUvRotation = ReadCurveF(textureMult.Properties, F_uvRotationMult);
+                textureMultBirthUvRotate = ReadCurveF(textureMult.Properties, F_birthUvRotateMult);
+                textureMultParticleUvRotate = ReadCurveF(textureMult.Properties, F_particleUvRotateMult);
+                textureMultAddressMode = GetU8(textureMult.Properties, F_texAddressMult) ?? 0;
+                textureMultFlipV = GetBool(textureMult.Properties, F_textureMultFlipV);
             }
+
+            VfxCurve2? birthUvScrollRate = ReadCurve2(p, F_birthUvScroll);
 
             VfxDistortionDefinition distortion = null;
             if (Get(p, F_distortionDefinition) is BinTreeStruct distortionData)
@@ -356,15 +388,19 @@ namespace AssetsManager.Services.Viewer.Vfx
             VfxChildParticleSetDefinition childParticleSet = ReadChildParticleSet(p);
             VfxFieldCollectionDefinition fields = ReadFields(p);
 
+            bool isSingle = GetBool(p, F_isSingle);
             return new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? "(emitter)",
-                Rate: ReadCurveF(p, F_rate) ?? VfxCurveF.Zero,
-                ParticleLifetime: ReadCurveF(p, F_particleLife) ?? VfxCurveF.Zero,
+                Rate: ReadCurveF(p, F_rate) ?? (isSingle ? VfxCurveF.Zero : VfxCurveF.Const(10f)),
+                ParticleLifetime: ReadCurveF(p, F_particleLife) ?? VfxCurveF.Const(1.5f),
                 EmitterLifetime: GetOptionalF32(p, F_lifetime),
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,
                 TimeBeforeFirstEmission: GetF32(p, F_timeBefore) ?? 0f,
-                IsSingleParticle: GetBool(p, F_isSingle),
+                IsSingleParticle: isSingle,
                 Disabled: GetBool(p, F_disabled),
+                RateIsPeriod: GetBool(p, F_rateIsPeriod),
+                BirthTimePeriod: GetF32(p, F_birthTimePeriod) ?? 0f,
+                IsLoop: GetBool(p, F_isLoop),
                 BlendMode: GetU8(p, F_blendMode) ?? 0,
                 BirthScale: birthScale,
                 ScaleOverLife: scaleOverLife,
@@ -380,7 +416,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 RandomStartFrame: GetBool(p, F_randomStart),
                 IsMeshPrimitive: isMesh,
                 MeshPath: meshPath,
-                UvScrollRate: ReadValueVec2(Get(p, F_birthUvScroll)) ?? Vector2.Zero,
+                UvScrollRate: birthUvScrollRate?.Constant ?? Vector2.Zero,
                 MeshSkeletonPath: meshSkl,
                 MeshAnimationPath: meshAnm,
                 SpawnShape: ReadSpawnShape(p),
@@ -428,7 +464,20 @@ namespace AssetsManager.Services.Viewer.Vfx
                 IsGroundLayer: GetBool(p, F_isGroundLayer),
                 IsUniformScale: GetBool(p, F_isUniformScale),
                 EmitterUvScrollRate: GetVec2(p, F_emitterUvScroll) ?? Vector2.Zero,
-                Trail: trail);
+                Trail: trail,
+                BirthUvScrollRateCurve: birthUvScrollRate,
+                ParticleUvScrollRate: ReadCurve2(p, F_particleUvScroll),
+                BirthUvRotateRate: ReadCurveF(p, F_birthUvRotate),
+                ParticleUvRotateRate: ReadCurveF(p, F_particleUvRotate),
+                TextureMultBirthUvOffset: textureMultBirthUvOffset,
+                TextureMultBirthUvScrollRate: textureMultBirthUvScroll,
+                TextureMultParticleUvScroll: textureMultParticleUvScroll,
+                TextureMultUvScale: textureMultUvScale,
+                TextureMultUvRotation: textureMultUvRotation,
+                TextureMultBirthUvRotateRate: textureMultBirthUvRotate,
+                TextureMultParticleUvRotate: textureMultParticleUvRotate,
+                TextureMultAddressMode: textureMultAddressMode,
+                TextureMultFlipV: textureMultFlipV);
         }
 
         private static VfxFieldCollectionDefinition ReadFields(
@@ -479,9 +528,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 foreach (BinTreeStruct identifier in identifiers.Elements.OfType<BinTreeStruct>())
                 {
-                    string name = GetString(identifier.Properties, F_effectName) ?? string.Empty;
+                    string name = GetString(identifier.Properties, F_effectName)
+                               ?? GetString(identifier.Properties, F_effectKey) ?? string.Empty;
                     uint systemHash = AsU32(Get(identifier.Properties, F_effect)) ?? 0u;
-                    uint effectKey = AsU32(Get(identifier.Properties, F_effectKey)) ?? 0u;
+                    uint effectKey = AsU32(Get(identifier.Properties, F_effectKey))
+                                  ?? (!string.IsNullOrEmpty(name) ? HashAlgorithms.Fnv1a(name) : 0u);
                     if (!string.IsNullOrEmpty(name) || systemHash != 0 || effectKey != 0)
                         children.Add(new VfxChildSystemReference(name, systemHash, effectKey));
                 }

@@ -1,0 +1,656 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Utils;
+using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Viewer;
+using Microsoft.WindowsAPICodePack.Dialogs;
+
+namespace AssetsManager.Views.Dialogs
+{
+    /// <summary>
+    /// Code-behind for the VFX Inspector & Diagnostic Studio.
+    /// Provides deep inspection of LoL champion VFX definitions, emitters, .scb meshes, textures, and OpenGL rendering.
+    /// </summary>
+    public partial class VfxInspectorWindow : HudWindow
+    {
+        private readonly VfxInspectorModel _model;
+        private readonly VfxLoadingService _loadingService = new();
+        private readonly VfxResourceResolver _resolver = new();
+        private readonly LogService _logService;
+        private Silk.NET.OpenGL.GL _gl;
+        private GlVfxRenderer _vfxRenderer;
+        private VfxLoadingService.Bundle _activeBundle;
+
+        // Camera control state
+        private float _camDistance = 350f;
+        private float _camYaw = 0f;
+        private float _camPitch = 20f;
+        private Vector3 _camTarget = Vector3.Zero;
+        private Point _lastMousePos;
+        private bool _isMouseDragging;
+        private bool _isRightDragging;
+
+        public VfxInspectorWindow(LogService logService = null)
+        {
+            _model = new VfxInspectorModel();
+            InitializeComponent();
+            _logService = logService;
+            DataContext = _model;
+
+            var settings = new OpenTK.Wpf.GLWpfControlSettings
+            {
+                MajorVersion = 3,
+                MinorVersion = 3,
+                RenderContinuously = true
+            };
+            OpenTkControl.Start(settings);
+
+            // Auto-detect Samira test directory if available
+            string defaultSamiraPath = @"C:\Users\danielpriego\Downloads\Workspace\AssetsManager\Samira.wad.client";
+            if (Directory.Exists(defaultSamiraPath))
+            {
+                _model.RootPath = defaultSamiraPath;
+                ScanRootDirectory(defaultSamiraPath);
+            }
+        }
+
+        #region OpenTK OpenGL Viewport Initialization & Rendering
+
+        [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr wglGetProcAddress(string procName);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern IntPtr LoadLibrary(string lpszLib);
+
+        private static readonly IntPtr OpenGLModule = LoadLibrary("opengl32.dll");
+
+        private static IntPtr GetOpenGLProcAddress(string procName)
+        {
+            var addr = wglGetProcAddress(procName);
+            if (addr == IntPtr.Zero)
+                addr = GetProcAddress(OpenGLModule, procName);
+            return addr;
+        }
+
+        private GridRenderer _gridRenderer;
+
+        private void OpenTkControl_Ready()
+        {
+            try
+            {
+                _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
+                _gridRenderer = new GridRenderer();
+                _gridRenderer.Initialize(_gl, false);
+                _vfxRenderer = new GlVfxRenderer(_logService);
+                _vfxRenderer.Initialize(_gl);
+                _model.LogMessages.Add("[GL] OpenGL viewport & 3D grid initialized successfully.");
+
+                if (_model.SelectedSystem != null)
+                {
+                    InspectSystem(_model.SelectedSystem);
+                }
+            }
+            catch (Exception ex)
+            {
+                _model.LogMessages.Add($"[ERROR] GL Init failed: {ex.Message}");
+            }
+        }
+
+        private void OpenTkControl_Render(TimeSpan delta)
+        {
+            if (_gl == null || _vfxRenderer == null) return;
+
+            float dt = (float)delta.TotalSeconds;
+            if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
+
+            // Update background clear color matching main viewer (Dark Studio)
+            switch (_model.BgMode)
+            {
+                case "Light":
+                    _gl.ClearColor(0.85f, 0.85f, 0.88f, 1.0f);
+                    break;
+                case "Transparent":
+                    _gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                    break;
+                default: // Dark Studio
+                    _gl.ClearColor(0.08f, 0.09f, 0.12f, 1.0f);
+                    break;
+            }
+
+            _gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit);
+
+            // Compute Orbit Camera View & Projection Matrices
+            float radYaw = _camYaw * MathF.PI / 180f;
+            float radPitch = _camPitch * MathF.PI / 180f;
+            Vector3 camEye = _camTarget + new Vector3(
+                _camDistance * MathF.Cos(radPitch) * MathF.Sin(radYaw),
+                _camDistance * MathF.Sin(radPitch),
+                _camDistance * MathF.Cos(radPitch) * MathF.Cos(radYaw)
+            );
+
+            Matrix4x4 view = Matrix4x4.CreateLookAt(camEye, _camTarget, Vector3.UnitY);
+            float aspect = (float)Math.Max(1, OpenTkControl.ActualWidth) / (float)Math.Max(1, OpenTkControl.ActualHeight);
+            Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(45f * MathF.PI / 180f, aspect, 1f, 10000f);
+            Matrix4x4 viewProj = view * proj;
+
+            // Render 3D Ground Grid (matching main viewer)
+            _gridRenderer?.Render(viewProj);
+
+            _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
+            _vfxRenderer.Update(dt);
+            _vfxRenderer.Render(viewProj, view);
+
+            _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
+            if (_model.IsPlaying && _vfxRenderer.ActiveSystem != null)
+            {
+                _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
+            }
+        }
+
+        #endregion
+
+        #region Camera Interaction
+
+        private void OpenTkControl_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _lastMousePos = e.GetPosition(OpenTkControl);
+            if (e.LeftButton == MouseButtonState.Pressed) _isMouseDragging = true;
+            if (e.RightButton == MouseButtonState.Pressed) _isRightDragging = true;
+            OpenTkControl.CaptureMouse();
+        }
+
+        private void OpenTkControl_MouseMove(object sender, MouseEventArgs e)
+        {
+            Point current = e.GetPosition(OpenTkControl);
+            System.Windows.Vector diff = current - _lastMousePos;
+            _lastMousePos = current;
+
+            if (_isMouseDragging)
+            {
+                _camYaw += (float)diff.X * 0.4f;
+                _camPitch = Math.Clamp(_camPitch - (float)diff.Y * 0.4f, -85f, 85f);
+            }
+            else if (_isRightDragging)
+            {
+                float panSpeed = _camDistance * 0.002f;
+                _camTarget.X -= (float)diff.X * panSpeed;
+                _camTarget.Y += (float)diff.Y * panSpeed;
+            }
+        }
+
+        private void OpenTkControl_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isMouseDragging = false;
+            _isRightDragging = false;
+            OpenTkControl.ReleaseMouseCapture();
+        }
+
+        private void OpenTkControl_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            float delta = e.Delta > 0 ? -30f : 30f;
+            _camDistance = Math.Clamp(_camDistance + delta, 10f, 5000f);
+        }
+
+        #endregion
+
+        #region Directory & BIN Scanning
+
+        private void BrowseRoot_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new CommonOpenFileDialog
+            {
+                IsFolderPicker = true,
+                Title = "Select ROOT Asset Directory (e.g., extracted Samira.wad.client)"
+            };
+
+            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            {
+                _model.RootPath = dialog.FileName;
+                ScanRootDirectory(dialog.FileName);
+            }
+        }
+
+        private void ReloadRoot_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(_model.RootPath))
+                ScanRootDirectory(_model.RootPath);
+        }
+
+        private void RootPathTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && !string.IsNullOrWhiteSpace(_model.RootPath))
+                ScanRootDirectory(_model.RootPath);
+        }
+
+        private void ScanRootDirectory(string rootFolder)
+        {
+            if (!Directory.Exists(rootFolder)) return;
+
+            try
+            {
+                _model.DetectedBins.Clear();
+                _model.Systems.Clear();
+                _model.LogMessages.Clear();
+
+                _model.LogMessages.Add($"[SCAN] Scanning ROOT directory: {rootFolder}");
+
+                var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
+                
+                // Prioritize skin BINs (skin0.bin, skin1.bin...) which are the primary VFX source of truth
+                var skinBins = binFiles
+                    .Where(b => b.Contains($"{Path.DirectorySeparatorChar}skins{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(b => b)
+                    .ToList();
+
+                var otherBins = binFiles
+                    .Where(b => !skinBins.Contains(b))
+                    .OrderBy(b => b)
+                    .ToList();
+
+                foreach (var bin in skinBins.Concat(otherBins))
+                {
+                    string relative = Path.GetRelativePath(rootFolder, bin);
+                    _model.DetectedBins.Add(relative);
+                }
+
+                _model.LogMessages.Add($"[SCAN] Found {binFiles.Length} .bin files ({skinBins.Count} Skin BINs prioritized).");
+
+                // Auto-select Samira skin0.bin or first skin BIN
+                string preferred = _model.DetectedBins.FirstOrDefault(b => b.EndsWith("skin0.bin", StringComparison.OrdinalIgnoreCase))
+                                ?? _model.DetectedBins.FirstOrDefault(b => b.Contains(@"\skins\", StringComparison.OrdinalIgnoreCase))
+                                ?? _model.DetectedBins.FirstOrDefault();
+
+                if (preferred != null)
+                {
+                    _model.SelectedBin = preferred;
+                    LoadBinFile(Path.Combine(rootFolder, preferred));
+                }
+
+                _model.StatusText = $"Scanned {binFiles.Length} BIN files in {Path.GetFileName(rootFolder)}.";
+            }
+            catch (Exception ex)
+            {
+                _model.LogMessages.Add($"[ERROR] Failed to scan ROOT: {ex.Message}");
+            }
+        }
+
+        private void BinSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_model.SelectedBin != null && !string.IsNullOrWhiteSpace(_model.RootPath))
+            {
+                string fullBinPath = Path.Combine(_model.RootPath, _model.SelectedBin);
+                LoadBinFile(fullBinPath);
+            }
+        }
+
+        private void LoadBinFile(string binFilePath)
+        {
+            if (!File.Exists(binFilePath)) return;
+
+            try
+            {
+                _model.Systems.Clear();
+                _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
+
+                _activeBundle = _loadingService.Load(binFilePath, _logService);
+
+                foreach (var (hash, sysDef) in _activeBundle.Systems)
+                {
+                    string name = sysDef.Name ?? $"VFX_0x{hash:X8}";
+
+                    // Filter out internal MATH, script, helper, dummy and 0-emitter non-visual systems
+                    if (name.StartsWith("MATH_", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("Math_", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("script_", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("helper_", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("dummy_", StringComparison.OrdinalIgnoreCase) ||
+                        sysDef.Emitters.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var item = new VfxSystemDiagnosticItem
+                    {
+                        Name = name,
+                        PathHash = hash,
+                        Definition = sysDef,
+                        EmitterCount = sysDef.Emitters.Count,
+                        TextureCount = sysDef.Emitters.Count(e => !string.IsNullOrEmpty(e.TexturePath)),
+                        MeshCount = sysDef.Emitters.Count(e => e.IsMeshPrimitive && !string.IsNullOrEmpty(e.MeshPath)),
+                        Status = "Ready",
+                        StatusBrush = Brushes.LightGreen
+                    };
+                    _model.Systems.Add(item);
+                }
+
+                _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
+                _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
+
+                if (_model.Systems.Count > 0)
+                {
+                    _model.SelectedSystem = _model.Systems.FirstOrDefault(s => s.Name.Contains("Samira", StringComparison.OrdinalIgnoreCase))
+                                          ?? _model.Systems.First();
+                }
+            }
+            catch (Exception ex)
+            {
+                _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region System & Emitter Diagnostics
+
+        private void SystemsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_model.SelectedSystem == null) return;
+
+            InspectSystem(_model.SelectedSystem);
+        }
+
+        private void InspectSystem(VfxSystemDiagnosticItem systemItem)
+        {
+            var def = systemItem.Definition;
+            if (def == null) return;
+
+            _model.Emitters.Clear();
+            _model.Textures.Clear();
+            _model.Meshes.Clear();
+            _model.LogMessages.Add($"[INSPECT] Selected VFX: {systemItem.Name} (Hash: 0x{systemItem.PathHash:X8})");
+
+            string searchDir = _model.RootPath;
+            if (!string.IsNullOrEmpty(searchDir) && File.Exists(searchDir))
+            {
+                searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
+            }
+
+            double maxDur = 0;
+            foreach (var e in def.Emitters)
+            {
+                double timeBefore = e.TimeBeforeFirstEmission;
+                double emitLife = e.EmitterLifetime ?? 1.0;
+                double partLife = e.ParticleLifetime.Sample(0.5f);
+                double total = timeBefore + emitLife + partLife;
+                if (total > maxDur) maxDur = total;
+            }
+            if (maxDur <= 0) maxDur = 3.0;
+
+            // 1. Prepare playback in OpenGL Viewport
+            var systemModel = new VfxSystemModel
+            {
+                Name = systemItem.Name,
+                Definition = def,
+                SystemCatalog = _activeBundle?.Systems ?? new Dictionary<uint, VfxSystemDefinition>(),
+                ResourceMap = _activeBundle?.ResourceMap ?? new Dictionary<uint, uint>(),
+                SearchDirectory = searchDir,
+                TotalDuration = maxDur,
+                Speed = _model.Speed
+            };
+
+            _model.TotalDuration = maxDur;
+            _model.CurrentTime = 0;
+            _camDistance = 120f;
+            _camTarget = Vector3.Zero;
+
+            _vfxRenderer?.SetVfxSystem(systemModel);
+            _vfxRenderer?.Play();
+            _model.IsPlaying = true;
+
+            // 2. Audit Emitters
+            foreach (var emitter in def.Emitters)
+            {
+                string texPath = emitter.TexturePath;
+                string meshPath = emitter.MeshPath;
+
+                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _resolver.ResolveTexture(texPath, searchDir);
+                var mesh = emitter.IsMeshPrimitive && !string.IsNullOrEmpty(meshPath) ? _resolver.ResolveMesh(meshPath, searchDir) : null;
+
+                var emitterDiagnostic = new VfxEmitterDiagnosticItem
+                {
+                    Name = emitter.Name ?? "Emitter",
+                    IsEnabled = true,
+                    EmitterDef = emitter,
+                    TexturePath = texPath ?? "N/A",
+                    TextureStatus = tex != null ? "Resolved" : (string.IsNullOrEmpty(texPath) ? "None" : "MISSING"),
+                    TextureStatusBrush = tex != null ? Brushes.LightGreen : (string.IsNullOrEmpty(texPath) ? Brushes.Gray : Brushes.OrangeRed),
+                    MeshPath = emitter.IsMeshPrimitive ? (meshPath ?? "N/A") : "N/A",
+                    MeshStatus = emitter.IsMeshPrimitive ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
+                    MeshStatusBrush = emitter.IsMeshPrimitive ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
+                    BlendMode = GetBlendModeName(emitter.BlendMode),
+                    TexDiv = $"{emitter.TexDiv.X} x {emitter.TexDiv.Y}",
+                    IsMeshPrimitive = emitter.IsMeshPrimitive,
+                    DisableBackfaceCull = emitter.RenderState?.DisableBackfaceCull ?? false
+                };
+
+                emitterDiagnostic.OnEnabledChanged += (item, enabled) =>
+                {
+                    _model.LogMessages.Add($"[EMITTER TOGGLE] {item.Name} set to {(enabled ? "ENABLED" : "DISABLED")}");
+                };
+
+                _model.Emitters.Add(emitterDiagnostic);
+
+                // Add to texture audit
+                if (!string.IsNullOrEmpty(texPath) && !_model.Textures.Any(t => t.AuthoredPath == texPath))
+                {
+                    _model.Textures.Add(new VfxTextureDiagnosticItem
+                    {
+                        AuthoredPath = texPath,
+                        ResolvedPath = tex != null ? "Resolved on disk" : "Missing",
+                        Status = tex != null ? "OK" : "MISSING",
+                        StatusBrush = tex != null ? Brushes.LightGreen : Brushes.Red,
+                        Width = tex?.PixelWidth ?? 0,
+                        Height = tex?.PixelHeight ?? 0,
+                        ImagePreview = tex,
+                        TexDiv = $"{emitter.TexDiv.X}x{emitter.TexDiv.Y}"
+                    });
+                }
+
+                // Add to mesh audit
+                if (emitter.IsMeshPrimitive && !string.IsNullOrEmpty(meshPath) && !_model.Meshes.Any(m => m.AuthoredPath == meshPath))
+                {
+                    _model.Meshes.Add(new VfxMeshDiagnosticItem
+                    {
+                        AuthoredPath = meshPath,
+                        ResolvedPath = mesh != null ? "Loaded" : "Missing",
+                        Status = mesh != null ? "OK" : "MISSING",
+                        StatusBrush = mesh != null ? Brushes.LightGreen : Brushes.Red,
+                        VertexCount = mesh?.Positions != null ? mesh.Value.Positions.Length / 3 : 0,
+                        FaceCount = mesh?.Indices != null ? mesh.Value.Indices.Length / 3 : 0,
+                        Format = meshPath.EndsWith(".scb", StringComparison.OrdinalIgnoreCase) ? "SCB" : (meshPath.EndsWith(".sco", StringComparison.OrdinalIgnoreCase) ? "SCO" : "SKN")
+                    });
+                }
+            }
+
+            _model.StatusText = $"Inspecting {systemItem.Name} ({_model.Emitters.Count} emitters).";
+        }
+
+        private static string GetBlendModeName(int blendMode) => blendMode switch
+        {
+            0 or 1 => "Additive (0/1)",
+            2 => "AlphaBlend (2)",
+            3 => "Multiply (3)",
+            4 => "Additive (4)",
+            5 => "Additive (5)",
+            _ => $"Custom ({blendMode})"
+        };
+
+        private void SearchQuery_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string query = _model.SearchQuery?.Trim() ?? "";
+            var view = CollectionViewSource.GetDefaultView(_model.Systems);
+            if (view == null) return;
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                view.Filter = null;
+            }
+            else
+            {
+                view.Filter = obj =>
+                {
+                    if (obj is VfxSystemDiagnosticItem item)
+                    {
+                        return item.Name.Contains(query, StringComparison.OrdinalIgnoreCase);
+                    }
+                    return false;
+                };
+            }
+        }
+
+        #endregion
+
+        #region Viewport Playback Control Events
+
+        private void Play_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedSystem != null)
+            {
+                if (_vfxRenderer == null || _vfxRenderer.ActiveSystem == null)
+                {
+                    InspectSystem(_model.SelectedSystem);
+                }
+                else if (_vfxRenderer.ActiveSystem.CurrentTime >= _model.TotalDuration)
+                {
+                    _vfxRenderer.Stop();
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+                else
+                {
+                    _vfxRenderer.Play();
+                    _model.IsPlaying = true;
+                }
+            }
+        }
+
+        private void Pause_Click(object sender, RoutedEventArgs e)
+        {
+            _vfxRenderer?.Pause();
+            _model.IsPlaying = false;
+        }
+
+        private void Stop_Click(object sender, RoutedEventArgs e)
+        {
+            _vfxRenderer?.Stop();
+            _model.IsPlaying = false;
+            _model.CurrentTime = 0;
+        }
+
+        private bool _isUserSeeking;
+
+        private void TimeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_vfxRenderer?.ActiveSystem == null) return;
+            if (!_model.IsPlaying || _isUserSeeking)
+            {
+                _vfxRenderer.Seek(e.NewValue);
+            }
+        }
+
+        private void TimeSlider_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isUserSeeking = true;
+        }
+
+        private void TimeSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _isUserSeeking = false;
+        }
+
+        private void Speed_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_model == null) return;
+            if (SpeedComboBox?.SelectedItem is ComboBoxItem item &&
+                float.TryParse(item.Tag?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out float speed))
+            {
+                _model.Speed = speed;
+                if (_vfxRenderer?.ActiveSystem != null)
+                {
+                    _vfxRenderer.ActiveSystem.Speed = speed;
+                }
+            }
+        }
+
+        private void BgMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_model == null) return;
+            if (BgComboBox?.SelectedItem is ComboBoxItem item)
+            {
+                _model.BgMode = item.Content?.ToString() ?? "Dark";
+            }
+        }
+
+        private void CopyDebugReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedSystem == null)
+            {
+                MessageBox.Show("Selecciona primero un sistema VFX de la lista para generar el reporte de depuración.", "VFX Inspector", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"# INFORME COMPLETO DE DIAGNÓSTICO DE VISUALIZACIÓN VFX");
+            sb.AppendLine($"Fecha/Hora: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Sistema VFX: {_model.SelectedSystem.Name}");
+            sb.AppendLine($"Ruta Partícula: {_model.SelectedSystem.Definition?.ParticlePath ?? "N/A"}");
+            sb.AppendLine($"Hash de Ruta: 0x{_model.SelectedSystem.Definition?.PathHash ?? 0:X8}");
+            sb.AppendLine($"Duración Calculada: {_model.TotalDuration:F2} s");
+            sb.AppendLine($"Emisores Totales: {_model.Emitters.Count}");
+            sb.AppendLine($"Texturas Cargadas: {_model.Textures.Count}");
+            sb.AppendLine();
+
+            sb.AppendLine("## EMISORES Y PROPIEDADES DE RENDERIZADO");
+            int idx = 1;
+            foreach (var emitter in _model.Emitters)
+            {
+                var d = emitter.EmitterDef;
+                sb.AppendLine($"### Emisor {idx++}: {emitter.Name}");
+                sb.AppendLine($"  - Estado: {(emitter.IsEnabled ? "ACTIVO" : "DESACTIVADO")}");
+                sb.AppendLine($"  - Modo Mezcla (BlendMode): {emitter.BlendMode} (Valor Original BIN: {d?.BlendMode})");
+                sb.AppendLine($"  - Tipo Primitiva: {(d?.IsMeshPrimitive == true ? "MALLA 3D (.scb/.sco)" : (d?.IsGroundLayer == true ? "CAPA SUELO 3D" : "QUAD BILLBOARD 2D"))}");
+                sb.AppendLine($"  - Malla 3D Ruta: {emitter.MeshPath} (Estado GPU: {emitter.MeshStatus})");
+                sb.AppendLine($"  - Textura Principal: {emitter.TexturePath} (Estado GPU: {emitter.TextureStatus})");
+                sb.AppendLine($"  - Rejilla Atlas (TexDiv): {emitter.TexDiv}");
+                if (d != null)
+                {
+                    var bs = d.BirthScale.Constant;
+                    sb.AppendLine($"  - Escala Inicial (BirthScale): X={bs.X:F1}, Y={bs.Y:F1}, Z={bs.Z:F1}");
+                    sb.AppendLine($"  - Usa Relación Aspecto (UseTextureAspect): {d.UseTextureAspect}");
+                    sb.AppendLine($"  - Bucle Infinito (IsLoop): {d.IsLoop}");
+                    sb.AppendLine($"  - Emisor Único (IsSingleParticle): {d.IsSingleParticle}");
+                    sb.AppendLine($"  - Flags Orientación: OrientadoDirección={d.IsDirectionOriented}, CuadriláteroArbitrario={d.IsArbitraryQuad}, Terreno={d.IsFollowingTerrain}, Suelo={d.IsGroundLayer}");
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("## TEXTURAS EN MEMORIA GPU");
+            foreach (var tex in _model.Textures)
+            {
+                sb.AppendLine($"  - {tex.AuthoredPath} => [{tex.Width}x{tex.Height}] ({tex.Status})");
+            }
+
+            string reportText = sb.ToString();
+            Clipboard.SetText(reportText);
+            _model.LogMessages.Add("[DEBUG EXPORT] Reporte completo de depuración copiado al Portapapeles.");
+            MessageBox.Show("¡Reporte de Depuración Completo copiado al Portapapeles de Windows!\n\nPuedes pegarlo directamente en la conversación para que analicemos cualquier anomalía visual.", "VFX Inspector", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        #endregion
+    }
+}

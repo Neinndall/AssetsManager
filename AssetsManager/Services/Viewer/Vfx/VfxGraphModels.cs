@@ -104,7 +104,23 @@ namespace AssetsManager.Services.Viewer.Vfx
         bool IsGroundLayer = false,
         bool IsUniformScale = false,
         Vector2 EmitterUvScrollRate = default,
-        VfxTrailDefinition Trail = null)
+        VfxTrailDefinition Trail = null,
+        VfxCurve2? BirthUvScrollRateCurve = null,
+        VfxCurve2? ParticleUvScrollRate = null,
+        VfxCurveF? BirthUvRotateRate = null,
+        VfxCurveF? ParticleUvRotateRate = null,
+        VfxCurve2? TextureMultBirthUvOffset = null,
+        VfxCurve2? TextureMultBirthUvScrollRate = null,
+        VfxCurve2? TextureMultParticleUvScroll = null,
+        VfxCurve2? TextureMultUvScale = null,
+        VfxCurveF? TextureMultUvRotation = null,
+        VfxCurveF? TextureMultBirthUvRotateRate = null,
+        VfxCurveF? TextureMultParticleUvRotate = null,
+        int TextureMultAddressMode = 0,
+        bool TextureMultFlipV = false,
+        bool RateIsPeriod = false,
+        float BirthTimePeriod = 0f,
+        bool IsLoop = false)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
@@ -189,7 +205,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     {
         public Vector3 SampleOffset(Random rng, float t = 0f)
         {
-            var offset = Kind switch
+            var offset = (Kind switch
             {
                 VfxSpawnShapeKind.Box => new Vector3(
                     SignedUnit(rng) * Size.X * 0.5f,
@@ -197,8 +213,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                     SignedUnit(rng) * Size.Z * 0.5f),
                 VfxSpawnShapeKind.Sphere => SampleSphere(rng, Radius),
                 VfxSpawnShapeKind.Cylinder => SampleCylinder(rng, Radius, Height),
-                _ => EmitOffset.SampleBirth(t, rng)
-            };
+                _ => Vector3.Zero
+            }) + EmitOffset.SampleBirth(t, rng);
             int count = Math.Min(RotationAxes.Count, RotationAngles.Count);
             for (int i = 0; i < count; i++)
             {

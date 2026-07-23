@@ -122,7 +122,14 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 uint systemHash = child.SystemHash;
                 if (systemHash == 0 && child.EffectKey != 0)
-                    _resourceMap.TryGetValue(child.EffectKey, out systemHash);
+                {
+                    if (!_resourceMap.TryGetValue(child.EffectKey, out systemHash))
+                        systemHash = child.EffectKey;
+                }
+                if (systemHash == 0 && !string.IsNullOrEmpty(child.Name))
+                {
+                    systemHash = VfxResourceResolver.Fnv1a(child.Name);
+                }
                 if (!_systems.TryGetValue(systemHash, out VfxSystemDefinition definition)) continue;
                 if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) break;
                 _pendingChildren.Add(CreateRuntime(definition, childTransform, parentDepth + 1));

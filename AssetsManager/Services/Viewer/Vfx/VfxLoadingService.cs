@@ -61,6 +61,16 @@ namespace AssetsManager.Services.Viewer.Vfx
                 string champRootBin = Path.Combine(charFolder, charName + ".bin");
                 Enqueue(champRootBin);
 
+                int targetSkinIndex = ExtractSkinIndex(skinName);
+
+                foreach (string multiBin in Directory.GetFiles(charFolder, "*multi_skins*.bin", SearchOption.TopDirectoryOnly))
+                {
+                    if (targetSkinIndex < 0 || multiBin.Contains($"skin{targetSkinIndex}", StringComparison.OrdinalIgnoreCase) || multiBin.Contains("multi_skins"))
+                    {
+                        Enqueue(multiBin);
+                    }
+                }
+
                 int guard = 0;
                 while (queue.Count > 0 && guard++ < 256)
                 {
@@ -71,8 +81,17 @@ namespace AssetsManager.Services.Viewer.Vfx
                         byte[] fileBytes = File.ReadAllBytes(currentBinPath);
                         VfxBinDocument document = VfxGraphParser.ParseDocument(fileBytes);
 
+                        bool isTargetSkinBin = currentBinPath.Equals(skinBinPath, StringComparison.OrdinalIgnoreCase);
+
                         foreach (var kv in document.Systems)
-                            bundle.Systems.TryAdd(kv.Key, kv.Value);
+                        {
+                            // Systems directly in the skin BIN always belong to it.
+                            // For dependency BINs, filter out systems explicitly belonging to OTHER skins.
+                            if (isTargetSkinBin || IsSystemForSkin(kv.Value.Name, targetSkinIndex))
+                            {
+                                bundle.Systems.TryAdd(kv.Key, kv.Value);
+                            }
+                        }
                         foreach (var kv in document.AnimationClips)
                             MergeClip(bundle.Clips, kv.Key, kv.Value);
                         foreach (var kv in document.ResourceMap)
@@ -82,6 +101,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                         foreach (var dep in document.Dependencies)
                         {
                             if (string.IsNullOrEmpty(dep)) continue;
+                            string normalizedDep = dep.Replace('/', Path.DirectorySeparatorChar);
                             string relativeDepPath = dep
                                 .Replace("DATA/", "", StringComparison.OrdinalIgnoreCase)
                                 .Replace("data/", "", StringComparison.OrdinalIgnoreCase)
@@ -91,8 +111,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                             foreach (var root in new[] { wadRoot, searchFolder, currentDir })
                             {
                                 if (string.IsNullOrEmpty(root)) continue;
-                                string fullDepPath = Path.Combine(root, relativeDepPath);
-                                if (File.Exists(fullDepPath)) { Enqueue(fullDepPath); enqueued = true; break; }
+
+                                string p1 = Path.Combine(root, normalizedDep);
+                                string p2 = Path.Combine(root, "data", relativeDepPath);
+                                string p3 = Path.Combine(root, relativeDepPath);
+
+                                if (File.Exists(p1)) { Enqueue(p1); enqueued = true; break; }
+                                if (File.Exists(p2)) { Enqueue(p2); enqueued = true; break; }
+                                if (File.Exists(p3)) { Enqueue(p3); enqueued = true; break; }
                             }
 
                             if (!enqueued)
@@ -274,6 +300,27 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             return string.Empty;
         }
-    }
 
+        private static int ExtractSkinIndex(string skinName)
+        {
+            if (string.IsNullOrEmpty(skinName)) return -1;
+            var match = System.Text.RegularExpressions.Regex.Match(skinName, @"skin(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return match.Success && int.TryParse(match.Groups[1].Value, out int idx) ? idx : -1;
+        }
+
+        private static bool IsSystemForSkin(string systemName, int targetSkinIndex)
+        {
+            if (string.IsNullOrEmpty(systemName) || targetSkinIndex < 0) return true;
+
+            var match = System.Text.RegularExpressions.Regex.Match(
+                systemName, @"[_\b]skin(\d+)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int sysSkinIndex))
+            {
+                return sysSkinIndex == targetSkinIndex;
+            }
+
+            return true;
+        }
+    }
 }

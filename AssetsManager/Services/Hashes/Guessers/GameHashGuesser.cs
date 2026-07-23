@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Hashing;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -26,6 +27,15 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] LuaExtensions = { "luabin64", "preload" };
         private static readonly string[] LuaCharacterPrefixes = { "", "spells/", "scripts/", "npcscripts", "npcscripts/" };
         private static readonly string[] LuaCommonPaths =
+        {
+            "data/spells", "data/spells/modules", "data/scripts", "data/shared/scripts",
+            "data/shared/scripts/aicomponents", "data/shared/spells", "data/shared/npcscripts",
+            "data/shared/tft/common", "data/shared/tft/items", "data/shared/tft/traits",
+            "data/shared/spells/practicetool", "data/items", "data/items/spells",
+            "data/items/spells/modules", "data/buildingblocks", "data/shared/gamemodes",
+            "data/shared/spells/cheat"
+        };
+        private static readonly string[] SharedScriptDirectories =
         {
             "data/spells", "data/spells/modules", "data/scripts", "data/shared/scripts",
             "data/shared/scripts/aicomponents", "data/shared/spells", "data/shared/npcscripts",
@@ -772,24 +782,60 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             uint sharedCount = ReadManifestCount(reader);
+            var sharedNames = new List<string>((int)Math.Min(sharedCount, 100_000));
             for (uint sharedIndex = 0; sharedIndex < sharedCount; sharedIndex++)
             {
-                string name = ReadManifestString(reader).ToLowerInvariant();
-                foreach (string prefix in LuaCommonPaths)
-                foreach (string extension in LuaExtensions)
-                    yield return new HashGuessCandidate($"{prefix}/{name}.{extension}", HashGuessStrategy.LuaManifest);
-
-                for (int map = 0; map < 1000; map++)
-                foreach (string prefix in new[] { string.Empty, "mutators/" })
-                    yield return new HashGuessCandidate(
-                        $"levels/map{map}/scripts/{prefix}{name}.luabin64",
-                        HashGuessStrategy.LuaManifest);
+                sharedNames.Add(ReadManifestString(reader).ToLowerInvariant());
             }
 
             uint hashCount = ReadManifestCount(reader);
             long hashBytes = checked((long)hashCount * sizeof(ulong));
             if (hashBytes > stream.Length - stream.Position)
                 throw new InvalidDataException("Lua manifest hash table exceeds the available data.");
+
+            var hashMap = new Dictionary<ulong, uint>((int)Math.Min(hashCount, 100_000));
+            for (uint i = 0; i < hashCount; i++)
+            {
+                ulong entry = reader.ReadUInt64();
+                uint dirIndex = (uint)(entry & 0x1F);
+                ulong xxh3Truncated = entry >> 5;
+                hashMap[xxh3Truncated] = dirIndex;
+            }
+
+            foreach (string name in sharedNames)
+            {
+                byte[] nameBytes = Encoding.UTF8.GetBytes(name);
+                ulong nameHashTruncated = XxHash3.HashToUInt64(nameBytes) >> 5;
+                if (hashMap.TryGetValue(nameHashTruncated, out uint dirIndex) && dirIndex < (uint)SharedScriptDirectories.Length)
+                {
+                    string dir = SharedScriptDirectories[dirIndex];
+                    foreach (string extension in LuaExtensions)
+                    {
+                        yield return new HashGuessCandidate($"{dir}/{name}.{extension}", HashGuessStrategy.LuaManifest);
+                    }
+                }
+                else
+                {
+                    // Fallback for stripped scripts (Cheat* or Map scripts)
+                    if (name.StartsWith("cheat", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (string extension in LuaExtensions)
+                            yield return new HashGuessCandidate($"data/shared/spells/cheat/{name}.{extension}", HashGuessStrategy.LuaManifest);
+                    }
+                    else
+                    {
+                        foreach (string prefix in LuaCommonPaths)
+                        foreach (string extension in LuaExtensions)
+                            yield return new HashGuessCandidate($"{prefix}/{name}.{extension}", HashGuessStrategy.LuaManifest);
+
+                        for (int map = 0; map < 1000; map++)
+                        foreach (string prefix in new[] { string.Empty, "mutators/" })
+                            yield return new HashGuessCandidate(
+                                $"levels/map{map}/scripts/{prefix}{name}.luabin64",
+                                HashGuessStrategy.LuaManifest);
+                    }
+                }
+            }
         }
 
         private static uint ReadManifestCount(BinaryReader reader)

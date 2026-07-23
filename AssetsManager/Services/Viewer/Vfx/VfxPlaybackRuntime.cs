@@ -9,7 +9,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxPlaybackRuntime
     {
-        public const int InstanceStride = 29;
+        public const int InstanceStride = 34;
 
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
@@ -58,7 +58,9 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
-            public Vector2 BirthUvOffset;
+            public Vector2 BirthUvOffset, BirthUvScrollRate;
+            public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
+            public float BirthUvRotateRate, TextureMultBirthUvRotateRate;
             public float Rot, RotVel;
             public float StartFrame, FrameRate;
             public float ColorRandom;   // stable per-particle 0..1 roll for the colour-gradient variant axis
@@ -91,16 +93,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                         Particle particle = es.Particles[particleIndex];
                         particle.Pos = Vector3.Transform(particle.Pos, emitterSpaceDelta);
                         particle.Vel = Vector3.TransformNormal(particle.Vel, emitterSpaceDelta);
-                        particle.BirthAccel = Vector3.TransformNormal(particle.BirthAccel, emitterSpaceDelta);
-                        es.Particles[particleIndex] = particle;
-                    }
-                }
+                        particle.BirthAccel = Vector3.TransformNormal(particle.BirthAccel, emitterSpaceDelta);                }
                 es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), worldTransform);
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ);
             }
-        }
+        } }
 
         public VfxPlaybackRuntime(int seed = 1234) => _rng = new Random(seed);
 
@@ -118,7 +117,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             for (int emitterIndex = 0; emitterIndex < system.Emitters.Count; emitterIndex++)
             {
                 var e = system.Emitters[emitterIndex];
-                if (!includeNonVisual && !e.IsVisual) continue;
+                if (e.Disabled) continue;
                 _emitters.Add(new EmitterState
                 {
                     Def = e,
@@ -153,10 +152,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ? Math.Clamp((state.Age - definition.TimeBeforeFirstEmission) / definition.EmitterLifetime.Value, 0f, 1f)
                 : 0f;
         }
-
-        /// <summary>Move the whole system WITHOUT resetting live particles.</summary>
-        public void SetWorldTransform(Matrix4x4 worldTransform)
-            => SetTransform(worldTransform);
 
         public void Reset()
         {
@@ -197,7 +192,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
             LiveParticleCount = live;
         }
-
         private void UpdateEmitter(EmitterState s, float dt)
         {
             var d = s.Def;
@@ -205,7 +199,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             float emitterT = EmitterTime(s);
             s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), _worldTransform);
 
-            // spawn
+            if (d.IsLoop && d.EmitterLifetime is { } loopLife && s.Age > d.TimeBeforeFirstEmission + loopLife)
+            {
+                s.Age = d.TimeBeforeFirstEmission;
+                s.BurstDone = false;
+            }
+
             bool emitting = s.Age >= d.TimeBeforeFirstEmission
                             && (d.EmitterLifetime is not { } life || s.Age <= d.TimeBeforeFirstEmission + life);
             if (emitting)
@@ -216,7 +215,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
                 else
                 {
-                    float rate = MathF.Max(0f, d.Rate.Sample(emitterT));
+                    float rawRate = MathF.Max(0f, d.Rate.Sample(emitterT));
+                    float rate = d.RateIsPeriod ? (rawRate > 0.001f ? 1f / rawRate : 0f) : rawRate;
                     s.SpawnAccum += rate * dt;
                     while (s.SpawnAccum >= 1f && s.Particles.Count < MaxParticlesPerEmitter)
                     {
@@ -227,7 +227,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
             }
 
-            // integrate + cull
             for (int i = s.Particles.Count - 1; i >= 0; i--)
             {
                 var p = s.Particles[i];
@@ -277,11 +276,21 @@ namespace AssetsManager.Services.Viewer.Vfx
             var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            Vector2 birthUvScrollRate = d.BirthUvScrollRateCurve?.SampleBirth(emitterT, _rng) ?? d.UvScrollRate;
+            float birthUvRotateRate = d.BirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
+            Vector2 textureMultBirthUvOffset = d.TextureMultBirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero;
+            Vector2 textureMultBirthUvScrollRate = d.TextureMultBirthUvScrollRate?.SampleBirth(emitterT, _rng)
+                ?? d.TextureMultUvScrollRate;
+            float textureMultBirthUvRotateRate = d.TextureMultBirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
 
             var localOffset = d.SpawnShape?.SampleOffset(_rng, emitterT) ?? Vector3.Zero;
             var worldOffset = Vector3.TransformNormal(localOffset, _worldTransform);
             vel = Vector3.TransformNormal(vel, _worldTransform);
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
+            Vector3 finalBirthSize = new Vector3(
+                birthScale.X,
+                birthScale.Y == 0f ? birthScale.X : birthScale.Y,
+                birthScale.Z == 0f ? birthScale.X : birthScale.Z);
 
             s.Particles.Add(new Particle
             {
@@ -292,17 +301,21 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthDrag = birthDrag,
                 Age = 0f,
                 Life = life,
-                BirthSize = birthScale,
+                BirthSize = finalBirthSize,
                 BirthColor = d.BirthColor.SampleBirth(emitterT, _rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
-                BirthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero,
-                Rot = birthRotation.X * (MathF.PI / 180f),
+                Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
                 RotVel = rotVel.X * (MathF.PI / 180f),
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
                     ? _rng.Next(d.NumFrames)
                     : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
                 FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng) ?? d.FrameRate ?? 0f,
                 ColorRandom = (float)_rng.NextDouble(),
+                BirthUvScrollRate = birthUvScrollRate,
+                BirthUvRotateRate = birthUvRotateRate,
+                TextureMultBirthUvOffset = textureMultBirthUvOffset,
+                TextureMultBirthUvScrollRate = textureMultBirthUvScrollRate,
+                TextureMultBirthUvRotateRate = textureMultBirthUvRotateRate
             });
             ParticleLifecycle?.Invoke(this, d, s.Particles[^1].Pos, false);
         }
@@ -370,9 +383,12 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
                 buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
                 buf[k++] = p.BirthSize.Z * scaleMul.Z;
-                Vector2 uvOffset = p.BirthUvOffset;
+                Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
+                    + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
-                float uvRotation = (d.UvRotation?.Sample(t) ?? 0f) * (MathF.PI / 180f);
+                float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
+                    + SampleIntegrated(d.ParticleUvRotateRate, t, p.Age, p.Life);
+                float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = uvOffset.X; buf[k++] = uvOffset.Y;
                 buf[k++] = uvScale.X; buf[k++] = uvScale.Y;
                 buf[k++] = uvRotation;
@@ -380,8 +396,72 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Vector4 erosionMixer = d.AlphaErosion?.ChannelMixer?.Sample(t) ?? new Vector4(1f, 0f, 0f, 0f);
                 buf[k++] = erosionMixer.X; buf[k++] = erosionMixer.Y;
                 buf[k++] = erosionMixer.Z; buf[k++] = erosionMixer.W;
+                Vector2 textureMultUvOffset = p.TextureMultBirthUvOffset
+                    + p.TextureMultBirthUvScrollRate * p.Age
+                    + SampleIntegrated(d.TextureMultParticleUvScroll, t, p.Age, p.Life);
+                Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
+                float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
+                    + p.TextureMultBirthUvRotateRate * p.Age
+                    + SampleIntegrated(d.TextureMultParticleUvRotate, t, p.Age, p.Life);
+                buf[k++] = textureMultUvOffset.X; buf[k++] = textureMultUvOffset.Y;
+                buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
+                buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
             }
             s.InstanceCount = instanceCount;
+        }
+
+        private static Vector2 SampleIntegrated(VfxCurve2? curve, float normalizedAge, float age, float life)
+        {
+            if (curve is not { } value) return Vector2.Zero;
+            if (value.Times is not { Length: > 0 }) return value.Constant * age;
+            if (!float.IsFinite(life)) return value.Sample(normalizedAge) * age;
+
+            Vector2 integrated = Vector2.Zero;
+            float previousTime = 0f;
+            Vector2 previousValue = value.Sample(0f);
+            foreach (float authoredTime in value.Times)
+            {
+                float time = Math.Clamp(authoredTime, 0f, normalizedAge);
+                if (time <= previousTime) continue;
+                Vector2 currentValue = value.Sample(time);
+                integrated += (previousValue + currentValue) * (0.5f * (time - previousTime));
+                previousTime = time;
+                previousValue = currentValue;
+                if (time >= normalizedAge) break;
+            }
+            if (previousTime < normalizedAge)
+            {
+                Vector2 currentValue = value.Sample(normalizedAge);
+                integrated += (previousValue + currentValue) * (0.5f * (normalizedAge - previousTime));
+            }
+            return integrated * life;
+        }
+
+        private static float SampleIntegrated(VfxCurveF? curve, float normalizedAge, float age, float life)
+        {
+            if (curve is not { } value) return 0f;
+            if (value.Times is not { Length: > 0 }) return value.Constant * age;
+            if (!float.IsFinite(life)) return value.Sample(normalizedAge) * age;
+
+            float integrated = 0f;
+            float previousTime = 0f;
+            float previousValue = value.Sample(0f);
+            foreach (float authoredTime in value.Times)
+            {
+                float time = Math.Clamp(authoredTime, 0f, normalizedAge);
+                if (time <= previousTime) continue;
+                float currentValue = value.Sample(time);
+                integrated += (previousValue + currentValue) * (0.5f * (time - previousTime));
+                previousTime = time;
+                previousValue = currentValue;
+                if (time >= normalizedAge) break;
+            }
+            if (previousTime < normalizedAge)
+            {
+                float currentValue = value.Sample(normalizedAge);
+                integrated += (previousValue + currentValue) * (0.5f * (normalizedAge - previousTime));
+            }
+            return integrated * life;
         }
 
         private void ApplyFields(
