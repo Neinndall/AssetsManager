@@ -333,14 +333,22 @@
                                                     <ItemsControl ItemsSource="{Binding Emitters}">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
-                                                                <Grid Height="24" Margin="0,2">
-                                                                    <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
-                                                                            Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
-                                                                        <Border.Effect>
-                                                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
-                                                                        </Border.Effect>
-                                                                    </Border>
-                                                                </Grid>
+                                                                 <Grid Height="24" Margin="0,2">
+                                                                     <!-- Main Emitter Lifetime Bar -->
+                                                                     <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
+                                                                             Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
+                                                                         <Border.Effect>
+                                                                             <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.35"/>
+                                                                         </Border.Effect>
+                                                                     </Border>
+
+                                                                     <!-- Yellow Keyframe Marker Dot for Emission Delay (Matching linea_tiempo.png) -->
+                                                                     <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"
+                                                                              HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                                              Margin="{Binding DelayMarkerMargin}"
+                                                                              Visibility="{Binding HasDelay, Converter={StaticResource BoolToVis}}"
+                                                                              ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
+                                                                 </Grid>
                                                             </DataTemplate>
                                                         </ItemsControl.ItemTemplate>
                                                     </ItemsControl>

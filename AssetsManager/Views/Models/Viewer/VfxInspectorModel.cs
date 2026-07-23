@@ -221,6 +221,28 @@ namespace AssetsManager.Views.Models.Viewer
             set { _trackWidth = value; OnPropertyChanged(); }
         }
 
+        private bool _hasDelay;
+        private double _delayTime;
+        private Thickness _delayMarkerMargin;
+
+        public bool HasDelay
+        {
+            get => _hasDelay;
+            set { _hasDelay = value; OnPropertyChanged(); }
+        }
+
+        public double DelayTime
+        {
+            get => _delayTime;
+            set { _delayTime = value; OnPropertyChanged(); }
+        }
+
+        public Thickness DelayMarkerMargin
+        {
+            get => _delayMarkerMargin;
+            set { _delayMarkerMargin = value; OnPropertyChanged(); }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string prop = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));

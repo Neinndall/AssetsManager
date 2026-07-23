@@ -436,12 +436,21 @@ namespace AssetsManager.Views.Dialogs
             foreach (var e in def.Emitters)
             {
                 double timeBefore = e.TimeBeforeFirstEmission;
-                double emitLife = e.EmitterLifetime ?? 1.0;
-                double partLife = e.ParticleLifetime.Sample(0.5f);
+                double emitLife = e.EmitterLifetime ?? 3.0;
+                double partLife = e.ParticleLifetime.Constant > 0 
+                    ? e.ParticleLifetime.Constant 
+                    : (e.ParticleLifetime.Values != null && e.ParticleLifetime.Values.Length > 0 ? e.ParticleLifetime.Values.Max() : 1.5);
+
+                if (e.ParticleLifetime.Times != null && e.ParticleLifetime.Times.Length > 0)
+                {
+                    double maxKeyframe = e.ParticleLifetime.Times.Max();
+                    if (maxKeyframe > partLife) partLife = maxKeyframe;
+                }
+
                 double total = timeBefore + emitLife + partLife;
                 if (total > maxDur) maxDur = total;
             }
-            if (maxDur <= 0) maxDur = 3.0;
+            if (maxDur <= 0) maxDur = 5.0;
 
             // 1. Prepare playback in OpenGL Viewport
             var systemModel = new VfxSystemModel
@@ -569,15 +578,38 @@ namespace AssetsManager.Views.Dialogs
                 emitter.TrackBrush = palette[(idx - 1) % palette.Length];
 
                 double delay = emitter.EmitterDef?.TimeBeforeFirstEmission ?? 0;
-                double emitLife = emitter.EmitterDef?.EmitterLifetime ?? 1.5;
-                double partLife = emitter.EmitterDef?.ParticleLifetime.Sample(0.5f) ?? 1.0;
+                double emitLife = emitter.EmitterDef?.EmitterLifetime ?? 3.0;
+                double partLife = 1.5;
+                if (emitter.EmitterDef != null)
+                {
+                    partLife = emitter.EmitterDef.ParticleLifetime.Constant > 0 
+                        ? emitter.EmitterDef.ParticleLifetime.Constant 
+                        : (emitter.EmitterDef.ParticleLifetime.Values != null && emitter.EmitterDef.ParticleLifetime.Values.Length > 0 
+                            ? emitter.EmitterDef.ParticleLifetime.Values.Max() : 1.5);
+                }
                 double duration = emitLife + partLife;
 
-                double leftMargin = Math.Clamp((delay / totalDur) * availableWidth, 0, Math.Max(0, availableWidth - 10));
-                double barWidth = Math.Clamp((duration / totalDur) * availableWidth, 10, Math.Max(10, availableWidth - leftMargin));
+                // Like Riot's editor in linea_tiempo.png, all tracks start at 0.00s
+                double leftMargin = 0;
+                double barWidth = Math.Clamp((duration / totalDur) * availableWidth, 20, availableWidth);
 
                 emitter.TrackMargin = new Thickness(leftMargin, 0, 0, 0);
                 emitter.TrackWidth = barWidth;
+
+                // Yellow Keyframe Marker Dot for Emission Delay (Matching linea_tiempo.png)
+                if (delay > 0.05)
+                {
+                    emitter.HasDelay = true;
+                    emitter.DelayTime = delay;
+                    double delayPos = Math.Clamp((delay / totalDur) * availableWidth - 4, 0, Math.Max(0, availableWidth - 8));
+                    emitter.DelayMarkerMargin = new Thickness(delayPos, 0, 0, 0);
+                }
+                else
+                {
+                    emitter.HasDelay = false;
+                    emitter.DelayTime = 0;
+                    emitter.DelayMarkerMargin = new Thickness(0);
+                }
 
                 idx++;
             }
