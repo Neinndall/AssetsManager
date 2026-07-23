@@ -59,8 +59,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly byte[][] WadBinPrefixesS = ToAsciiPrefixes("Shaders/");
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
         {
-            "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm",
-            "troybin", "bnk", "wpk", "tex"
+            "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm", "anm", "skl", "skn",
+            "scb", "sco", "troybin", "bnk", "wpk", "tex"
         };
 
         private readonly LogService _logService;
