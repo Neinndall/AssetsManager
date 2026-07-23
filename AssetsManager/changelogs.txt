@@ -4,6 +4,9 @@ HOTFIX UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Added multi-layer Emitters / Layers timeline deck matching Riot editor layout, placing Master VFX System bar at Row 0 with emission delay markers for secondary emitters.
+  - VFX Studio / Added automatic dependency resolution from BIN headers (PROP v2+ Dependencies) to recursively pre-load companion sub-systems, static meshes, textures, and sounds.
+  - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows each GREP match as soon as it is discovered.
   - Viewer / Added configurable ground logo opacity in General settings.
@@ -98,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed texture transparency rendering for Alpha Blend (blendMode 0) particles to eliminate black borders, solid background glows, and unhandled texture alpha artifacts.
   - Viewer VFX textures now animate their authored UV movement, rotation, and multiplier transforms throughout particle playback.
   - Viewer VFX systems can now be selected without crashing the playback panel.
   - Viewer VFX now evaluates authored birth curves, trail geometry, UV scrolling, and erosion channels correctly.
