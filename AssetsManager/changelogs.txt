@@ -101,6 +101,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Unified viewport camera controls, panning, smooth interpolation, and zoom modifiers with the 3D Model Viewport.
+  - Viewer VFX Studio / Fixed texture masking on particles to eliminate dark rectangular overlays.
   - Viewer VFX Studio / Fixed texture transparency rendering for Alpha Blend (blendMode 0) particles to eliminate black borders, solid background glows, and unhandled texture alpha artifacts.
   - Viewer VFX textures now animate their authored UV movement, rotation, and multiplier transforms throughout particle playback.
   - Viewer VFX systems can now be selected without crashing the playback panel.

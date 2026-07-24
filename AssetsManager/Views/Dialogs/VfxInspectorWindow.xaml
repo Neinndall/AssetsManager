@@ -223,11 +223,7 @@
                                 <Grid>
                                     <glWpfControl:GLWpfControl x:Name="OpenTkControl" 
                                                          Ready="OpenTkControl_Ready" 
-                                                         Render="OpenTkControl_Render"
-                                                         MouseDown="OpenTkControl_MouseDown"
-                                                         MouseMove="OpenTkControl_MouseMove"
-                                                         MouseUp="OpenTkControl_MouseUp"
-                                                         MouseWheel="OpenTkControl_MouseWheel"/>
+                                                         Render="OpenTkControl_Render"/>
 
                                     <!-- HUD Overlay in Viewport -->
                                     <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12" 

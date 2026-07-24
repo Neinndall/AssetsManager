@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
+using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
@@ -307,6 +308,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                     _gl.BindTexture(TextureTarget.Texture2D, es.TextureMult);
                     ApplyAddressMode(es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
+                }
+                if (es.DistortionTexture != 0)
+                {
                     _gl.ActiveTexture(TextureUnit.Texture3);
                     _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
                     _gl.ActiveTexture(TextureUnit.Texture0);
@@ -677,7 +681,12 @@ uniform vec4 uErosionMixer;
 out vec4 fragColor;
 void main(){
     vec4 texel = texture(uTex, vUv);
-    if (uHasTexMult != 0) texel *= texture(uTexMult, vUvMult);
+    if (uHasTexMult != 0) {
+        vec4 mult = texture(uTexMult, vUvMult);
+        texel.rgb *= mult.rgb;
+        float multAlpha = mult.a < 0.999 ? mult.a : max(mult.r, max(mult.g, mult.b));
+        texel.a *= multAlpha;
+    }
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), uErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(uErosionDrive, 0.0, 1.0)));
@@ -829,7 +838,12 @@ uniform float uErosionFeatherOut;
 out vec4 fragColor;
 void main(){
     vec4 t = texture(uTex, vUv);
-    if (uHasTexMult != 0) t *= texture(uTexMult, vUvMult);
+    if (uHasTexMult != 0) {
+        vec4 mult = texture(uTexMult, vUvMult);
+        t.rgb *= mult.rgb;
+        float multAlpha = mult.a < 0.999 ? mult.a : max(mult.r, max(mult.g, mult.b));
+        t.a *= multAlpha;
+    }
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), vErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(vErosionDrive, 0.0, 1.0)));

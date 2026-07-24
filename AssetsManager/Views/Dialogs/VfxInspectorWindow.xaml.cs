@@ -34,14 +34,16 @@ namespace AssetsManager.Views.Dialogs
         private GlVfxRenderer _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
 
-        // Camera control state
-        private float _camDistance = 350f;
-        private float _camYaw = 0f;
-        private float _camPitch = 20f;
-        private Vector3 _camTarget = Vector3.Zero;
-        private Point _lastMousePos;
-        private bool _isMouseDragging;
-        private bool _isRightDragging;
+        // Shared camera controller instance matching main 3D Model Viewport
+        private readonly System.Windows.Controls.Viewport3D _dummyViewport = new System.Windows.Controls.Viewport3D
+        {
+            Camera = new System.Windows.Media.Media3D.PerspectiveCamera(
+                new System.Windows.Media.Media3D.Point3D(0, 1130, 280),
+                new System.Windows.Media.Media3D.Vector3D(0, -0.14, -0.99),
+                new System.Windows.Media.Media3D.Vector3D(0, 0.99, -0.14),
+                45)
+        };
+        private CustomCameraController _cameraController;
 
         public VfxInspectorWindow(LogService logService = null)
         {
@@ -49,6 +51,8 @@ namespace AssetsManager.Views.Dialogs
             InitializeComponent();
             _logService = logService;
             DataContext = _model;
+
+            Unloaded += (s, e) => _cameraController?.Dispose();
 
             var settings = new OpenTK.Wpf.GLWpfControlSettings
             {
@@ -91,7 +95,8 @@ namespace AssetsManager.Views.Dialogs
                 _gridRenderer.Initialize(_gl, false);
                 _vfxRenderer = new GlVfxRenderer(_logService);
                 _vfxRenderer.Initialize(_gl);
-                _model.LogMessages.Add("[GL] OpenGL viewport & 3D grid initialized successfully.");
+                _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
+                _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
 
                 if (_model.SelectedSystem != null)
                 {
@@ -127,19 +132,20 @@ namespace AssetsManager.Views.Dialogs
 
             _gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit);
 
-            // Compute Orbit Camera View & Projection Matrices
-            float radYaw = _camYaw * MathF.PI / 180f;
-            float radPitch = _camPitch * MathF.PI / 180f;
-            Vector3 camEye = _camTarget + new Vector3(
-                _camDistance * MathF.Cos(radPitch) * MathF.Sin(radYaw),
-                _camDistance * MathF.Sin(radPitch),
-                _camDistance * MathF.Cos(radPitch) * MathF.Cos(radYaw)
-            );
+            // Build View/Projection matrices directly from CustomCameraController's PerspectiveCamera
+            var camera = _dummyViewport.Camera as System.Windows.Media.Media3D.PerspectiveCamera;
+            if (camera == null) return;
 
-            Matrix4x4 view = Matrix4x4.CreateLookAt(camEye, _camTarget, Vector3.UnitY);
+            var eye = new Vector3((float)camera.Position.X, (float)camera.Position.Y, (float)camera.Position.Z);
+            var lookDir = new Vector3((float)camera.LookDirection.X, (float)camera.LookDirection.Y, (float)camera.LookDirection.Z);
+            var target = eye + lookDir;
+            var up = new Vector3((float)camera.UpDirection.X, (float)camera.UpDirection.Y, (float)camera.UpDirection.Z);
+            var view = Matrix4x4.CreateLookAt(eye, target, up);
+
+            float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)Math.Max(1, OpenTkControl.ActualWidth) / (float)Math.Max(1, OpenTkControl.ActualHeight);
-            Matrix4x4 proj = Matrix4x4.CreatePerspectiveFieldOfView(45f * MathF.PI / 180f, aspect, 1f, 10000f);
-            Matrix4x4 viewProj = view * proj;
+            var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspect, 1f, 10000f);
+            var viewProj = view * proj;
 
             // Render 3D Ground Grid (matching main viewer)
             _gridRenderer?.Render(viewProj);
@@ -161,75 +167,11 @@ namespace AssetsManager.Views.Dialogs
 
         #endregion
 
-        #region Camera Interaction (Matching CustomCameraController)
+        #region Camera Control
 
-        private void OpenTkControl_MouseDown(object sender, MouseButtonEventArgs e)
+        public void ResetCamera()
         {
-            _lastMousePos = e.GetPosition(OpenTkControl);
-
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                _isMouseDragging = true;
-                OpenTkControl.Cursor = Cursors.SizeAll;
-                OpenTkControl.CaptureMouse();
-            }
-            else if (e.RightButton == MouseButtonState.Pressed)
-            {
-                _isRightDragging = true;
-                OpenTkControl.Cursor = Cursors.Hand;
-                OpenTkControl.CaptureMouse();
-            }
-        }
-
-        private void OpenTkControl_MouseMove(object sender, MouseEventArgs e)
-        {
-            Point current = e.GetPosition(OpenTkControl);
-            Vector diff = current - _lastMousePos;
-            _lastMousePos = current;
-
-            if (_isMouseDragging && e.LeftButton == MouseButtonState.Pressed)
-            {
-                _camYaw += (float)diff.X * 0.4f;
-                _camPitch = Math.Clamp(_camPitch - (float)diff.Y * 0.4f, -85f, 85f);
-            }
-            else if (_isRightDragging && e.RightButton == MouseButtonState.Pressed)
-            {
-                float panSpeed = _camDistance * 0.002f;
-                _camTarget.X -= (float)diff.X * panSpeed;
-                _camTarget.Y += (float)diff.Y * panSpeed;
-            }
-        }
-
-        private void OpenTkControl_MouseUp(object sender, MouseButtonEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Released && _isMouseDragging)
-            {
-                _isMouseDragging = false;
-                OpenTkControl.Cursor = Cursors.Arrow;
-                OpenTkControl.ReleaseMouseCapture();
-            }
-            if (e.RightButton == MouseButtonState.Released && _isRightDragging)
-            {
-                _isRightDragging = false;
-                OpenTkControl.Cursor = Cursors.Arrow;
-                OpenTkControl.ReleaseMouseCapture();
-            }
-        }
-
-        private void OpenTkControl_MouseWheel(object sender, MouseWheelEventArgs e)
-        {
-            float speedMultiplier = 1.0f;
-            if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
-            {
-                speedMultiplier = 5.0f; // Turbo Mode (Matching CustomCameraController)
-            }
-            else if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
-            {
-                speedMultiplier = 0.2f; // Precision Mode (Matching CustomCameraController)
-            }
-
-            float delta = (e.Delta > 0 ? -30f : 30f) * speedMultiplier;
-            _camDistance = Math.Clamp(_camDistance + delta, 10f, 5000f);
+            _cameraController?.Reset();
         }
 
         #endregion
@@ -466,8 +408,7 @@ namespace AssetsManager.Views.Dialogs
 
             _model.TotalDuration = maxDur;
             _model.CurrentTime = 0;
-            _camDistance = 120f;
-            _camTarget = Vector3.Zero;
+            _cameraController?.Reset();
 
             _vfxRenderer?.SetVfxSystem(systemModel);
             _vfxRenderer?.Play();
