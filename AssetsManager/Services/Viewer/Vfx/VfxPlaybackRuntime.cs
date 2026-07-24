@@ -290,7 +290,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             Vector3 finalBirthSize = new Vector3(
                 birthScale.X,
                 (birthScale.Y <= 0.001f || (birthScale.X > 5.0f && birthScale.Y <= 2.0f)) ? birthScale.X : birthScale.Y,
-                birthScale.Z <= 0.001f ? birthScale.X : birthScale.Z);
+                (birthScale.Z <= 0.001f) ? (birthScale.X > 5.0f ? 1.0f : birthScale.X) : birthScale.Z);
 
             s.Particles.Add(new Particle
             {
@@ -383,7 +383,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = p.Rot + lifeRotation.X;
                 buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
                 buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
-                buf[k++] = p.BirthSize.Z * scaleMul.Z;
+                float sizeZ = p.BirthSize.Z * (scaleMul.Z <= 0.001f ? 1.0f : scaleMul.Z);
+                if (d.IsMeshPrimitive && sizeZ <= 0.01f) sizeZ = 1.0f;
+                buf[k++] = sizeZ;
                 Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
                     + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
