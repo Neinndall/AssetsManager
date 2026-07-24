@@ -388,7 +388,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult, _muFlipVMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muFlipU, _muFlipV;
-        private int _muBirthUvOffset, _muUvScale, _muUvRotation;
+        private int _muBirthUvOffset, _muUvScale, _muUvRotation, _muTexDivMesh;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
         private uint _whiteTex;
 
@@ -403,6 +403,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
+                _muTexDivMesh = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muUvOffset = _gl.GetUniformLocation(_meshProgram, "uUvOffset");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
                 _muTexMult = _gl.GetUniformLocation(_meshProgram, "uTexMult");
@@ -534,6 +535,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muErosionTex, 4);
             _gl.Uniform1(_muHasTexMult, es.TextureMult != 0 ? 1 : 0);
+            _gl.Uniform2(_muTexDivMesh, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
             Vector2 textureMultTexDiv = es.Def.TextureMultTexDiv;
             _gl.Uniform2(
                 _muTexDivMult,
@@ -624,6 +626,7 @@ uniform vec2 uEmitterUvOffset;
 uniform vec2 uUvOffsetMult;
 uniform vec2 uUvScaleMult;
 uniform float uUvRotationMult;
+uniform vec2 uTexDiv;
 uniform vec2 uTexDivMult;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
@@ -654,7 +657,7 @@ void main(){
     baseUv = centeredUv + vec2(0.5) + uBirthUvOffset;
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
-    vUv = baseUv + uUvOffset + uEmitterUvOffset;
+    vUv = (baseUv / max(uTexDiv, vec2(1.0))) + uUvOffset + uEmitterUvOffset;
     vec2 multUv = aUv;
     vec2 centeredMultUv = (multUv - vec2(0.5)) * uUvScaleMult;
     float multSin = sin(uUvRotationMult); float multCos = cos(uUvRotationMult);
