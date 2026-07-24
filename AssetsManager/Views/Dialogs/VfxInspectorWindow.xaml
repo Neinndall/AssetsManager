@@ -350,15 +350,29 @@
                                                     </ItemsControl>
                                                 </StackPanel>
 
-                                                <!-- Playhead Needle Overlay Canvas -->
-                                                <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False">
-                                                    <!-- Vertical Red Line sweeping across timeline -->
-                                                    <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
-                                                          Stroke="#FF4D4D" StrokeThickness="2"/>
-                                                    <!-- Yellow Playhead Handle Indicator -->
-                                                    <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
-                                                             Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"/>
-                                                </Canvas>
+                                                 <!-- Active System Loop Boundary Needle Overlay Canvas (Matching linea_tiempo.png) -->
+                                                 <Canvas x:Name="LoopBoundaryCanvas" IsHitTestVisible="False">
+                                                     <!-- Vertical Golden Amber Line marking system loop boundary -->
+                                                     <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                           Stroke="#FFD700" StrokeThickness="2"/>
+                                                     <!-- Top Golden Handle Circle with Amber Glow -->
+                                                     <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-5" Canvas.Top="0"
+                                                              Width="10" Height="10" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5">
+                                                         <Ellipse.Effect>
+                                                             <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.8"/>
+                                                         </Ellipse.Effect>
+                                                     </Ellipse>
+                                                 </Canvas>
+
+                                                 <!-- Playhead Needle Overlay Canvas -->
+                                                 <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False">
+                                                     <!-- Vertical Red Line sweeping across timeline -->
+                                                     <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                           Stroke="#FF4D4D" StrokeThickness="2"/>
+                                                     <!-- Red Playhead Top Circle Indicator -->
+                                                     <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
+                                                              Width="8" Height="8" Fill="#FF4D4D" Stroke="#18181B" StrokeThickness="1"/>
+                                                 </Canvas>
                                             </Grid>
                                         </Grid>
                                     </ScrollViewer>
@@ -412,6 +426,7 @@
                                                     <Run Text="{Binding CurrentTime, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource AccentBrush}"/>
                                                     <Run Text=" / " Foreground="{StaticResource TextMuted}"/>
                                                     <Run Text="{Binding TotalDuration, Mode=OneWay, StringFormat={}{0:F2}s}" Foreground="{StaticResource TextMuted}"/>
+                                                    <Run Text="{Binding ActiveLoopDurationText, Mode=OneWay}" Foreground="#FFD700"/>
                                                 </TextBlock>
                                             </Grid>
 

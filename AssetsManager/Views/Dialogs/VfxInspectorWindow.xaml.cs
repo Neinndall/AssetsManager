@@ -151,7 +151,8 @@ namespace AssetsManager.Views.Dialogs
             if (_model.IsPlaying && !_isUserSeeking)
             {
                 _vfxRenderer.Update(dt);
-                if (_model.CurrentTime >= _model.TotalDuration || (_model.LiveParticleCount == 0 && _model.CurrentTime > 0.15))
+                double loopBoundary = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : _model.TotalDuration;
+                if (_model.CurrentTime >= loopBoundary || (_model.LiveParticleCount == 0 && _model.CurrentTime > 0.15))
                 {
                     _model.CurrentTime = 0;
                     _vfxRenderer.Seek(0);
@@ -400,7 +401,10 @@ namespace AssetsManager.Views.Dialogs
                 double total = timeBefore + emitLife + partLife;
                 if (total > maxDur) maxDur = total;
             }
-            if (maxDur <= 0) maxDur = 5.0;
+            if (maxDur <= 0) maxDur = 1.5;
+            double timelineMax = Math.Max(maxDur, 3.0);
+            _model.ActiveLoopDuration = maxDur;
+            _model.TotalDuration = timelineMax;
 
             // 1. Prepare playback in OpenGL Viewport
             var systemModel = new VfxSystemModel
@@ -410,7 +414,7 @@ namespace AssetsManager.Views.Dialogs
                 SystemCatalog = _activeBundle?.Systems ?? new Dictionary<uint, VfxSystemDefinition>(),
                 ResourceMap = _activeBundle?.ResourceMap ?? new Dictionary<uint, uint>(),
                 SearchDirectory = searchDir,
-                TotalDuration = maxDur,
+                TotalDuration = timelineMax,
                 Speed = _model.Speed
             };
 
@@ -576,6 +580,17 @@ namespace AssetsManager.Views.Dialogs
             PlayheadLine.X1 = posX;
             PlayheadLine.X2 = posX;
             Canvas.SetLeft(PlayheadHandle, posX - 4);
+
+            if (LoopBoundaryLine != null && LoopBoundaryHandle != null)
+            {
+                double loopDur = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : totalDur;
+                double loopRatio = Math.Clamp(loopDur / totalDur, 0.0, 1.0);
+                double loopPosX = loopRatio * availableWidth;
+
+                LoopBoundaryLine.X1 = loopPosX;
+                LoopBoundaryLine.X2 = loopPosX;
+                Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 5);
+            }
         }
 
         private bool _isTimelineDragging;

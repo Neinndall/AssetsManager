@@ -420,6 +420,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isPlaying;
         private double _currentTime;
         private double _totalDuration = 5.0;
+        private double _activeLoopDuration = 1.32;
         private float _speed = 1.0f;
         private int _liveParticleCount;
         private string _bgMode = "Dark";
@@ -432,6 +433,14 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
         public ObservableCollection<VfxMeshDiagnosticItem> Meshes { get; } = new();
         public ObservableCollection<string> LogMessages { get; } = new();
+
+        public double ActiveLoopDuration
+        {
+            get => _activeLoopDuration;
+            set { _activeLoopDuration = value; OnPropertyChanged(); OnPropertyChanged(nameof(ActiveLoopDurationText)); }
+        }
+
+        public string ActiveLoopDurationText => _activeLoopDuration > 0 ? $" · ↺ {_activeLoopDuration:F2}s" : string.Empty;
 
         public string RootPath
         {
