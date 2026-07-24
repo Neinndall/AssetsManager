@@ -420,7 +420,7 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isPlaying;
         private double _currentTime;
         private double _totalDuration = 5.0;
-        private double _activeLoopDuration = 1.32;
+        private double _activeLoopDuration = 0.0;
         private float _speed = 1.0f;
         private int _liveParticleCount;
         private string _bgMode = "Dark";
