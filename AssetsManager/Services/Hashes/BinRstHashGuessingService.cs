@@ -556,7 +556,8 @@ namespace AssetsManager.Services.Hashes
             [InternalHashKind.BinTypes] = new(),
             [InternalHashKind.BinHashes] = new(),
             [InternalHashKind.RstXxh3] = new(),
-            [InternalHashKind.RstXxh64] = new()
+            [InternalHashKind.RstXxh64] = new(),
+            [InternalHashKind.SklJoints] = new()
         };
 
         private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed)
@@ -1313,6 +1314,9 @@ namespace AssetsManager.Services.Hashes
                 {
                     Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
                     Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+
+                    uint elf = Elf.HashLower(candidate);
+                    Check32(InternalHashKind.SklJoints, elf, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(elf, localTargets, InternalHashKind.SklJoints));
                 }
 
                 if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
@@ -1372,9 +1376,13 @@ namespace AssetsManager.Services.Hashes
 
             private static bool HasLocalEvidence(
                 uint hash,
-                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets)
+                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets,
+                InternalHashKind specificKind = InternalHashKind.BinFields)
             {
                 if (localTargets == null) return false;
+                if (specificKind == InternalHashKind.SklJoints)
+                    return localTargets.TryGetValue(InternalHashKind.SklJoints, out var joints) && joints.Contains(hash);
+
                 return (localTargets.TryGetValue(InternalHashKind.BinEntries, out var entries) && entries.Contains(hash)) ||
                        (localTargets.TryGetValue(InternalHashKind.BinHashes, out var hashes) && hashes.Contains(hash)) ||
                        (localTargets.TryGetValue(InternalHashKind.BinFields, out var fields) && fields.Contains(hash)) ||

@@ -10,7 +10,8 @@ namespace AssetsManager.Views.Models.Hashes
         BinTypes,
         BinHashes,
         RstXxh3,
-        RstXxh64
+        RstXxh64,
+        SklJoints
     }
 
     public enum InternalHashGuessStrategy
@@ -46,7 +47,9 @@ namespace AssetsManager.Views.Models.Hashes
             InternalHashKind.BinTypes => "BIN Types",
             InternalHashKind.BinHashes => "BIN Hashes",
             InternalHashKind.RstXxh3 => "RST XXH3",
-            _ => "RST XXH64"
+            InternalHashKind.RstXxh64 => "RST XXH64",
+            InternalHashKind.SklJoints => "SKL Joints (ELF)",
+            _ => "Unknown Domain"
         };
         public string Path => Value;
         public string StrategyText => $"{Strategy} · Verified";
