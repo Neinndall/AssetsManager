@@ -48,7 +48,13 @@ namespace AssetsManager.Services.Viewer.Vfx
             set => Root.UserTag = value;
         }
 
-        public void SetTransform(Matrix4x4 transform) => Root.SetTransform(transform);
+        public void SetTransform(Matrix4x4 transform)
+        {
+            foreach (VfxPlaybackRuntime runtime in _runtimes)
+            {
+                runtime.SetTransform(transform);
+            }
+        }
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
         public void Reset()
@@ -122,16 +128,20 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (VfxChildSystemReference child in childSet.Children)
             {
                 uint systemHash = child.SystemHash;
-                if (systemHash == 0 && child.EffectKey != 0)
+                VfxSystemDefinition definition = null;
+                if (systemHash != 0) _systems.TryGetValue(systemHash, out definition);
+                if (definition is null && child.EffectKey != 0)
                 {
-                    if (!_resourceMap.TryGetValue(child.EffectKey, out systemHash))
-                        systemHash = child.EffectKey;
+                    if (_resourceMap.TryGetValue(child.EffectKey, out uint mappedHash))
+                        _systems.TryGetValue(mappedHash, out definition);
+                    if (definition is null) _systems.TryGetValue(child.EffectKey, out definition);
                 }
-                if (systemHash == 0 && !string.IsNullOrEmpty(child.Name))
+                if (definition is null && !string.IsNullOrEmpty(child.Name))
                 {
-                    systemHash = VfxResourceResolver.Fnv1a(child.Name);
+                    uint lowerHash = VfxResourceResolver.Fnv1a(child.Name);
+                    _systems.TryGetValue(lowerHash, out definition);
                 }
-                if (!_systems.TryGetValue(systemHash, out VfxSystemDefinition definition)) continue;
+                if (definition is null) continue;
                 if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) break;
                 _pendingChildren.Add(CreateRuntime(definition, childTransform, parentDepth + 1));
             }

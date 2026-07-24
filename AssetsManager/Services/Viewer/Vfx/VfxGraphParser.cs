@@ -402,7 +402,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 RateIsPeriod: GetBool(p, F_rateIsPeriod),
                 BirthTimePeriod: GetF32(p, F_birthTimePeriod) ?? 0f,
                 IsLoop: GetBool(p, F_isLoop),
-                BlendMode: GetU8(p, F_blendMode) ?? 0,
+                BlendMode: GetU8(p, F_blendMode) ?? (byte?)(AsU32(Get(p, F_blendMode))) ?? 0,
                 BirthScale: birthScale,
                 ScaleOverLife: scaleOverLife,
                 BirthColor: birthColor,

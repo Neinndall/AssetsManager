@@ -284,13 +284,13 @@ namespace AssetsManager.Services.Viewer.Vfx
             float textureMultBirthUvRotateRate = d.TextureMultBirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
 
             var localOffset = d.SpawnShape?.SampleOffset(_rng, emitterT) ?? Vector3.Zero;
-            var worldOffset = Vector3.TransformNormal(localOffset, _worldTransform);
+            var worldOffset = Vector3.Transform(localOffset, _worldTransform) - Vector3.Transform(Vector3.Zero, _worldTransform);
             vel = Vector3.TransformNormal(vel, _worldTransform);
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
             Vector3 finalBirthSize = new Vector3(
                 birthScale.X,
-                (birthScale.Y <= 0.001f || (birthScale.X > 5.0f && birthScale.Y <= 2.0f)) ? birthScale.X : birthScale.Y,
-                (birthScale.Z <= 0.001f) ? (birthScale.X > 5.0f ? 1.0f : birthScale.X) : birthScale.Z);
+                birthScale.Y <= 0.001f ? birthScale.X : birthScale.Y,
+                birthScale.Z <= 0.001f ? birthScale.X : birthScale.Z);
 
             s.Particles.Add(new Particle
             {
@@ -355,7 +355,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
                 float sizeY = p.BirthSize.Y * (scaleMul.Y <= 0.001f ? scaleMul.X : scaleMul.Y);
-                if (sizeY <= 0.05f * sizeX && sizeX > 5.0f) sizeY = sizeX;
                 Vector3 direction = p.Vel;
                 if (isTrail)
                 {
@@ -380,9 +379,21 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
                 Vector3 lifeRotation = d.RotationOverLife?.Sample(t) ?? Vector3.Zero;
                 lifeRotation *= MathF.PI / 180f;
-                buf[k++] = p.Rot + lifeRotation.X;
-                buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
-                buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
+                if (d.IsDirectionOriented && direction.LengthSquared() > 1e-6f)
+                {
+                    Vector3 dir = Vector3.Normalize(direction);
+                    float yaw = MathF.Atan2(dir.X, dir.Z);
+                    float pitch = MathF.Asin(Math.Clamp(-dir.Y, -1f, 1f));
+                    buf[k++] = pitch + lifeRotation.X;
+                    buf[k++] = yaw + lifeRotation.Y;
+                    buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
+                }
+                else
+                {
+                    buf[k++] = p.Rot + lifeRotation.X;
+                    buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
+                    buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
+                }
                 float sizeZ = p.BirthSize.Z * (scaleMul.Z <= 0.001f ? 1.0f : scaleMul.Z);
                 if (d.IsMeshPrimitive && sizeZ <= 0.01f) sizeZ = 1.0f;
                 buf[k++] = sizeZ;

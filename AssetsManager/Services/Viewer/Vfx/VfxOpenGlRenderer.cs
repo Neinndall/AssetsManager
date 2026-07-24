@@ -174,7 +174,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindTexture(TextureTarget.Texture2D, tex);
 
             _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0,
-                PixelFormat.Bgra, PixelType.UnsignedByte, new ReadOnlySpan<byte>(rgba));
+                PixelFormat.Rgba, PixelType.UnsignedByte, new ReadOnlySpan<byte>(rgba));
 
             _gl.GenerateMipmap(TextureTarget.Texture2D);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
@@ -182,8 +182,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _ownedTextures.Add(tex);
             _texHasAlpha[tex] = hasAlpha;
+            _ownedTextures.Add(tex);
             return tex;
         }
 
@@ -243,8 +243,11 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             foreach (var es in sim.Emitters)
             {
-                if (es.InstanceCount == 0) continue;
-                if (es.MeshVao != 0) { RenderMeshEmitter(es, viewProj); continue; }
+                if (es.Def.IsMeshPrimitive)
+                {
+                    if (es.MeshVao != 0) RenderMeshEmitter(es, viewProj);
+                    continue;
+                }
                 bool isDistortion = es.Def.Distortion is not null;
                 if (isDistortion && (es.DistortionTexture == 0 || _sceneTexture == 0)) continue;
 
@@ -308,16 +311,24 @@ namespace AssetsManager.Services.Viewer.Vfx
                     ApplyAddressMode(es.Def.TextureMultAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
+                if (_sceneTexture != 0)
+                {
+                    _gl.ActiveTexture(TextureUnit.Texture2);
+                    _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
+                    _gl.ActiveTexture(TextureUnit.Texture0);
+                }
                 if (es.DistortionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture3);
                     _gl.BindTexture(TextureTarget.Texture2D, es.DistortionTexture);
+                    ApplyAddressMode(renderState.TextureAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 if (es.ErosionTexture != 0)
                 {
                     _gl.ActiveTexture(TextureUnit.Texture4);
                     _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
+                    ApplyAddressMode(es.Def.AlphaErosion?.AddressMode ?? renderState.TextureAddressMode);
                     _gl.ActiveTexture(TextureUnit.Texture0);
                 }
                 _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)es.InstanceCount);
@@ -338,10 +349,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
-
-        private static bool IsAdditive(int blendMode) => blendMode is 1 or 3 or 4 or 5;
-
-        private bool IsAdditiveFor(int blendMode, uint texture) => IsAdditive(blendMode);
 
         private void ApplyAddressMode(int addressMode)
         {
@@ -523,6 +530,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
+            if (es.MeshVao == 0 || es.MeshIndexCount == 0) return;
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
@@ -560,6 +568,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 _gl.ActiveTexture(TextureUnit.Texture4);
                 _gl.BindTexture(TextureTarget.Texture2D, es.ErosionTexture);
+                ApplyAddressMode(es.Def.AlphaErosion?.AddressMode ?? renderState.TextureAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
             if (renderState.DisableBackfaceCull) _gl.Disable(EnableCap.CullFace);
@@ -758,9 +767,8 @@ void main(){
             right = normalize(side);
             up = dir;
         } else {
-            float vx = dot(vel, uCamRight);
-            float vy = dot(vel, uCamUp);
-            if (abs(vx) + abs(vy) > 0.0001) rotation = atan(-vx, vy);
+            right = placedRight;
+            up = placedUp;
         }
     }
 
@@ -771,6 +779,10 @@ void main(){
     if (uPrimitiveKind == 7 || uPrimitiveKind == 8) {
         float alongRay = aCorner.y + 0.5;
         world = aCenter + up * (alongRay * aSize.y) + right * (rc.x * aSize.x);
+    } else if (uIsGroundLayer != 0 || uPrimitiveKind == 10) {
+        vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
+        vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
+        world = aCenter + groundRight * (rc.x * aSize.x) + groundForward * (rc.y * aSize.y) + vec3(0.0, 0.02, 0.0);
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
     }
@@ -850,6 +862,18 @@ void main(){
         return;
     }
     fragColor = t * vColor;
-}";
+}        ";
+
+        private static bool IsAdditive(int blendMode) => blendMode is 1 or 3 or 4 or 5;
+
+        private bool IsAdditiveFor(int blendMode, uint texture)
+        {
+            if (IsAdditive(blendMode)) return true;
+            if (texture != 0 && _texHasAlpha.TryGetValue(texture, out bool hasAlpha) && !hasAlpha)
+            {
+                return true;
+            }
+            return false;
+        }
     }
 }

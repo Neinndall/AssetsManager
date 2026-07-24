@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\Downloads\Workspace\AssetsManager\AssetsManager_v4.1.0.3\AssetsManager\AssetsManager.csproj" />
+  </ItemGroup>
+</Project>
