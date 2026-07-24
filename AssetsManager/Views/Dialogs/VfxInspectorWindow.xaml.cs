@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using Vector = System.Windows.Vector;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
@@ -35,13 +36,9 @@ namespace AssetsManager.Views.Dialogs
         private VfxLoadingService.Bundle _activeBundle;
 
         // Shared camera controller instance matching main 3D Model Viewport
-        private readonly System.Windows.Controls.Viewport3D _dummyViewport = new System.Windows.Controls.Viewport3D
+        private readonly Viewport3D _dummyViewport = new Viewport3D
         {
-            Camera = new System.Windows.Media.Media3D.PerspectiveCamera(
-                new System.Windows.Media.Media3D.Point3D(0, 1130, 280),
-                new System.Windows.Media.Media3D.Vector3D(0, -0.14, -0.99),
-                new System.Windows.Media.Media3D.Vector3D(0, 0.99, -0.14),
-                45)
+            Camera = new PerspectiveCamera(new Point3D(0, 1130, 280), new Vector3D(0, -0.14, -0.99), new Vector3D(0, 0.99, -0.14), 45)
         };
         private CustomCameraController _cameraController;
 
@@ -133,7 +130,7 @@ namespace AssetsManager.Views.Dialogs
             _gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit);
 
             // Build View/Projection matrices directly from CustomCameraController's PerspectiveCamera
-            var camera = _dummyViewport.Camera as System.Windows.Media.Media3D.PerspectiveCamera;
+            var camera = _dummyViewport.Camera as PerspectiveCamera;
             if (camera == null) return;
 
             var eye = new Vector3((float)camera.Position.X, (float)camera.Position.Y, (float)camera.Position.Z);
