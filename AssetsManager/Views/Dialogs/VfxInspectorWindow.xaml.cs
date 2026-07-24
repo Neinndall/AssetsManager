@@ -381,7 +381,7 @@ namespace AssetsManager.Views.Dialogs
             foreach (var e in def.Emitters)
             {
                 double timeBefore = e.TimeBeforeFirstEmission;
-                double emitLife = e.EmitterLifetime ?? 3.0;
+                double emitLife = e.EmitterLifetime ?? 0.1;
                 double partLife = e.ParticleLifetime.Constant > 0 
                     ? e.ParticleLifetime.Constant 
                     : (e.ParticleLifetime.Values != null && e.ParticleLifetime.Values.Length > 0 ? e.ParticleLifetime.Values.Max() : 1.5);

@@ -244,7 +244,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (es.InstanceCount == 0) continue;
-                if (es.Texture == 0 && !es.Def.IsMeshPrimitive) continue;
                 if (es.MeshVao != 0) { RenderMeshEmitter(es, viewProj); continue; }
                 bool isDistortion = es.Def.Distortion is not null;
                 if (isDistortion && (es.DistortionTexture == 0 || _sceneTexture == 0)) continue;

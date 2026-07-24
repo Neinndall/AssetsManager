@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed playback and rendering for fast impulse hit effects (like Sett_Base_BA_Hit_01) by allowing fallback texture rendering and accurate short-duration timeline calculation.
   - Viewer VFX Studio / Fixed duplicate skin entries in skin selector by filtering strictly for BIN files inside /skins/ folder.
   - Viewer VFX Studio / Fixed sub-UV texture atlas grid scaling (TexDiv) for mesh emitters to eliminate tiled square particle artifacts.
   - Viewer VFX Studio / Fixed stencil mask handling (negative RenderPass) to eliminate black stencil cap box mesh artifacts in particle craters.
