@@ -44,25 +44,28 @@ namespace AssetsManager.Services.Viewer.Vfx
             string authoredPath,
             string searchDirectory)
         {
-            string key = CreateKey(string.IsNullOrWhiteSpace(authoredPath) ? "__avatar_mesh__" : authoredPath, searchDirectory);
-            if (_meshes.TryGetValue(key, out var cached)) return cached;
-
             if (string.IsNullOrWhiteSpace(authoredPath))
             {
                 string champPath = FindChampionMesh(searchDirectory);
+                string avatarKey = CreateKey(champPath ?? "__fallback_quad__", searchDirectory);
+                if (_meshes.TryGetValue(avatarKey, out var cachedAvatar)) return cachedAvatar;
+
                 if (champPath != null)
                 {
                     var champMesh = DecodeMesh(champPath);
                     if (champMesh != null)
                     {
-                        _meshes[key] = champMesh;
+                        _meshes[avatarKey] = champMesh;
                         return champMesh;
                     }
                 }
                 var fallback = GetFallbackQuadMesh();
-                _meshes[key] = fallback;
+                _meshes[avatarKey] = fallback;
                 return fallback;
             }
+
+            string key = CreateKey(authoredPath, searchDirectory);
+            if (_meshes.TryGetValue(key, out var cached)) return cached;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, MeshExtensions);
             var mesh = resolvedPath == null ? null : DecodeMesh(resolvedPath);
