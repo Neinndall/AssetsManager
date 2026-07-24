@@ -1295,7 +1295,7 @@ namespace AssetsManager.Services.Hashes
                     DiscardedCandidates++;
                     return;
                 }
-                string candidate = value.Trim().ToLowerInvariant().Replace('\\', '/');
+                string candidate = PathUtils.NormalizePath(value.Trim());
                 uint fnv = Fnv1a.HashLower(candidate);
                 bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
                 bool crossDictionary = strategy == InternalHashGuessStrategy.CrossDictionary;
@@ -1345,7 +1345,7 @@ namespace AssetsManager.Services.Hashes
                     return false;
                 }
 
-                string candidate = value.Trim().ToLowerInvariant().Replace('\\', '/');
+                string candidate = PathUtils.NormalizePath(value.Trim());
                 uint computedHash = Fnv1a.HashLower(candidate);
                 if (observedHash.HasValue && computedHash != observedHash.Value)
                 {
