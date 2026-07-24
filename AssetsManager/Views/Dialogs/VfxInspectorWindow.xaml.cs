@@ -398,7 +398,9 @@ namespace AssetsManager.Views.Dialogs
                     if (maxKeyframe > partLife) partLife = maxKeyframe;
                 }
 
-                double total = timeBefore + emitLife + partLife;
+                double total = e.IsSingleParticle 
+                    ? (timeBefore + partLife) 
+                    : (timeBefore + (e.EmitterLifetime.HasValue ? e.EmitterLifetime.Value : 0.0) + partLife);
                 if (total > maxDur) maxDur = total;
             }
             if (maxDur <= 0) maxDur = 1.5;
@@ -591,6 +593,49 @@ namespace AssetsManager.Views.Dialogs
                 LoopBoundaryLine.X2 = loopPosX;
                 Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 5);
             }
+        }
+
+        private bool _isDraggingLoopBoundary;
+
+        private void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            _isDraggingLoopBoundary = true;
+            ((UIElement)sender).CaptureMouse();
+            UpdateLoopBoundaryFromMouse(e.GetPosition(TracksCanvasContainer).X);
+            e.Handled = true;
+        }
+
+        private void LoopBoundaryHandle_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDraggingLoopBoundary && e.LeftButton == MouseButtonState.Pressed)
+            {
+                UpdateLoopBoundaryFromMouse(e.GetPosition(TracksCanvasContainer).X);
+                e.Handled = true;
+            }
+        }
+
+        private void LoopBoundaryHandle_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_isDraggingLoopBoundary)
+            {
+                _isDraggingLoopBoundary = false;
+                ((UIElement)sender).ReleaseMouseCapture();
+                e.Handled = true;
+            }
+        }
+
+        private void UpdateLoopBoundaryFromMouse(double mouseX)
+        {
+            if (_model == null || TracksCanvasContainer == null) return;
+            double availableWidth = TracksCanvasContainer.ActualWidth;
+            if (availableWidth <= 0) return;
+
+            double totalDur = _model.TotalDuration > 0 ? _model.TotalDuration : 3.0;
+            double ratio = Math.Clamp(mouseX / availableWidth, 0.02, 1.0);
+            double newLoopDur = Math.Round(ratio * totalDur, 2);
+
+            _model.ActiveLoopDuration = Math.Max(0.05, newLoopDur);
+            UpdatePlayheadPosition();
         }
 
         private bool _isTimelineDragging;
