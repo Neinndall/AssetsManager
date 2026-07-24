@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed duplicate skin entries in skin selector by filtering strictly for BIN files inside /skins/ folder.
   - Viewer VFX Studio / Fixed sub-UV texture atlas grid scaling (TexDiv) for mesh emitters to eliminate tiled square particle artifacts.
   - Viewer VFX Studio / Fixed stencil mask handling (negative RenderPass) to eliminate black stencil cap box mesh artifacts in particle craters.
   - Viewer VFX Studio / Fixed blend mode handling for additive particle emitters (blendMode 4 & 5) to eliminate black rectangular overlays in ground effects.

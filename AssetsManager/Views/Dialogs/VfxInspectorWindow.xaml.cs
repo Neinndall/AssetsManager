@@ -213,10 +213,11 @@ namespace AssetsManager.Views.Dialogs
 
                 var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
                 
-                // Filter strictly for skin BINs inside /skins/ directory
+                // Filter strictly for skin BINs named skin0.bin, skin1.bin, skin10.bin, etc. inside /skins/ folder
                 var skinBinFiles = binFiles
                     .Where(b => b.Contains($"{Path.DirectorySeparatorChar}skins{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
                                 b.Contains("/skins/", StringComparison.OrdinalIgnoreCase))
+                    .Where(b => Path.GetFileNameWithoutExtension(b).StartsWith("skin", StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
                 var skinItems = new List<VfxSkinItem>();
@@ -225,7 +226,7 @@ namespace AssetsManager.Views.Dialogs
                 {
                     string fileName = Path.GetFileNameWithoutExtension(binPath);
                     int skinIndex = ExtractSkinIndex(fileName);
-                    string displayName = skinIndex == 0 ? "Skin Base" : (skinIndex > 0 ? $"Skin {skinIndex}" : fileName);
+                    string displayName = skinIndex == 0 ? "Skin Base (skin0)" : (skinIndex > 0 ? $"Skin {skinIndex} ({fileName})" : fileName);
 
                     skinItems.Add(new VfxSkinItem
                     {
@@ -241,7 +242,7 @@ namespace AssetsManager.Views.Dialogs
                     _model.DetectedSkins.Add(item);
                 }
 
-                // Fallback: If no /skins/*.bin files were found (e.g. non-standard folder), show general BIN files cleanly
+                // Fallback: If no skin*.bin files were found (e.g. non-standard folder), show general BIN files cleanly
                 if (_model.DetectedSkins.Count == 0)
                 {
                     foreach (var binPath in binFiles.OrderBy(b => b))
@@ -274,10 +275,15 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
-        private static int ExtractSkinIndex(string skinName)
+        private static int ExtractSkinIndex(string fileName)
         {
-            if (string.IsNullOrEmpty(skinName)) return -1;
-            string digits = new string(skinName.Where(char.IsDigit).ToArray());
+            if (string.IsNullOrEmpty(fileName)) return -1;
+            if (fileName.StartsWith("skin", StringComparison.OrdinalIgnoreCase))
+            {
+                string numPart = fileName.Substring(4);
+                if (int.TryParse(numPart, out int skinId)) return skinId;
+            }
+            string digits = new string(fileName.Where(char.IsDigit).ToArray());
             return int.TryParse(digits, out int val) ? val : -1;
         }
 
