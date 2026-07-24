@@ -434,7 +434,7 @@ namespace AssetsManager.Views.Dialogs
                 string meshPath = emitter.MeshPath;
 
                 BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _resolver.ResolveTexture(texPath, searchDir);
-                var mesh = emitter.IsMeshPrimitive && !string.IsNullOrEmpty(meshPath) ? _resolver.ResolveMesh(meshPath, searchDir) : null;
+                var mesh = emitter.IsMeshPrimitive ? _resolver.ResolveMesh(meshPath, searchDir) : null;
 
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {

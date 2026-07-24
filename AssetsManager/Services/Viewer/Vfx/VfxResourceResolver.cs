@@ -44,14 +44,58 @@ namespace AssetsManager.Services.Viewer.Vfx
             string authoredPath,
             string searchDirectory)
         {
-            if (string.IsNullOrWhiteSpace(authoredPath)) return null;
-            string key = CreateKey(authoredPath, searchDirectory);
+            string key = CreateKey(string.IsNullOrWhiteSpace(authoredPath) ? "__avatar_mesh__" : authoredPath, searchDirectory);
             if (_meshes.TryGetValue(key, out var cached)) return cached;
+
+            if (string.IsNullOrWhiteSpace(authoredPath))
+            {
+                string champPath = FindChampionMesh(searchDirectory);
+                if (champPath != null)
+                {
+                    var champMesh = DecodeMesh(champPath);
+                    if (champMesh != null)
+                    {
+                        _meshes[key] = champMesh;
+                        return champMesh;
+                    }
+                }
+                var fallback = GetFallbackQuadMesh();
+                _meshes[key] = fallback;
+                return fallback;
+            }
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, MeshExtensions);
             var mesh = resolvedPath == null ? null : DecodeMesh(resolvedPath);
+            if (mesh == null) mesh = GetFallbackQuadMesh();
             _meshes[key] = mesh;
             return mesh;
+        }
+
+        private static string FindChampionMesh(string searchDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(searchDirectory)) return null;
+            try
+            {
+                var dir = new DirectoryInfo(searchDirectory);
+                while (dir != null && dir.Exists)
+                {
+                    var skn = dir.GetFiles("*.skn", SearchOption.AllDirectories).FirstOrDefault();
+                    if (skn != null) return skn.FullName;
+                    var scb = dir.GetFiles("*.scb", SearchOption.AllDirectories).FirstOrDefault();
+                    if (scb != null) return scb.FullName;
+                    dir = dir.Parent;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static (float[] Positions, float[] Uvs, uint[] Indices) GetFallbackQuadMesh()
+        {
+            float[] pos = { -50f, -50f, 0f, 50f, -50f, 0f, 50f, 50f, 0f, -50f, 50f, 0f };
+            float[] uvs = { 0f, 1f, 1f, 1f, 1f, 0f, 0f, 0f };
+            uint[] idx = { 0, 1, 2, 0, 2, 3 };
+            return (pos, uvs, idx);
         }
 
         public string ResolveBin(string authoredPath, string searchDirectory)
