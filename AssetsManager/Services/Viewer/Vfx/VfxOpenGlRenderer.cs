@@ -244,8 +244,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (es.InstanceCount == 0) continue;
-                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
-                if (renderState.RenderPass < 0) continue;
                 if (es.Texture == 0 && !es.Def.IsMeshPrimitive) continue;
                 if (es.MeshVao != 0) { RenderMeshEmitter(es, viewProj); continue; }
                 bool isDistortion = es.Def.Distortion is not null;
@@ -287,6 +285,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
                 _gl.Uniform1(_uIsGroundLayer, (es.Def.IsGroundLayer || es.Def.IsFollowingTerrain || es.Def.PrimitiveKind == VfxPrimitiveKind.PlanarProjection) ? 1 : 0);
+                _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
+                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
                 _gl.Uniform1(_uFlipU, renderState.FlipU ? 1 : 0);
                 _gl.Uniform1(_uFlipV, renderState.FlipV ? 1 : 0);
@@ -388,7 +388,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult, _muFlipVMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muFlipU, _muFlipV;
-        private int _muBirthUvOffset, _muUvScale, _muUvRotation, _muTexDivMesh;
+        private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
         private uint _whiteTex;
 
@@ -403,7 +403,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
-                _muTexDivMesh = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muUvOffset = _gl.GetUniformLocation(_meshProgram, "uUvOffset");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
                 _muTexMult = _gl.GetUniformLocation(_meshProgram, "uTexMult");
@@ -525,8 +524,6 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
-            var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
-            if (renderState.RenderPass < 0) return;
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
@@ -535,7 +532,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muErosionTex, 4);
             _gl.Uniform1(_muHasTexMult, es.TextureMult != 0 ? 1 : 0);
-            _gl.Uniform2(_muTexDivMesh, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
             Vector2 textureMultTexDiv = es.Def.TextureMultTexDiv;
             _gl.Uniform2(
                 _muTexDivMult,
@@ -549,6 +545,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _whiteTex);
+            var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             ApplyAddressMode(renderState.TextureAddressMode);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
             _gl.Uniform1(_muFlipU, renderState.FlipU ? 1 : 0);
@@ -626,7 +623,6 @@ uniform vec2 uEmitterUvOffset;
 uniform vec2 uUvOffsetMult;
 uniform vec2 uUvScaleMult;
 uniform float uUvRotationMult;
-uniform vec2 uTexDiv;
 uniform vec2 uTexDivMult;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
@@ -657,7 +653,7 @@ void main(){
     baseUv = centeredUv + vec2(0.5) + uBirthUvOffset;
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
-    vUv = (baseUv / max(uTexDiv, vec2(1.0))) + uUvOffset + uEmitterUvOffset;
+    vUv = baseUv + uUvOffset + uEmitterUvOffset;
     vec2 multUv = aUv;
     vec2 centeredMultUv = (multUv - vec2(0.5)) * uUvScaleMult;
     float multSin = sin(uUvRotationMult); float multCos = cos(uUvRotationMult);
@@ -685,12 +681,7 @@ uniform vec4 uErosionMixer;
 out vec4 fragColor;
 void main(){
     vec4 texel = texture(uTex, vUv);
-    if (uHasTexMult != 0) {
-        vec4 mult = texture(uTexMult, vUvMult);
-        texel.rgb *= mult.rgb;
-        float multAlpha = mult.a < 0.999 ? mult.a : max(mult.r, max(mult.g, mult.b));
-        texel.a *= multAlpha;
-    }
+    if (uHasTexMult != 0) texel *= texture(uTexMult, vUvMult);
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), uErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(uErosionDrive, 0.0, 1.0)));
@@ -842,12 +833,7 @@ uniform float uErosionFeatherOut;
 out vec4 fragColor;
 void main(){
     vec4 t = texture(uTex, vUv);
-    if (uHasTexMult != 0) {
-        vec4 mult = texture(uTexMult, vUvMult);
-        t.rgb *= mult.rgb;
-        float multAlpha = mult.a < 0.999 ? mult.a : max(mult.r, max(mult.g, mult.b));
-        t.a *= multAlpha;
-    }
+    if (uHasTexMult != 0) t *= texture(uTexMult, vUvMult);
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), vErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(vErosionDrive, 0.0, 1.0)));
