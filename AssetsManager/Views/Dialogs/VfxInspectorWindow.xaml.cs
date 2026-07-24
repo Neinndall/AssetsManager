@@ -405,7 +405,6 @@ namespace AssetsManager.Views.Dialogs
 
             _model.TotalDuration = maxDur;
             _model.CurrentTime = 0;
-            _cameraController?.Reset();
 
             _vfxRenderer?.SetVfxSystem(systemModel);
             _vfxRenderer?.Play();
