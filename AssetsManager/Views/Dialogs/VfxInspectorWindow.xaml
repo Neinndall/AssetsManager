@@ -350,32 +350,32 @@
                                                     </ItemsControl>
                                                 </StackPanel>
 
-                                                 <!-- Active System Loop Boundary Needle Overlay Canvas (Matching linea_tiempo.png) -->
-                                                 <Canvas x:Name="LoopBoundaryCanvas">
-                                                     <!-- Vertical Golden Amber Line marking system loop boundary -->
-                                                     <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
-                                                           Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
-                                                     <!-- Top Golden Handle Circle with Amber Glow - Drag to adjust custom loop boundary! -->
-                                                     <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-6" Canvas.Top="-2" Cursor="SizeWE"
-                                                              Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5"
-                                                              PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
-                                                              PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
-                                                              PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
-                                                              ToolTip="Drag to adjust custom Loop Boundary (↺)">
-                                                         <Ellipse.Effect>
-                                                             <DropShadowEffect Color="#FFD700" BlurRadius="8" ShadowDepth="0" Opacity="0.9"/>
-                                                         </Ellipse.Effect>
-                                                     </Ellipse>
-                                                 </Canvas>
-
                                                  <!-- Playhead Needle Overlay Canvas -->
-                                                 <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False">
+                                                 <Canvas x:Name="PlayheadCanvas" IsHitTestVisible="False" Panel.ZIndex="10">
                                                      <!-- Vertical Red Line sweeping across timeline -->
                                                      <Line x:Name="PlayheadLine" X1="0" Y1="0" X2="0" Y2="400"
                                                            Stroke="#FF4D4D" StrokeThickness="2"/>
                                                      <!-- Red Playhead Top Circle Indicator -->
                                                      <Ellipse x:Name="PlayheadHandle" Canvas.Left="-4" Canvas.Top="0"
                                                               Width="8" Height="8" Fill="#FF4D4D" Stroke="#18181B" StrokeThickness="1"/>
+                                                 </Canvas>
+
+                                                 <!-- Active System Loop Boundary Needle Overlay Canvas (Placed ON TOP of Playhead for easy grabbing!) -->
+                                                 <Canvas x:Name="LoopBoundaryCanvas" Panel.ZIndex="100">
+                                                     <!-- Vertical Golden Amber Line marking system loop boundary -->
+                                                     <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
+                                                           Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
+                                                     <!-- Top Golden Handle Circle with Amber Glow - Drag to adjust custom loop boundary! -->
+                                                     <Ellipse x:Name="LoopBoundaryHandle" Canvas.Left="-7" Canvas.Top="1" Cursor="SizeWE"
+                                                              Width="14" Height="14" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1.5"
+                                                              PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
+                                                              PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
+                                                              PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
+                                                              ToolTip="Drag to adjust custom Loop Boundary (↺)">
+                                                         <Ellipse.Effect>
+                                                             <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
+                                                         </Ellipse.Effect>
+                                                     </Ellipse>
                                                  </Canvas>
                                             </Grid>
                                         </Grid>
@@ -437,7 +437,7 @@
                                             <!-- Speed Selector -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                                 <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="75" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
+                                                <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
                                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
                                                     <ComboBoxItem Content="1.0x" Tag="1.0"/>
                                                     <ComboBoxItem Content="1.5x" Tag="1.5"/>

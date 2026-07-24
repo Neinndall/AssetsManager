@@ -591,7 +591,7 @@ namespace AssetsManager.Views.Dialogs
 
                 LoopBoundaryLine.X1 = loopPosX;
                 LoopBoundaryLine.X2 = loopPosX;
-                Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 5);
+                Canvas.SetLeft(LoopBoundaryHandle, loopPosX - 7);
             }
         }
 
@@ -642,6 +642,8 @@ namespace AssetsManager.Views.Dialogs
 
         private void TimelineGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            if (_isDraggingLoopBoundary) return;
+            if (e.OriginalSource is FrameworkElement fe && (fe == LoopBoundaryHandle || fe == LoopBoundaryCanvas || fe == LoopBoundaryLine)) return;
             _isTimelineDragging = true;
             UpdateSeekFromTimeline(e.GetPosition(TracksCanvasContainer).X);
         }
