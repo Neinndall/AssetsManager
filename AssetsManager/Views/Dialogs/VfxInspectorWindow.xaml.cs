@@ -151,6 +151,11 @@ namespace AssetsManager.Views.Dialogs
             if (_model.IsPlaying && !_isUserSeeking)
             {
                 _vfxRenderer.Update(dt);
+                if (_model.CurrentTime >= _model.TotalDuration || (_model.LiveParticleCount == 0 && _model.CurrentTime > 0.15))
+                {
+                    _model.CurrentTime = 0;
+                    _vfxRenderer.Seek(0);
+                }
             }
             _vfxRenderer.Render(viewProj, view);
 

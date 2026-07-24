@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed playback for Sett_Base_W_Min_Tar_Center and short target hit impacts with seamless auto-restart looping.
   - Viewer VFX Studio / Fixed cross-skin system leakage in VFX list by correcting skin index regex filter and multi_skins BIN dependency loading.
   - Viewer VFX Studio / Fixed playback and rendering for fast impulse hit effects (like Sett_Base_BA_Hit_01) by allowing fallback texture rendering and accurate short-duration timeline calculation.
   - Viewer VFX Studio / Fixed duplicate skin entries in skin selector by filtering strictly for BIN files inside /skins/ folder.

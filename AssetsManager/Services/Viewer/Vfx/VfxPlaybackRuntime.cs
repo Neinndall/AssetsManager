@@ -168,8 +168,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public bool IsComplete
             => _emitters.Count == 0 || _emitters.TrueForAll(state =>
-                state.Def.EmitterLifetime is { } lifetime &&
-                state.Age > state.Def.TimeBeforeFirstEmission + lifetime &&
+                (state.BurstDone || (state.Def.EmitterLifetime is { } lifetime && state.Age > state.Def.TimeBeforeFirstEmission + lifetime)) &&
                 state.Particles.Count == 0);
 
         public void Update(float dt)
