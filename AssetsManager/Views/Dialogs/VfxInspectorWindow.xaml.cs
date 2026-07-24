@@ -35,10 +35,10 @@ namespace AssetsManager.Views.Dialogs
         private GlVfxRenderer _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
 
-        // Shared camera controller instance matching main 3D Model Viewport
+        // VFX Studio dedicated camera framing (focused studio angle for 3D particles & ground AOE)
         private readonly Viewport3D _dummyViewport = new Viewport3D
         {
-            Camera = new PerspectiveCamera(new Point3D(0, 1130, 280), new Vector3D(0, -0.14, -0.99), new Vector3D(0, 0.99, -0.14), 45)
+            Camera = new PerspectiveCamera(new Point3D(0, 500, 650), new Vector3D(0, -0.609, -0.793), new Vector3D(0, 0.793, -0.609), 45)
         };
         private CustomCameraController _cameraController;
 
