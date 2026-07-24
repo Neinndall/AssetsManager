@@ -66,7 +66,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 foreach (string multiBin in Directory.GetFiles(charFolder, "*multi_skins*.bin", SearchOption.TopDirectoryOnly))
                 {
-                    if (targetSkinIndex < 0 || multiBin.Contains($"skin{targetSkinIndex}", StringComparison.OrdinalIgnoreCase) || multiBin.Contains("multi_skins"))
+                    string binName = Path.GetFileName(multiBin);
+                    if (targetSkinIndex < 0 || binName.Contains($"skin{targetSkinIndex}", StringComparison.OrdinalIgnoreCase) || binName.Contains($"skin0{targetSkinIndex}", StringComparison.OrdinalIgnoreCase))
                     {
                         Enqueue(multiBin);
                     }
@@ -86,9 +87,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                         foreach (var kv in document.Systems)
                         {
-                            // Systems directly in the skin BIN always belong to it.
-                            // For dependency BINs, filter out systems explicitly belonging to OTHER skins.
-                            if (isTargetSkinBin || IsSystemForSkin(kv.Value.Name, targetSkinIndex))
+                            // Systems directly in the skin BIN or dependencies are filtered to exclude systems belonging to OTHER skins.
+                            if (IsSystemForSkin(kv.Value.Name, targetSkinIndex))
                             {
                                 bundle.Systems.TryAdd(kv.Key, kv.Value);
                             }
@@ -314,7 +314,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (string.IsNullOrEmpty(systemName) || targetSkinIndex < 0) return true;
 
             var match = System.Text.RegularExpressions.Regex.Match(
-                systemName, @"[_\b]skin(\d+)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                systemName, @"(?:^|_|/|\\)skin0*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
             if (match.Success && int.TryParse(match.Groups[1].Value, out int sysSkinIndex))
             {
