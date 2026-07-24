@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed razor-thin 1.5px quad particle scaling in Sett_Base_W_Min_Swipe by correctly evaluating scalar aspect ratio multipliers.
   - Viewer VFX Studio / Fixed UI clipping for SpeedComboBox (0.25x) and top golden LoopBoundaryHandle shadow.
   - Viewer VFX Studio / Fixed Z-index order and hit-testing priority for golden LoopBoundaryHandle to prevent accidental playhead dragging.
   - Viewer VFX Studio / Made golden loop boundary needle interactively draggable with mouse, and corrected IsSingleParticle lifespan detection (e.g. 0.31s for Sett_Base_Q_Swipe_B instead of 5.30s).

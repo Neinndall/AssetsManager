@@ -289,8 +289,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
             Vector3 finalBirthSize = new Vector3(
                 birthScale.X,
-                birthScale.Y == 0f ? birthScale.X : birthScale.Y,
-                birthScale.Z == 0f ? birthScale.X : birthScale.Z);
+                (birthScale.Y <= 0.001f || (birthScale.X > 5.0f && birthScale.Y <= 2.0f)) ? birthScale.X : birthScale.Y,
+                birthScale.Z <= 0.001f ? birthScale.X : birthScale.Z);
 
             s.Particles.Add(new Particle
             {
@@ -355,7 +355,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
                 float sizeY = p.BirthSize.Y * (scaleMul.Y <= 0.001f ? scaleMul.X : scaleMul.Y);
-                if (sizeY <= 0.001f) sizeY = sizeX;
+                if (sizeY <= 0.05f * sizeX && sizeX > 5.0f) sizeY = sizeX;
                 Vector3 direction = p.Vel;
                 if (isTrail)
                 {
