@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed blend mode handling for additive particle emitters (blendMode 4 & 5) to eliminate black rectangular overlays in ground effects.
   - Viewer VFX Studio / Unified viewport camera controls, panning, smooth interpolation, and zoom modifiers with the 3D Model Viewport.
   - Viewer VFX Studio / Fixed texture masking on particles to eliminate dark rectangular overlays.
   - Viewer VFX Studio / Fixed texture transparency rendering for Alpha Blend (blendMode 0) particles to eliminate black borders, solid background glows, and unhandled texture alpha artifacts.

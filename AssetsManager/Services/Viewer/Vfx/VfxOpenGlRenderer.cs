@@ -340,7 +340,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
-        private static bool IsAdditive(int blendMode) => blendMode is 1 or 3;
+        private static bool IsAdditive(int blendMode) => blendMode is 1 or 3 or 4 or 5;
 
         private bool IsAdditiveFor(int blendMode, uint texture) => IsAdditive(blendMode);
 
