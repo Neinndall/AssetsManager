@@ -101,6 +101,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed missing mesh resolution in VfxLoadingService for AttachedMesh emitters with empty MeshPath.
   - Viewer VFX Studio / Fixed Z-scale flattening bug for 3D Mesh Emitters to prevent 0.01f paper-thin mesh scaling.
   - Viewer VFX Studio / Refined AttachedMesh caching key to use exact resolved champion body mesh path for semantic cache lookup.
   - Viewer VFX Studio / Fixed rendering for AttachedMesh avatar VFX systems (like Sett_Base_W_Max_Warning_Avatar) by resolving champion body mesh (.skn) when meshPath is unpopulated.

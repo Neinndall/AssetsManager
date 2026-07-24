@@ -202,7 +202,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     searchDirectory);
                 if (gradient != null) ApplyColorGradient(emitter, gradient);
 
-                if (emitter.Def.IsMeshPrimitive && !string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                if (emitter.Def.IsMeshPrimitive)
                 {
                     emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
                     if (emitter.PendingMesh == null)
