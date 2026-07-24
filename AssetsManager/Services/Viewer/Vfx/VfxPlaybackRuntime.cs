@@ -354,7 +354,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
-                float sizeY = p.BirthSize.Y * scaleMul.Y;
+                float sizeY = p.BirthSize.Y * (scaleMul.Y <= 0.001f ? scaleMul.X : scaleMul.Y);
+                if (sizeY <= 0.001f) sizeY = sizeX;
                 Vector3 direction = p.Vel;
                 if (isTrail)
                 {
