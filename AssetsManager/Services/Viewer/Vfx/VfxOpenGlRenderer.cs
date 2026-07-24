@@ -244,6 +244,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (es.InstanceCount == 0) continue;
+                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+                if (renderState.RenderPass < 0) continue;
                 if (es.Texture == 0 && !es.Def.IsMeshPrimitive) continue;
                 if (es.MeshVao != 0) { RenderMeshEmitter(es, viewProj); continue; }
                 bool isDistortion = es.Def.Distortion is not null;
@@ -285,8 +287,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);
                 _gl.Uniform1(_uIsGroundLayer, (es.Def.IsGroundLayer || es.Def.IsFollowingTerrain || es.Def.PrimitiveKind == VfxPrimitiveKind.PlanarProjection) ? 1 : 0);
-                _gl.Uniform1(_uPrimitiveKind, (int)es.Def.PrimitiveKind);
-                var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 _gl.Uniform1(_uAlphaCutoff, renderState.AlphaCutoff);
                 _gl.Uniform1(_uFlipU, renderState.FlipU ? 1 : 0);
                 _gl.Uniform1(_uFlipV, renderState.FlipV ? 1 : 0);
@@ -524,6 +524,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
+            var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+            if (renderState.RenderPass < 0) return;
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
@@ -545,7 +547,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _whiteTex);
-            var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             ApplyAddressMode(renderState.TextureAddressMode);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);
             _gl.Uniform1(_muFlipU, renderState.FlipU ? 1 : 0);
