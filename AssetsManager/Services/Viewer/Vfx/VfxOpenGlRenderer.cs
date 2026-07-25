@@ -810,6 +810,27 @@ namespace AssetsManager.Services.Viewer.Vfx
                !definition.IsFollowingTerrain &&
                definition.PrimitiveKind != VfxPrimitiveKind.PlanarProjection;
 
+        internal static Vector3 GetAuthoredPrimitiveLongitudinalAxis(
+            VfxPrimitiveKind primitiveKind,
+            Vector3 rotationRadians)
+        {
+            Vector3 axis = primitiveKind is VfxPrimitiveKind.Ray or VfxPrimitiveKind.Beam
+                ? Vector3.UnitZ
+                : Vector3.UnitY;
+            float sz = MathF.Sin(rotationRadians.Z);
+            float cz = MathF.Cos(rotationRadians.Z);
+            axis = new Vector3(axis.X * cz - axis.Y * sz, axis.X * sz + axis.Y * cz, axis.Z);
+            float sx = MathF.Sin(rotationRadians.X);
+            float cx = MathF.Cos(rotationRadians.X);
+            axis = new Vector3(axis.X, axis.Y * cx - axis.Z * sx, axis.Y * sx + axis.Z * cx);
+            float sy = MathF.Sin(rotationRadians.Y);
+            float cy = MathF.Cos(rotationRadians.Y);
+            return Vector3.Normalize(new Vector3(
+                axis.X * cy + axis.Z * sy,
+                axis.Y,
+                -axis.X * sy + axis.Z * cy));
+        }
+
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
@@ -1037,11 +1058,14 @@ vec2 addressUv(vec2 uv, int mode){
     return clamp(uv, vec2(0.0), vec2(1.0));
 }
 void main(){
-    float rotation = uArbitraryQuad != 0 ? 0.0 : aRotFrame.x;
+    bool rayPrimitive = uPrimitiveKind == 7 || uPrimitiveKind == 8;
+    float rotation = (uArbitraryQuad != 0 || rayPrimitive) ? 0.0 : aRotFrame.x;
     vec3 localRight = rotateEuler(vec3(1.0, 0.0, 0.0), aRotation);
     vec3 localUp = rotateEuler(vec3(0.0, 1.0, 0.0), aRotation);
+    vec3 localForward = rotateEuler(vec3(0.0, 0.0, 1.0), aRotation);
     vec3 placedRight = uPlacementRight * localRight.x + uPlacementUp * localRight.y + uPlacementForward * localRight.z;
     vec3 placedUp = uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z;
+    vec3 placedForward = uPlacementRight * localForward.x + uPlacementUp * localForward.y + uPlacementForward * localForward.z;
     vec3 right = uArbitraryQuad != 0 ? placedRight : uCamRight;
     vec3 up = uArbitraryQuad != 0 ? placedUp : uCamUp;
 
@@ -1057,7 +1081,7 @@ void main(){
             up = dir;
         } else {
             right = placedRight;
-            up = placedUp;
+            up = rayPrimitive ? placedForward : placedUp;
         }
     }
 
@@ -1065,7 +1089,7 @@ void main(){
     float c = cos(rotation);
     vec2 rc = vec2(aCorner.x * c - aCorner.y * s, aCorner.x * s + aCorner.y * c);
     vec3 world;
-    if (uPrimitiveKind == 7 || uPrimitiveKind == 8) {
+    if (rayPrimitive) {
         float alongRay = aCorner.y + 0.5;
         world = aCenter + up * (alongRay * aSize.y) + right * (rc.x * aSize.x);
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {

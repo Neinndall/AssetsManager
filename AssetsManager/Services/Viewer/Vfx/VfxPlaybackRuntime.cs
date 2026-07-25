@@ -65,6 +65,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector3 BirthSize;
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
+            public Vector3 RotationalVelocity;
             public Vector2 BirthUvOffset, BirthUvScrollRate;
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
             public float BirthUvRotateRate, TextureMultBirthUvRotateRate;
@@ -275,6 +276,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     p.Pos = s.BasePos + Vector3.TransformNormal(Vector3.Transform(localRelative, orbit), _worldTransform);
                 }
                 p.Rot += p.RotVel * dt;
+                p.BirthRotation += p.RotationalVelocity * dt;
                 s.Particles[i] = p;
             }
 
@@ -320,6 +322,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthSize = finalBirthSize,
                 BirthColor = d.BirthColor.SampleBirth(emitterT, _rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
+                RotationalVelocity = rotVel * (MathF.PI / 180f),
                 Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
                 RotVel = rotVel.X * (MathF.PI / 180f),
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
@@ -417,7 +420,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
                 else
                 {
-                    buf[k++] = p.Rot + lifeRotation.X;
+                    buf[k++] = p.BirthRotation.X + lifeRotation.X;
                     buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
                     buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
                 }

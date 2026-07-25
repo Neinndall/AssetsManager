@@ -329,6 +329,47 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void SamiraSpotlightRaysUseAuthoredForwardAxisTowardSceneCenter()
+        {
+            Vector3 leftAxis = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
+                VfxPrimitiveKind.Ray,
+                new Vector3(50f, 90f, 0f) * (MathF.PI / 180f));
+            Vector3 rightAxis = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
+                VfxPrimitiveKind.Ray,
+                new Vector3(130f, 90f, 0f) * (MathF.PI / 180f));
+            Vector3 leftToCenter = Vector3.Normalize(new Vector3(520f, -800f, 0f));
+            Vector3 rightToCenter = Vector3.Normalize(new Vector3(-520f, -800f, 0f));
+
+            Assert.True(Vector3.Dot(leftAxis, leftToCenter) > 0.98f);
+            Assert.True(Vector3.Dot(rightAxis, rightToCenter) > 0.98f);
+            Assert.True(leftAxis.Y < 0f);
+            Assert.True(rightAxis.Y < 0f);
+        }
+
+        [Fact]
+        public void MeshParticlesAdvanceAuthoredRotationOnAllThreeAxes()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                BirthRotation = VfxCurve3.Const(new Vector3(10f, 20f, 30f)),
+                BirthRotationalVelocity = VfxCurve3.Const(new Vector3(40f, 50f, 60f))
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "rotation", "rotation", new[] { emitter }), Vector3.Zero);
+
+            for (int step = 0; step < 4; step++)
+                runtime.Update(0.0625f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(1, state.InstanceCount);
+            Assert.Equal(20f * MathF.PI / 180f, state.Instances[15], precision: 5);
+            Assert.Equal(32.5f * MathF.PI / 180f, state.Instances[16], precision: 5);
+            Assert.Equal(45f * MathF.PI / 180f, state.Instances[17], precision: 5);
+        }
+
+        [Fact]
         public void FinitePlaybackWaitsForTimelineBoundaryAfterParticlesExpire()
         {
             Assert.False(GlVfxRenderer.ShouldRestartPlayback(
