@@ -152,7 +152,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 _vfxRenderer.Update(dt);
                 double loopBoundary = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : _model.TotalDuration;
-                if (_model.CurrentTime >= loopBoundary || (_model.LiveParticleCount == 0 && _model.CurrentTime > 0.15))
+                if (_model.CurrentTime >= loopBoundary)
                 {
                     _model.CurrentTime = 0;
                     _vfxRenderer.Seek(0);

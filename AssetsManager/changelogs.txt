@@ -106,6 +106,8 @@ Bug Fixes
   - Viewer VFX Studio / Fixed texture colors, transparency modes, atlas frames, UV transforms, erosion, reflection, distortion, and soft-particle intersections.
   - Viewer VFX Studio / Fixed global placement, scaling, and AttachedMesh overlays so VFX follow the animated champion without creating a duplicate body.
   - Viewer VFX Studio / Standardized the systems search field with the shared search-box style, restoring the visible white text caret, placeholder, focus state, and clear action.
+  - Viewer VFX Studio / Fixed invisible ground-layer effects such as `Locke_Base_E_Dash_Trail_child_splash` by preventing soft-particle depth fading from erasing geometry coincident with the ground.
+  - Viewer VFX Studio / Removed the premature empty-frame restart so delayed, low-rate, and event-driven emitters can reach their authored trigger time.
   - Viewer VFX Studio / Fixed Z-scale flattening bug for 3D Mesh Emitters to prevent 0.01f paper-thin mesh scaling.
   - Viewer VFX Studio / Fixed razor-thin 1.5px quad particle scaling in Sett_Base_W_Min_Swipe by correctly evaluating scalar aspect ratio multipliers.
   - Viewer VFX Studio / Fixed UI clipping for SpeedComboBox (0.25x) and top golden LoopBoundaryHandle shadow.

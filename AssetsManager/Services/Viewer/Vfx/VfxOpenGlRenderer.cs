@@ -322,7 +322,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_uHasErosion, es.ErosionTexture != 0 ? 1 : 0);
                 _gl.Uniform1(_uErosionFeatherIn, es.Def.AlphaErosion?.FeatherIn ?? 0f);
                 _gl.Uniform1(_uErosionFeatherOut, es.Def.AlphaErosion?.FeatherOut ?? 0f);
-                _gl.Uniform1(_uHasSoftParticle, es.Def.SoftParticle != null && _sceneDepthTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_uHasSoftParticle, ShouldUseSoftParticles(es.Def, _sceneDepthTexture != 0) ? 1 : 0);
                 VfxSoftParticleDefinition soft = es.Def.SoftParticle;
                 _gl.Uniform4(
                     _uSoftParticleParams,
@@ -737,7 +737,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ApplyAddressMode(renderState.TextureAddressMode);
                 _gl.ActiveTexture(TextureUnit.Texture0);
             }
-            _gl.Uniform1(_muHasSoftParticle, es.Def.SoftParticle != null && _sceneDepthTexture != 0 ? 1 : 0);
+            _gl.Uniform1(_muHasSoftParticle, ShouldUseSoftParticles(es.Def, _sceneDepthTexture != 0) ? 1 : 0);
             VfxSoftParticleDefinition soft = es.Def.SoftParticle;
             _gl.Uniform4(
                 _muSoftParticleParams,
@@ -802,6 +802,13 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static float ClampScale(float value)
             => float.IsFinite(value) ? value : 1f;
+
+        internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
+            => hasSceneDepth &&
+               definition?.SoftParticle != null &&
+               !definition.IsGroundLayer &&
+               !definition.IsFollowingTerrain &&
+               definition.PrimitiveKind != VfxPrimitiveKind.PlanarProjection;
 
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;

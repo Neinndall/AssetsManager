@@ -307,6 +307,27 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void GroundLayersDoNotFadeThemselvesAgainstSceneDepth()
+        {
+            var soft = new VfxSoftParticleDefinition(0f, 80f, 0f, 0f);
+            VfxEmitterDefinition regular = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                SoftParticle = soft
+            };
+            VfxEmitterDefinition ground = regular with { IsGroundLayer = true };
+            VfxEmitterDefinition terrain = regular with { IsFollowingTerrain = true };
+            VfxEmitterDefinition projection = regular with { PrimitiveKind = VfxPrimitiveKind.PlanarProjection };
+
+            Assert.True(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: true));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(ground, hasSceneDepth: true));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
+        }
+
+        [Fact]
         public void AssetIndexPrefersAuthoredPathOverSameNamedFallback()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxIndex", Guid.NewGuid().ToString("N"));
