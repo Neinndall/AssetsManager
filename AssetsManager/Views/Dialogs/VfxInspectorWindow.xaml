@@ -118,19 +118,13 @@
                     </StackPanel>
 
                     <!-- Search Filter -->
-                    <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="6" 
-                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,10" Padding="6,4">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Magnify" Width="16" Height="16" Foreground="{StaticResource TextMuted}" Margin="4,0,6,0"/>
-                            <TextBox Grid.Column="1" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
-                                     Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextPrimary}" 
-                                     FontSize="12" VerticalAlignment="Center" TextChanged="SearchQuery_TextChanged"/>
-                        </Grid>
-                    </Border>
+                    <TextBox Grid.Row="1"
+                             Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource StandardSearchBoxStyle}"
+                             Tag="Search VFX systems..."
+                             Height="34"
+                             Margin="0,0,0,10"
+                             TextChanged="SearchQuery_TextChanged"/>
 
                     <!-- Systems List -->
                     <ListView Grid.Row="2" ItemsSource="{Binding Systems}" SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
