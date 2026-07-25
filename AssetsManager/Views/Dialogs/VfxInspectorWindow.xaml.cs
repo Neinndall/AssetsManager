@@ -388,15 +388,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 double timeBefore = e.TimeBeforeFirstEmission;
                 double emitLife = e.EmitterLifetime ?? 0.1;
-                double partLife = e.ParticleLifetime.Constant > 0 
-                    ? e.ParticleLifetime.Constant 
-                    : (e.ParticleLifetime.Values != null && e.ParticleLifetime.Values.Length > 0 ? e.ParticleLifetime.Values.Max() : 1.5);
-
-                if (e.ParticleLifetime.Times != null && e.ParticleLifetime.Times.Length > 0)
-                {
-                    double maxKeyframe = e.ParticleLifetime.Times.Max();
-                    if (maxKeyframe > partLife) partLife = maxKeyframe;
-                }
+                double partLife = GetMaximumParticleLifetime(e);
 
                 double total = e.IsSingleParticle 
                     ? (timeBefore + partLife) 
@@ -536,31 +528,24 @@ namespace AssetsManager.Views.Dialogs
                 emitter.TrackBrush = palette[(idx - 1) % palette.Length];
 
                 double delay = emitter.EmitterDef?.TimeBeforeFirstEmission ?? 0;
-                double emitLife = emitter.EmitterDef?.EmitterLifetime ?? 3.0;
-                double partLife = 1.5;
-                if (emitter.EmitterDef != null)
-                {
-                    partLife = emitter.EmitterDef.ParticleLifetime.Constant > 0 
-                        ? emitter.EmitterDef.ParticleLifetime.Constant 
-                        : (emitter.EmitterDef.ParticleLifetime.Values != null && emitter.EmitterDef.ParticleLifetime.Values.Length > 0 
-                            ? emitter.EmitterDef.ParticleLifetime.Values.Max() : 1.5);
-                }
-                double duration = emitLife + partLife;
+                VfxEmitterDefinition definition = emitter.EmitterDef;
+                double partLife = definition == null ? 1.5 : GetMaximumParticleLifetime(definition);
+                double duration = definition?.IsSingleParticle == true
+                    ? partLife
+                    : definition?.EmitterLifetime is { } emitterLife
+                        ? emitterLife + partLife
+                        : Math.Max(0, totalDur - delay);
+                var metrics = CalculateEmitterTrackMetrics(delay, duration, totalDur, availableWidth);
 
-                // Like Riot's editor in linea_tiempo.png, all tracks start at 0.00s
-                double leftMargin = 0;
-                double barWidth = Math.Clamp((duration / totalDur) * availableWidth, 20, availableWidth);
-
-                emitter.TrackMargin = new Thickness(leftMargin, 0, 0, 0);
-                emitter.TrackWidth = barWidth;
+                emitter.TrackMargin = new Thickness(metrics.BarLeft, 0, 0, 0);
+                emitter.TrackWidth = metrics.BarWidth;
 
                 // Yellow Keyframe Marker Dot for Emission Delay (Matching linea_tiempo.png)
                 if (delay > 0.05)
                 {
                     emitter.HasDelay = true;
                     emitter.DelayTime = delay;
-                    double delayPos = Math.Clamp((delay / totalDur) * availableWidth - 4, 0, Math.Max(0, availableWidth - 8));
-                    emitter.DelayMarkerMargin = new Thickness(delayPos, 0, 0, 0);
+                    emitter.DelayMarkerMargin = new Thickness(metrics.MarkerLeft, 0, 0, 0);
                 }
                 else
                 {
@@ -571,6 +556,30 @@ namespace AssetsManager.Views.Dialogs
 
                 idx++;
             }
+        }
+
+        internal static (double BarLeft, double BarWidth, double MarkerLeft) CalculateEmitterTrackMetrics(
+            double delay,
+            double duration,
+            double totalDuration,
+            double availableWidth)
+        {
+            double safeTotal = Math.Max(0.001, totalDuration);
+            double safeWidth = Math.Max(0, availableWidth);
+            double barLeft = Math.Clamp(Math.Max(0, delay) / safeTotal * safeWidth, 0, safeWidth);
+            double rawWidth = Math.Max(0, duration) / safeTotal * safeWidth;
+            double remainingWidth = Math.Max(0, safeWidth - barLeft);
+            double barWidth = Math.Min(Math.Max(remainingWidth > 0 ? 2 : 0, rawWidth), remainingWidth);
+            double markerLeft = Math.Clamp(barLeft - 4, 0, Math.Max(0, safeWidth - 8));
+            return (barLeft, barWidth, markerLeft);
+        }
+
+        private static double GetMaximumParticleLifetime(VfxEmitterDefinition emitter)
+        {
+            double maximum = emitter.ParticleLifetime.Constant;
+            if (emitter.ParticleLifetime.Values is { Length: > 0 })
+                maximum = Math.Max(maximum, emitter.ParticleLifetime.Values.Max());
+            return maximum > 0 ? maximum : 1.5;
         }
 
         private void UpdatePlayheadPosition()

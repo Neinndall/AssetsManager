@@ -324,7 +324,7 @@
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
                                                                  <Grid Height="24" Margin="0,2">
-                                                                     <!-- Main Emitter Lifetime Bar -->
+                                                                     <!-- Authored emitter interval: starts at its emission trigger and includes residual particle lifetime. -->
                                                                      <Border Background="{Binding TrackBrush}" CornerRadius="4" Height="14" VerticalAlignment="Center"
                                                                              Margin="{Binding TrackMargin}" HorizontalAlignment="Left" Width="{Binding TrackWidth}">
                                                                          <Border.Effect>
@@ -332,7 +332,7 @@
                                                                          </Border.Effect>
                                                                      </Border>
 
-                                                                     <!-- Yellow Keyframe Marker Dot for Emission Delay (Matching linea_tiempo.png) -->
+                                                                     <!-- Emission trigger marker, centered on the real start of the emitter bar. -->
                                                                      <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"
                                                                               HorizontalAlignment="Left" VerticalAlignment="Center"
                                                                               Margin="{Binding DelayMarkerMargin}"

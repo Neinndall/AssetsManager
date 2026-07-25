@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -345,6 +346,20 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                 currentTime: 0.83,
                 totalDuration: 0,
                 graphIsComplete: true));
+        }
+
+        [Fact]
+        public void DelayedEmitterTrackStartsAtItsEmissionMarker()
+        {
+            var metrics = VfxInspectorWindow.CalculateEmitterTrackMetrics(
+                delay: 5,
+                duration: 3,
+                totalDuration: 13,
+                availableWidth: 780);
+
+            Assert.Equal(300, metrics.BarLeft, precision: 6);
+            Assert.Equal(180, metrics.BarWidth, precision: 6);
+            Assert.Equal(metrics.BarLeft, metrics.MarkerLeft + 4, precision: 6);
         }
 
         [Fact]
