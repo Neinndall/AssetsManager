@@ -162,12 +162,25 @@ namespace AssetsManager.Services.Viewer
             _graph.Update(elapsed);
             _activeSystem.CurrentTime += elapsed;
 
-            if (_graph.IsComplete || (_activeSystem.HasFiniteDuration && _activeSystem.CurrentTime >= _activeSystem.TotalDuration))
+            if (ShouldRestartPlayback(
+                    _activeSystem.HasFiniteDuration,
+                    _activeSystem.CurrentTime,
+                    _activeSystem.TotalDuration,
+                    _graph.IsComplete))
             {
                 _graph.Reset();
                 _activeSystem.CurrentTime = 0;
             }
         }
+
+        internal static bool ShouldRestartPlayback(
+            bool hasFiniteDuration,
+            double currentTime,
+            double totalDuration,
+            bool graphIsComplete)
+            => hasFiniteDuration
+                ? currentTime >= totalDuration
+                : graphIsComplete;
 
         public void Seek(double seconds)
         {

@@ -328,6 +328,26 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void FinitePlaybackWaitsForTimelineBoundaryAfterParticlesExpire()
+        {
+            Assert.False(GlVfxRenderer.ShouldRestartPlayback(
+                hasFiniteDuration: true,
+                currentTime: 0.83,
+                totalDuration: 1.25,
+                graphIsComplete: true));
+            Assert.True(GlVfxRenderer.ShouldRestartPlayback(
+                hasFiniteDuration: true,
+                currentTime: 1.25,
+                totalDuration: 1.25,
+                graphIsComplete: true));
+            Assert.True(GlVfxRenderer.ShouldRestartPlayback(
+                hasFiniteDuration: false,
+                currentTime: 0.83,
+                totalDuration: 0,
+                graphIsComplete: true));
+        }
+
+        [Fact]
         public void AssetIndexPrefersAuthoredPathOverSameNamedFallback()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxIndex", Guid.NewGuid().ToString("N"));
