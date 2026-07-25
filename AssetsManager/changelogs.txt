@@ -112,7 +112,8 @@ Bug Fixes
   - Viewer VFX Studio / Corrected delayed-emitter timeline geometry so each colored bar starts at its yellow emission marker and ends after emission plus residual particle lifetime.
   - Viewer VFX Studio / Corrected authored `Ray` and `Beam` orientation by using their local forward axis and avoiding duplicate 2D rotation, fixing displaced spotlights such as Samira Skin 30 Pentakill.
   - Viewer VFX Studio / Made `Ray` and `Beam` width camera-facing while preserving authored length direction, restoring both broad Samira Pentakill spotlights instead of edge-on or overlapping planes.
-  - Viewer VFX Studio / Preserved initial mesh rotation and rotational velocity on all three axes, preventing Samira Skin 30 confetti pieces from collapsing visually into repeated needle-like streaks.
+  - Viewer VFX Studio / Preserved initial mesh rotation and rotational velocity on all three axes so authored particle spin is reproduced completely.
+  - Viewer VFX Studio / Respected uniform particle scaling so animated mesh confetti retains its complete 3D shape instead of collapsing into colored streaks.
   - Viewer VFX Studio / Fixed Z-scale flattening bug for 3D Mesh Emitters to prevent 0.01f paper-thin mesh scaling.
   - Viewer VFX Studio / Fixed razor-thin 1.5px quad particle scaling in Sett_Base_W_Min_Swipe by correctly evaluating scalar aspect ratio multipliers.
   - Viewer VFX Studio / Fixed UI clipping for SpeedComboBox (0.25x) and top golden LoopBoundaryHandle shadow.

@@ -30,6 +30,25 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void UniformScaleCurveUsesItsAuthoredScalarForEveryMeshAxis()
+        {
+            var emitter = CreateEmitter(new Vector3(8f, 1f, 1f), VfxEmitterRenderState.Default) with
+            {
+                ScaleOverLife = VfxCurve3.Const(new Vector3(0.6f, 0f, 0f)),
+                IsUniformScale = true
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "confetti", "confetti", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(4.8f, state.Instances[3], precision: 5);
+            Assert.Equal(0.6f, state.Instances[4], precision: 5);
+            Assert.Equal(0.6f, state.Instances[18], precision: 5);
+        }
+
+        [Fact]
         public void WorldTransformScaleAppliesToParticleDimensions()
         {
             var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);

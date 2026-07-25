@@ -360,6 +360,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 var p = s.Particles[i];
                 float t = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
                 var scaleMul = d.ScaleOverLife?.Sample(t) ?? Vector3.One;
+                if (d.IsUniformScale)
+                    scaleMul = new Vector3(scaleMul.X);
                 var colMul = d.ColorOverLife?.Sample(t) ?? Vector4.One;
                 var col = p.BirthColor * colMul;
 
