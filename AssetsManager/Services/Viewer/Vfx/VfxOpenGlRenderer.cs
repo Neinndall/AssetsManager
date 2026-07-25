@@ -831,6 +831,30 @@ namespace AssetsManager.Services.Viewer.Vfx
                 -axis.X * sy + axis.Z * cy));
         }
 
+        internal static Vector3 GetCameraFacingPrimitiveSide(
+            Vector3 longitudinalAxis,
+            Vector3 cameraForward,
+            Vector3 cameraUp)
+        {
+            Vector3 direction = longitudinalAxis.LengthSquared() > 1e-8f
+                ? Vector3.Normalize(longitudinalAxis)
+                : Vector3.UnitY;
+            Vector3 forward = cameraForward.LengthSquared() > 1e-8f
+                ? Vector3.Normalize(cameraForward)
+                : Vector3.UnitZ;
+            Vector3 side = Vector3.Cross(direction, forward);
+            if (side.LengthSquared() <= 1e-8f)
+            {
+                Vector3 up = cameraUp.LengthSquared() > 1e-8f
+                    ? Vector3.Normalize(cameraUp)
+                    : Vector3.UnitY;
+                side = Vector3.Cross(direction, up);
+            }
+            if (side.LengthSquared() <= 1e-8f)
+                side = Vector3.Cross(direction, Vector3.UnitX);
+            return Vector3.Normalize(side);
+        }
+
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
@@ -1068,20 +1092,28 @@ void main(){
     vec3 placedForward = uPlacementRight * localForward.x + uPlacementUp * localForward.y + uPlacementForward * localForward.z;
     vec3 right = uArbitraryQuad != 0 ? placedRight : uCamRight;
     vec3 up = uArbitraryQuad != 0 ? placedUp : uCamUp;
+    vec3 cameraForward = normalize(cross(uCamRight, uCamUp));
 
-    if (uDirectionOriented != 0) {
+    if (rayPrimitive) {
+        vec3 vel = aAgeVelX.yzw;
+        float lenSq = dot(vel, vel);
+        up = lenSq > 0.0001 ? vel * inversesqrt(lenSq) : normalize(placedForward);
+        vec3 side = cross(up, cameraForward);
+        if (dot(side, side) < 0.0001) side = cross(up, uCamUp);
+        if (dot(side, side) < 0.0001) side = cross(up, uCamRight);
+        right = normalize(side);
+    } else if (uDirectionOriented != 0) {
         vec3 vel = aAgeVelX.yzw;
         float lenSq = dot(vel, vel);
         if (lenSq > 0.0001) {
             vec3 dir = vel * inversesqrt(lenSq);
-            vec3 cameraForward = normalize(cross(uCamRight, uCamUp));
             vec3 side = cross(dir, cameraForward);
             if (dot(side, side) < 0.0001) side = cross(dir, uCamUp);
             right = normalize(side);
             up = dir;
         } else {
             right = placedRight;
-            up = rayPrimitive ? placedForward : placedUp;
+            up = placedUp;
         }
     }
 

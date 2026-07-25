@@ -347,6 +347,23 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void RayWidthFacesCameraWithoutChangingAuthoredDirection()
+        {
+            Vector3 direction = Vector3.Normalize(new Vector3(0.64f, -0.77f, 0f));
+            Vector3 cameraForward = Vector3.Normalize(new Vector3(0f, -0.61f, -0.79f));
+            Vector3 cameraUp = Vector3.Normalize(new Vector3(0f, 0.79f, -0.61f));
+
+            Vector3 side = VfxOpenGlRenderer.GetCameraFacingPrimitiveSide(
+                direction,
+                cameraForward,
+                cameraUp);
+
+            Assert.Equal(1f, side.Length(), precision: 5);
+            Assert.Equal(0f, Vector3.Dot(side, direction), precision: 5);
+            Assert.Equal(0f, Vector3.Dot(side, cameraForward), precision: 5);
+        }
+
+        [Fact]
         public void MeshParticlesAdvanceAuthoredRotationOnAllThreeAxes()
         {
             VfxEmitterDefinition emitter = CreateEmitter(
