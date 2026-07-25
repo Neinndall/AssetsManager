@@ -49,7 +49,7 @@ namespace AssetsManager.Views.Models.Viewer
         float TimeBeforeFirstEmission,
         bool IsSingleParticle,          // burst of exactly one particle
         bool Disabled,
-        int BlendMode,                  // 1 = additive (most VFX), else alpha
+        int BlendMode,                  // 0/1/4/5 additive, 2 alpha, 3 multiply
         VfxCurve3 BirthScale,           // ABSOLUTE size at birth (birthScale0), world units
         VfxCurve3? ScaleOverLife,       // scale0: normalised MULTIPLIER over age → effective size = BirthScale * this
         VfxCurve4 BirthColor,           // rgba at birth
@@ -118,10 +118,23 @@ namespace AssetsManager.Views.Models.Viewer
         VfxCurveF? TextureMultBirthUvRotateRate = null,
         VfxCurveF? TextureMultParticleUvRotate = null,
         int TextureMultAddressMode = 0,
-        bool TextureMultFlipV = false,
+        bool TextureMultFlipV = true,
         bool RateIsPeriod = false,
         float BirthTimePeriod = 0f,
-        bool IsLoop = false)
+        bool IsLoop = false,
+        Vector2 ColorLookUpOffsets = default,
+        Vector2 ColorLookUpScales = default,
+        byte ColorRenderFlags = 0,
+        bool IsTexturePixelated = false,
+        Vector2 UvTransformCenter = default,
+        bool TextureMultFlipU = false,
+        bool TextureMultRandomStartFrame = true,
+        Vector2 TextureMultTransformCenter = default,
+        bool TextureMultClampUvScroll = false,
+        Vector2 TextureMultEmitterUvScrollRate = default,
+        bool TextureMultScrollAlpha = false,
+        VfxSoftParticleDefinition SoftParticle = null,
+        VfxReflectionDefinition Reflection = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
@@ -144,6 +157,21 @@ namespace AssetsManager.Views.Models.Viewer
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
+
+    public sealed record VfxSoftParticleDefinition(
+        float BeginIn,
+        float DeltaIn,
+        float BeginOut,
+        float DeltaOut);
+
+    public sealed record VfxReflectionDefinition(
+        float DirectOpacity,
+        float GlancingOpacity,
+        float ReflectionFresnel,
+        float Fresnel,
+        Vector4 FresnelColor,
+        Vector4 ReflectionFresnelColor,
+        string TexturePath);
 
     public sealed record VfxAlphaErosionDefinition(
         string TexturePath,

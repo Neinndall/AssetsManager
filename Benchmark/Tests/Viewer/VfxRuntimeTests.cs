@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Services.Viewer
@@ -24,6 +26,43 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Equal(2f, state.Instances[3]);
             Assert.Equal(3f, state.Instances[4]);
             Assert.Equal(4f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void WorldTransformScaleAppliesToParticleDimensions()
+        {
+            var emitter = CreateEmitter(new Vector3(2f, 3f, 4f), VfxEmitterRenderState.Default);
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(
+                new VfxSystemDefinition(1, "scaled", "scaled", new[] { emitter }),
+                Matrix4x4.CreateScale(2f));
+
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(4f, state.Instances[3]);
+            Assert.Equal(6f, state.Instances[4]);
+            Assert.Equal(8f, state.Instances[18]);
+        }
+
+        [Fact]
+        public void ViewerVfxTransformMatchesTheActiveSceneTransform()
+        {
+            var model = new SceneModel
+            {
+                PositionX = 10,
+                PositionY = 20,
+                PositionZ = 30,
+                RotationY = 90,
+                Scale = 2
+            };
+
+            Matrix4x4 transform = GlVfxRenderer.CreateSceneWorldTransform(model);
+            Vector3 origin = Vector3.Transform(Vector3.Zero, transform);
+            Vector3 scaledAxis = Vector3.TransformNormal(Vector3.UnitX, transform);
+
+            Assert.Equal(new Vector3(10f, 20f, 30f), origin);
+            Assert.Equal(2f, scaledAxis.Length(), 3);
         }
 
         [Fact]
@@ -161,6 +200,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             simulator.Update(0.05f);
 
             var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(0.25f, state.Instances[11], 3);
             Assert.Equal(1.6f, state.Instances[19], 3);
             Assert.Equal(0.2f, state.Instances[20], 3);
             Assert.Equal(MathF.PI / 6f, state.Instances[23], 3);
@@ -188,6 +228,31 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(0.25f, state.Instances[19], 3);
+        }
+
+        [Fact]
+        public void MultiplierAtlasFrameIsDeterministicAndPackedPerParticle()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                TextureMultPath = "mult.tex",
+                TextureMultTexDiv = new Vector2(4f, 2f),
+                TextureMultRandomStartFrame = true
+            };
+            var first = new VfxPlaybackRuntime(37);
+            var second = new VfxPlaybackRuntime(37);
+            var system = new VfxSystemDefinition(1, "mult-atlas", "mult-atlas", new[] { emitter });
+            first.SetSystem(system, Vector3.Zero);
+            second.SetSystem(system, Vector3.Zero);
+
+            first.Update(0.02f);
+            second.Update(0.02f);
+
+            float firstFrame = Assert.Single(first.Emitters).Instances[34];
+            float secondFrame = Assert.Single(second.Emitters).Instances[34];
+            Assert.Equal(firstFrame, secondFrame);
+            Assert.InRange(firstFrame, 0f, 7f);
+            Assert.Equal(35, VfxPlaybackRuntime.InstanceStride);
         }
 
         [Fact]
@@ -286,6 +351,34 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                     new[] { ".bin" });
 
                 Assert.Equal(Path.GetFullPath(extracted), resolved);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void AssetIndexIncludesVfxSkeletonAndAnimationResources()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxRigIndex", Guid.NewGuid().ToString("N"));
+            string directory = Path.Combine(root, "assets", "characters", "hero", "particles");
+            Directory.CreateDirectory(directory);
+            string skeleton = Path.Combine(directory, "effect.skl");
+            string animation = Path.Combine(directory, "effect.anm");
+            File.WriteAllBytes(skeleton, new byte[] { 1 });
+            File.WriteAllBytes(animation, new byte[] { 2 });
+
+            try
+            {
+                var index = VfxResourceIndex.Build(root);
+
+                Assert.Equal(
+                    Path.GetFullPath(skeleton),
+                    index.Resolve("ASSETS/Characters/Hero/Particles/effect.skl", new[] { ".skl" }));
+                Assert.Equal(
+                    Path.GetFullPath(animation),
+                    index.Resolve("ASSETS/Characters/Hero/Particles/effect.anm", new[] { ".anm" }));
             }
             finally
             {

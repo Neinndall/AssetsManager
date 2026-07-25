@@ -334,7 +334,7 @@ namespace AssetsManager.Views.Dialogs
                         Definition = sysDef,
                         EmitterCount = sysDef.Emitters.Count,
                         TextureCount = sysDef.Emitters.Count(e => !string.IsNullOrEmpty(e.TexturePath)),
-                        MeshCount = sysDef.Emitters.Count(e => e.IsMeshPrimitive && !string.IsNullOrEmpty(e.MeshPath)),
+                        MeshCount = sysDef.Emitters.Count(e => e.IsMeshPrimitive),
                         Status = "Ready",
                         StatusBrush = Brushes.LightGreen
                     };
@@ -432,9 +432,13 @@ namespace AssetsManager.Views.Dialogs
             {
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
+                bool usesSceneMesh = emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh &&
+                                     string.IsNullOrWhiteSpace(meshPath);
 
                 BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _resolver.ResolveTexture(texPath, searchDir);
-                var mesh = emitter.IsMeshPrimitive ? _resolver.ResolveMesh(meshPath, searchDir) : null;
+                var mesh = emitter.IsMeshPrimitive && !usesSceneMesh
+                    ? _resolver.ResolveMesh(meshPath, searchDir)
+                    : null;
 
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {
@@ -444,9 +448,9 @@ namespace AssetsManager.Views.Dialogs
                     TexturePath = texPath ?? "N/A",
                     TextureStatus = tex != null ? "Resolved" : (string.IsNullOrEmpty(texPath) ? "None" : "MISSING"),
                     TextureStatusBrush = tex != null ? Brushes.LightGreen : (string.IsNullOrEmpty(texPath) ? Brushes.Gray : Brushes.OrangeRed),
-                    MeshPath = emitter.IsMeshPrimitive ? (meshPath ?? "N/A") : "N/A",
-                    MeshStatus = emitter.IsMeshPrimitive ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
-                    MeshStatusBrush = emitter.IsMeshPrimitive ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
+                    MeshPath = usesSceneMesh ? "Active scene mesh" : emitter.IsMeshPrimitive ? (meshPath ?? "N/A") : "N/A",
+                    MeshStatus = usesSceneMesh ? "Attached" : emitter.IsMeshPrimitive ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
+                    MeshStatusBrush = usesSceneMesh ? Brushes.LightGreen : emitter.IsMeshPrimitive ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
                     BlendMode = GetBlendModeName(emitter.BlendMode),
                     TexDiv = $"{emitter.TexDiv.X} x {emitter.TexDiv.Y}",
                     IsMeshPrimitive = emitter.IsMeshPrimitive,

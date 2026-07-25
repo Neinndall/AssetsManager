@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxPlaybackRuntime
     {
-        public const int InstanceStride = 34;
+        public const int InstanceStride = 35;
 
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
@@ -22,14 +22,18 @@ namespace AssetsManager.Services.Viewer.Vfx
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
             public int TextureWidth, TextureHeight;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
+            public int TextureMultWidth, TextureMultHeight;
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
             public uint ErosionTexture;
+            public uint ReflectionTexture;
             public object PendingTexture;
             public object PendingTextureMult;
             public object PendingDistortionTexture;
             public object PendingErosionTexture;
+            public object PendingReflectionTexture;
             /// <summary>Pending mesh data (positions, uvs, indices) for deferred GL upload of .scb/.sco mesh primitives.</summary>
             public (float[] Positions, float[] Uvs, uint[] Indices)? PendingMesh;
+            internal VfxAnimatedMesh MeshAnimation;
             // CPU copy of particleColorTexture (RGBA8, top-left origin).
             public byte[] ColorGradient;
             public int ColorGradientW, ColorGradientH;
@@ -48,6 +52,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
             public float[] MeshInterleaved;
+            public bool UsesExternalAttachedMesh;
+            public Matrix4x4 AttachedMeshWorld = Matrix4x4.Identity;
             /// <summary>Emitter age in seconds — drives UV scroll + wing-flap animation time.</summary>
             public float EmitterAge => Age;
         }
@@ -63,7 +69,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
             public float BirthUvRotateRate, TextureMultBirthUvRotateRate;
             public float Rot, RotVel;
-            public float StartFrame, FrameRate;
+            public float StartFrame, FrameRate, TextureMultFrame;
             public float ColorRandom;   // stable per-particle 0..1 roll for the colour-gradient variant axis
         }
 
@@ -72,6 +78,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private readonly Random _rng;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
+        private Vector3 _worldScale = Vector3.One;
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
         public event Action<VfxPlaybackRuntime, VfxEmitterDefinition, Vector3, bool> ParticleLifecycle;
@@ -82,6 +89,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             Matrix4x4 previousInverse = _inverseWorldTransform;
             Matrix4x4 emitterSpaceDelta = previousInverse * worldTransform;
             _worldTransform = worldTransform;
+            _worldScale = ExtractScale(worldTransform);
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
                 _inverseWorldTransform = Matrix4x4.Identity;
 
@@ -94,13 +102,16 @@ namespace AssetsManager.Services.Viewer.Vfx
                         Particle particle = es.Particles[particleIndex];
                         particle.Pos = Vector3.Transform(particle.Pos, emitterSpaceDelta);
                         particle.Vel = Vector3.TransformNormal(particle.Vel, emitterSpaceDelta);
-                        particle.BirthAccel = Vector3.TransformNormal(particle.BirthAccel, emitterSpaceDelta);                }
+                        particle.BirthAccel = Vector3.TransformNormal(particle.BirthAccel, emitterSpaceDelta);
+                        es.Particles[particleIndex] = particle;
+                    }
+                }
                 es.BasePos = Vector3.Transform(es.Def.EmitterPosition.Sample(EmitterTime(es)), worldTransform);
                 es.PlacementRight = SafeNormal(Vector3.TransformNormal(Vector3.UnitX, worldTransform), Vector3.UnitX);
                 es.PlacementUp = SafeNormal(Vector3.TransformNormal(Vector3.UnitY, worldTransform), Vector3.UnitY);
                 es.PlacementForward = SafeNormal(Vector3.TransformNormal(Vector3.UnitZ, worldTransform), Vector3.UnitZ);
             }
-        } }
+        }
 
         public VfxPlaybackRuntime(int seed = 1234) => _rng = new Random(seed);
 
@@ -113,6 +124,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             _emitters.Clear();
             _worldTransform = worldTransform;
+            _worldScale = ExtractScale(worldTransform);
             if (!Matrix4x4.Invert(worldTransform, out _inverseWorldTransform))
                 _inverseWorldTransform = Matrix4x4.Identity;
             for (int emitterIndex = 0; emitterIndex < system.Emitters.Count; emitterIndex++)
@@ -145,6 +157,12 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static Vector3 SafeNormal(Vector3 value, Vector3 fallback)
             => value.LengthSquared() > 1e-8f ? Vector3.Normalize(value) : fallback;
+
+        private static Vector3 ExtractScale(Matrix4x4 transform)
+            => new(
+                MathF.Max(1e-6f, Vector3.TransformNormal(Vector3.UnitX, transform).Length()),
+                MathF.Max(1e-6f, Vector3.TransformNormal(Vector3.UnitY, transform).Length()),
+                MathF.Max(1e-6f, Vector3.TransformNormal(Vector3.UnitZ, transform).Length()));
 
         private static float EmitterTime(EmitterState state)
         {
@@ -276,6 +294,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var birthDrag = d.BirthDrag?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthRotation = d.BirthRotation?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var rotVel = d.BirthRotationalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
+            Vector2 birthUvOffset = d.BirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero;
             Vector2 birthUvScrollRate = d.BirthUvScrollRateCurve?.SampleBirth(emitterT, _rng) ?? d.UvScrollRate;
             float birthUvRotateRate = d.BirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
             Vector2 textureMultBirthUvOffset = d.TextureMultBirthUvOffset?.SampleBirth(emitterT, _rng) ?? Vector2.Zero;
@@ -287,10 +306,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var worldOffset = Vector3.Transform(localOffset, _worldTransform) - Vector3.Transform(Vector3.Zero, _worldTransform);
             vel = Vector3.TransformNormal(vel, _worldTransform);
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
-            Vector3 finalBirthSize = new Vector3(
-                birthScale.X,
-                birthScale.Y <= 0.001f ? birthScale.X : birthScale.Y,
-                birthScale.Z <= 0.001f ? birthScale.X : birthScale.Z);
+            Vector3 finalBirthSize = birthScale * _worldScale;
 
             s.Particles.Add(new Particle
             {
@@ -310,7 +326,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                     ? _rng.Next(d.NumFrames)
                     : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
                 FrameRate = d.BirthFrameRate?.SampleBirth(emitterT, _rng) ?? d.FrameRate ?? 0f,
+                TextureMultFrame = d.TextureMultRandomStartFrame
+                    ? _rng.Next(Math.Max(1,
+                        (int)MathF.Max(1f, d.TextureMultTexDiv.X) *
+                        (int)MathF.Max(1f, d.TextureMultTexDiv.Y)))
+                    : 0f,
                 ColorRandom = (float)_rng.NextDouble(),
+                BirthUvOffset = birthUvOffset,
                 BirthUvScrollRate = birthUvScrollRate,
                 BirthUvRotateRate = birthUvRotateRate,
                 TextureMultBirthUvOffset = textureMultBirthUvOffset,
@@ -341,8 +363,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (s.ColorGradient is { } grad && s.ColorGradientW > 0 && s.ColorGradientH > 0)
                 {
                     float speed = p.Vel.Length();
-                    float u = LookupCoord(d.ColorLookUpTypeX ?? 0, t, speed, p.ColorRandom);
-                    float v = d.ColorLookUpTypeY is { } ty ? LookupCoord(ty, t, speed, p.ColorRandom) : 0.5f;
+                    Vector2 lookupScale = d.ColorLookUpScales == Vector2.Zero
+                        ? Vector2.One
+                        : d.ColorLookUpScales;
+                    float u = LookupCoord(d.ColorLookUpTypeX ?? 1, t, speed, p.ColorRandom) *
+                        lookupScale.X + d.ColorLookUpOffsets.X;
+                    float v = LookupCoord(d.ColorLookUpTypeY ?? 0, t, speed, p.ColorRandom) *
+                        lookupScale.Y + d.ColorLookUpOffsets.Y;
                     col *= SampleGradient(grad, s.ColorGradientW, s.ColorGradientH, u, v);
                 }
 
@@ -354,7 +381,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
-                float sizeY = p.BirthSize.Y * (scaleMul.Y <= 0.001f ? scaleMul.X : scaleMul.Y);
+                float sizeY = p.BirthSize.Y * scaleMul.Y;
                 Vector3 direction = p.Vel;
                 if (isTrail)
                 {
@@ -394,8 +421,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     buf[k++] = p.BirthRotation.Y + lifeRotation.Y;
                     buf[k++] = p.BirthRotation.Z + lifeRotation.Z;
                 }
-                float sizeZ = p.BirthSize.Z * (scaleMul.Z <= 0.001f ? 1.0f : scaleMul.Z);
-                if (d.IsMeshPrimitive && sizeZ <= 0.01f) sizeZ = 1.0f;
+                float sizeZ = p.BirthSize.Z * scaleMul.Z;
                 buf[k++] = sizeZ;
                 Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
                     + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
@@ -420,6 +446,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = textureMultUvOffset.X; buf[k++] = textureMultUvOffset.Y;
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
+                buf[k++] = p.TextureMultFrame;
             }
             s.InstanceCount = instanceCount;
         }
@@ -532,9 +559,10 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static float LookupCoord(int type, float age, float speed, float random) => type switch
         {
-            1 => Math.Clamp(speed / 400f, 0f, 1f),
-            2 or 3 => random,
-            _ => age,
+            1 => age,
+            2 => Math.Clamp(speed / 400f, 0f, 1f),
+            3 => random,
+            _ => 0.5f,
         };
 
         private static Vector4 SampleGradient(byte[] rgba, int w, int h, float u, float v)

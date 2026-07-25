@@ -15,7 +15,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".skn", ".bin"
+            ".tex", ".dds", ".png", ".tga", ".scb", ".sco", ".skn", ".skl", ".anm", ".bin"
         };
 
         private readonly string _root;
@@ -54,14 +54,17 @@ namespace AssetsManager.Services.Viewer.Vfx
         public static VfxResourceIndex Build(string root) => new(root);
 
         public string Resolve(string authoredPath, IReadOnlyList<string> extensions)
+            => ResolveAll(authoredPath, extensions).FirstOrDefault();
+
+        public IReadOnlyList<string> ResolveAll(string authoredPath, IReadOnlyList<string> extensions)
         {
-            if (string.IsNullOrWhiteSpace(authoredPath)) return null;
+            if (string.IsNullOrWhiteSpace(authoredPath)) return Array.Empty<string>();
 
             string normalized = Normalize(authoredPath);
             foreach (string extension in extensions)
             {
                 string candidate = Normalize(Path.ChangeExtension(normalized, extension));
-                if (_byRelativePath.TryGetValue(candidate, out string exact)) return exact;
+                if (_byRelativePath.TryGetValue(candidate, out string exact)) return new[] { exact };
             }
 
             string authoredDirectory = Normalize(Path.GetDirectoryName(normalized) ?? string.Empty);
@@ -69,22 +72,23 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 if (!extension.Equals(".bin", StringComparison.OrdinalIgnoreCase)) continue;
                 string authoredFileName = Path.GetFileName(Path.ChangeExtension(normalized, extension));
-                string truncated = _byRelativePath
+                string authoredStem = Path.GetFileNameWithoutExtension(authoredFileName);
+                string[] truncated = _byRelativePath
                     .Where(pair =>
                     {
                         string indexedDirectory = Normalize(Path.GetDirectoryName(pair.Key) ?? string.Empty);
                         string indexedFileName = Path.GetFileName(pair.Key);
-                        string indexedStem = Path.GetFileNameWithoutExtension(indexedFileName);
-                        string authoredStem = Path.GetFileNameWithoutExtension(authoredFileName);
-                        return indexedFileName.Length >= ExtractedFileNameLimit &&
+                        string indexedStem = StripCollisionSuffix(Path.GetFileNameWithoutExtension(indexedFileName));
+                        return (indexedFileName.Length >= ExtractedFileNameLimit ||
+                                HasCollisionSuffix(Path.GetFileNameWithoutExtension(indexedFileName))) &&
                                indexedDirectory.Equals(authoredDirectory, StringComparison.OrdinalIgnoreCase) &&
                                authoredStem.StartsWith(indexedStem, StringComparison.OrdinalIgnoreCase);
                     })
-                    .OrderByDescending(pair => Path.GetFileName(pair.Key).Length)
+                    .OrderBy(pair => HasCollisionSuffix(Path.GetFileNameWithoutExtension(pair.Key)) ? 1 : 0)
                     .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                     .Select(pair => pair.Value)
-                    .FirstOrDefault();
-                if (truncated != null) return truncated;
+                    .ToArray();
+                if (truncated.Length > 0) return truncated;
             }
 
             foreach (string extension in extensions)
@@ -92,16 +96,38 @@ namespace AssetsManager.Services.Viewer.Vfx
                 string fileName = Path.GetFileNameWithoutExtension(normalized) + extension;
                 if (!_byFileName.TryGetValue(fileName, out string[] candidates)) continue;
 
+                int bestScore = candidates.Max(path => SharedSuffixLength(
+                    authoredDirectory,
+                    Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)));
                 return candidates
+                    .Where(path => SharedSuffixLength(
+                        authoredDirectory,
+                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)) == bestScore)
                     .OrderByDescending(path => SharedSuffixLength(
                         authoredDirectory,
                         Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)))
                     .ThenBy(path => path.Length)
                     .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .First();
+                    .ToArray();
             }
 
-            return null;
+            return Array.Empty<string>();
+        }
+
+        private static bool HasCollisionSuffix(string stem)
+        {
+            int open = stem.LastIndexOf(" (", StringComparison.Ordinal);
+            return open >= 0 && stem.EndsWith(')') &&
+                   int.TryParse(stem.AsSpan(open + 2, stem.Length - open - 3), out _);
+        }
+
+        private static string StripCollisionSuffix(string stem)
+        {
+            int open = stem.LastIndexOf(" (", StringComparison.Ordinal);
+            return open >= 0 && stem.EndsWith(')') &&
+                   int.TryParse(stem.AsSpan(open + 2, stem.Length - open - 3), out _)
+                ? stem[..open]
+                : stem;
         }
 
         private static string Normalize(string path)

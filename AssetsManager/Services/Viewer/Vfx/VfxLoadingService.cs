@@ -25,6 +25,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
             public Dictionary<string, VfxAnimationClip> Clips { get; } = new(StringComparer.OrdinalIgnoreCase);
             public Dictionary<uint, uint> ResourceMap { get; } = new();
+            public Dictionary<uint, string> SystemSources { get; } = new();
+            public List<string> LoadedBins { get; } = new();
+            public List<string> MissingDependencies { get; } = new();
+            public List<string> AmbiguousDependencies { get; } = new();
         }
 
         public Bundle Load(string skinBinPath, LogService log)
@@ -49,32 +53,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                         queue.Enqueue(p);
                 }
 
-                Enqueue(skinBinPath);
-
                 string charName = Path.GetFileName(charFolder);
                 string skinName = Path.GetFileNameWithoutExtension(skinBinPath);
-                string animBinPath = Path.Combine(charFolder, "animations", skinName + ".bin");
-                Enqueue(animBinPath);
+                Enqueue(skinBinPath);
 
-                // The selected skin BIN is the source of truth. Its dependency table identifies
-                // the champion, animation and shared multi-skin BINs without confusing skin1 with skin11.
-                // Explicit fallbacks keep older extractions that omitted dependency metadata usable.
-                string champRootBin = Path.Combine(charFolder, charName + ".bin");
-                Enqueue(champRootBin);
-
-                int targetSkinIndex = ExtractSkinIndex(skinName);
-
-                foreach (string multiBin in Directory.GetFiles(charFolder, "*multi_skins*.bin", SearchOption.TopDirectoryOnly))
-                {
-                    string binName = Path.GetFileName(multiBin);
-                    if (targetSkinIndex < 0 || binName.Contains($"skin{targetSkinIndex}", StringComparison.OrdinalIgnoreCase) || binName.Contains($"skin0{targetSkinIndex}", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Enqueue(multiBin);
-                    }
-                }
-
-                int guard = 0;
-                while (queue.Count > 0 && guard++ < 256)
+                while (queue.Count > 0)
                 {
                     string currentBinPath = queue.Dequeue();
                     try
@@ -82,15 +65,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                         if (!File.Exists(currentBinPath)) continue;
                         byte[] fileBytes = File.ReadAllBytes(currentBinPath);
                         VfxBinDocument document = VfxGraphParser.ParseDocument(fileBytes);
-
-                        bool isTargetSkinBin = currentBinPath.Equals(skinBinPath, StringComparison.OrdinalIgnoreCase);
+                        bundle.LoadedBins.Add(Path.GetFullPath(currentBinPath));
 
                         foreach (var kv in document.Systems)
                         {
-                            // Systems directly in the skin BIN or dependencies are filtered to exclude systems belonging to OTHER skins.
-                            if (IsSystemForSkin(kv.Value.Name, targetSkinIndex))
+                            if (bundle.Systems.TryAdd(kv.Key, kv.Value))
                             {
-                                bundle.Systems.TryAdd(kv.Key, kv.Value);
+                                bundle.SystemSources[kv.Key] = Path.GetFullPath(currentBinPath);
                             }
                         }
                         foreach (var kv in document.AnimationClips)
@@ -124,10 +105,34 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                             if (!enqueued)
                             {
-                                string resolvedDependency = _resources.ResolveBin(dep, currentDir ?? searchFolder);
-                                if (resolvedDependency != null) Enqueue(resolvedDependency);
-                                else log?.Log($"VFX BIN dependency missing: {dep}.");
+                                IReadOnlyList<string> resolvedDependencies =
+                                    _resources.ResolveBins(dep, currentDir ?? searchFolder);
+                                if (resolvedDependencies.Count > 1)
+                                {
+                                    bundle.AmbiguousDependencies.Add(dep);
+                                    log?.Log($"VFX BIN dependency matched {resolvedDependencies.Count} extracted files: {dep}.");
+                                }
+                                foreach (string resolvedDependency in resolvedDependencies)
+                                {
+                                    Enqueue(resolvedDependency);
+                                    enqueued = true;
+                                }
                             }
+
+                            if (!enqueued)
+                            {
+                                bundle.MissingDependencies.Add(dep);
+                                log?.Log($"VFX BIN dependency missing: {dep}.");
+                            }
+                        }
+
+                        if (currentBinPath.Equals(skinBinPath, StringComparison.OrdinalIgnoreCase) &&
+                            document.Dependencies.Count == 0)
+                        {
+                            Enqueue(Path.Combine(charFolder, "animations", skinName + ".bin"));
+                            Enqueue(Path.Combine(charFolder, charName + ".bin"));
+                            foreach (string multiBin in FindLegacyMultiSkinBins(charFolder, skinName))
+                                Enqueue(multiBin);
                         }
                     }
                     catch (Exception ex)
@@ -196,6 +201,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 emitter.PendingErosionTexture = _resources.ResolveTexture(
                     emitter.Def.AlphaErosion?.TexturePath,
                     searchDirectory);
+                emitter.PendingReflectionTexture = _resources.ResolveTexture(
+                    emitter.Def.Reflection?.TexturePath,
+                    searchDirectory);
 
                 BitmapSource gradient = _resources.ResolveTexture(
                     emitter.Def.ParticleColorTexturePath,
@@ -204,9 +212,26 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 if (emitter.Def.IsMeshPrimitive)
                 {
-                    emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
-                    if (emitter.PendingMesh == null)
-                        log?.Log($"VFX mesh missing: {emitter.Def.MeshPath} ({definition.Name}/{emitter.Def.Name}).");
+                    if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
+                    {
+                        emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
+                        if (emitter.PendingMesh == null)
+                            log?.Log($"VFX mesh missing: {emitter.Def.MeshPath} ({definition.Name}/{emitter.Def.Name}).");
+                        else if (!string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath))
+                        {
+                            emitter.MeshAnimation = _resources.ResolveMeshAnimation(
+                                emitter.Def.MeshPath,
+                                emitter.Def.MeshSkeletonPath,
+                                emitter.Def.MeshAnimationPath,
+                                searchDirectory);
+                            if (emitter.MeshAnimation == null)
+                            {
+                                log?.Log(
+                                    $"VFX mesh animation missing: {emitter.Def.MeshAnimationPath} " +
+                                    $"({definition.Name}/{emitter.Def.Name}).");
+                            }
+                        }
+                    }
                 }
             }
 
@@ -302,26 +327,20 @@ namespace AssetsManager.Services.Viewer.Vfx
             return string.Empty;
         }
 
-        private static int ExtractSkinIndex(string skinName)
+        private static IEnumerable<string> FindLegacyMultiSkinBins(string charFolder, string skinName)
         {
-            if (string.IsNullOrEmpty(skinName)) return -1;
-            var match = System.Text.RegularExpressions.Regex.Match(skinName, @"skin(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            return match.Success && int.TryParse(match.Groups[1].Value, out int idx) ? idx : -1;
-        }
-
-        private static bool IsSystemForSkin(string systemName, int targetSkinIndex)
-        {
-            if (string.IsNullOrEmpty(systemName) || targetSkinIndex < 0) return true;
-
-            var match = System.Text.RegularExpressions.Regex.Match(
-                systemName, @"(?:^|_|/|\\)skin0*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int sysSkinIndex))
-            {
-                return sysSkinIndex == targetSkinIndex;
-            }
-
-            return true;
+            var target = System.Text.RegularExpressions.Regex.Match(
+                skinName ?? string.Empty,
+                @"^skin0*(\d+)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!target.Success) return Array.Empty<string>();
+            string token = "skin" + int.Parse(target.Groups[1].Value);
+            return Directory.GetFiles(charFolder, "*multi_skins*.bin", SearchOption.TopDirectoryOnly)
+                .Where(path => System.Text.RegularExpressions.Regex.IsMatch(
+                    Path.GetFileNameWithoutExtension(path),
+                    $@"(?:^|_)skin0*{System.Text.RegularExpressions.Regex.Escape(token[4..])}(?:_|$)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
         }
     }
 }

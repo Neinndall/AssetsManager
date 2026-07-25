@@ -75,7 +75,7 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 StartColor { get; set; } = Vector4.One;
         public Vector4 EndColor { get; set; } = Vector4.One;
 
-        public int BlendMode { get; set; } = 0; // 0: AlphaBlend, 1: Additive, 2: Modulate
+        public int BlendMode { get; set; } = 0; // 0/1/4/5: Additive, 2: AlphaBlend, 3: Multiply
         public ushort NumFrames { get; set; } = 1;
         public bool IsLooping { get; set; } = true;
     }

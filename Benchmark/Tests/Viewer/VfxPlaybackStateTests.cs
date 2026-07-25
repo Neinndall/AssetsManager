@@ -21,17 +21,17 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
-        public void SelectingVfxSystemNotifiesPanelBindings()
+        public void SelectingModelNotifiesPanelBindings()
         {
             var panel = new ViewerPanelModel();
-            var system = new VfxSystemModel { Name = "Aurora" };
+            var model = new SceneModel { Name = "Aurora" };
             string changedProperty = null;
             panel.PropertyChanged += (_, args) => changedProperty = args.PropertyName;
 
-            panel.SelectedVfxSystem = system;
+            panel.SelectedModel = model;
 
-            Assert.Same(system, panel.SelectedVfxSystem);
-            Assert.Equal(nameof(ViewerPanelModel.SelectedVfxSystem), changedProperty);
+            Assert.Same(model, panel.SelectedModel);
+            Assert.Equal(nameof(ViewerPanelModel.HasSelectedModel), changedProperty);
         }
     }
 }

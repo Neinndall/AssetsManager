@@ -3,10 +3,20 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <AssemblyName>AssetsManager.BenchmarkApp</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>AssetsManager.BenchmarkTests</AssemblyName>
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Inspect\**\*.cs" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="Blake3" Version="2.2.0" PrivateAssets="all" />
     <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <ProjectReference Include="..\AssetsManager\AssetsManager.csproj" />
     <Reference Include="BCnEncoder">
       <HintPath>..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\BCnEncoder.dll</HintPath>

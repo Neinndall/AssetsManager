@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Numerics;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -40,6 +42,137 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
 
                 VfxSystemDefinition system = Assert.Single(bundle.Systems).Value;
                 Assert.Equal("Shared", system.Name);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void LoadsInheritedSkinSystemsFromDeclaredDependency()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxInheritedSkin", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            Directory.CreateDirectory(skinsDirectory);
+
+            string sharedBin = Path.Combine(championDirectory, "hero_skin1_multi_skins.bin");
+            string skin2Bin = Path.Combine(skinsDirectory, "skin2.bin");
+            WriteBin(
+                sharedBin,
+                new[] { CreateSystem("Characters/Hero/Skins/Skin1/Particles/Inherited", "Inherited") },
+                Array.Empty<string>());
+            WriteBin(
+                skin2Bin,
+                Array.Empty<BinTreeObject>(),
+                new[] { "DATA/Characters/Hero/hero_skin1_multi_skins.bin" });
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skin2Bin, new LogService(logger));
+
+                VfxSystemDefinition system = Assert.Single(bundle.Systems).Value;
+                Assert.Equal("Inherited", system.Name);
+                Assert.Equal(
+                    Path.GetFullPath(sharedBin),
+                    bundle.SystemSources[system.PathHash],
+                    ignoreCase: true);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void LoadsEveryCollisionSiblingForOneTruncatedDependency()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxCollisions", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            Directory.CreateDirectory(skinsDirectory);
+
+            string extractedStem = new string('b', 236);
+            string firstBin = Path.Combine(championDirectory, extractedStem + ".bin");
+            string secondBin = Path.Combine(championDirectory, extractedStem + " (1).bin");
+            string skinBin = Path.Combine(skinsDirectory, "skin28.bin");
+            WriteBin(firstBin, new[] { CreateSystem("Effects/First", "First") }, Array.Empty<string>());
+            WriteBin(secondBin, new[] { CreateSystem("Effects/Second", "Second") }, Array.Empty<string>());
+            WriteBin(
+                skinBin,
+                Array.Empty<BinTreeObject>(),
+                new[] { $"DATA/Characters/Hero/{extractedStem}_irreversibly_truncated.bin" });
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skinBin, new LogService(logger));
+
+                Assert.Equal(2, bundle.Systems.Count);
+                Assert.Contains(bundle.Systems.Values, system => system.Name == "First");
+                Assert.Contains(bundle.Systems.Values, system => system.Name == "Second");
+                Assert.Single(bundle.AmbiguousDependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void AttachedMeshWithoutPathDoesNotLoadASecondChampionBody()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerAttachedMesh", Guid.NewGuid().ToString("N"));
+            string searchDirectory = Path.Combine(root, "data", "characters", "hero", "skins");
+            string modelDirectory = Path.Combine(root, "assets", "characters", "hero", "skins", "skin30");
+            Directory.CreateDirectory(searchDirectory);
+            Directory.CreateDirectory(modelDirectory);
+            File.WriteAllBytes(Path.Combine(modelDirectory, "hero_skin30.skn"), new byte[] { 1, 2, 3, 4 });
+
+            var emitter = new VfxEmitterDefinition(
+                Name: "Avatar",
+                Rate: VfxCurveF.Const(1f),
+                ParticleLifetime: VfxCurveF.Const(1f),
+                EmitterLifetime: null,
+                ParticleLinger: 0f,
+                TimeBeforeFirstEmission: 0f,
+                IsSingleParticle: true,
+                Disabled: false,
+                BlendMode: 4,
+                BirthScale: VfxCurve3.Const(new Vector3(15f)),
+                ScaleOverLife: null,
+                BirthColor: VfxCurve4.Const(Vector4.One),
+                ColorOverLife: null,
+                BirthVelocity: null,
+                Acceleration: null,
+                BirthRotationalVelocity: null,
+                EmitterPosition: VfxCurve3.Const(Vector3.Zero),
+                TexturePath: string.Empty,
+                TexDiv: Vector2.One,
+                NumFrames: 1,
+                RandomStartFrame: false,
+                IsMeshPrimitive: true,
+                PrimitiveKind: VfxPrimitiveKind.AttachedMesh);
+            var definition = new VfxSystemDefinition(1, "attached", "Characters/Hero/Skins/Skin30/Attached", new[] { emitter });
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var service = new VfxLoadingService();
+                VfxPlaybackRuntime runtime = service.PreparePlayback(
+                    definition,
+                    searchDirectory,
+                    Matrix4x4.Identity,
+                    7,
+                    new LogService(logger));
+
+                var state = Assert.Single(runtime.Emitters);
+                Assert.Null(state.PendingMesh);
+                Assert.Equal(VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
             }
             finally
             {

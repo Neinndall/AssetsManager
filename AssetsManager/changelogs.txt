@@ -6,6 +6,7 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 New Features
   - VFX Studio / Added multi-layer Emitters / Layers timeline deck matching Riot editor layout, placing Master VFX System bar at Row 0 with emission delay markers for secondary emitters.
   - VFX Studio / Added automatic dependency resolution from BIN headers (PROP v2+ Dependencies) to recursively pre-load companion sub-systems, static meshes, textures, and sounds.
+  - VFX Studio / Added CPU skinning for authored `.skn + .skl + .anm` particle meshes and indexed skeleton/animation resources from extracted WAD trees.
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows each GREP match as soon as it is discovered.
@@ -101,18 +102,17 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
-  - Viewer VFX Studio / Fixed missing mesh resolution in VfxLoadingService for AttachedMesh emitters with empty MeshPath.
+  - Viewer VFX Studio / Rebuilt skin BIN dependency loading so inherited and extractor-truncated effects load without omissions or cross-skin matches.
+  - Viewer VFX Studio / Fixed texture colors, transparency modes, atlas frames, UV transforms, erosion, reflection, distortion, and soft-particle intersections.
+  - Viewer VFX Studio / Fixed global placement, scaling, and AttachedMesh overlays so VFX follow the animated champion without creating a duplicate body.
   - Viewer VFX Studio / Fixed Z-scale flattening bug for 3D Mesh Emitters to prevent 0.01f paper-thin mesh scaling.
-  - Viewer VFX Studio / Refined AttachedMesh caching key to use exact resolved champion body mesh path for semantic cache lookup.
-  - Viewer VFX Studio / Fixed rendering for AttachedMesh avatar VFX systems (like Sett_Base_W_Max_Warning_Avatar) by resolving champion body mesh (.skn) when meshPath is unpopulated.
   - Viewer VFX Studio / Fixed razor-thin 1.5px quad particle scaling in Sett_Base_W_Min_Swipe by correctly evaluating scalar aspect ratio multipliers.
   - Viewer VFX Studio / Fixed UI clipping for SpeedComboBox (0.25x) and top golden LoopBoundaryHandle shadow.
   - Viewer VFX Studio / Fixed Z-index order and hit-testing priority for golden LoopBoundaryHandle to prevent accidental playhead dragging.
   - Viewer VFX Studio / Made golden loop boundary needle interactively draggable with mouse, and corrected IsSingleParticle lifespan detection (e.g. 0.31s for Sett_Base_Q_Swipe_B instead of 5.30s).
   - Viewer VFX Studio / Added golden loop boundary needle with circular handle (matching Riot editor UI design) to visually bound active VFX duration and prevent timeline jumps.
-  - Viewer VFX Studio / Fixed 0-height particle rendering in Sett_Base_W_Min_Swipe by auto-defaulting sizeY to sizeX when height scale curve is unpopulated.
+  - Viewer VFX Studio / Preserved authored zero scale axes used by planar mesh effects instead of replacing them with unrelated dimensions.
   - Viewer VFX Studio / Fixed playback for Sett_Base_W_Min_Tar_Center and short target hit impacts with seamless auto-restart looping.
-  - Viewer VFX Studio / Fixed cross-skin system leakage in VFX list by correcting skin index regex filter and multi_skins BIN dependency loading.
   - Viewer VFX Studio / Fixed playback and rendering for fast impulse hit effects (like Sett_Base_BA_Hit_01) by allowing fallback texture rendering and accurate short-duration timeline calculation.
   - Viewer VFX Studio / Fixed duplicate skin entries in skin selector by filtering strictly for BIN files inside /skins/ folder.
   - Viewer VFX Studio / Fixed sub-UV texture atlas grid scaling (TexDiv) for mesh emitters to eliminate tiled square particle artifacts.
