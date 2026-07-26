@@ -742,7 +742,7 @@ namespace AssetsManager.Views.Controls.Viewer
             SceneModel newModel;
             try
             {
-                if (!string.IsNullOrEmpty(materialsPath))
+                if (!string.IsNullOrEmpty(materialsPath) && File.Exists(materialsPath))
                 {
                     newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
                 }
@@ -776,6 +776,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 _viewModel.LoadedModels.Clear();
                 _viewModel.LoadedModels.Add(newModel);
+                _viewModel.SelectedModel = newModel;
+                ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
                 LoadModelButton.IsEnabled = false;

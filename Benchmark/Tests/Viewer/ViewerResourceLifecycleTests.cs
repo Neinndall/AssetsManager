@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Numerics;
 using System.Windows.Media.Media3D;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -57,6 +59,15 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             part.IsVisible = true;
 
             Assert.Equal(0, visibilityChanges);
+        }
+
+        [Fact]
+        public void ProjectionFarPlaneExpandsForMapScaleCameraDistances()
+        {
+            float farPlane = ViewerViewportControl.CalculateProjectionFarPlane(
+                new Vector3(0f, -18000f, -15000f));
+
+            Assert.True(farPlane > 90000f);
         }
     }
 }

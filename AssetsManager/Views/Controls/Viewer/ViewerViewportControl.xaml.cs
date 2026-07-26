@@ -121,7 +121,11 @@ namespace AssetsManager.Views.Controls.Viewer
             float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)(OpenTkControl.ActualWidth / OpenTkControl.ActualHeight);
             if (float.IsNaN(aspect) || aspect <= 0) aspect = 1.0f;
-            var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspect, 10f, 10000f);
+            var proj = Matrix4x4.CreatePerspectiveFieldOfView(
+                fovRadians,
+                aspect,
+                10f,
+                CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
 
             // 3. Setup lighting from view model settings
@@ -373,6 +377,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (isMapGeometry)
             {
+                _viewModel.IsGridVisible = false;
                 if (_skyVisual != null && Viewport.Children.Contains(_skyVisual))
                     Viewport.Children.Remove(_skyVisual);
                 if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
@@ -938,6 +943,17 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         public void SnapCamera() => ResetCamera(false);
+
+        internal static float CalculateProjectionFarPlane(Vector3 lookDirection)
+        {
+            float cameraDistance = lookDirection.Length();
+            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
+            {
+                return 10000f;
+            }
+
+            return Math.Max(10000f, cameraDistance * 4f);
+        }
 
         private void SetCameraView_Click(object sender, RoutedEventArgs e)
         {

@@ -106,6 +106,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer MapGeometry now selects loaded maps in the inspector and keeps large scenes inside the visible camera range.
+  - Viewer MapGeometry now opens without the studio grid covering the map.
   - Backup snapshot count and storage metrics now follow the selected LIVE, PBE, or ALL filter.
   - Unique Meta Schema resolutions now move from research into BIN type and field overrides.
   - Verified RST overrides now resolve across string tables immediately and after restarting the app.
