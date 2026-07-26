@@ -22,7 +22,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
-  - Backups now include integrity manifests, storage preflight, optional names, preferred-client filtering, sorting, and direct folder access.
+  - Backups now include storage preflight, preferred-client filtering, sorting, and direct folder access.
   - Enhanced BIN and Lua hash guessing accuracy with strict syntax validation and binary script manifest decoding.
   - Asset Tracker / Increased card margin to 14px for cleaner grid spacing.
   - Manage Versions / Preserved active page selection when refreshing version manifests via Fetch Versions.

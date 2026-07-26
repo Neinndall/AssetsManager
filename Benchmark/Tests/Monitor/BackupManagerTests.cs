@@ -1,11 +1,9 @@
 using System.IO;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.BenchmarkTests.Infrastructure;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
-using AssetsManager.Views.Models.Monitor;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Monitor
@@ -28,7 +26,7 @@ namespace AssetsManager.BenchmarkTests.Monitor
         }
 
         [Fact]
-        public async Task BackupWritesCompleteManifestAndAccurateEstimate()
+        public async Task BackupCopiesFilesAndReportsAccurateEstimate()
         {
             using var bridge = new AssetsManagerTestBridge();
             string sourcePath = bridge.CreateDirectory("League of Legends (PBE)");
@@ -44,20 +42,13 @@ namespace AssetsManager.BenchmarkTests.Monitor
             await manager.CreateLolPbeDirectoryBackupAsync(
                 sourcePath,
                 destinationPath,
-                CancellationToken.None,
-                displayName: "Preseason Snapshot");
+                CancellationToken.None);
 
             Assert.Equal(2, estimate.FileCount);
             Assert.Equal(12, estimate.TotalBytes);
-            string manifestPath = Path.Combine(destinationPath, BackupManager.ManifestFileName);
-            Assert.True(File.Exists(manifestPath));
-            BackupManifest manifest = JsonSerializer.Deserialize<BackupManifest>(
-                await File.ReadAllTextAsync(manifestPath));
-            Assert.Equal("Preseason Snapshot", manifest.DisplayName);
-            Assert.Equal("PBE", manifest.Environment);
-            Assert.Equal("Complete", manifest.Status);
-            Assert.Equal(2, manifest.FileCount);
-            Assert.Equal(12, manifest.TotalBytes);
+            Assert.Equal("12345", await File.ReadAllTextAsync(Path.Combine(destinationPath, "root.dat")));
+            Assert.Equal("1234567", await File.ReadAllTextAsync(Path.Combine(destinationPath, "Game", "game.dat")));
+            Assert.False(File.Exists(Path.Combine(destinationPath, ".assetsmanager-backup.json")));
         }
     }
 }

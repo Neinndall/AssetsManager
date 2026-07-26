@@ -263,30 +263,6 @@
                                                     </StackPanel>
                                                 </Border>
 
-                                                <Border Background="{StaticResource HoverColor}" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
-                                                        ToolTip="{Binding IntegrityDetails}">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                        <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="10" Height="10" Margin="0,0,4,0">
-                                                            <materialIcons:MaterialIcon.Style>
-                                                                <Style TargetType="materialIcons:MaterialIcon">
-                                                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IntegrityStatus}" Value="Complete">
-                                                                            <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IntegrityStatus}" Value="Incomplete">
-                                                                            <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IntegrityStatus}" Value="Missing Files">
-                                                                            <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </materialIcons:MaterialIcon.Style>
-                                                        </materialIcons:MaterialIcon>
-                                                        <TextBlock Text="{Binding IntegrityStatus}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
-                                                    </StackPanel>
-                                                </Border>
                                             </StackPanel>
                                         </StackPanel>
 

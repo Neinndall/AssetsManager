@@ -250,16 +250,6 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            var inputDialog = ServiceProvider.GetRequiredService<InputDialog>();
-            inputDialog.Initialize(
-                "Backup Name",
-                "Enter an optional descriptive name for this snapshot:",
-                selectedBackup?.CanModify == true ? selectedBackup.DisplayName : $"{clientName} Snapshot");
-            inputDialog.Owner = Window.GetWindow(this);
-            if (inputDialog.ShowDialog() != true) return;
-            string displayName = inputDialog.InputText?.Trim();
-            if (displayName?.Length > 80) displayName = displayName[..80];
-
             ViewModel.IsBusy = true;
             try
             {
@@ -267,11 +257,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 BackupManager.BackupStorageEstimate estimate =
                     await BackupManager.GetStorageEstimateAsync(sourcePath, destinationPath, cancellationToken);
                 string operation = action == BackupAction.Overwrite ? "Refresh" : isCloning ? "Clone" : "Create";
-                string snapshotLabel = string.IsNullOrWhiteSpace(displayName)
-                    ? $"{clientName} snapshot"
-                    : $"'{displayName}'";
                 string spaceMessage =
-                    $"{operation} {snapshotLabel}?\n\n" +
+                    $"{operation} {clientName} snapshot?\n\n" +
                     $"Required: {FormatUtils.FormatSize(estimate.TotalBytes)} ({estimate.FileCount:N0} files)\n" +
                     $"Available: {FormatUtils.FormatSize(estimate.AvailableBytes)}";
                 if (estimate.TotalBytes > estimate.AvailableBytes)
@@ -284,12 +271,12 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 if (isCloning)
                 {
-                    await BackupManager.CloneBackupAsync(sourcePath, destinationPath, cancellationToken, displayName);
+                    await BackupManager.CloneBackupAsync(sourcePath, destinationPath, cancellationToken);
                 }
                 else
                 {
                     string logMsg = !string.IsNullOrEmpty(oldBackupPathToDelete) ? "Overwriting backup..." : "Creating backup...";
-                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg, displayName);
+                    await BackupManager.CreateLolPbeDirectoryBackupAsync(sourcePath, destinationPath, cancellationToken, logMsg);
                 }
                 
                 if (!cancellationToken.IsCancellationRequested)
