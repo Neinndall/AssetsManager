@@ -383,6 +383,22 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void DownwardSpotlightRayReachesTheGroundContact()
+        {
+            Vector3 origin = new(-520f, 800f, 0f);
+            Vector3 direction = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
+                VfxPrimitiveKind.Ray,
+                new Vector3(50f, 90f, 0f) * (MathF.PI / 180f));
+
+            float length = VfxOpenGlRenderer.GetGroundContactRayLength(origin, direction, 900f);
+            Vector3 endpoint = origin + direction * length;
+
+            Assert.True(length > 900f);
+            Assert.True(endpoint.Y < 0f);
+            Assert.True(endpoint.Y > -2f);
+        }
+
+        [Fact]
         public void MeshParticlesAdvanceAuthoredRotationOnAllThreeAxes()
         {
             VfxEmitterDefinition emitter = CreateEmitter(

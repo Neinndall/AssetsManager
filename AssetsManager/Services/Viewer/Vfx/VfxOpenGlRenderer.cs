@@ -855,6 +855,20 @@ namespace AssetsManager.Services.Viewer.Vfx
             return Vector3.Normalize(side);
         }
 
+        internal static float GetGroundContactRayLength(
+            Vector3 origin,
+            Vector3 direction,
+            float authoredLength)
+        {
+            float length = MathF.Max(0f, authoredLength);
+            if (origin.Y <= 0f || direction.Y >= -1e-5f) return length;
+
+            float groundDistance = origin.Y / -direction.Y;
+            return groundDistance > length && groundDistance <= length * 1.25f
+                ? groundDistance + 2f
+                : length;
+        }
+
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
@@ -1123,7 +1137,13 @@ void main(){
     vec3 world;
     if (rayPrimitive) {
         float alongRay = aCorner.y + 0.5;
-        world = aCenter + up * (alongRay * aSize.y) + right * (rc.x * aSize.x);
+        float rayLength = aSize.y;
+        if (aCenter.y > 0.0 && up.y < -0.00001) {
+            float groundDistance = aCenter.y / -up.y;
+            if (groundDistance > rayLength && groundDistance <= rayLength * 1.25)
+                rayLength = groundDistance + 2.0;
+        }
+        world = aCenter + up * (alongRay * rayLength) + right * (rc.x * aSize.x);
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
         vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
         vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
