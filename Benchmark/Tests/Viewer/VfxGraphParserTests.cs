@@ -55,6 +55,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                 new BinTreeProperty[]
                 {
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "DefaultEmitter"),
+                    new BinTreeU8(Fnv1a.HashLower("importance"), 3),
                     textureMult
                 });
             var effectObject = new BinTreeObject(
@@ -79,6 +80,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Equal(0, parsed.ColorLookUpTypeY);
             Assert.True(parsed.TextureMultFlipV);
             Assert.True(parsed.TextureMultRandomStartFrame);
+            Assert.Equal(3, parsed.Importance);
             Assert.Equal(0.5f, parsed.UvTransformCenter.X);
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);
         }

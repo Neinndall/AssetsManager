@@ -135,7 +135,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool TextureMultScrollAlpha = false,
         VfxSoftParticleDefinition SoftParticle = null,
         VfxReflectionDefinition Reflection = null,
-        Vector3? RayTargetOffset = null)
+        Vector3? RayTargetOffset = null,
+        byte Importance = 1)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||

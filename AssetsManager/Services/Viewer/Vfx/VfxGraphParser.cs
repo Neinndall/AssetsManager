@@ -59,6 +59,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_timeBefore    = HashAlgorithms.Fnv1a("timeBeforeFirstEmission");
         private static readonly uint F_isSingle      = HashAlgorithms.Fnv1a("isSingleParticle");
         private static readonly uint F_disabled      = HashAlgorithms.Fnv1a("disabled");
+        private static readonly uint F_importance    = HashAlgorithms.Fnv1a("importance");
         private static readonly uint F_rateIsPeriod  = HashAlgorithms.Fnv1a("rateIsPeriod");
         private static readonly uint F_birthTimePeriod = HashAlgorithms.Fnv1a("birthTimePeriod");
         private static readonly uint F_isLoop        = HashAlgorithms.Fnv1a("isLoop");
@@ -600,7 +601,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 TextureMultEmitterUvScrollRate: textureMultEmitterUvScroll,
                 TextureMultScrollAlpha: textureMultScrollAlpha,
                 SoftParticle: softParticle,
-                Reflection: reflection);
+                Reflection: reflection,
+                Importance: (byte)(GetU8(p, F_importance) ?? 1));
         }
 
         private static VfxFieldCollectionDefinition ReadFields(

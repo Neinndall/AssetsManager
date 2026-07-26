@@ -449,6 +449,7 @@ namespace BenchmarkApp
 
             var systems = service.LoadVfxSystemsForModel(sknPath, rootPath);
             Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {systems.Count}");
+            var meshResolver = new AssetsManager.Services.Viewer.Vfx.VfxResourceResolver();
 
             string systemFilter = args.Length > 2 ? args[2] : null;
             var selectedSystems = string.IsNullOrWhiteSpace(systemFilter)
@@ -457,7 +458,9 @@ namespace BenchmarkApp
 
             foreach (var sys in selectedSystems)
             {
-                Console.WriteLine($" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count}");
+                Console.WriteLine(
+                    $" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count} | " +
+                    $"VisibilityRadius: {sys.Definition?.VisibilityRadius ?? 0f}");
                 if (string.IsNullOrWhiteSpace(systemFilter) || sys.Definition is null) continue;
                 foreach (var emitter in sys.Definition.Emitters)
                 {
@@ -465,11 +468,37 @@ namespace BenchmarkApp
                         ? "-"
                         : string.Join(", ", emitter.ChildParticleSet.Children.Select(child =>
                             $"{child.Name}[system={child.SystemHash:X8}, key={child.EffectKey:X8}]"));
+                    string spawn = emitter.SpawnShape is null
+                        ? "-"
+                        : $"{emitter.SpawnShape.Kind}[size={emitter.SpawnShape.Size}, " +
+                          $"radius={emitter.SpawnShape.Radius}, height={emitter.SpawnShape.Height}, " +
+                          $"offset={emitter.SpawnShape.EmitOffset.Constant}]";
+                    string meshBounds = "-";
+                    var mesh = meshResolver.ResolveMesh(emitter.MeshPath, rootPath);
+                    if (mesh is { } decoded && decoded.Positions.Length >= 3)
+                    {
+                        var min = new System.Numerics.Vector3(float.PositiveInfinity);
+                        var max = new System.Numerics.Vector3(float.NegativeInfinity);
+                        for (int index = 0; index + 2 < decoded.Positions.Length; index += 3)
+                        {
+                            var position = new System.Numerics.Vector3(
+                                decoded.Positions[index],
+                                decoded.Positions[index + 1],
+                                decoded.Positions[index + 2]);
+                            min = System.Numerics.Vector3.Min(min, position);
+                            max = System.Numerics.Vector3.Max(max, position);
+                        }
+                        meshBounds = $"{min}..{max} size={max - min}";
+                    }
                     Console.WriteLine(
                         $"   * {emitter.Name} | primitive={emitter.PrimitiveKind} | " +
+                        $"importance={emitter.Importance} | " +
                         $"birthScale={emitter.BirthScale.Constant} | scale0={emitter.ScaleOverLife?.Constant} | " +
                         $"uniform={emitter.IsUniformScale} | position={emitter.EmitterPosition.Constant} | " +
-                        $"mesh={emitter.MeshPath ?? "-"} | children={children}");
+                        $"spawn={spawn} | velocity={emitter.BirthVelocity?.Constant} | " +
+                        $"acceleration={emitter.Acceleration?.Constant} | mesh={emitter.MeshPath ?? "-"} | " +
+                        $"meshBounds={meshBounds} | " +
+                        $"children={children}");
                 }
             }
         }

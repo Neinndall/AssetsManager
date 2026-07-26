@@ -4,6 +4,7 @@ HOTFIX UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio / Extended the filtered BIN audit with emitter importance, spawn volumes, motion values, child links, and decoded mesh bounds for reproducible scale and placement diagnostics.
   - VFX Studio / Added multi-layer Emitters / Layers timeline deck matching Riot editor layout, placing Master VFX System bar at Row 0 with emission delay markers for secondary emitters.
   - VFX Studio / Added automatic dependency resolution from BIN headers (PROP v2+ Dependencies) to recursively pre-load companion sub-systems, static meshes, textures, and sounds.
   - VFX Studio / Added CPU skinning for authored `.skn + .skl + .anm` particle meshes and indexed skeleton/animation resources from extracted WAD trees.
