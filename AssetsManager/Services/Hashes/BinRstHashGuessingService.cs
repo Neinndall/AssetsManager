@@ -22,6 +22,9 @@ namespace AssetsManager.Services.Hashes
 {
     public sealed class BinRstHashGuessingService
     {
+        private const string MetaSchemaClassSource = "Meta Schema class names";
+        private const string MetaSchemaPropertySource = "Meta Schema property names";
+
         private static readonly HashSet<uint> NamedEntryTypes = new[]
         {
             "StaticMaterialDef", "UISceneData", "UiElementEffectAmmoData", "UiElementEffectAnimatedRotatingIconData",
@@ -373,8 +376,8 @@ namespace AssetsManager.Services.Hashes
                     }
                     if (includeBin)
                     {
-                        CheckCandidates(metaSchema.KnownTypeNames, InternalHashGuessStrategy.CrossDictionary, "Meta Schema class names");
-                        CheckCandidates(metaSchema.KnownFieldNames, InternalHashGuessStrategy.CrossDictionary, "Meta Schema property names");
+                        CheckCandidates(metaSchema.KnownTypeNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaClassSource);
+                        CheckCandidates(metaSchema.KnownFieldNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaPropertySource);
                     }
                     CheckCandidates(Common3DBones, InternalHashGuessStrategy.CrossDictionary, "Common 3D Skeleton Bones");
 
@@ -415,6 +418,8 @@ namespace AssetsManager.Services.Hashes
                 }, cancellationToken);
 
                 int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
+                IReadOnlyList<InternalHashGuessMatch> existingResearch = await _store.LoadResearchAsync(cancellationToken);
+                matcher.PromoteUniqueSchemaCandidates(existingResearch);
                 progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", checkedCount));
                 return await CompleteRunAsync(matcher, initial, checkedCount);
             }
@@ -680,7 +685,120 @@ namespace AssetsManager.Services.Hashes
             HashResolverService resolver = null)
         {
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
+            MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
             VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+        }
+
+        internal static void MatchObjectLocalHashEvidence(
+            BinTree tree,
+            LocalEvidenceMatcher matcher,
+            string path,
+            string wadPath = null)
+        {
+            foreach (BinTreeObject item in tree.Objects.Values)
+            {
+                MatchDirectProperties(item.Properties.Values);
+                foreach (BinTreeProperty property in item.Properties.Values)
+                    VisitScope(property);
+            }
+            foreach (var item in tree.DataOverrides)
+                VisitScope(item.Property);
+
+            void MatchDirectProperties(IEnumerable<BinTreeProperty> properties)
+            {
+                var strings = new HashSet<string>(StringComparer.Ordinal);
+                var observedHashes = new HashSet<uint>();
+                foreach (BinTreeProperty property in properties)
+                {
+                    if (property is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
+                        strings.Add(text.Value.Trim());
+                    else if (property is BinTreeHash hash)
+                        observedHashes.Add(hash.Value);
+                }
+                MatchCandidates(strings, observedHashes);
+            }
+
+            void MatchPair(BinTreeProperty key, BinTreeProperty value)
+            {
+                var strings = new HashSet<string>(StringComparer.Ordinal);
+                var observedHashes = new HashSet<uint>();
+                Collect(key, strings, observedHashes);
+                Collect(value, strings, observedHashes);
+                MatchCandidates(strings, observedHashes);
+            }
+
+            void MatchCandidates(HashSet<string> strings, HashSet<uint> observedHashes)
+            {
+                foreach (var group in strings
+                    .Where(LocalEvidenceMatcher.IsIdentifier)
+                    .GroupBy(Fnv1a.HashLower))
+                {
+                    string[] candidates = group.Distinct(StringComparer.Ordinal).ToArray();
+                    if (candidates.Length == 1 && observedHashes.Contains(group.Key))
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidates[0], path, wadPath, group.Key);
+                }
+            }
+
+            void VisitScope(BinTreeProperty property)
+            {
+                switch (property)
+                {
+                    case BinTreeStruct structure:
+                        MatchDirectProperties(structure.Properties.Values);
+                        foreach (BinTreeProperty child in structure.Properties.Values)
+                            VisitScope(child);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements)
+                            VisitScope(child);
+                        break;
+                    case BinTreeOptional option when option.Value != null:
+                        VisitScope(option.Value);
+                        break;
+                    case BinTreeMap map:
+                        foreach (var child in map)
+                        {
+                            MatchPair(child.Key, child.Value);
+                            VisitScope(child.Key);
+                            VisitScope(child.Value);
+                        }
+                        break;
+                }
+            }
+
+            static void Collect(
+                BinTreeProperty property,
+                HashSet<string> strings,
+                HashSet<uint> observedHashes)
+            {
+                switch (property)
+                {
+                    case BinTreeString text:
+                        if (!string.IsNullOrWhiteSpace(text.Value)) strings.Add(text.Value.Trim());
+                        break;
+                    case BinTreeHash hash:
+                        observedHashes.Add(hash.Value);
+                        break;
+                    case BinTreeStruct structure:
+                        foreach (BinTreeProperty child in structure.Properties.Values)
+                            Collect(child, strings, observedHashes);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements)
+                            Collect(child, strings, observedHashes);
+                        break;
+                    case BinTreeOptional option when option.Value != null:
+                        Collect(option.Value, strings, observedHashes);
+                        break;
+                    case BinTreeMap map:
+                        foreach (var child in map)
+                        {
+                            Collect(child.Key, strings, observedHashes);
+                            Collect(child.Value, strings, observedHashes);
+                        }
+                        break;
+                }
+            }
         }
 
         internal static void MatchBinContextualEvidence(
@@ -1430,6 +1548,57 @@ namespace AssetsManager.Services.Hashes
                 _matches[key] = match;
                 _pendingMatches.Add(match);
                 return true;
+            }
+
+            internal void PromoteUniqueSchemaCandidates(IEnumerable<InternalHashGuessMatch> existingResearch)
+            {
+                var candidates = existingResearch
+                    .Concat(_matches.Values)
+                    .Where(match =>
+                        match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema &&
+                        match.Evidence == InternalHashEvidence.MetaSchemaWordset &&
+                        !match.IsVerified &&
+                        match.Confidence == InternalHashConfidence.Candidate &&
+                        !string.IsNullOrWhiteSpace(match.Value) &&
+                        match.Source is MetaSchemaClassSource or MetaSchemaPropertySource &&
+                        match.Kind is InternalHashKind.BinTypes or InternalHashKind.BinFields &&
+                        _targets[match.Kind].Contains(match.LookupHash))
+                    .GroupBy(match => (match.Kind, match.LookupHash));
+
+                foreach (var group in candidates)
+                {
+                    InternalHashGuessMatch[] distinct = group
+                        .GroupBy(match => match.Value, StringComparer.Ordinal)
+                        .Select(values => values.OrderByDescending(match => match.FoundAtUtc).First())
+                        .ToArray();
+                    if (distinct.Length != 1) continue;
+
+                    InternalHashGuessMatch candidate = distinct[0];
+                    _targets[candidate.Kind].Remove(candidate.LookupHash);
+                    foreach (var key in _matches.Keys
+                        .Where(key => key.Kind == candidate.Kind && key.Hash == candidate.Hash)
+                        .ToList())
+                        _matches.Remove(key);
+
+                    var promoted = new InternalHashGuessMatch
+                    {
+                        Hash = candidate.Hash,
+                        LookupHash = candidate.LookupHash,
+                        HashBits = candidate.HashBits,
+                        Value = candidate.Value,
+                        Kind = candidate.Kind,
+                        Strategy = candidate.Strategy,
+                        Source = candidate.Source,
+                        SourceWad = candidate.SourceWad,
+                        SourceBin = candidate.SourceBin,
+                        IsVerified = true,
+                        VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                        Confidence = InternalHashConfidence.Verified,
+                        Evidence = InternalHashEvidence.MetaSchemaUnique
+                    };
+                    _matches[(promoted.Kind, promoted.Hash, promoted.Value)] = promoted;
+                    _pendingMatches.Add(promoted);
+                }
             }
 
             internal static bool IsIdentifier(string value)

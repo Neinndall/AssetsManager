@@ -120,6 +120,130 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void ObjectLocalHashEvidenceResolvesMatchingIdentifier()
+        {
+            const string candidate = "apheliospluffas";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("SpellData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), candidate),
+                    new BinTreeHash(Fnv1a.HashLower("nameHash"), hash)
+                })
+            }, Array.Empty<string>());
+
+            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+            Assert.Equal(candidate, match.Value);
+            Assert.Equal(InternalHashEvidence.RuntimeContext, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void HashEvidenceFromAnotherObjectCannotResolveIdentifier()
+        {
+            const string candidate = "apheliospluffas";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("StringOwner"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), candidate)
+                }),
+                new BinTreeObject(0x22222222, Fnv1a.HashLower("HashOwner"), new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("nameHash"), hash)
+                })
+            }, Array.Empty<string>());
+
+            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void HashAndStringFromDifferentMapPairsCannotResolveIdentifier()
+        {
+            const string candidate = "play_sfx_akali_joke3d_loop";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, hash),
+                        new BinTreeStruct(0, 0x11111111, new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("resource"), "unrelated_clip")
+                        })),
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 0x22222222),
+                        new BinTreeStruct(0, 0x11111111, new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("resource"), candidate)
+                        }))
+                });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x33333333, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map })
+            }, Array.Empty<string>());
+
+            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "akali.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void HashAndStringFromSameMapPairResolveIdentifier()
+        {
+            const string candidate = "apheliospluffas";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("dataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, hash),
+                        new BinTreeStruct(0, 0x11111111, new BinTreeProperty[]
+                        {
+                            new BinTreeString(Fnv1a.HashLower("name"), candidate)
+                        }))
+                });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x22222222, Fnv1a.HashLower("SpellData"), new BinTreeProperty[] { map })
+            }, Array.Empty<string>());
+
+            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(candidate, match.Value);
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
         public void ContextualEntryAttributeResolvesObjectPath()
         {
             const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
@@ -216,6 +340,121 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.False(match.CanPromote);
             Assert.Equal(InternalHashConfidence.Candidate, match.Confidence);
             Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void UniqueMetaSchemaCandidatePromotesToOverrideEvidence()
+        {
+            const string candidate = "VfxGeComponentDef";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                candidate,
+                InternalHashGuessStrategy.CrossDictionary,
+                "Meta Schema class names");
+
+            matcher.PromoteUniqueSchemaCandidates(Array.Empty<InternalHashGuessMatch>());
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.True(match.CanPromote);
+            Assert.Equal(InternalHashEvidence.MetaSchemaUnique, match.Evidence);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void PreviousMetaCollisionKeepsSchemaCandidatesUnverified()
+        {
+            const string candidate = "VfxGeComponentDef";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                candidate,
+                InternalHashGuessStrategy.CrossDictionary,
+                "Meta Schema class names");
+            var previousCollision = new InternalHashGuessMatch
+            {
+                Hash = hash,
+                LookupHash = hash,
+                HashBits = 32,
+                Value = "DifferentCandidate",
+                Kind = InternalHashKind.BinTypes,
+                Strategy = InternalHashGuessStrategy.CrossDictionary,
+                Source = "Meta Schema class names",
+                IsVerified = false,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Candidate,
+                Evidence = InternalHashEvidence.MetaSchemaWordset
+            };
+
+            matcher.PromoteUniqueSchemaCandidates(new[] { previousCollision });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.False(match.CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void GeneratedSchemaCandidateCannotUseMetaPromotion()
+        {
+            const string candidate = "VfxGeComponentDef42";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                candidate,
+                InternalHashGuessStrategy.NumericVariant,
+                "Advanced Structural Generation");
+
+            matcher.PromoteUniqueSchemaCandidates(Array.Empty<InternalHashGuessMatch>());
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.False(match.CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public async Task UniquePreviousMetaResearchCanBePromotedOnNextMetaRun()
+        {
+            const string candidate = "VfxGeComponentDef";
+            uint hash = Fnv1a.HashLower(candidate);
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            await store.SaveMatchesAsync(new[]
+            {
+                new InternalHashGuessMatch
+                {
+                    Hash = hash,
+                    LookupHash = hash,
+                    HashBits = 32,
+                    Value = candidate,
+                    Kind = InternalHashKind.BinTypes,
+                    Strategy = InternalHashGuessStrategy.CrossDictionary,
+                    Source = "Meta Schema class names",
+                    IsVerified = false,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Candidate,
+                    Evidence = InternalHashEvidence.MetaSchemaWordset
+                }
+            }, CancellationToken.None);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            matcher.PromoteUniqueSchemaCandidates(await store.LoadResearchAsync(CancellationToken.None));
+            await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
+
+            Assert.Contains(hash.ToString("x8"), await File.ReadAllTextAsync(
+                store.GetOverridePath(InternalHashKind.BinTypes)));
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
         [Fact]
@@ -363,6 +602,48 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal(value.ToString("x8"), resolver.ResolveBinHash(value));
             Assert.Equal(value.ToString("x8"), resolver.ResolveBinEntry(value));
             Assert.Equal(value.ToString("x8"), resolver.ResolveBinType(value));
+        }
+
+        [Fact]
+        public void RstOverridesLoadIntoResolverAndStringTableDictionaries()
+        {
+            const ulong officialXxh3 = 0x1111111111111111;
+            const ulong overrideXxh3 = 0x2222222222222222;
+            const ulong sharedXxh3 = 0x3333333333333333;
+            const ulong officialXxh64 = 0x4444444444444444;
+            const ulong overrideXxh64 = 0x5555555555555555;
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string overrideDirectory = Path.Combine(bridge.Directories.HashLabPath, "overrides");
+            Directory.CreateDirectory(overrideDirectory);
+            File.WriteAllLines(Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh3.txt"), new[]
+            {
+                $"{officialXxh3:x16} official_xxh3",
+                $"{sharedXxh3:x16} official_shared"
+            });
+            File.WriteAllLines(Path.Combine(overrideDirectory, "hashes.rst.xxh3.txt"), new[]
+            {
+                $"{overrideXxh3:x16} override_xxh3",
+                $"{sharedXxh3:x16} override_shared"
+            });
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh64.txt"),
+                $"{officialXxh64:x16} official_xxh64{Environment.NewLine}");
+            File.WriteAllText(
+                Path.Combine(overrideDirectory, "hashes.rst.xxh64.txt"),
+                $"{overrideXxh64:x16} override_xxh64{Environment.NewLine}");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+
+            resolver.LoadRstHashes();
+
+            Assert.Equal("official_xxh3", resolver.ResolveRstHash(officialXxh3));
+            Assert.Equal("override_xxh3", resolver.ResolveRstHash(overrideXxh3));
+            Assert.Equal("official_shared", resolver.ResolveRstHash(sharedXxh3));
+            Assert.Equal("official_xxh64", resolver.ResolveRstHash(officialXxh64));
+            Assert.Equal("override_xxh64", resolver.ResolveRstHash(overrideXxh64));
+            Assert.Equal("override_xxh3", resolver.RstXxh3Hashes[overrideXxh3]);
+            Assert.Equal("official_shared", resolver.RstXxh3Hashes[sharedXxh3]);
+            Assert.Equal("override_xxh64", resolver.RstXxh64Hashes[overrideXxh64]);
         }
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateTargets() => new()

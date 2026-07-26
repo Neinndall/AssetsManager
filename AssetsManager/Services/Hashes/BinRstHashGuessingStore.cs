@@ -64,6 +64,23 @@ namespace AssetsManager.Services.Hashes
             return result;
         }
 
+        public async Task<IReadOnlyList<InternalHashGuessMatch>> LoadResearchAsync(CancellationToken cancellationToken)
+        {
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                string path = Path.Combine(_directories.HashLabPath, "internal.research.json");
+                if (!File.Exists(path)) return Array.Empty<InternalHashGuessMatch>();
+                await using var input = File.OpenRead(path);
+                return await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(
+                    input, cancellationToken: cancellationToken) ?? new();
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
         public async Task SaveInventoryAsync(
             IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> observed,
             string patchFingerprint,

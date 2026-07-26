@@ -23,6 +23,7 @@ New Features
 
 Improvements
   - Backups now include storage preflight, preferred-client filtering, sorting, and direct folder access.
+  - BIN Local GREP now validates identifier hashes only within direct structures or matching map pairs.
   - Enhanced BIN and Lua hash guessing accuracy with strict syntax validation and binary script manifest decoding.
   - Asset Tracker / Increased card margin to 14px for cleaner grid spacing.
   - Manage Versions / Preserved active page selection when refreshing version manifests via Fetch Versions.
@@ -106,6 +107,8 @@ Improvements
 
 Bug Fixes
   - Backup snapshot count and storage metrics now follow the selected LIVE, PBE, or ALL filter.
+  - Unique Meta Schema resolutions now move from research into BIN type and field overrides.
+  - Verified RST overrides now resolve across string tables immediately and after restarting the app.
   - MAIN game installations remain selectable for cloning but cannot be deleted as backup snapshots.
   - BIN Hash Guessing now rejects self-confirming literals and cross-domain evidence.
   - BIN Hash Guessing now separates review candidates from context-verified overrides and quarantines legacy findings.

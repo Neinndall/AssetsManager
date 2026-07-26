@@ -19,6 +19,7 @@ namespace AssetsManager.Services.Hashes
         private readonly List<BinaryHashCache> _binCaches = new();
         private readonly List<BinaryHashCache> _binOverrideCaches = new();
         private readonly List<BinaryHashCache> _rstCaches = new();
+        private readonly List<BinaryHashCache> _rstOverrideCaches = new();
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -134,6 +135,22 @@ namespace AssetsManager.Services.Hashes
                     cache.Load();
                     _rstCaches.Add(cache);
                 }
+                else
+                {
+                    _rstCaches.Add(null);
+                }
+
+                var overridePath = Path.Combine(_directoriesCreator.HashLabPath, "overrides", file);
+                if (File.Exists(overridePath))
+                {
+                    var overrideCache = new BinaryHashCache(overridePath, _logService);
+                    overrideCache.Load();
+                    _rstOverrideCaches.Add(overrideCache);
+                }
+                else
+                {
+                    _rstOverrideCaches.Add(null);
+                }
             }
             _rstHashesLoaded = true;
         }
@@ -145,18 +162,35 @@ namespace AssetsManager.Services.Hashes
         private Dictionary<ulong, string> _cachedRstXxh3Hashes;
         private Dictionary<ulong, string> _cachedRstXxh64Hashes;
 
-        public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh3")));
-        public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??= GetCacheDictionary(_rstCaches.FirstOrDefault(c => c.BinPath.Contains("xxh64")));
+        public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??=
+            GetMergedCacheDictionary(GetCache(_rstCaches, 0), GetCache(_rstOverrideCaches, 0));
+        public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??=
+            GetMergedCacheDictionary(GetCache(_rstCaches, 1), GetCache(_rstOverrideCaches, 1));
 
-        private Dictionary<ulong, string> GetCacheDictionary(BinaryHashCache cache)
+        private static BinaryHashCache GetCache(IReadOnlyList<BinaryHashCache> caches, int index) =>
+            index >= 0 && index < caches.Count ? caches[index] : null;
+
+        private static Dictionary<ulong, string> GetMergedCacheDictionary(
+            BinaryHashCache officialCache,
+            BinaryHashCache overrideCache)
         {
-            if (cache == null) return new Dictionary<ulong, string>();
             var dict = new Dictionary<ulong, string>();
-            for (int i = 0; i < cache.Count; i++)
-            {
-                dict[cache.GetHash(i)] = cache.ResolveByIndex(i);
-            }
+            Add(officialCache, overwrite: true);
+            Add(overrideCache, overwrite: false);
             return dict;
+
+            void Add(BinaryHashCache cache, bool overwrite)
+            {
+                if (cache == null) return;
+                for (int index = 0; index < cache.Count; index++)
+                {
+                    ulong hash = cache.GetHash(index);
+                    if (overwrite)
+                        dict[hash] = cache.ResolveByIndex(index);
+                    else
+                        dict.TryAdd(hash, cache.ResolveByIndex(index));
+                }
+            }
         }
 
         public string ResolveHash(ulong pathHash)
@@ -214,6 +248,13 @@ namespace AssetsManager.Services.Hashes
         {
             foreach (var cache in _rstCaches)
             {
+                if (cache == null) continue;
+                var result = cache.Resolve(rstHash);
+                if (result != null) return result;
+            }
+            foreach (var cache in _rstOverrideCaches)
+            {
+                if (cache == null) continue;
                 var result = cache.Resolve(rstHash);
                 if (result != null) return result;
             }
@@ -237,11 +278,13 @@ namespace AssetsManager.Services.Hashes
             foreach (var c in _gameCaches) c.Dispose();
             foreach (var c in _binCaches) c?.Dispose();
             foreach (var c in _binOverrideCaches) c?.Dispose();
-            foreach (var c in _rstCaches) c.Dispose();
+            foreach (var c in _rstCaches) c?.Dispose();
+            foreach (var c in _rstOverrideCaches) c?.Dispose();
             _gameCaches.Clear();
             _binCaches.Clear();
             _binOverrideCaches.Clear();
             _rstCaches.Clear();
+            _rstOverrideCaches.Clear();
         }
     }
 }

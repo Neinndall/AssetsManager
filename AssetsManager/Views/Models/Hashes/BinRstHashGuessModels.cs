@@ -34,7 +34,8 @@ namespace AssetsManager.Views.Models.Hashes
         Legacy,
         RuntimeContext,
         MetaSchemaWordset,
-        RstHashMatch
+        RstHashMatch,
+        MetaSchemaUnique
     }
 
     public sealed class InternalHashGuessMatch
