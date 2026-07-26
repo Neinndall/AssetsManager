@@ -17,6 +17,7 @@ namespace AssetsManager.Services.Hashes
 
         private readonly List<BinaryHashCache> _gameCaches = new();
         private readonly List<BinaryHashCache> _binCaches = new();
+        private readonly List<BinaryHashCache> _binOverrideCaches = new();
         private readonly List<BinaryHashCache> _rstCaches = new();
 
         private readonly DirectoriesCreator _directoriesCreator;
@@ -99,6 +100,22 @@ namespace AssetsManager.Services.Hashes
                     cache.Load();
                     _binCaches.Add(cache);
                 }
+                else
+                {
+                    _binCaches.Add(null);
+                }
+
+                var overridePath = Path.Combine(_directoriesCreator.HashLabPath, "overrides", file);
+                if (File.Exists(overridePath))
+                {
+                    var overrideCache = new BinaryHashCache(overridePath, _logService);
+                    overrideCache.Load();
+                    _binOverrideCaches.Add(overrideCache);
+                }
+                else
+                {
+                    _binOverrideCaches.Add(null);
+                }
             }
             _binHashesLoaded = true;
         }
@@ -165,7 +182,29 @@ namespace AssetsManager.Services.Hashes
         {
             foreach (var cache in _binCaches)
             {
+                if (cache == null) continue;
                 var result = cache.Resolve(hash);
+                if (result != null) return result;
+            }
+            foreach (var cache in _binOverrideCaches)
+            {
+                if (cache == null) continue;
+                var result = cache.Resolve(hash);
+                if (result != null) return result;
+            }
+            return hash.ToString("x8");
+        }
+
+        internal string ResolveBinDomain(uint hash, int index)
+        {
+            if (index >= 0 && index < _binCaches.Count && _binCaches[index] != null)
+            {
+                string result = _binCaches[index].Resolve(hash);
+                if (result != null) return result;
+            }
+            if (index >= 0 && index < _binOverrideCaches.Count && _binOverrideCaches[index] != null)
+            {
+                string result = _binOverrideCaches[index].Resolve(hash);
                 if (result != null) return result;
             }
             return hash.ToString("x8");
@@ -196,10 +235,12 @@ namespace AssetsManager.Services.Hashes
         public void Dispose()
         {
             foreach (var c in _gameCaches) c.Dispose();
-            foreach (var c in _binCaches) c.Dispose();
+            foreach (var c in _binCaches) c?.Dispose();
+            foreach (var c in _binOverrideCaches) c?.Dispose();
             foreach (var c in _rstCaches) c.Dispose();
             _gameCaches.Clear();
             _binCaches.Clear();
+            _binOverrideCaches.Clear();
             _rstCaches.Clear();
         }
     }

@@ -19,19 +19,23 @@ namespace AssetsManager.Services.Hashes
         public BinRstHashGuessingStore(DirectoriesCreator directories) => _directories = directories;
 
         public string GetKnownPath(InternalHashKind kind) => Path.Combine(_directories.HashesPath, GetKnownFileName(kind));
+        public string GetOverridePath(InternalHashKind kind) =>
+            Path.Combine(_directories.HashLabPath, "overrides", GetKnownFileName(kind));
 
         public async Task<Dictionary<ulong, string>> LoadKnownAsync(InternalHashKind kind, CancellationToken cancellationToken)
         {
             var result = new Dictionary<ulong, string>();
-            string path = GetKnownPath(kind);
-            if (!File.Exists(path)) return result;
             int width = IsRst(kind) ? 16 : 8;
-            using var reader = new StreamReader(path);
-            while (await reader.ReadLineAsync(cancellationToken) is string line)
+            foreach (string path in new[] { GetKnownPath(kind), GetOverridePath(kind) })
             {
-                if (line.Length <= width || line[width] != ' ') continue;
-                if (ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash))
-                    result[hash] = line[(width + 1)..];
+                if (!File.Exists(path)) continue;
+                using var reader = new StreamReader(path);
+                while (await reader.ReadLineAsync(cancellationToken) is string line)
+                {
+                    if (line.Length <= width || line[width] != ' ') continue;
+                    if (ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash))
+                        result.TryAdd(hash, line[(width + 1)..]);
+                }
             }
             return result;
         }
@@ -70,6 +74,7 @@ namespace AssetsManager.Services.Hashes
             try
             {
                 Directory.CreateDirectory(_directories.HashLabPath);
+                await SaveResearchAsync(Array.Empty<InternalHashGuessMatch>(), cancellationToken);
                 foreach (var pair in observed)
                 {
                     var known = await LoadKnownAsync(pair.Key, cancellationToken);
@@ -96,16 +101,18 @@ namespace AssetsManager.Services.Hashes
 
         public async Task SaveMatchesAsync(IEnumerable<InternalHashGuessMatch> matches, CancellationToken cancellationToken)
         {
-            var materialized = matches.Where(match => match.IsVerified).ToList();
+            var materialized = matches
+                .Where(match => match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema)
+                .ToList();
             await _lock.WaitAsync(cancellationToken);
             try
             {
                 await SaveResearchAsync(materialized, cancellationToken);
-                var groups = materialized.GroupBy(match => match.Kind).ToList();
+                var groups = materialized.Where(match => match.CanPromote).GroupBy(match => match.Kind).ToList();
                 foreach (var group in groups)
                 {
                     var incoming = group.GroupBy(match => match.Hash).ToDictionary(g => g.Key, g => g.Last().Value);
-                    await MergeKnownAsync(GetKnownPath(group.Key), incoming, IsRst(group.Key) ? 16 : 8, cancellationToken);
+                    await MergeKnownAsync(GetOverridePath(group.Key), incoming, IsRst(group.Key) ? 16 : 8, cancellationToken);
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
                     foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
                     {
@@ -132,13 +139,49 @@ namespace AssetsManager.Services.Hashes
             if (File.Exists(path))
             {
                 await using var input = File.OpenRead(path);
-                existing = (await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(input, cancellationToken: cancellationToken) ?? new())
-                    .Where(match => match.IsVerified)
-                    .ToList();
+                existing = await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(
+                    input, cancellationToken: cancellationToken) ?? new();
             }
-            var merged = existing.Concat(incoming).GroupBy(match => new { match.Kind, match.Hash })
+            var legacy = existing.Where(match =>
+                match.VerificationSchema < InternalHashGuessMatch.CurrentVerificationSchema).ToList();
+            if (legacy.Count > 0)
+                await SaveLegacyQuarantineAsync(legacy, cancellationToken);
+
+            var merged = existing
+                .Where(match => match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema)
+                .Concat(incoming).GroupBy(match => new { match.Kind, match.Hash, match.Value })
                 .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
                 .OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
+            string temporary = path + ".tmp";
+            try
+            {
+                await using (var output = File.Create(temporary))
+                    await JsonSerializer.SerializeAsync(output, merged, cancellationToken: cancellationToken);
+                File.Move(temporary, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+        }
+
+        private async Task SaveLegacyQuarantineAsync(
+            IEnumerable<InternalHashGuessMatch> incoming,
+            CancellationToken cancellationToken)
+        {
+            string path = Path.Combine(_directories.HashLabPath, "internal.legacy-quarantine.json");
+            var existing = new List<InternalHashGuessMatch>();
+            if (File.Exists(path))
+            {
+                await using var input = File.OpenRead(path);
+                existing = await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(
+                    input, cancellationToken: cancellationToken) ?? new();
+            }
+            var merged = existing.Concat(incoming)
+                .GroupBy(match => new { match.Kind, match.Hash, match.Value })
+                .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
+                .OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal)
+                .ToList();
             string temporary = path + ".tmp";
             try
             {
@@ -183,6 +226,7 @@ namespace AssetsManager.Services.Hashes
 
         private async Task MergeKnownAsync(string path, IReadOnlyDictionary<ulong, string> incoming, int width, CancellationToken cancellationToken)
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var values = new Dictionary<ulong, string>();
             if (File.Exists(path))
             {
@@ -230,13 +274,15 @@ namespace AssetsManager.Services.Hashes
         {
             InternalHashKind.BinEntries => "binentries", InternalHashKind.BinFields => "binfields",
             InternalHashKind.BinTypes => "bintypes", InternalHashKind.BinHashes => "binhashes",
-            InternalHashKind.RstXxh3 => "rst.xxh3.38", _ => "rst.xxh64"
+            InternalHashKind.RstXxh3 => "rst.xxh3.38", InternalHashKind.RstXxh64 => "rst.xxh64",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         private static string GetKnownFileName(InternalHashKind kind) => kind switch
         {
             InternalHashKind.BinEntries => "hashes.binentries.txt", InternalHashKind.BinFields => "hashes.binfields.txt",
             InternalHashKind.BinTypes => "hashes.bintypes.txt", InternalHashKind.BinHashes => "hashes.binhashes.txt",
-            InternalHashKind.RstXxh3 => "hashes.rst.xxh3.txt", _ => "hashes.rst.xxh64.txt"
+            InternalHashKind.RstXxh3 => "hashes.rst.xxh3.txt", InternalHashKind.RstXxh64 => "hashes.rst.xxh64.txt",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
     }
 }

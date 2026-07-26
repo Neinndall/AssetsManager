@@ -156,6 +156,7 @@ namespace AssetsManager
       services.AddSingleton<HashGuessPersistenceService>();
       services.AddSingleton<HashGuessingService>();
       services.AddSingleton<BinRstHashGuessingStore>();
+      services.AddSingleton<MetaSchemaHashSource>();
       services.AddSingleton<BinRstHashGuessingService>();
 
       // Comparator Services

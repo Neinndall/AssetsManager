@@ -103,6 +103,9 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - BIN Hash Guessing now rejects self-confirming literals and cross-domain evidence.
+  - BIN Hash Guessing now separates review candidates from context-verified overrides and quarantines legacy findings.
+  - BIN inventories now include active unresolved Meta Schema types and fields.
   - Viewer VFX Studio / Rebuilt skin BIN dependency loading so inherited and extractor-truncated effects load without omissions or cross-skin matches.
   - Viewer VFX Studio / Fixed texture colors, transparency modes, atlas frames, UV transforms, erosion, reflection, distortion, and soft-particle intersections.
   - Viewer VFX Studio / Fixed global placement, scaling, and AttachedMesh overlays so VFX follow the animated champion without creating a duplicate body.

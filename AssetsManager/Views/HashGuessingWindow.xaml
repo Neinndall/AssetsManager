@@ -542,12 +542,15 @@
                                     <Grid HorizontalAlignment="Stretch">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                         <materialIcons:MaterialIcon Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                                        <StackPanel Grid.Column="1"><TextBlock Text="Build BIN Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Parse internal hashes from BIN files" FontSize="9.5" Foreground="{StaticResource TextSecondary}"/></StackPanel>
+                                        <StackPanel Grid.Column="1"><TextBlock Text="Build BIN Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="BIN runtime + active Meta Schema" FontSize="9.5" Foreground="{StaticResource TextSecondary}"/></StackPanel>
                                     </Grid>
                                 </Button>
-                                <UniformGrid Columns="1">
+                                <UniformGrid Columns="2">
                                     <Button Click="RunInternalContent_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="CodeBraces" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="BIN Local GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Literal values with same-BIN evidence" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
+                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="CodeBraces" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="BIN Context" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Verified context-linked values" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
+                                    </Button>
+                                    <Button Click="RunInternalStructural_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Meta Schema Guess" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Review-only type/field candidates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
                                     </Button>
                                 </UniformGrid>
                             </StackPanel>

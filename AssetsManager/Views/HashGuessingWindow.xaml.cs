@@ -324,7 +324,7 @@ namespace AssetsManager.Views
             string internalDomain = includeBin ? "BIN" : "RST";
             _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
             _viewModel.Matches.Clear();
-            var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash)>();
+            var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash, string Value)>();
 
             try
             {
@@ -333,7 +333,7 @@ namespace AssetsManager.Views
                     if (value.NewMatches.Count > 0)
                     {
                         var newMatches = value.NewMatches
-                            .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash)))
+                            .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
                             .Cast<object>()
                             .ToList();
                         if (newMatches.Count > 0) _viewModel.Matches.AddRange(newMatches);
@@ -370,7 +370,7 @@ namespace AssetsManager.Views
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     _viewModel.StatusText = includeBin
-                        ? $"BIN inventory completed: {inventory.ScannedBins:N0} files parsed."
+                        ? $"BIN inventory: {inventory.ScannedBins:N0} files + Meta {inventory.MetaSchemaVersion} ({inventory.MetaSchemaTypes:N0} types, {inventory.MetaSchemaFields:N0} fields)."
                         : $"RST inventory completed: {inventory.ScannedStringTables:N0} stringtables parsed.";
                 }
                 else
@@ -381,11 +381,12 @@ namespace AssetsManager.Views
                         _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
                     };
                     _viewModel.Matches.AddRange(result.Matches
-                        .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash)))
+                        .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
                         .Cast<object>());
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
-                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} verified.";
+                    int verified = result.Matches.Count(match => match.CanPromote);
+                    _viewModel.StatusText = $"Completed: {verified:N0} verified, {result.Matches.Count - verified:N0} candidates.";
                 }
             }
             catch (OperationCanceledException)

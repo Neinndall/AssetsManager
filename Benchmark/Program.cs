@@ -87,7 +87,9 @@ namespace BenchmarkApp
             var pathStore = new HashGuessingStore(directories);
             var persistence = new HashGuessPersistenceService(pathStore, store);
             var resolver = new HashResolverService(directories, log);
-            var service = new BinRstHashGuessingService(store, persistence, resolver, directories, log);
+            using var metaHttpClient = new System.Net.Http.HttpClient();
+            var metaSchema = new MetaSchemaHashSource(metaHttpClient, directories, log);
+            var service = new BinRstHashGuessingService(store, persistence, resolver, directories, log, metaSchema);
 
             // Create Controlled Hidden Test Corpus (Blind Test)
             Console.WriteLine("Establishing Controlled Hidden Test Corpus (Blind Test)...");

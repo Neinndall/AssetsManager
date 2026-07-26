@@ -60,19 +60,22 @@ namespace AssetsManager.Services.Hashes
         private readonly HashResolverService _resolver;
         private readonly DirectoriesCreator _directories;
         private readonly LogService _log;
+        private readonly MetaSchemaHashSource _metaSchema;
 
         public BinRstHashGuessingService(
             BinRstHashGuessingStore store,
             HashGuessPersistenceService persistence,
             HashResolverService resolver,
             DirectoriesCreator directories,
-            LogService log)
+            LogService log,
+            MetaSchemaHashSource metaSchema)
         {
             _store = store;
             _persistence = persistence;
             _resolver = resolver;
             _directories = directories;
             _log = log;
+            _metaSchema = metaSchema;
         }
 
         public Task<InternalHashSummary> GetSummaryAsync(CancellationToken cancellationToken) => _store.LoadSummaryAsync(cancellationToken);
@@ -91,6 +94,11 @@ namespace AssetsManager.Services.Hashes
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             var observed = CreateObservedSets();
             int scannedBins = 0, scannedRst = 0;
+            MetaSchemaHashSnapshot metaSchema = includeBin
+                ? await _metaSchema.GetSnapshotAsync(cancellationToken)
+                : new MetaSchemaHashSnapshot();
+            observed[InternalHashKind.BinTypes].UnionWith(metaSchema.UnknownTypes);
+            observed[InternalHashKind.BinFields].UnionWith(metaSchema.UnknownFields);
 
             await Task.Run(() =>
             {
@@ -175,9 +183,9 @@ namespace AssetsManager.Services.Hashes
             }, cancellationToken);
 
             string inventoryDomain = includeBin ? "bin" : "rst";
-            string fingerprint = BuildFingerprint(wads, inventoryDomain);
+            string fingerprint = BuildFingerprint(wads, inventoryDomain, metaSchema.Version);
             var selectedObserved = observed.Where(pair =>
-                (includeBin && pair.Key is not (InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64)) ||
+                (includeBin && IsBinKind(pair.Key)) ||
                 (includeRst && pair.Key is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
             await HashResolverService._hashFileAccessLock.WaitAsync(CancellationToken.None);
@@ -198,7 +206,10 @@ namespace AssetsManager.Services.Hashes
                 Unknowns = unknowns,
                 PatchFingerprint = fingerprint,
                 ScannedBins = scannedBins,
-                ScannedStringTables = scannedRst
+                ScannedStringTables = scannedRst,
+                MetaSchemaVersion = metaSchema.Version,
+                MetaSchemaTypes = metaSchema.UnknownTypes.Count,
+                MetaSchemaFields = metaSchema.UnknownFields.Count
             };
         }
 
@@ -339,17 +350,15 @@ namespace AssetsManager.Services.Hashes
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
             progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
-            if (includeBin && !includeRst)
-            {
-                _log.LogWarning("BIN structural guessing is disabled because it cannot provide same-BIN literal evidence.");
-                return await CompleteRunAsync(matcher, initial, 0);
-            }
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
                 binKnown.AddRange((await _store.LoadKnownAsync(kind, cancellationToken)).Values);
             var rst3 = (await _store.LoadKnownAsync(InternalHashKind.RstXxh3, cancellationToken)).Values.ToList();
             var rst64 = (await _store.LoadKnownAsync(InternalHashKind.RstXxh64, cancellationToken)).Values.ToList();
             var wadPaths = (await LoadWadPathsAsync(includeRst, cancellationToken)).Values;
+            MetaSchemaHashSnapshot metaSchema = includeBin
+                ? await _metaSchema.GetSnapshotAsync(cancellationToken)
+                : new MetaSchemaHashSnapshot();
             long checkedCandidates = 0;
 
             try
@@ -362,6 +371,11 @@ namespace AssetsManager.Services.Hashes
                         CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
                         CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
                     }
+                    if (includeBin)
+                    {
+                        CheckCandidates(metaSchema.KnownTypeNames, InternalHashGuessStrategy.CrossDictionary, "Meta Schema class names");
+                        CheckCandidates(metaSchema.KnownFieldNames, InternalHashGuessStrategy.CrossDictionary, "Meta Schema property names");
+                    }
                     CheckCandidates(Common3DBones, InternalHashGuessStrategy.CrossDictionary, "Common 3D Skeleton Bones");
 
                     // Run advanced structural candidate generation
@@ -372,6 +386,8 @@ namespace AssetsManager.Services.Hashes
                         foreach (string val in rst3) wordlist.AddName(val);
                         foreach (string val in rst64) wordlist.AddName(val);
                         foreach (string val in wadPaths) wordlist.AddName(val);
+                        foreach (string val in metaSchema.KnownTypeNames) wordlist.AddName(val);
+                        foreach (string val in metaSchema.KnownFieldNames) wordlist.AddName(val);
                         wordlist.FinalizeList();
 
                         CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
@@ -382,7 +398,13 @@ namespace AssetsManager.Services.Hashes
                         foreach (string candidate in candidates)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            matcher.Check(candidate, strategy, source);
+                            if (includeBin)
+                            {
+                                matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source);
+                                matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source);
+                            }
+                            if (includeRst)
+                                matcher.Check(candidate, strategy, source);
                             checkedCandidates++;
                             if ((checkedCandidates & 0x3ffff) == 0)
                                 progress?.Report(CreateProgress(matcher, stopwatch, source,
@@ -418,7 +440,9 @@ namespace AssetsManager.Services.Hashes
         {
             var matches = matcher.Matches.OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
             await PersistMatchesAsync(matches);
-            _log.LogSuccess($"Internal Hash Lab completed: {matches.Count} locally verified values from {initial} unknown hashes.");
+            int verified = matches.Count(match => match.CanPromote);
+            int candidates = matches.Count - verified;
+            _log.LogSuccess($"Internal Hash Lab completed: {verified} verified values and {candidates} candidates from {initial} unknown hashes.");
             return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
         }
 
@@ -479,7 +503,10 @@ namespace AssetsManager.Services.Hashes
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
                 string[] wads = EnumerateWadContainers(rootDirectory, isBinDomain, !isBinDomain);
-                string fingerprint = BuildFingerprint(wads, domain);
+                string schemaVersion = isBinDomain
+                    ? (await _metaSchema.GetSnapshotAsync(cancellationToken)).Version
+                    : "none";
+                string fingerprint = BuildFingerprint(wads, domain, schemaVersion);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
                 string stored = File.Exists(marker) ? (await File.ReadAllTextAsync(marker, cancellationToken)).Trim() : string.Empty;
                 if (!string.Equals(stored, fingerprint, StringComparison.Ordinal))
@@ -492,6 +519,12 @@ namespace AssetsManager.Services.Hashes
             if (includeBin) yield return "bin";
             if (includeRst) yield return "rst";
         }
+
+        private static bool IsBinKind(InternalHashKind kind) => kind is
+            InternalHashKind.BinEntries or
+            InternalHashKind.BinFields or
+            InternalHashKind.BinTypes or
+            InternalHashKind.BinHashes;
 
         private static string[] EnumerateWadContainers(string rootDirectory, bool includeBin, bool includeRst)
         {
@@ -523,10 +556,12 @@ namespace AssetsManager.Services.Hashes
                     targets[kind] = includeRst
                         ? await _store.LoadUnknownAsync(kind, cancellationToken)
                         : new HashSet<ulong>();
-                else
+                else if (IsBinKind(kind))
                     targets[kind] = includeBin
                         ? await _store.LoadCurrentUnknownAsync(kind, cancellationToken)
                         : new HashSet<ulong>();
+                else
+                    targets[kind] = new HashSet<ulong>();
             }
             return new LocalEvidenceMatcher(targets);
         }
@@ -556,8 +591,7 @@ namespace AssetsManager.Services.Hashes
             [InternalHashKind.BinTypes] = new(),
             [InternalHashKind.BinHashes] = new(),
             [InternalHashKind.RstXxh3] = new(),
-            [InternalHashKind.RstXxh64] = new(),
-            [InternalHashKind.SklJoints] = new()
+            [InternalHashKind.RstXxh64] = new()
         };
 
         private static void ReadBinInventory(Stream stream, Dictionary<InternalHashKind, HashSet<ulong>> observed)
@@ -635,37 +669,18 @@ namespace AssetsManager.Services.Hashes
         private static void ScanBinContextualMatches(Stream stream, LocalEvidenceMatcher matcher, string path, string wadPath, HashResolverService resolver)
         {
             var tree = new BinTree(stream);
-            var localTargets = new Dictionary<InternalHashKind, HashSet<ulong>>();
-            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
-            {
-                localTargets[kind] = new HashSet<ulong>();
-            }
-            ReadBinInventory(tree, localTargets);
+            MatchBinContentEvidence(tree, matcher, path, wadPath, resolver);
+        }
 
-            // Add hashes of literal strings in the BIN tree to localTargets categorized by domain syntax
-            VisitBinStrings(tree, value =>
-            {
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    string trimmed = value.Trim();
-                    uint hash = Fnv1a.HashLower(trimmed);
-                    localTargets[InternalHashKind.BinHashes].Add(hash);
-
-                    if (LocalEvidenceMatcher.IsIdentifier(trimmed))
-                    {
-                        localTargets[InternalHashKind.BinFields].Add(hash);
-                        localTargets[InternalHashKind.BinTypes].Add(hash);
-                    }
-
-                    if (trimmed.Contains('/'))
-                    {
-                        localTargets[InternalHashKind.BinEntries].Add(hash);
-                    }
-                }
-            });
-
+        internal static void MatchBinContentEvidence(
+            BinTree tree,
+            LocalEvidenceMatcher matcher,
+            string path,
+            string wadPath = null,
+            HashResolverService resolver = null)
+        {
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
-            VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
+            VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
         }
 
         internal static void MatchBinContextualEvidence(
@@ -974,7 +989,7 @@ namespace AssetsManager.Services.Hashes
             path.EndsWith(".log", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".info", StringComparison.OrdinalIgnoreCase);
 
-        private static string BuildFingerprint(IEnumerable<string> paths, string domain)
+        private static string BuildFingerprint(IEnumerable<string> paths, string domain, string sourceVersion = "none")
         {
             ulong xor = 0, sum = 0;
             long count = 0;
@@ -984,8 +999,8 @@ namespace AssetsManager.Services.Hashes
                 ulong value = unchecked((ulong)info.Length ^ (ulong)info.LastWriteTimeUtc.Ticks);
                 xor ^= value; sum = unchecked(sum + value); count++;
             }
-            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "2" : "1";
-            return $"internal:{domain}:v{schema}:{count}:{xor:x16}:{sum:x16}";
+            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "3" : "1";
+            return $"internal:{domain}:v{schema}:{sourceVersion}:{count}:{xor:x16}:{sum:x16}";
         }
 
         private static void ValidateRoot(string rootDirectory)
@@ -1114,13 +1129,13 @@ namespace AssetsManager.Services.Hashes
             int budget,
             CancellationToken cancellationToken)
         {
-            var generatedSet = new HashSet<string>(StringComparer.Ordinal);
+            var generatedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int count = 0;
 
             bool Emit(string candidate)
             {
                 if (string.IsNullOrWhiteSpace(candidate) || candidate.Length > 512) return false;
-                string clean = candidate.Trim().ToLowerInvariant();
+                string clean = candidate.Trim();
                 if (generatedSet.Add(clean))
                 {
                     count++;
@@ -1190,7 +1205,7 @@ namespace AssetsManager.Services.Hashes
                 cancellationToken.ThrowIfCancellationRequested();
                 foreach (string pref in prefixes)
                 {
-                    string candidate = pref + token;
+                    string candidate = pref + UpperFirst(token);
                     if (Emit(candidate))
                     {
                         yield return candidate;
@@ -1199,7 +1214,7 @@ namespace AssetsManager.Services.Hashes
                 }
                 foreach (string suff in suffixes)
                 {
-                    string candidate = token + suff;
+                    string candidate = token + UpperFirst(suff);
                     if (Emit(candidate))
                     {
                         yield return candidate;
@@ -1223,7 +1238,7 @@ namespace AssetsManager.Services.Hashes
                 {
                     if (i == j) continue;
 
-                    string comb1 = combTokens[i] + combTokens[j];
+                    string comb1 = UpperFirst(combTokens[i]) + UpperFirst(combTokens[j]);
                     if (Emit(comb1))
                     {
                         yield return comb1;
@@ -1261,11 +1276,14 @@ namespace AssetsManager.Services.Hashes
             return word + "s";
         }
 
+        private static string UpperFirst(string value) =>
+            string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
+
         internal sealed class LocalEvidenceMatcher
         {
             private const ulong Rst38Mask = (1UL << 38) - 1;
             private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
-            private readonly Dictionary<(InternalHashKind Kind, ulong Hash), InternalHashGuessMatch> _matches = new();
+            private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
             private readonly List<InternalHashGuessMatch> _pendingMatches = new();
             public LocalEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) => _targets = targets;
             public IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
@@ -1306,17 +1324,15 @@ namespace AssetsManager.Services.Hashes
                     if (!isAssetPath)
                     {
                         if (candidate.Contains('/'))
-                            Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
-                        Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+                            Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinEntries));
+                        Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinHashes));
                     }
                 }
                 if ((content || crossDictionary) && IsIdentifier(candidate))
                 {
-                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
-                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets));
+                    Check32(InternalHashKind.BinFields, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinFields));
+                    Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinTypes));
 
-                    uint elf = Elf.HashLower(candidate);
-                    Check32(InternalHashKind.SklJoints, elf, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(elf, localTargets, InternalHashKind.SklJoints));
                 }
 
                 if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
@@ -1366,6 +1382,56 @@ namespace AssetsManager.Services.Hashes
                 return _matches.Count != before;
             }
 
+            internal bool CheckSchemaCandidate(
+                InternalHashKind kind,
+                string value,
+                InternalHashGuessStrategy strategy,
+                string source)
+            {
+                CheckedCandidates++;
+                if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
+                    string.IsNullOrWhiteSpace(value) ||
+                    value.Length > 128)
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+                string candidate = value.Trim();
+                if (!IsIdentifier(candidate))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+                candidate = kind == InternalHashKind.BinTypes
+                    ? UpperFirst(candidate)
+                    : char.ToLowerInvariant(candidate[0]) + candidate[1..];
+                uint hash = Fnv1a.HashLower(candidate);
+                if (!_targets[kind].Contains(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+                var key = (kind, (ulong)hash, candidate);
+                if (_matches.ContainsKey(key)) return false;
+                var match = new InternalHashGuessMatch
+                {
+                    Hash = hash,
+                    LookupHash = hash,
+                    HashBits = 32,
+                    Value = candidate,
+                    Kind = kind,
+                    Strategy = strategy,
+                    Source = source,
+                    IsVerified = false,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Candidate,
+                    Evidence = InternalHashEvidence.MetaSchemaWordset
+                };
+                _matches[key] = match;
+                _pendingMatches.Add(match);
+                return true;
+            }
+
             internal static bool IsIdentifier(string value)
             {
                 if (value.Length == 0 || value.Length > 128 || !(char.IsLetter(value[0]) || value[0] == '_')) return false;
@@ -1377,16 +1443,10 @@ namespace AssetsManager.Services.Hashes
             private static bool HasLocalEvidence(
                 uint hash,
                 IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets,
-                InternalHashKind specificKind = InternalHashKind.BinFields)
+                InternalHashKind kind)
             {
                 if (localTargets == null) return false;
-                if (specificKind == InternalHashKind.SklJoints)
-                    return localTargets.TryGetValue(InternalHashKind.SklJoints, out var joints) && joints.Contains(hash);
-
-                return (localTargets.TryGetValue(InternalHashKind.BinEntries, out var entries) && entries.Contains(hash)) ||
-                       (localTargets.TryGetValue(InternalHashKind.BinHashes, out var hashes) && hashes.Contains(hash)) ||
-                       (localTargets.TryGetValue(InternalHashKind.BinFields, out var fields) && fields.Contains(hash)) ||
-                       (localTargets.TryGetValue(InternalHashKind.BinTypes, out var types) && types.Contains(hash));
+                return localTargets.TryGetValue(kind, out var values) && values.Contains(hash);
             }
 
             private void Check32(
@@ -1400,7 +1460,10 @@ namespace AssetsManager.Services.Hashes
                 bool hasLocalEvidence)
             {
                 if (!hasLocalEvidence || !_targets[kind].Remove(hash)) return;
-                var key = (kind, (ulong)hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(key => key.Kind == kind && key.Hash == hash).ToList())
+                    _matches.Remove(candidateKey);
+                var key = (kind, (ulong)hash, value);
                 var match = new InternalHashGuessMatch
                 {
                     Hash = hash,
@@ -1412,7 +1475,10 @@ namespace AssetsManager.Services.Hashes
                     Source = source,
                     SourceWad = sourceWad,
                     SourceBin = sourceBin,
-                    IsVerified = true
+                    IsVerified = true,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Verified,
+                    Evidence = InternalHashEvidence.RuntimeContext
                 };
                 _matches[key] = match;
                 _pendingMatches.Add(match);
@@ -1435,9 +1501,12 @@ namespace AssetsManager.Services.Hashes
                         Source = source,
                         SourceWad = sourceWad,
                         SourceBin = sourceBin,
-                        IsVerified = true
+                        IsVerified = true,
+                        VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                        Confidence = InternalHashConfidence.Verified,
+                        Evidence = InternalHashEvidence.RstHashMatch
                     };
-                    _matches[(kind, fullHash)] = match;
+                    _matches[(kind, fullHash, value)] = match;
                     _pendingMatches.Add(match);
                     break;
                 }

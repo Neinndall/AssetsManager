@@ -10,8 +10,7 @@ namespace AssetsManager.Views.Models.Hashes
         BinTypes,
         BinHashes,
         RstXxh3,
-        RstXxh64,
-        SklJoints
+        RstXxh64
     }
 
     public enum InternalHashGuessStrategy
@@ -24,8 +23,23 @@ namespace AssetsManager.Views.Models.Hashes
         NumericVariant
     }
 
+    public enum InternalHashConfidence
+    {
+        Candidate,
+        Verified
+    }
+
+    public enum InternalHashEvidence
+    {
+        Legacy,
+        RuntimeContext,
+        MetaSchemaWordset,
+        RstHashMatch
+    }
+
     public sealed class InternalHashGuessMatch
     {
+        public const int CurrentVerificationSchema = 2;
         public ulong Hash { get; init; }
         public ulong LookupHash { get; init; }
         public int HashBits { get; init; }
@@ -36,7 +50,14 @@ namespace AssetsManager.Views.Models.Hashes
         public string SourceWad { get; init; }
         public string SourceBin { get; init; }
         public bool IsVerified { get; init; }
+        public int VerificationSchema { get; init; }
+        public InternalHashConfidence Confidence { get; init; }
+        public InternalHashEvidence Evidence { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
+        public bool CanPromote =>
+            IsVerified &&
+            Confidence == InternalHashConfidence.Verified &&
+            VerificationSchema >= CurrentVerificationSchema;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");
@@ -48,11 +69,10 @@ namespace AssetsManager.Views.Models.Hashes
             InternalHashKind.BinHashes => "BIN Hashes",
             InternalHashKind.RstXxh3 => "RST XXH3",
             InternalHashKind.RstXxh64 => "RST XXH64",
-            InternalHashKind.SklJoints => "SKL Joints (ELF)",
             _ => "Unknown Domain"
         };
         public string Path => Value;
-        public string StrategyText => $"{Strategy} · Verified";
+        public string StrategyText => $"{Strategy} · {Confidence}";
         public string SourceWadPath
         {
             get
@@ -74,6 +94,9 @@ namespace AssetsManager.Views.Models.Hashes
         public string PatchFingerprint { get; init; }
         public int ScannedBins { get; init; }
         public int ScannedStringTables { get; init; }
+        public string MetaSchemaVersion { get; init; }
+        public int MetaSchemaTypes { get; init; }
+        public int MetaSchemaFields { get; init; }
     }
 
     public sealed class InternalHashSummary

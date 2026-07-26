@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.BenchmarkTests.Infrastructure;
@@ -85,6 +87,39 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void EvidenceFromDifferentBinDomainIsRejected()
+        {
+            const string candidate = "data/test/example";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var localObserved = CreateTargets();
+            localObserved[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "test.bin", localTargets: localObserved);
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void LiteralStringCannotCertifyItselfAsBinHash()
+        {
+            const string candidate = "data/characters/illaoi/skins/skin38/birthscale0/spec_intensity";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var tree = CreateEntryTree(0x11111111, "UnrelatedClass", "unrelatedPath", candidate);
+
+            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "illaoi.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
         public void ContextualEntryAttributeResolvesObjectPath()
         {
             const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
@@ -119,7 +154,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public async Task StoreDiscardsUnverifiedInputAndPromotesVerifiedMatches()
+        public async Task StoreKeepsCandidatesInResearchAndPromotesVerifiedMatchesToOverrides()
         {
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
@@ -132,14 +167,17 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 Value = "data/characters/illaoi/skins/skin38/birthscale0/spec_intensity",
                 Kind = InternalHashKind.BinHashes,
                 Strategy = InternalHashGuessStrategy.BinContent,
-                IsVerified = false
+                IsVerified = false,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Candidate,
+                Evidence = InternalHashEvidence.MetaSchemaWordset
             };
 
             await store.SaveMatchesAsync(new[] { candidate }, CancellationToken.None);
 
             Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "internal.research.json")));
             Assert.False(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
-            Assert.Equal("[]", await File.ReadAllTextAsync(Path.Combine(bridge.Directories.HashLabPath, "internal.research.json")));
+            Assert.Contains("spec_intensity", await File.ReadAllTextAsync(Path.Combine(bridge.Directories.HashLabPath, "internal.research.json")));
 
             await store.SaveMatchesAsync(new[] { new InternalHashGuessMatch
             {
@@ -149,10 +187,99 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 Value = candidate.Value,
                 Kind = candidate.Kind,
                 Strategy = candidate.Strategy,
-                IsVerified = true
+                IsVerified = true,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Verified,
+                Evidence = InternalHashEvidence.RuntimeContext
             } }, CancellationToken.None);
 
-            Assert.Contains("15f32511", await File.ReadAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
+            Assert.False(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
+            Assert.Contains("15f32511", await File.ReadAllTextAsync(store.GetOverridePath(InternalHashKind.BinHashes)));
+        }
+
+        [Fact]
+        public void SchemaCandidateDoesNotResolveTarget()
+        {
+            const string candidate = "VfxGeComponentDef";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            Assert.True(matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                candidate,
+                InternalHashGuessStrategy.CrossDictionary,
+                "test schema"));
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.False(match.CanPromote);
+            Assert.Equal(InternalHashConfidence.Candidate, match.Confidence);
+            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void MetaSchemaParserKeepsOnlyActiveUnnamedClassesAndProperties()
+        {
+            const string json = """
+                {
+                  "latest": 42,
+                  "classes": {
+                    "0x11111111": {
+                      "revisions": [{ "from": 1 }],
+                      "properties": {
+                        "0x22222222": { "revisions": [{ "from": 1 }] },
+                        "0x33333333": { "name": "knownField", "revisions": [{ "from": 1 }] },
+                        "0x44444444": { "revisions": [{ "from": 1, "to": 2 }] }
+                      }
+                    },
+                    "0x55555555": {
+                      "name": "KnownClass",
+                      "revisions": [{ "from": 1 }],
+                      "properties": {}
+                    },
+                    "0x66666666": {
+                      "revisions": [{ "from": 1, "to": 2 }],
+                      "properties": {}
+                    }
+                  }
+                }
+                """;
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+            MetaSchemaHashSnapshot snapshot = MetaSchemaHashSource.Parse(stream);
+
+            Assert.Equal("42", snapshot.Version);
+            Assert.Equal(new ulong[] { 0x11111111 }, snapshot.UnknownTypes);
+            Assert.Equal(new ulong[] { 0x22222222 }, snapshot.UnknownFields);
+            Assert.Contains("KnownClass", snapshot.KnownTypeNames);
+            Assert.Contains("knownField", snapshot.KnownFieldNames);
+        }
+
+        [Fact]
+        public async Task LegacyResearchIsQuarantinedInsteadOfPromoted()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            string researchPath = Path.Combine(bridge.Directories.HashLabPath, "internal.research.json");
+            var legacy = new InternalHashGuessMatch
+            {
+                Hash = 0x12345678,
+                LookupHash = 0x12345678,
+                HashBits = 32,
+                Value = "legacy_false_positive",
+                Kind = InternalHashKind.BinHashes,
+                IsVerified = true
+            };
+            await File.WriteAllTextAsync(researchPath, JsonSerializer.Serialize(new[] { legacy }));
+
+            await store.SaveMatchesAsync(Array.Empty<InternalHashGuessMatch>(), CancellationToken.None);
+
+            Assert.Equal("[]", await File.ReadAllTextAsync(researchPath));
+            Assert.Contains("legacy_false_positive", await File.ReadAllTextAsync(
+                Path.Combine(bridge.Directories.HashLabPath, "internal.legacy-quarantine.json")));
+            Assert.False(File.Exists(store.GetOverridePath(InternalHashKind.BinHashes)));
         }
 
         [Fact]
@@ -203,6 +330,39 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal("entry_value", resolver.ResolveBinEntry(value));
             Assert.Equal("field_value", resolver.ResolveBinField(value));
             Assert.Equal("type_value", resolver.ResolveBinType(value));
+        }
+
+        [Fact]
+        public async Task VerifiedOverrideResolvesOnlyInItsBinDomain()
+        {
+            const uint value = 0x15f32511;
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            await store.SaveMatchesAsync(new[]
+            {
+                new InternalHashGuessMatch
+                {
+                    Hash = value,
+                    LookupHash = value,
+                    HashBits = 32,
+                    Value = "verifiedField",
+                    Kind = InternalHashKind.BinFields,
+                    Strategy = InternalHashGuessStrategy.BinContent,
+                    IsVerified = true,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Verified,
+                    Evidence = InternalHashEvidence.RuntimeContext
+                }
+            }, CancellationToken.None);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+
+            resolver.LoadBinHashes();
+
+            Assert.Equal("verifiedField", resolver.ResolveBinField(value));
+            Assert.Equal(value.ToString("x8"), resolver.ResolveBinHash(value));
+            Assert.Equal(value.ToString("x8"), resolver.ResolveBinEntry(value));
+            Assert.Equal(value.ToString("x8"), resolver.ResolveBinType(value));
         }
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateTargets() => new()
