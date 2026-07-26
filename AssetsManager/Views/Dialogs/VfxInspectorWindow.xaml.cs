@@ -36,11 +36,24 @@ namespace AssetsManager.Views.Dialogs
         private VfxLoadingService.Bundle _activeBundle;
 
         // VFX Studio dedicated camera framing (focused studio angle for 3D particles & ground AOE)
+        private static readonly Point3D VfxCameraPosition = new(0, 500, 650);
+        private static readonly Point3D VfxCameraTarget = new(0, 0, 0);
+        private static readonly Vector3D VfxCameraUpDirection = new(0, 0.793, -0.609);
+
         private readonly Viewport3D _dummyViewport = new Viewport3D
         {
-            Camera = new PerspectiveCamera(new Point3D(0, 500, 650), new Vector3D(0, -0.609, -0.793), new Vector3D(0, 0.793, -0.609), 45)
+            Camera = CreateVfxCamera()
         };
         private CustomCameraController _cameraController;
+
+        internal static PerspectiveCamera CreateVfxCamera()
+        {
+            return new PerspectiveCamera(
+                VfxCameraPosition,
+                VfxCameraTarget - VfxCameraPosition,
+                VfxCameraUpDirection,
+                45);
+        }
 
         public VfxInspectorWindow(LogService logService = null)
         {
@@ -174,7 +187,10 @@ namespace AssetsManager.Views.Dialogs
 
         public void ResetCamera()
         {
-            _cameraController?.Reset();
+            _cameraController?.FlyTo(
+                VfxCameraPosition,
+                VfxCameraTarget - VfxCameraPosition,
+                VfxCameraUpDirection);
         }
 
         #endregion

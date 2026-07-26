@@ -108,6 +108,7 @@ Improvements
 Bug Fixes
   - Viewer MapGeometry now selects loaded maps in the inspector and keeps large scenes inside the visible camera range.
   - Viewer MapGeometry now opens without the studio grid covering the map.
+  - VFX Studio now supports close camera zoom while preserving its dedicated framing and reset position.
   - Backup snapshot count and storage metrics now follow the selected LIVE, PBE, or ALL filter.
   - Unique Meta Schema resolutions now move from research into BIN type and field overrides.
   - Verified RST overrides now resolve across string tables immediately and after restarting the app.
