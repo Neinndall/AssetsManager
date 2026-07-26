@@ -290,6 +290,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng);
             float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
+            if (d.IsUniformScale && !d.IsMeshPrimitive)
+                birthScale = new Vector3(birthScale.X);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
@@ -388,6 +390,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 float sizeX = p.BirthSize.X * scaleMul.X;
                 float sizeY = p.BirthSize.Y * scaleMul.Y;
                 Vector3 direction = p.Vel;
+                if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)
+                    direction = Vector3.TransformNormal(targetOffset, _worldTransform);
                 if (isTrail)
                 {
                     Vector3 start = s.Particles[i - 1].Pos;

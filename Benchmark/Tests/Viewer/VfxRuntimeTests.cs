@@ -119,6 +119,25 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void UniformBillboardBirthScaleUsesOneAuthoredDimension()
+        {
+            var emitter = CreateEmitter(new Vector3(100f, 230f, 0f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.CameraQuad,
+                IsUniformScale = true
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "stars", "stars", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(100f, state.Instances[3]);
+            Assert.Equal(100f, state.Instances[4]);
+        }
+
+        [Fact]
         public void BirthColorDynamicsUseEmitterTimeAtParticleCreation()
         {
             var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -396,6 +415,28 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.True(length > 900f);
             Assert.True(endpoint.Y < 0f);
             Assert.True(endpoint.Y > -2f);
+        }
+
+        [Fact]
+        public void AdjacentImpactMeshTargetsAuthoredRayAtItsGroundLight()
+        {
+            VfxEmitterDefinition ray = CreateEmitter(new Vector3(600f, 900f, 0f), VfxEmitterRenderState.Default) with
+            {
+                Name = "ray",
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.Ray,
+                EmitterPosition = VfxCurve3.Const(new Vector3(-520f, 800f, 0f))
+            };
+            VfxEmitterDefinition impact = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                Name = "impact",
+                EmitterPosition = VfxCurve3.Const(new Vector3(-125f, 2f, 0f))
+            };
+            var emitters = new List<VfxEmitterDefinition> { ray, impact };
+
+            VfxGraphParser.LinkAdjacentRayImpacts(emitters);
+
+            Assert.Equal(new Vector3(395f, -798f, 0f), emitters[0].RayTargetOffset);
         }
 
         [Fact]

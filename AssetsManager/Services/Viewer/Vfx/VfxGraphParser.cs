@@ -309,10 +309,31 @@ namespace AssetsManager.Services.Viewer.Vfx
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
                         emitters.Add(ParseEmitter(s));
             }
+            LinkAdjacentRayImpacts(emitters);
             string persistentSound = GetString(o.Properties, F_soundPersistent);
             string onCreateSound = GetString(o.Properties, F_soundOnCreate);
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             return new VfxSystemDefinition(o.PathHash, name, path, emitters, persistentSound, onCreateSound, radius);
+        }
+
+        internal static void LinkAdjacentRayImpacts(List<VfxEmitterDefinition> emitters)
+        {
+            for (int index = 0; index + 1 < emitters.Count; index++)
+            {
+                VfxEmitterDefinition ray = emitters[index];
+                VfxEmitterDefinition impact = emitters[index + 1];
+                if (ray.PrimitiveKind != VfxPrimitiveKind.Ray || !impact.IsMeshPrimitive) continue;
+
+                Vector3 offset = impact.EmitterPosition.Constant - ray.EmitterPosition.Constant;
+                float authoredLength = MathF.Abs(ray.BirthScale.Constant.Y);
+                float distance = offset.Length();
+                if (offset.Y >= 0f || authoredLength <= 1e-5f ||
+                    distance < authoredLength * 0.5f || distance > authoredLength * 1.25f)
+                {
+                    continue;
+                }
+                emitters[index] = ray with { RayTargetOffset = offset };
+            }
         }
 
         private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s)
