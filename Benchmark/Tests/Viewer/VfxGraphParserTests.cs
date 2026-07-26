@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
@@ -21,6 +22,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                 {
                     new BinTreeString(Fnv1a.HashLower("particleName"), "TestEffect"),
                     new BinTreeString(Fnv1a.HashLower("particlePath"), "Effects/Test"),
+                    new BinTreeMatrix44(
+                        Fnv1a.HashLower("transform"),
+                        Matrix4x4.CreateScale(0.5f)),
                 });
             var tree = new BinTree(new[] { effectObject }, new[] { "data/effects/shared.bin" });
             using var stream = new MemoryStream();
@@ -32,6 +36,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             var system = Assert.Single(document.Systems).Value;
             Assert.Equal("TestEffect", system.Name);
             Assert.Equal("Effects/Test", system.ParticlePath);
+            Assert.Equal(Matrix4x4.CreateScale(0.5f), system.Transform);
             Assert.Empty(system.Emitters);
             Assert.Empty(document.AnimationClips);
             Assert.Empty(document.ResourceMap);

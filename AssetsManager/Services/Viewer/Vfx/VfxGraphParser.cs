@@ -47,6 +47,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_soundPersistent = HashAlgorithms.Fnv1a("soundPersistentDefault");
         private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("soundOnCreateDefault");
         private static readonly uint F_visibilityRadius = HashAlgorithms.Fnv1a("visibilityRadius");
+        private static readonly uint F_transform = HashAlgorithms.Fnv1a("transform");
 
         // emitter fields
         private static readonly uint F_emitterName   = HashAlgorithms.Fnv1a("emitterName");
@@ -314,7 +315,18 @@ namespace AssetsManager.Services.Viewer.Vfx
             string persistentSound = GetString(o.Properties, F_soundPersistent);
             string onCreateSound = GetString(o.Properties, F_soundOnCreate);
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
-            return new VfxSystemDefinition(o.PathHash, name, path, emitters, persistentSound, onCreateSound, radius);
+            Matrix4x4? transform = Get(o.Properties, F_transform) is BinTreeMatrix44 matrix
+                ? matrix.Value
+                : null;
+            return new VfxSystemDefinition(
+                o.PathHash,
+                name,
+                path,
+                emitters,
+                persistentSound,
+                onCreateSound,
+                radius,
+                transform);
         }
 
         internal static void LinkRayImpacts(List<VfxEmitterDefinition> emitters)

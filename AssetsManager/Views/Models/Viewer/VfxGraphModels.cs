@@ -37,7 +37,8 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<VfxEmitterDefinition> Emitters,
         string PersistentSoundEventName = null,
         string OnCreateSoundEventName = null,
-        float VisibilityRadius = 0f);
+        float VisibilityRadius = 0f,
+        Matrix4x4? Transform = null);
 
     /// <summary>One emitter inside a system. Curves are absolute-valued (sampled over normalised particle age 0..1).</summary>
     public sealed record VfxEmitterDefinition(

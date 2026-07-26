@@ -460,7 +460,8 @@ namespace BenchmarkApp
             {
                 Console.WriteLine(
                     $" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count} | " +
-                    $"VisibilityRadius: {sys.Definition?.VisibilityRadius ?? 0f}");
+                    $"VisibilityRadius: {sys.Definition?.VisibilityRadius ?? 0f} | " +
+                    $"Transform: {sys.Definition?.Transform}");
                 if (string.IsNullOrWhiteSpace(systemFilter) || sys.Definition is null) continue;
                 foreach (var emitter in sys.Definition.Emitters)
                 {
@@ -472,7 +473,7 @@ namespace BenchmarkApp
                         ? "-"
                         : $"{emitter.SpawnShape.Kind}[size={emitter.SpawnShape.Size}, " +
                           $"radius={emitter.SpawnShape.Radius}, height={emitter.SpawnShape.Height}, " +
-                          $"offset={emitter.SpawnShape.EmitOffset.Constant}]";
+                          $"offset={emitter.SpawnShape.EmitOffset.Constant}, flags={emitter.SpawnShape.Flags}]";
                     string meshBounds = "-";
                     var mesh = meshResolver.ResolveMesh(emitter.MeshPath, rootPath);
                     if (mesh is { } decoded && decoded.Positions.Length >= 3)
@@ -493,6 +494,9 @@ namespace BenchmarkApp
                     Console.WriteLine(
                         $"   * {emitter.Name} | primitive={emitter.PrimitiveKind} | " +
                         $"importance={emitter.Importance} | " +
+                        $"rate={emitter.Rate.Constant} | rateIsPeriod={emitter.RateIsPeriod} | " +
+                        $"birthPeriod={emitter.BirthTimePeriod} | emitterLife={emitter.EmitterLifetime} | " +
+                        $"particleLife={emitter.ParticleLifetime.Constant} | single={emitter.IsSingleParticle} | " +
                         $"birthScale={emitter.BirthScale.Constant} | scale0={emitter.ScaleOverLife?.Constant} | " +
                         $"uniform={emitter.IsUniformScale} | position={emitter.EmitterPosition.Constant} | " +
                         $"spawn={spawn} | velocity={emitter.BirthVelocity?.Constant} | " +
