@@ -68,6 +68,10 @@ namespace AssetsManager.Views.Models.Monitor
         public long Size { get; set; }
         public string SizeDisplay { get; set; }
         public bool IsCurrentSessionBackup { get; set; }
+        public string IntegrityStatus { get; set; }
+        public string IntegrityDetails { get; set; }
+        public int FileCount { get; set; }
+        public bool CanModify => !IsMainClient;
 
         private bool _isSelected;
         public bool IsSelected
@@ -81,5 +85,18 @@ namespace AssetsManager.Views.Models.Monitor
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public sealed class BackupManifest
+    {
+        public int SchemaVersion { get; set; } = 1;
+        public string DisplayName { get; set; }
+        public string Environment { get; set; }
+        public string Version { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public string SourcePath { get; set; }
+        public int FileCount { get; set; }
+        public long TotalBytes { get; set; }
+        public string Status { get; set; }
     }
 }

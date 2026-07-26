@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services;
@@ -14,6 +15,7 @@ namespace AssetsManager.Services.Monitor
 {
     public class BackupManager
     {
+        public const string ManifestFileName = ".assetsmanager-backup.json";
         public event Action<int> BackupStarted;
         public event Action<int, int, string> BackupProgressChanged;
         public event Action<bool> BackupCompleted;
@@ -23,6 +25,7 @@ namespace AssetsManager.Services.Monitor
         private readonly AppSettings _appSettings;
         private readonly VersionService _versionService;
         private readonly HashSet<string> _currentSessionBackups;
+        private readonly object _sessionBackupsSync = new();
 
         public BackupManager(DirectoriesCreator directoriesCreator, LogService logService, AppSettings appSettings, VersionService versionService)
         {
@@ -30,16 +33,21 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
             _appSettings = appSettings;
             _versionService = versionService;
-            _currentSessionBackups = new HashSet<string>();
+            _currentSessionBackups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
+        public readonly record struct BackupStorageEstimate(int FileCount, long TotalBytes, long AvailableBytes);
 
-        public async Task CreateLolPbeDirectoryBackupAsync(string sourceLolPath, string destinationBackupPath, CancellationToken cancellationToken, string logMessage = "Starting backup...")
+        public async Task CreateLolPbeDirectoryBackupAsync(
+            string sourceLolPath,
+            string destinationBackupPath,
+            CancellationToken cancellationToken,
+            string logMessage = "Starting backup...",
+            string displayName = null)
         {
-            // Notify UI immediately to show activity (Indeterminate spinner)
             BackupStarted?.Invoke(0);
-
-            await Task.Run(async () =>
+            string version = _versionService == null ? null : await _versionService.GetGameVersionAsync(sourceLolPath);
+            await Task.Run(() =>
             {
                 try
                 {
@@ -52,24 +60,18 @@ namespace AssetsManager.Services.Monitor
 
                     _logService.Log(logMessage);
                     
-                    // Count total files for progress
-                    int totalFiles = 0;
-                    try 
-                    {
-                        totalFiles = Directory.GetFiles(sourceLolPath, "*", SearchOption.AllDirectories).Length;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Could not count files for progress in {sourceLolPath}");
-                    }
-
-                    // Update UI with the real total discovered
-                    BackupStarted?.Invoke(totalFiles);
+                    DirectoryMetrics metrics = MeasureDirectory(sourceLolPath, cancellationToken);
+                    BackupStarted?.Invoke(metrics.FileCount);
+                    _directoriesCreator.CreateDirectory(destinationBackupPath);
+                    BackupManifest manifest = CreateManifest(sourceLolPath, displayName, version, metrics);
+                    WriteManifest(destinationBackupPath, manifest);
 
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
+                    CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
+                    manifest.Status = "Complete";
+                    WriteManifest(destinationBackupPath, manifest);
                     
-                    _currentSessionBackups.Add(destinationBackupPath);
+                    MarkCurrentSessionBackup(destinationBackupPath);
                     BackupCompleted?.Invoke(true);
                 }
                 catch (OperationCanceledException)
@@ -92,11 +94,15 @@ namespace AssetsManager.Services.Monitor
             }, cancellationToken);
         }
 
-        public async Task CloneBackupAsync(string sourceBackupPath, string destinationBackupPath, CancellationToken cancellationToken)
+        public async Task CloneBackupAsync(
+            string sourceBackupPath,
+            string destinationBackupPath,
+            CancellationToken cancellationToken,
+            string displayName = null)
         {
             BackupStarted?.Invoke(0);
-
-            await Task.Run(async () =>
+            string version = _versionService == null ? null : await _versionService.GetGameVersionAsync(sourceBackupPath);
+            await Task.Run(() =>
             {
                 try
                 {
@@ -109,22 +115,18 @@ namespace AssetsManager.Services.Monitor
 
                     _logService.Log($"Cloning backup: {Path.GetFileName(sourceBackupPath)}...");
 
-                    int totalFiles = 0;
-                    try
-                    {
-                        totalFiles = Directory.GetFiles(sourceBackupPath, "*", SearchOption.AllDirectories).Length;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, $"Could not count files for cloning progress: {sourceBackupPath}");
-                    }
-
-                    BackupStarted?.Invoke(totalFiles);
+                    DirectoryMetrics metrics = MeasureDirectory(sourceBackupPath, cancellationToken);
+                    BackupStarted?.Invoke(metrics.FileCount);
+                    _directoriesCreator.CreateDirectory(destinationBackupPath);
+                    BackupManifest manifest = CreateManifest(sourceBackupPath, displayName, version, metrics);
+                    WriteManifest(destinationBackupPath, manifest);
 
                     int processedFiles = 0;
-                    CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, totalFiles, cancellationToken);
+                    CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
+                    manifest.Status = "Complete";
+                    WriteManifest(destinationBackupPath, manifest);
 
-                    _currentSessionBackups.Add(destinationBackupPath);
+                    MarkCurrentSessionBackup(destinationBackupPath);
                     BackupCompleted?.Invoke(true);
                 }
                 catch (OperationCanceledException)
@@ -159,6 +161,7 @@ namespace AssetsManager.Services.Monitor
             foreach (FileInfo file in dir.GetFiles())
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (string.Equals(file.Name, ManifestFileName, StringComparison.OrdinalIgnoreCase)) continue;
                 file.CopyTo(Path.Combine(destinationDir, file.Name), true);
                 processedFiles++;
                 BackupProgressChanged?.Invoke(processedFiles, totalFiles, file.Name);
@@ -170,60 +173,58 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<List<BackupModel>> GetBackupsAsync()
+        public async Task<List<BackupModel>> GetBackupsAsync(CancellationToken cancellationToken = default)
         {
-            var backups = new List<BackupModel>();
-            var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var basePaths = new List<string>();
-            if (!string.IsNullOrEmpty(_appSettings.LolPbeDirectory)) basePaths.Add(_appSettings.LolPbeDirectory);
-            if (!string.IsNullOrEmpty(_appSettings.LolLiveDirectory)) basePaths.Add(_appSettings.LolLiveDirectory);
-
-            foreach (var basePath in basePaths)
+            return await Task.Run(() =>
             {
-                var parentDir = Directory.GetParent(basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.FullName;
-                if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir)) continue;
+                var backups = new List<BackupModel>();
+                var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var basePaths = new[] { _appSettings.LolPbeDirectory, _appSettings.LolLiveDirectory }
+                    .Where(path => !string.IsNullOrWhiteSpace(path));
 
-                try
+                foreach (string basePath in basePaths)
                 {
-                    foreach (var dir in Directory.EnumerateDirectories(parentDir))
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var parentDir = Directory.GetParent(basePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))?.FullName;
+                    if (string.IsNullOrEmpty(parentDir) || !Directory.Exists(parentDir)) continue;
+                    try
                     {
-                        if (scannedPaths.Contains(dir)) continue;
-                        
-                        string version = await _versionService.GetGameVersionAsync(dir);
-                        if (version != null)
+                        foreach (string dir in Directory.EnumerateDirectories(parentDir))
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (!scannedPaths.Add(dir)) continue;
+                            string version = _versionService.GetGameVersionAsync(dir).GetAwaiter().GetResult();
+                            if (version == null) continue;
                             var (isPbe, isMain) = GetPathIdentification(dir);
-
-                            // Filter by preference
-                            if (_appSettings.PreferredClient == PreferredClient.PBE && !isPbe) continue;
-                            if (_appSettings.PreferredClient == PreferredClient.LIVE && isPbe) continue;
-
+                            DirectoryMetrics metrics = MeasureDirectory(dir, cancellationToken);
+                            BackupManifest manifest = isMain ? null : ReadManifest(dir);
+                            (string integrity, string details) = GetIntegrity(isMain, manifest, metrics);
                             backups.Add(new BackupModel
                             {
                                 Name = Path.GetFileName(dir),
-                                DisplayName = GetBackupDisplayName(null, dir),
-                                Version = version,
+                                DisplayName = string.IsNullOrWhiteSpace(manifest?.DisplayName) ? GetBackupDisplayName(null, dir) : manifest.DisplayName,
+                                Version = manifest?.Version ?? version,
                                 IsPbe = isPbe,
                                 Path = dir,
                                 IsMainClient = isMain,
-                                CreationDate = Directory.GetCreationTime(dir),
-                                Size = GetDirectorySize(dir),
-                                SizeDisplay = FormatUtils.FormatSize(GetDirectorySize(dir)),
+                                CreationDate = manifest?.CreatedAtUtc.ToLocalTime() ?? Directory.GetCreationTime(dir),
+                                Size = metrics.TotalBytes,
+                                SizeDisplay = FormatUtils.FormatSize(metrics.TotalBytes),
+                                FileCount = metrics.FileCount,
+                                IntegrityStatus = integrity,
+                                IntegrityDetails = details,
                                 IsSelected = false,
-                                IsCurrentSessionBackup = _currentSessionBackups.Contains(dir)
+                                IsCurrentSessionBackup = IsCurrentSessionBackup(dir)
                             });
-                            scannedPaths.Add(dir);
                         }
                     }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
-                }
-            }
-
-            return backups.OrderByDescending(b => b.CreationDate).ToList();
+                return backups.OrderByDescending(backup => backup.CreationDate).ToList();
+            }, cancellationToken);
         }
 
         public (bool IsPbe, bool IsMain) GetPathIdentification(string path)
@@ -315,31 +316,111 @@ namespace AssetsManager.Services.Monitor
             var (isPbe, _) = GetPathIdentification(virtualPath);
             return isPbe ? "League of Legends PBE" : "League of Legends LIVE";
         }
-        
-        private long GetDirectorySize(string path)
-        {
-            long size = 0;
-            var dirInfo = new DirectoryInfo(path);
 
+        public Task<BackupStorageEstimate> GetStorageEstimateAsync(
+            string sourcePath,
+            string destinationPath,
+            CancellationToken cancellationToken = default) =>
+            Task.Run(() =>
+            {
+                DirectoryMetrics metrics = MeasureDirectory(sourcePath, cancellationToken);
+                string root = Path.GetPathRoot(Path.GetFullPath(destinationPath));
+                long available = string.IsNullOrEmpty(root) ? 0 : new DriveInfo(root).AvailableFreeSpace;
+                return new BackupStorageEstimate(metrics.FileCount, metrics.TotalBytes, available);
+            }, cancellationToken);
+
+        public bool CanDeleteBackup(string backupPath) =>
+            !string.IsNullOrWhiteSpace(backupPath) &&
+            !GetPathIdentification(backupPath).IsMain;
+
+        private static DirectoryMetrics MeasureDirectory(string path, CancellationToken cancellationToken)
+        {
+            int fileCount = 0;
+            long totalBytes = 0;
+            foreach (string filePath in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.Equals(Path.GetFileName(filePath), ManifestFileName, StringComparison.OrdinalIgnoreCase)) continue;
+                var info = new FileInfo(filePath);
+                fileCount++;
+                totalBytes += info.Length;
+            }
+            return new DirectoryMetrics(fileCount, totalBytes);
+        }
+
+        private static void WriteManifest(string backupPath, BackupManifest manifest)
+        {
+            string path = Path.Combine(backupPath, ManifestFileName);
+            File.WriteAllText(path, JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        private BackupManifest CreateManifest(
+            string sourcePath,
+            string displayName,
+            string version,
+            DirectoryMetrics metrics) =>
+            new()
+            {
+                DisplayName = string.IsNullOrWhiteSpace(displayName)
+                    ? GetBackupDisplayName(null, sourcePath)
+                    : displayName.Trim(),
+                Environment = GetPathIdentification(sourcePath).IsPbe ? "PBE" : "LIVE",
+                Version = version,
+                CreatedAtUtc = DateTime.UtcNow,
+                SourcePath = Path.GetFullPath(sourcePath),
+                FileCount = metrics.FileCount,
+                TotalBytes = metrics.TotalBytes,
+                Status = "Incomplete"
+            };
+
+        private BackupManifest ReadManifest(string backupPath)
+        {
+            string path = Path.Combine(backupPath, ManifestFileName);
+            if (!File.Exists(path)) return null;
             try
             {
-                foreach (FileInfo fi in dirInfo.GetFiles("*", SearchOption.AllDirectories))
-                {
-                    size += fi.Length;
-                }
+                return JsonSerializer.Deserialize<BackupManifest>(File.ReadAllText(path));
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Unable to calculate size for {path}");
+                _logService.LogWarning($"Backup manifest could not be read for '{backupPath}': {ex.Message}");
+                return new BackupManifest { Status = "Incomplete" };
             }
-            
-            return size;
+        }
+
+        private static (string Status, string Details) GetIntegrity(
+            bool isMain,
+            BackupManifest manifest,
+            DirectoryMetrics metrics)
+        {
+            if (isMain) return ("Active", "Configured game installation");
+            if (manifest == null) return ("Unverified", "Legacy snapshot without an AssetsManager manifest");
+            if (!string.Equals(manifest.Status, "Complete", StringComparison.OrdinalIgnoreCase))
+                return ("Incomplete", "The backup did not finish with a complete manifest");
+            if (manifest.FileCount != metrics.FileCount || manifest.TotalBytes != metrics.TotalBytes)
+                return ("Missing Files", $"Expected {manifest.FileCount:N0} files / {FormatUtils.FormatSize(manifest.TotalBytes)}");
+            return ("Complete", $"{metrics.FileCount:N0} files verified by manifest");
+        }
+
+        private void MarkCurrentSessionBackup(string path)
+        {
+            lock (_sessionBackupsSync) _currentSessionBackups.Add(path);
+        }
+
+        private bool IsCurrentSessionBackup(string path)
+        {
+            lock (_sessionBackupsSync) return _currentSessionBackups.Contains(path);
         }
 
         public bool DeleteBackup(string backupPath, bool showLog = true)
         {
             try
             {
+                if (!CanDeleteBackup(backupPath))
+                {
+                    _logService.LogWarning($"Refused to delete configured MAIN installation: {backupPath}");
+                    return false;
+                }
                 if (Directory.Exists(backupPath))
                 {
                     Directory.Delete(backupPath, true);
@@ -347,7 +428,7 @@ namespace AssetsManager.Services.Monitor
                     {
                         _logService.LogSuccess("The selected backup was deleted successfully.");
                     }
-                    _currentSessionBackups.Remove(backupPath);
+                    lock (_sessionBackupsSync) _currentSessionBackups.Remove(backupPath);
                     return true;
                 }
                 _logService.LogWarning($"Attempted to delete non-existent backup: {backupPath}");
@@ -359,5 +440,7 @@ namespace AssetsManager.Services.Monitor
                 return false;
             }
         }
+
+        private readonly record struct DirectoryMetrics(int FileCount, long TotalBytes);
     }
 }

@@ -22,7 +22,9 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Backups now include integrity manifests, storage preflight, optional names, preferred-client filtering, sorting, and direct folder access.
   - Enhanced BIN and Lua hash guessing accuracy with strict syntax validation and binary script manifest decoding.
+  - Asset Tracker / Increased card margin to 14px for cleaner grid spacing.
   - Manage Versions / Preserved active page selection when refreshing version manifests via Fetch Versions.
   - Viewer Content Browser now keeps multiple opened WAD projects as separate roots and aligns the project toolbar consistently.
   - Viewer project folders now open with a single click in the Content Browser.
@@ -103,6 +105,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Backup snapshot count and storage metrics now follow the selected LIVE, PBE, or ALL filter.
+  - MAIN game installations remain selectable for cloning but cannot be deleted as backup snapshots.
   - BIN Hash Guessing now rejects self-confirming literals and cross-domain evidence.
   - BIN Hash Guessing now separates review candidates from context-verified overrides and quarantines legacy findings.
   - BIN inventories now include active unresolved Meta Schema types and fields.
