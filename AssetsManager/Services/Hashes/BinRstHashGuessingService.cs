@@ -697,104 +697,79 @@ namespace AssetsManager.Services.Hashes
         {
             foreach (BinTreeObject item in tree.Objects.Values)
             {
-                MatchDirectProperties(item.Properties.Values);
+                MatchScope(item.Properties.Values, includeDescendants: false);
                 foreach (BinTreeProperty property in item.Properties.Values)
                     VisitScope(property);
             }
             foreach (var item in tree.DataOverrides)
                 VisitScope(item.Property);
 
-            void MatchDirectProperties(IEnumerable<BinTreeProperty> properties)
+            void MatchScope(IEnumerable<BinTreeProperty> properties, bool includeDescendants)
             {
-                var strings = new HashSet<string>(StringComparer.Ordinal);
+                var candidates = new Dictionary<uint, string>();
+                var ambiguous = new HashSet<uint>();
                 var observedHashes = new HashSet<uint>();
-                foreach (BinTreeProperty property in properties)
+                var pending = new Stack<BinTreeProperty>(properties);
+                while (pending.TryPop(out BinTreeProperty property))
                 {
                     if (property is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
-                        strings.Add(text.Value.Trim());
+                    {
+                        string value = text.Value.Trim();
+                        if (LocalEvidenceMatcher.IsIdentifier(value))
+                        {
+                            uint hash = Fnv1a.HashLower(value);
+                            if (candidates.TryGetValue(hash, out string existing) &&
+                                !string.Equals(existing, value, StringComparison.Ordinal))
+                                ambiguous.Add(hash);
+                            else
+                                candidates.TryAdd(hash, value);
+                        }
+                    }
                     else if (property is BinTreeHash hash)
                         observedHashes.Add(hash.Value);
-                }
-                MatchCandidates(strings, observedHashes);
-            }
 
-            void MatchPair(BinTreeProperty key, BinTreeProperty value)
-            {
-                var strings = new HashSet<string>(StringComparer.Ordinal);
-                var observedHashes = new HashSet<uint>();
-                Collect(key, strings, observedHashes);
-                Collect(value, strings, observedHashes);
-                MatchCandidates(strings, observedHashes);
-            }
-
-            void MatchCandidates(HashSet<string> strings, HashSet<uint> observedHashes)
-            {
-                foreach (var group in strings
-                    .Where(LocalEvidenceMatcher.IsIdentifier)
-                    .GroupBy(Fnv1a.HashLower))
-                {
-                    string[] candidates = group.Distinct(StringComparer.Ordinal).ToArray();
-                    if (candidates.Length == 1 && observedHashes.Contains(group.Key))
-                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, candidates[0], path, wadPath, group.Key);
+                    if (includeDescendants)
+                        foreach (BinTreeProperty child in EnumerateChildren(property))
+                            pending.Push(child);
                 }
+
+                foreach (uint hash in observedHashes)
+                    if (!ambiguous.Contains(hash) && candidates.TryGetValue(hash, out string value))
+                        matcher.CheckContextualCandidate(InternalHashKind.BinHashes, value, path, wadPath, hash);
             }
 
             void VisitScope(BinTreeProperty property)
             {
-                switch (property)
-                {
-                    case BinTreeStruct structure:
-                        MatchDirectProperties(structure.Properties.Values);
-                        foreach (BinTreeProperty child in structure.Properties.Values)
-                            VisitScope(child);
-                        break;
-                    case BinTreeContainer container:
-                        foreach (BinTreeProperty child in container.Elements)
-                            VisitScope(child);
-                        break;
-                    case BinTreeOptional option when option.Value != null:
-                        VisitScope(option.Value);
-                        break;
-                    case BinTreeMap map:
-                        foreach (var child in map)
-                        {
-                            MatchPair(child.Key, child.Value);
-                            VisitScope(child.Key);
-                            VisitScope(child.Value);
-                        }
-                        break;
-                }
+                if (property is BinTreeStruct structure)
+                    MatchScope(structure.Properties.Values, includeDescendants: false);
+                else if (property is BinTreeMap map)
+                    foreach (var pair in map)
+                        MatchScope(new[] { pair.Key, pair.Value }, includeDescendants: true);
+
+                foreach (BinTreeProperty child in EnumerateChildren(property))
+                    VisitScope(child);
             }
 
-            static void Collect(
-                BinTreeProperty property,
-                HashSet<string> strings,
-                HashSet<uint> observedHashes)
+            static IEnumerable<BinTreeProperty> EnumerateChildren(BinTreeProperty property)
             {
                 switch (property)
                 {
-                    case BinTreeString text:
-                        if (!string.IsNullOrWhiteSpace(text.Value)) strings.Add(text.Value.Trim());
-                        break;
-                    case BinTreeHash hash:
-                        observedHashes.Add(hash.Value);
-                        break;
                     case BinTreeStruct structure:
                         foreach (BinTreeProperty child in structure.Properties.Values)
-                            Collect(child, strings, observedHashes);
+                            yield return child;
                         break;
                     case BinTreeContainer container:
                         foreach (BinTreeProperty child in container.Elements)
-                            Collect(child, strings, observedHashes);
+                            yield return child;
                         break;
                     case BinTreeOptional option when option.Value != null:
-                        Collect(option.Value, strings, observedHashes);
+                        yield return option.Value;
                         break;
                     case BinTreeMap map:
-                        foreach (var child in map)
+                        foreach (var pair in map)
                         {
-                            Collect(child.Key, strings, observedHashes);
-                            Collect(child.Value, strings, observedHashes);
+                            yield return pair.Key;
+                            yield return pair.Value;
                         }
                         break;
                 }
