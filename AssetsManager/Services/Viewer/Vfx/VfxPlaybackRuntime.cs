@@ -290,7 +290,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng);
             float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
-            if (d.IsUniformScale && !d.IsMeshPrimitive)
+            if (d.IsUniformScale)
                 birthScale = new Vector3(birthScale.X);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;

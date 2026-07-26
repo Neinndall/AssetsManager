@@ -432,7 +432,7 @@ namespace BenchmarkApp
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Usage: vfx-audit <model.skn> <project-root>");
+                Console.WriteLine("Usage: vfx-audit <model.skn> <project-root> [system-filter]");
                 return;
             }
 
@@ -450,9 +450,27 @@ namespace BenchmarkApp
             var systems = service.LoadVfxSystemsForModel(sknPath, rootPath);
             Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {systems.Count}");
 
-            foreach (var sys in systems.Take(20))
+            string systemFilter = args.Length > 2 ? args[2] : null;
+            var selectedSystems = string.IsNullOrWhiteSpace(systemFilter)
+                ? systems.Take(20)
+                : systems.Where(system => system.Name.Contains(systemFilter, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var sys in selectedSystems)
             {
                 Console.WriteLine($" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count}");
+                if (string.IsNullOrWhiteSpace(systemFilter) || sys.Definition is null) continue;
+                foreach (var emitter in sys.Definition.Emitters)
+                {
+                    string children = emitter.ChildParticleSet is null
+                        ? "-"
+                        : string.Join(", ", emitter.ChildParticleSet.Children.Select(child =>
+                            $"{child.Name}[system={child.SystemHash:X8}, key={child.EffectKey:X8}]"));
+                    Console.WriteLine(
+                        $"   * {emitter.Name} | primitive={emitter.PrimitiveKind} | " +
+                        $"birthScale={emitter.BirthScale.Constant} | scale0={emitter.ScaleOverLife?.Constant} | " +
+                        $"uniform={emitter.IsUniformScale} | position={emitter.EmitterPosition.Constant} | " +
+                        $"mesh={emitter.MeshPath ?? "-"} | children={children}");
+                }
             }
         }
     }

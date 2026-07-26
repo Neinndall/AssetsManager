@@ -44,8 +44,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(4.8f, state.Instances[3], precision: 5);
-            Assert.Equal(0.6f, state.Instances[4], precision: 5);
-            Assert.Equal(0.6f, state.Instances[18], precision: 5);
+            Assert.Equal(4.8f, state.Instances[4], precision: 5);
+            Assert.Equal(4.8f, state.Instances[18], precision: 5);
         }
 
         [Fact]
@@ -101,21 +101,21 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
-        public void UniformScaleFlagDoesNotOverwriteAuthoredBirthScaleAxes()
+        public void UniformMeshBirthScaleUsesTheAuthoredScalarComponent()
         {
-            var emitter = CreateEmitter(new Vector3(100f, 230f, 0f), VfxEmitterRenderState.Default) with
+            var emitter = CreateEmitter(new Vector3(1f, 45f, 40f), VfxEmitterRenderState.Default) with
             {
                 IsUniformScale = true
             };
             var simulator = new VfxPlaybackRuntime(7);
 
-            simulator.SetSystem(new VfxSystemDefinition(1, "stars", "stars", new[] { emitter }), Vector3.Zero);
+            simulator.SetSystem(new VfxSystemDefinition(1, "jumbotron", "jumbotron", new[] { emitter }), Vector3.Zero);
             simulator.Update(0.02f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(100f, state.Instances[3]);
-            Assert.Equal(230f, state.Instances[4]);
-            Assert.Equal(0f, state.Instances[18]);
+            Assert.Equal(1f, state.Instances[3]);
+            Assert.Equal(1f, state.Instances[4]);
+            Assert.Equal(1f, state.Instances[18]);
         }
 
         [Fact]

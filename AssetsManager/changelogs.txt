@@ -113,6 +113,7 @@ Bug Fixes
   - Viewer VFX Studio / Corrected authored `Ray` and `Beam` orientation by using their local forward axis and avoiding duplicate 2D rotation, fixing displaced spotlights such as Samira Skin 30 Pentakill.
   - Viewer VFX Studio / Made `Ray` and `Beam` width camera-facing while preserving authored length direction, restoring both broad Samira Pentakill spotlights instead of edge-on or overlapping planes.
   - Viewer VFX Studio / Preserved initial mesh rotation and rotational velocity on all three axes so authored particle spin is reproduced completely.
+  - Viewer VFX Studio / Applied authored uniform birth scaling to mesh primitives, preventing celebration props such as Samira's jumbotron screens and body from expanding by unused Y/Z scale channels.
   - Viewer VFX Studio / Respected uniform lifetime scaling so animated mesh confetti retains its complete 3D shape instead of collapsing into colored streaks.
   - Viewer VFX Studio / Applied uniform birth sizing to billboard flashes without overwriting mesh proportions, restoring compact sparkles instead of elongated color stains.
   - Viewer VFX Studio / Extended downward spotlights to their nearby ground intersection so authored impact lights and beams meet without a floating gap.
