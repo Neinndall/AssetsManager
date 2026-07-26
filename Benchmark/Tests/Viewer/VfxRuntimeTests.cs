@@ -418,25 +418,38 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
-        public void AdjacentImpactMeshTargetsAuthoredRayAtItsGroundLight()
+        public void RaysChooseTheGroundImpactAlignedWithTheirAuthoredCrossing()
         {
-            VfxEmitterDefinition ray = CreateEmitter(new Vector3(600f, 900f, 0f), VfxEmitterRenderState.Default) with
+            VfxEmitterDefinition leftRay = CreateEmitter(new Vector3(600f, 900f, 0f), VfxEmitterRenderState.Default) with
             {
-                Name = "ray",
+                Name = "left-ray",
                 IsMeshPrimitive = false,
                 PrimitiveKind = VfxPrimitiveKind.Ray,
-                EmitterPosition = VfxCurve3.Const(new Vector3(-520f, 800f, 0f))
+                EmitterPosition = VfxCurve3.Const(new Vector3(-520f, 800f, 0f)),
+                BirthRotation = VfxCurve3.Const(new Vector3(50f, 90f, 0f))
             };
-            VfxEmitterDefinition impact = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            VfxEmitterDefinition leftImpact = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
-                Name = "impact",
+                Name = "left-impact",
                 EmitterPosition = VfxCurve3.Const(new Vector3(-125f, 2f, 0f))
             };
-            var emitters = new List<VfxEmitterDefinition> { ray, impact };
+            VfxEmitterDefinition rightRay = leftRay with
+            {
+                Name = "right-ray",
+                EmitterPosition = VfxCurve3.Const(new Vector3(520f, 800f, 0f)),
+                BirthRotation = VfxCurve3.Const(new Vector3(130f, 90f, 0f))
+            };
+            VfxEmitterDefinition rightImpact = leftImpact with
+            {
+                Name = "right-impact",
+                EmitterPosition = VfxCurve3.Const(new Vector3(125f, 2f, 0f))
+            };
+            var emitters = new List<VfxEmitterDefinition> { leftRay, leftImpact, rightRay, rightImpact };
 
-            VfxGraphParser.LinkAdjacentRayImpacts(emitters);
+            VfxGraphParser.LinkRayImpacts(emitters);
 
-            Assert.Equal(new Vector3(395f, -798f, 0f), emitters[0].RayTargetOffset);
+            Assert.Equal(new Vector3(645f, -798f, 0f), emitters[0].RayTargetOffset);
+            Assert.Equal(new Vector3(-645f, -798f, 0f), emitters[2].RayTargetOffset);
         }
 
         [Fact]

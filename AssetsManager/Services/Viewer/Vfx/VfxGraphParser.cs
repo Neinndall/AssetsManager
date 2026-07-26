@@ -309,31 +309,57 @@ namespace AssetsManager.Services.Viewer.Vfx
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
                         emitters.Add(ParseEmitter(s));
             }
-            LinkAdjacentRayImpacts(emitters);
+            LinkRayImpacts(emitters);
             string persistentSound = GetString(o.Properties, F_soundPersistent);
             string onCreateSound = GetString(o.Properties, F_soundOnCreate);
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             return new VfxSystemDefinition(o.PathHash, name, path, emitters, persistentSound, onCreateSound, radius);
         }
 
-        internal static void LinkAdjacentRayImpacts(List<VfxEmitterDefinition> emitters)
+        internal static void LinkRayImpacts(List<VfxEmitterDefinition> emitters)
         {
-            for (int index = 0; index + 1 < emitters.Count; index++)
+            for (int index = 0; index < emitters.Count; index++)
             {
                 VfxEmitterDefinition ray = emitters[index];
-                VfxEmitterDefinition impact = emitters[index + 1];
-                if (ray.PrimitiveKind != VfxPrimitiveKind.Ray || !impact.IsMeshPrimitive) continue;
+                if (ray.PrimitiveKind != VfxPrimitiveKind.Ray) continue;
 
-                Vector3 offset = impact.EmitterPosition.Constant - ray.EmitterPosition.Constant;
                 float authoredLength = MathF.Abs(ray.BirthScale.Constant.Y);
-                float distance = offset.Length();
-                if (offset.Y >= 0f || authoredLength <= 1e-5f ||
-                    distance < authoredLength * 0.5f || distance > authoredLength * 1.25f)
+                if (authoredLength <= 1e-5f) continue;
+
+                Vector3 rotation = ray.BirthRotation?.Constant ?? Vector3.Zero;
+                Vector3 authoredDirection = RotateRayAxis(rotation * (MathF.PI / 180f));
+                Vector3? bestOffset = null;
+                float bestAlignment = 0.9f;
+                foreach (VfxEmitterDefinition impact in emitters)
                 {
-                    continue;
+                    if (!impact.IsMeshPrimitive) continue;
+                    Vector3 offset = impact.EmitterPosition.Constant - ray.EmitterPosition.Constant;
+                    float distance = offset.Length();
+                    if (offset.Y >= 0f || distance < authoredLength * 0.5f || distance > authoredLength * 1.25f)
+                        continue;
+
+                    float alignment = Vector3.Dot(authoredDirection, Vector3.Normalize(offset));
+                    if (alignment <= bestAlignment) continue;
+                    bestAlignment = alignment;
+                    bestOffset = offset;
                 }
-                emitters[index] = ray with { RayTargetOffset = offset };
+                if (bestOffset is { } targetOffset)
+                    emitters[index] = ray with { RayTargetOffset = targetOffset };
             }
+        }
+
+        private static Vector3 RotateRayAxis(Vector3 rotation)
+        {
+            float sz = MathF.Sin(rotation.Z), cz = MathF.Cos(rotation.Z);
+            float sx = MathF.Sin(rotation.X), cx = MathF.Cos(rotation.X);
+            float sy = MathF.Sin(rotation.Y), cy = MathF.Cos(rotation.Y);
+            Vector3 axis = Vector3.UnitZ;
+            axis = new Vector3(axis.X * cz - axis.Y * sz, axis.X * sz + axis.Y * cz, axis.Z);
+            axis = new Vector3(axis.X, axis.Y * cx - axis.Z * sx, axis.Y * sx + axis.Z * cx);
+            return Vector3.Normalize(new Vector3(
+                axis.X * cy + axis.Z * sy,
+                axis.Y,
+                -axis.X * sy + axis.Z * cy));
         }
 
         private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s)
