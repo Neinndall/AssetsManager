@@ -828,7 +828,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         foreach (string extension in LuaExtensions)
                             yield return new HashGuessCandidate($"{prefix}/{name}.{extension}", HashGuessStrategy.LuaManifest);
 
-                        for (int map = 0; map < 1000; map++)
+                        for (int map = 0; map < 1500; map++)
                         foreach (string prefix in new[] { string.Empty, "mutators/" })
                             yield return new HashGuessCandidate(
                                 $"levels/map{map}/scripts/{prefix}{name}.luabin64",
