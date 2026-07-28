@@ -78,10 +78,11 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         private ObservableRangeCollection<ModelPart> _parts;
+        private readonly HashSet<ModelPart> _trackedParts = new HashSet<ModelPart>();
         public ObservableRangeCollection<ModelPart> Parts
         {
             get => _parts;
-            set
+            private set
             {
                 if (_parts != null)
                 {
@@ -177,22 +178,62 @@ namespace AssetsManager.Views.Models.Viewer
             Animations = new ObservableRangeCollection<AnimationData>();
         }
 
+        public bool AddPart(ModelPart part)
+        {
+            if (part == null || Parts.Contains(part))
+                return false;
+
+            Parts.Add(part);
+            return true;
+        }
+
+        public int AddParts(IEnumerable<ModelPart> parts)
+        {
+            if (parts == null)
+                throw new ArgumentNullException(nameof(parts));
+
+            var existing = new HashSet<ModelPart>(Parts);
+            var additions = parts
+                .Where(part => part != null && existing.Add(part))
+                .ToList();
+
+            Parts.AddRange(additions);
+            return additions.Count;
+        }
+
+        public bool RemovePart(ModelPart part, bool dispose = false)
+        {
+            if (part == null || !Parts.Remove(part))
+                return false;
+
+            if (dispose)
+                part.Dispose();
+            return true;
+        }
+
+        private void SynchronizeParts()
+        {
+            var currentParts = new HashSet<ModelPart>(Parts ?? Enumerable.Empty<ModelPart>());
+            foreach (ModelPart removedPart in _trackedParts.Where(part => !currentParts.Contains(part)).ToList())
+            {
+                removedPart.PropertyChanged -= Part_PropertyChanged;
+                if (removedPart.Visual != null && RootVisual?.Children.Contains(removedPart.Visual) == true)
+                    RootVisual.Children.Remove(removedPart.Visual);
+                _trackedParts.Remove(removedPart);
+            }
+
+            foreach (ModelPart part in currentParts)
+            {
+                if (_trackedParts.Add(part))
+                    part.PropertyChanged += Part_PropertyChanged;
+                if (part.Visual != null && RootVisual?.Children.Contains(part.Visual) == false)
+                    RootVisual.Children.Add(part.Visual);
+            }
+        }
+
         private void Parts_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.OldItems != null)
-                foreach (ModelPart item in e.OldItems) item.PropertyChanged -= Part_PropertyChanged;
-
-            if (e.NewItems != null)
-                foreach (ModelPart item in e.NewItems) item.PropertyChanged += Part_PropertyChanged;
-
-            if (e.Action == NotifyCollectionChangedAction.Reset)
-            {
-                foreach (var item in Parts)
-                {
-                    item.PropertyChanged -= Part_PropertyChanged;
-                    item.PropertyChanged += Part_PropertyChanged;
-                }
-            }
+            SynchronizeParts();
             UpdateMasterVisibility();
         }
 
@@ -256,6 +297,7 @@ namespace AssetsManager.Views.Models.Viewer
                     part.Dispose();
                 }
                 _parts.Clear();
+                _trackedParts.Clear();
 
                 foreach (var dict in uniqueTextureDicts)
                 {
@@ -276,7 +318,7 @@ namespace AssetsManager.Views.Models.Viewer
 
             IsAnimationPaused = false;
             AnimationTime = 0;
-            
+
             if (PropertyChanged != null)
             {
                 foreach (var d in PropertyChanged.GetInvocationList())

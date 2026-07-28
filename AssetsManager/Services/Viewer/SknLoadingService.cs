@@ -130,12 +130,14 @@ namespace AssetsManager.Services.Viewer
 
             string defaultTextureKey = colorTextureKeys
                 .Where(k => k.IndexOf(skinName, StringComparison.OrdinalIgnoreCase) >= 0)
-                .Where(k => {
+                .Where(k =>
+                {
                     int dotIndex = k.IndexOf('.');
                     string baseName = dotIndex > 0 ? k.Substring(0, dotIndex) : k;
                     return baseName.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase);
                 })
-                .OrderBy(k => {
+                .OrderBy(k =>
+                {
                     int dotIndex = k.IndexOf('.');
                     return dotIndex > 0 ? dotIndex : k.Length;
                 })
@@ -225,25 +227,22 @@ namespace AssetsManager.Services.Viewer
 
                     var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Black)));
 
-                    var modelPart = new ModelPart
+                    var modelPart = new ModelPart(
+                        string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
+                        geometryModel)
                     {
-                        Name = string.IsNullOrEmpty(data.MaterialName) ? "Default" : data.MaterialName,
-                        Visual = new ModelVisual3D(),
                         SourceVertexIndices = data.SourceVertexIndices,
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
-                        SelectedTextureName = data.TexturePath,
-                        Geometry = geometryModel
+                        SelectedTextureName = data.TexturePath
                     };
 
-                    modelPart.Visual.Content = geometryModel;
                     TextureUtils.UpdateMaterial(modelPart);
 
                     parts.Add(modelPart);
-                    sceneModel.RootVisual.Children.Add(modelPart.Visual);
                 }
 
-                sceneModel.Parts.AddRange(parts);
+                sceneModel.AddParts(parts);
                 _logService.LogDebug("--- Finished displaying model ---");
                 return sceneModel;
             });

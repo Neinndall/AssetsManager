@@ -136,21 +136,23 @@ namespace AssetsManager.Utils
             if (texture != null)
             {
                 var materialGroup = new MaterialGroup();
-                var imageBrush = CreateViewerTextureBrush(texture);
+                var imageBrush = CreateViewerTextureBrush(texture, modelPart.IsTextureTiled);
                 materialGroup.Children.Add(new DiffuseMaterial(imageBrush));
 
                 modelPart.Geometry.Material = materialGroup;
-                modelPart.Geometry.BackMaterial = materialGroup;
+                modelPart.Geometry.BackMaterial = modelPart.IsDoubleSided ? materialGroup : null;
             }
         }
 
-        private static ImageBrush CreateViewerTextureBrush(BitmapSource texture)
+        internal static ImageBrush CreateViewerTextureBrush(BitmapSource texture, bool isTiled)
         {
             var imageBrush = new ImageBrush(texture)
             {
                 Viewport = new System.Windows.Rect(0, 0, 1, 1),
-                ViewportUnits = BrushMappingMode.Absolute,
-                TileMode = TileMode.Tile,
+                ViewportUnits = BrushMappingMode.RelativeToBoundingBox,
+                Viewbox = new System.Windows.Rect(0, 0, 1, 1),
+                ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
+                TileMode = isTiled ? TileMode.Tile : TileMode.None,
                 Stretch = Stretch.Fill
             };
 
@@ -158,6 +160,7 @@ namespace AssetsManager.Utils
             RenderOptions.SetCachingHint(imageBrush, CachingHint.Cache);
             RenderOptions.SetEdgeMode(imageBrush, EdgeMode.Unspecified);
 
+            if (imageBrush.CanFreeze) imageBrush.Freeze();
             return imageBrush;
         }
 

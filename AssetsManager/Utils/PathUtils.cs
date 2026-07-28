@@ -339,7 +339,7 @@ namespace AssetsManager.Utils
         /// </summary>
         public static string ToVirtualPath(string path)
         {
-            return NormalizePath(path).TrimStart('/');
+            return NormalizePath(path?.Trim()).TrimStart('/');
         }
 
         /// <summary>

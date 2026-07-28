@@ -17,15 +17,14 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             {
                 ["body"] = null
             };
-            var part = new ModelPart
-            {
-                Name = "Body",
-                Visual = new ModelVisual3D(),
-                Geometry = new GeometryModel3D
+            var part = new ModelPart(
+                "Body",
+                new GeometryModel3D
                 {
                     Geometry = new MeshGeometry3D(),
                     Material = new DiffuseMaterial()
-                },
+                })
+            {
                 AllTextures = textures,
                 SourceVertexIndices = new[] { 0, 1, 2 }
             };

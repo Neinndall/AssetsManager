@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -46,6 +48,29 @@ namespace AssetsManager.BenchmarkTests.Tests.Utils
             thread.Start();
             thread.Join();
             if (failure != null) throw failure;
+        }
+
+        [Fact]
+        public void CreateViewerTextureBrush_UsesUvRelativeViewportAndAuthoredWrapMode()
+        {
+            BitmapSource bitmap = BitmapSource.Create(
+                1,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[] { 0, 0, 0, 255 },
+                4);
+            bitmap.Freeze();
+
+            ImageBrush tiled = TextureUtils.CreateViewerTextureBrush(bitmap, true);
+            ImageBrush clamped = TextureUtils.CreateViewerTextureBrush(bitmap, false);
+
+            Assert.Equal(BrushMappingMode.RelativeToBoundingBox, tiled.ViewportUnits);
+            Assert.Equal(BrushMappingMode.RelativeToBoundingBox, tiled.ViewboxUnits);
+            Assert.Equal(TileMode.Tile, tiled.TileMode);
+            Assert.Equal(TileMode.None, clamped.TileMode);
         }
     }
 }

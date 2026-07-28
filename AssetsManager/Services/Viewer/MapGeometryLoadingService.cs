@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -10,11 +10,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
-using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Hashes;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
@@ -23,44 +20,53 @@ namespace AssetsManager.Services.Viewer
 {
     public class MapGeometryLoadingService
     {
-        private readonly LogService _logService;
-        private readonly HashResolverService _hashResolverService;
-        private readonly WadContentProvider _wadContentProvider;
-        private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private const int MapTextureMaxSize = 2048;
 
-        public MapGeometryLoadingService(LogService logService, HashResolverService hashResolverService, WadContentProvider wadContentProvider, WadNodeLoaderService wadNodeLoaderService)
+        private readonly LogService _logService;
+
+        public MapGeometryLoadingService(LogService logService)
         {
             _logService = logService;
-            _hashResolverService = hashResolverService;
-            _wadContentProvider = wadContentProvider;
-            _wadNodeLoaderService = wadNodeLoaderService;
         }
 
-        public async Task<SceneModel> LoadMapGeometry(string filePath, string gameDataPath)
+        public async Task<SceneModel> LoadMapGeometry(
+            string filePath,
+            string gameDataPath,
+            CancellationToken cancellationToken = default)
         {
-            return await LoadMapGeometryInternal(filePath, null, gameDataPath);
+            return await LoadMapGeometryInternal(filePath, null, gameDataPath, cancellationToken);
         }
 
-        public async Task<SceneModel> LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
+        public async Task<SceneModel> LoadMapGeometry(
+            string filePath,
+            string materialsPath,
+            string gameDataPath,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                await _hashResolverService.LoadBinHashesAsync();
-
                 using (var stream = File.OpenRead(materialsPath))
                 {
                     var materialsBin = new BinTree(stream);
-                    return await LoadMapGeometryInternal(filePath, materialsBin, gameDataPath);
+                    return await LoadMapGeometryInternal(filePath, materialsBin, gameDataPath, cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to load materials.bin");
-                return null;
+                return await LoadMapGeometryInternal(filePath, null, gameDataPath, cancellationToken);
             }
         }
 
-        private async Task<SceneModel> LoadMapGeometryInternal(string filePath, BinTree materialsBin, string gameDataPath)
+        private async Task<SceneModel> LoadMapGeometryInternal(
+            string filePath,
+            BinTree materialsBin,
+            string gameDataPath,
+            CancellationToken cancellationToken)
         {
             try
             {
@@ -69,8 +75,17 @@ namespace AssetsManager.Services.Viewer
                 {
                     string modelName = Path.GetFileNameWithoutExtension(filePath);
 
-                    return await CreateSceneModel(mapGeometry, modelName, materialsBin, gameDataPath);
+                    return await CreateSceneModel(
+                        mapGeometry,
+                        modelName,
+                        materialsBin,
+                        gameDataPath,
+                        cancellationToken);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -79,215 +94,466 @@ namespace AssetsManager.Services.Viewer
             }
         }
 
-        private async Task<SceneModel> CreateSceneModel(EnvironmentAsset mapGeometry, string modelName, BinTree materialsBin, string gameDataPath)
+        private async Task<SceneModel> CreateSceneModel(
+            EnvironmentAsset mapGeometry,
+            string modelName,
+            BinTree materialsBin,
+            string gameDataPath,
+            CancellationToken cancellationToken)
         {
-            var sceneModel = new SceneModel { Name = modelName };
-
-            var processingResult = await Task.Run(() =>
-            {
-                var resolvedMaterials = new Dictionary<string, BinTreeObject>(StringComparer.OrdinalIgnoreCase);
-                if (materialsBin != null)
-                {
-                    foreach (var kvp in materialsBin.Objects)
-                    {
-                        string resolvedName = _hashResolverService.ResolveBinEntry(kvp.Key);
-                        if (!resolvedMaterials.ContainsKey(resolvedName))
-                        {
-                            resolvedMaterials[resolvedName] = kvp.Value;
-                        }
-                    }
-                }
-
-                var dataList = new List<SubmeshData>();
-                foreach (var mesh in mapGeometry.Meshes)
-                {
-                    var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
-                    var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
-                    bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
-
-                    foreach (var submesh in mesh.Submeshes)
-                    {
-                        string materialName = submesh.Material.TrimEnd('\0');
-
-                        var subPositions = new Point3D[submesh.VertexCount];
-                        for (int i = 0; i < submesh.VertexCount; i++)
-                        {
-                            var p = positions[submesh.MinVertex + i];
-                            subPositions[i] = new Point3D(p.X, p.Y, p.Z);
-                        }
-
-                        var indices = mesh.Indices.Slice(submesh.StartIndex, submesh.IndexCount);
-                        var triangleIndices = new int[submesh.IndexCount];
-                        for (int i = 0; i < submesh.IndexCount; i++)
-                        {
-                            triangleIndices[i] = (int)indices[i] - submesh.MinVertex;
-                        }
-
-                        var subTexCoords = new Point[submesh.VertexCount];
-                        if (isPacked1616)
-                        {
-                            var texCoords = texCoordAccessor.AsXyF16Array();
-                            for (int i = 0; i < submesh.VertexCount; i++)
-                            {
-                                var uv = texCoords[submesh.MinVertex + i];
-                                subTexCoords[i] = new Point((float)uv.Item1, (float)uv.Item2);
-                            }
-                        }
-                        else
-                        {
-                            var texCoords = texCoordAccessor.AsVector2Array();
-                            for (int i = 0; i < submesh.VertexCount; i++)
-                            {
-                                var uv = texCoords[submesh.MinVertex + i];
-                                subTexCoords[i] = new Point(uv.X, uv.Y);
-                            }
-                        }
-
-                        string fullTexturePath = null;
-                        if (resolvedMaterials.TryGetValue(materialName, out var materialObject))
-                        {
-                            var samplerValuesKvp = materialObject.Properties.FirstOrDefault(propKvp =>
-                                _hashResolverService.ResolveBinField(propKvp.Key).Equals("samplerValues", StringComparison.OrdinalIgnoreCase)
-                            );
-
-                            if (samplerValuesKvp.Value is BinTreeContainer samplerValuesContainer && samplerValuesContainer.Elements.Any())
-                            {
-                                foreach (var samplerElement in samplerValuesContainer.Elements)
-                                {
-                                    if (samplerElement is BinTreeStruct samplerObject)
-                                    {
-                                        var textureNamePropKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                            _hashResolverService.ResolveBinField(propKvp.Key).Equals("TextureName", StringComparison.OrdinalIgnoreCase)
-                                        );
-
-                                        if (textureNamePropKvp.Value is BinTreeString textureNameString &&
-                                            (textureNameString.Value.Equals("Diffuse_Texture", StringComparison.OrdinalIgnoreCase) ||
-                                             textureNameString.Value.Equals("DiffuseTexture", StringComparison.OrdinalIgnoreCase) ||
-                                             textureNameString.Value.Equals("ColorTexture", StringComparison.OrdinalIgnoreCase) ||
-                                             textureNameString.Value.Equals("NoiseTexture", StringComparison.OrdinalIgnoreCase)))
-                                        {
-                                            var texturePathKvp = samplerObject.Properties.FirstOrDefault(propKvp =>
-                                                _hashResolverService.ResolveBinField(propKvp.Key).Equals("texturePath", StringComparison.OrdinalIgnoreCase)
-                                            );
-
-                                            if (texturePathKvp.Value is BinTreeString tps && !string.IsNullOrEmpty(tps.Value))
-                                            {
-                                                fullTexturePath = tps.Value;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        dataList.Add(new SubmeshData(materialName, subPositions, triangleIndices, subTexCoords, fullTexturePath));
-                    }
-                }
-
-                var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
-                foreach (var data in dataList)
-                {
-                    if (!string.IsNullOrEmpty(data.TexturePath))
-                    {
-                        string textureNameKey = Path.GetFileNameWithoutExtension(data.TexturePath);
-                        if (!loadedTextures.ContainsKey(textureNameKey))
-                        {
-                            string absoluteFilePath = Path.Combine(gameDataPath, data.TexturePath.Replace('\\', '/'));
-                            if (File.Exists(absoluteFilePath))
-                            {
-                                try
-                                {
-                                    using (Stream fileStream = File.OpenRead(absoluteFilePath))
-                                    {
-                                        BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(absoluteFilePath), 1024);
-                                        if (loadedTex != null)
-                                        {
-                                            loadedTex.Freeze();
-                                            loadedTextures[textureNameKey] = loadedTex;
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    _logService.LogError(ex, $"Failed to load texture file: {absoluteFilePath}");
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return new { SubmeshDataList = dataList, LoadedTextures = loadedTextures };
-            });
-
-            var submeshDataList = processingResult.SubmeshDataList;
-            var loadedTextures = processingResult.LoadedTextures;
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
-            var parts = new List<ModelPart>();
-
-            foreach (var data in submeshDataList)
-            {
-                var positionsCol = new Point3DCollection(data.Positions);
-                var indicesCol = new Int32Collection(data.TriangleIndices);
-                var texCoordsCol = new PointCollection(data.TextureCoordinates);
-
-                if (positionsCol.CanFreeze) positionsCol.Freeze();
-                if (indicesCol.CanFreeze) indicesCol.Freeze();
-                if (texCoordsCol.CanFreeze) texCoordsCol.Freeze();
-
-                var meshGeometry = new MeshGeometry3D
-                {
-                    Positions = positionsCol,
-                    TriangleIndices = indicesCol,
-                    TextureCoordinates = texCoordsCol
-                };
-
-                string textureNameKey = string.IsNullOrEmpty(data.TexturePath) ? null : Path.GetFileNameWithoutExtension(data.TexturePath);
-
-                if (string.IsNullOrEmpty(textureNameKey) || !loadedTextures.ContainsKey(textureNameKey))
-                {
-                    _logService.LogWarning($"Could not find or load texture for material '{data.MaterialName}'.");
-                }
-
-                var geometryModel = new GeometryModel3D(meshGeometry, new DiffuseMaterial(new SolidColorBrush(System.Windows.Media.Colors.Magenta)));
-
-                var modelPart = new ModelPart
-                {
-                    Name = PathUtils.SimplifyMeshName(data.MaterialName),
-                    Visual = new ModelVisual3D(),
-                    AllTextures = loadedTextures,
-                    AvailableTextureNames = availableTextureNames,
-                    SelectedTextureName = textureNameKey,
-                    Geometry = geometryModel
-                };
-
-                modelPart.Visual.Content = geometryModel;
-                TextureUtils.UpdateMaterial(modelPart);
-
-                parts.Add(modelPart);
-                sceneModel.RootVisual.Children.Add(modelPart.Visual);
-            }
-
-            sceneModel.Parts.AddRange(parts);
+            MapGeometryProcessingResult processingResult = await Task.Run(
+                () => ProcessMapGeometry(mapGeometry, materialsBin, gameDataPath, cancellationToken),
+                cancellationToken);
+            SceneModel sceneModel = CreateSceneFromProcessedMap(modelName, processingResult);
+            LogMaterialDiagnostics(processingResult, materialsBin != null);
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }
 
-        private readonly struct SubmeshData
+        private MapGeometryProcessingResult ProcessMapGeometry(
+            EnvironmentAsset mapGeometry,
+            BinTree materialsBin,
+            string gameDataPath,
+            CancellationToken cancellationToken)
         {
-            public readonly string MaterialName;
-            public readonly Point3D[] Positions;
-            public readonly int[] TriangleIndices;
-            public readonly Point[] TextureCoordinates;
-            public readonly string TexturePath;
+            cancellationToken.ThrowIfCancellationRequested();
+            var materialResolver = new MapGeometryMaterialResolver(materialsBin);
 
-            public SubmeshData(string materialName, Point3D[] positions, int[] triangleIndices, Point[] textureCoordinates, string texturePath)
+            var dataList = new List<MapGeometrySubmeshData>();
+            var allTexturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var unresolvedMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var materialsWithoutVisuals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var layeredMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var materialDefinitions = new Dictionary<string, MapGeometryMaterialDefinition>(
+                StringComparer.OrdinalIgnoreCase);
+            var mappingBuilders = new Dictionary<string, MapGeometryUvWorldMappingBuilder>(
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var mesh in mapGeometry.Meshes)
             {
-                MaterialName = materialName;
-                Positions = positions;
-                TriangleIndices = triangleIndices;
-                TextureCoordinates = textureCoordinates;
-                TexturePath = texturePath;
+                cancellationToken.ThrowIfCancellationRequested();
+                var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
+                var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
+                bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
+
+                foreach (var submesh in mesh.Submeshes)
+                {
+                    string materialName = submesh.Material.TrimEnd('\0');
+                    MapGeometryMaterialDefinition material = null;
+                    if (materialsBin != null && !materialResolver.TryResolve(materialName, out material))
+                    {
+                        unresolvedMaterials.Add(materialName);
+                    }
+                    else if (material != null)
+                    {
+                        materialDefinitions[materialName] = material;
+                    }
+
+                    var subPositions = new Point3D[submesh.VertexCount];
+                    for (int i = 0; i < submesh.VertexCount; i++)
+                    {
+                        var p = positions[submesh.MinVertex + i];
+                        subPositions[i] = new Point3D(p.X, p.Y, p.Z);
+                    }
+
+                    var indices = mesh.Indices.Slice(submesh.StartIndex, submesh.IndexCount);
+                    var triangleIndices = new int[submesh.IndexCount];
+                    for (int i = 0; i < submesh.IndexCount; i++)
+                    {
+                        triangleIndices[i] = (int)indices[i] - submesh.MinVertex;
+                    }
+
+                    var subTexCoords = new Point[submesh.VertexCount];
+                    if (isPacked1616)
+                    {
+                        var texCoords = texCoordAccessor.AsXyF16Array();
+                        for (int i = 0; i < submesh.VertexCount; i++)
+                        {
+                            var uv = texCoords[submesh.MinVertex + i];
+                            subTexCoords[i] = new Point((float)uv.Item1, (float)uv.Item2);
+                        }
+                    }
+                    else
+                    {
+                        var texCoords = texCoordAccessor.AsVector2Array();
+                        for (int i = 0; i < submesh.VertexCount; i++)
+                        {
+                            var uv = texCoords[submesh.MinVertex + i];
+                            subTexCoords[i] = new Point(uv.X, uv.Y);
+                        }
+                    }
+
+                    bool isTerrainBlend = MapGeometryLayeredTextureComposer.IsTerrainBlend(material);
+                    if (isTerrainBlend)
+                    {
+                        layeredMaterials.Add(materialName);
+                        if (!mappingBuilders.TryGetValue(materialName, out MapGeometryUvWorldMappingBuilder builder))
+                        {
+                            builder = new MapGeometryUvWorldMappingBuilder();
+                            mappingBuilders[materialName] = builder;
+                        }
+
+                        for (int i = 0; i < submesh.VertexCount; i++)
+                        {
+                            var uv = subTexCoords[i];
+                            builder.Add(
+                                (float)uv.X,
+                                (float)uv.Y,
+                                positions[submesh.MinVertex + i],
+                                mesh.Transform);
+                        }
+                    }
+
+                    MapGeometryTextureSampler primarySampler = material?.PrimarySampler;
+                    string primaryTexturePath = primarySampler?.TexturePath;
+                    if (material != null)
+                    {
+                        foreach (MapGeometryTextureSampler sampler in material.Samplers)
+                        {
+                            allTexturePaths.Add(PathUtils.ToVirtualPath(sampler.TexturePath));
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(primaryTexturePath) && material?.TintColor == null)
+                        materialsWithoutVisuals.Add(materialName);
+
+                    dataList.Add(new MapGeometrySubmeshData(
+                        materialName,
+                        subPositions,
+                        triangleIndices,
+                        subTexCoords,
+                        mesh.Transform,
+                        primaryTexturePath,
+                        primarySampler?.AddressU == 0 || primarySampler?.AddressV == 0,
+                        material?.TintColor,
+                        mesh.DisableBackfaceCulling));
+                }
             }
+
+            MapGeometryTextureLoadResult textures = LoadTextures(
+                gameDataPath,
+                allTexturePaths,
+                cancellationToken);
+            Dictionary<string, string> layeredTextureKeys = ComposeLayeredTextures(
+                layeredMaterials,
+                materialDefinitions,
+                mappingBuilders,
+                textures,
+                cancellationToken);
+
+            return new MapGeometryProcessingResult(
+                dataList,
+                textures.LoadedTextures,
+                textures.TextureKeys,
+                layeredTextureKeys,
+                unresolvedMaterials,
+                materialsWithoutVisuals,
+                textures.MissingTexturePaths,
+                layeredMaterials);
         }
+
+        private MapGeometryTextureLoadResult LoadTextures(
+            string gameDataPath,
+            IEnumerable<string> texturePaths,
+            CancellationToken cancellationToken)
+        {
+            Dictionary<string, string> textureKeys = BuildTextureKeys(texturePaths);
+            var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            var texturesByPath = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+            var missingTexturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string texturePath in textureKeys.Keys)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string absoluteFilePath = ResolveTextureFilePath(gameDataPath, texturePath);
+                if (absoluteFilePath == null)
+                {
+                    missingTexturePaths.Add(texturePath);
+                    continue;
+                }
+
+                try
+                {
+                    using Stream fileStream = File.OpenRead(absoluteFilePath);
+                    BitmapSource loadedTexture = TextureUtils.LoadViewerTexture(
+                        fileStream,
+                        Path.GetExtension(absoluteFilePath),
+                        MapTextureMaxSize,
+                        MapTextureMaxSize);
+                    if (loadedTexture == null)
+                    {
+                        missingTexturePaths.Add(texturePath);
+                        continue;
+                    }
+
+                    if (loadedTexture.CanFreeze) loadedTexture.Freeze();
+                    loadedTextures[textureKeys[texturePath]] = loadedTexture;
+                    texturesByPath[texturePath] = loadedTexture;
+                }
+                catch (Exception ex)
+                {
+                    missingTexturePaths.Add(texturePath);
+                    _logService.LogError(ex, $"Failed to load texture file: {absoluteFilePath}");
+                }
+            }
+
+            return new MapGeometryTextureLoadResult(
+                loadedTextures,
+                texturesByPath,
+                textureKeys,
+                missingTexturePaths);
+        }
+
+        private Dictionary<string, string> ComposeLayeredTextures(
+            IEnumerable<string> layeredMaterials,
+            IReadOnlyDictionary<string, MapGeometryMaterialDefinition> materialDefinitions,
+            IReadOnlyDictionary<string, MapGeometryUvWorldMappingBuilder> mappingBuilders,
+            MapGeometryTextureLoadResult textures,
+            CancellationToken cancellationToken)
+        {
+            var layeredTextureKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string materialName in layeredMaterials)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    BitmapSource composite = MapGeometryLayeredTextureComposer.Compose(
+                        materialDefinitions[materialName],
+                        mappingBuilders[materialName].Build(),
+                        textures.TexturesByPath,
+                        cancellationToken);
+                    if (composite == null)
+                        continue;
+
+                    string key = $"{materialName} [Terrain Blend]";
+                    textures.LoadedTextures[key] = composite;
+                    layeredTextureKeys[materialName] = key;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, $"Failed to compose layered terrain material: {materialName}");
+                }
+            }
+
+            return layeredTextureKeys;
+        }
+
+        private static SceneModel CreateSceneFromProcessedMap(
+            string modelName,
+            MapGeometryProcessingResult result)
+        {
+            var availableTextureNames = new ObservableRangeCollection<string>(result.LoadedTextures.Keys);
+            var parts = new List<ModelPart>(result.Submeshes.Count);
+            var sceneModel = new SceneModel { Name = modelName };
+
+            foreach (MapGeometrySubmeshData data in result.Submeshes)
+            {
+                var positions = new Point3DCollection(data.Positions);
+                var indices = new Int32Collection(data.TriangleIndices);
+                var textureCoordinates = new PointCollection(data.TextureCoordinates);
+                if (positions.CanFreeze) positions.Freeze();
+                if (indices.CanFreeze) indices.Freeze();
+                if (textureCoordinates.CanFreeze) textureCoordinates.Freeze();
+
+                var mesh = new MeshGeometry3D
+                {
+                    Positions = positions,
+                    TriangleIndices = indices,
+                    TextureCoordinates = textureCoordinates
+                };
+                if (mesh.CanFreeze) mesh.Freeze();
+
+                string textureKey = ResolveTextureKey(data, result);
+                var fallbackBrush = new SolidColorBrush(ToMediaColor(data.TintColor));
+                if (fallbackBrush.CanFreeze) fallbackBrush.Freeze();
+                var fallbackMaterial = new DiffuseMaterial(fallbackBrush);
+                if (fallbackMaterial.CanFreeze) fallbackMaterial.Freeze();
+                var geometryModel = new GeometryModel3D(mesh, fallbackMaterial)
+                {
+                    Transform = ToMediaTransform(data.Transform),
+                    BackMaterial = data.IsDoubleSided ? fallbackMaterial : null
+                };
+
+                var modelPart = new ModelPart(
+                    PathUtils.SimplifyMeshName(data.MaterialName),
+                    geometryModel)
+                {
+                    AllTextures = result.LoadedTextures,
+                    AvailableTextureNames = availableTextureNames,
+                    SelectedTextureName = textureKey,
+                    IsTextureTiled = data.IsTextureTiled,
+                    IsDoubleSided = data.IsDoubleSided
+                };
+
+                TextureUtils.UpdateMaterial(modelPart);
+                parts.Add(modelPart);
+            }
+
+            sceneModel.AddParts(parts);
+            return sceneModel;
+        }
+
+        private static string ResolveTextureKey(
+            MapGeometrySubmeshData data,
+            MapGeometryProcessingResult result)
+        {
+            if (result.LayeredTextureKeys.TryGetValue(data.MaterialName, out string layeredKey))
+                return layeredKey;
+
+            string normalizedPath = PathUtils.ToVirtualPath(data.TexturePath);
+            return !string.IsNullOrEmpty(normalizedPath) &&
+                   result.TextureKeys.TryGetValue(normalizedPath, out string textureKey)
+                ? textureKey
+                : null;
+        }
+
+        private static Color ToMediaColor(System.Numerics.Vector4? value)
+        {
+            if (value == null)
+                return Colors.Magenta;
+
+            static byte ToByte(float component) =>
+                (byte)Math.Round(Math.Clamp(component, 0f, 1f) * byte.MaxValue);
+
+            System.Numerics.Vector4 color = value.Value;
+            return Color.FromArgb(ToByte(color.W), ToByte(color.X), ToByte(color.Y), ToByte(color.Z));
+        }
+
+        private static Transform3D ToMediaTransform(System.Numerics.Matrix4x4 value)
+        {
+            if (value == System.Numerics.Matrix4x4.Identity)
+                return Transform3D.Identity;
+
+            return new MatrixTransform3D(new Matrix3D(
+                value.M11, value.M12, value.M13, value.M14,
+                value.M21, value.M22, value.M23, value.M24,
+                value.M31, value.M32, value.M33, value.M34,
+                value.M41, value.M42, value.M43, value.M44));
+        }
+
+        private void LogMaterialDiagnostics(MapGeometryProcessingResult result, bool hasMaterials)
+        {
+            if (!hasMaterials)
+            {
+                _logService.LogWarning("MapGeometry loaded without materials metadata.");
+                return;
+            }
+
+            if (result.UnresolvedMaterials.Count > 0)
+            {
+                _logService.LogWarning(
+                    $"MapGeometry materials missing from materials.bin ({result.UnresolvedMaterials.Count}): " +
+                    string.Join(", ", result.UnresolvedMaterials.Take(8)));
+            }
+
+            if (result.MissingTexturePaths.Count > 0)
+            {
+                _logService.LogWarning(
+                    $"MapGeometry texture files missing or unreadable ({result.MissingTexturePaths.Count}): " +
+                    string.Join(", ", result.MissingTexturePaths.Take(8)));
+            }
+
+            if (result.MaterialsWithoutVisuals.Count > 0)
+            {
+                _logService.LogDebug(
+                    $"MapGeometry materials without a color sampler or tint ({result.MaterialsWithoutVisuals.Count}): " +
+                    string.Join(", ", result.MaterialsWithoutVisuals.Take(8)));
+            }
+
+            if (result.LayeredMaterials.Count > 0)
+            {
+                _logService.LogDebug(
+                    $"MapGeometry layered terrain materials composed: " +
+                    $"{result.LayeredTextureKeys.Count}/{result.LayeredMaterials.Count}.");
+            }
+
+            _logService.LogDebug(
+                $"MapGeometry materials parsed: textures={result.LoadedTextures.Count}, " +
+                $"unresolvedMaterials={result.UnresolvedMaterials.Count}, missingTextures={result.MissingTexturePaths.Count}.");
+        }
+
+        internal static Dictionary<string, string> BuildTextureKeys(IEnumerable<string> texturePaths)
+        {
+            string[] paths = texturePaths
+                .Select(PathUtils.ToVirtualPath)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var duplicateNames = paths
+                .GroupBy(x => Path.GetFileNameWithoutExtension(x), StringComparer.OrdinalIgnoreCase)
+                .Where(x => x.Count() > 1)
+                .Select(x => x.Key)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            return paths.ToDictionary(
+                x => x,
+                x =>
+                {
+                    string shortName = Path.GetFileNameWithoutExtension(x);
+                    return duplicateNames.Contains(shortName) ? x : shortName;
+                },
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        internal static string ResolveTextureFilePath(string gameDataPath, string texturePath)
+        {
+            if (string.IsNullOrWhiteSpace(gameDataPath) || string.IsNullOrWhiteSpace(texturePath))
+                return null;
+
+            string normalizedPath = PathUtils.ToVirtualPath(texturePath).Replace('/', Path.DirectorySeparatorChar);
+            string rootPath = Path.GetFullPath(gameDataPath);
+            string candidatePath = Path.GetFullPath(Path.Combine(rootPath, normalizedPath));
+            if (!PathUtils.IsSameOrSubPath(rootPath, candidatePath))
+                return null;
+
+            if (File.Exists(candidatePath))
+                return candidatePath;
+
+            string extension = Path.GetExtension(candidatePath);
+            foreach (string alternativeExtension in new[] { ".tex", ".dds", ".png", ".tga" })
+            {
+                if (extension.Equals(alternativeExtension, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string alternativePath = Path.ChangeExtension(candidatePath, alternativeExtension);
+                if (File.Exists(alternativePath))
+                    return alternativePath;
+            }
+
+            return null;
+        }
+
+        private sealed record MapGeometryProcessingResult(
+            List<MapGeometrySubmeshData> Submeshes,
+            Dictionary<string, BitmapSource> LoadedTextures,
+            Dictionary<string, string> TextureKeys,
+            Dictionary<string, string> LayeredTextureKeys,
+            HashSet<string> UnresolvedMaterials,
+            HashSet<string> MaterialsWithoutVisuals,
+            HashSet<string> MissingTexturePaths,
+            HashSet<string> LayeredMaterials);
+
+        private sealed record MapGeometryTextureLoadResult(
+            Dictionary<string, BitmapSource> LoadedTextures,
+            Dictionary<string, BitmapSource> TexturesByPath,
+            Dictionary<string, string> TextureKeys,
+            HashSet<string> MissingTexturePaths);
+
+        private sealed record MapGeometrySubmeshData(
+            string MaterialName,
+            Point3D[] Positions,
+            int[] TriangleIndices,
+            Point[] TextureCoordinates,
+            System.Numerics.Matrix4x4 Transform,
+            string TexturePath,
+            bool IsTextureTiled,
+            System.Numerics.Vector4? TintColor,
+            bool IsDoubleSided);
+
     }
 }

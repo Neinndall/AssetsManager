@@ -744,11 +744,18 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (!string.IsNullOrEmpty(materialsPath) && File.Exists(materialsPath))
                 {
-                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, materialsPath, gameDataPath);
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(
+                        filePath,
+                        materialsPath,
+                        gameDataPath,
+                        cancellationToken);
                 }
                 else
                 {
-                    newModel = await MapGeometryLoadingService.LoadMapGeometry(filePath, gameDataPath);
+                    newModel = await MapGeometryLoadingService.LoadMapGeometry(
+                        filePath,
+                        gameDataPath,
+                        cancellationToken);
                 }
             }
             catch (System.OperationCanceledException)

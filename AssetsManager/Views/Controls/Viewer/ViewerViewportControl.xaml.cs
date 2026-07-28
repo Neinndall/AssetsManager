@@ -131,13 +131,13 @@ namespace AssetsManager.Views.Controls.Viewer
             // 3. Setup lighting from view model settings
             float phi = (float)(_viewModel.LightRotation * (Math.PI / 180.0));
             float theta = (float)(_viewModel.LightHeight * (Math.PI / 180.0));
-            
+
             // Key Light (StudioLight)
             float x = MathF.Cos(theta) * MathF.Sin(phi);
             float y = MathF.Sin(theta);
             float z = MathF.Cos(theta) * MathF.Cos(phi);
             var lightDir1 = new Vector3(-x, -y, -z);
-            
+
             // Fill Light (FillLight - opposite)
             var lightDir2 = new Vector3(x, y, -z);
 
@@ -302,7 +302,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (visual == null) return null;
             var sceneModel = new SceneModel { Name = name, IsVisible = true };
-            
+
             void ExtractGeometryModels(Model3D model, Transform3D parentTransform)
             {
                 Transform3D combined = Transform3D.Identity;
@@ -333,27 +333,27 @@ namespace AssetsManager.Views.Controls.Viewer
                         transformedMesh.TriangleIndices = mesh.TriangleIndices;
                         transformedMesh.TextureCoordinates = mesh.TextureCoordinates;
                         transformedMesh.Normals = mesh.Normals;
-                        
+
                         foreach (var pos in mesh.Positions)
                         {
                             transformedMesh.Positions.Add(combined.Transform(pos));
                         }
-                        
-                        var part = new ModelPart
+
+                        var part = new ModelPart(
+                            name + "_" + sceneModel.Parts.Count,
+                            new GeometryModel3D(transformedMesh, geomModel.Material))
                         {
-                            Name = name + "_" + sceneModel.Parts.Count,
-                            Geometry = new GeometryModel3D(transformedMesh, geomModel.Material),
                             IsVisible = true
                         };
-                        
+
                         if (geomModel.Material is DiffuseMaterial diffuse && diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
                         {
                             string texName = "tex_" + part.Name;
                             part.AllTextures[texName] = bitmap;
                             part.SelectedTextureName = texName;
                         }
-                        
-                        sceneModel.Parts.Add(part);
+
+                        sceneModel.AddPart(part);
                     }
                 }
                 else if (model is Model3DGroup group)
@@ -364,12 +364,12 @@ namespace AssetsManager.Views.Controls.Viewer
                     }
                 }
             }
-            
+
             if (visual.Content != null)
             {
                 ExtractGeometryModels(visual.Content, visual.Transform ?? Transform3D.Identity);
             }
-            
+
             return sceneModel;
         }
 
@@ -445,13 +445,13 @@ namespace AssetsManager.Views.Controls.Viewer
                 // Liberar el renderizador de OpenGL
                 _meshRenderer?.Dispose();
                 _meshRenderer = null;
- 
+
                 _gridRenderer?.Dispose();
                 _gridRenderer = null;
 
                 _vfxRenderer?.Dispose();
                 _vfxRenderer = null;
- 
+
             }
             catch (Exception ex)
             {
@@ -632,7 +632,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (!Viewport.Children.Contains(model.RootVisual))
                     Viewport.Children.Add(model.RootVisual);
             }
-            
+
             model.PropertyChanged += Model_PropertyChanged;
             SetActiveModel(model);
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
@@ -898,7 +898,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             bool isMap = Panel?.ViewModel?.IsMapMode == true;
             double baselineY = 1000;
-            
+
             Point3D position;
             Vector3D lookDirection;
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
@@ -1060,7 +1060,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // 2. Set Studio Lights Intensity (Inverse of Ambient)
             double studioFactor = 1.0 - (_viewModel.AmbientIntensity / 100.0);
-            
+
             if (studioFactor <= 0)
             {
                 StudioLight.Color = Colors.Black;

@@ -12,6 +12,21 @@ namespace AssetsManager.Views.Models.Viewer
 {
     public class ModelPart : INotifyPropertyChanged, IDisposable
     {
+        private ModelVisual3D _visual;
+        private GeometryModel3D _geometry;
+
+        public ModelPart()
+        {
+            _visual = new ModelVisual3D();
+        }
+
+        public ModelPart(string name, GeometryModel3D geometry)
+            : this()
+        {
+            Name = name;
+            Geometry = geometry;
+        }
+
         public string Name { get; set; }
 
         private bool _isVisible = true;
@@ -27,9 +42,22 @@ namespace AssetsManager.Views.Models.Viewer
             }
         }
 
-        public ModelVisual3D Visual { get; set; }
-        public GeometryModel3D Geometry { get; set; }
+        public ModelVisual3D Visual => _visual;
+
+        public GeometryModel3D Geometry
+        {
+            get => _geometry;
+            set
+            {
+                if (ReferenceEquals(_geometry, value)) return;
+                _geometry = value;
+                UpdateVisualContent();
+                OnPropertyChanged();
+            }
+        }
         public int[] SourceVertexIndices { get; set; }
+        public bool IsTextureTiled { get; set; } = true;
+        public bool IsDoubleSided { get; set; } = true;
 
         public Dictionary<string, BitmapSource> AllTextures
         {
@@ -80,18 +108,18 @@ namespace AssetsManager.Views.Models.Viewer
         public void Dispose()
         {
             IsVisible = false;
-            if (Visual != null)
+            if (_visual != null)
             {
-                Visual.Content = null;
-                Visual = null;
+                _visual.Content = null;
+                _visual = null;
             }
 
-            if (Geometry != null)
+            if (_geometry != null)
             {
-                Geometry.Material = null;
-                Geometry.BackMaterial = null;
-                Geometry.Geometry = null;
-                Geometry = null;
+                _geometry.Material = null;
+                _geometry.BackMaterial = null;
+                _geometry.Geometry = null;
+                _geometry = null;
             }
 
             // Shared texture dictionaries are cleared by the owning SceneModel.
