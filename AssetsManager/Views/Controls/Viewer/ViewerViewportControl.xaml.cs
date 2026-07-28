@@ -1211,6 +1211,11 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private void ViewportSnapshotButton_Click(object sender, RoutedEventArgs e)
+        {
+            InitiateHighDefinitionSnapshot();
+        }
+
         // --- Diff Mode support ---
         public static readonly DependencyProperty IsDiffModeProperty =
             DependencyProperty.Register(
