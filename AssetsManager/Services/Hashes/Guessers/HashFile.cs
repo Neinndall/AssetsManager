@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
 
@@ -27,7 +28,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             Domain = domain;
             Path = string.Empty;
-            _hashes = paths.Select(HashGuessEngine.NormalizePath)
+            _hashes = paths.Select(PathUtils.NormalizePath)
                 .Where(path => path.Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 .ToDictionary(path => XxHash64Ext.Hash(path), path => path);
@@ -59,7 +60,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         int separator = line.IndexOf(' ');
                         if (separator <= 0 || separator == line.Length - 1) continue;
                         if (!ulong.TryParse(line.AsSpan(0, separator), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash)) continue;
-                        string value = HashGuessEngine.NormalizePath(line[(separator + 1)..]);
+                        string value = PathUtils.NormalizePath(line[(separator + 1)..]);
                         if (value.Length > 0) hashes[hash] = value;
                     }
                 }

@@ -223,7 +223,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         {
             string candidate = "assets/" + new string('a', 600) + ".bin";
 
-            Assert.Equal(candidate, HashGuessEngine.NormalizePath(candidate));
+            Assert.Equal(candidate, PathUtils.NormalizePath(candidate));
         }
 
         [Fact]
@@ -549,20 +549,29 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void CheckIterHashesEachPathExactlyLikeCdtb()
+        public void CheckIterNormalizesWadPathsBeforeHashing()
         {
             const string exactPath = "assets/UI/MixedCase.bin";
+            const string canonicalPath = "assets/ui/mixedcase.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, canonicalPath);
             var game = new GameHashGuesser();
-            var exactEngine = CreateEngine(HashGuessDomain.Game, exactPath);
 
-            game.CheckIter(exactEngine, new[] { exactPath }, HashGuessStrategy.WordlistVariant);
+            game.CheckIter(engine, new[] { exactPath }, HashGuessStrategy.WordlistVariant);
 
-            AssertResolved(exactEngine, exactPath);
+            AssertResolved(engine, canonicalPath);
+        }
 
-            var lowerCaseEngine = CreateEngine(HashGuessDomain.Game, exactPath.ToLowerInvariant());
-            game.CheckIter(lowerCaseEngine, new[] { exactPath }, HashGuessStrategy.WordlistVariant);
-            Assert.Empty(lowerCaseEngine.Matches);
-            Assert.Equal(1, lowerCaseEngine.RemainingUnknownCount);
+        [Fact]
+        public void CheckIterNormalizesBackslashesAndPreservesDataSoonIdentity()
+        {
+            const string inputPath = @"DATA_SOON\Characters\Annie\Annie.bin";
+            const string canonicalPath = "data_soon/characters/annie/annie.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, canonicalPath);
+            var game = new GameHashGuesser();
+
+            game.CheckIter(engine, new[] { inputPath }, HashGuessStrategy.WordlistVariant);
+
+            AssertResolved(engine, canonicalPath);
         }
 
         [Fact]

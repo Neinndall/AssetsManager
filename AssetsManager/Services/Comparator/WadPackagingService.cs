@@ -83,7 +83,7 @@ namespace AssetsManager.Services.Comparator
 
                     _logService.LogDebug($"[CreateLeanWadPackageAsync] Resolved target WAD path: '{targetWadRelativePath}'. Creating dependency...");
 
-                    ulong binHash = XxHash64Ext.Hash(binStrategy.BinPath.ToLowerInvariant());
+                    ulong binHash = XxHash64Ext.Hash(PathUtils.NormalizePath(binStrategy.BinPath));
                     diffsByHash.TryGetValue(binHash, out var diffForBinDependency);
                     dependencyRequests.Add(new DependencyRequest(audioBankDiff, binStrategy.BinPath, binHash,
                         targetWadRelativePath, targetWadRelativePath, diffForBinDependency));

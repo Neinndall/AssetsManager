@@ -22,6 +22,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Simplified BIN processing by separating readable JSON output from audio event extraction.
   - Viewer now measures FPS from completed OpenTK render callbacks and applies its optional 60 FPS limit directly in the OpenGL render flow.
   - Viewer keeps high-definition scene capture exclusively in Studio and delegates genuine aspect-preserving UHD framebuffer output to a dedicated OpenGL snapshot service.
   - Viewer viewport, camera, and toolbar-toggle controls now use a more compact layout with smaller icons.
@@ -113,6 +114,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Preserved PTCH data overrides in BIN previews and comparisons.
+  - Fixed WAD path normalization and BIN name resolution across class, property, entry, and value domains.
   - Viewer maximize mode now spans the viewport across the full main-content width instead of leaving the hidden inspector column reserved.
   - Viewer Studio snapshots no longer capture the zero-sized legacy camera host or upscale the visible viewport framebuffer.
   - Viewer MapGeometry now resolves Jade textures without false missing warnings, filename collisions, or camera-dependent texture tiling artifacts.

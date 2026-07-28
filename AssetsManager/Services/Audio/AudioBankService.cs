@@ -24,12 +24,12 @@ namespace AssetsManager.Services.Audio
         }
 
         private readonly LogService _logService;
-        private readonly BinParser _binParser;
+        private readonly BinAudioEventExtractor _binAudioEventExtractor;
 
-        public AudioBankService(LogService logService, BinParser binParser)
+        public AudioBankService(LogService logService, BinAudioEventExtractor binAudioEventExtractor)
         {
             _logService = logService;
-            _binParser = binParser;
+            _binAudioEventExtractor = binAudioEventExtractor;
         }
 
         public int GetSoundCount(byte[] wpkData, byte[] audioBnkData)
@@ -58,9 +58,9 @@ namespace AssetsManager.Services.Audio
             return 0;
         }
 
-        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
+        public List<AudioEventNode> ParseAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData, byte[] binData, string baseName)
         {
-            var eventNameMap = _binParser.GetEventsFromBin(binData, baseName, binType, _logService);
+            var eventNameMap = _binAudioEventExtractor.Extract(binData, baseName, _logService);
             
             // Now we include eventsData in WEM extraction in case Riot embedded audios there too
             var allWems = ExtractWems(wpkData, audioBnkData, eventsData);
@@ -117,14 +117,14 @@ namespace AssetsManager.Services.Audio
             eventNodes.Insert(0, techNode);
         }
 
-        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName, BinType binType)
+        public List<AudioEventNode> ParseSfxAudioBank(byte[] audioData, byte[] eventsData, byte[] binData, string baseName)
         {
-            return ParseAudioBank(null, audioData, eventsData, binData, baseName, binType);
+            return ParseAudioBank(null, audioData, eventsData, binData, baseName);
         }
 
         public List<AudioEventNode> ParseGenericAudioBank(byte[] wpkData, byte[] audioBnkData, byte[] eventsData)
         {
-            return ParseAudioBank(wpkData, audioBnkData, eventsData, null, null, BinType.Unknown);
+            return ParseAudioBank(wpkData, audioBnkData, eventsData, null, null);
         }
 
         private Dictionary<uint, WemSoundInfo> ExtractWems(byte[] wpkData, byte[] audioBnkData, byte[] eventsBnkData = null)

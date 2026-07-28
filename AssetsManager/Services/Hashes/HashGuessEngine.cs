@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO.Hashing;
 using System.Text;
 using System.Text.RegularExpressions;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
 
@@ -36,34 +37,27 @@ namespace AssetsManager.Services.Hashes
 
         public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {
-            string path = NormalizePath(candidate);
-            if (path.Length == 0)
-            {
-                CheckedCandidates++;
-                DiscardedCandidates++;
-                return false;
-            }
-
-            return CheckExact(path, strategy, source, sourceChunkHash);
+            return CheckExact(candidate, strategy, source, sourceChunkHash);
         }
 
         internal bool CheckExact(string path, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {
             CheckedCandidates++;
-            if (string.IsNullOrEmpty(path))
+            string normalizedPath = PathUtils.NormalizePath(path);
+            if (normalizedPath.Length == 0)
             {
                 DiscardedCandidates++;
                 return false;
             }
 
-            ulong hash = XxHash64Ext.Hash(path);
+            ulong hash = XxHash64Ext.Hash(normalizedPath);
             if (!_unknownHashes.Remove(hash))
             {
                 DiscardedCandidates++;
                 return false;
             }
 
-            AddMatch(hash, path, strategy, source, sourceChunkHash);
+            AddMatch(hash, normalizedPath, strategy, source, sourceChunkHash);
             return true;
         }
 
@@ -75,18 +69,24 @@ namespace AssetsManager.Services.Hashes
             ulong sourceChunkHash)
         {
             CheckedCandidates++;
-            int directoryByteCount = Encoding.UTF8.GetByteCount(directory);
-            int relativeByteCount = Encoding.UTF8.GetByteCount(relativePath);
-            int byteCount = checked(directoryByteCount + 1 + relativeByteCount);
+            string combinedPath = string.IsNullOrEmpty(directory)
+                ? relativePath
+                : string.Concat(directory, "/", relativePath);
+            string normalizedPath = PathUtils.NormalizePath(combinedPath);
+            if (normalizedPath.Length == 0)
+            {
+                DiscardedCandidates++;
+                return false;
+            }
+
+            int byteCount = Encoding.UTF8.GetByteCount(normalizedPath);
             byte[] rented = null;
             Span<byte> utf8 = byteCount <= 1024
                 ? stackalloc byte[byteCount]
                 : (rented = ArrayPool<byte>.Shared.Rent(byteCount));
             try
             {
-                int written = Encoding.UTF8.GetBytes(directory, utf8);
-                utf8[written++] = (byte)'/';
-                written += Encoding.UTF8.GetBytes(relativePath, utf8[written..]);
+                int written = Encoding.UTF8.GetBytes(normalizedPath, utf8);
                 ulong hash = XxHash64.HashToUInt64(utf8[..written]);
                 if (!_unknownHashes.Remove(hash))
                 {
@@ -94,7 +94,7 @@ namespace AssetsManager.Services.Hashes
                     return false;
                 }
 
-                AddMatch(hash, string.Concat(directory, "/", relativePath), strategy, source, sourceChunkHash);
+                AddMatch(hash, normalizedPath, strategy, source, sourceChunkHash);
                 return true;
             }
             finally
@@ -266,13 +266,5 @@ namespace AssetsManager.Services.Hashes
                 .ToList();
         }
 
-        public static string NormalizePath(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-            string path = value.Trim().Replace('\\', '/').ToLowerInvariant().Replace("data_soon/", "data/");
-            // Riot's historical GAME list contains valid hashed paths with repeated separators.
-            // Preserve the exact path spelling: collapsing or rejecting it changes the hash.
-            return path;
-        }
     }
 }

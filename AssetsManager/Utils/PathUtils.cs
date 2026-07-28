@@ -292,8 +292,9 @@ namespace AssetsManager.Utils
         /// </summary>
         public static string NormalizePath(string path)
         {
-            if (string.IsNullOrEmpty(path)) return string.Empty;
-            return path.Replace('\\', '/').ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+            // Repeated separators are significant in Riot's historical GAME hashes.
+            return path.Trim().Replace('\\', '/').ToLowerInvariant();
         }
 
         /// <summary>

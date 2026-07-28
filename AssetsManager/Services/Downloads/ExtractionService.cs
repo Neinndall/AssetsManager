@@ -297,7 +297,7 @@ namespace AssetsManager.Services.Downloads
 
                             List<AudioEventNode> audioTree;
                             if (linkedBank.BinData != null)
-                                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsData, linkedBank.BinData, linkedBank.BaseName);
                             else
                                 audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsData);
 
@@ -600,7 +600,7 @@ namespace AssetsManager.Services.Downloads
             
             List<AudioEventNode> audioTree;
             if (linkedBank.BinData != null)
-                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
             else
                 audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
 

@@ -13,11 +13,11 @@ using System.Text.Encodings.Web;
 
 namespace AssetsManager.Services.Parsers
 {
-    public class BinPropertyParser
+    public sealed class BinJsonSerializer
     {
         private readonly HashResolverService _hashResolver;
 
-        public BinPropertyParser(HashResolverService hashResolver)
+        public BinJsonSerializer(HashResolverService hashResolver)
         {
             _hashResolver = hashResolver;
         }
@@ -37,9 +37,10 @@ namespace AssetsManager.Services.Parsers
             string magic = Encoding.ASCII.GetString(br.ReadBytes(4));
             if (magic == "PTCH")
             {
-                br.ReadUInt32(); // override version
-                br.ReadUInt32(); // object count override
-                magic = Encoding.ASCII.GetString(br.ReadBytes(4));
+                binStream.Position = startPosition;
+                var overrideTree = new BinTree(binStream);
+                WriteBinTreeAsJsonInternal(outputStream, overrideTree);
+                return;
             }
 
             if (magic != "PROP") throw new InvalidDataException("Invalid BIN signature");
@@ -86,47 +87,40 @@ namespace AssetsManager.Services.Parsers
 
         private void RunStreamingLoop(Utf8JsonWriter writer, BinaryReader br, uint[] objectClasses)
         {
-            var resolutionCache = new Dictionary<uint, string>();
-            string Resolve(uint hash)
-            {
-                if (resolutionCache.TryGetValue(hash, out var resolved)) return resolved;
-                var res = _hashResolver.ResolveBinHashGeneral(hash);
-                resolutionCache[hash] = res;
-                return res;
-            }
+            var resolution = new BinResolutionContext(_hashResolver);
 
             writer.WriteStartObject();
             for (int i = 0; i < objectClasses.Length; i++)
             {
-                WriteObjectStreaming(writer, br, objectClasses[i], Resolve);
+                WriteObjectStreaming(writer, br, objectClasses[i], resolution);
             }
             writer.WriteEndObject();
             writer.Flush();
         }
 
-        private void WriteObjectStreaming(Utf8JsonWriter writer, BinaryReader br, uint classHash, Func<uint, string> resolve)
+        private void WriteObjectStreaming(Utf8JsonWriter writer, BinaryReader br, uint classHash, BinResolutionContext resolution)
         {
             br.ReadUInt32(); // size
             uint pathHash = br.ReadUInt32();
             ushort propertyCount = br.ReadUInt16();
 
-            writer.WritePropertyName(resolve(pathHash));
+            writer.WritePropertyName(resolution.Entry(pathHash));
             writer.WriteStartObject();
-            writer.WriteString("type", resolve(classHash));
+            writer.WriteString("type", resolution.Type(classHash));
 
             for (int i = 0; i < propertyCount; i++)
             {
                 uint nameHash = br.ReadUInt32();
                 var type = (BinPropertyType)br.ReadByte();
 
-                writer.WritePropertyName(resolve(nameHash));
-                WritePropertyContentStreaming(writer, br, type, resolve);
+                writer.WritePropertyName(resolution.Field(nameHash));
+                WritePropertyContentStreaming(writer, br, type, resolution);
             }
 
             writer.WriteEndObject();
         }
 
-        private void WritePropertyContentStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType type, Func<uint, string> resolve)
+        private void WritePropertyContentStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType type, BinResolutionContext resolution)
         {
             switch (type)
             {
@@ -161,16 +155,16 @@ namespace AssetsManager.Services.Parsers
                     ushort strLen = br.ReadUInt16();
                     writer.WriteStringValue(Encoding.UTF8.GetString(br.ReadBytes(strLen)));
                     break;
-                case BinPropertyType.Hash: writer.WriteStringValue(resolve(br.ReadUInt32())); break;
+                case BinPropertyType.Hash: writer.WriteStringValue(resolution.Hash(br.ReadUInt32())); break;
                 case BinPropertyType.WadChunkLink: writer.WriteStringValue(_hashResolver.ResolveHash(br.ReadUInt64())); break;
-                case BinPropertyType.ObjectLink: writer.WriteStringValue(resolve(br.ReadUInt32())); break;
+                case BinPropertyType.ObjectLink: writer.WriteStringValue(resolution.Entry(br.ReadUInt32())); break;
                 case BinPropertyType.BitBool: writer.WriteBooleanValue(br.ReadByte() != 0); break;
                 case BinPropertyType.Optional:
                     var optType = (BinPropertyType)br.ReadByte();
                     byte hasValue = br.ReadByte();
                     if (hasValue != 0)
                     {
-                        WritePropertyContentStreaming(writer, br, optType, resolve);
+                        WritePropertyContentStreaming(writer, br, optType, resolution);
                     }
                     else writer.WriteNullValue();
                     break;
@@ -181,12 +175,12 @@ namespace AssetsManager.Services.Parsers
                     uint itemCount = br.ReadUInt32();
                     if (IsPrimitiveType(itemType))
                     {
-                        WritePrimitiveContainerStreaming(writer, br, itemType, itemCount, resolve);
+                        WritePrimitiveContainerStreaming(writer, br, itemType, itemCount, resolution);
                     }
                     else
                     {
                         writer.WriteStartArray();
-                        for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolve);
+                        for (uint i = 0; i < itemCount; i++) WritePropertyContentStreaming(writer, br, itemType, resolution);
                         writer.WriteEndArray();
                     }
                     break;
@@ -197,13 +191,13 @@ namespace AssetsManager.Services.Parsers
                     br.ReadUInt32(); // struct size
                     ushort structPropCount = br.ReadUInt16();
                     writer.WriteStartObject();
-                    writer.WriteString("type", resolve(structClassHash));
+                    writer.WriteString("type", resolution.Type(structClassHash));
                     for (int i = 0; i < structPropCount; i++)
                     {
                         uint pNameHash = br.ReadUInt32();
                         var pType = (BinPropertyType)br.ReadByte();
-                        writer.WritePropertyName(resolve(pNameHash));
-                        WritePropertyContentStreaming(writer, br, pType, resolve);
+                        writer.WritePropertyName(resolution.Field(pNameHash));
+                        WritePropertyContentStreaming(writer, br, pType, resolution);
                     }
                     writer.WriteEndObject();
                     break;
@@ -215,9 +209,9 @@ namespace AssetsManager.Services.Parsers
                     writer.WriteStartObject();
                     for (uint i = 0; i < mapCount; i++)
                     {
-                        string keyStr = ReadPropertyAsKeyStringStreaming(br, kType, resolve);
+                        string keyStr = ReadPropertyAsKeyStringStreaming(br, kType, resolution);
                         writer.WritePropertyName(keyStr);
-                        WritePropertyContentStreaming(writer, br, vType, resolve);
+                        WritePropertyContentStreaming(writer, br, vType, resolution);
                     }
                     writer.WriteEndObject();
                     break;
@@ -227,7 +221,7 @@ namespace AssetsManager.Services.Parsers
             }
         }
 
-        private string ReadPropertyAsKeyStringStreaming(BinaryReader br, BinPropertyType type, Func<uint, string> resolve)
+        private string ReadPropertyAsKeyStringStreaming(BinaryReader br, BinPropertyType type, BinResolutionContext resolution)
         {
             return type switch
             {
@@ -241,7 +235,7 @@ namespace AssetsManager.Services.Parsers
                 BinPropertyType.U64 => br.ReadUInt64().ToString(),
                 BinPropertyType.F32 => br.ReadSingle().ToString(CultureInfo.InvariantCulture),
                 BinPropertyType.String => Encoding.UTF8.GetString(br.ReadBytes(br.ReadUInt16())),
-                BinPropertyType.Hash => resolve(br.ReadUInt32()),
+                BinPropertyType.Hash => resolution.Hash(br.ReadUInt32()),
                 _ => "UnknownKey_" + type.ToString()
             };
         }
@@ -258,6 +252,11 @@ namespace AssetsManager.Services.Parsers
                 using var newStream = new MemoryStream(newData, writable: false);
                 var oldTree = new BinTree(oldStream);
                 var newTree = new BinTree(newStream);
+                if (oldTree.IsOverride || newTree.IsOverride)
+                {
+                    return (WriteBinTreeAsJsonString(oldTree), WriteBinTreeAsJsonString(newTree));
+                }
+
                 BinTreeDiff diff = oldTree.Diff(newTree);
 
                 return (WriteBinDiffSideAsJson(diff, useNewValues: false), WriteBinDiffSideAsJson(diff, useNewValues: true));
@@ -273,15 +272,7 @@ namespace AssetsManager.Services.Parsers
                 Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             using var writer = new Utf8JsonWriter(output, options);
-            var resolutionCache = new Dictionary<uint, string>();
-
-            string Resolve(uint hash)
-            {
-                if (resolutionCache.TryGetValue(hash, out string resolved)) return resolved;
-                string result = _hashResolver.ResolveBinHashGeneral(hash);
-                resolutionCache[hash] = result;
-                return result;
-            }
+            var resolution = new BinResolutionContext(_hashResolver);
 
             writer.WriteStartObject();
             foreach (BinTreeObjectDiff objectDiff in diff.Objects)
@@ -289,16 +280,16 @@ namespace AssetsManager.Services.Parsers
                 BinTreeObject treeObject = GetObjectForSide(objectDiff, useNewValues);
                 if (treeObject == null) continue;
 
-                writer.WritePropertyName(Resolve(objectDiff.PathHash));
+                writer.WritePropertyName(resolution.Entry(objectDiff.PathHash));
                 writer.WriteStartObject();
-                writer.WriteString("type", Resolve(treeObject.ClassHash));
+                writer.WriteString("type", resolution.Type(treeObject.ClassHash));
 
                 if (objectDiff is not ModifiedBinTreeObjectDiff modifiedObject)
                 {
                     foreach (var property in treeObject.Properties.OrderBy(x => x.Key))
                     {
-                        writer.WritePropertyName(Resolve(property.Key));
-                        WritePropertyValueInternal(writer, property.Value, Resolve);
+                        writer.WritePropertyName(resolution.Field(property.Key));
+                        WritePropertyValueInternal(writer, property.Value, resolution);
                     }
                 }
                 else
@@ -309,7 +300,7 @@ namespace AssetsManager.Services.Parsers
                         modifiedObject.Properties,
                         0,
                         useNewValues,
-                        Resolve
+                        resolution
                     );
                 }
 
@@ -327,31 +318,31 @@ namespace AssetsManager.Services.Parsers
             IEnumerable<BinTreePropertyDiff> differences,
             int pathIndex,
             bool useNewValues,
-            Func<uint, string> resolve)
+            BinResolutionContext resolution)
         {
             foreach (var group in differences.GroupBy(x => x.Path[pathIndex]).OrderBy(x => x.Key))
             {
                 if (!properties.TryGetValue(group.Key, out BinTreeProperty property)) continue;
 
-                writer.WritePropertyName(resolve(group.Key));
+                writer.WritePropertyName(resolution.Field(group.Key));
                 if (group.Any(x => x.Path.Count == pathIndex + 1))
                 {
                     BinTreePropertyDiff difference = group.Single(x => x.Path.Count == pathIndex + 1);
                     BinTreeProperty changedProperty = GetPropertyForSide(difference, useNewValues);
-                    WritePropertyValueInternal(writer, changedProperty, resolve);
+                    WritePropertyValueInternal(writer, changedProperty, resolution);
                     continue;
                 }
 
                 var structure = (BinTreeStruct)property;
                 writer.WriteStartObject();
-                writer.WriteString("type", resolve(structure.ClassHash));
+                writer.WriteString("type", resolution.Type(structure.ClassHash));
                 WriteChangedProperties(
                     writer,
                     structure.Properties,
                     group,
                     pathIndex + 1,
                     useNewValues,
-                    resolve
+                    resolution
                 );
                 writer.WriteEndObject();
             }
@@ -388,40 +379,63 @@ namespace AssetsManager.Services.Parsers
             };
             using var writer = new Utf8JsonWriter(outputStream, options);
 
-            var resolutionCache = new Dictionary<uint, string>();
-            string Resolve(uint hash)
-            {
-                if (resolutionCache.TryGetValue(hash, out var resolved)) return resolved;
-                var res = _hashResolver.ResolveBinHashGeneral(hash);
-                resolutionCache[hash] = res;
-                return res;
-            }
+            var resolution = new BinResolutionContext(_hashResolver);
 
             writer.WriteStartObject();
             foreach (var kvp in binTree.Objects)
             {
-                writer.WritePropertyName(Resolve(kvp.Key));
+                writer.WritePropertyName(resolution.Entry(kvp.Key));
                 writer.WriteStartObject();
-                writer.WriteString("type", Resolve(kvp.Value.ClassHash));
+                writer.WriteString("type", resolution.Type(kvp.Value.ClassHash));
                 foreach (var propKvp in kvp.Value.Properties)
                 {
-                    writer.WritePropertyName(Resolve(propKvp.Key));
-                    WritePropertyValueInternal(writer, propKvp.Value, Resolve);
+                    writer.WritePropertyName(resolution.Field(propKvp.Key));
+                    WritePropertyValueInternal(writer, propKvp.Value, resolution);
                 }
                 writer.WriteEndObject();
             }
+            WriteDataOverrides(writer, binTree.DataOverrides, resolution);
             writer.WriteEndObject();
             writer.Flush();
         }
 
-        private void WritePropertyValueInternal(Utf8JsonWriter writer, BinTreeProperty prop, Func<uint, string> resolve)
+        private string WriteBinTreeAsJsonString(BinTree binTree)
+        {
+            using var output = new MemoryStream();
+            WriteBinTreeAsJsonInternal(output, binTree);
+            return Encoding.UTF8.GetString(output.ToArray());
+        }
+
+        private void WriteDataOverrides(
+            Utf8JsonWriter writer,
+            IReadOnlyList<BinTreeDataOverride> overrides,
+            BinResolutionContext resolution)
+        {
+            if (overrides.Count == 0) return;
+
+            writer.WritePropertyName("$dataOverrides");
+            writer.WriteStartArray();
+            foreach (BinTreeDataOverride item in overrides)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("object", resolution.Entry(item.ObjectPathHash));
+                writer.WriteString("propertyPath", item.PropertyPath);
+                writer.WriteString("type", item.Property.Type.ToString());
+                writer.WritePropertyName("value");
+                WritePropertyValueInternal(writer, item.Property, resolution);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+        }
+
+        private void WritePropertyValueInternal(Utf8JsonWriter writer, BinTreeProperty prop, BinResolutionContext resolution)
         {
             if (prop == null) { writer.WriteNullValue(); return; }
 
             switch (prop.Type)
             {
                 case BinPropertyType.String: writer.WriteStringValue(((BinTreeString)prop).Value); break;
-                case BinPropertyType.Hash: writer.WriteStringValue(_hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value)); break;
+                case BinPropertyType.Hash: writer.WriteStringValue(resolution.Hash(((BinTreeHash)prop).Value)); break;
                 case BinPropertyType.I8: writer.WriteNumberValue(((BinTreeI8)prop).Value); break;
                 case BinPropertyType.U8: writer.WriteNumberValue(((BinTreeU8)prop).Value); break;
                 case BinPropertyType.I16: writer.WriteNumberValue(((BinTreeI16)prop).Value); break;
@@ -455,7 +469,7 @@ namespace AssetsManager.Services.Parsers
                     var c = ((BinTreeColor)prop).Value;
                     writer.WriteStartObject(); writer.WriteNumber("r", c.R); writer.WriteNumber("g", c.G); writer.WriteNumber("b", c.B); writer.WriteNumber("a", c.A); writer.WriteEndObject();
                     break;
-                case BinPropertyType.ObjectLink: writer.WriteStringValue(resolve(((BinTreeObjectLink)prop).Value)); break;
+                case BinPropertyType.ObjectLink: writer.WriteStringValue(resolution.Entry(((BinTreeObjectLink)prop).Value)); break;
                 case BinPropertyType.WadChunkLink: writer.WriteStringValue(_hashResolver.ResolveHash(((BinTreeWadChunkLink)prop).Value)); break;
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
@@ -471,12 +485,12 @@ namespace AssetsManager.Services.Parsers
                     }
                     if (allPrimitive)
                     {
-                        WritePrimitiveContainerFallback(writer, container, resolve);
+                        WritePrimitiveContainerFallback(writer, container, resolution);
                     }
                     else
                     {
                         writer.WriteStartArray();
-                        foreach (var p in container.Elements) WritePropertyValueInternal(writer, p, resolve);
+                        foreach (var p in container.Elements) WritePropertyValueInternal(writer, p, resolution);
                         writer.WriteEndArray();
                     }
                     break;
@@ -484,29 +498,29 @@ namespace AssetsManager.Services.Parsers
                 case BinPropertyType.Embedded:
                     var structProp = (BinTreeStruct)prop;
                     writer.WriteStartObject();
-                    writer.WriteString("type", resolve(structProp.ClassHash));
-                    foreach (var kvp in structProp.Properties) { writer.WritePropertyName(resolve(kvp.Key)); WritePropertyValueInternal(writer, kvp.Value, resolve); }
+                    writer.WriteString("type", resolution.Type(structProp.ClassHash));
+                    foreach (var kvp in structProp.Properties) { writer.WritePropertyName(resolution.Field(kvp.Key)); WritePropertyValueInternal(writer, kvp.Value, resolution); }
                     writer.WriteEndObject();
                     break;
-                case BinPropertyType.Optional: WritePropertyValueInternal(writer, ((BinTreeOptional)prop).Value, resolve); break;
+                case BinPropertyType.Optional: WritePropertyValueInternal(writer, ((BinTreeOptional)prop).Value, resolution); break;
                 case BinPropertyType.Map:
                     writer.WriteStartObject();
-                    foreach (var kvp in (BinTreeMap)prop) { writer.WritePropertyName(ConvertPropertyToStringInternal(kvp.Key)); WritePropertyValueInternal(writer, kvp.Value, resolve); }
+                    foreach (var kvp in (BinTreeMap)prop) { writer.WritePropertyName(ConvertPropertyToStringInternal(kvp.Key, resolution)); WritePropertyValueInternal(writer, kvp.Value, resolution); }
                     writer.WriteEndObject();
                     break;
                 default:
-                    writer.WriteStartObject(); writer.WriteString("Type", prop.Type.ToString()); writer.WriteString("NameHash", resolve(prop.NameHash)); writer.WriteEndObject();
+                    writer.WriteStartObject(); writer.WriteString("Type", prop.Type.ToString()); writer.WriteString("NameHash", resolution.Field(prop.NameHash)); writer.WriteEndObject();
                     break;
             }
         }
 
-        private string ConvertPropertyToStringInternal(BinTreeProperty prop)
+        private string ConvertPropertyToStringInternal(BinTreeProperty prop, BinResolutionContext resolution)
         {
             if (prop == null) return "null";
             switch (prop.Type)
             {
                 case BinPropertyType.String: return ((BinTreeString)prop).Value;
-                case BinPropertyType.Hash: return _hashResolver.ResolveBinHashGeneral(((BinTreeHash)prop).Value);
+                case BinPropertyType.Hash: return resolution.Hash(((BinTreeHash)prop).Value);
                 case BinPropertyType.I8: return ((BinTreeI8)prop).Value.ToString();
                 case BinPropertyType.U8: return ((BinTreeU8)prop).Value.ToString();
                 case BinPropertyType.I16: return ((BinTreeI16)prop).Value.ToString();
@@ -515,13 +529,43 @@ namespace AssetsManager.Services.Parsers
                 case BinPropertyType.U32: return ((BinTreeU32)prop).Value.ToString();
                 case BinPropertyType.I64: return ((BinTreeI64)prop).Value.ToString();
                 case BinPropertyType.U64: return ((BinTreeU64)prop).Value.ToString();
-                default: return _hashResolver.ResolveBinHashGeneral(prop.NameHash);
+                default: return resolution.Field(prop.NameHash);
             }
         }
 
         #endregion
 
         #region Helpers
+
+        private sealed class BinResolutionContext
+        {
+            private readonly HashResolverService _resolver;
+            private readonly Dictionary<uint, string> _entries = new();
+            private readonly Dictionary<uint, string> _fields = new();
+            private readonly Dictionary<uint, string> _types = new();
+            private readonly Dictionary<uint, string> _hashes = new();
+
+            public BinResolutionContext(HashResolverService resolver)
+            {
+                _resolver = resolver;
+            }
+
+            public string Entry(uint hash) => Resolve(_entries, hash, _resolver.ResolveBinEntry);
+            public string Field(uint hash) => Resolve(_fields, hash, _resolver.ResolveBinField);
+            public string Type(uint hash) => Resolve(_types, hash, _resolver.ResolveBinType);
+            public string Hash(uint hash) => Resolve(_hashes, hash, _resolver.ResolveBinHash);
+
+            private static string Resolve(
+                Dictionary<uint, string> cache,
+                uint hash,
+                Func<uint, string> resolver)
+            {
+                if (cache.TryGetValue(hash, out string resolved)) return resolved;
+                resolved = resolver(hash);
+                cache[hash] = resolved;
+                return resolved;
+            }
+        }
 
         private bool IsPrimitiveType(BinPropertyType type)
         {
@@ -544,7 +588,7 @@ namespace AssetsManager.Services.Parsers
             }
         }
 
-        private void WritePrimitiveContainerStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType itemType, uint itemCount, Func<uint, string> resolve)
+        private void WritePrimitiveContainerStreaming(Utf8JsonWriter writer, BinaryReader br, BinPropertyType itemType, uint itemCount, BinResolutionContext resolution)
         {
             var sb = new StringBuilder();
             sb.Append("[");
@@ -595,7 +639,7 @@ namespace AssetsManager.Services.Parsers
             writer.WriteRawValue(sb.ToString());
         }
 
-        private void WritePrimitiveContainerFallback(Utf8JsonWriter writer, BinTreeContainer container, Func<uint, string> resolve)
+        private void WritePrimitiveContainerFallback(Utf8JsonWriter writer, BinTreeContainer container, BinResolutionContext resolution)
         {
             var sb = new StringBuilder();
             sb.Append("[");

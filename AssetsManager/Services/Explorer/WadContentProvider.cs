@@ -66,7 +66,7 @@ namespace AssetsManager.Services.Explorer
             {
                 var requestedPaths = virtualPaths
                     .Where(path => !string.IsNullOrWhiteSpace(path))
-                    .Select(path => path.Replace('\\', '/').ToLowerInvariant())
+                    .Select(PathUtils.NormalizePath)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 

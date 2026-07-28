@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
@@ -272,7 +273,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal bool IsKnown(HashGuessEngine engine, string path, HashGuessStrategy strategy, string source = "Generated")
         {
-            ulong hash = XxHash64Ext.Hash(path);
+            ulong hash = XxHash64Ext.Hash(PathUtils.NormalizePath(path));
             return engine.CheckExact(path, strategy, source) || HashFile.Load().ContainsKey(hash);
         }
 
@@ -483,7 +484,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             yield return candidate.Path;
         }
 
-        protected static string NormalizePath(string value) => HashGuessEngine.NormalizePath(value);
+        protected static string NormalizePath(string value) => PathUtils.NormalizePath(value);
 
         protected static bool CountCandidate(ref int count, int candidateBudget)
         {

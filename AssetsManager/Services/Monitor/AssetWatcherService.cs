@@ -168,7 +168,7 @@ namespace AssetsManager.Services.Monitor
 
                     checkPerformed = true;
                     using var wadFile = new WadFile(fullWadPath);
-                    ulong pathHash = XxHash64Ext.Hash(asset.InternalPath.ToLower());
+                    ulong pathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(asset.InternalPath));
                     
                     if (!wadFile.Chunks.TryGetValue(pathHash, out var chunk))
                     {

@@ -268,14 +268,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public static uint Fnv1a(string text)
         {
-            if (string.IsNullOrEmpty(text)) return 0;
-            uint hash = 2166136261;
-            foreach (char character in text.ToLowerInvariant())
-            {
-                hash ^= character;
-                hash *= 16777619;
-            }
-            return hash;
+            return string.IsNullOrEmpty(text) ? 0 : LeagueToolkit.Hashing.Fnv1a.HashLower(text);
         }
     }
 

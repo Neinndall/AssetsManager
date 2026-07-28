@@ -24,17 +24,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static class HashAlgorithms
         {
-            public static uint Fnv1a(string text)
-            {
-                if (text == null) return 0;
-                uint hash = 2166136261;
-                foreach (char c in text.ToLowerInvariant())
-                {
-                    hash ^= c;
-                    hash *= 16777619;
-                }
-                return hash;
-            }
+            public static uint Fnv1a(string text) =>
+                text == null ? 0 : LeagueToolkit.Hashing.Fnv1a.HashLower(text);
         }
 
         // class hashes

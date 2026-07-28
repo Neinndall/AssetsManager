@@ -13,11 +13,11 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils.Framework;
-using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Audio
 {
@@ -297,7 +297,7 @@ namespace AssetsManager.Services.Audio
                 {
                     Path = siblingVirtualPath,
                     SourceWad = sourceWadFile,
-                    PathHash = XxHash64Ext.Hash(siblingVirtualPath.ToLower()),
+                    PathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(siblingVirtualPath)),
                     Type = siblingType
                 });
             }
@@ -337,7 +337,7 @@ namespace AssetsManager.Services.Audio
                 {
                     Path = binVirtualPath,
                     SourceWad = targetWadRelativePath,
-                    PathHash = XxHash64Ext.Hash(binVirtualPath.ToLower()),
+                    PathHash = XxHash64Ext.Hash(PathUtils.NormalizePath(binVirtualPath)),
                     Type = AudioDependencyType.Bin
                 });
             }
@@ -492,16 +492,14 @@ namespace AssetsManager.Services.Audio
                 audioBnkData: oldAudioBnk,
                 eventsData: oldEventsBnk,
                 binData: oldBin,
-                baseName: baseName,
-                binType: binStrategy?.Type ?? BinType.Unknown);
+                baseName: baseName);
 
             var newNodes = _audioBankService.ParseAudioBank(
                 wpkData: newWpk,
                 audioBnkData: newAudioBnk,
                 eventsData: newEventsBnk,
                 binData: newBin,
-                baseName: baseName,
-                binType: binStrategy?.Type ?? BinType.Unknown);
+                baseName: baseName);
 
             return (oldNodes, newNodes);
         }
@@ -525,8 +523,6 @@ namespace AssetsManager.Services.Audio
             bool clickedIsEventsBnk = fileName.Contains("_events", StringComparison.OrdinalIgnoreCase);
 
             var binStrategy = GetBinFileSearchStrategy(diff.NewPath ?? diff.OldPath, diff.SourceWadFile);
-            var binType = binStrategy?.Type ?? BinType.Unknown;
-
             byte[] oldEventsBnk = null, oldAudioBnk = null, oldWpk = null, oldBin = null;
             byte[] newEventsBnk = null, newAudioBnk = null, newWpk = null, newBin = null;
 
@@ -571,16 +567,14 @@ namespace AssetsManager.Services.Audio
                 audioBnkData: oldAudioBnk,
                 eventsData: oldEventsBnk,
                 binData: oldBin,
-                baseName: baseName,
-                binType: binType);
+                baseName: baseName);
 
             var newNodes = _audioBankService.ParseAudioBank(
                 wpkData: newWpk,
                 audioBnkData: newAudioBnk,
                 eventsData: newEventsBnk,
                 binData: newBin,
-                baseName: baseName,
-                binType: binType);
+                baseName: baseName);
 
             return (oldNodes, newNodes);
         }

@@ -22,8 +22,7 @@ namespace AssetsManager.Services.Formatting
         private readonly AudioBankService _audioBankService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
-        private readonly BinParser _binParser;
-        private readonly BinPropertyParser _binPropertyParser;
+        private readonly BinJsonSerializer _binJsonSerializer;
         private readonly TroybinParser _troybinParser;
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
@@ -37,8 +36,7 @@ namespace AssetsManager.Services.Formatting
             AudioBankService audioBankService, 
             WadContentProvider wadContentProvider, 
             JsonFormatterService jsonFormatterService,
-            BinParser binParser,
-            BinPropertyParser binPropertyParser,
+            BinJsonSerializer binJsonSerializer,
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
@@ -51,8 +49,7 @@ namespace AssetsManager.Services.Formatting
             _audioBankService = audioBankService;
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
-            _binParser = binParser;
-            _binPropertyParser = binPropertyParser;
+            _binJsonSerializer = binJsonSerializer;
             _troybinParser = troybinParser;
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
@@ -72,7 +69,7 @@ namespace AssetsManager.Services.Formatting
                 List<AudioEventNode> result;
                 if (linkedBank.BinData != null)
                 {
-                    result = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsBnkData, linkedBank.BinData, linkedBank.BaseName, linkedBank.BinType);
+                    result = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsBnkData, linkedBank.BinData, linkedBank.BaseName);
                 }
                 else
                 {
@@ -157,7 +154,7 @@ namespace AssetsManager.Services.Formatting
         }
 
         public Task<(string OldJson, string NewJson)> GetBinDiffJsonAsync(byte[] oldData, byte[] newData) =>
-            _binPropertyParser.WriteBinDiffAsJsonAsync(oldData, newData);
+            _binJsonSerializer.WriteBinDiffAsJsonAsync(oldData, newData);
 
         private async Task<string> GetBnkJsonStringAsync(byte[] data)
         {
@@ -191,8 +188,7 @@ namespace AssetsManager.Services.Formatting
                 using var jsonStream = new MemoryStream();
                 using (var binStream = new MemoryStream(data))
                 {
-                    // Llamar al orquestador BinParser
-                    await _binParser.WriteBinTreeAsJsonAsync(jsonStream, binStream);
+                    await _binJsonSerializer.WriteBinTreeAsJsonStreamingAsync(jsonStream, binStream);
                 } 
                 
                 jsonStream.Position = 0;

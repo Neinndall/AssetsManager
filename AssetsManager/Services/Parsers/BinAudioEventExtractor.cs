@@ -1,30 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
-using System.Threading.Tasks;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
-using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
-using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Services.Parsers
 {
-    public class BinParser
+    public sealed class BinAudioEventExtractor
     {
-        private readonly HashResolverService _hashResolver;
-        private readonly BinPropertyParser _propertyParser;
-
-        public BinParser(HashResolverService hashResolver, BinPropertyParser propertyParser)
-        {
-            _hashResolver = hashResolver;
-            _propertyParser = propertyParser;
-        }
-
-        #region Get Events (Audio)
-
-        public Dictionary<uint, string> GetEventsFromBin(byte[] binData, string bankName, BinType binType, LogService logService)
+        public Dictionary<uint, string> Extract(byte[] binData, string bankName, LogService logService)
         {
             var mapEventNames = new Dictionary<uint, string>();
             if (binData == null || binData.Length == 0) return mapEventNames;
@@ -78,7 +63,7 @@ namespace AssetsManager.Services.Parsers
             }
             catch (Exception ex)
             {
-                logService.LogError(ex, "[AUDIO] Crash during BinTree processing in BinParser.");
+                logService.LogError(ex, "[AUDIO] Failed to extract events from BIN metadata.");
             }
             return mapEventNames;
         }
@@ -90,7 +75,7 @@ namespace AssetsManager.Services.Parsers
             {
                 case BinPropertyType.String:
                     var str = ((BinTreeString)prop).Value;
-                    if (!string.IsNullOrEmpty(str)) map[Fnv1Hash(str)] = str;
+                    if (!string.IsNullOrEmpty(str)) map[ComputeWwiseEventHash(str)] = str;
                     break;
                 case BinPropertyType.Container:
                 case BinPropertyType.UnorderedContainer:
@@ -109,7 +94,7 @@ namespace AssetsManager.Services.Parsers
             }
         }
 
-        private static uint Fnv1Hash(string input)
+        private static uint ComputeWwiseEventHash(string input)
         {
             const uint offsetBasis = 2166136261;
             const uint prime = 16777619;
@@ -124,15 +109,5 @@ namespace AssetsManager.Services.Parsers
             return hash;
         }
 
-        #endregion
-
-        #region JSON Serialization
-
-        public Task WriteBinTreeAsJsonAsync(Stream outputStream, Stream binStream)
-        {
-            return _propertyParser.WriteBinTreeAsJsonStreamingAsync(outputStream, binStream);
-        }
-
-        #endregion
     }
 }

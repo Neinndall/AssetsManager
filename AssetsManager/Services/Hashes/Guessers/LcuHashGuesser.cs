@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Hashing;
 
@@ -229,7 +230,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             string[] wordList = (words ?? BuildWordlist())
                 .Where(word => !string.IsNullOrWhiteSpace(word))
-                .Select(HashGuessEngine.NormalizePath)
+                .Select(PathUtils.NormalizePath)
                 .Where(word => word.Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 // Short, composable terms produce useful v1 names early (for example augment + list),
@@ -267,7 +268,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string defaultPath = $"{v1Prefix}default/v1/{fileName}";
                 cancellationToken.ThrowIfCancellationRequested();
                 bool resolvedDefault = Check(engine, defaultPath, HashGuessStrategy.LcuPattern, source);
-                bool hasDefaultEvidence = resolvedDefault || knownHashes.ContainsKey(XxHash64Ext.Hash(defaultPath));
+                bool hasDefaultEvidence = resolvedDefault ||
+                    knownHashes.ContainsKey(XxHash64Ext.Hash(PathUtils.NormalizePath(defaultPath)));
                 if (checkedCandidates != int.MaxValue) checkedCandidates++;
                 Report(phase);
                 if (engine.RemainingUnknownCount == 0) return false;
