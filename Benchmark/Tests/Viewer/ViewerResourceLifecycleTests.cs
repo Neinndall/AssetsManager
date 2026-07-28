@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using System.Windows.Media.Media3D;
+using AssetsManager.Services.Viewer;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Viewer;
@@ -80,7 +81,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             int expectedWidth,
             int expectedHeight)
         {
-            (int width, int height) = ViewerViewportControl.CalculateUhdSnapshotSize(
+            (int width, int height) = OpenGlSnapshotService.CalculateUhdSize(
                 sourceWidth,
                 sourceHeight);
 

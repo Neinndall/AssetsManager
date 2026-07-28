@@ -23,7 +23,7 @@ New Features
 
 Improvements
   - Viewer now measures FPS from completed OpenTK render callbacks and applies its optional 60 FPS limit directly in the OpenGL render flow.
-  - Viewer keeps high-definition scene capture exclusively in Studio and now renders genuine aspect-preserving UHD output through an independent OpenGL framebuffer.
+  - Viewer keeps high-definition scene capture exclusively in Studio and delegates genuine aspect-preserving UHD framebuffer output to a dedicated OpenGL snapshot service.
   - Viewer viewport, camera, and toolbar-toggle controls now use a more compact layout with smaller icons.
   - Viewer scene ownership now centralizes part attachment, visual synchronization, visibility, and removal through SceneModel and ModelPart.
   - Viewer MapGeometry now composes masked four-layer terrain materials with their authored world-space tiling and RGB blend parameters.

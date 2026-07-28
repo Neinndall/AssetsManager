@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.IO;
 using System.Linq;
 using System.ComponentModel;
@@ -31,6 +30,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private GlMeshRenderer _meshRenderer;
         private GlVfxRenderer _vfxRenderer;
         private GridRenderer _gridRenderer;
+        private readonly OpenGlSnapshotService _snapshotService = new();
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
 
@@ -237,9 +237,8 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _framesSinceFpsUpdate;
         private TimeSpan _lastRenderedAt;
         private TimeSpan _nextLimitedFrame;
-        private string _pendingSnapshotPath;
-        private int _pendingSnapshotWidth;
-        private int _pendingSnapshotHeight;
+        private sealed record SnapshotRequest(string FilePath, int Width, int Height);
+        private SnapshotRequest _pendingSnapshot;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
@@ -456,9 +455,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _isCleanedUp = true;
             try
             {
-                _pendingSnapshotPath = null;
-                _pendingSnapshotWidth = 0;
-                _pendingSnapshotHeight = 0;
+                _pendingSnapshot = null;
 
                 // 1. Desuscribir eventos
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
@@ -1128,145 +1125,28 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        internal static (int Width, int Height) CalculateUhdSnapshotSize(int sourceWidth, int sourceHeight)
-        {
-            if (sourceWidth <= 0 || sourceHeight <= 0)
-                throw new ArgumentOutOfRangeException(nameof(sourceWidth), "Snapshot source dimensions must be positive.");
-
-            const int maxWidth = 3840;
-            const int maxHeight = 2160;
-            double scale = Math.Min((double)maxWidth / sourceWidth, (double)maxHeight / sourceHeight);
-            return (
-                Math.Max(1, (int)Math.Round(sourceWidth * scale)),
-                Math.Max(1, (int)Math.Round(sourceHeight * scale)));
-        }
-
         private void ProcessPendingSnapshot()
         {
-            if (string.IsNullOrEmpty(_pendingSnapshotPath))
+            SnapshotRequest request = _pendingSnapshot;
+            if (request == null)
                 return;
 
-            string filePath = _pendingSnapshotPath;
-            int width = _pendingSnapshotWidth;
-            int height = _pendingSnapshotHeight;
-            _pendingSnapshotPath = null;
-            _pendingSnapshotWidth = 0;
-            _pendingSnapshotHeight = 0;
+            _pendingSnapshot = null;
 
             try
             {
-                BitmapSource snapshot = RenderSnapshotToBitmap(width, height);
-                _ = SaveSnapshotAsync(snapshot, filePath);
+                BitmapSource snapshot = _snapshotService.Capture(
+                    _gl,
+                    request.Width,
+                    request.Height,
+                    OpenTkControl.FrameBufferWidth,
+                    OpenTkControl.FrameBufferHeight,
+                    () => RenderScene(request.Width, request.Height, TimeSpan.Zero, updateVfx: false));
+                _ = SaveSnapshotAsync(snapshot, request.FilePath);
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, $"Failed to render high-definition snapshot to {filePath}");
-            }
-        }
-
-        private BitmapSource RenderSnapshotToBitmap(int width, int height)
-        {
-            ImageExportUtils.ValidateDimensions(width, height);
-
-            _gl.GetInteger(Silk.NET.OpenGL.GLEnum.FramebufferBinding, out int previousFramebuffer);
-            uint framebuffer = 0;
-            uint colorRenderbuffer = 0;
-            uint depthRenderbuffer = 0;
-
-            try
-            {
-                framebuffer = _gl.GenFramebuffer();
-                _gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, framebuffer);
-
-                colorRenderbuffer = _gl.GenRenderbuffer();
-                _gl.BindRenderbuffer(Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer, colorRenderbuffer);
-                _gl.RenderbufferStorage(
-                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
-                    Silk.NET.OpenGL.InternalFormat.Rgba8,
-                    (uint)width,
-                    (uint)height);
-                _gl.FramebufferRenderbuffer(
-                    Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
-                    Silk.NET.OpenGL.FramebufferAttachment.ColorAttachment0,
-                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
-                    colorRenderbuffer);
-
-                depthRenderbuffer = _gl.GenRenderbuffer();
-                _gl.BindRenderbuffer(Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer, depthRenderbuffer);
-                _gl.RenderbufferStorage(
-                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
-                    Silk.NET.OpenGL.InternalFormat.Depth24Stencil8,
-                    (uint)width,
-                    (uint)height);
-                _gl.FramebufferRenderbuffer(
-                    Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
-                    Silk.NET.OpenGL.FramebufferAttachment.DepthStencilAttachment,
-                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
-                    depthRenderbuffer);
-
-                Silk.NET.OpenGL.GLEnum status = _gl.CheckFramebufferStatus(Silk.NET.OpenGL.FramebufferTarget.Framebuffer);
-                if (status != Silk.NET.OpenGL.GLEnum.FramebufferComplete)
-                    throw new InvalidOperationException($"OpenGL snapshot framebuffer is incomplete: {status}.");
-
-                RenderScene(width, height, TimeSpan.Zero, updateVfx: false);
-
-                byte[] pixels = GC.AllocateUninitializedArray<byte>(checked(width * height * 4));
-                _gl.ReadPixels<byte>(
-                    0,
-                    0,
-                    (uint)width,
-                    (uint)height,
-                    Silk.NET.OpenGL.GLEnum.Bgra,
-                    Silk.NET.OpenGL.GLEnum.UnsignedByte,
-                    out pixels[0]);
-                FlipPixelRowsInPlace(pixels, width, height);
-
-                BitmapSource bitmap = BitmapSource.Create(
-                    width,
-                    height,
-                    96,
-                    96,
-                    PixelFormats.Bgra32,
-                    null,
-                    pixels,
-                    checked(width * 4));
-                bitmap.Freeze();
-                return bitmap;
-            }
-            finally
-            {
-                _gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
-                if (depthRenderbuffer != 0)
-                    _gl.DeleteRenderbuffer(depthRenderbuffer);
-                if (colorRenderbuffer != 0)
-                    _gl.DeleteRenderbuffer(colorRenderbuffer);
-                if (framebuffer != 0)
-                    _gl.DeleteFramebuffer(framebuffer);
-
-                int viewportWidth = Math.Max(1, OpenTkControl.FrameBufferWidth);
-                int viewportHeight = Math.Max(1, OpenTkControl.FrameBufferHeight);
-                _gl.Viewport(0, 0, (uint)viewportWidth, (uint)viewportHeight);
-            }
-        }
-
-        private static void FlipPixelRowsInPlace(byte[] pixels, int width, int height)
-        {
-            int stride = checked(width * 4);
-            byte[] rowBuffer = ArrayPool<byte>.Shared.Rent(stride);
-            try
-            {
-                for (int top = 0, bottom = height - 1; top < bottom; top++, bottom--)
-                {
-                    int topOffset = top * stride;
-                    int bottomOffset = bottom * stride;
-                    Buffer.BlockCopy(pixels, topOffset, rowBuffer, 0, stride);
-                    Buffer.BlockCopy(pixels, bottomOffset, pixels, topOffset, stride);
-                    Buffer.BlockCopy(rowBuffer, 0, pixels, bottomOffset, stride);
-                }
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(rowBuffer);
+                LogService.LogError(ex, $"Failed to render high-definition snapshot to {request.FilePath}");
             }
         }
 
@@ -1274,7 +1154,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             try
             {
-                await ImageExportUtils.SaveBitmapAsPngAsync(snapshot, filePath);
+                await _snapshotService.SaveAsync(snapshot, filePath);
                 LogService.LogInteractiveSuccess(
                     $"Snapshot saved ({snapshot.PixelWidth}x{snapshot.PixelHeight})",
                     filePath,
@@ -1323,13 +1203,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 string filePath = Path.GetExtension(saveFileDialog.FileName).Equals(".png", StringComparison.OrdinalIgnoreCase)
                     ? saveFileDialog.FileName
                     : Path.ChangeExtension(saveFileDialog.FileName, ".png");
-                (int width, int height) = CalculateUhdSnapshotSize(
+                (int width, int height) = OpenGlSnapshotService.CalculateUhdSize(
                     OpenTkControl.FrameBufferWidth,
                     OpenTkControl.FrameBufferHeight);
                 ImageExportUtils.ValidateDimensions(width, height);
-                _pendingSnapshotPath = filePath;
-                _pendingSnapshotWidth = width;
-                _pendingSnapshotHeight = height;
+                _pendingSnapshot = new SnapshotRequest(filePath, width, height);
             }
         }
 
