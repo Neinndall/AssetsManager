@@ -20,20 +20,14 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        private static readonly HashSet<string> GenericMaterialKeywords =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            { "body", "face", "head", "hair", "mask", "eyes", "leg" };
-
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
             var keys = textureKeys?.ToList() ?? new List<string>();
-            var colorKeys = keys
+            return keys
                 .Where(IsColorTextureCandidate)
                 .OrderByDescending(key => key.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
                 .ThenBy(key => key.Length)
                 .ToList();
-
-            return colorKeys.Count > 0 ? colorKeys : keys;
         }
 
         private static bool IsColorTextureCandidate(string textureKey)
@@ -68,53 +62,6 @@ namespace AssetsManager.Utils
                    padded.Contains("_albedo_") ||
                    padded.Contains("_basecolor_") ||
                    padded.Contains("_base_color_");
-        }
-
-        public static string FindBestTextureMatch(string materialName, string skinName, IEnumerable<string> availableTextureKeys, string defaultTextureKey, LogService logService)
-        {
-            var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
-            if (textureKeys.Count == 0)
-            {
-                logService?.LogDebug($"No textures available for material: '{materialName}'");
-                return null;
-            }
-
-            string exactMatch = textureKeys.FirstOrDefault(key => key.Equals(materialName, StringComparison.OrdinalIgnoreCase));
-            if (exactMatch != null)
-            {
-                logService?.LogDebug($"Found texture '{exactMatch}' via exact name match.");
-                return exactMatch;
-            }
-
-            string lowerMaterialName = materialName.ToLowerInvariant();
-            bool isGeneric = GenericMaterialKeywords.Contains(lowerMaterialName);
-            if (!isGeneric && lowerMaterialName.EndsWith("_mat") && lowerMaterialName.Length > 4)
-            {
-                string baseWord = lowerMaterialName.Substring(0, lowerMaterialName.Length - 4);
-                isGeneric = GenericMaterialKeywords.Contains(baseWord);
-            }
-
-            if (isGeneric)
-            {
-                string skinTxCm = $"{skinName}_tx_cm";
-                string genericMatch = textureKeys
-                    .FirstOrDefault(key => key.IndexOf(skinTxCm, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (genericMatch != null)
-                {
-                    logService?.LogDebug($"Found main texture '{genericMatch}' for generic material '{materialName}'.");
-                    return genericMatch;
-                }
-            }
-
-            string propTexture = textureKeys.FirstOrDefault(key => key.Contains("_prop_tx_cm", StringComparison.OrdinalIgnoreCase));
-            if (propTexture != null)
-            {
-                logService?.LogDebug($"Falling back to generic prop texture '{propTexture}' for material '{materialName}'.");
-                return propTexture;
-            }
-
-            logService?.LogDebug($"No specific match found. Falling back to default: '{defaultTextureKey}'");
-            return defaultTextureKey;
         }
 
         public static BitmapSource ResolveTexture(Dictionary<string, BitmapSource> allTextures, string selectedTextureName)

@@ -22,6 +22,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer now assigns each model submesh from its exact skin BIN, including hash-named PBE metadata, without guessing loadscreen or mask textures.
   - Simplified BIN processing by separating readable JSON output from audio event extraction.
   - Viewer now measures FPS from completed OpenTK render callbacks and applies its optional 60 FPS limit directly in the OpenGL render flow.
   - Viewer keeps high-definition scene capture exclusively in Studio and delegates genuine aspect-preserving UHD framebuffer output to a dedicated OpenGL snapshot service.
