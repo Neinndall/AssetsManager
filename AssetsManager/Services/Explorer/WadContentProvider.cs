@@ -146,7 +146,8 @@ namespace AssetsManager.Services.Explorer
             cancellationToken.ThrowIfCancellationRequested();
             byte[] compressedData = await File.ReadAllBytesAsync(chunkPath, cancellationToken);
             WadChunkCompression compression = compressionType ?? WadChunkCompression.None;
-            if (compression == WadChunkCompression.ZstdChunked)
+            if (compression == WadChunkCompression.ZstdChunked
+                || (compression == WadChunkCompression.Zstd && !uncompressedSize.HasValue))
             {
                 return await Task.Run(
                     () =>

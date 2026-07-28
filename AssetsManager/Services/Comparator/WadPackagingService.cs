@@ -129,6 +129,10 @@ namespace AssetsManager.Services.Comparator
                             NewPath = dep.Path,
                             OldPathHash = dep.OldPathHash, 
                             NewPathHash = dep.NewPathHash, 
+                            OldUncompressedSize = dep.OldUncompressedSize,
+                            NewUncompressedSize = dep.NewUncompressedSize,
+                            OldCompressionType = dep.OldCompressionType ?? dep.CompressionType,
+                            NewCompressionType = dep.NewCompressionType ?? dep.CompressionType,
                             SourceWadFile = dep.SourceWad, 
                             Type = ChunkDiffType.Modified 
                         });
@@ -219,33 +223,49 @@ namespace AssetsManager.Services.Comparator
             foreach (var wadGroup in requests.GroupBy(request => request.WadRelativePath, StringComparer.OrdinalIgnoreCase))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                string wadVirtualPath = PathUtils.ResolveWadPath(newPbePath, wadGroup.Key);
-                if (!File.Exists(wadVirtualPath))
-                {
-                    wadVirtualPath = PathUtils.ResolveWadPath(oldPbePath, wadGroup.Key);
-                }
+                string oldWadPath = PathUtils.ResolveWadPath(oldPbePath, wadGroup.Key);
+                string newWadPath = PathUtils.ResolveWadPath(newPbePath, wadGroup.Key);
+                using var oldWad = File.Exists(oldWadPath) ? new WadFile(oldWadPath) : null;
+                using var newWad = File.Exists(newWadPath) ? new WadFile(newWadPath) : null;
+                if (oldWad == null && newWad == null) continue;
 
-                if (!File.Exists(wadVirtualPath)) continue;
-
-                using var wad = new WadFile(wadVirtualPath);
                 foreach (var request in wadGroup)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (wad.Chunks.TryGetValue(request.FileHash, out var chunk))
+                    ulong oldHash = request.OriginalDiff?.OldPathHash ?? request.FileHash;
+                    ulong newHash = request.OriginalDiff?.NewPathHash ?? request.FileHash;
+
+                    WadChunk? oldChunk = TryGetChunk(oldWad, oldHash);
+                    WadChunk? newChunk = TryGetChunk(newWad, newHash);
+                    if (oldChunk.HasValue || newChunk.HasValue)
                     {
+                        WadChunkCompression fallbackCompression =
+                            newChunk?.Compression ?? oldChunk?.Compression ?? WadChunkCompression.None;
+
                         request.Dependency = new AssociatedDependency
                         {
                             Path = request.FilePath,
                             SourceWad = request.SourceWad,
-                            OldPathHash = request.FileHash,
-                            NewPathHash = request.FileHash,
-                            CompressionType = chunk.Compression,
+                            OldPathHash = oldChunk.HasValue ? oldHash : 0,
+                            NewPathHash = newChunk.HasValue ? newHash : 0,
+                            OldUncompressedSize = oldChunk.HasValue ? (ulong)oldChunk.Value.UncompressedSize : null,
+                            NewUncompressedSize = newChunk.HasValue ? (ulong)newChunk.Value.UncompressedSize : null,
+                            OldCompressionType = oldChunk?.Compression,
+                            NewCompressionType = newChunk?.Compression,
+                            CompressionType = fallbackCompression,
                             Type = request.OriginalDiff?.Type ?? ChunkDiffType.Dependency,
                             WasTopLevelDiff = true
                         };
                     }
                 }
             }
+        }
+
+        private static WadChunk? TryGetChunk(WadFile wad, ulong hash)
+        {
+            return wad != null && hash != 0 && wad.Chunks.TryGetValue(hash, out var chunk)
+                ? chunk
+                : null;
         }
 
         private async Task SaveChunksFromWadAsync(string sourceWadPath, string targetChunkPath, IEnumerable<SerializableChunkDiff> chunkDiffs, string wadRelativePath, bool useOld, CancellationToken cancellationToken)

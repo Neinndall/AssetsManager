@@ -225,6 +225,53 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
         }
 
         [Fact]
+        public async Task BackupChunkReadingLoadsLegacyZstdPayloadWithoutSizeMetadata()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            const string sourceWad = "champions/test.wad.client";
+            const string virtualPath = "assets/test/events.bnk";
+            byte[] expected = Encoding.UTF8.GetBytes(new string('e', 16384));
+            string wadPath = Path.Combine(directory, "source.wad");
+
+            try
+            {
+                Directory.CreateDirectory(directory);
+                WadBuilder.Bake(
+                    new[] { new WadBakeEntry(virtualPath, () => new MemoryStream(expected), WadChunkCompression.Zstd) },
+                    wadPath,
+                    new WadBakeSettings());
+
+                ulong hash = LeagueToolkit.Hashing.XxHash64Ext.Hash(virtualPath);
+                using var wad = new WadFile(wadPath);
+                WadChunk chunk = wad.Chunks[hash];
+                byte[] stored = new byte[chunk.CompressedSize];
+                using (var stream = File.OpenRead(wadPath))
+                {
+                    stream.Position = chunk.DataOffset;
+                    await stream.ReadExactlyAsync(stored);
+                }
+
+                string chunkDirectory = Path.Combine(directory, "wad_chunks", "new", sourceWad);
+                Directory.CreateDirectory(chunkDirectory);
+                await File.WriteAllBytesAsync(Path.Combine(chunkDirectory, $"{hash:X16}.chunk"), stored);
+
+                var provider = CreateProvider();
+                byte[] actual = await provider.GetBackupChunkBytesAsync(
+                    directory,
+                    sourceWad,
+                    hash,
+                    WadChunkCompression.Zstd,
+                    isOld: false);
+
+                Assert.Equal(expected, actual);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public async Task LiveZstdChunkUsesWadMetadataForDecompression()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));

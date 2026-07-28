@@ -131,8 +131,10 @@ namespace AssetsManager.Services.Explorer
                                         SourceWadFile = dep.SourceWad,
                                         OldPathHash = dep.OldPathHash,
                                         NewPathHash = dep.NewPathHash,
-                                        OldCompressionType = dep.CompressionType,
-                                        NewCompressionType = dep.CompressionType,
+                                        OldCompressionType = dep.OldCompressionType ?? dep.CompressionType,
+                                        NewCompressionType = dep.NewCompressionType ?? dep.CompressionType,
+                                        OldUncompressedSize = dep.OldUncompressedSize,
+                                        NewUncompressedSize = dep.NewUncompressedSize,
                                         BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = depType, SourceWadFile = dep.SourceWad })
                                     };
                                     depNode.BackupChunkPath = depNode.ChunkDiff.BackupChunkPath;
@@ -181,8 +183,10 @@ namespace AssetsManager.Services.Explorer
                                             SourceWadFile = dep.SourceWad,
                                             OldPathHash = dep.OldPathHash,
                                             NewPathHash = dep.NewPathHash,
-                                            OldCompressionType = dep.CompressionType,
-                                            NewCompressionType = dep.CompressionType,
+                                            OldCompressionType = dep.OldCompressionType ?? dep.CompressionType,
+                                            NewCompressionType = dep.NewCompressionType ?? dep.CompressionType,
+                                            OldUncompressedSize = dep.OldUncompressedSize,
+                                            NewUncompressedSize = dep.NewUncompressedSize,
                                             BackupChunkPath = GetBackupChunkPath(backupRoot, new SerializableChunkDiff { OldPathHash = dep.OldPathHash, NewPathHash = dep.NewPathHash, Type = dep.Type.Value, SourceWadFile = dep.SourceWad })
                                         };
                                     }

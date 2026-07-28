@@ -531,11 +531,15 @@ namespace AssetsManager.Services.Audio
                 if (!depByPath.TryGetValue(dep.Path, out var assoc) || assoc == null) continue;
 
                 byte[] oldBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
-                    backupRoot, dep.SourceWad, assoc.OldPathHash, assoc.CompressionType,
-                    isOld: true);
+                    backupRoot, dep.SourceWad, assoc.OldPathHash,
+                    assoc.OldCompressionType ?? assoc.CompressionType,
+                    isOld: true,
+                    uncompressedSize: assoc.OldUncompressedSize);
                 byte[] newBytes = await _wadContentProvider.GetBackupChunkBytesAsync(
-                    backupRoot, dep.SourceWad, assoc.NewPathHash, assoc.CompressionType,
-                    isOld: false);
+                    backupRoot, dep.SourceWad, assoc.NewPathHash,
+                    assoc.NewCompressionType ?? assoc.CompressionType,
+                    isOld: false,
+                    uncompressedSize: assoc.NewUncompressedSize);
 
                 switch (dep.Type)
                 {

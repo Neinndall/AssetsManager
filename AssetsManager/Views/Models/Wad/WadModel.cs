@@ -40,6 +40,13 @@ namespace AssetsManager.Views.Models.Wad
         public string SourceWad { get; set; }
         public ulong OldPathHash { get; set; }
         public ulong NewPathHash { get; set; }
+        public ulong? OldUncompressedSize { get; set; }
+        public ulong? NewUncompressedSize { get; set; }
+        public WadChunkCompression? OldCompressionType { get; set; }
+        public WadChunkCompression? NewCompressionType { get; set; }
+
+        // Retained so comparison files created before per-side dependency
+        // metadata was introduced remain readable.
         public WadChunkCompression CompressionType { get; set; }
         public ChunkDiffType? Type { get; set; }
         public bool WasTopLevelDiff { get; set; }
