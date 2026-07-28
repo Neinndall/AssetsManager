@@ -114,6 +114,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer now renders Riot models that use submesh-relative vertex indices correctly.
   - Comparator now clears stale Base and Target data when the preferred game client or its directory changes.
   - Comparator now refreshes Quick Select and version metadata whenever the view is reopened after a game update.
   - Comparator Quick Select now shows only the preferred PBE or LIVE environment while preserving MAIN and backup entries.
