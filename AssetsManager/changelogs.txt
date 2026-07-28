@@ -23,7 +23,7 @@ New Features
 
 Improvements
   - Viewer now measures FPS from completed OpenTK render callbacks and applies its optional 60 FPS limit directly in the OpenGL render flow.
-  - Viewer keeps high-definition scene capture exclusively in Studio and presents a simpler viewport toolbar.
+  - Viewer keeps high-definition scene capture exclusively in Studio and now renders genuine aspect-preserving UHD output through an independent OpenGL framebuffer.
   - Viewer viewport, camera, and toolbar-toggle controls now use a more compact layout with smaller icons.
   - Viewer scene ownership now centralizes part attachment, visual synchronization, visibility, and removal through SceneModel and ModelPart.
   - Viewer MapGeometry now composes masked four-layer terrain materials with their authored world-space tiling and RGB blend parameters.
@@ -114,7 +114,7 @@ Improvements
 
 Bug Fixes
   - Viewer maximize mode now spans the viewport across the full main-content width instead of leaving the hidden inspector column reserved.
-  - Viewer Studio snapshots now capture the visible OpenGL viewport instead of the zero-sized legacy camera host.
+  - Viewer Studio snapshots no longer capture the zero-sized legacy camera host or upscale the visible viewport framebuffer.
   - Viewer MapGeometry now resolves Jade textures without false missing warnings, filename collisions, or camera-dependent texture tiling artifacts.
   - Viewer MapGeometry now selects loaded maps in the inspector and keeps large scenes inside the visible camera range.
   - Viewer MapGeometry now opens without the studio grid covering the map.

@@ -1,7 +1,9 @@
 using System;
+using System.Buffers;
 using System.IO;
 using System.Linq;
 using System.ComponentModel;
+using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -119,6 +121,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _lastRenderedAt = renderTime;
             UpdateScene(frameDelta);
+            RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
+            RecordRenderedFrame();
+            ProcessPendingSnapshot();
+        }
+
+        private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
+        {
             _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
 
             // Clear color based on transparent background setting
@@ -215,11 +224,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
                 _vfxRenderer.SetAttachedMeshSource(_activeSceneModel);
                 _vfxRenderer.SetViewportSize(framebufferWidth, framebufferHeight);
-                _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));
+                if (updateVfx)
+                    _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));
                 _vfxRenderer.Render(viewProj, view);
             }
-
-            RecordRenderedFrame();
         }
 
         private CustomCameraController _cameraController;
@@ -229,6 +237,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private int _framesSinceFpsUpdate;
         private TimeSpan _lastRenderedAt;
         private TimeSpan _nextLimitedFrame;
+        private string _pendingSnapshotPath;
+        private int _pendingSnapshotWidth;
+        private int _pendingSnapshotHeight;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
@@ -445,6 +456,10 @@ namespace AssetsManager.Views.Controls.Viewer
             _isCleanedUp = true;
             try
             {
+                _pendingSnapshotPath = null;
+                _pendingSnapshotWidth = 0;
+                _pendingSnapshotHeight = 0;
+
                 // 1. Desuscribir eventos
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
 
@@ -1113,59 +1128,168 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void SaveHighDefinitionSnapshot(string filePath, int supersamplingFactor)
+        internal static (int Width, int Height) CalculateUhdSnapshotSize(int sourceWidth, int sourceHeight)
         {
-            string finalFilePath = filePath;
-            if (Path.GetExtension(finalFilePath).ToLower() != ".png")
-            {
-                finalFilePath = Path.ChangeExtension(finalFilePath, ".png");
-            }
+            if (sourceWidth <= 0 || sourceHeight <= 0)
+                throw new ArgumentOutOfRangeException(nameof(sourceWidth), "Snapshot source dimensions must be positive.");
+
+            const int maxWidth = 3840;
+            const int maxHeight = 2160;
+            double scale = Math.Min((double)maxWidth / sourceWidth, (double)maxHeight / sourceHeight);
+            return (
+                Math.Max(1, (int)Math.Round(sourceWidth * scale)),
+                Math.Max(1, (int)Math.Round(sourceHeight * scale)));
+        }
+
+        private void ProcessPendingSnapshot()
+        {
+            if (string.IsNullOrEmpty(_pendingSnapshotPath))
+                return;
+
+            string filePath = _pendingSnapshotPath;
+            int width = _pendingSnapshotWidth;
+            int height = _pendingSnapshotHeight;
+            _pendingSnapshotPath = null;
+            _pendingSnapshotWidth = 0;
+            _pendingSnapshotHeight = 0;
 
             try
             {
-                if (!TryGetSnapshotSize(out int baseWidth, out int baseHeight))
-                {
-                    LogService.LogWarning("The OpenGL viewport is not ready for high-definition capture.");
-                    return;
-                }
-
-                int outputWidth = checked(baseWidth * supersamplingFactor);
-                int outputHeight = checked(baseHeight * supersamplingFactor);
-                ImageExportUtils.ValidateDimensions(outputWidth, outputHeight);
-                var rtb = new RenderTargetBitmap(outputWidth, outputHeight, 96, 96, PixelFormats.Pbgra32);
-                var drawing = new DrawingVisual();
-                using (var context = drawing.RenderOpen())
-                {
-                    context.PushTransform(new ScaleTransform(supersamplingFactor, supersamplingFactor));
-                    context.DrawRectangle(
-                        new VisualBrush(OpenTkControl) { Stretch = Stretch.Fill },
-                        null,
-                        new Rect(0, 0, baseWidth, baseHeight));
-                    context.Pop();
-                }
-                rtb.Render(drawing);
-
-                var pngEncoder = new PngBitmapEncoder();
-                pngEncoder.Interlace = PngInterlaceOption.Off;
-                pngEncoder.Frames.Add(BitmapFrame.Create(rtb));
-
-                using (var stream = File.Create(finalFilePath))
-                {
-                    pngEncoder.Save(stream);
-                }
-
-                LogService.LogInteractiveSuccess($"Snapshot saved ({baseWidth * supersamplingFactor}x{baseHeight * supersamplingFactor})", finalFilePath, Path.GetFileName(finalFilePath));
+                BitmapSource snapshot = RenderSnapshotToBitmap(width, height);
+                _ = SaveSnapshotAsync(snapshot, filePath);
             }
             catch (Exception ex)
             {
-                LogService.LogError(ex, $"Failed to save screenshot to {finalFilePath}");
+                LogService.LogError(ex, $"Failed to render high-definition snapshot to {filePath}");
+            }
+        }
+
+        private BitmapSource RenderSnapshotToBitmap(int width, int height)
+        {
+            ImageExportUtils.ValidateDimensions(width, height);
+
+            _gl.GetInteger(Silk.NET.OpenGL.GLEnum.FramebufferBinding, out int previousFramebuffer);
+            uint framebuffer = 0;
+            uint colorRenderbuffer = 0;
+            uint depthRenderbuffer = 0;
+
+            try
+            {
+                framebuffer = _gl.GenFramebuffer();
+                _gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, framebuffer);
+
+                colorRenderbuffer = _gl.GenRenderbuffer();
+                _gl.BindRenderbuffer(Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer, colorRenderbuffer);
+                _gl.RenderbufferStorage(
+                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
+                    Silk.NET.OpenGL.InternalFormat.Rgba8,
+                    (uint)width,
+                    (uint)height);
+                _gl.FramebufferRenderbuffer(
+                    Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
+                    Silk.NET.OpenGL.FramebufferAttachment.ColorAttachment0,
+                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
+                    colorRenderbuffer);
+
+                depthRenderbuffer = _gl.GenRenderbuffer();
+                _gl.BindRenderbuffer(Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer, depthRenderbuffer);
+                _gl.RenderbufferStorage(
+                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
+                    Silk.NET.OpenGL.InternalFormat.Depth24Stencil8,
+                    (uint)width,
+                    (uint)height);
+                _gl.FramebufferRenderbuffer(
+                    Silk.NET.OpenGL.FramebufferTarget.Framebuffer,
+                    Silk.NET.OpenGL.FramebufferAttachment.DepthStencilAttachment,
+                    Silk.NET.OpenGL.RenderbufferTarget.Renderbuffer,
+                    depthRenderbuffer);
+
+                Silk.NET.OpenGL.GLEnum status = _gl.CheckFramebufferStatus(Silk.NET.OpenGL.FramebufferTarget.Framebuffer);
+                if (status != Silk.NET.OpenGL.GLEnum.FramebufferComplete)
+                    throw new InvalidOperationException($"OpenGL snapshot framebuffer is incomplete: {status}.");
+
+                RenderScene(width, height, TimeSpan.Zero, updateVfx: false);
+
+                byte[] pixels = GC.AllocateUninitializedArray<byte>(checked(width * height * 4));
+                _gl.ReadPixels<byte>(
+                    0,
+                    0,
+                    (uint)width,
+                    (uint)height,
+                    Silk.NET.OpenGL.GLEnum.Bgra,
+                    Silk.NET.OpenGL.GLEnum.UnsignedByte,
+                    out pixels[0]);
+                FlipPixelRowsInPlace(pixels, width, height);
+
+                BitmapSource bitmap = BitmapSource.Create(
+                    width,
+                    height,
+                    96,
+                    96,
+                    PixelFormats.Bgra32,
+                    null,
+                    pixels,
+                    checked(width * 4));
+                bitmap.Freeze();
+                return bitmap;
+            }
+            finally
+            {
+                _gl.BindFramebuffer(Silk.NET.OpenGL.FramebufferTarget.Framebuffer, (uint)previousFramebuffer);
+                if (depthRenderbuffer != 0)
+                    _gl.DeleteRenderbuffer(depthRenderbuffer);
+                if (colorRenderbuffer != 0)
+                    _gl.DeleteRenderbuffer(colorRenderbuffer);
+                if (framebuffer != 0)
+                    _gl.DeleteFramebuffer(framebuffer);
+
+                int viewportWidth = Math.Max(1, OpenTkControl.FrameBufferWidth);
+                int viewportHeight = Math.Max(1, OpenTkControl.FrameBufferHeight);
+                _gl.Viewport(0, 0, (uint)viewportWidth, (uint)viewportHeight);
+            }
+        }
+
+        private static void FlipPixelRowsInPlace(byte[] pixels, int width, int height)
+        {
+            int stride = checked(width * 4);
+            byte[] rowBuffer = ArrayPool<byte>.Shared.Rent(stride);
+            try
+            {
+                for (int top = 0, bottom = height - 1; top < bottom; top++, bottom--)
+                {
+                    int topOffset = top * stride;
+                    int bottomOffset = bottom * stride;
+                    Buffer.BlockCopy(pixels, topOffset, rowBuffer, 0, stride);
+                    Buffer.BlockCopy(pixels, bottomOffset, pixels, topOffset, stride);
+                    Buffer.BlockCopy(rowBuffer, 0, pixels, bottomOffset, stride);
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rowBuffer);
+            }
+        }
+
+        private async Task SaveSnapshotAsync(BitmapSource snapshot, string filePath)
+        {
+            try
+            {
+                await ImageExportUtils.SaveBitmapAsPngAsync(snapshot, filePath);
+                LogService.LogInteractiveSuccess(
+                    $"Snapshot saved ({snapshot.PixelWidth}x{snapshot.PixelHeight})",
+                    filePath,
+                    Path.GetFileName(filePath));
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to save high-definition snapshot to {filePath}");
             }
         }
 
         private bool TryGetSnapshotSize(out int width, out int height)
         {
-            width = (int)Math.Ceiling(OpenTkControl.ActualWidth);
-            height = (int)Math.Ceiling(OpenTkControl.ActualHeight);
+            width = OpenTkControl.FrameBufferWidth;
+            height = OpenTkControl.FrameBufferHeight;
             return OpenTkControl.IsVisible && width > 0 && height > 0;
         }
 
@@ -1196,7 +1320,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                SaveHighDefinitionSnapshot(saveFileDialog.FileName, 4);
+                string filePath = Path.GetExtension(saveFileDialog.FileName).Equals(".png", StringComparison.OrdinalIgnoreCase)
+                    ? saveFileDialog.FileName
+                    : Path.ChangeExtension(saveFileDialog.FileName, ".png");
+                (int width, int height) = CalculateUhdSnapshotSize(
+                    OpenTkControl.FrameBufferWidth,
+                    OpenTkControl.FrameBufferHeight);
+                ImageExportUtils.ValidateDimensions(width, height);
+                _pendingSnapshotPath = filePath;
+                _pendingSnapshotWidth = width;
+                _pendingSnapshotHeight = height;
             }
         }
 

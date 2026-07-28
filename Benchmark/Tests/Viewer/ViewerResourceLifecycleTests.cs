@@ -70,6 +70,24 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.True(farPlane > 90000f);
         }
 
+        [Theory]
+        [InlineData(1920, 1080, 3840, 2160)]
+        [InlineData(800, 600, 2880, 2160)]
+        [InlineData(3440, 1440, 3840, 1607)]
+        public void UhdSnapshotPreservesViewportAspectRatio(
+            int sourceWidth,
+            int sourceHeight,
+            int expectedWidth,
+            int expectedHeight)
+        {
+            (int width, int height) = ViewerViewportControl.CalculateUhdSnapshotSize(
+                sourceWidth,
+                sourceHeight);
+
+            Assert.Equal(expectedWidth, width);
+            Assert.Equal(expectedHeight, height);
+        }
+
         [Fact]
         public void VfxStudioCameraPreservesItsRealDistanceToTheOrigin()
         {
