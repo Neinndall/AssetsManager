@@ -906,7 +906,7 @@ namespace AssetsManager.Views.Controls.Viewer
         // STUDIO HANDLERS
         private void SnapshotButton_Click(object sender, RoutedEventArgs e)
         {
-            Viewport?.InitiateSnapshot(4.0);
+            Viewport?.InitiateHighDefinitionSnapshot();
         }
 
         private void ResetStudio_Click(object sender, RoutedEventArgs e)

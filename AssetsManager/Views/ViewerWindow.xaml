@@ -165,6 +165,16 @@
 
                 <!-- Left section: Viewport (top) and Project Explorer (bottom) -->
                 <Grid Grid.Column="0" x:Name="LeftSectionGrid">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Grid.ColumnSpan" Value="1"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ViewModel.IsMaximized, ElementName=ViewportControl}" Value="True">
+                                    <Setter Property="Grid.ColumnSpan" Value="3"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>

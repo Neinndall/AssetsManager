@@ -22,6 +22,9 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer now measures FPS from completed OpenTK render callbacks and applies its optional 60 FPS limit directly in the OpenGL render flow.
+  - Viewer keeps high-definition scene capture exclusively in Studio and presents a simpler viewport toolbar.
+  - Viewer viewport, camera, and toolbar-toggle controls now use a more compact layout with smaller icons.
   - Viewer scene ownership now centralizes part attachment, visual synchronization, visibility, and removal through SceneModel and ModelPart.
   - Viewer MapGeometry now composes masked four-layer terrain materials with their authored world-space tiling and RGB blend parameters.
   - Viewer MapGeometry now reads material samplers, texture paths, wrapping, shaders, and color-only materials directly from materials.bin.
@@ -110,6 +113,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer maximize mode now spans the viewport across the full main-content width instead of leaving the hidden inspector column reserved.
+  - Viewer Studio snapshots now capture the visible OpenGL viewport instead of the zero-sized legacy camera host.
   - Viewer MapGeometry now resolves Jade textures without false missing warnings, filename collisions, or camera-dependent texture tiling artifacts.
   - Viewer MapGeometry now selects loaded maps in the inspector and keeps large scenes inside the visible camera range.
   - Viewer MapGeometry now opens without the studio grid covering the map.

@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
-using System.Diagnostics;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using System.Collections.Generic;
@@ -93,6 +92,34 @@ namespace AssetsManager.Views.Controls.Viewer
         private void OpenTkControl_Render(TimeSpan delta)
         {
             if (_gl == null || _meshRenderer == null) return;
+            int framebufferWidth = OpenTkControl.FrameBufferWidth;
+            int framebufferHeight = OpenTkControl.FrameBufferHeight;
+            if (framebufferWidth <= 0 || framebufferHeight <= 0) return;
+
+            TimeSpan renderTime = _renderStopwatch.Elapsed;
+            TimeSpan frameDelta = _lastRenderedAt == TimeSpan.Zero
+                ? delta
+                : renderTime - _lastRenderedAt;
+
+            if (_viewModel.LimitFps)
+            {
+                TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
+                if (_nextLimitedFrame != TimeSpan.Zero && renderTime < _nextLimitedFrame)
+                    return;
+
+                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero ||
+                                    renderTime - _nextLimitedFrame > targetFrameTime * 4
+                    ? renderTime + targetFrameTime
+                    : _nextLimitedFrame + targetFrameTime;
+            }
+            else
+            {
+                _nextLimitedFrame = TimeSpan.Zero;
+            }
+
+            _lastRenderedAt = renderTime;
+            UpdateScene(frameDelta);
+            _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
 
             // Clear color based on transparent background setting
             if (_viewModel.IsTransparentBg)
@@ -119,8 +146,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var view = Matrix4x4.CreateLookAt(eye, target, up);
 
             float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
-            float aspect = (float)(OpenTkControl.ActualWidth / OpenTkControl.ActualHeight);
-            if (float.IsNaN(aspect) || aspect <= 0) aspect = 1.0f;
+            float aspect = (float)framebufferWidth / framebufferHeight;
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
@@ -188,20 +214,21 @@ namespace AssetsManager.Views.Controls.Viewer
                         GlVfxRenderer.CreateSceneWorldTransform(_activeSceneModel));
                 }
                 _vfxRenderer.SetAttachedMeshSource(_activeSceneModel);
-                _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
-                _vfxRenderer.Update((float)delta.TotalSeconds);
+                _vfxRenderer.SetViewportSize(framebufferWidth, framebufferHeight);
+                _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));
                 _vfxRenderer.Render(viewProj, view);
             }
+
+            RecordRenderedFrame();
         }
 
         private CustomCameraController _cameraController;
         private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
-        private readonly System.Diagnostics.Stopwatch _frameStopwatch = new();
+        private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
         private int _framesSinceFpsUpdate;
-        private bool _renderPulse;
+        private TimeSpan _lastRenderedAt;
         private TimeSpan _nextLimitedFrame;
-        private DateTime _lastFrameTime;
 
         private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
 
@@ -245,10 +272,13 @@ namespace AssetsManager.Views.Controls.Viewer
             switch (e.PropertyName)
             {
                 case nameof(ViewerViewportModel.LimitFps):
-                    _nextLimitedFrame = TimeSpan.Zero;
-                    _frameStopwatch.Restart();
+                    ResetRenderTiming();
+                    break;
+                case nameof(ViewerViewportModel.IsFpsVisible):
                     _fpsStopwatch.Restart();
                     _framesSinceFpsUpdate = 0;
+                    if (!_viewModel.IsFpsVisible)
+                        _viewModel.DisplayFps = "0";
                     break;
                 case nameof(ViewerViewportModel.IsAutoRotateActive):
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
@@ -285,11 +315,7 @@ namespace AssetsManager.Views.Controls.Viewer
             };
             OpenTkControl.Start(settings);
 
-            // Self-healing subscription to the rendering loop
-            CompositionTarget.Rendering -= CompositionTarget_Rendering;
-            CompositionTarget.Rendering += CompositionTarget_Rendering;
-            _lastFrameTime = DateTime.Now;
-            _frameStopwatch.Restart();
+            ResetRenderTiming();
             _fpsStopwatch.Restart();
         }
 
@@ -420,7 +446,6 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 // 1. Desuscribir eventos
-                CompositionTarget.Rendering -= CompositionTarget_Rendering;
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
 
                 // 2. Limpiar escena y animaciones
@@ -489,9 +514,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _activeSceneModel.AnimationTime = 0;
                 _activeSceneModel.IsAnimationPaused = false;
             }
-
-            _lastFrameTime = DateTime.Now;
-            _frameStopwatch.Restart();
 
             Panel?.SetAnimationPlayingState(animationModel, true);
         }
@@ -728,43 +750,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SeekVfx(TimeSpan time) => _vfxRenderer?.Seek(time.TotalSeconds);
 
-        private void CompositionTarget_Rendering(object sender, System.EventArgs e)
+        private void UpdateScene(TimeSpan frameDelta)
         {
-            var renderingTime = e is RenderingEventArgs renderingArgs
-                ? renderingArgs.RenderingTime
-                : _fpsStopwatch.Elapsed;
-
-            if (_viewModel.LimitFps)
-            {
-                var targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
-                if (_nextLimitedFrame != TimeSpan.Zero && renderingTime < _nextLimitedFrame)
-                    return;
-
-                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero ||
-                                    renderingTime - _nextLimitedFrame > targetFrameTime * 4
-                    ? renderingTime + targetFrameTime
-                    : _nextLimitedFrame + targetFrameTime;
-            }
-            else
-            {
-                _nextLimitedFrame = TimeSpan.Zero;
-            }
-
-            var elapsed = _frameStopwatch.Elapsed.TotalSeconds;
-            _frameStopwatch.Restart();
-
-            _framesSinceFpsUpdate++;
-            if (_fpsStopwatch.Elapsed.TotalSeconds >= 1.0)
-            {
-                var fps = _framesSinceFpsUpdate / _fpsStopwatch.Elapsed.TotalSeconds;
-                _viewModel.DisplayFps = Math.Round(fps).ToString("0");
-                _framesSinceFpsUpdate = 0;
-                _fpsStopwatch.Restart();
-            }
-
-            var now = DateTime.Now;
-            _lastFrameTime = now;
-            var deltaTime = elapsed;
+            double deltaTime = Math.Clamp(frameDelta.TotalSeconds, 0, 0.25);
 
             if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
@@ -787,7 +775,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     {
                         transformGroup.Children.Add(_autoRotation);
                     }
-                    double rotationSpeed = 30.0 * elapsed;
+                    double rotationSpeed = 30.0 * deltaTime;
                     ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = (((AxisAngleRotation3D)_autoRotation.Rotation).Angle + rotationSpeed) % 360;
                 }
             }
@@ -873,15 +861,29 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
             }
 
-            // WPF renders static 3D scenes on demand. While FPS measurement is
-            // visible, request continuous real frames without a visible camera change.
-            if (_viewModel.IsFpsVisible && Viewport3D.IsVisible &&
-                Viewport3D.Camera is PerspectiveCamera camera)
-            {
-                _renderPulse = !_renderPulse;
-                camera.NearPlaneDistance = _renderPulse ? 0.1 : 0.100001;
-            }
+        }
 
+        private void ResetRenderTiming()
+        {
+            _lastRenderedAt = TimeSpan.Zero;
+            _nextLimitedFrame = TimeSpan.Zero;
+            _renderStopwatch.Restart();
+        }
+
+        private void RecordRenderedFrame()
+        {
+            if (!_viewModel.IsFpsVisible)
+                return;
+
+            _framesSinceFpsUpdate++;
+            double elapsedSeconds = _fpsStopwatch.Elapsed.TotalSeconds;
+            if (elapsedSeconds < 1.0)
+                return;
+
+            double fps = _framesSinceFpsUpdate / elapsedSeconds;
+            _viewModel.DisplayFps = Math.Round(fps).ToString("0");
+            _framesSinceFpsUpdate = 0;
+            _fpsStopwatch.Restart();
         }
 
         private AnimationPlayer GetPlayerForModel(SceneModel model)
@@ -1111,7 +1113,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void TakeScreenshot(string filePath, double scaleFactor = 1.0)
+        private void SaveHighDefinitionSnapshot(string filePath, int supersamplingFactor)
         {
             string finalFilePath = filePath;
             if (Path.GetExtension(finalFilePath).ToLower() != ".png")
@@ -1121,24 +1123,24 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
-                int baseWidth = (int)Viewport3D.ActualWidth;
-                int baseHeight = (int)Viewport3D.ActualHeight;
-                int supersamplingFactor = (int)Math.Max(1, scaleFactor);
-
-                if (baseWidth <= 0 || baseHeight <= 0)
+                if (!TryGetSnapshotSize(out int baseWidth, out int baseHeight))
                 {
-                    LogService.LogWarning("Cannot take a screenshot of a zero-sized viewport.");
+                    LogService.LogWarning("The OpenGL viewport is not ready for high-definition capture.");
                     return;
                 }
 
-                int outputWidth = baseWidth * supersamplingFactor;
-                int outputHeight = baseHeight * supersamplingFactor;
+                int outputWidth = checked(baseWidth * supersamplingFactor);
+                int outputHeight = checked(baseHeight * supersamplingFactor);
+                ImageExportUtils.ValidateDimensions(outputWidth, outputHeight);
                 var rtb = new RenderTargetBitmap(outputWidth, outputHeight, 96, 96, PixelFormats.Pbgra32);
                 var drawing = new DrawingVisual();
                 using (var context = drawing.RenderOpen())
                 {
                     context.PushTransform(new ScaleTransform(supersamplingFactor, supersamplingFactor));
-                    context.DrawRectangle(new VisualBrush(Viewport3D), null, new Rect(0, 0, baseWidth, baseHeight));
+                    context.DrawRectangle(
+                        new VisualBrush(OpenTkControl) { Stretch = Stretch.Fill },
+                        null,
+                        new Rect(0, 0, baseWidth, baseHeight));
                     context.Pop();
                 }
                 rtb.Render(drawing);
@@ -1160,8 +1162,21 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void InitiateSnapshot(double scaleFactor = 1.0)
+        private bool TryGetSnapshotSize(out int width, out int height)
         {
+            width = (int)Math.Ceiling(OpenTkControl.ActualWidth);
+            height = (int)Math.Ceiling(OpenTkControl.ActualHeight);
+            return OpenTkControl.IsVisible && width > 0 && height > 0;
+        }
+
+        public void InitiateHighDefinitionSnapshot()
+        {
+            if (!TryGetSnapshotSize(out _, out _))
+            {
+                LogService.LogWarning("The OpenGL viewport is not ready for high-definition capture.");
+                return;
+            }
+
             if (_activeSceneModel == null || string.IsNullOrEmpty(_activeSceneModel.Name))
             {
                 LogService.LogWarning("No model loaded to name the screenshot automatically. Using default name.");
@@ -1174,14 +1189,14 @@ namespace AssetsManager.Views.Controls.Viewer
             var saveFileDialog = new CommonSaveFileDialog
             {
                 Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = scaleFactor > 1.5 ? "Save 4K Snapshot" : "Save Screenshot",
+                Title = "Save 4K Snapshot",
                 DefaultExtension = ".png",
                 DefaultFileName = defaultFileName
             };
 
             if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                TakeScreenshot(saveFileDialog.FileName, scaleFactor);
+                SaveHighDefinitionSnapshot(saveFileDialog.FileName, 4);
             }
         }
 
@@ -1292,11 +1307,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 ResetCamera();
             }
-        }
-
-        private void ScreenshotButton_Click(object sender, RoutedEventArgs e)
-        {
-            InitiateSnapshot(1.0);
         }
 
         private void HandleAutoRotateChanged(bool isAutoRotating)
