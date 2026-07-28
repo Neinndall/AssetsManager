@@ -53,6 +53,7 @@ namespace AssetsManager.Views
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
+        private ComparatorWindow _comparatorWindow;
 
         private string _latestAppVersionAvailable;
         
@@ -427,7 +428,11 @@ namespace AssetsManager.Views
         }
 
         private void LoadExplorerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ExplorerWindow>();
-        private void LoadComparatorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ComparatorWindow>();
+        private void LoadComparatorWindow()
+        {
+            _comparatorWindow ??= _serviceProvider.GetRequiredService<ComparatorWindow>();
+            MainContentArea.Content = _comparatorWindow;
+        }
         private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
         private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
         private void LoadHashGuessingWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<HashGuessingWindow>();

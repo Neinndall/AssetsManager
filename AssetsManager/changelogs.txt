@@ -114,6 +114,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Preserved Comparator selections and path fields when navigating between main views.
   - Restored resolved audio event names in archived comparisons by preserving dependency decompression metadata and supporting legacy Zstd chunks.
   - Preserved PTCH data overrides in BIN previews and comparisons.
   - Fixed WAD path normalization and BIN name resolution across class, property, entry, and value domains.

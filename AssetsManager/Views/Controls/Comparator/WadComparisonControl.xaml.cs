@@ -25,6 +25,7 @@ namespace AssetsManager.Views.Controls.Comparator
         public VersionService VersionService { get; set; }
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
+        private Task _initializationTask;
 
         public WadComparisonControl()
         {
@@ -41,8 +42,9 @@ namespace AssetsManager.Views.Controls.Comparator
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
-            await LoadBackupsAsync();
-            await InitializeDefaultPathsAsync();
+
+            _initializationTask ??= InitializeAsync();
+            await _initializationTask;
         }
 
         private void WadComparisonControl_Unloaded(object sender, RoutedEventArgs e)
@@ -51,12 +53,28 @@ namespace AssetsManager.Views.Controls.Comparator
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
+        }
 
-            // Clear heavy data from memory when not in use
-            if (ViewModel != null)
+        private async Task InitializeAsync()
+        {
+            string defaultPath = GetPreferredInitialDirectory();
+            Task targetMetadataTask = Task.CompletedTask;
+
+            // Publish the configured target path before scanning backups so
+            // the read-only field is populated during the first render.
+            if (!string.IsNullOrEmpty(defaultPath))
             {
-                ViewModel.AvailableBackups.Clear();
+                SetPathWithSync(false, defaultPath);
+                targetMetadataTask = ViewModel.UpdateMetadataFromPathAsync(
+                    false,
+                    defaultPath,
+                    VersionService,
+                    BackupManager);
             }
+
+            await LoadBackupsAsync();
+            await targetMetadataTask;
+            await InitializeDefaultPathsAsync(defaultPath);
         }
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
@@ -85,10 +103,10 @@ namespace AssetsManager.Views.Controls.Comparator
             }
         }
 
-        private async Task InitializeDefaultPathsAsync()
+        private async Task InitializeDefaultPathsAsync(string defaultPath = null)
         {
             if (ViewModel == null || AppSettings == null || VersionService == null) return;
-            string defaultPath = GetPreferredInitialDirectory();
+            defaultPath ??= GetPreferredInitialDirectory();
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 SetPathWithSync(false, defaultPath);
@@ -127,7 +145,7 @@ namespace AssetsManager.Views.Controls.Comparator
             if (BackupManager == null || ViewModel == null) return;
             try
             {
-                var backups = await BackupManager.GetBackupsAsync();
+                var backups = await BackupManager.GetBackupsAsync(includeStorageMetrics: false);
                 ViewModel.AvailableBackups.Clear();
                 foreach (var backup in backups) { ViewModel.AvailableBackups.Add(backup); }
 

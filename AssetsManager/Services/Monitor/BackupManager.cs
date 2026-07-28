@@ -156,7 +156,9 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<List<BackupModel>> GetBackupsAsync(CancellationToken cancellationToken = default)
+        public async Task<List<BackupModel>> GetBackupsAsync(
+            CancellationToken cancellationToken = default,
+            bool includeStorageMetrics = true)
         {
             return await Task.Run(() =>
             {
@@ -179,7 +181,9 @@ namespace AssetsManager.Services.Monitor
                             string version = _versionService.GetGameVersionAsync(dir).GetAwaiter().GetResult();
                             if (version == null) continue;
                             var (isPbe, isMain) = GetPathIdentification(dir);
-                            DirectoryMetrics metrics = MeasureDirectory(dir, cancellationToken);
+                            DirectoryMetrics metrics = includeStorageMetrics
+                                ? MeasureDirectory(dir, cancellationToken)
+                                : default;
                             backups.Add(new BackupModel
                             {
                                 Name = Path.GetFileName(dir),
@@ -190,7 +194,9 @@ namespace AssetsManager.Services.Monitor
                                 IsMainClient = isMain,
                                 CreationDate = Directory.GetCreationTime(dir),
                                 Size = metrics.TotalBytes,
-                                SizeDisplay = FormatUtils.FormatSize(metrics.TotalBytes),
+                                SizeDisplay = includeStorageMetrics
+                                    ? FormatUtils.FormatSize(metrics.TotalBytes)
+                                    : null,
                                 IsSelected = false,
                                 IsCurrentSessionBackup = IsCurrentSessionBackup(dir)
                             });
