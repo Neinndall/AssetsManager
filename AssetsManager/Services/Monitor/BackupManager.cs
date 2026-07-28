@@ -158,7 +158,8 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<List<BackupModel>> GetBackupsAsync(
             CancellationToken cancellationToken = default,
-            bool includeStorageMetrics = true)
+            bool includeStorageMetrics = true,
+            BackupEnvironment environment = BackupEnvironment.All)
         {
             return await Task.Run(() =>
             {
@@ -207,8 +208,24 @@ namespace AssetsManager.Services.Monitor
                         _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
                     }
                 }
-                return backups.OrderByDescending(backup => backup.CreationDate).ToList();
+                return FilterByEnvironment(backups, environment)
+                    .OrderByDescending(backup => backup.CreationDate)
+                    .ToList();
             }, cancellationToken);
+        }
+
+        public static IEnumerable<BackupModel> FilterByEnvironment(
+            IEnumerable<BackupModel> backups,
+            BackupEnvironment environment)
+        {
+            if (backups == null) throw new ArgumentNullException(nameof(backups));
+
+            return environment switch
+            {
+                BackupEnvironment.Pbe => backups.Where(backup => backup.IsPbe),
+                BackupEnvironment.Live => backups.Where(backup => !backup.IsPbe),
+                _ => backups
+            };
         }
 
         public (bool IsPbe, bool IsMain) GetPathIdentification(string path)

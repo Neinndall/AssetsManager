@@ -161,9 +161,13 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             string filter = (EnvironmentFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ALL";
             string sort = (SortSelector?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "NEWEST";
-            IEnumerable<BackupModel> query = _loadedBackups;
-            if (filter == "PBE") query = query.Where(backup => backup.IsPbe);
-            if (filter == "LIVE") query = query.Where(backup => !backup.IsPbe);
+            BackupEnvironment environment = filter switch
+            {
+                "PBE" => BackupEnvironment.Pbe,
+                "LIVE" => BackupEnvironment.Live,
+                _ => BackupEnvironment.All
+            };
+            IEnumerable<BackupModel> query = BackupManager.FilterByEnvironment(_loadedBackups, environment);
             query = sort switch
             {
                 "OLDEST" => query.OrderBy(backup => backup.CreationDate),

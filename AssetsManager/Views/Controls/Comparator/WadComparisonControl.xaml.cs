@@ -145,7 +145,12 @@ namespace AssetsManager.Views.Controls.Comparator
             if (BackupManager == null || ViewModel == null) return;
             try
             {
-                var backups = await BackupManager.GetBackupsAsync(includeStorageMetrics: false);
+                BackupEnvironment environment = AppSettings?.PreferredClient == PreferredClient.LIVE
+                    ? BackupEnvironment.Live
+                    : BackupEnvironment.Pbe;
+                var backups = await BackupManager.GetBackupsAsync(
+                    includeStorageMetrics: false,
+                    environment: environment);
                 ViewModel.AvailableBackups.Clear();
                 foreach (var backup in backups) { ViewModel.AvailableBackups.Add(backup); }
 

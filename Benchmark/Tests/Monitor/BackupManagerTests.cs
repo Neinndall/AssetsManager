@@ -1,9 +1,12 @@
+using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.BenchmarkTests.Infrastructure;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Monitor;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Monitor
@@ -49,6 +52,29 @@ namespace AssetsManager.BenchmarkTests.Monitor
             Assert.Equal("12345", await File.ReadAllTextAsync(Path.Combine(destinationPath, "root.dat")));
             Assert.Equal("1234567", await File.ReadAllTextAsync(Path.Combine(destinationPath, "Game", "game.dat")));
             Assert.False(File.Exists(Path.Combine(destinationPath, ".assetsmanager-backup.json")));
+        }
+
+        [Theory]
+        [InlineData(BackupEnvironment.Pbe, "pbe-main", "pbe-backup")]
+        [InlineData(BackupEnvironment.Live, "live-main", "live-backup")]
+        [InlineData(BackupEnvironment.All, "pbe-main", "pbe-backup", "live-main", "live-backup")]
+        public void EnvironmentFilterReturnsOnlyRequestedClients(
+            BackupEnvironment environment,
+            params string[] expectedPaths)
+        {
+            var backups = new[]
+            {
+                new BackupModel { Path = "pbe-main", IsPbe = true, IsMainClient = true },
+                new BackupModel { Path = "pbe-backup", IsPbe = true },
+                new BackupModel { Path = "live-main", IsPbe = false, IsMainClient = true },
+                new BackupModel { Path = "live-backup", IsPbe = false }
+            };
+
+            string[] actualPaths = BackupManager.FilterByEnvironment(backups, environment)
+                .Select(backup => backup.Path)
+                .ToArray();
+
+            Assert.Equal(expectedPaths, actualPaths);
         }
     }
 }
