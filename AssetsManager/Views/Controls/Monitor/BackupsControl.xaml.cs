@@ -161,13 +161,13 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             string filter = (EnvironmentFilter?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "ALL";
             string sort = (SortSelector?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "NEWEST";
-            BackupEnvironment environment = filter switch
+            PreferredClient? client = filter switch
             {
-                "PBE" => BackupEnvironment.Pbe,
-                "LIVE" => BackupEnvironment.Live,
-                _ => BackupEnvironment.All
+                "PBE" => PreferredClient.PBE,
+                "LIVE" => PreferredClient.LIVE,
+                _ => null
             };
-            IEnumerable<BackupModel> query = BackupManager.FilterByEnvironment(_loadedBackups, environment);
+            IEnumerable<BackupModel> query = BackupManager.FilterByClient(_loadedBackups, client);
             query = sort switch
             {
                 "OLDEST" => query.OrderBy(backup => backup.CreationDate),

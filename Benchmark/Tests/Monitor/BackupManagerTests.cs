@@ -7,6 +7,7 @@ using AssetsManager.BenchmarkTests.Infrastructure;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Monitor
@@ -55,11 +56,11 @@ namespace AssetsManager.BenchmarkTests.Monitor
         }
 
         [Theory]
-        [InlineData(BackupEnvironment.Pbe, "pbe-main", "pbe-backup")]
-        [InlineData(BackupEnvironment.Live, "live-main", "live-backup")]
-        [InlineData(BackupEnvironment.All, "pbe-main", "pbe-backup", "live-main", "live-backup")]
+        [InlineData(PreferredClient.PBE, "pbe-main", "pbe-backup")]
+        [InlineData(PreferredClient.LIVE, "live-main", "live-backup")]
+        [InlineData(null, "pbe-main", "pbe-backup", "live-main", "live-backup")]
         public void EnvironmentFilterReturnsOnlyRequestedClients(
-            BackupEnvironment environment,
+            PreferredClient? client,
             params string[] expectedPaths)
         {
             var backups = new[]
@@ -70,7 +71,7 @@ namespace AssetsManager.BenchmarkTests.Monitor
                 new BackupModel { Path = "live-backup", IsPbe = false }
             };
 
-            string[] actualPaths = BackupManager.FilterByEnvironment(backups, environment)
+            string[] actualPaths = BackupManager.FilterByClient(backups, client)
                 .Select(backup => backup.Path)
                 .ToArray();
 

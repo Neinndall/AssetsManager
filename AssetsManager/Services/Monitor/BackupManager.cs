@@ -159,13 +159,19 @@ namespace AssetsManager.Services.Monitor
         public async Task<List<BackupModel>> GetBackupsAsync(
             CancellationToken cancellationToken = default,
             bool includeStorageMetrics = true,
-            BackupEnvironment environment = BackupEnvironment.All)
+            PreferredClient? client = null)
         {
             return await Task.Run(() =>
             {
                 var backups = new List<BackupModel>();
                 var scannedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var basePaths = new[] { _appSettings.LolPbeDirectory, _appSettings.LolLiveDirectory }
+                string[] configuredPaths = client switch
+                {
+                    PreferredClient.PBE => new[] { _appSettings.LolPbeDirectory },
+                    PreferredClient.LIVE => new[] { _appSettings.LolLiveDirectory },
+                    _ => new[] { _appSettings.LolPbeDirectory, _appSettings.LolLiveDirectory }
+                };
+                var basePaths = configuredPaths
                     .Where(path => !string.IsNullOrWhiteSpace(path));
 
                 foreach (string basePath in basePaths)
@@ -208,22 +214,22 @@ namespace AssetsManager.Services.Monitor
                         _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
                     }
                 }
-                return FilterByEnvironment(backups, environment)
+                return FilterByClient(backups, client)
                     .OrderByDescending(backup => backup.CreationDate)
                     .ToList();
             }, cancellationToken);
         }
 
-        public static IEnumerable<BackupModel> FilterByEnvironment(
+        public static IEnumerable<BackupModel> FilterByClient(
             IEnumerable<BackupModel> backups,
-            BackupEnvironment environment)
+            PreferredClient? client)
         {
             if (backups == null) throw new ArgumentNullException(nameof(backups));
 
-            return environment switch
+            return client switch
             {
-                BackupEnvironment.Pbe => backups.Where(backup => backup.IsPbe),
-                BackupEnvironment.Live => backups.Where(backup => !backup.IsPbe),
+                PreferredClient.PBE => backups.Where(backup => backup.IsPbe),
+                PreferredClient.LIVE => backups.Where(backup => !backup.IsPbe),
                 _ => backups
             };
         }
