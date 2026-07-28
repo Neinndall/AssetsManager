@@ -26,6 +26,8 @@ namespace AssetsManager.Views.Controls.Comparator
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
 
+        private string _lastPreferredClientKey;
+
         public WadComparisonControl()
         {
             InitializeComponent();
@@ -42,6 +44,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
+            _lastPreferredClientKey = GetPreferredClientKey();
             await InitializeAsync();
         }
 
@@ -77,12 +80,23 @@ namespace AssetsManager.Views.Controls.Comparator
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
+            string preferredClientKey = GetPreferredClientKey();
+            bool preferredClientConfigurationChanged = !string.Equals(
+                _lastPreferredClientKey,
+                preferredClientKey,
+                StringComparison.OrdinalIgnoreCase);
+            _lastPreferredClientKey = preferredClientKey;
+
             await Dispatcher.InvokeAsync(async () =>
             {
                 await LoadBackupsAsync();
-                await InitializeDefaultPathsAsync();
+                await InitializeDefaultPathsAsync(
+                    resetSources: preferredClientConfigurationChanged);
             });
         }
+
+        private string GetPreferredClientKey() =>
+            $"{AppSettings?.PreferredClient}:{GetPreferredInitialDirectory()}";
 
         private void SetPathWithSync(bool isBase, string path)
         {
@@ -101,9 +115,29 @@ namespace AssetsManager.Views.Controls.Comparator
             }
         }
 
-        private async Task InitializeDefaultPathsAsync(string defaultPath = null)
+        private async Task InitializeDefaultPathsAsync(
+            string defaultPath = null,
+            bool resetSources = false)
         {
             if (ViewModel == null || AppSettings == null || VersionService == null) return;
+            if (resetSources)
+            {
+                ViewModel.SelectedTargetBackup = null;
+                ViewModel.SelectedBaseBackup = null;
+                if (ViewModel.IsDirectoryMode)
+                {
+                    ViewModel.NewDirectoryPath = null;
+                    ViewModel.OldDirectoryPath = null;
+                }
+                else
+                {
+                    ViewModel.NewWadFilePath = null;
+                    ViewModel.OldWadFilePath = null;
+                }
+                ViewModel.ClearMetadata(false);
+                ViewModel.ClearMetadata(true);
+            }
+
             defaultPath ??= GetPreferredInitialDirectory();
             if (!string.IsNullOrEmpty(defaultPath))
             {
@@ -131,11 +165,9 @@ namespace AssetsManager.Views.Controls.Comparator
         private string GetPreferredInitialDirectory()
         {
             if (AppSettings == null) return null;
-            if (AppSettings.PreferredClient == PreferredClient.PBE && !string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
-                return AppSettings.LolPbeDirectory;
-            else if (AppSettings.PreferredClient == PreferredClient.LIVE && !string.IsNullOrEmpty(AppSettings.LolLiveDirectory))
-                return AppSettings.LolLiveDirectory;
-            return !string.IsNullOrEmpty(AppSettings.LolPbeDirectory) ? AppSettings.LolPbeDirectory : AppSettings.LolLiveDirectory;
+            return AppSettings.PreferredClient == PreferredClient.PBE
+                ? AppSettings.LolPbeDirectory
+                : AppSettings.LolLiveDirectory;
         }
 
         private async Task LoadBackupsAsync()
