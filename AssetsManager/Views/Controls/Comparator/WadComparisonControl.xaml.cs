@@ -25,7 +25,6 @@ namespace AssetsManager.Views.Controls.Comparator
         public VersionService VersionService { get; set; }
 
         public WadComparisonModel ViewModel => DataContext as WadComparisonModel;
-        private Task _initializationTask;
 
         public WadComparisonControl()
         {
@@ -43,8 +42,7 @@ namespace AssetsManager.Views.Controls.Comparator
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
 
-            _initializationTask ??= InitializeAsync();
-            await _initializationTask;
+            await InitializeAsync();
         }
 
         private void WadComparisonControl_Unloaded(object sender, RoutedEventArgs e)

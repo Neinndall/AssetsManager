@@ -114,6 +114,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Comparator now refreshes Quick Select and version metadata whenever the view is reopened after a game update.
   - Comparator Quick Select now shows only the preferred PBE or LIVE environment while preserving MAIN and backup entries.
   - Restored the original height and rounded proportions of the Comparison Results search and filter toolbar.
   - Preserved Comparator selections and path fields when navigating between main views.
