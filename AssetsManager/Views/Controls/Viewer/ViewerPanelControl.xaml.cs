@@ -870,7 +870,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void OpenChromaFolder()
         {
-            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the 'skins' folder" };
+            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the skins folder" };
 
             if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
@@ -887,7 +887,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 string mapGeoPath = openMapGeoDialog.FileName;
                 string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
 
-                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select map root" };
+                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select asset directory root" };
                 if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
                 {
                     if (WindowViewModel != null)

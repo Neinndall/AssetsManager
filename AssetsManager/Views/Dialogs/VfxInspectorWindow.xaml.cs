@@ -202,7 +202,7 @@ namespace AssetsManager.Views.Dialogs
             var dialog = new CommonOpenFileDialog
             {
                 IsFolderPicker = true,
-                Title = "Select ROOT Asset Directory (e.g., extracted Samira.wad.client)"
+                Title = "Select asset directory root"
             };
 
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)

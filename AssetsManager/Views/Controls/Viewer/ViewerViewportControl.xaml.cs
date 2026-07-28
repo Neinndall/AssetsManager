@@ -30,10 +30,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private GlMeshRenderer _meshRenderer;
         private GlVfxRenderer _vfxRenderer;
         private GridRenderer _gridRenderer;
-        private readonly OpenGlSnapshotService _snapshotService = new();
+
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
 
+        private readonly OpenGlSnapshotService _snapshotService = new();
         private readonly Viewport3D _dummyViewport = new Viewport3D
         {
             Camera = new PerspectiveCamera(new Point3D(0, 1130, 280), new Vector3D(0, -0.14, -0.99), new Vector3D(0, 0.99, -0.14), 45)
