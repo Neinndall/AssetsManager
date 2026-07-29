@@ -496,6 +496,52 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void InspectorTimelineIgnoresAuthoredDisabledEmitters()
+        {
+            VfxEmitterDefinition playable = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(0.5f),
+                IsSingleParticle = false
+            };
+            VfxEmitterDefinition disabled = playable with
+            {
+                Name = "disabled",
+                Disabled = true,
+                EmitterLifetime = 20f,
+                ParticleLifetime = VfxCurveF.Const(1f)
+            };
+            var system = new VfxSystemDefinition(
+                1,
+                "timeline",
+                "timeline",
+                new[] { playable, disabled });
+
+            Assert.True(VfxInspectorWindow.HasPlayableEmitters(system));
+            Assert.Equal(1.5, VfxInspectorWindow.CalculatePlaybackDuration(system), precision: 3);
+        }
+
+        [Fact]
+        public void InspectorRejectsSystemsWhoseEmittersAreAllAuthoredDisabled()
+        {
+            VfxEmitterDefinition disabled = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                Disabled = true
+            };
+            var system = new VfxSystemDefinition(
+                1,
+                "disabled",
+                "disabled",
+                new[] { disabled });
+
+            Assert.False(VfxInspectorWindow.HasPlayableEmitters(system));
+        }
+
+        [Fact]
         public void DelayedEmitterTrackStartsAtItsEmissionMarker()
         {
             var metrics = VfxInspectorWindow.CalculateEmitterTrackMetrics(

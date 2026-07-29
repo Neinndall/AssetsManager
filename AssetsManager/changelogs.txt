@@ -116,6 +116,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - VFX Studio now excludes authored-disabled systems and emitters from playback counts and timeline duration.
+  - VFX Studio now presents Riot's authored forward direction toward the bottom of the viewport.
   - Viewer now renders Riot models that use submesh-relative vertex indices correctly.
   - Comparator now clears stale Base and Target data when the preferred game client or its directory changes.
   - Comparator now refreshes Quick Select and version metadata whenever the view is reopened after a game update.

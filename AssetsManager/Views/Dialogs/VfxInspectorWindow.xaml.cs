@@ -36,9 +36,9 @@ namespace AssetsManager.Views.Dialogs
         private VfxLoadingService.Bundle _activeBundle;
 
         // VFX Studio dedicated camera framing (focused studio angle for 3D particles & ground AOE)
-        private static readonly Point3D VfxCameraPosition = new(0, 500, 650);
+        private static readonly Point3D VfxCameraPosition = new(650, 500, 0);
         private static readonly Point3D VfxCameraTarget = new(0, 0, 0);
-        private static readonly Vector3D VfxCameraUpDirection = new(0, 0.793, -0.609);
+        private static readonly Vector3D VfxCameraUpDirection = new(-0.609, 0.793, 0);
 
         private readonly Viewport3D _dummyViewport = new Viewport3D
         {
@@ -338,19 +338,22 @@ namespace AssetsManager.Views.Dialogs
                         name.StartsWith("script_", StringComparison.OrdinalIgnoreCase) ||
                         name.StartsWith("helper_", StringComparison.OrdinalIgnoreCase) ||
                         name.StartsWith("dummy_", StringComparison.OrdinalIgnoreCase) ||
-                        sysDef.Emitters.Count == 0)
+                        !HasPlayableEmitters(sysDef))
                     {
                         continue;
                     }
 
+                    VfxEmitterDefinition[] playableEmitters = sysDef.Emitters
+                        .Where(emitter => !emitter.Disabled)
+                        .ToArray();
                     var item = new VfxSystemDiagnosticItem
                     {
                         Name = name,
                         PathHash = hash,
                         Definition = sysDef,
-                        EmitterCount = sysDef.Emitters.Count,
-                        TextureCount = sysDef.Emitters.Count(e => !string.IsNullOrEmpty(e.TexturePath)),
-                        MeshCount = sysDef.Emitters.Count(e => e.IsMeshPrimitive),
+                        EmitterCount = playableEmitters.Length,
+                        TextureCount = playableEmitters.Count(e => !string.IsNullOrEmpty(e.TexturePath)),
+                        MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive),
                         Status = "Ready",
                         StatusBrush = Brushes.LightGreen
                     };
@@ -370,6 +373,26 @@ namespace AssetsManager.Views.Dialogs
             {
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
             }
+        }
+
+        internal static bool HasPlayableEmitters(VfxSystemDefinition definition)
+            => definition?.Emitters.Any(emitter => !emitter.Disabled) == true;
+
+        internal static double CalculatePlaybackDuration(VfxSystemDefinition definition)
+        {
+            double maximum = 0;
+            if (definition == null) return 1.5;
+
+            foreach (VfxEmitterDefinition emitter in definition.Emitters.Where(item => !item.Disabled))
+            {
+                double particleLifetime = GetMaximumParticleLifetime(emitter);
+                double duration = emitter.IsSingleParticle
+                    ? emitter.TimeBeforeFirstEmission + particleLifetime
+                    : emitter.TimeBeforeFirstEmission + (emitter.EmitterLifetime ?? 0.0) + particleLifetime;
+                maximum = Math.Max(maximum, duration);
+            }
+
+            return maximum > 0 ? maximum : 1.5;
         }
 
         #endregion
@@ -399,19 +422,7 @@ namespace AssetsManager.Views.Dialogs
                 searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
             }
 
-            double maxDur = 0;
-            foreach (var e in def.Emitters)
-            {
-                double timeBefore = e.TimeBeforeFirstEmission;
-                double emitLife = e.EmitterLifetime ?? 0.1;
-                double partLife = GetMaximumParticleLifetime(e);
-
-                double total = e.IsSingleParticle 
-                    ? (timeBefore + partLife) 
-                    : (timeBefore + (e.EmitterLifetime.HasValue ? e.EmitterLifetime.Value : 0.0) + partLife);
-                if (total > maxDur) maxDur = total;
-            }
-            if (maxDur <= 0) maxDur = 1.5;
+            double maxDur = CalculatePlaybackDuration(def);
             double timelineMax = Math.Max(maxDur, 3.0);
             _model.ActiveLoopDuration = maxDur;
             _model.TotalDuration = timelineMax;
@@ -436,7 +447,7 @@ namespace AssetsManager.Views.Dialogs
             _model.IsPlaying = true;
 
             // 2. Audit Emitters
-            foreach (var emitter in def.Emitters)
+            foreach (var emitter in def.Emitters.Where(item => !item.Disabled))
             {
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
