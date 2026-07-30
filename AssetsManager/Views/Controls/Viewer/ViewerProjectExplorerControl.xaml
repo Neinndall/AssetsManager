@@ -43,6 +43,7 @@
                     <explorer:BreadcrumbControl Grid.Column="1"
                                                 x:Name="Breadcrumbs"
                                                 Margin="6,0"
+                                                FontSize="10"
                                                 VerticalAlignment="Center"
                                                 ItemClicked="Breadcrumbs_ItemClicked"/>
 

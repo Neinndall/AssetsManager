@@ -47,7 +47,25 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
 
             Assert.Contains("ItemsSource=\"{Binding Items}\"", xaml);
             Assert.Contains("Content=\"{Binding DisplayName}\"", xaml);
+            Assert.Contains("FontSize=\"12\"", xaml);
             Assert.DoesNotContain("Binding Nodes", xaml);
+        }
+
+        [Fact]
+        public void ViewerUsesCompactBreadcrumbText()
+        {
+            string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+            string xaml = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "AssetsManager",
+                "Views",
+                "Controls",
+                "Viewer",
+                "ViewerProjectExplorerControl.xaml"));
+
+            Assert.Matches(
+                @"<explorer:BreadcrumbControl[^>]*FontSize=""10""",
+                xaml.ReplaceLineEndings(" "));
         }
     }
 }
