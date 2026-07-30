@@ -23,6 +23,8 @@ namespace AssetsManager.Utils
         public string ApiCacheSalesPath { get; }
         public string ApiCacheMythicPath { get; }
         public string ApiCacheRewardsPath { get; }
+        public string NotificationsPath { get; }
+        public string NotificationsHistoryPath { get; }
 
         public DirectoriesCreator(string customAppFolderPath = null)
         {
@@ -57,6 +59,10 @@ namespace AssetsManager.Utils
 
             WadComparisonSavePath = Path.Combine(appFolderPath, "wadcomparison");
             VersionsPath = Path.Combine(appFolderPath, "versions");
+
+            NotificationsPath = Path.Combine(appFolderPath, "notifications");
+            NotificationsHistoryPath = Path.Combine(NotificationsPath, "notifications_history.json");
+            CreateDirectory(NotificationsPath);
         }
 
         // Dynamic naming logic (Stateless & Safe)

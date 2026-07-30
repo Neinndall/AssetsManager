@@ -22,6 +22,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Notification Hub now filters persistent alerts by category with synchronized unread states, actions, and progress feedback.
   - Viewer now offers direct 4K snapshot capture from the viewport toolbar.
   - Viewer now assigns each model submesh from its exact skin BIN, including hash-named PBE metadata, without guessing loadscreen or mask textures.
   - Simplified BIN processing by separating readable JSON output from audio event extraction.
@@ -32,7 +33,7 @@ Improvements
   - Viewer MapGeometry now composes masked four-layer terrain materials with their authored world-space tiling and RGB blend parameters.
   - Viewer MapGeometry now reads material samplers, texture paths, wrapping, shaders, and color-only materials directly from materials.bin.
   - Viewer image previews now present a clearer icon-led header with the texture name aligned beneath its title.
-  - Backups now include storage preflight, preferred-client filtering, sorting, and direct folder access.
+  - Backups now include integrity manifests, storage preflight, optional names, preferred-client filtering, sorting, and direct folder access.
   - BIN Local GREP now validates identifier hashes only within direct structures or matching map pairs.
   - Enhanced BIN and Lua hash guessing accuracy with strict syntax validation and binary script manifest decoding.
   - Asset Tracker / Increased card margin to 14px for cleaner grid spacing.

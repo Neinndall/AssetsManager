@@ -240,7 +240,11 @@ namespace AssetsManager.Services.Updater
                 if (dialogResult == true)
                 {
                     var notificationService = _serviceProvider.GetRequiredService<NotificationService>();
-                    notificationService.AddNotification("Installing Update", $"Extracting build for commit {shortSha}...", AssetsManager.Views.Models.Notifications.NotificationType.Info);
+                    notificationService.AddNotification(
+                        "Installing Update",
+                        $"Extracting build for commit {shortSha}...",
+                        AssetsManager.Views.Models.Notifications.NotificationType.Info,
+                        category: AssetsManager.Views.Models.Notifications.NotificationCategory.Updates);
 
                     bool saveSettings = dialog.SelectedMode == UpdateMode.CleanWithSaving;
                     await _updateExtractor.ExtractAndRestart(downloadPath, saveSettings, owner);

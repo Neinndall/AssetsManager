@@ -9,7 +9,7 @@
                 mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
                 HeaderTitle="Notifications" 
                 HeaderIcon="BellOutline"
-                Height="500" Width="400"
+                Height="540" Width="460"
                 WindowStartupLocation="CenterOwner"
                 ResizeMode="NoResize"
                 ShowMinimizeButton="False"
@@ -19,27 +19,29 @@
     <Window.Resources>
         <!-- DataTemplate for Notifications -->
         <DataTemplate DataType="{x:Type models:NotificationModel}">
-            <Grid Margin="0,0,0,10" Cursor="Hand">
+            <Grid Margin="0,0,0,10" Cursor="Hand" MouseLeftButtonDown="NotificationCard_Click">
                 <!-- 1. Background Layer -->
                 <Border x:Name="NotificationBackground" 
                         Background="{StaticResource CardBackground}" 
                         CornerRadius="8"/>
 
                 <!-- 2. Content Layer (Fixed Padding, never shifts) -->
-                <Border Padding="16,14">
+                <Border Padding="14,12">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/> <!-- 0: Icon -->
                             <ColumnDefinition Width="*"/>    <!-- 1: Body -->
-                            <ColumnDefinition Width="Auto"/> <!-- 2: Close -->
+                            <ColumnDefinition Width="Auto"/> <!-- 2: Action & Close -->
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/> <!-- Row 0: Header (Icon + Title + Time) -->
+                            <RowDefinition Height="Auto"/> <!-- Row 0: Header (Title + Time) -->
                             <RowDefinition Height="*"/>    <!-- Row 1: Message -->
+                            <RowDefinition Height="Auto"/> <!-- Row 2: Progress Bar (Optional) -->
+                            <RowDefinition Height="Auto"/> <!-- Row 3: Action Button (Optional) -->
                         </Grid.RowDefinitions>
 
-                        <!-- 1. Technical Icon (Aligned with Title line) -->
-                        <materialIcons:MaterialIcon Grid.Row="0" Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center" Margin="0,1,12,0">
+                        <!-- 1. Technical Icon -->
+                        <materialIcons:MaterialIcon Grid.Row="0" Grid.Column="0" Width="18" Height="18" VerticalAlignment="Top" Margin="0,2,10,0">
                             <materialIcons:MaterialIcon.Style>
                                 <Style TargetType="materialIcons:MaterialIcon">
                                     <Setter Property="Kind" Value="InformationOutline"/>
@@ -62,12 +64,12 @@
                             </materialIcons:MaterialIcon.Style>
                         </materialIcons:MaterialIcon>
 
-                        <!-- 2. Header: Title - Time (Perfectly aligned with Icon) -->
-                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,0">
+                        <!-- 2. Header: Title - Time -->
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
                             <TextBlock Text="{Binding Title, Converter={StaticResource StringCaseConverter}}" 
                                        FontWeight="Black" 
                                        FontSize="11" 
-                                       Foreground="{StaticResource TextMuted}" 
+                                       Foreground="{StaticResource TextPrimary}"
                                        VerticalAlignment="Center"/>
                             
                             <TextBlock Text="-" 
@@ -78,7 +80,7 @@
                                        VerticalAlignment="Center"/>
 
                             <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}" 
-                                       FontSize="11" 
+                                       FontSize="10"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextMuted}"
                                        VerticalAlignment="Center"/>
@@ -90,12 +92,33 @@
                                    FontSize="12" 
                                    Foreground="{StaticResource TextPrimary}" 
                                    TextWrapping="Wrap"
-                                   LineHeight="15"
+                                   LineHeight="16"
                                    LineStackingStrategy="BlockLineHeight"
                                    Opacity="0.85"/>
 
-                        <!-- 4. Close Action (Centered vertically in the whole card) -->
-                        <Grid Grid.Column="2" Grid.RowSpan="2" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <!-- 4. Progress Bar (If HasProgress is true) -->
+                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" Visibility="{Binding HasProgress, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="Progress" FontSize="10" Foreground="{StaticResource TextMuted}"/>
+                                <TextBlock Text="{Binding ProgressText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <ProgressBar Value="{Binding ProgressPercentage}" Maximum="100" Height="4" Style="{StaticResource ModernProgressBar}"/>
+                        </StackPanel>
+
+                        <!-- 5. Action Button (If ActionText is set) -->
+                        <Button Grid.Row="3" Grid.Column="1"
+                                HorizontalAlignment="Left" Margin="0,8,0,0"
+                                Style="{StaticResource SmallTextButtonStyle}"
+                                Click="NotificationAction_Click"
+                                Visibility="{Binding ActionText, Converter={StaticResource NullToVisibilityConverter}}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="OpenInApp" Width="12" Height="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0"/>
+                                <TextBlock Text="{Binding ActionText}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 6. Close Action Button (Centered vertically) -->
+                        <Grid Grid.Column="2" Grid.RowSpan="4" VerticalAlignment="Center" Margin="16,0,0,0">
                             <Button x:Name="CloseNotifyBtn"
                                     Style="{StaticResource SmallCloseButtonStyle}" 
                                     HorizontalAlignment="Right"
@@ -141,7 +164,6 @@
                     </MultiDataTrigger.Conditions>
                     <Setter TargetName="NotificationBorder" Property="BorderBrush" Value="{StaticResource AccentRed}"/>
                 </MultiDataTrigger>
-                
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter TargetName="NotificationBackground" Property="Background" Value="{StaticResource HoverColor}"/>
                     <Setter TargetName="CloseNotifyBtn" Property="Visibility" Value="Visible"/>
@@ -152,12 +174,228 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- 0: Actions Area (Header) -->
-            <RowDefinition Height="*"/>    <!-- 1: Content Area -->
+            <RowDefinition Height="Auto"/> <!-- 0: Category Filter Tabs -->
+            <RowDefinition Height="Auto"/> <!-- 1: Header Actions Area -->
+            <RowDefinition Height="*"/>    <!-- 2: Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Actions Area (Header under Title Bar) -->
-        <Border Grid.Row="0" Padding="20,10" Background="{StaticResource CardBackground}" 
+        <!-- 0. Category Filter Tabs (Primary Navigation) -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" Padding="12,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal">
+                    <!-- ALL TAB -->
+                    <Border Padding="10,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterAll_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsAllSelected}" Value="True">
+                                        <Setter Property="Background" Value="#2600D2FF"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="ALL" FontSize="10" FontWeight="Bold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsAllSelected}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
+
+                    <!-- SYSTEM TAB -->
+                    <Border Padding="8,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterSystem_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSystemSelected}" Value="True">
+                                        <Setter Property="Background" Value="#2600D2FF"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="SYSTEM" FontSize="10" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSystemSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding UnreadSystemCount, StringFormat=' ({0})'}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Visibility="{Binding UnreadSystemCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- WATCHER TAB -->
+                    <Border Padding="8,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterWatcher_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsWatcherSelected}" Value="True">
+                                        <Setter Property="Background" Value="#26FF9800"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentOrange}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="WATCHER" FontSize="10" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsWatcherSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding UnreadWatcherCount, StringFormat=' ({0})'}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentOrange}" Visibility="{Binding UnreadWatcherCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- COMPARATOR TAB -->
+                    <Border Padding="8,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterComparator_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsComparatorSelected}" Value="True">
+                                        <Setter Property="Background" Value="#264CAF50"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentGreen}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="COMPARATOR" FontSize="10" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsComparatorSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding UnreadComparatorCount, StringFormat=' ({0})'}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentGreen}" Visibility="{Binding UnreadComparatorCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- UPDATES TAB -->
+                    <Border Padding="8,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterUpdates_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUpdatesSelected}" Value="True">
+                                        <Setter Property="Background" Value="#2600D2FF"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="UPDATES" FontSize="10" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsUpdatesSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding UnreadUpdatesCount, StringFormat=' ({0})'}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Visibility="{Binding UnreadUpdatesCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ISSUES TAB -->
+                    <Border Padding="8,4" Margin="0,0,4,0" CornerRadius="6" Cursor="Hand" MouseLeftButtonDown="FilterIssues_Click">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsIssuesSelected}" Value="True">
+                                        <Setter Property="Background" Value="#26FF5252"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentRed}"/>
+                                    </DataTrigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ISSUES" FontSize="10" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsIssuesSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding UnreadIssuesCount, StringFormat=' ({0})'}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentRed}" Visibility="{Binding UnreadIssuesCount, Converter={StaticResource CountToVisibilityConverter}}" Margin="2,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- 1. Actions Area (Sub-header under Category Filter Tabs) -->
+        <Border Grid.Row="1" Padding="16,8" Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
                 Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
             <Grid>
@@ -167,27 +405,27 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Recent activity" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                    <Border Background="#26FF5252" BorderBrush="{StaticResource AccentRed}" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="12,0,0,0" VerticalAlignment="Center" 
-                            Visibility="{Binding HasUnread, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding SelectedCategoryTitle}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <Border Background="#26FF5252" BorderBrush="{StaticResource AccentRed}" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                            Visibility="{Binding HasSelectedUnread, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal">
-                            <materialIcons:MaterialIcon Kind="BellAlertOutline" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding UnreadCount}" Foreground="{StaticResource AccentRed}" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="BellAlertOutline" Width="12" Height="12" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedUnreadCount}" Foreground="{StaticResource AccentRed}" FontSize="10" FontWeight="Black" VerticalAlignment="Center"/>
                             <TextBlock Text="NEW" Foreground="{StaticResource AccentRed}" FontSize="9" FontWeight="Bold" Margin="4,0,0,0" Opacity="0.9" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                    <Button Style="{StaticResource TransparentIconButton}" Click="MarkAllRead_Click" Margin="0,0,8,0" Padding="6,4">
+                    <Button Style="{StaticResource TransparentIconButton}" Click="MarkAllRead_Click" Margin="0,0,6,0" Padding="6,3">
                         <StackPanel Orientation="Horizontal">
-                            <materialIcons:MaterialIcon Kind="CheckAll" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="CheckAll" Width="14" Height="14" Foreground="{StaticResource AccentGreen}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Mark Read" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource TransparentIconButton}" Click="ClearAll_Click" Padding="6,4">
+                    <Button Style="{StaticResource TransparentIconButton}" Click="ClearAll_Click" Padding="6,3">
                         <StackPanel Orientation="Horizontal">
-                            <materialIcons:MaterialIcon Kind="DeleteOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="DeleteOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Clear All" FontSize="11" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -196,25 +434,25 @@
         </Border>
 
         <!-- 2. Content Area (With bottom rounding) -->
-        <Border Grid.Row="1" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
+        <Border Grid.Row="2" Background="{StaticResource SidebarBackground}" CornerRadius="0,0,11,11" ClipToBounds="True">
             <Grid>
                 <!-- Empty State -->
-                <Grid Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}, ConverterParameter=Invert}" Margin="0,40,0,40">
+                <Grid Visibility="{Binding HasFilteredNotifications, Converter={StaticResource InverseBooleanToVisibilityConverter}}" Margin="0,40,0,40">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                        <Border Background="{StaticResource CardBackground}" CornerRadius="50" Width="80" Height="80" Margin="0,0,0,16">
-                            <materialIcons:MaterialIcon Kind="BellSleepOutline" Width="32" Height="32" Foreground="{StaticResource TextMuted}" Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Background="{StaticResource CardBackground}" CornerRadius="50" Width="70" Height="70" Margin="0,0,0,14">
+                            <materialIcons:MaterialIcon Kind="BellSleepOutline" Width="30" Height="30" Foreground="{StaticResource TextMuted}" Opacity="0.5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="All caught up!" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                        <TextBlock Text="No new notifications at the moment." FontSize="13" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
+                        <TextBlock Text="All caught up!" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                        <TextBlock Text="No new notifications in this category." FontSize="12" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- List Area -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" 
                               HorizontalScrollBarVisibility="Disabled"
-                              Padding="16" 
-                              Visibility="{Binding Notifications.Count, Converter={StaticResource CountToVisibilityConverter}}">
-                    <ItemsControl ItemsSource="{Binding Notifications}"/>
+                              Padding="14"
+                              Visibility="{Binding HasFilteredNotifications, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding FilteredNotifications}"/>
                 </ScrollViewer>
             </Grid>
         </Border>

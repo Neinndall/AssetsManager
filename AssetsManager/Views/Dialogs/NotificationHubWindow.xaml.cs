@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Views.Helpers;
@@ -33,6 +34,53 @@ namespace AssetsManager.Views.Dialogs
             {
                 ViewModel?.RemoveNotification(note);
             }
+        }
+
+        private void NotificationCard_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is NotificationModel note)
+            {
+                ViewModel?.ExecuteNotificationAction(note);
+            }
+        }
+
+        private void NotificationAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is NotificationModel note)
+            {
+                ViewModel?.ExecuteNotificationAction(note);
+                e.Handled = true;
+            }
+        }
+
+        private void FilterAll_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(null);
+        }
+
+        private void FilterSystem_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.System);
+        }
+
+        private void FilterWatcher_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Watcher);
+        }
+
+        private void FilterComparator_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Comparator);
+        }
+
+        private void FilterUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Updates);
+        }
+
+        private void FilterIssues_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.Issues);
         }
 
         protected override void OnClosed(EventArgs e)
