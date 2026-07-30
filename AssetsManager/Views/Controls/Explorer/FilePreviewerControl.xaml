@@ -127,7 +127,8 @@
             <local:BreadcrumbControl x:Name="Breadcrumbs" 
                                      Grid.Row="0" 
                                      Margin="5,2,5,0" 
-                                     VerticalAlignment="Center"/>
+                                     VerticalAlignment="Center"
+                                     ItemClicked="Breadcrumbs_ItemClicked"/>
             <Border x:Name="BreadcrumbSeparator" 
                     Grid.Row="1" 
                     Height="1" 

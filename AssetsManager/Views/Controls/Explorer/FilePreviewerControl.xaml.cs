@@ -19,7 +19,6 @@ using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Models.Wad;
-using NodeClickedEventArgs = AssetsManager.Views.Controls.Explorer.NodeClickedEventArgs;
 
 namespace AssetsManager.Views.Controls.Explorer
 {
@@ -223,7 +222,6 @@ namespace AssetsManager.Views.Controls.Explorer
                 }
 
                 // Setup sub-controls peer connection
-                Breadcrumbs.ParentPreviewer = this;
                 FileGridControl.ParentPreviewer = this;
                 
                 UpdateScrollButtonsVisibility();
@@ -265,7 +263,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     }
 
                     // Clear sub-controls peer connection
-                    if (Breadcrumbs != null) Breadcrumbs.ParentPreviewer = null;
                     if (FileGridControl != null) FileGridControl.ParentPreviewer = null;
                 }
                 catch (Exception ex)
@@ -473,33 +470,19 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private void UpdateBreadcrumbs(FileSystemNodeModel selectedNode)
         {
-            Breadcrumbs.Nodes.Clear();
+            Breadcrumbs.Clear();
             if (selectedNode == null || _rootNodes == null) return;
 
             var path = TreeUIManager.FindNodePath(_rootNodes, selectedNode);
             if (path == null) return;
 
-            const int maxItems = 5;
+            Breadcrumbs.SetPath(path, node => node.BreadcrumbDisplayName);
+        }
 
-            if (path.Count > maxItems)
-            {
-                var truncatedPath = new List<FileSystemNodeModel>();
-                truncatedPath.Add(path[0]);
-                truncatedPath.Add(path[1]);
-
-                truncatedPath.Add(new FileSystemNodeModel("...", NodeType.VirtualDirectory) { IsEnabled = false });
-
-                for (int i = path.Count - 2; i < path.Count; i++)
-                {
-                    truncatedPath.Add(path[i]);
-                }
-                path = truncatedPath;
-            }
-
-            foreach (var node in path)
-            {
-                Breadcrumbs.Nodes.Add(node);
-            }
+        private void Breadcrumbs_ItemClicked(object sender, BreadcrumbItemClickedEventArgs e)
+        {
+            if (e.Value is FileSystemNodeModel node)
+                HandleNodeClicked(node);
         }
     }
 }

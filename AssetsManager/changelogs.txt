@@ -23,6 +23,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer Browser now uses the compact shared breadcrumb navigation.
   - BIN Hash Lab now preserves observed casing and requires runtime evidence before promoting Meta Schema candidates.
   - BIN Hash Lab now discovers owner-matched entry names without class-specific whitelists.
   - BIN Hash Lab now preserves unpaired semantic matches as research and extracts embedded function names without partial block results.

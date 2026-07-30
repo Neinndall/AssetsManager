@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
+             xmlns:explorer="clr-namespace:AssetsManager.Views.Controls.Explorer"
              xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Viewer"
              mc:Ignorable="d" 
@@ -39,9 +40,11 @@
                     </StackPanel>
 
                     <!-- Breadcrumbs display -->
-                    <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="6,0" VerticalAlignment="Center">
-                        <StackPanel x:Name="BreadcrumbsContainer" Orientation="Horizontal"/>
-                    </ScrollViewer>
+                    <explorer:BreadcrumbControl Grid.Column="1"
+                                                x:Name="Breadcrumbs"
+                                                Margin="6,0"
+                                                VerticalAlignment="Center"
+                                                ItemClicked="Breadcrumbs_ItemClicked"/>
 
                     <shared:SearchBoxControl Grid.Column="2" x:Name="SearchBox" Height="26"
                                              SearchTextChanged="SearchBox_SearchTextChanged"

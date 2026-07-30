@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Material.Icons;
@@ -413,7 +414,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void UpdateBreadcrumbs(ProjectExplorerNode folderNode)
         {
-            BreadcrumbsContainer.Children.Clear();
+            Breadcrumbs.Clear();
             if (folderNode == null) return;
 
             var path = new List<ProjectExplorerNode>();
@@ -424,45 +425,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 current = FindParentNode(current);
             }
 
-            for (int i = 0; i < path.Count; i++)
-            {
-                var node = path[i];
-                var cleanName = node.Name.Contains("/") ? node.Name.Split('/').Last() : node.Name;
-                
-                var btn = new Button
-                {
-                    Content = cleanName.ToUpperInvariant(),
-                    Style = (Style)FindResource("SmallTextButtonStyle"),
-                    Tag = node,
-                    Padding = new Thickness(4, 2, 4, 2),
-                    Margin = new Thickness(0),
-                    FontSize = 9.5,
-                    FontWeight = FontWeights.Bold
-                };
-                btn.Click += Breadcrumb_Click;
-                BreadcrumbsContainer.Children.Add(btn);
-
-                if (i < path.Count - 1)
-                {
-                    var separator = new TextBlock
-                    {
-                        Text = " › ",
-                        Foreground = (Brush)FindResource("TextMuted"),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        FontSize = 10,
-                        FontWeight = FontWeights.Bold
-                    };
-                    BreadcrumbsContainer.Children.Add(separator);
-                }
-            }
+            Breadcrumbs.SetPath(
+                path,
+                node => (node.Name.Contains("/") ? node.Name.Split('/').Last() : node.Name)
+                    .ToUpperInvariant());
         }
 
-        private void Breadcrumb_Click(object sender, RoutedEventArgs e)
+        private void Breadcrumbs_ItemClicked(object sender, BreadcrumbItemClickedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is ProjectExplorerNode node)
-            {
+            if (e.Value is ProjectExplorerNode node)
                 NavigateToFolder(node);
-            }
         }
 
         private void SelectionBehavior_PrimaryAction(object sender, RoutedEventArgs e)
