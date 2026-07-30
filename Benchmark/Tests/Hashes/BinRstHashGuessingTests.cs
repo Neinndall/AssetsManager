@@ -20,7 +20,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
     public sealed class BinRstHashGuessingTests
     {
         [Fact]
-        public void LocalEvidenceMatcherPublishesEachLiteralMatchExactlyOnce()
+        public void EvidenceMatcherPublishesEachLiteralMatchExactlyOnce()
         {
             const string candidate = "data/test/example.bin";
             uint hash = Fnv1a.HashLower(candidate);
@@ -30,7 +30,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             var localObserved = CreateTargets();
             localObserved[InternalHashKind.BinEntries].Add(hash);
             localObserved[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "test", localTargets: localObserved);
 
@@ -57,7 +57,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             targets[InternalHashKind.BinFields].Add(hash);
             var localObserved = CreateTargets();
             localObserved[InternalHashKind.BinFields].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "test", localTargets: localObserved);
 
@@ -72,7 +72,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "other.bin");
 
@@ -93,7 +93,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         public void TextScannerExtractsAtVFunctionAcrossBlocksWithoutPartialCandidate()
         {
             var candidates = new List<string>();
-            var scanner = new BinRstHashGuessingService.TextCandidateScanner(candidates.Add);
+            var scanner = new BinaryTextCandidateScanner(candidates.Add);
 
             scanner.Append(Encoding.ASCII.GetBytes("@VSpellCal"));
             Assert.Empty(candidates);
@@ -111,7 +111,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             bool found = matcher.CheckContextualCandidate(
                 InternalHashKind.BinEntries,
@@ -133,7 +133,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             bool found = matcher.CheckContextualCandidate(
                 InternalHashKind.BinHashes,
@@ -157,7 +157,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             targets[InternalHashKind.BinHashes].Add(hash);
             var localObserved = CreateTargets();
             localObserved[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "test.bin", localTargets: localObserved);
 
@@ -172,10 +172,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(0x11111111, "UnrelatedClass", "unrelatedPath", candidate);
 
-            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "illaoi.bin");
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "illaoi.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
@@ -188,7 +188,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = new BinTree(new[]
             {
                 new BinTreeObject(0x11111111, Fnv1a.HashLower("SpellData"), new BinTreeProperty[]
@@ -198,7 +198,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 })
             }, Array.Empty<string>());
 
-            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashKind.BinHashes, match.Kind);
@@ -215,7 +215,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = new BinTree(new[]
             {
                 new BinTreeObject(0x11111111, Fnv1a.HashLower("StringOwner"), new BinTreeProperty[]
@@ -228,7 +228,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 })
             }, Array.Empty<string>());
 
-            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
@@ -241,7 +241,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var map = new BinTreeMap(
                 Fnv1a.HashLower("mClipDataMap"),
                 BinPropertyType.Hash,
@@ -266,7 +266,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 new BinTreeObject(0x33333333, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map })
             }, Array.Empty<string>());
 
-            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "akali.bin");
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "akali.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
@@ -279,7 +279,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var map = new BinTreeMap(
                 Fnv1a.HashLower("dataMap"),
                 BinPropertyType.Hash,
@@ -298,7 +298,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 new BinTreeObject(0x22222222, Fnv1a.HashLower("SpellData"), new BinTreeProperty[] { map })
             }, Array.Empty<string>());
 
-            BinRstHashGuessingService.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(candidate, match.Value);
@@ -312,10 +312,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(hash, "VfxSystemDefinitionData", "particlePath", candidate);
 
-            BinRstHashGuessingService.MatchBinContextualEvidence(tree, matcher, "cassiopeia.bin");
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "cassiopeia.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashKind.BinEntries, match.Kind);
@@ -330,10 +330,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(hash, "UnrelatedClass", "unrelatedPath", candidate);
 
-            BinRstHashGuessingService.MatchBinContextualEvidence(tree, matcher, "cassiopeia.bin");
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "cassiopeia.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(hash, targets[InternalHashKind.BinEntries]);
@@ -347,10 +347,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint entryHash = Fnv1a.HashLower(entry);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(entryHash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(entryHash, "UnrelatedClass", "assetPath", asset);
 
-            BinRstHashGuessingService.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+            BinContentEvidenceSource.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(entry, match.Value);
@@ -365,10 +365,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint targetHash = Fnv1a.HashLower(entry);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(targetHash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(0x12345678, "UnrelatedClass", "assetPath", entry + "/test.dds");
 
-            BinRstHashGuessingService.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+            BinContentEvidenceSource.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(targetHash, targets[InternalHashKind.BinEntries]);
@@ -386,10 +386,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             var targets = CreateTargets();
             foreach (string path in paths)
                 targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(path));
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             string[] lines = paths.Select((path, index) => $"{index:x16} {path}").ToArray();
 
-            BinRstHashGuessingService.DiscoverGamePathCandidates(lines, matcher, "hashes.game.txt");
+            GamePathCandidateSource.Discover(lines, matcher, "hashes.game.txt");
 
             Assert.Equal(3, matcher.Matches.Count);
             Assert.All(matcher.Matches, match =>
@@ -407,9 +407,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
             const string path = "assets/test/single.dds";
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(path));
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
-            BinRstHashGuessingService.DiscoverGamePathCandidates(
+            GamePathCandidateSource.Discover(
                 new[] { $"0000000000000000 {path}" },
                 matcher,
                 "hashes.game.txt");
@@ -468,7 +468,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             Assert.True(matcher.CheckSchemaCandidate(
                 InternalHashKind.BinTypes,
@@ -489,7 +489,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             matcher.CheckSchemaCandidate(
                 InternalHashKind.BinTypes,
                 candidate,
@@ -511,7 +511,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             matcher.CheckSchemaCandidate(
                 InternalHashKind.BinTypes,
                 candidate,
@@ -546,7 +546,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             matcher.CheckSchemaCandidate(
                 InternalHashKind.BinTypes,
                 candidate,
@@ -567,7 +567,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinFields].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
             matcher.CheckSchemaCandidate(
                 InternalHashKind.BinFields,
                 candidate,
@@ -607,7 +607,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             }, CancellationToken.None);
             var targets = CreateTargets();
             targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var matcher = new InternalHashEvidenceMatcher(targets);
 
             matcher.PromoteUniqueSchemaCandidates(await store.LoadResearchAsync(CancellationToken.None));
             await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
