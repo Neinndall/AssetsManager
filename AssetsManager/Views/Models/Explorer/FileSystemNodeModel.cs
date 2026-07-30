@@ -16,7 +16,7 @@ namespace AssetsManager.Views.Models.Explorer
     public enum DiffStatus { Unchanged, New, Modified, Renamed, Removed, Dependency }
     public enum AudioSourceType { Wpk, Bnk }
 
-    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, IMultiSelectable
+    public class FileSystemNodeModel : INotifyPropertyChanged, IDisposable, ISelectableTreeNode
     {
         public string Name { get; set; }
         public NodeType Type { get; set; }
@@ -227,6 +227,9 @@ namespace AssetsManager.Views.Models.Explorer
                 }
             }
         }
+
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Children;
+        bool ISelectableTreeNode.IsSelectionVisible => IsVisible;
 
         private string _preMatch;
         public string PreMatch

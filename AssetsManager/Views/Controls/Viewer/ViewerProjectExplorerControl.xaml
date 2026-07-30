@@ -72,11 +72,6 @@
                               x:Name="FoldersTreeView"
                               Style="{StaticResource ModernTreeView}"
                               SelectedItemChanged="FoldersTreeView_SelectedItemChanged">
-                        <TreeView.ItemContainerStyle>
-                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
-                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                            </Style>
-                        </TreeView.ItemContainerStyle>
                         <TreeView.Resources>
                             <HierarchicalDataTemplate DataType="{x:Type local:ProjectExplorerNode}" ItemsSource="{Binding Children}">
                                 <StackPanel Orientation="Horizontal" Margin="2,1">
@@ -112,6 +107,7 @@
                          Margin="4"
                          Background="Transparent"
                          BorderThickness="0"
+                         SelectionMode="Extended"
                          Style="{StaticResource SmoothScrollListBox}">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>

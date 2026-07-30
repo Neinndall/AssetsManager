@@ -69,11 +69,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
     }
 
-    public class WadGroupViewModel : INotifyPropertyChanged, IMultiSelectable
+    public class WadGroupViewModel : INotifyPropertyChanged, ISelectableTreeNode
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
         private bool _isMultiSelected;
+        private bool _isExpanded;
 
         public bool IsSelected
         {
@@ -86,6 +87,15 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             get => _isMultiSelected;
             set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
         }
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { if (_isExpanded != value) { _isExpanded = value; OnPropertyChanged(); } }
+        }
+
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Types;
+        bool ISelectableTreeNode.IsSelectionVisible => true;
 
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
@@ -96,11 +106,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ObservableRangeCollection<DiffTypeGroupViewModel> Types { get; set; } = new ObservableRangeCollection<DiffTypeGroupViewModel>();
     }
 
-    public class DiffTypeGroupViewModel : INotifyPropertyChanged, IMultiSelectable
+    public class DiffTypeGroupViewModel : INotifyPropertyChanged, ISelectableTreeNode
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
         private bool _isMultiSelected;
+        private bool _isExpanded;
 
         public bool IsSelected
         {
@@ -113,6 +124,15 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             get => _isMultiSelected;
             set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
         }
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set { if (_isExpanded != value) { _isExpanded = value; OnPropertyChanged(); } }
+        }
+
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Diffs;
+        bool ISelectableTreeNode.IsSelectionVisible => true;
 
         protected void OnPropertyChanged([CallerMemberName] string name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 

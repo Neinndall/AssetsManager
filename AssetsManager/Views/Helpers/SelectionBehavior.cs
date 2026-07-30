@@ -6,9 +6,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using AssetsManager.Views.Models.Dialogs.Controls;
-using AssetsManager.Views.Models.Explorer;
-using AssetsManager.Views.Models.Wad;
 
 namespace AssetsManager.Views.Helpers
 {
@@ -119,9 +116,9 @@ namespace AssetsManager.Views.Helpers
             if (item is TreeViewItem treeItem && IsRangeSelectIntent())
             {
                 TreeView tree = FindAncestor<TreeView>(treeItem);
-                var anchor = tree?.GetValue(RangeAnchorProperty) as FileSystemNodeModel;
-                if (treeItem.DataContext is FileSystemNodeModel target &&
-                    SelectFileTreeRange(
+                var anchor = tree?.GetValue(RangeAnchorProperty) as ISelectableTreeNode;
+                if (treeItem.DataContext is ISelectableTreeNode target &&
+                    SelectTreeRange(
                         tree?.ItemsSource,
                         anchor,
                         target,
@@ -181,17 +178,17 @@ namespace AssetsManager.Views.Helpers
             }
         }
 
-        internal static bool SelectFileTreeRange(
+        internal static bool SelectTreeRange(
             IEnumerable roots,
-            FileSystemNodeModel anchor,
-            FileSystemNodeModel target,
+            ISelectableTreeNode anchor,
+            ISelectableTreeNode target,
             bool additive,
             out bool usedAnchor)
         {
             usedAnchor = false;
             if (roots == null || target == null) return false;
-            var visible = new System.Collections.Generic.List<FileSystemNodeModel>();
-            CollectVisibleFileNodes(roots, visible);
+            var visible = new System.Collections.Generic.List<ISelectableTreeNode>();
+            CollectVisibleTreeNodes(roots, visible);
             int targetIndex = visible.IndexOf(target);
             if (targetIndex < 0) return false;
 
@@ -211,16 +208,16 @@ namespace AssetsManager.Views.Helpers
             return true;
         }
 
-        private static void CollectVisibleFileNodes(
+        private static void CollectVisibleTreeNodes(
             IEnumerable nodes,
-            System.Collections.Generic.ICollection<FileSystemNodeModel> visible)
+            System.Collections.Generic.ICollection<ISelectableTreeNode> visible)
         {
             foreach (object item in nodes)
             {
-                if (item is not FileSystemNodeModel node || !node.IsVisible) continue;
+                if (item is not ISelectableTreeNode node || !node.IsSelectionVisible) continue;
                 visible.Add(node);
-                if (node.IsExpanded && node.VisibleChildren != null)
-                    CollectVisibleFileNodes(node.VisibleChildren, visible);
+                if (node.IsExpanded && node.SelectionChildren != null)
+                    CollectVisibleTreeNodes(node.SelectionChildren, visible);
             }
         }
 
@@ -349,17 +346,9 @@ namespace AssetsManager.Views.Helpers
                     if (ms.IsMultiSelected) ms.IsMultiSelected = false;
                 }
 
-                if (node is FileSystemNodeModel fsm && fsm.HasLoadedChildren)
+                if (node is ISelectableTreeNode treeNode && treeNode.SelectionChildren != null)
                 {
-                    ClearAllMultiSelected(fsm.Children);
-                }
-                else if (node is WadGroupViewModel wgv && wgv.Types != null)
-                {
-                    ClearAllMultiSelected(wgv.Types);
-                }
-                else if (node is DiffTypeGroupViewModel dtgv && dtgv.Diffs != null)
-                {
-                    ClearAllMultiSelected(dtgv.Diffs);
+                    ClearAllMultiSelected(treeNode.SelectionChildren);
                 }
             }
         }

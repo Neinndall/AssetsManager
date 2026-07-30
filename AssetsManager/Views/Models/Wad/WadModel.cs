@@ -52,7 +52,7 @@ namespace AssetsManager.Views.Models.Wad
         public bool WasTopLevelDiff { get; set; }
     }
 
-    public class SerializableChunkDiff : INotifyPropertyChanged, IMultiSelectable
+    public class SerializableChunkDiff : INotifyPropertyChanged, ISelectableTreeNode
     {
         public event PropertyChangedEventHandler PropertyChanged;
         private bool _isSelected;
@@ -71,6 +71,12 @@ namespace AssetsManager.Views.Models.Wad
             get => _isMultiSelected;
             set { if (_isMultiSelected != value) { _isMultiSelected = value; OnPropertyChanged(); } }
         }
+
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Array.Empty<object>();
+        [JsonIgnore]
+        public bool IsExpanded { get; set; }
+
+        bool ISelectableTreeNode.IsSelectionVisible => true;
 
         protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string propertyName = null)
         {

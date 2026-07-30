@@ -30,6 +30,7 @@
         <Setter Property="Margin" Value="0,0"/>
         <!-- Thinner selection box -->
         <Setter Property="Padding" Value="4,1"/> 
+        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
         <Setter Property="helpers:SelectionBehavior.SingleClickExpand" Value="True"/>
         <Setter Property="helpers:SelectionBehavior.PreserveSelectionOnRightClick" Value="True"/>
         <Setter Property="ContextMenu" Value="{x:Null}"/>

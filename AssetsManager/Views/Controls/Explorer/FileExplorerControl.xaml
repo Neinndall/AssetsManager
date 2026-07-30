@@ -234,7 +234,6 @@
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
                         <Setter Property="ContextMenu" Value="{StaticResource ExplorerContextMenu}"/>
-                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVisibilityConverter}}" />

@@ -1,25 +1,62 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using Material.Icons;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public class ProjectExplorerNode
+    public class ProjectExplorerNode : INotifyPropertyChanged, ISelectableTreeNode
     {
+        private bool _isExpanded = true;
+        private bool _isSelected;
+        private bool _isMultiSelected;
+
         public string Name { get; set; }
         public string FullPath { get; set; }
         public bool IsFile { get; set; }
         public MaterialIconKind IconKind { get; set; }
         public Brush IconColor { get; set; }
-        public bool IsExpanded { get; set; } = true;
+
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set => SetProperty(ref _isExpanded, value);
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set => SetProperty(ref _isSelected, value);
+        }
+
+        public bool IsMultiSelected
+        {
+            get => _isMultiSelected;
+            set => SetProperty(ref _isMultiSelected, value);
+        }
+
         public List<ProjectExplorerNode> Children { get; } = new List<ProjectExplorerNode>();
+
+        System.Collections.IEnumerable ISelectableTreeNode.SelectionChildren => Children;
+        bool ISelectableTreeNode.IsSelectionVisible => true;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void SetProperty(ref bool field, bool value, [CallerMemberName] string propertyName = null)
+        {
+            if (field == value) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public partial class ViewerProjectExplorerControl : UserControl

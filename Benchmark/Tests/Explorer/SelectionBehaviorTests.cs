@@ -1,11 +1,15 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Input;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Helpers;
+using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Explorer;
+using AssetsManager.Views.Models.Wad;
 using Xunit;
 
 namespace AssetsManager.BenchmarkTests.Tests.Explorer
@@ -58,6 +62,40 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             Assert.DoesNotContain("Property=\"IsSelected\" Value=\"{Binding IsSelected", treeStyle);
             Assert.DoesNotContain("Property=\"IsSelected\" Value=\"{Binding IsSelected", gridStyle);
             Assert.DoesNotContain("Property=\"IsSelected\" Value=\"{Binding IsSelected", resultsTree);
+            Assert.Contains("Property=\"IsExpanded\" Value=\"{Binding IsExpanded, Mode=TwoWay}\"", treeStyle);
+        }
+
+        [Fact]
+        public void EveryTreeViewUsesSharedSelectionStyle()
+        {
+            string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+            string viewsRoot = Path.Combine(repositoryRoot, "AssetsManager", "Views");
+
+            foreach (string file in Directory.EnumerateFiles(viewsRoot, "*.xaml", SearchOption.AllDirectories))
+            {
+                string xaml = File.ReadAllText(file);
+                foreach (Match tree in Regex.Matches(xaml, @"<TreeView(?!\.)\b[^>]*>", RegexOptions.Singleline))
+                {
+                    Assert.Contains("Style=\"{StaticResource ModernTreeView}\"", tree.Value);
+                }
+            }
+        }
+
+        [Fact]
+        public void ViewerBrowserUsesExtendedFileSelection()
+        {
+            string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+            string browser = File.ReadAllText(Path.Combine(
+                repositoryRoot,
+                "AssetsManager",
+                "Views",
+                "Controls",
+                "Viewer",
+                "ViewerProjectExplorerControl.xaml"));
+
+            Assert.Matches(
+                @"<ListBox[^>]*x:Name=""FilesListBox""[^>]*SelectionMode=""Extended""",
+                browser.ReplaceLineEndings(" "));
         }
 
         [Theory]
@@ -92,7 +130,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             root.Children.Add(hidden);
             root.Children.Add(second);
 
-            Assert.True(SelectionBehavior.SelectFileTreeRange(
+            Assert.True(SelectionBehavior.SelectTreeRange(
                 new ArrayList { root, target },
                 first,
                 target,
@@ -115,7 +153,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             var target = new FileSystemNodeModel("target", NodeType.VirtualFile);
             root.Children.Add(collapsedChild);
 
-            Assert.True(SelectionBehavior.SelectFileTreeRange(
+            Assert.True(SelectionBehavior.SelectTreeRange(
                 new ArrayList { root, target },
                 root,
                 target,
@@ -135,7 +173,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             var anchor = new FileSystemNodeModel("anchor", NodeType.VirtualFile);
             var target = new FileSystemNodeModel("target", NodeType.VirtualFile);
 
-            Assert.True(SelectionBehavior.SelectFileTreeRange(
+            Assert.True(SelectionBehavior.SelectTreeRange(
                 new ArrayList { previous, anchor, target },
                 anchor,
                 target,
@@ -145,6 +183,59 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             Assert.True(usedAnchor);
             Assert.True(previous.IsMultiSelected);
             Assert.True(anchor.IsMultiSelected);
+            Assert.True(target.IsMultiSelected);
+        }
+
+        [Fact]
+        public void ComparisonTreeRangeUsesSharedVisibleOrder()
+        {
+            var first = new SerializableChunkDiff { NewPath = "first.bin" };
+            var middle = new SerializableChunkDiff { NewPath = "middle.bin" };
+            var target = new SerializableChunkDiff { NewPath = "target.bin" };
+            var type = new DiffTypeGroupViewModel { IsExpanded = true };
+            type.Diffs.Add(first);
+            type.Diffs.Add(middle);
+            type.Diffs.Add(target);
+            var wad = new WadGroupViewModel { IsExpanded = true };
+            wad.Types.Add(type);
+
+            Assert.True(SelectionBehavior.SelectTreeRange(
+                new ArrayList { wad },
+                first,
+                target,
+                additive: false,
+                out bool usedAnchor));
+
+            Assert.True(usedAnchor);
+            Assert.False(wad.IsMultiSelected);
+            Assert.False(type.IsMultiSelected);
+            Assert.True(first.IsMultiSelected);
+            Assert.True(middle.IsMultiSelected);
+            Assert.True(target.IsMultiSelected);
+        }
+
+        [Fact]
+        public void ViewerTreeRangeUsesSharedVisibleOrder()
+        {
+            var first = new ProjectExplorerNode { Name = "first" };
+            var middle = new ProjectExplorerNode { Name = "middle" };
+            var target = new ProjectExplorerNode { Name = "target" };
+            var root = new ProjectExplorerNode { Name = "root", IsExpanded = true };
+            root.Children.Add(first);
+            root.Children.Add(middle);
+            root.Children.Add(target);
+
+            Assert.True(SelectionBehavior.SelectTreeRange(
+                new ArrayList { root },
+                first,
+                target,
+                additive: false,
+                out bool usedAnchor));
+
+            Assert.True(usedAnchor);
+            Assert.False(root.IsMultiSelected);
+            Assert.True(first.IsMultiSelected);
+            Assert.True(middle.IsMultiSelected);
             Assert.True(target.IsMultiSelected);
         }
 
