@@ -134,8 +134,8 @@
                                                 <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
                                             </Trigger>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="#25FFFFFF"/>
-                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="Transparent"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
