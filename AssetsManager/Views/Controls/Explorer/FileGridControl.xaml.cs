@@ -44,6 +44,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 control._isUpdatingItemsSource = true;
                 try
                 {
+                    control.ClearSelectionSession(resetAnchor: true);
                     var newItems = (ObservableRangeCollection<FileGridViewModel>)e.NewValue;
                     control._allItems = newItems ?? new ObservableRangeCollection<FileGridViewModel>();
                     
@@ -68,17 +69,17 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (_isUpdatingItemsSource) return;
 
-            // Keep the batch selection state separate from the active item state.
             foreach (FileGridViewModel item in e.RemovedItems)
             {
                 item.IsMultiSelected = false;
             }
 
-            // Sync IsMultiSelected if multiple items are selected OR if the user is using CTRL to select
-            bool isMulti = FileGridListBox.SelectedItems.Count > 1 || SelectionBehavior.IsMultiSelectIntent();
-            foreach (FileGridViewModel item in DisplayItems)
+            bool isMulti = FileGridListBox.SelectedItems.Count > 1 ||
+                           SelectionBehavior.IsMultiSelectIntent() ||
+                           SelectionBehavior.IsRangeSelectIntent();
+            foreach (FileGridViewModel item in FileGridListBox.SelectedItems)
             {
-                item.IsMultiSelected = isMulti && FileGridListBox.SelectedItems.Contains(item);
+                item.IsMultiSelected = isMulti;
             }
 
             if (ViewModel != null)
@@ -101,6 +102,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private void ApplyFilter(string type)
         {
             if (_allItems == null) return;
+            ClearSelectionSession(resetAnchor: true);
 
             if (type == "All")
             {
@@ -127,8 +129,21 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             if (e.OriginalSource is ListBoxItem item && item.DataContext is FileGridViewModel viewModel)
             {
+                ClearSelectionSession(resetAnchor: true);
                 ParentPreviewer?.HandleNodeClicked(viewModel.Node);
             }
+        }
+
+        private void ClearSelectionSession(bool resetAnchor)
+        {
+            foreach (FileGridViewModel item in FileGridListBox.SelectedItems)
+                item.IsMultiSelected = false;
+            FileGridListBox.UnselectAll();
+            if (ViewModel != null) ViewModel.SelectedCount = 0;
+
+            if (!resetAnchor) return;
+            FileGridListBox.ItemsSource = null;
+            FileGridListBox.ItemsSource = DisplayItems;
         }
 
         private void ActionBar_Action_Click(object sender, RoutedEventArgs e)
@@ -137,7 +152,7 @@ namespace AssetsManager.Views.Controls.Explorer
             {
                 if (action == "Close")
                 {
-                    FileGridListBox.UnselectAll();
+                    ClearSelectionSession(resetAnchor: true);
                     return;
                 }
 

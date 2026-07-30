@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
@@ -13,7 +14,7 @@ namespace AssetsManager.Views.Helpers
 {
     /// <summary>
     /// Orquestador universal de interacción y selección. 
-    /// Centraliza la lógica de selección múltiple (CTRL) y acciones primarias (Navegación).
+    /// Centraliza la lógica de selección múltiple y acciones primarias (Navegación).
     /// </summary>
     public static class SelectionBehavior
     {
@@ -27,6 +28,9 @@ namespace AssetsManager.Views.Helpers
 
         public static readonly DependencyProperty EnableUnifiedSelectionProperty =
             DependencyProperty.RegisterAttached("EnableUnifiedSelection", typeof(bool), typeof(SelectionBehavior), new UIPropertyMetadata(false, OnEnableUnifiedSelectionChanged));
+
+        private static readonly DependencyProperty RangeAnchorProperty =
+            DependencyProperty.RegisterAttached("RangeAnchor", typeof(object), typeof(SelectionBehavior));
 
         // Evento que se dispara cuando el usuario realiza una acción primaria (clic sin modificadores)
         public static readonly RoutedEvent PrimaryActionEvent = 
@@ -111,7 +115,26 @@ namespace AssetsManager.Views.Helpers
             if (sender is not FrameworkElement item || e.OriginalSource is ToggleButton) return;
             if (item is TreeViewItem && FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject) != item) return;
 
-            // 1. Lógica de Selección Múltiple (CTRL)
+            // TreeView owns its CTRL toggle; ListBox keeps native Extended selection.
+            if (item is TreeViewItem treeItem && IsRangeSelectIntent())
+            {
+                TreeView tree = FindAncestor<TreeView>(treeItem);
+                var anchor = tree?.GetValue(RangeAnchorProperty) as FileSystemNodeModel;
+                if (treeItem.DataContext is FileSystemNodeModel target &&
+                    SelectFileTreeRange(
+                        tree?.ItemsSource,
+                        anchor,
+                        target,
+                        IsMultiSelectIntent(),
+                        out bool usedAnchor))
+                {
+                    if (!usedAnchor) tree?.SetValue(RangeAnchorProperty, target);
+                    SetItemSelected(treeItem, true);
+                    e.Handled = true;
+                }
+                return;
+            }
+
             if (IsMultiSelectIntent())
             {
                 if (item is TreeViewItem)
@@ -119,30 +142,85 @@ namespace AssetsManager.Views.Helpers
                     bool current = GetIsMultiSelected(item.DataContext);
                     if (SetIsMultiSelected(item.DataContext, !current))
                     {
+                        FindAncestor<TreeView>(item)?.SetValue(RangeAnchorProperty, item.DataContext);
                         e.Handled = true;
                         return;
                     }
                 }
             }
 
-            // 2. Lógica de Acción Primaria / Navegación
+            // SHIFT ranges are handled by ListBox.SelectionMode=Extended.
             if (IsPrimaryActionIntent())
             {
-                // Limpiar selección múltiple en todo el árbol/lista
                 var rootControl = (ItemsControl)FindAncestor<TreeView>(item) ?? FindAncestor<ListBox>(item);
                 if (rootControl?.ItemsSource != null)
                 {
                     ClearAllMultiSelected(rootControl.ItemsSource);
                 }
 
-                // Disparar el evento de acción primaria para que el control sepa que debe "ejecutar" el nodo
-                item.RaiseEvent(new RoutedEventArgs(PrimaryActionEvent, item));
+                if (item is TreeViewItem)
+                    FindAncestor<TreeView>(item)?.SetValue(RangeAnchorProperty, item.DataContext);
+
+                if (item is ListBoxItem listBoxItem)
+                {
+                    listBoxItem.Dispatcher.BeginInvoke(
+                        DispatcherPriority.Input,
+                        new Action(() => listBoxItem.RaiseEvent(
+                            new RoutedEventArgs(PrimaryActionEvent, listBoxItem))));
+                }
+                else
+                {
+                    item.RaiseEvent(new RoutedEventArgs(PrimaryActionEvent, item));
+                }
 
                 if (item is TreeViewItem tvi)
                 {
                     ApplyPrimaryTreeAction(tvi);
                     e.Handled = true;
                 }
+            }
+        }
+
+        internal static bool SelectFileTreeRange(
+            IEnumerable roots,
+            FileSystemNodeModel anchor,
+            FileSystemNodeModel target,
+            bool additive,
+            out bool usedAnchor)
+        {
+            usedAnchor = false;
+            if (roots == null || target == null) return false;
+            var visible = new System.Collections.Generic.List<FileSystemNodeModel>();
+            CollectVisibleFileNodes(roots, visible);
+            int targetIndex = visible.IndexOf(target);
+            if (targetIndex < 0) return false;
+
+            int anchorIndex = anchor == null ? -1 : visible.IndexOf(anchor);
+            if (!additive) ClearAllMultiSelected(roots);
+            if (anchorIndex < 0)
+            {
+                target.IsMultiSelected = true;
+                return true;
+            }
+
+            usedAnchor = true;
+            int start = Math.Min(anchorIndex, targetIndex);
+            int end = Math.Max(anchorIndex, targetIndex);
+            for (int index = start; index <= end; index++)
+                visible[index].IsMultiSelected = true;
+            return true;
+        }
+
+        private static void CollectVisibleFileNodes(
+            IEnumerable nodes,
+            System.Collections.Generic.ICollection<FileSystemNodeModel> visible)
+        {
+            foreach (object item in nodes)
+            {
+                if (item is not FileSystemNodeModel node || !node.IsVisible) continue;
+                visible.Add(node);
+                if (node.IsExpanded && node.VisibleChildren != null)
+                    CollectVisibleFileNodes(node.VisibleChildren, visible);
             }
         }
 
@@ -212,10 +290,22 @@ namespace AssetsManager.Views.Helpers
             return Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         }
 
+        public static bool IsRangeSelectIntent()
+        {
+            return IsRangeSelectIntent(Keyboard.Modifiers);
+        }
+
         public static bool IsPrimaryActionIntent()
         {
-            return !IsMultiSelectIntent();
+            return IsPrimaryActionIntent(Keyboard.Modifiers);
         }
+
+        internal static bool IsRangeSelectIntent(ModifierKeys modifiers) =>
+            modifiers.HasFlag(ModifierKeys.Shift);
+
+        internal static bool IsPrimaryActionIntent(ModifierKeys modifiers) =>
+            !modifiers.HasFlag(ModifierKeys.Control) &&
+            !modifiers.HasFlag(ModifierKeys.Shift);
 
         private static bool IsItemSelected(FrameworkElement container)
         {
