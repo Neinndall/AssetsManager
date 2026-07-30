@@ -73,7 +73,7 @@ namespace AssetsManager.Services.Hashes
             {
                 uint entryHash = pair.Key;
                 if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) continue;
-                var candidates = new Dictionary<string, InternalHashEvidence>(StringComparer.Ordinal);
+                var candidates = new Dictionary<string, InternalHashEvidence>(StringComparer.OrdinalIgnoreCase);
                 foreach (BinTreeProperty property in pair.Value.Properties.Values)
                     Visit(property);
                 if (candidates.Count == 1)
@@ -117,7 +117,7 @@ namespace AssetsManager.Services.Hashes
                 void MatchOwnedString(string value)
                 {
                     if (string.IsNullOrWhiteSpace(value)) return;
-                    string candidate = PathUtils.NormalizePath(value.Trim());
+                    string candidate = InternalHashEvidenceMatcher.NormalizeCandidate(value);
 
                     AddCandidate(candidate, InternalHashEvidence.OwningEntryString);
                     if (!candidate.Contains('/')) return;

@@ -427,8 +427,6 @@ namespace AssetsManager.Services.Hashes
                 }, cancellationToken);
 
                 int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
-                IReadOnlyList<InternalHashGuessMatch> existingResearch = await _store.LoadResearchAsync(cancellationToken);
-                matcher.PromoteUniqueSchemaCandidates(existingResearch);
                 progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", checkedCount));
                 return await CompleteRunAsync(matcher, initial, checkedCount);
             }

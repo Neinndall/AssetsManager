@@ -44,9 +44,19 @@ namespace AssetsManager.Views.Models.Hashes
         OwningEntryString
     }
 
+    public enum InternalHashEvidenceOrigin
+    {
+        Unknown,
+        ShippedData,
+        RuntimeCorrelation,
+        ExternalSchema,
+        StatisticalInference,
+        StructuralInference
+    }
+
     public sealed class InternalHashGuessMatch
     {
-        public const int CurrentVerificationSchema = 4;
+        public const int CurrentVerificationSchema = 5;
         public ulong Hash { get; init; }
         public ulong LookupHash { get; init; }
         public int HashBits { get; init; }
@@ -60,6 +70,7 @@ namespace AssetsManager.Views.Models.Hashes
         public int VerificationSchema { get; init; }
         public InternalHashConfidence Confidence { get; init; }
         public InternalHashEvidence Evidence { get; init; }
+        public InternalHashEvidenceOrigin EvidenceOrigin { get; init; }
         public int EvidenceOccurrences { get; init; }
         public double ExpectedRandomMatches { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
@@ -72,8 +83,7 @@ namespace AssetsManager.Views.Models.Hashes
             evidence is InternalHashEvidence.ObservedHashPair or
                 InternalHashEvidence.OwningEntryString or
                 InternalHashEvidence.OwningEntryPrefix or
-                InternalHashEvidence.RstHashMatch or
-                InternalHashEvidence.MetaSchemaUnique;
+                InternalHashEvidence.RstHashMatch;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");

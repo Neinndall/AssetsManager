@@ -13,6 +13,7 @@ namespace AssetsManager.Services.Hashes
 {
     public sealed class BinRstHashGuessingStore
     {
+        internal const string VerificationSchemaFileName = "verification.schema";
         private readonly DirectoriesCreator _directories;
         private readonly SemaphoreSlim _lock = new(1, 1);
 
@@ -30,7 +31,10 @@ namespace AssetsManager.Services.Hashes
         {
             var result = new Dictionary<ulong, string>();
             int width = IsRst(kind) ? 16 : 8;
-            foreach (string path in new[] { GetKnownPath(kind), GetVerifiedPath(kind) })
+            IEnumerable<string> paths = new[] { GetKnownPath(kind) };
+            if (HasCurrentVerificationSchema())
+                paths = paths.Append(GetVerifiedPath(kind));
+            foreach (string path in paths)
             {
                 if (!File.Exists(path)) continue;
                 using var reader = new StreamReader(path);
@@ -95,7 +99,9 @@ namespace AssetsManager.Services.Hashes
             try
             {
                 Directory.CreateDirectory(_directories.HashLabPath);
-                await SaveResearchAsync(Array.Empty<InternalHashGuessMatch>(), cancellationToken);
+                List<InternalHashGuessMatch> research = await SaveResearchAsync(
+                    Array.Empty<InternalHashGuessMatch>(), cancellationToken);
+                await RebuildVerifiedCatalogsAsync(research, cancellationToken);
                 foreach (var pair in observed)
                 {
                     var known = await LoadKnownAsync(pair.Key, cancellationToken);
@@ -128,12 +134,12 @@ namespace AssetsManager.Services.Hashes
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                await SaveResearchAsync(materialized, cancellationToken);
-                var groups = materialized.Where(match => match.CanPromote).GroupBy(match => match.Kind).ToList();
+                List<InternalHashGuessMatch> research = await SaveResearchAsync(materialized, cancellationToken);
+                IReadOnlyList<InternalHashGuessMatch> verified =
+                    await RebuildVerifiedCatalogsAsync(research, cancellationToken);
+                var groups = verified.GroupBy(match => match.Kind).ToList();
                 foreach (var group in groups)
                 {
-                    var incoming = group.GroupBy(match => match.Hash).ToDictionary(g => g.Key, g => g.Last().Value);
-                    await MergeKnownAsync(GetVerifiedPath(group.Key), incoming, IsRst(group.Key) ? 16 : 8, cancellationToken);
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
                     foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
                     {
@@ -153,7 +159,9 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private async Task SaveResearchAsync(IEnumerable<InternalHashGuessMatch> incoming, CancellationToken cancellationToken)
+        private async Task<List<InternalHashGuessMatch>> SaveResearchAsync(
+            IEnumerable<InternalHashGuessMatch> incoming,
+            CancellationToken cancellationToken)
         {
             string path = Path.Combine(_directories.HashLabPath, "internal.research.json");
             var existing = new List<InternalHashGuessMatch>();
@@ -184,6 +192,55 @@ namespace AssetsManager.Services.Hashes
             {
                 if (File.Exists(temporary)) File.Delete(temporary);
             }
+            return merged;
+        }
+
+        private async Task<IReadOnlyList<InternalHashGuessMatch>> RebuildVerifiedCatalogsAsync(
+            IReadOnlyCollection<InternalHashGuessMatch> research,
+            CancellationToken cancellationToken)
+        {
+            string verifiedDirectory = Path.Combine(_directories.HashLabPath, "verified");
+            Directory.CreateDirectory(verifiedDirectory);
+            string schemaPath = Path.Combine(verifiedDirectory, VerificationSchemaFileName);
+            if (File.Exists(schemaPath)) File.Delete(schemaPath);
+
+            List<InternalHashGuessMatch> verified = research
+                .Where(match => match.CanPromote)
+                .GroupBy(match => (match.Kind, match.Hash))
+                .Where(group => group
+                    .Select(match => match.Value)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(2)
+                    .Count() == 1)
+                .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
+                .ToList();
+
+            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
+            {
+                int width = IsRst(kind) ? 16 : 8;
+                IEnumerable<string> lines = verified
+                    .Where(match => match.Kind == kind)
+                    .OrderBy(match => match.Value, StringComparer.Ordinal)
+                    .Select(match => $"{match.Hash.ToString(width == 16 ? "x16" : "x8")} {match.Value}");
+                await WriteTextAtomicallyAsync(GetVerifiedPath(kind), lines, cancellationToken);
+            }
+
+            await WriteTextAtomicallyAsync(
+                schemaPath,
+                new[] { InternalHashGuessMatch.CurrentVerificationSchema.ToString(CultureInfo.InvariantCulture) },
+                cancellationToken);
+            return verified;
+        }
+
+        private bool HasCurrentVerificationSchema()
+        {
+            string path = Path.Combine(
+                _directories.HashLabPath,
+                "verified",
+                VerificationSchemaFileName);
+            return File.Exists(path) &&
+                   int.TryParse(File.ReadAllText(path).Trim(), out int schema) &&
+                   schema == InternalHashGuessMatch.CurrentVerificationSchema;
         }
 
         private async Task SaveLegacyQuarantineAsync(
@@ -243,22 +300,6 @@ namespace AssetsManager.Services.Hashes
                 lookups.Add(hash & ((1UL << 40) - 1));
             }
             return lookups;
-        }
-
-        private async Task MergeKnownAsync(string path, IReadOnlyDictionary<ulong, string> incoming, int width, CancellationToken cancellationToken)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            var values = new Dictionary<ulong, string>();
-            if (File.Exists(path))
-            {
-                using var reader = new StreamReader(path);
-                while (await reader.ReadLineAsync(cancellationToken) is string line)
-                    if (line.Length > width && ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong hash))
-                        values[hash] = line[(width + 1)..];
-            }
-            foreach (var pair in incoming) values[pair.Key] = pair.Value;
-            await WriteTextAtomicallyAsync(path, values.OrderBy(pair => pair.Value, StringComparer.Ordinal)
-                .Select(pair => $"{pair.Key.ToString(width == 16 ? "x16" : "x8")} {pair.Value}"), cancellationToken);
         }
 
         private async Task WriteUnknownAtomicallyAsync(string path, IEnumerable<ulong> hashes, InternalHashKind kind, CancellationToken cancellationToken)

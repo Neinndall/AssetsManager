@@ -11,8 +11,6 @@ namespace AssetsManager.Services.Hashes
 {
     internal sealed class InternalHashEvidenceMatcher
     {
-        private const string MetaSchemaClassSource = "Meta Schema class names";
-        private const string MetaSchemaPropertySource = "Meta Schema property names";
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
         private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
         private readonly List<InternalHashGuessMatch> _pendingMatches = new();
@@ -47,14 +45,14 @@ namespace AssetsManager.Services.Hashes
                 DiscardedCandidates++;
                 return;
             }
-            string candidate = PathUtils.NormalizePath(value.Trim());
+            string candidate = NormalizeCandidate(value);
             uint fnv = Fnv1a.HashLower(candidate);
             bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
             bool crossDictionary = strategy == InternalHashGuessStrategy.CrossDictionary;
             bool gamePath = strategy == InternalHashGuessStrategy.GamePath;
             if (content || crossDictionary || gamePath)
             {
-                bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin");
+                bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                 if (!isAssetPath)
                 {
                     if (candidate.Contains('/'))
@@ -95,7 +93,7 @@ namespace AssetsManager.Services.Hashes
                 return false;
             }
 
-            string candidate = PathUtils.NormalizePath(value.Trim());
+            string candidate = NormalizeCandidate(value);
             uint computedHash = Fnv1a.HashLower(candidate);
             if (observedHash.HasValue && computedHash != observedHash.Value)
             {
@@ -148,7 +146,7 @@ namespace AssetsManager.Services.Hashes
                 return false;
             }
 
-            string candidate = PathUtils.NormalizePath(value.Trim());
+            string candidate = NormalizeCandidate(value);
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
             {
@@ -173,6 +171,7 @@ namespace AssetsManager.Services.Hashes
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = InternalHashConfidence.Candidate,
                 Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence),
                 EvidenceOccurrences = occurrences,
                 ExpectedRandomMatches = expectedRandomMatches
             };
@@ -233,64 +232,12 @@ namespace AssetsManager.Services.Hashes
                 IsVerified = false,
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = InternalHashConfidence.Candidate,
-                Evidence = evidence
+                Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
             _pendingMatches.Add(match);
             return true;
-        }
-
-        internal void PromoteUniqueSchemaCandidates(IEnumerable<InternalHashGuessMatch> existingResearch)
-        {
-            var candidates = existingResearch
-                .Concat(_matches.Values)
-                .Where(match =>
-                    match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema &&
-                    match.Evidence == InternalHashEvidence.MetaSchemaWordset &&
-                    !match.IsVerified &&
-                    match.Confidence == InternalHashConfidence.Candidate &&
-                    !string.IsNullOrWhiteSpace(match.Value) &&
-                    match.Source is MetaSchemaClassSource or MetaSchemaPropertySource &&
-                    match.Kind is InternalHashKind.BinTypes or InternalHashKind.BinFields &&
-                    ((match.Kind == InternalHashKind.BinTypes && match.Source == MetaSchemaClassSource) ||
-                     (match.Kind == InternalHashKind.BinFields && match.Source == MetaSchemaPropertySource)) &&
-                    _targets[match.Kind].Contains(match.LookupHash))
-                .GroupBy(match => (match.Kind, match.LookupHash));
-
-            foreach (var group in candidates)
-            {
-                InternalHashGuessMatch[] distinct = group
-                    .GroupBy(match => match.Value, StringComparer.Ordinal)
-                    .Select(values => values.OrderByDescending(match => match.FoundAtUtc).First())
-                    .ToArray();
-                if (distinct.Length != 1) continue;
-
-                InternalHashGuessMatch candidate = distinct[0];
-                _targets[candidate.Kind].Remove(candidate.LookupHash);
-                foreach (var key in _matches.Keys
-                    .Where(key => key.Kind == candidate.Kind && key.Hash == candidate.Hash)
-                    .ToList())
-                    _matches.Remove(key);
-
-                var promoted = new InternalHashGuessMatch
-                {
-                    Hash = candidate.Hash,
-                    LookupHash = candidate.LookupHash,
-                    HashBits = candidate.HashBits,
-                    Value = candidate.Value,
-                    Kind = candidate.Kind,
-                    Strategy = candidate.Strategy,
-                    Source = candidate.Source,
-                    SourceWad = candidate.SourceWad,
-                    SourceBin = candidate.SourceBin,
-                    IsVerified = true,
-                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.MetaSchemaUnique
-                };
-                _matches[(promoted.Kind, promoted.Hash, promoted.Value)] = promoted;
-                _pendingMatches.Add(promoted);
-            }
         }
 
         internal static bool IsIdentifier(string value)
@@ -347,6 +294,7 @@ namespace AssetsManager.Services.Hashes
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
                 Evidence = evidence,
+                EvidenceOrigin = GetEvidenceOrigin(evidence),
                 EvidenceOccurrences = 1
             };
             _matches[key] = match;
@@ -381,7 +329,8 @@ namespace AssetsManager.Services.Hashes
                     IsVerified = true,
                     VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                     Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.RstHashMatch
+                    Evidence = InternalHashEvidence.RstHashMatch,
+                    EvidenceOrigin = InternalHashEvidenceOrigin.ShippedData
                 };
                 _matches[(kind, fullHash, value)] = match;
                 _pendingMatches.Add(match);
@@ -391,5 +340,22 @@ namespace AssetsManager.Services.Hashes
 
         private static string UpperFirst(string value) =>
             string.IsNullOrEmpty(value) ? value : char.ToUpperInvariant(value[0]) + value[1..];
+
+        internal static string NormalizeCandidate(string value) =>
+            value?.Trim().Replace('\\', '/') ?? string.Empty;
+
+        private static InternalHashEvidenceOrigin GetEvidenceOrigin(InternalHashEvidence evidence) => evidence switch
+        {
+            InternalHashEvidence.ObservedHashPair or
+            InternalHashEvidence.OwningEntryString or
+            InternalHashEvidence.OwningEntryPrefix => InternalHashEvidenceOrigin.RuntimeCorrelation,
+            InternalHashEvidence.RstHashMatch => InternalHashEvidenceOrigin.ShippedData,
+            InternalHashEvidence.MetaSchemaWordset or
+            InternalHashEvidence.MetaSchemaRelation or
+            InternalHashEvidence.MetaSchemaUnique => InternalHashEvidenceOrigin.ExternalSchema,
+            InternalHashEvidence.GamePathStatisticalMatch => InternalHashEvidenceOrigin.StatisticalInference,
+            InternalHashEvidence.SemanticReference => InternalHashEvidenceOrigin.StructuralInference,
+            _ => InternalHashEvidenceOrigin.Unknown
+        };
     }
 }

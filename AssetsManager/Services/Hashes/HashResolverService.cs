@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using LeagueToolkit.Hashing;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.Hashes;
 
 namespace AssetsManager.Services.Hashes
 {
@@ -100,6 +101,7 @@ namespace AssetsManager.Services.Hashes
         {
             if (_binHashesLoaded) return;
             var binHashesDir = _directoriesCreator.HashesPath;
+            bool loadVerified = HasCurrentVerificationSchema();
             var files = new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binfields.txt", "hashes.bintypes.txt" };
             foreach (var file in files)
             {
@@ -116,7 +118,7 @@ namespace AssetsManager.Services.Hashes
                 }
 
                 var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
-                if (File.Exists(verifiedPath))
+                if (loadVerified && File.Exists(verifiedPath))
                 {
                     var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
                     verifiedCache.Load();
@@ -134,6 +136,7 @@ namespace AssetsManager.Services.Hashes
         {
             if (_rstHashesLoaded) return;
             var rstHashesDir = _directoriesCreator.HashesPath;
+            bool loadVerified = HasCurrentVerificationSchema();
             var files = new[] { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" };
             foreach (var file in files)
             {
@@ -150,7 +153,7 @@ namespace AssetsManager.Services.Hashes
                 }
 
                 var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
-                if (File.Exists(verifiedPath))
+                if (loadVerified && File.Exists(verifiedPath))
                 {
                     var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
                     verifiedCache.Load();
@@ -162,6 +165,17 @@ namespace AssetsManager.Services.Hashes
                 }
             }
             _rstHashesLoaded = true;
+        }
+
+        private bool HasCurrentVerificationSchema()
+        {
+            string path = Path.Combine(
+                _directoriesCreator.HashLabPath,
+                "verified",
+                BinRstHashGuessingStore.VerificationSchemaFileName);
+            return File.Exists(path) &&
+                   int.TryParse(File.ReadAllText(path).Trim(), out int schema) &&
+                   schema == InternalHashGuessMatch.CurrentVerificationSchema;
         }
 
         public Task LoadHashesAsync() { LoadHashes(); return Task.CompletedTask; }

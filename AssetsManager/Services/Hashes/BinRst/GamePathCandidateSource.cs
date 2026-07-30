@@ -26,7 +26,7 @@ namespace AssetsManager.Services.Hashes
                 if (string.IsNullOrWhiteSpace(line)) continue;
                 int separator = line.IndexOf(' ');
                 string path = separator >= 0 ? line[(separator + 1)..] : line;
-                path = PathUtils.NormalizePath(path.Trim());
+                path = InternalHashEvidenceMatcher.NormalizeCandidate(path);
                 if (path.Length < 3 || !path.Contains('/')) continue;
 
                 AddForm(path);
