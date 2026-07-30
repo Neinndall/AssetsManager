@@ -306,25 +306,26 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void ContextualEntryAttributeResolvesObjectPath()
+        public void OwnedPathResolvesWithoutClassSpecificHook()
         {
             const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
             uint hash = Fnv1a.HashLower(candidate);
             var targets = CreateTargets();
             targets[InternalHashKind.BinEntries].Add(hash);
             var matcher = new InternalHashEvidenceMatcher(targets);
-            var tree = CreateEntryTree(hash, "VfxSystemDefinitionData", "particlePath", candidate);
+            var tree = CreateEntryTree(hash, "PreviouslyUnknownClass", "arbitraryValue", candidate);
 
-            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "cassiopeia.bin");
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "cassiopeia.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashKind.BinEntries, match.Kind);
             Assert.Equal(candidate.ToLowerInvariant(), match.Value);
+            Assert.Equal(InternalHashEvidence.OwningEntryString, match.Evidence);
             Assert.True(match.IsVerified);
         }
 
         [Fact]
-        public void UnrelatedEntryStringIsRejected()
+        public void ContextualHooksDoNotResolveLiteralOwnerStrings()
         {
             const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
             uint hash = Fnv1a.HashLower(candidate);
@@ -350,12 +351,72 @@ namespace AssetsManager.BenchmarkTests.Hashes
             var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(entryHash, "UnrelatedClass", "assetPath", asset);
 
-            BinContentEvidenceSource.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "test.bin");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.Equal(entry, match.Value);
+            Assert.Equal(entry.ToLowerInvariant(), match.Value);
             Assert.Equal(InternalHashEvidence.OwningEntryPrefix, match.Evidence);
             Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void SimpleOwnedStringResolvesEntryWithoutClassWhitelist()
+        {
+            const string entry = "UnlistedEntryName";
+            uint entryHash = Fnv1a.HashLower(entry);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(entryHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = CreateEntryTree(entryHash, "PreviouslyUnknownClass", "arbitraryValue", entry);
+
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "test.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(entry.ToLowerInvariant(), match.Value);
+            Assert.Equal(InternalHashEvidence.OwningEntryString, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(entryHash, targets[InternalHashKind.BinEntries]);
+        }
+
+        [Fact]
+        public void SimpleStringCannotResolveEntryOwnedByAnotherObject()
+        {
+            const string entry = "UnlistedEntryName";
+            uint targetHash = Fnv1a.HashLower(entry);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(targetHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = CreateEntryTree(0x12345678, "PreviouslyUnknownClass", "arbitraryValue", entry);
+
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "test.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(targetHash, targets[InternalHashKind.BinEntries]);
+        }
+
+        [Fact]
+        public void CollidingOwnedStringsRemainUnresolved()
+        {
+            const string first = "yafhet0d6pup";
+            const string second = "aye79o8723jl";
+            uint entryHash = Fnv1a.HashLower(first);
+            Assert.Equal(entryHash, Fnv1a.HashLower(second));
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(entryHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(entryHash, Fnv1a.HashLower("PreviouslyUnknownClass"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("first"), first),
+                    new BinTreeString(Fnv1a.HashLower("second"), second)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "test.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(entryHash, targets[InternalHashKind.BinEntries]);
         }
 
         [Fact]
@@ -368,7 +429,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             var matcher = new InternalHashEvidenceMatcher(targets);
             var tree = CreateEntryTree(0x12345678, "UnrelatedClass", "assetPath", entry + "/test.dds");
 
-            BinContentEvidenceSource.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+            BinContentEvidenceSource.MatchOwningEntryStringEvidence(tree, matcher, "test.bin");
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(targetHash, targets[InternalHashKind.BinEntries]);

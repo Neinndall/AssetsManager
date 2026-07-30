@@ -12,29 +12,6 @@ namespace AssetsManager.Services.Hashes
 {
     internal static class BinContentEvidenceSource
     {
-        private static readonly HashSet<uint> NamedEntryTypes = new[]
-        {
-            "StaticMaterialDef", "UISceneData", "UiElementEffectAmmoData", "UiElementEffectAnimatedRotatingIconData",
-            "UiElementEffectAnimationData", "UiElementEffectArcFillData", "UiElementEffectCircleMaskCooldownData",
-            "UiElementEffectCircleMaskDesaturateData", "UiElementEffectCooldownData", "UiElementEffectCooldownRadialData",
-            "UiElementEffectCustomMaterialData", "UiElementEffectData", "UiElementEffectDesaturateData",
-            "UiElementEffectFillPercentageData", "UiElementEffectGlowConstantData", "UiElementEffectGlowData",
-            "UiElementEffectGlowingRotatingIconData", "UiElementGroupButtonData", "UiElementGroupData", "UiElementGroupFramedData",
-            "UiElementGroupManagedLayoutData", "UiElementGroupMeterData", "UiElementGroupSliderData", "UiElementIconData",
-            "UiElementParticleSystemData", "UiElementRegionData", "UiElementScissorRegionData", "UiElementSpineAnimationData",
-            "UiElementTextData", "UiSceneViewPaneData"
-        }.Select(Fnv1a.HashLower).ToHashSet();
-
-        private static readonly Dictionary<uint, uint> DirectEntryFields = new()
-        {
-            [Fnv1a.HashLower("ContextualActionData")] = Fnv1a.HashLower("mObjectPath"),
-            [Fnv1a.HashLower("CustomShaderDef")] = Fnv1a.HashLower("objectPath"),
-            [Fnv1a.HashLower("MapContainer")] = Fnv1a.HashLower("mapPath"),
-            [Fnv1a.HashLower("RewardGroup")] = Fnv1a.HashLower("internalName"),
-            [Fnv1a.HashLower("VfxSystemDefinitionData")] = Fnv1a.HashLower("particlePath"),
-            [Fnv1a.HashLower("Sequence")] = Fnv1a.HashLower("path")
-        };
-
         private static void VisitBinStrings(BinTree tree, Action<string> check)
         {
             foreach (string dependency in tree.Dependencies) check(dependency);
@@ -78,7 +55,7 @@ namespace AssetsManager.Services.Hashes
             string wadPath = null,
             HashResolverService resolver = null)
         {
-            MatchOwningEntryPrefixEvidence(tree, matcher, path, wadPath);
+            MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
             MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
             if (matcher.GetRemaining(InternalHashKind.RstXxh3).Count > 0 ||
@@ -86,7 +63,7 @@ namespace AssetsManager.Services.Hashes
                 VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
         }
 
-        internal static void MatchOwningEntryPrefixEvidence(
+        internal static void MatchOwningEntryStringEvidence(
             BinTree tree,
             InternalHashEvidenceMatcher matcher,
             string path,
@@ -96,16 +73,27 @@ namespace AssetsManager.Services.Hashes
             {
                 uint entryHash = pair.Key;
                 if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) continue;
+                var candidates = new Dictionary<string, InternalHashEvidence>(StringComparer.Ordinal);
                 foreach (BinTreeProperty property in pair.Value.Properties.Values)
                     Visit(property);
+                if (candidates.Count == 1)
+                {
+                    var candidate = candidates.First();
+                    matcher.CheckContextualCandidate(
+                        InternalHashKind.BinEntries,
+                        candidate.Key,
+                        path,
+                        wadPath,
+                        entryHash,
+                        candidate.Value);
+                }
 
                 void Visit(BinTreeProperty property)
                 {
-                    if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
                     switch (property)
                     {
                         case BinTreeString text:
-                            MatchPrefixes(text.Value);
+                            MatchOwnedString(text.Value);
                             break;
                         case BinTreeStruct structure:
                             foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
@@ -126,11 +114,12 @@ namespace AssetsManager.Services.Hashes
                     }
                 }
 
-                void MatchPrefixes(string value)
+                void MatchOwnedString(string value)
                 {
-                    if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
                     if (string.IsNullOrWhiteSpace(value)) return;
                     string candidate = PathUtils.NormalizePath(value.Trim());
+
+                    AddCandidate(candidate, InternalHashEvidence.OwningEntryString);
                     if (!candidate.Contains('/')) return;
 
                     // A prefix is authoritative only for the entry that owns the string.
@@ -138,22 +127,14 @@ namespace AssetsManager.Services.Hashes
                     for (int index = candidate.IndexOf('/'); index >= 0; index = candidate.IndexOf('/', index + 1))
                     {
                         if (index < 3) continue;
-                        matcher.CheckContextualCandidate(
-                            InternalHashKind.BinEntries,
-                            candidate[..index],
-                            path,
-                            wadPath,
-                            entryHash,
-                            InternalHashEvidence.OwningEntryPrefix);
-                        if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
+                        AddCandidate(candidate[..index], InternalHashEvidence.OwningEntryPrefix);
                     }
-                    matcher.CheckContextualCandidate(
-                        InternalHashKind.BinEntries,
-                        candidate,
-                        path,
-                        wadPath,
-                        entryHash,
-                        InternalHashEvidence.OwningEntryPrefix);
+                }
+
+                void AddCandidate(string candidate, InternalHashEvidence evidence)
+                {
+                    if (Fnv1a.HashLower(candidate) == entryHash)
+                        candidates.TryAdd(candidate, evidence);
                 }
             }
         }
@@ -264,9 +245,6 @@ namespace AssetsManager.Services.Hashes
 
             void MatchEntry(uint entryHash, BinTreeObject item)
             {
-                if (NamedEntryTypes.Contains(item.ClassHash)) MatchEntryFromString(entryHash, item, "name");
-                if (DirectEntryFields.TryGetValue(item.ClassHash, out uint directField)) MatchEntryFromFieldHash(entryHash, item, directField);
-
                 if (item.ClassHash is uint classHash)
                 {
                     if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
@@ -368,12 +346,6 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            void MatchEntryFromString(uint entryHash, BinTreeObject item, string field) => MatchEntryFromFieldHash(entryHash, item, Fnv1a.HashLower(field));
-            void MatchEntryFromFieldHash(uint entryHash, BinTreeObject item, uint field)
-            {
-                if (item.Properties.TryGetValue(field, out BinTreeProperty property) && property is BinTreeString text)
-                    MatchObservedEntry(entryHash, text.Value);
-            }
             void MatchEntryPattern(uint entryHash, BinTreeObject item, string field, Func<string, string> format)
             {
                 if (TryGetString(item.Properties, field, out string value)) MatchObservedEntry(entryHash, format(value));

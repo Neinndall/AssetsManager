@@ -322,8 +322,7 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence evidence = InternalHashEvidence.RuntimeContext)
         {
             if (!hasLocalEvidence || !_targets[kind].Contains(hash)) return;
-            bool verified = evidence is InternalHashEvidence.ObservedHashPair or
-                InternalHashEvidence.OwningEntryPrefix;
+            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
             if (verified)
             {
                 _targets[kind].Remove(hash);

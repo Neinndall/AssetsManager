@@ -40,7 +40,8 @@ namespace AssetsManager.Views.Models.Hashes
         MetaSchemaWordset,
         MetaSchemaRelation,
         RstHashMatch,
-        MetaSchemaUnique
+        MetaSchemaUnique,
+        OwningEntryString
     }
 
     public sealed class InternalHashGuessMatch
@@ -66,7 +67,10 @@ namespace AssetsManager.Views.Models.Hashes
             IsVerified &&
             Confidence == InternalHashConfidence.Verified &&
             VerificationSchema >= CurrentVerificationSchema &&
-            Evidence is InternalHashEvidence.ObservedHashPair or
+            IsPromotableEvidence(Evidence);
+        internal static bool IsPromotableEvidence(InternalHashEvidence evidence) =>
+            evidence is InternalHashEvidence.ObservedHashPair or
+                InternalHashEvidence.OwningEntryString or
                 InternalHashEvidence.OwningEntryPrefix or
                 InternalHashEvidence.RstHashMatch or
                 InternalHashEvidence.MetaSchemaUnique;
