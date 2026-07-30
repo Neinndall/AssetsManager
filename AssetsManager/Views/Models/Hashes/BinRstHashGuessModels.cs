@@ -33,14 +33,19 @@ namespace AssetsManager.Views.Models.Hashes
     {
         Legacy,
         RuntimeContext,
+        ObservedHashPair,
+        SemanticReference,
+        OwningEntryPrefix,
+        GamePathStatisticalMatch,
         MetaSchemaWordset,
+        MetaSchemaRelation,
         RstHashMatch,
         MetaSchemaUnique
     }
 
     public sealed class InternalHashGuessMatch
     {
-        public const int CurrentVerificationSchema = 2;
+        public const int CurrentVerificationSchema = 4;
         public ulong Hash { get; init; }
         public ulong LookupHash { get; init; }
         public int HashBits { get; init; }
@@ -54,11 +59,17 @@ namespace AssetsManager.Views.Models.Hashes
         public int VerificationSchema { get; init; }
         public InternalHashConfidence Confidence { get; init; }
         public InternalHashEvidence Evidence { get; init; }
+        public int EvidenceOccurrences { get; init; }
+        public double ExpectedRandomMatches { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
         public bool CanPromote =>
             IsVerified &&
             Confidence == InternalHashConfidence.Verified &&
-            VerificationSchema >= CurrentVerificationSchema;
+            VerificationSchema >= CurrentVerificationSchema &&
+            Evidence is InternalHashEvidence.ObservedHashPair or
+                InternalHashEvidence.OwningEntryPrefix or
+                InternalHashEvidence.RstHashMatch or
+                InternalHashEvidence.MetaSchemaUnique;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");

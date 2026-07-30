@@ -330,6 +330,18 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
                 }
+                if (includeBin && matcher.GetRemaining(InternalHashKind.BinEntries).Count > 0)
+                {
+                    string gameHashesPath = Path.Combine(_directories.HashesPath, "hashes.game.txt");
+                    if (File.Exists(gameHashesPath))
+                    {
+                        DiscoverGamePathCandidates(
+                            File.ReadLines(gameHashesPath),
+                            matcher,
+                            gameHashesPath,
+                            cancellationToken);
+                    }
+                }
                 progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", scanned));
                 return await CompleteRunAsync(matcher, initial, scanned);
             }
@@ -337,6 +349,73 @@ namespace AssetsManager.Services.Hashes
             {
                 await HandleCancelledRunAsync(matcher, stopwatch, progress, scanned);
                 throw;
+            }
+        }
+
+        internal static void DiscoverGamePathCandidates(
+            IEnumerable<string> gameHashLines,
+            LocalEvidenceMatcher matcher,
+            string source,
+            CancellationToken cancellationToken = default)
+        {
+            HashSet<ulong> targets = matcher.GetRemaining(InternalHashKind.BinEntries).ToHashSet();
+            if (targets.Count == 0) return;
+
+            var formsByGroup = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (string line in gameHashLines)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                int separator = line.IndexOf(' ');
+                string path = separator >= 0 ? line[(separator + 1)..] : line;
+                path = PathUtils.NormalizePath(path.Trim());
+                if (path.Length < 3 || !path.Contains('/')) continue;
+
+                AddForm(path);
+                int extensionIndex = path.LastIndexOf('.');
+                int slashIndex = path.LastIndexOf('/');
+                if (extensionIndex > slashIndex + 1)
+                    AddForm(path[..extensionIndex]);
+            }
+
+            foreach (var pair in formsByGroup)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var matches = pair.Value
+                    .Select(value => (Value: value, Hash: (ulong)Fnv1a.HashLower(value)))
+                    .Where(candidate => targets.Contains(candidate.Hash))
+                    .GroupBy(candidate => candidate.Hash)
+                    .Select(group => group.First())
+                    .ToArray();
+                double expected = pair.Value.Count * (double)targets.Count / 4294967296d;
+
+                // Statistical enrichment is useful discovery evidence, never proof.
+                // Require several observations and a 10x signal over random collisions.
+                if (matches.Length < 3 || expected > 1 || matches.Length < expected * 10) continue;
+                foreach (var match in matches)
+                {
+                    matcher.CheckResearchCandidate(
+                        InternalHashKind.BinEntries,
+                        match.Value,
+                        InternalHashGuessStrategy.GamePath,
+                        $"{source} [{pair.Key}]",
+                        InternalHashEvidence.GamePathStatisticalMatch,
+                        matches.Length,
+                        expected);
+                }
+            }
+
+            void AddForm(string value)
+            {
+                int slash = value.IndexOf('/');
+                if (slash <= 0) return;
+                string group = value[..slash];
+                if (!formsByGroup.TryGetValue(group, out HashSet<string> forms))
+                {
+                    forms = new HashSet<string>(StringComparer.Ordinal);
+                    formsByGroup[group] = forms;
+                }
+                forms.Add(value);
             }
         }
 
@@ -403,8 +482,27 @@ namespace AssetsManager.Services.Hashes
                             cancellationToken.ThrowIfCancellationRequested();
                             if (includeBin)
                             {
-                                matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source);
-                                matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source);
+                                if (source != MetaSchemaPropertySource)
+                                {
+                                    string typeCandidate = UpperFirst(candidate?.Trim());
+                                    uint typeHash = string.IsNullOrEmpty(typeCandidate) ? 0 : Fnv1a.HashLower(typeCandidate);
+                                    if (strategy == InternalHashGuessStrategy.NumericVariant &&
+                                        metaSchema.TypeContexts.TryGetValue(typeHash, out IReadOnlyList<string> contexts))
+                                    {
+                                        matcher.CheckSchemaCandidate(
+                                            InternalHashKind.BinTypes,
+                                            candidate,
+                                            strategy,
+                                            $"{source}; schema context: {string.Join(", ", contexts.Take(3))}",
+                                            InternalHashEvidence.MetaSchemaRelation);
+                                    }
+                                    else
+                                    {
+                                        matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source);
+                                    }
+                                }
+                                if (source != MetaSchemaClassSource)
+                                    matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source);
                             }
                             if (includeRst)
                                 matcher.Check(candidate, strategy, source);
@@ -684,9 +782,84 @@ namespace AssetsManager.Services.Hashes
             string wadPath = null,
             HashResolverService resolver = null)
         {
+            MatchOwningEntryPrefixEvidence(tree, matcher, path, wadPath);
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
             MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
-            VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+            if (matcher.GetRemaining(InternalHashKind.RstXxh3).Count > 0 ||
+                matcher.GetRemaining(InternalHashKind.RstXxh64).Count > 0)
+                VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+        }
+
+        internal static void MatchOwningEntryPrefixEvidence(
+            BinTree tree,
+            LocalEvidenceMatcher matcher,
+            string path,
+            string wadPath = null)
+        {
+            foreach (var pair in tree.Objects)
+            {
+                uint entryHash = pair.Key;
+                if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) continue;
+                foreach (BinTreeProperty property in pair.Value.Properties.Values)
+                    Visit(property);
+
+                void Visit(BinTreeProperty property)
+                {
+                    if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
+                    switch (property)
+                    {
+                        case BinTreeString text:
+                            MatchPrefixes(text.Value);
+                            break;
+                        case BinTreeStruct structure:
+                            foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
+                            break;
+                        case BinTreeContainer container:
+                            foreach (BinTreeProperty child in container.Elements) Visit(child);
+                            break;
+                        case BinTreeOptional option when option.Value != null:
+                            Visit(option.Value);
+                            break;
+                        case BinTreeMap map:
+                            foreach (var child in map)
+                            {
+                                Visit(child.Key);
+                                Visit(child.Value);
+                            }
+                            break;
+                    }
+                }
+
+                void MatchPrefixes(string value)
+                {
+                    if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
+                    if (string.IsNullOrWhiteSpace(value)) return;
+                    string candidate = PathUtils.NormalizePath(value.Trim());
+                    if (!candidate.Contains('/')) return;
+
+                    // A prefix is authoritative only for the entry that owns the string.
+                    // This is deliberately not compared against every unknown entry hash.
+                    for (int index = candidate.IndexOf('/'); index >= 0; index = candidate.IndexOf('/', index + 1))
+                    {
+                        if (index < 3) continue;
+                        matcher.CheckContextualCandidate(
+                            InternalHashKind.BinEntries,
+                            candidate[..index],
+                            path,
+                            wadPath,
+                            entryHash,
+                            InternalHashEvidence.OwningEntryPrefix);
+                        if (!matcher.IsRemaining(InternalHashKind.BinEntries, entryHash)) return;
+                    }
+                    matcher.CheckContextualCandidate(
+                        InternalHashKind.BinEntries,
+                        candidate,
+                        path,
+                        wadPath,
+                        entryHash,
+                        InternalHashEvidence.OwningEntryPrefix);
+                }
+            }
         }
 
         internal static void MatchObjectLocalHashEvidence(
@@ -992,62 +1165,173 @@ namespace AssetsManager.Services.Hashes
 
         private static void CheckTextCandidates(ReadOnlySpan<byte> data, Action<string> check)
         {
-            int start = -1;
-            for (int index = 0; index <= data.Length; index++)
-            {
-                bool accepted = index < data.Length && IsCandidateByte(data[index]);
-                if (accepted)
-                {
-                    if (start < 0) start = index;
-                    continue;
-                }
-                if (start < 0) continue;
-                int length = index - start;
-                if (length is >= 5 and <= 512)
-                {
-                    CheckCandidateSlice(data, start, length, check);
-                    if (start >= 2)
-                    {
-                        int declared = data[start - 2] | data[start - 1] << 8;
-                        if (declared == 0 && start >= 4)
-                            declared = data[start - 4] | data[start - 3] << 8 | data[start - 2] << 16 | data[start - 1] << 24;
-                        if (declared is >= 5 and < 513 && declared < length) CheckCandidateSlice(data, start, declared, check);
-                    }
-                }
-                start = -1;
-            }
-
-            static bool IsCandidateByte(byte value) => value is >= (byte)'0' and <= (byte)'9' or
-                >= (byte)'a' and <= (byte)'z' or >= (byte)'A' and <= (byte)'Z' or
-                (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-';
-        }
-
-        private static void CheckCandidateSlice(ReadOnlySpan<byte> data, int offset, int length, Action<string> check)
-        {
-            string candidate = Encoding.ASCII.GetString(data.Slice(offset, length)).Trim();
-            if (candidate.Length >= 5) check(candidate);
-            if (candidate.StartsWith("@V", StringComparison.Ordinal) && candidate.Length > 3)
-            {
-                check(candidate[2..]);
-            }
+            var scanner = new TextCandidateScanner(check);
+            scanner.Append(data);
+            scanner.Complete();
         }
 
         private static async Task ScanTextFileAsync(string path, Action<string> check, CancellationToken cancellationToken)
         {
             const int blockSize = 4 * 1024 * 1024;
-            const int overlap = 512;
-            byte[] buffer = new byte[blockSize + overlap];
-            int carried = 0;
+            byte[] buffer = new byte[blockSize];
+            var scanner = new TextCandidateScanner(check);
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, blockSize, true);
             while (true)
             {
-                int read = await stream.ReadAsync(buffer.AsMemory(carried, blockSize), cancellationToken);
+                int read = await stream.ReadAsync(buffer, cancellationToken);
                 if (read == 0) break;
-                int length = carried + read;
-                CheckTextCandidates(buffer.AsSpan(0, length), check);
-                carried = Math.Min(overlap, length);
-                buffer.AsSpan(length - carried, carried).CopyTo(buffer);
+                scanner.Append(buffer.AsSpan(0, read));
             }
+            scanner.Complete();
+        }
+
+        internal sealed class TextCandidateScanner
+        {
+            private const int MaximumCandidateLength = 512;
+            private readonly Action<string> _check;
+            private readonly byte[] _candidate = new byte[MaximumCandidateLength];
+            private readonly byte[] _function = new byte[MaximumCandidateLength];
+            private readonly byte[] _history = new byte[4];
+            private readonly byte[] _startPrefix = new byte[4];
+            private int _candidateLength;
+            private int _functionLength;
+            private int _historyLength;
+            private int _startPrefixLength;
+            private int _functionState;
+            private bool _candidateOverflow;
+            private bool _functionOverflow;
+
+            internal TextCandidateScanner(Action<string> check) =>
+                _check = check ?? throw new ArgumentNullException(nameof(check));
+
+            internal void Append(ReadOnlySpan<byte> data)
+            {
+                foreach (byte value in data)
+                {
+                    ProcessFunctionByte(value);
+                    if (IsCandidateByte(value))
+                    {
+                        if (_candidateLength == 0 && !_candidateOverflow)
+                        {
+                            _startPrefixLength = _historyLength;
+                            Array.Copy(_history, _startPrefix, _historyLength);
+                        }
+                        if (_candidateLength < MaximumCandidateLength && !_candidateOverflow)
+                            _candidate[_candidateLength++] = value;
+                        else
+                            _candidateOverflow = true;
+                    }
+                    else
+                    {
+                        EmitCandidate();
+                    }
+                    PushHistory(value);
+                }
+            }
+
+            internal void Complete()
+            {
+                EmitCandidate();
+                EmitFunction();
+                _functionState = 0;
+            }
+
+            private void ProcessFunctionByte(byte value)
+            {
+                switch (_functionState)
+                {
+                    case 0:
+                        if (value == (byte)'@') _functionState = 1;
+                        break;
+                    case 1:
+                        if (value == (byte)'V')
+                        {
+                            _functionState = 2;
+                            _functionLength = 0;
+                            _functionOverflow = false;
+                        }
+                        else
+                        {
+                            _functionState = value == (byte)'@' ? 1 : 0;
+                        }
+                        break;
+                    default:
+                        if (value == (byte)'@')
+                        {
+                            EmitFunction();
+                            _functionState = 1;
+                        }
+                        else if (IsCandidateByte(value))
+                        {
+                            if (_functionLength < MaximumCandidateLength && !_functionOverflow)
+                                _function[_functionLength++] = value;
+                            else
+                                _functionOverflow = true;
+                        }
+                        else
+                        {
+                            EmitFunction();
+                            _functionState = 0;
+                        }
+                        break;
+                }
+            }
+
+            private void EmitCandidate()
+            {
+                if (!_candidateOverflow && _candidateLength >= 5)
+                {
+                    CheckBytes(_candidate.AsSpan(0, _candidateLength));
+                    int declared = ReadDeclaredLength();
+                    if (declared is >= 5 and <= MaximumCandidateLength && declared < _candidateLength)
+                        CheckBytes(_candidate.AsSpan(0, declared));
+                }
+                _candidateLength = 0;
+                _candidateOverflow = false;
+                _startPrefixLength = 0;
+            }
+
+            private void EmitFunction()
+            {
+                if (!_functionOverflow && _functionLength >= 3)
+                    CheckBytes(_function.AsSpan(0, _functionLength));
+                _functionLength = 0;
+                _functionOverflow = false;
+            }
+
+            private int ReadDeclaredLength()
+            {
+                if (_startPrefixLength < 2) return -1;
+                int last = _startPrefixLength - 1;
+                int declared = _startPrefix[last - 1] | _startPrefix[last] << 8;
+                if (declared == 0 && _startPrefixLength == 4)
+                    declared = _startPrefix[0] | _startPrefix[1] << 8 |
+                        _startPrefix[2] << 16 | _startPrefix[3] << 24;
+                return declared;
+            }
+
+            private void CheckBytes(ReadOnlySpan<byte> bytes)
+            {
+                string candidate = Encoding.ASCII.GetString(bytes).Trim();
+                if (candidate.Length >= 3) _check(candidate);
+            }
+
+            private void PushHistory(byte value)
+            {
+                if (_historyLength < _history.Length)
+                {
+                    _history[_historyLength++] = value;
+                    return;
+                }
+                _history[0] = _history[1];
+                _history[1] = _history[2];
+                _history[2] = _history[3];
+                _history[3] = value;
+            }
+
+            private static bool IsCandidateByte(byte value) => value is >= (byte)'0' and <= (byte)'9' or
+                >= (byte)'a' and <= (byte)'z' or >= (byte)'A' and <= (byte)'Z' or
+                (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-';
         }
 
         private static IEnumerable<string> GenerateNumberCandidates(IEnumerable<string> values, int limit, int budget, CancellationToken cancellationToken)
@@ -1445,7 +1729,8 @@ namespace AssetsManager.Services.Hashes
                 string value,
                 string source,
                 string sourceWad = null,
-                uint? observedHash = null)
+                uint? observedHash = null,
+                InternalHashEvidence evidence = InternalHashEvidence.ObservedHashPair)
             {
                 CheckedCandidates++;
                 if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
@@ -1461,6 +1746,17 @@ namespace AssetsManager.Services.Hashes
                     DiscardedCandidates++;
                     return false;
                 }
+                if (!observedHash.HasValue)
+                {
+                    return CheckResearchCandidate(
+                        kind,
+                        candidate,
+                        InternalHashGuessStrategy.BinContent,
+                        source,
+                        InternalHashEvidence.SemanticReference,
+                        sourceWad: sourceWad,
+                        countCheck: false);
+                }
 
                 int before = _matches.Count;
                 Check32(
@@ -1471,15 +1767,78 @@ namespace AssetsManager.Services.Hashes
                     source,
                     sourceWad,
                     source,
-                    true);
+                    true,
+                    evidence);
                 return _matches.Count != before;
             }
+
+            internal bool CheckResearchCandidate(
+                InternalHashKind kind,
+                string value,
+                InternalHashGuessStrategy strategy,
+                string source,
+                InternalHashEvidence evidence,
+                int occurrences = 1,
+                double expectedRandomMatches = 0,
+                string sourceWad = null,
+                bool countCheck = true)
+            {
+                if (countCheck) CheckedCandidates++;
+                if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 ||
+                    string.IsNullOrWhiteSpace(value) ||
+                    value.Length > 512)
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                string candidate = PathUtils.NormalizePath(value.Trim());
+                uint hash = Fnv1a.HashLower(candidate);
+                if (!_targets[kind].Contains(hash))
+                {
+                    DiscardedCandidates++;
+                    return false;
+                }
+
+                var key = (kind, (ulong)hash, candidate);
+                if (_matches.ContainsKey(key)) return false;
+                var match = new InternalHashGuessMatch
+                {
+                    Hash = hash,
+                    LookupHash = hash,
+                    HashBits = 32,
+                    Value = candidate,
+                    Kind = kind,
+                    Strategy = strategy,
+                    Source = source,
+                    SourceWad = sourceWad,
+                    SourceBin = source,
+                    IsVerified = false,
+                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                    Confidence = InternalHashConfidence.Candidate,
+                    Evidence = evidence,
+                    EvidenceOccurrences = occurrences,
+                    ExpectedRandomMatches = expectedRandomMatches
+                };
+                _matches[key] = match;
+                _pendingMatches.Add(match);
+                return true;
+            }
+
+            internal IReadOnlyCollection<ulong> GetRemaining(InternalHashKind kind) =>
+                _targets.TryGetValue(kind, out HashSet<ulong> values)
+                    ? values
+                    : Array.Empty<ulong>();
+
+            internal bool IsRemaining(InternalHashKind kind, ulong hash) =>
+                _targets.TryGetValue(kind, out HashSet<ulong> values) && values.Contains(hash);
 
             internal bool CheckSchemaCandidate(
                 InternalHashKind kind,
                 string value,
                 InternalHashGuessStrategy strategy,
-                string source)
+                string source,
+                InternalHashEvidence evidence = InternalHashEvidence.MetaSchemaWordset)
             {
                 CheckedCandidates++;
                 if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
@@ -1518,7 +1877,7 @@ namespace AssetsManager.Services.Hashes
                     IsVerified = false,
                     VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                     Confidence = InternalHashConfidence.Candidate,
-                    Evidence = InternalHashEvidence.MetaSchemaWordset
+                    Evidence = evidence
                 };
                 _matches[key] = match;
                 _pendingMatches.Add(match);
@@ -1537,6 +1896,8 @@ namespace AssetsManager.Services.Hashes
                         !string.IsNullOrWhiteSpace(match.Value) &&
                         match.Source is MetaSchemaClassSource or MetaSchemaPropertySource &&
                         match.Kind is InternalHashKind.BinTypes or InternalHashKind.BinFields &&
+                        ((match.Kind == InternalHashKind.BinTypes && match.Source == MetaSchemaClassSource) ||
+                         (match.Kind == InternalHashKind.BinFields && match.Source == MetaSchemaPropertySource)) &&
                         _targets[match.Kind].Contains(match.LookupHash))
                     .GroupBy(match => (match.Kind, match.LookupHash));
 
@@ -1601,13 +1962,21 @@ namespace AssetsManager.Services.Hashes
                 string source,
                 string sourceWad,
                 string sourceBin,
-                bool hasLocalEvidence)
+                bool hasLocalEvidence,
+                InternalHashEvidence evidence = InternalHashEvidence.RuntimeContext)
             {
-                if (!hasLocalEvidence || !_targets[kind].Remove(hash)) return;
-                foreach (var candidateKey in _matches.Keys
-                    .Where(key => key.Kind == kind && key.Hash == hash).ToList())
-                    _matches.Remove(candidateKey);
+                if (!hasLocalEvidence || !_targets[kind].Contains(hash)) return;
+                bool verified = evidence is InternalHashEvidence.ObservedHashPair or
+                    InternalHashEvidence.OwningEntryPrefix;
+                if (verified)
+                {
+                    _targets[kind].Remove(hash);
+                    foreach (var candidateKey in _matches.Keys
+                        .Where(key => key.Kind == kind && key.Hash == hash).ToList())
+                        _matches.Remove(candidateKey);
+                }
                 var key = (kind, (ulong)hash, value);
+                if (_matches.ContainsKey(key)) return;
                 var match = new InternalHashGuessMatch
                 {
                     Hash = hash,
@@ -1619,10 +1988,11 @@ namespace AssetsManager.Services.Hashes
                     Source = source,
                     SourceWad = sourceWad,
                     SourceBin = sourceBin,
-                    IsVerified = true,
+                    IsVerified = verified,
                     VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.RuntimeContext
+                    Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
+                    Evidence = evidence,
+                    EvidenceOccurrences = 1
                 };
                 _matches[key] = match;
                 _pendingMatches.Add(match);

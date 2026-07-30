@@ -11,15 +11,24 @@ using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Hashes
 {
+    public enum HashResolutionOrigin
+    {
+        Unknown,
+        Official,
+        LocalVerified
+    }
+
+    public readonly record struct HashResolution(string Value, HashResolutionOrigin Origin);
+
     public class HashResolverService : IDisposable
     {
         internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
 
         private readonly List<BinaryHashCache> _gameCaches = new();
         private readonly List<BinaryHashCache> _binCaches = new();
-        private readonly List<BinaryHashCache> _binOverrideCaches = new();
+        private readonly List<BinaryHashCache> _binVerifiedCaches = new();
         private readonly List<BinaryHashCache> _rstCaches = new();
-        private readonly List<BinaryHashCache> _rstOverrideCaches = new();
+        private readonly List<BinaryHashCache> _rstVerifiedCaches = new();
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -106,16 +115,16 @@ namespace AssetsManager.Services.Hashes
                     _binCaches.Add(null);
                 }
 
-                var overridePath = Path.Combine(_directoriesCreator.HashLabPath, "overrides", file);
-                if (File.Exists(overridePath))
+                var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
+                if (File.Exists(verifiedPath))
                 {
-                    var overrideCache = new BinaryHashCache(overridePath, _logService);
-                    overrideCache.Load();
-                    _binOverrideCaches.Add(overrideCache);
+                    var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
+                    verifiedCache.Load();
+                    _binVerifiedCaches.Add(verifiedCache);
                 }
                 else
                 {
-                    _binOverrideCaches.Add(null);
+                    _binVerifiedCaches.Add(null);
                 }
             }
             _binHashesLoaded = true;
@@ -140,16 +149,16 @@ namespace AssetsManager.Services.Hashes
                     _rstCaches.Add(null);
                 }
 
-                var overridePath = Path.Combine(_directoriesCreator.HashLabPath, "overrides", file);
-                if (File.Exists(overridePath))
+                var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
+                if (File.Exists(verifiedPath))
                 {
-                    var overrideCache = new BinaryHashCache(overridePath, _logService);
-                    overrideCache.Load();
-                    _rstOverrideCaches.Add(overrideCache);
+                    var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
+                    verifiedCache.Load();
+                    _rstVerifiedCaches.Add(verifiedCache);
                 }
                 else
                 {
-                    _rstOverrideCaches.Add(null);
+                    _rstVerifiedCaches.Add(null);
                 }
             }
             _rstHashesLoaded = true;
@@ -163,20 +172,20 @@ namespace AssetsManager.Services.Hashes
         private Dictionary<ulong, string> _cachedRstXxh64Hashes;
 
         public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??=
-            GetMergedCacheDictionary(GetCache(_rstCaches, 0), GetCache(_rstOverrideCaches, 0));
+            GetMergedCacheDictionary(GetCache(_rstCaches, 0), GetCache(_rstVerifiedCaches, 0));
         public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??=
-            GetMergedCacheDictionary(GetCache(_rstCaches, 1), GetCache(_rstOverrideCaches, 1));
+            GetMergedCacheDictionary(GetCache(_rstCaches, 1), GetCache(_rstVerifiedCaches, 1));
 
         private static BinaryHashCache GetCache(IReadOnlyList<BinaryHashCache> caches, int index) =>
             index >= 0 && index < caches.Count ? caches[index] : null;
 
         private static Dictionary<ulong, string> GetMergedCacheDictionary(
             BinaryHashCache officialCache,
-            BinaryHashCache overrideCache)
+            BinaryHashCache verifiedCache)
         {
             var dict = new Dictionary<ulong, string>();
             Add(officialCache, overwrite: true);
-            Add(overrideCache, overwrite: false);
+            Add(verifiedCache, overwrite: false);
             return dict;
 
             void Add(BinaryHashCache cache, bool overwrite)
@@ -220,7 +229,7 @@ namespace AssetsManager.Services.Hashes
                 var result = cache.Resolve(hash);
                 if (result != null) return result;
             }
-            foreach (var cache in _binOverrideCaches)
+            foreach (var cache in _binVerifiedCaches)
             {
                 if (cache == null) continue;
                 var result = cache.Resolve(hash);
@@ -230,18 +239,21 @@ namespace AssetsManager.Services.Hashes
         }
 
         internal string ResolveBinDomain(uint hash, int index)
+            => ResolveBinDomainDetailed(hash, index).Value;
+
+        internal HashResolution ResolveBinDomainDetailed(uint hash, int index)
         {
             if (index >= 0 && index < _binCaches.Count && _binCaches[index] != null)
             {
                 string result = _binCaches[index].Resolve(hash);
-                if (result != null) return result;
+                if (result != null) return new HashResolution(result, HashResolutionOrigin.Official);
             }
-            if (index >= 0 && index < _binOverrideCaches.Count && _binOverrideCaches[index] != null)
+            if (index >= 0 && index < _binVerifiedCaches.Count && _binVerifiedCaches[index] != null)
             {
-                string result = _binOverrideCaches[index].Resolve(hash);
-                if (result != null) return result;
+                string result = _binVerifiedCaches[index].Resolve(hash);
+                if (result != null) return new HashResolution(result, HashResolutionOrigin.LocalVerified);
             }
-            return hash.ToString("x8");
+            return new HashResolution(hash.ToString("x8"), HashResolutionOrigin.Unknown);
         }
 
         public string ResolveRstHash(ulong rstHash)
@@ -252,7 +264,7 @@ namespace AssetsManager.Services.Hashes
                 var result = cache.Resolve(rstHash);
                 if (result != null) return result;
             }
-            foreach (var cache in _rstOverrideCaches)
+            foreach (var cache in _rstVerifiedCaches)
             {
                 if (cache == null) continue;
                 var result = cache.Resolve(rstHash);
@@ -277,14 +289,14 @@ namespace AssetsManager.Services.Hashes
         {
             foreach (var c in _gameCaches) c.Dispose();
             foreach (var c in _binCaches) c?.Dispose();
-            foreach (var c in _binOverrideCaches) c?.Dispose();
+            foreach (var c in _binVerifiedCaches) c?.Dispose();
             foreach (var c in _rstCaches) c?.Dispose();
-            foreach (var c in _rstOverrideCaches) c?.Dispose();
+            foreach (var c in _rstVerifiedCaches) c?.Dispose();
             _gameCaches.Clear();
             _binCaches.Clear();
-            _binOverrideCaches.Clear();
+            _binVerifiedCaches.Clear();
             _rstCaches.Clear();
-            _rstOverrideCaches.Clear();
+            _rstVerifiedCaches.Clear();
         }
     }
 }

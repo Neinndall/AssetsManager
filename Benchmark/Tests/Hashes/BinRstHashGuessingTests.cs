@@ -66,7 +66,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void BinMatchWithoutSameFileDomainEvidenceIsRejected()
+        public void SameFileDomainEvidenceRemainsCandidateWithoutObservedPair()
         {
             const string candidate = "data/characters/illaoi/skins/skin38/birthscale0/spec_intensity";
             uint hash = Fnv1a.HashLower(candidate);
@@ -83,7 +83,68 @@ namespace AssetsManager.BenchmarkTests.Hashes
             localTargets[InternalHashKind.BinHashes].Add(hash);
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "illaoi.bin", localTargets: localTargets);
 
-            Assert.True(matcher.Matches.Single().IsVerified);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.False(match.IsVerified);
+            Assert.False(match.CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void TextScannerExtractsAtVFunctionAcrossBlocksWithoutPartialCandidate()
+        {
+            var candidates = new List<string>();
+            var scanner = new BinRstHashGuessingService.TextCandidateScanner(candidates.Add);
+
+            scanner.Append(Encoding.ASCII.GetBytes("@VSpellCal"));
+            Assert.Empty(candidates);
+            scanner.Append(Encoding.ASCII.GetBytes("culation@next"));
+            scanner.Complete();
+
+            Assert.Contains("SpellCalculation", candidates);
+            Assert.DoesNotContain("SpellCal", candidates);
+        }
+
+        [Fact]
+        public void UnpairedContextualStringRemainsResearchCandidate()
+        {
+            const string candidate = "Characters/Test/LinkedEntry";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            bool found = matcher.CheckContextualCandidate(
+                InternalHashKind.BinEntries,
+                candidate,
+                "test.bin");
+
+            Assert.True(found);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashEvidence.SemanticReference, match.Evidence);
+            Assert.False(match.IsVerified);
+            Assert.False(match.CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinEntries]);
+        }
+
+        [Fact]
+        public void ObservedHashPairCreatesVerifiedMatch()
+        {
+            const string candidate = "DataValueName";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            bool found = matcher.CheckContextualCandidate(
+                InternalHashKind.BinHashes,
+                candidate,
+                "test.bin",
+                observedHash: hash);
+
+            Assert.True(found);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashEvidence.ObservedHashPair, match.Evidence);
+            Assert.True(match.CanPromote);
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
         }
 
@@ -142,7 +203,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashKind.BinHashes, match.Kind);
             Assert.Equal(candidate, match.Value);
-            Assert.Equal(InternalHashEvidence.RuntimeContext, match.Evidence);
+            Assert.Equal(InternalHashEvidence.ObservedHashPair, match.Evidence);
             Assert.True(match.CanPromote);
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
         }
@@ -279,7 +340,85 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public async Task StoreKeepsCandidatesInResearchAndPromotesVerifiedMatchesToOverrides()
+        public void OwningEntryStringPrefixResolvesOnlyItsOwnEntryHash()
+        {
+            const string entry = "characters/test/skins/skin01";
+            const string asset = entry + "/particles/test_idle.dds";
+            uint entryHash = Fnv1a.HashLower(entry);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(entryHash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var tree = CreateEntryTree(entryHash, "UnrelatedClass", "assetPath", asset);
+
+            BinRstHashGuessingService.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(entry, match.Value);
+            Assert.Equal(InternalHashEvidence.OwningEntryPrefix, match.Evidence);
+            Assert.True(match.CanPromote);
+        }
+
+        [Fact]
+        public void StringPrefixCannotResolveHashOwnedByAnotherEntry()
+        {
+            const string entry = "characters/test/skins/skin01";
+            uint targetHash = Fnv1a.HashLower(entry);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(targetHash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            var tree = CreateEntryTree(0x12345678, "UnrelatedClass", "assetPath", entry + "/test.dds");
+
+            BinRstHashGuessingService.MatchOwningEntryPrefixEvidence(tree, matcher, "test.bin");
+
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(targetHash, targets[InternalHashKind.BinEntries]);
+        }
+
+        [Fact]
+        public void EnrichedGamePathGroupCreatesResearchCandidatesWithoutPromotion()
+        {
+            string[] paths =
+            {
+                "levels/map11/scripts/alpha.lua",
+                "levels/map11/scripts/beta.lua",
+                "levels/map11/scripts/gamma.lua"
+            };
+            var targets = CreateTargets();
+            foreach (string path in paths)
+                targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(path));
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            string[] lines = paths.Select((path, index) => $"{index:x16} {path}").ToArray();
+
+            BinRstHashGuessingService.DiscoverGamePathCandidates(lines, matcher, "hashes.game.txt");
+
+            Assert.Equal(3, matcher.Matches.Count);
+            Assert.All(matcher.Matches, match =>
+            {
+                Assert.False(match.CanPromote);
+                Assert.Equal(InternalHashEvidence.GamePathStatisticalMatch, match.Evidence);
+                Assert.Equal(3, match.EvidenceOccurrences);
+            });
+            Assert.Equal(3, targets[InternalHashKind.BinEntries].Count);
+        }
+
+        [Fact]
+        public void IsolatedGamePathCollisionIsNotReported()
+        {
+            const string path = "assets/test/single.dds";
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(path));
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+
+            BinRstHashGuessingService.DiscoverGamePathCandidates(
+                new[] { $"0000000000000000 {path}" },
+                matcher,
+                "hashes.game.txt");
+
+            Assert.Empty(matcher.Matches);
+        }
+
+        [Fact]
+        public async Task StoreKeepsCandidatesInResearchAndPromotesVerifiedMatchesSeparately()
         {
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
@@ -315,11 +454,11 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 IsVerified = true,
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = InternalHashConfidence.Verified,
-                Evidence = InternalHashEvidence.RuntimeContext
+                Evidence = InternalHashEvidence.ObservedHashPair
             } }, CancellationToken.None);
 
             Assert.False(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
-            Assert.Contains("15f32511", await File.ReadAllTextAsync(store.GetOverridePath(InternalHashKind.BinHashes)));
+            Assert.Contains("15f32511", await File.ReadAllTextAsync(store.GetVerifiedPath(InternalHashKind.BinHashes)));
         }
 
         [Fact]
@@ -344,7 +483,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void UniqueMetaSchemaCandidatePromotesToOverrideEvidence()
+        public void UniqueMetaSchemaCandidatePromotesToVerifiedEvidence()
         {
             const string candidate = "VfxGeComponentDef";
             uint hash = Fnv1a.HashLower(candidate);
@@ -422,6 +561,26 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void MetaSchemaNameCannotPromoteAcrossHashDomains()
+        {
+            const string candidate = "VfxGeComponentDef";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinFields].Add(hash);
+            var matcher = new BinRstHashGuessingService.LocalEvidenceMatcher(targets);
+            matcher.CheckSchemaCandidate(
+                InternalHashKind.BinFields,
+                candidate,
+                InternalHashGuessStrategy.CrossDictionary,
+                "Meta Schema class names");
+
+            matcher.PromoteUniqueSchemaCandidates(Array.Empty<InternalHashGuessMatch>());
+
+            Assert.False(Assert.Single(matcher.Matches).CanPromote);
+            Assert.Contains(hash, targets[InternalHashKind.BinFields]);
+        }
+
+        [Fact]
         public async Task UniquePreviousMetaResearchCanBePromotedOnNextMetaRun()
         {
             const string candidate = "VfxGeComponentDef";
@@ -454,7 +613,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
 
             Assert.Contains(hash.ToString("x8"), await File.ReadAllTextAsync(
-                store.GetOverridePath(InternalHashKind.BinTypes)));
+                store.GetVerifiedPath(InternalHashKind.BinTypes)));
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
@@ -466,7 +625,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                   "latest": 42,
                   "classes": {
                     "0x11111111": {
-                      "revisions": [{ "from": 1 }],
+                      "revisions": [{ "from": 1, "bases": ["0x55555555"] }],
                       "properties": {
                         "0x22222222": { "revisions": [{ "from": 1 }] },
                         "0x33333333": { "name": "knownField", "revisions": [{ "from": 1 }] },
@@ -475,8 +634,13 @@ namespace AssetsManager.BenchmarkTests.Hashes
                     },
                     "0x55555555": {
                       "name": "KnownClass",
-                      "revisions": [{ "from": 1 }],
-                      "properties": {}
+                      "revisions": [{ "from": 1, "bases": ["0x11111111"] }],
+                      "properties": {
+                        "0x77777777": {
+                          "name": "component",
+                          "revisions": [{ "from": 1, "type": ["Pointer", "0x11111111"] }]
+                        }
+                      }
                     },
                     "0x66666666": {
                       "revisions": [{ "from": 1, "to": 2 }],
@@ -494,6 +658,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal(new ulong[] { 0x22222222 }, snapshot.UnknownFields);
             Assert.Contains("KnownClass", snapshot.KnownTypeNames);
             Assert.Contains("knownField", snapshot.KnownFieldNames);
+            Assert.Contains("base of KnownClass", snapshot.TypeContexts[0x11111111]);
+            Assert.Contains("KnownClass.component", snapshot.TypeContexts[0x11111111]);
+            Assert.Contains("inherits KnownClass", snapshot.TypeContexts[0x11111111]);
         }
 
         [Fact]
@@ -519,7 +686,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal("[]", await File.ReadAllTextAsync(researchPath));
             Assert.Contains("legacy_false_positive", await File.ReadAllTextAsync(
                 Path.Combine(bridge.Directories.HashLabPath, "internal.legacy-quarantine.json")));
-            Assert.False(File.Exists(store.GetOverridePath(InternalHashKind.BinHashes)));
+            Assert.False(File.Exists(store.GetVerifiedPath(InternalHashKind.BinHashes)));
         }
 
         [Fact]
@@ -570,6 +737,41 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal("entry_value", resolver.ResolveBinEntry(value));
             Assert.Equal("field_value", resolver.ResolveBinField(value));
             Assert.Equal("type_value", resolver.ResolveBinType(value));
+        }
+
+        [Fact]
+        public void ResolverReportsOfficialAndLocalVerifiedProvenanceAndIgnoresLegacyOverrides()
+        {
+            const uint officialHash = 0x11111111;
+            const uint verifiedHash = 0x22222222;
+            const uint legacyHash = 0x33333333;
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            File.WriteAllText(
+                store.GetKnownPath(InternalHashKind.BinEntries),
+                $"{officialHash:x8} official_entry{Environment.NewLine}");
+            Directory.CreateDirectory(Path.GetDirectoryName(store.GetVerifiedPath(InternalHashKind.BinEntries))!);
+            File.WriteAllText(
+                store.GetVerifiedPath(InternalHashKind.BinEntries),
+                $"{verifiedHash:x8} verified_entry{Environment.NewLine}");
+#pragma warning disable CS0618
+            Directory.CreateDirectory(Path.GetDirectoryName(store.GetOverridePath(InternalHashKind.BinEntries))!);
+            File.WriteAllText(
+                store.GetOverridePath(InternalHashKind.BinEntries),
+                $"{legacyHash:x8} legacy_entry{Environment.NewLine}");
+#pragma warning restore CS0618
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+
+            resolver.LoadBinHashes();
+
+            Assert.Equal(
+                new HashResolution("official_entry", HashResolutionOrigin.Official),
+                resolver.ResolveBinDomainDetailed(officialHash, 1));
+            Assert.Equal(
+                new HashResolution("verified_entry", HashResolutionOrigin.LocalVerified),
+                resolver.ResolveBinDomainDetailed(verifiedHash, 1));
+            Assert.Equal(HashResolutionOrigin.Unknown, resolver.ResolveBinDomainDetailed(legacyHash, 1).Origin);
         }
 
         [Fact]
@@ -649,7 +851,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public async Task VerifiedOverrideResolvesOnlyInItsBinDomain()
+        public async Task LocalVerifiedValueResolvesOnlyInItsBinDomain()
         {
             const uint value = 0x15f32511;
             using var bridge = new AssetsManagerTestBridge();
@@ -668,7 +870,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                     IsVerified = true,
                     VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                     Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.RuntimeContext
+                    Evidence = InternalHashEvidence.ObservedHashPair
                 }
             }, CancellationToken.None);
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
@@ -682,7 +884,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void RstOverridesLoadIntoResolverAndStringTableDictionaries()
+        public void RstLocalVerifiedValuesLoadIntoResolverAndStringTableDictionaries()
         {
             const ulong officialXxh3 = 0x1111111111111111;
             const ulong overrideXxh3 = 0x2222222222222222;
@@ -691,14 +893,14 @@ namespace AssetsManager.BenchmarkTests.Hashes
             const ulong overrideXxh64 = 0x5555555555555555;
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
-            string overrideDirectory = Path.Combine(bridge.Directories.HashLabPath, "overrides");
-            Directory.CreateDirectory(overrideDirectory);
+            string verifiedDirectory = Path.Combine(bridge.Directories.HashLabPath, "verified");
+            Directory.CreateDirectory(verifiedDirectory);
             File.WriteAllLines(Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh3.txt"), new[]
             {
                 $"{officialXxh3:x16} official_xxh3",
                 $"{sharedXxh3:x16} official_shared"
             });
-            File.WriteAllLines(Path.Combine(overrideDirectory, "hashes.rst.xxh3.txt"), new[]
+            File.WriteAllLines(Path.Combine(verifiedDirectory, "hashes.rst.xxh3.txt"), new[]
             {
                 $"{overrideXxh3:x16} override_xxh3",
                 $"{sharedXxh3:x16} override_shared"
@@ -707,7 +909,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh64.txt"),
                 $"{officialXxh64:x16} official_xxh64{Environment.NewLine}");
             File.WriteAllText(
-                Path.Combine(overrideDirectory, "hashes.rst.xxh64.txt"),
+                Path.Combine(verifiedDirectory, "hashes.rst.xxh64.txt"),
                 $"{overrideXxh64:x16} override_xxh64{Environment.NewLine}");
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
 

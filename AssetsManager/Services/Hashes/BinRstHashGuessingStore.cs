@@ -19,6 +19,10 @@ namespace AssetsManager.Services.Hashes
         public BinRstHashGuessingStore(DirectoriesCreator directories) => _directories = directories;
 
         public string GetKnownPath(InternalHashKind kind) => Path.Combine(_directories.HashesPath, GetKnownFileName(kind));
+        public string GetVerifiedPath(InternalHashKind kind) =>
+            Path.Combine(_directories.HashLabPath, "verified", GetKnownFileName(kind));
+
+        [Obsolete("Legacy overrides are quarantined and are no longer loaded. Use GetVerifiedPath.")]
         public string GetOverridePath(InternalHashKind kind) =>
             Path.Combine(_directories.HashLabPath, "overrides", GetKnownFileName(kind));
 
@@ -26,7 +30,7 @@ namespace AssetsManager.Services.Hashes
         {
             var result = new Dictionary<ulong, string>();
             int width = IsRst(kind) ? 16 : 8;
-            foreach (string path in new[] { GetKnownPath(kind), GetOverridePath(kind) })
+            foreach (string path in new[] { GetKnownPath(kind), GetVerifiedPath(kind) })
             {
                 if (!File.Exists(path)) continue;
                 using var reader = new StreamReader(path);
@@ -129,7 +133,7 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in groups)
                 {
                     var incoming = group.GroupBy(match => match.Hash).ToDictionary(g => g.Key, g => g.Last().Value);
-                    await MergeKnownAsync(GetOverridePath(group.Key), incoming, IsRst(group.Key) ? 16 : 8, cancellationToken);
+                    await MergeKnownAsync(GetVerifiedPath(group.Key), incoming, IsRst(group.Key) ? 16 : 8, cancellationToken);
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
                     foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
                     {
