@@ -14,6 +14,18 @@ namespace AssetsManager.Services.Viewer
         string DefaultTextureKey,
         IReadOnlyDictionary<string, string> Overrides);
 
+    internal sealed record SknMaterialTextureMetadata(
+        string DefaultTexturePath,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths)
+    {
+        internal IEnumerable<string> ReferencedTexturePaths =>
+            OverrideTexturePaths.Values
+                .Select(paths => paths.FirstOrDefault())
+                .Prepend(DefaultTexturePath)
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
     internal static class SknMaterialTextureResolver
     {
         private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
@@ -30,12 +42,14 @@ namespace AssetsManager.Services.Viewer
 
         internal static SknMaterialTextureResolution Resolve(
             BinTree binTree,
-            IEnumerable<string> availableTextureKeys)
+            IEnumerable<string> availableTextureKeys) =>
+            Resolve(ReadMetadata(binTree), availableTextureKeys);
+
+        internal static SknMaterialTextureMetadata ReadMetadata(BinTree binTree)
         {
-            var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
-            var materialTextures = BuildMaterialTextureMap(binTree, textureKeys);
-            var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            string defaultTextureKey = null;
+            var materialTexturePaths = BuildMaterialTexturePathMap(binTree);
+            var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            string defaultTexturePath = null;
 
             foreach (BinTreeObject obj in binTree.Objects.Values)
             {
@@ -46,10 +60,10 @@ namespace AssetsManager.Services.Viewer
                     continue;
                 }
 
-                if (meshProperties.Properties.TryGetValue(Texture, out BinTreeProperty defaultProperty) &&
-                    defaultProperty is BinTreeString defaultTexture)
+                if (defaultTexturePath == null &&
+                    TryGetString(meshProperties, Texture, out string texturePath))
                 {
-                    defaultTextureKey ??= MatchTextureKey(defaultTexture.Value, textureKeys);
+                    defaultTexturePath = texturePath;
                 }
 
                 if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
@@ -66,76 +80,50 @@ namespace AssetsManager.Services.Viewer
                         continue;
                     }
 
-                    string textureKey = null;
+                    var candidates = new List<string>(2);
                     if (TryGetString(entry, Texture, out string directTexturePath))
                     {
-                        textureKey = MatchTextureKey(directTexturePath, textureKeys);
+                        candidates.Add(directTexturePath);
                     }
 
-                    if (textureKey == null &&
-                        entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
-                        linkProperty is BinTreeObjectLink materialLink)
+                    if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
+                        linkProperty is BinTreeObjectLink materialLink &&
+                        materialTexturePaths.TryGetValue(materialLink.Value, out string materialTexturePath))
                     {
-                        materialTextures.TryGetValue(materialLink.Value, out textureKey);
+                        candidates.Add(materialTexturePath);
                     }
 
                     string normalizedSubmesh = NormalizeMaterialKey(submeshName);
-                    if (!string.IsNullOrEmpty(normalizedSubmesh) && textureKey != null)
+                    if (!string.IsNullOrEmpty(normalizedSubmesh) && candidates.Count > 0)
                     {
-                        overrides[normalizedSubmesh] = textureKey;
+                        overrideTexturePaths[normalizedSubmesh] = candidates;
                     }
                 }
             }
 
-            return new SknMaterialTextureResolution(defaultTextureKey, overrides);
+            return new SknMaterialTextureMetadata(defaultTexturePath, overrideTexturePaths);
         }
 
-        internal static IReadOnlyCollection<string> GetReferencedTexturePaths(BinTree binTree)
+        internal static SknMaterialTextureResolution Resolve(
+            SknMaterialTextureMetadata metadata,
+            IEnumerable<string> availableTextureKeys)
         {
-            var materialTexturePaths = BuildMaterialTexturePathMap(binTree);
-            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (BinTreeObject obj in binTree.Objects.Values)
+            var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
+            var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string submesh, IReadOnlyList<string> texturePaths) in metadata.OverrideTexturePaths)
             {
-                if (obj.ClassHash != SkinPropertiesClass ||
-                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
-                    meshProperty is not BinTreeStruct meshProperties)
+                string textureKey = texturePaths
+                    .Select(path => MatchTextureKey(path, textureKeys))
+                    .FirstOrDefault(key => key != null);
+                if (textureKey != null)
                 {
-                    continue;
-                }
-
-                if (TryGetString(meshProperties, Texture, out string defaultTexturePath))
-                {
-                    result.Add(defaultTexturePath);
-                }
-
-                if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
-                    overrideProperty is not BinTreeContainer materialOverrides)
-                {
-                    continue;
-                }
-
-                foreach (BinTreeProperty element in materialOverrides.Elements)
-                {
-                    if (element is not BinTreeStruct entry)
-                    {
-                        continue;
-                    }
-
-                    if (TryGetString(entry, Texture, out string directTexturePath))
-                    {
-                        result.Add(directTexturePath);
-                    }
-                    else if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
-                             linkProperty is BinTreeObjectLink materialLink &&
-                             materialTexturePaths.TryGetValue(materialLink.Value, out string materialTexturePath))
-                    {
-                        result.Add(materialTexturePath);
-                    }
+                    overrides[submesh] = textureKey;
                 }
             }
 
-            return result;
+            return new SknMaterialTextureResolution(
+                MatchTextureKey(metadata.DefaultTexturePath, textureKeys),
+                overrides);
         }
 
         internal static string TryResolveBinPath(string sknPath)
@@ -178,6 +166,56 @@ namespace AssetsManager.Services.Viewer
             // Unknown paths extracted from a WAD retain their xxHash64 as the file name.
             string hashedPath = Path.Combine(rootPath, $"{XxHash64Ext.Hash(virtualPath):x16}.bin");
             return File.Exists(hashedPath) ? hashedPath : null;
+        }
+
+        internal static string TryResolveTexturePath(string sknPath, string assetTexturePath)
+        {
+            DirectoryInfo characterRoot = FindCharacterRoot(sknPath);
+            if (characterRoot == null || string.IsNullOrWhiteSpace(assetTexturePath))
+            {
+                return null;
+            }
+
+            string assetPath = assetTexturePath.Replace('\\', '/').TrimStart('/');
+            string prefix = $"assets/characters/{characterRoot.Name}/";
+            if (!assetPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string candidate = Path.GetFullPath(Path.Combine(
+                characterRoot.FullName,
+                assetPath[prefix.Length..].Replace('/', Path.DirectorySeparatorChar)));
+            string extension = Path.GetExtension(candidate);
+            string rootedPrefix =
+                characterRoot.FullName.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
+                   (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                   File.Exists(candidate)
+                ? candidate
+                : null;
+        }
+
+        private static DirectoryInfo FindCharacterRoot(string sknPath)
+        {
+            if (string.IsNullOrWhiteSpace(sknPath))
+            {
+                return null;
+            }
+
+            for (DirectoryInfo directory = Directory.GetParent(Path.GetFullPath(sknPath));
+                 directory?.Parent != null;
+                 directory = directory.Parent)
+            {
+                if (directory.Name.Equals("themes", StringComparison.OrdinalIgnoreCase) ||
+                    directory.Name.Equals("skins", StringComparison.OrdinalIgnoreCase))
+                {
+                    return directory.Parent;
+                }
+            }
+
+            return null;
         }
 
         private static string TryResolveCompanionBinPath(string normalizedSknPath)
@@ -261,23 +299,6 @@ namespace AssetsManager.Services.Viewer
             string key = materialName.TrimEnd('\0').ToLowerInvariant();
             key = Regex.Replace(key, @"_?skn$", string.Empty, RegexOptions.IgnoreCase);
             return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
-        }
-
-        private static Dictionary<uint, string> BuildMaterialTextureMap(
-            BinTree binTree,
-            IReadOnlyList<string> textureKeys)
-        {
-            var result = new Dictionary<uint, string>();
-            foreach ((uint pathHash, string texturePath) in BuildMaterialTexturePathMap(binTree))
-            {
-                string textureKey = MatchTextureKey(texturePath, textureKeys);
-                if (textureKey != null)
-                {
-                    result[pathHash] = textureKey;
-                }
-            }
-
-            return result;
         }
 
         private static Dictionary<uint, string> BuildMaterialTexturePathMap(BinTree binTree)

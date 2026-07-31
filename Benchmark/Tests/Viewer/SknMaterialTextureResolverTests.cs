@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using AssetsManager.Services.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -68,6 +69,29 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
             Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["head"]);
         }
 
+        [Fact]
+        public void Resolve_FallsBackToLinkedMaterialWhenDirectTextureIsUnavailable()
+        {
+            const string materialPath = "Characters/Belveth/Skins/Skin29/Materials/Head";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex",
+                CreateOverride(
+                    "Head",
+                    new BinTreeString(Fnv1a.HashLower("texture"), "missing.tex"),
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterial(
+                    materialPath,
+                    CreateSampler(
+                        "Diffuse_Texture",
+                        "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex")));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "belveth_skin29_tx_cm" });
+
+            Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["head"]);
+        }
+
         [Theory]
         [InlineData(
             "Alune",
@@ -104,12 +128,13 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
             SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
                 tree,
                 new[] { textureName.ToLowerInvariant() });
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
 
             Assert.Equal(textureName.ToLowerInvariant(), resolution.Overrides[expectedMaterialKey]);
-            Assert.Contains(texturePath, SknMaterialTextureResolver.GetReferencedTexturePaths(tree));
+            Assert.Contains(texturePath, metadata.ReferencedTexturePaths);
             Assert.DoesNotContain(
                 "ASSETS/Characters/Shared/Overlay.tex",
-                SknMaterialTextureResolver.GetReferencedTexturePaths(tree));
+                metadata.ReferencedTexturePaths);
         }
 
         [Fact]
@@ -287,7 +312,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
 
                 Assert.Equal(
                     texturePath,
-                    SknLoadingService.TryResolveReferencedTexturePath(sknPath, assetTexturePath),
+                    SknMaterialTextureResolver.TryResolveTexturePath(sknPath, assetTexturePath),
                     ignoreCase: true);
             }
             finally
@@ -336,15 +361,14 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
                 : new BinTree(new[] { skin, material }, Array.Empty<string>());
         }
 
-        private static BinTreeEmbedded CreateOverride(string submesh, BinTreeProperty textureOrMaterial) =>
+        private static BinTreeEmbedded CreateOverride(
+            string submesh,
+            params BinTreeProperty[] textureOrMaterial) =>
             new(
                 0,
                 Fnv1a.HashLower("SkinMeshDataProperties_MaterialOverride"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("submesh"), submesh),
-                    textureOrMaterial
-                });
+                new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("submesh"), submesh) }
+                    .Concat(textureOrMaterial));
 
         private static BinTreeObject CreateMaterial(string path, params BinTreeEmbedded[] samplers) =>
             new(
