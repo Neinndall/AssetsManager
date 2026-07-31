@@ -124,16 +124,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IEnumerable<HashGuessCandidate> GeneratePatternCandidates()
         {
-            const string gdata = "plugins/rcp-be-lol-game-data/global/default/v1/";
-            foreach (string endpoint in new[]
-            {
-                "tft-map-skins.json", "tft-companion-species.json", "tft-damage-skins.json",
-                "arena-augments.json", "cherry-augments.json", "brawl-augments.json"
-            })
-            {
-                yield return new HashGuessCandidate(gdata + endpoint, HashGuessStrategy.LcuPattern);
-            }
-
             var paths = KnownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
             var perkPrimary = Enumerable.Range(80, 6).Select(value => value * 100).ToList();
             foreach (int primary in perkPrimary)
