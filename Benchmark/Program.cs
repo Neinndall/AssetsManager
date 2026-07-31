@@ -35,6 +35,12 @@ namespace BenchmarkApp
                 await ListAllExtensionsAsync();
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "inspect-skn", StringComparison.OrdinalIgnoreCase))
+            {
+                string targetPath = args.Length > 1 ? args[1] : null;
+                BenchmarkApp.Infrastructure.InspectSkn.Run(targetPath);
+                return;
+            }
 
             if (args.Length == 0 || !string.Equals(args[0], "guessing", StringComparison.OrdinalIgnoreCase))
             {
