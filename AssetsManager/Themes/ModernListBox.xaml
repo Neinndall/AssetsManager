@@ -31,6 +31,63 @@
         </Setter>
     </Style>
 
+    <!-- [ChromaSelectionControl.xaml] Source-family navigation item -->
+    <Style x:Key="ChromaFamilyItemStyle" TargetType="ListBoxItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid SnapsToDevicePixels="True">
+                        <Border x:Name="BackgroundLayer"
+                                Background="{StaticResource CardBackground}"
+                                CornerRadius="10"/>
+                        <ContentPresenter Margin="12,10"/>
+                        <Border x:Name="SelectionBorder"
+                                BorderBrush="{StaticResource BorderColor}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                IsHitTestVisible="False"/>
+                        <Border x:Name="AccentStrip"
+                                Width="2"
+                                Height="28"
+                                Margin="-1,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="{StaticResource AccentBrush}"
+                                CornerRadius="1"
+                                Visibility="Collapsed"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="BackgroundLayer"
+                                    Property="Background"
+                                    Value="{StaticResource HoverColor}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="BackgroundLayer"
+                                    Property="Background"
+                                    Value="{StaticResource HoverColor}"/>
+                            <Setter TargetName="SelectionBorder"
+                                    Property="BorderBrush"
+                                    Value="{StaticResource AccentBrush}"/>
+                            <Setter TargetName="SelectionBorder"
+                                    Property="BorderThickness"
+                                    Value="1.5"/>
+                            <Setter TargetName="AccentStrip"
+                                    Property="Visibility"
+                                    Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Estilo para tipo Models/Paneles Seleccioanables (Models) -->
     <Style x:Key="ListBoxItemStyle" TargetType="ListBoxItem">
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
