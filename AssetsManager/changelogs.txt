@@ -4,6 +4,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer models can now be selected directly in the viewport and moved along XYZ axes with a transform gizmo, including CTRL toggles and SHIFT ranges.
+  - Viewer can now auto-arrange selected models from left to right around the scene center using their model-list order.
   - Tree explorers and Grid View now support SHIFT and CTRL+SHIFT range selection.
   - VFX Studio / Extended the filtered BIN audit with emitter importance, spawn volumes, motion values, child links, and decoded mesh bounds for reproducible scale and placement diagnostics.
   - VFX Studio / Added multi-layer Emitters / Layers timeline deck matching Riot editor layout, placing Master VFX System bar at Row 0 with emission delay markers for secondary emitters.

@@ -35,7 +35,17 @@
                                            Ready="OpenTkControl_Ready"
                                            Render="OpenTkControl_Render"/>
 
-                <Border x:Name="CameraInputSurface" Background="Transparent"/>
+                <Border x:Name="CameraInputSurface"
+                        Background="Transparent"/>
+
+                <Canvas x:Name="TransformGizmoCanvas"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed">
+                    <Line x:Name="GizmoXAxis" Stroke="#FFFF5A5F" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Triangle"/>
+                    <Line x:Name="GizmoYAxis" Stroke="#FF35E58A" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Triangle"/>
+                    <Line x:Name="GizmoZAxis" Stroke="#FF4DA3FF" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Triangle"/>
+                    <Ellipse x:Name="GizmoOrigin" Width="10" Height="10" Fill="#FFF4F4F5" Stroke="#FF18181B" StrokeThickness="2"/>
+                </Canvas>
 
                 <Border HorizontalAlignment="Right"
                         VerticalAlignment="Top"
@@ -256,7 +266,32 @@
 
                             <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
 
-                            <!-- Group 3: Layout -->
+                            <!-- Group 3: Model interaction -->
+                            <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="TransformGizmoToggle"
+                                                  Style="{StaticResource TransparentIconToggleButton}"
+                                                  ToolTip="Select and move models in the viewport"
+                                                  IsChecked="True"
+                                                  Click="TransformGizmoToggle_Click"
+                                                  Width="30" Height="30">
+                                        <materialIcons:MaterialIcon Kind="AxisArrow" Width="13" Height="13"/>
+                                    </ToggleButton>
+                                    <Button x:Name="AutoArrangeModelsButton"
+                                            Style="{StaticResource TransparentIconButton}"
+                                            ToolTip="Auto-arrange selected models"
+                                            Click="AutoArrangeModelsButton_Click"
+                                            IsEnabled="False"
+                                            Width="30" Height="30"
+                                            Margin="2,0,0,0">
+                                        <materialIcons:MaterialIcon Kind="Layers" Width="13" Height="13"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <Rectangle Width="1" Fill="#22FFFFFF" Margin="2,7" VerticalAlignment="Stretch"/>
+
+                            <!-- Group 4: Layout -->
                             <Border Background="#1AFFFFFF" CornerRadius="11" Padding="2,1" Margin="2,0,0,0">
                                 <StackPanel Orientation="Horizontal">
                                     <ToggleButton x:Name="MaximizeToggleButton"

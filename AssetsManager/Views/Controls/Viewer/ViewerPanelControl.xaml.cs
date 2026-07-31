@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -12,6 +13,7 @@ using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.MapGeometry;
 using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Formatting;
@@ -50,6 +52,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private AnimationModel _currentlyPlayingAnimation;
         private bool _isCleanedUp;
+        private bool _isSynchronizingModelSelection;
+        private SceneModel _modelSelectionAnchor;
 
         public ViewerPanelControl()
         {
@@ -275,6 +279,110 @@ namespace AssetsManager.Views.Controls.Viewer
             RotationZLock.IsChecked = false;
 
             ScaleLock.IsChecked = false;
+        }
+
+        private void ModelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isSynchronizingModelSelection) return;
+
+            SceneModel active = e.AddedItems.OfType<SceneModel>().LastOrDefault();
+            if (active != null && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                _modelSelectionAnchor = active;
+            SynchronizeModelSelection(active);
+        }
+
+        public void SelectModelFromViewport(SceneModel model, ModifierKeys modifiers)
+        {
+            _isSynchronizingModelSelection = true;
+            try
+            {
+                ApplyViewportSelection(model, modifiers);
+                SynchronizeModelSelection(model);
+            }
+            finally
+            {
+                _isSynchronizingModelSelection = false;
+            }
+        }
+
+        public void AutoArrangeSelectedModels()
+        {
+            ViewerInteractionService.ArrangeModels(GetSelectedModels());
+        }
+
+        private void ApplyViewportSelection(SceneModel model, ModifierKeys modifiers)
+        {
+            bool control = modifiers.HasFlag(ModifierKeys.Control);
+            bool shift = modifiers.HasFlag(ModifierKeys.Shift);
+
+            if (model == null)
+            {
+                if (!control && !shift)
+                {
+                    ModelsListBox.SelectedItems.Clear();
+                    _modelSelectionAnchor = null;
+                }
+                return;
+            }
+
+            if (shift)
+            {
+                SelectModelRange(_modelSelectionAnchor ?? _viewModel.SelectedModel, model, control);
+            }
+            else if (control)
+            {
+                if (ModelsListBox.SelectedItems.Contains(model))
+                    ModelsListBox.SelectedItems.Remove(model);
+                else
+                    ModelsListBox.SelectedItems.Add(model);
+                _modelSelectionAnchor = model;
+            }
+            else
+            {
+                ModelsListBox.SelectedItems.Clear();
+                ModelsListBox.SelectedItems.Add(model);
+                _modelSelectionAnchor = model;
+            }
+
+            ModelsListBox.ScrollIntoView(model);
+        }
+
+        private void SelectModelRange(SceneModel anchor, SceneModel target, bool additive)
+        {
+            int anchorIndex = _viewModel.LoadedModels.IndexOf(anchor);
+            int targetIndex = _viewModel.LoadedModels.IndexOf(target);
+            if (targetIndex < 0) return;
+            if (!additive) ModelsListBox.SelectedItems.Clear();
+            if (anchorIndex < 0)
+            {
+                anchorIndex = targetIndex;
+                _modelSelectionAnchor = target;
+            }
+
+            int start = Math.Min(anchorIndex, targetIndex);
+            int end = Math.Max(anchorIndex, targetIndex);
+            for (int index = start; index <= end; index++)
+            {
+                SceneModel model = _viewModel.LoadedModels[index];
+                if (!ModelsListBox.SelectedItems.Contains(model))
+                    ModelsListBox.SelectedItems.Add(model);
+            }
+        }
+
+        private List<SceneModel> GetSelectedModels()
+        {
+            return _viewModel.LoadedModels
+                .Where(ModelsListBox.SelectedItems.Contains)
+                .ToList();
+        }
+
+        private void SynchronizeModelSelection(SceneModel preferredActive)
+        {
+            List<SceneModel> selected = GetSelectedModels();
+            _viewModel.SelectedModel = preferredActive != null && selected.Contains(preferredActive)
+                ? preferredActive
+                : selected.LastOrDefault();
+            Viewport?.SetSelectedModels(selected, _viewModel.SelectedModel);
         }
 
         public void Cleanup()

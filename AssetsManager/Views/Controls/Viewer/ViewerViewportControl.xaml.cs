@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
+using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Utils;
@@ -166,6 +167,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 10f,
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
+            _modelInteractionController?.Update(viewProj);
 
             // 3. Setup lighting from view model settings
             float phi = (float)(_viewModel.LightRotation * (Math.PI / 180.0));
@@ -249,6 +251,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
+        private ViewportModelInteractionController _modelInteractionController;
         private bool _isCleanedUp;
 
         private struct ModelUpdateKey
@@ -272,6 +275,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _viewModel = new ViewerViewportModel();
             DataContext = _viewModel;
+            InitializeModelInteraction();
 
             _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
 
@@ -279,6 +283,21 @@ namespace AssetsManager.Views.Controls.Viewer
             Unloaded += OnViewportUnloaded;
 
             UpdateToolbarVisibility();
+        }
+
+        private void InitializeModelInteraction()
+        {
+            if (_modelInteractionController != null) return;
+            _modelInteractionController = new ViewportModelInteractionController(
+                CameraInputSurface,
+                TransformGizmoCanvas,
+                GizmoXAxis,
+                GizmoYAxis,
+                GizmoZAxis,
+                GizmoOrigin,
+                () => Viewport3D.Camera as PerspectiveCamera,
+                _loadedModels);
+            _modelInteractionController.SelectionRequested += OnModelSelectionRequested;
         }
 
         private void OnViewportViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -319,6 +338,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             _isCleanedUp = false;
             _modelPlayers.Clear();
+            InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
 
             var settings = new GLWpfControlSettings
@@ -460,6 +480,12 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _pendingSnapshot = null;
+                if (_modelInteractionController != null)
+                {
+                    _modelInteractionController.SelectionRequested -= OnModelSelectionRequested;
+                    _modelInteractionController.Dispose();
+                    _modelInteractionController = null;
+                }
 
                 // 1. Desuscribir eventos
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
@@ -751,6 +777,31 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _activeSceneModel = model;
+        }
+
+        public void SetSelectedModels(IEnumerable<SceneModel> models, SceneModel activeModel)
+        {
+            var selected = models?.Where(model => model != null).ToList() ?? new List<SceneModel>();
+            _modelInteractionController?.SetSelection(selected, activeModel);
+            AutoArrangeModelsButton.IsEnabled = selected.Count > 1;
+        }
+
+        private void OnModelSelectionRequested(
+            SceneModel model,
+            System.Windows.Input.ModifierKeys modifiers)
+        {
+            Panel?.SelectModelFromViewport(model, modifiers);
+        }
+
+        private void TransformGizmoToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_modelInteractionController != null)
+                _modelInteractionController.IsEnabled = TransformGizmoToggle.IsChecked == true;
+        }
+
+        private void AutoArrangeModelsButton_Click(object sender, RoutedEventArgs e)
+        {
+            Panel?.AutoArrangeSelectedModels();
         }
 
         public void SelectVfxSystem(VfxSystemModel vfxSystem)

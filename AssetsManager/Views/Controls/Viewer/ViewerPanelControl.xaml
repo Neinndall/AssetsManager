@@ -186,7 +186,8 @@
 
                             <ListBox x:Name="ModelsListBox"
                                      ItemsSource="{Binding FilteredModels}"
-                                     SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
+                                     SelectionMode="Extended"
+                                     SelectionChanged="ModelsListBox_SelectionChanged"
                                      Style="{StaticResource SmoothScrollListBox}"
                                      ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
                                      MinHeight="120" MaxHeight="240"
