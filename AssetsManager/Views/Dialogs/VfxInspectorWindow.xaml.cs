@@ -35,8 +35,8 @@ namespace AssetsManager.Views.Dialogs
         private GlVfxRenderer _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
 
-        // VFX Studio dedicated camera framing (focused on particle emission origin Y=0)
-        private static readonly Point3D VfxCameraPosition = new(0, 150, 450);
+        // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
+        private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
         private static readonly Point3D VfxCameraTarget = new(0, 0, 0);
         private static readonly Vector3D VfxCameraUpDirection = new(0, 1, 0);
 
