@@ -1156,6 +1156,24 @@
         </Setter>
     </Style>
 
+    <!-- [ChromaCardTemplate.xaml] Chrome-free selectable card surface -->
+    <Style x:Key="ChromaCardToggleButtonStyle" TargetType="ToggleButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- [ViewerPanelControl.xaml, TreeViewStyles.xaml] Animated chevron for any collapsible parent.
          Base angle is -90° (chevron pointing right) so the initial state is correct without
          depending on the DataTrigger's EnterActions. The DataTrigger animates to 0° (chevron

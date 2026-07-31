@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using AssetsManager.Services.Viewer.Models;
 using AssetsManager.Views.Models.Viewer;
 
@@ -53,15 +52,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ChromaCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is FrameworkElement element && element.DataContext is ChromaSkinModel skin)
-            {
-                skin.IsSelected = !skin.IsSelected;
-                _viewModel.RefreshSelection();
-            }
-        }
-
         private void FamilyListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (FamilyListBox.SelectedItem is ChromaFamilyModel family)
@@ -83,7 +73,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_viewModel.SelectedFamily == null) return;
             foreach (ChromaSkinModel chroma in _viewModel.SelectedFamily.Chromas)
                 chroma.IsSelected = isSelected;
-            _viewModel.RefreshSelection();
         }
 
         private void LoadSelectedButton_Click(object sender, RoutedEventArgs e)

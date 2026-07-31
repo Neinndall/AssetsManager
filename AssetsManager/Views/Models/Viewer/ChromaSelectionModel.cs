@@ -126,7 +126,10 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void SetFamilies(IEnumerable<ChromaFamilyModel> families)
         {
+            ClearFamilies();
             AvailableFamilies.ReplaceRange(families ?? Enumerable.Empty<ChromaFamilyModel>());
+            foreach (ChromaSkinModel chroma in AvailableFamilies.SelectMany(family => family.Chromas))
+                chroma.PropertyChanged += ChromaPropertyChanged;
             SelectedFamily = AvailableFamilies.FirstOrDefault();
             RefreshCounts();
         }
@@ -141,7 +144,7 @@ namespace AssetsManager.Views.Models.Viewer
         public void SetScanningState(string folderName)
         {
             IsLoading = true;
-            AvailableFamilies.Clear();
+            ClearFamilies();
             SelectedFamily = null;
             RefreshCounts();
             StatusText = $"Scanning chromas in: {folderName.ToUpperInvariant()}";
@@ -167,11 +170,24 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void Reset()
         {
-            AvailableFamilies.Clear();
+            ClearFamilies();
             SelectedFamily = null;
             StatusText = "Ready to scan.";
             IsLoading = false;
             RefreshCounts();
+        }
+
+        private void ChromaPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ChromaSkinModel.IsSelected))
+                RefreshSelection();
+        }
+
+        private void ClearFamilies()
+        {
+            foreach (ChromaSkinModel chroma in AvailableFamilies.SelectMany(family => family.Chromas))
+                chroma.PropertyChanged -= ChromaPropertyChanged;
+            AvailableFamilies.Clear();
         }
 
         private void RefreshCounts()
