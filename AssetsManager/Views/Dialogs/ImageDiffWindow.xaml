@@ -199,7 +199,7 @@
         </Border>
 
         <!-- 2. Main Content Area -->
-        <Grid Grid.Row="1" Margin="24">
+        <Grid Grid.Row="1" x:Name="MainContentArea" Background="Transparent" Margin="24">
             <!-- Side by Side -->
             <Grid x:Name="SideBySidePanel" Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>

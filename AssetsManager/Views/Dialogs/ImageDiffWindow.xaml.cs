@@ -73,11 +73,11 @@ namespace AssetsManager.Views.Dialogs
             this.SizeChanged += (s, e) => UpdateSliderEffect();
             this.PreviewKeyDown += ImageDiffWindow_PreviewKeyDown;
 
-            // Register Mouse Events for Zoom & Pan
-            this.MouseWheel += ImageDiffWindow_MouseWheel;
-            this.MouseDown += ImageDiffWindow_MouseDown;
-            this.MouseMove += ImageDiffWindow_MouseMove;
-            this.MouseUp += ImageDiffWindow_MouseUp;
+            // Register Mouse Events for Zoom & Pan on MainContentArea only
+            MainContentArea.MouseWheel += ImageDiffWindow_MouseWheel;
+            MainContentArea.MouseDown += ImageDiffWindow_MouseDown;
+            MainContentArea.MouseMove += ImageDiffWindow_MouseMove;
+            MainContentArea.MouseUp += ImageDiffWindow_MouseUp;
             
             // Sync Slider value
             OverlaySlider.Value = 50;
@@ -248,15 +248,12 @@ namespace AssetsManager.Views.Dialogs
 
         private void ImageDiffWindow_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            // Abort if the click comes from the title bar area (36px)
-            if (e.GetPosition(this).Y < 36) return;
-
             if (e.ChangedButton == MouseButton.Left || e.ChangedButton == MouseButton.Middle)
             {
                 _isDragging = true;
-                _lastMousePosition = e.GetPosition(this);
-                this.Cursor = Cursors.SizeAll;
-                this.CaptureMouse();
+                _lastMousePosition = e.GetPosition(MainContentArea);
+                MainContentArea.Cursor = Cursors.SizeAll;
+                MainContentArea.CaptureMouse();
             }
         }
 
@@ -264,7 +261,7 @@ namespace AssetsManager.Views.Dialogs
         {
             if (_isDragging)
             {
-                Point currentPos = e.GetPosition(this);
+                Point currentPos = e.GetPosition(MainContentArea);
                 Vector delta = currentPos - _lastMousePosition;
                 ApplyTransform(deltaX: delta.X, deltaY: delta.Y);
                 _lastMousePosition = currentPos;
@@ -276,8 +273,8 @@ namespace AssetsManager.Views.Dialogs
             if (_isDragging)
             {
                 _isDragging = false;
-                this.Cursor = Cursors.Arrow;
-                this.ReleaseMouseCapture();
+                MainContentArea.Cursor = Cursors.Arrow;
+                MainContentArea.ReleaseMouseCapture();
             }
         }
 
