@@ -204,6 +204,7 @@ namespace AssetsManager.Views
             _viewModel.StatusText = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
             _viewModel.Matches.Clear();
             var displayedMatchHashes = new System.Collections.Generic.HashSet<ulong>();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
@@ -222,9 +223,10 @@ namespace AssetsManager.Views
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
                     long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
+                    string timeText = FormatElapsedTime(value.Elapsed);
                     _viewModel.StatusText = value.TotalWads > 0
-                        ? $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s"
-                        : $"{value.CurrentWad} · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
+                        ? $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · Time: {timeText}"
+                        : $"{value.CurrentWad} · {value.FoundMatches:N0} found · Time: {timeText}";
                 });
                 IProgress<HashGuessMatch> matchProgress =
                     (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu || mode == HashGuessMode.LcuV1Paths)
@@ -248,6 +250,8 @@ namespace AssetsManager.Views
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
+                stopwatch.Stop();
+                string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
                 _viewModel.ProgressValue = 100;
                 _viewModel.ProgressText = "100%";
@@ -255,11 +259,11 @@ namespace AssetsManager.Views
                 if (result.Matches.Count > 0)
                 {
                     await _hashGuessingService.SaveMatchesAsync(result.Matches, CancellationToken.None);
-                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} paths resolved and automatically added to main hash files.";
                 }
                 else
                 {
-                    _viewModel.StatusText = $"Completed: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {result.Matches.Count:N0} paths resolved from {result.UnknownHashesAtStart:N0} unknown hashes.";
                 }
             }
             catch (OperationCanceledException)
@@ -325,6 +329,7 @@ namespace AssetsManager.Views
             _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
             _viewModel.Matches.Clear();
             var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash, string Value)>();
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
             {
@@ -359,19 +364,22 @@ namespace AssetsManager.Views
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
                     long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
+                    string timeText = FormatElapsedTime(value.Elapsed);
                     _viewModel.StatusText = value.TotalWads > 0
-                        ? $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s"
-                        : $"{value.CurrentStage} · {value.FoundMatches:N0} found · {value.CandidatesPerSecond:N0}/s";
+                        ? $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · Time: {timeText}"
+                        : $"{value.CurrentStage} · {value.FoundMatches:N0} found · Time: {timeText}";
                 });
 
                 if (action == InternalHashAction.Inventory)
                 {
                     var inventory = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
+                    stopwatch.Stop();
+                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     _viewModel.StatusText = includeBin
-                        ? $"BIN inventory: {inventory.ScannedBins:N0} files + Meta {inventory.MetaSchemaVersion} ({inventory.MetaSchemaTypes:N0} types, {inventory.MetaSchemaFields:N0} fields)."
-                        : $"RST inventory completed: {inventory.ScannedStringTables:N0} stringtables parsed.";
+                        ? $"BIN inventory completed in {elapsedTime}: {inventory.ScannedBins:N0} files + Meta {inventory.MetaSchemaVersion} ({inventory.MetaSchemaTypes:N0} types, {inventory.MetaSchemaFields:N0} fields)."
+                        : $"RST inventory completed in {elapsedTime}: {inventory.ScannedStringTables:N0} stringtables parsed.";
                 }
                 else
                 {
@@ -380,13 +388,15 @@ namespace AssetsManager.Views
                         InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
                         _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
                     };
+                    stopwatch.Stop();
+                    string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.Matches.AddRange(result.Matches
                         .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
                         .Cast<object>());
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
                     int verified = result.Matches.Count(match => match.CanPromote);
-                    _viewModel.StatusText = $"Completed: {verified:N0} verified, {result.Matches.Count - verified:N0} candidates.";
+                    _viewModel.StatusText = $"Completed in {elapsedTime}: {verified:N0} verified, {result.Matches.Count - verified:N0} candidates.";
                 }
             }
             catch (OperationCanceledException)
@@ -407,6 +417,13 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 UpdateUnknownCountAsync();
             }
+        }
+
+        private static string FormatElapsedTime(TimeSpan elapsed)
+        {
+            if (elapsed.TotalHours >= 1)
+                return elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+            return elapsed.ToString(@"mm\:ss\.f", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced, LcuV1Paths }
