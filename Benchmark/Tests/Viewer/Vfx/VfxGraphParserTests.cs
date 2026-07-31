@@ -38,7 +38,6 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal("Effects/Test", system.ParticlePath);
             Assert.Equal(Matrix4x4.CreateScale(0.5f), system.Transform);
             Assert.Empty(system.Emitters);
-            Assert.Empty(document.AnimationClips);
             Assert.Empty(document.ResourceMap);
             Assert.Equal("data/effects/shared.bin", Assert.Single(document.Dependencies));
         }

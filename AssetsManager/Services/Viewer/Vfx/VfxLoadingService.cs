@@ -23,7 +23,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         public sealed class Bundle
         {
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
-            public Dictionary<string, VfxAnimationClip> Clips { get; } = new(StringComparer.OrdinalIgnoreCase);
             public Dictionary<uint, uint> ResourceMap { get; } = new();
             public Dictionary<uint, string> SystemSources { get; } = new();
             public List<string> LoadedBins { get; } = new();
@@ -74,8 +73,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                                 bundle.SystemSources[kv.Key] = Path.GetFullPath(currentBinPath);
                             }
                         }
-                        foreach (var kv in document.AnimationClips)
-                            MergeClip(bundle.Clips, kv.Key, kv.Value);
                         foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
 
@@ -141,7 +138,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     }
                 }
 
-                log?.Log($"Loaded {bundle.Systems.Count} VFX systems and {bundle.Clips.Count} animation clips.");
+                log?.Log($"Loaded {bundle.Systems.Count} VFX systems.");
             }
             catch (Exception ex)
             {
@@ -287,31 +284,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             emitter.ColorGradient = pixels;
             emitter.ColorGradientW = width;
             emitter.ColorGradientH = height;
-        }
-
-        /// <summary>
-        /// Merges clip entries across bins. The same anm is often declared in several bins
-        /// (skins, animations, fused); only one carries the mEventDataMap that links the
-        /// animation to its VFX. Accumulate particle/sound events so the link is never lost.
-        /// </summary>
-        private static void MergeClip(Dictionary<string, VfxAnimationClip> map, string key, VfxAnimationClip clip)
-        {
-            if (string.IsNullOrEmpty(key)) return;
-            if (!map.TryGetValue(key, out var existing))
-            {
-                map[key] = clip;
-                return;
-            }
-
-            foreach (var pe in clip.ParticleEvents)
-                if (existing.ParticleEvents.All(e => e.EffectHash != pe.EffectHash || e.EffectName != pe.EffectName))
-                    existing.ParticleEvents.Add(pe);
-            foreach (var se in clip.SoundEvents)
-                if (existing.SoundEvents.All(e => e.SoundHash != se.SoundHash || e.SoundName != se.SoundName))
-                    existing.SoundEvents.Add(se);
-
-            if (string.IsNullOrEmpty(existing.AnimationName) && !string.IsNullOrEmpty(clip.AnimationName))
-                existing.AnimationName = clip.AnimationName;
         }
 
         private static string ResolveWadRoot(string skinBinPath)

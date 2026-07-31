@@ -35,8 +35,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         // system fields
         private static readonly uint F_particleName = HashAlgorithms.Fnv1a("particleName");
         private static readonly uint F_particlePath = HashAlgorithms.Fnv1a("particlePath");
-        private static readonly uint F_soundPersistent = HashAlgorithms.Fnv1a("soundPersistentDefault");
-        private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("soundOnCreateDefault");
         private static readonly uint F_visibilityRadius = HashAlgorithms.Fnv1a("visibilityRadius");
         private static readonly uint F_transform = HashAlgorithms.Fnv1a("transform");
 
@@ -237,7 +235,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             BinTree tree = ParseTree(data);
             return new VfxBinDocument(
                 ExtractAll(tree),
-                ExtractAnimationClips(tree),
                 ExtractResourceMap(tree),
                 tree.Dependencies.ToArray());
         }
@@ -303,8 +300,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                         emitters.Add(ParseEmitter(s));
             }
             LinkRayImpacts(emitters);
-            string persistentSound = GetString(o.Properties, F_soundPersistent);
-            string onCreateSound = GetString(o.Properties, F_soundOnCreate);
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             Matrix4x4? transform = Get(o.Properties, F_transform) is BinTreeMatrix44 matrix
                 ? matrix.Value
@@ -314,8 +309,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 name,
                 path,
                 emitters,
-                persistentSound,
-                onCreateSound,
                 radius,
                 transform);
         }
@@ -939,322 +932,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             _ => null
         };
 
-        private static void MergeClip(Dictionary<string, VfxAnimationClip> map, string key, VfxAnimationClip clip)
-        {
-            if (string.IsNullOrEmpty(key)) return;
-            if (!map.TryGetValue(key, out var existing))
-            {
-                map[key] = clip;
-                return;
-            }
-
-            // Accumulate events from both entries so the anm->VFX link is never lost when the
-            // same clip is declared in multiple bins (only one of them carries the events).
-            foreach (var pe in clip.ParticleEvents)
-                if (existing.ParticleEvents.All(e => e.EffectHash != pe.EffectHash || e.EffectName != pe.EffectName))
-                    existing.ParticleEvents.Add(pe);
-            foreach (var se in clip.SoundEvents)
-                if (existing.SoundEvents.All(e => e.SoundHash != se.SoundHash || e.SoundName != se.SoundName))
-                    existing.SoundEvents.Add(se);
-
-            // Prefer the animation path from whichever entry actually resolved one.
-            if (string.IsNullOrEmpty(existing.AnimationName) && !string.IsNullOrEmpty(clip.AnimationName))
-                existing.AnimationName = clip.AnimationName;
-        }
-
         private static int? GetI16(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeI16 value ? value.Value : null;
 
         private static int? GetI32(IReadOnlyDictionary<uint, BinTreeProperty> p, uint hash)
             => Get(p, hash) is BinTreeI32 value ? value.Value : null;
 
-        public static IReadOnlyDictionary<string, VfxAnimationClip> ExtractAnimationClips(byte[] materialsBin)
-            => ExtractAnimationClips(ParseTree(materialsBin));
-
-        private static IReadOnlyDictionary<string, VfxAnimationClip> ExtractAnimationClips(BinTree bin)
-        {
-            var map = new Dictionary<string, VfxAnimationClip>(StringComparer.OrdinalIgnoreCase);
-
-            uint f_clipDataMap = HashAlgorithms.Fnv1a("mClipDataMap");
-            uint class_atomic = HashAlgorithms.Fnv1a("atomicClipData");
-            uint f_animRes = HashAlgorithms.Fnv1a("mAnimationResourceData");
-            uint f_animPath = HashAlgorithms.Fnv1a("mAnimationFilePath");
-            uint f_eventMap = HashAlgorithms.Fnv1a("mEventDataMap");
-            uint class_particleEvent = HashAlgorithms.Fnv1a("ParticleEventData");
-            uint f_effectKey = HashAlgorithms.Fnv1a("mEffectKey");
-            uint f_particleName = HashAlgorithms.Fnv1a("mParticleName");
-            uint f_boneName = HashAlgorithms.Fnv1a("mBoneName");
-            uint f_startFrame = HashAlgorithms.Fnv1a("mStartFrame");
-            uint f_pairList = HashAlgorithms.Fnv1a("mParticleEventDataPairList");
-
-            uint class_soundEvent = HashAlgorithms.Fnv1a("SoundEventData");
-            uint f_soundName = HashAlgorithms.Fnv1a("mSoundName");
-
-            // 1. Try parsing modern atomicClipData structure
-            bool foundModern = false;
-            foreach (var o in bin.Objects.Values)
-            {
-                if (o.Properties.TryGetValue(f_clipDataMap, out var mapProp) && mapProp is BinTreeMap clipMap)
-                {
-                    foundModern = true;
-                    foreach (var pair in clipMap)
-                    {
-                        if (pair.Value is BinTreeStruct s && s.ClassHash == class_atomic)
-                        {
-                            string clipName = pair.Key switch
-                            {
-                                BinTreeString str => str.Value,
-                                BinTreeHash h => h.Value.ToString("x8"),
-                                BinTreeU32 u => u.Value.ToString("x8"),
-                                _ => "unknown"
-                            };
-
-                            string anmPath = "";
-                            if (s.Properties.TryGetValue(f_animRes, out var res) && res is BinTreeStruct rs
-                                && rs.Properties.TryGetValue(f_animPath, out var ap) && ap is BinTreeString aps)
-                            {
-                                anmPath = aps.Value;
-                            }
-
-                            if (string.IsNullOrEmpty(anmPath)) continue;
-                            string animFile = Path.GetFileName(anmPath.Replace('\\', '/'));
-
-                            var clip = new VfxAnimationClip
-                            {
-                                Name = clipName,
-                                AnimationName = anmPath
-                            };
-
-                            if (s.Properties.TryGetValue(f_eventMap, out var em) && em is System.Collections.IEnumerable eventsEnumerable)
-                            {
-                                foreach (var ekv in eventsEnumerable)
-                                {
-                                    var ekvType = ekv.GetType();
-                                    if (ekvType.GetProperty("Value")?.GetValue(ekv) is not BinTreeStruct es) continue;
-
-                                    if (es.ClassHash == class_particleEvent)
-                                    {
-                                        var (effectName, effectHash) = GetStringOrHash(es, f_effectKey);
-                                        if (string.IsNullOrEmpty(effectName) && effectHash == 0)
-                                        {
-                                            (effectName, effectHash) = GetStringOrHash(es, f_particleName);
-                                        }
-
-                                        string boneName = "";
-                                        uint boneHash = 0;
-                                        var (bName, bHash) = GetStringOrHash(es, f_boneName);
-                                        boneName = bName;
-                                        boneHash = bHash;
-
-                                        if (string.IsNullOrEmpty(boneName) && boneHash == 0 && es.Properties.TryGetValue(f_pairList, out var pl) && pl is BinTreeContainer pairs)
-                                        {
-                                            foreach (var pe in pairs.Elements)
-                                            {
-                                                if (pe is BinTreeStruct ps2)
-                                                {
-                                                    var (pBoneName, pBoneHash) = GetStringOrHash(ps2, f_boneName);
-                                                    if (!string.IsNullOrEmpty(pBoneName) || pBoneHash != 0)
-                                                    {
-                                                        boneName = pBoneName;
-                                                        boneHash = pBoneHash;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        float startFrame = 0f;
-                                        if (es.Properties.TryGetValue(f_startFrame, out var sf) && sf is BinTreeF32 f)
-                                        {
-                                            startFrame = f.Value;
-                                        }
-
-                                        clip.ParticleEvents.Add(new VfxAnimationEvent
-                                        {
-                                            EffectName = effectName,
-                                            EffectHash = effectHash,
-                                            BoneName = boneName,
-                                            BoneHash = boneHash,
-                                            StartFrame = startFrame
-                                        });
-                                    }
-                                    else if (es.ClassHash == class_soundEvent)
-                                    {
-                                        var (soundName, soundHash) = GetStringOrHash(es, f_soundName);
-                                        float startFrame = 0f;
-                                        if (es.Properties.TryGetValue(f_startFrame, out var sf) && sf is BinTreeF32 f)
-                                        {
-                                            startFrame = f.Value;
-                                        }
-
-                                        clip.SoundEvents.Add(new VfxSoundEvent
-                                        {
-                                            SoundName = soundName,
-                                            SoundHash = soundHash,
-                                            StartFrame = startFrame
-                                        });
-                                    }
-                                }
-                            }
-
-                            // Merge into existing clip entries instead of overwriting: the same
-                            // anm is often declared in several bins (skins, animations, fused), and
-                            // only one of them carries the mEventDataMap particle/sound events that
-                            // link the animation to its VFX. Keep the richest entry (most events).
-                            MergeClip(map, animFile, clip);
-                            MergeClip(map, clipName, clip);
-                            string nameWithoutExt = Path.GetFileNameWithoutExtension(animFile);
-                            MergeClip(map, nameWithoutExt, clip);
-                        }
-                    }
-                }
-            }
-
-            if (foundModern) return map;
-
-            // 2. Legacy fallback recursive scanning
-            uint f_animationName = HashAlgorithms.Fnv1a("mAnimationName"); // 0x948259d6
-            uint f_particleEventDataList = HashAlgorithms.Fnv1a("mParticleEventDataList"); // 0xb1b6c70f
-            uint f_effectName = HashAlgorithms.Fnv1a("mEffectName"); // 0x21c83c21
-            uint f_effectKey2 = HashAlgorithms.Fnv1a("mEffectKey"); // 0x51c6c57f
-            uint f_boneName2 = HashAlgorithms.Fnv1a("mBoneName"); // 0x0d73ab6d
-            uint f_startFrame2 = HashAlgorithms.Fnv1a("mStartFrame"); // 0x32c1c69f
-            uint f_soundEventDataList = HashAlgorithms.Fnv1a("mSoundEventDataList"); // 0x0a6ef062
-            uint f_soundName2 = HashAlgorithms.Fnv1a("mSoundName");
-
-            void FindClipsRecursive(BinTreeProperty val, uint parentPathHash)
-            {
-                if (val is BinTreeStruct s)
-                {
-                    if (s.Properties.TryGetValue(f_animationName, out var animNameProp))
-                    {
-                        string animName = (animNameProp is BinTreeString str ? str.Value : null) ?? "";
-                        if (!string.IsNullOrEmpty(animName))
-                        {
-                            string animFile = Path.GetFileName(animName.Replace('\\', '/'));
-                            var clip = new VfxAnimationClip
-                            {
-                                Name = parentPathHash.ToString("x8"),
-                                AnimationName = animName
-                            };
-
-                            if (s.Properties.TryGetValue(f_particleEventDataList, out var listProp) && listProp is BinTreeContainer list)
-                            {
-                                foreach (var el in list.Elements)
-                                {
-                                    if (el is BinTreeStruct eventStruct)
-                                    {
-                                        var (effectName, effectKey) = GetStringOrHash(eventStruct, f_effectName);
-                                        if (string.IsNullOrEmpty(effectName) && effectKey == 0)
-                                        {
-                                            (effectName, effectKey) = GetStringOrHash(eventStruct, f_effectKey2);
-                                        }
-
-                                        var (boneName, boneHash) = GetStringOrHash(eventStruct, f_boneName2);
-                                        float startFrame = AsF32(Get(eventStruct.Properties, f_startFrame2)) ?? 0f;
-
-                                        clip.ParticleEvents.Add(new VfxAnimationEvent
-                                        {
-                                            EffectName = effectName,
-                                            EffectHash = effectKey,
-                                            BoneName = boneName,
-                                            BoneHash = boneHash,
-                                            StartFrame = startFrame
-                                        });
-                                    }
-                                }
-                            }
-
-                            if (s.Properties.TryGetValue(f_soundEventDataList, out var sListProp) && sListProp is BinTreeContainer sList)
-                            {
-                                foreach (var el in sList.Elements)
-                                {
-                                    if (el is BinTreeStruct soundStruct)
-                                    {
-                                        var (soundName, soundHash) = GetStringOrHash(soundStruct, f_soundName2);
-                                        float startFrame = AsF32(Get(soundStruct.Properties, f_startFrame2)) ?? 0f;
-
-                                        clip.SoundEvents.Add(new VfxSoundEvent
-                                        {
-                                            SoundName = soundName,
-                                            SoundHash = soundHash,
-                                            StartFrame = startFrame
-                                        });
-                                    }
-                                }
-                            }
-                            MergeClip(map, animFile, clip);
-                            string nameWithoutExt = Path.GetFileNameWithoutExtension(animFile);
-                            MergeClip(map, nameWithoutExt, clip);
-                        }
-                    }
-
-                    foreach (var prop in s.Properties.Values)
-                    {
-                        FindClipsRecursive(prop, parentPathHash);
-                    }
-                }
-                else if (val is BinTreeContainer c)
-                {
-                    foreach (var el in c.Elements)
-                    {
-                        FindClipsRecursive(el, parentPathHash);
-                    }
-                }
-                else if (val is BinTreeMap m)
-                {
-                    foreach (var pair in m)
-                    {
-                        FindClipsRecursive(pair.Value, parentPathHash);
-                    }
-                }
-            }
-
-            foreach (var o in bin.Objects.Values)
-            {
-                foreach (var prop in o.Properties.Values)
-                {
-                    FindClipsRecursive(prop, o.PathHash);
-                }
-            }
-            return map;
-        }
-
-        private static (string Name, uint Hash) GetStringOrHash(BinTreeStruct s, uint field)
-        {
-            if (!s.Properties.TryGetValue(field, out var p)) return ("", 0u);
-            return p switch
-            {
-                BinTreeString str => (str.Value, HashAlgorithms.Fnv1a(str.Value)),
-                BinTreeHash h => ("", h.Value),
-                BinTreeU32 u => ("", u.Value),
-                _ => ("", 0u),
-            };
-        }
-    }
-
-    public class VfxAnimationEvent
-    {
-        public string EffectName { get; set; }
-        public uint EffectHash { get; set; }
-        public string BoneName { get; set; }
-        public uint BoneHash { get; set; }
-        public float StartFrame { get; set; }
-    }
-
-    public class VfxSoundEvent
-    {
-        public string SoundName { get; set; }
-        public uint SoundHash { get; set; }
-        public float StartFrame { get; set; }
-        public bool Triggered { get; set; }
-    }
-
-    public class VfxAnimationClip
-    {
-        public string Name { get; set; }
-        public string AnimationName { get; set; }
-        public List<VfxAnimationEvent> ParticleEvents { get; } = new List<VfxAnimationEvent>();
-        public List<VfxSoundEvent> SoundEvents { get; } = new List<VfxSoundEvent>();
     }
 }

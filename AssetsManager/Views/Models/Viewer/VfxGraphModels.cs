@@ -23,7 +23,6 @@ namespace AssetsManager.Views.Models.Viewer
 
     internal sealed record VfxBinDocument(
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
-        IReadOnlyDictionary<string, VfxAnimationClip> AnimationClips,
         IReadOnlyDictionary<uint, uint> ResourceMap,
         IReadOnlyList<string> Dependencies);
 
@@ -35,8 +34,6 @@ namespace AssetsManager.Views.Models.Viewer
         string Name,
         string ParticlePath,
         IReadOnlyList<VfxEmitterDefinition> Emitters,
-        string PersistentSoundEventName = null,
-        string OnCreateSoundEventName = null,
         float VisibilityRadius = 0f,
         Matrix4x4? Transform = null);
 
