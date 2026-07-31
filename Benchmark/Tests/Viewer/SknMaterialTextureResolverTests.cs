@@ -68,6 +68,50 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
             Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["head"]);
         }
 
+        [Theory]
+        [InlineData(
+            "Alune",
+            "PetStyleTwoAphelios_Alune",
+            "PetStyleTwoAphelios_Skin2_Alune_TX",
+            "alune")]
+        [InlineData(
+            "Alune_Head",
+            "PetStyleTwoAphelios_Alune_Face",
+            "PetStyleTwoAphelios_Skin2_Alune_Face_TX",
+            "alunehead")]
+        public void Resolve_UsesLayerTex01ForCompanionMaterial(
+            string submesh,
+            string materialName,
+            string textureName,
+            string expectedMaterialKey)
+        {
+            string materialPath =
+                $"Characters/PetStyleTwoAphelios/Skins/Skin2/Materials/{materialName}";
+            string texturePath =
+                $"ASSETS/Characters/PetStyleTwoAphelios/Skins/Skin2/Particles/{textureName}.tex";
+            BinTreeEmbedded materialOverride = CreateOverride(
+                submesh,
+                new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath)));
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/PetStyleTwoAphelios/Themes/SpiritBlossomSprings/" +
+                "PetStyleTwoAphelios_SpiritBlossomSprings_Tier1_TX_CM.tex",
+                materialOverride,
+                CreateMaterial(
+                    materialPath,
+                    CreateSampler("_LayerTex02", "ASSETS/Characters/Shared/Overlay.tex"),
+                    CreateSampler("_LayerTex01", texturePath)));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { textureName.ToLowerInvariant() });
+
+            Assert.Equal(textureName.ToLowerInvariant(), resolution.Overrides[expectedMaterialKey]);
+            Assert.Contains(texturePath, SknMaterialTextureResolver.GetReferencedTexturePaths(tree));
+            Assert.DoesNotContain(
+                "ASSETS/Characters/Shared/Overlay.tex",
+                SknMaterialTextureResolver.GetReferencedTexturePaths(tree));
+        }
+
         [Fact]
         public void Resolve_PrefersMainTextureOverDiffuseMask()
         {
@@ -138,27 +182,150 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer
             }
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TryResolveBinPath_UsesCompanionSkinBinReferencingThemeModel(bool retainsAssetPrefix)
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-{Guid.NewGuid():N}");
+            string characterRoot = retainsAssetPrefix
+                ? Path.Combine(root, "assets", "characters", "petstyletwoaphelios")
+                : Path.Combine(root, "petstyletwoaphelios");
+            string sknPath = Path.Combine(
+                characterRoot,
+                "themes",
+                "spiritblossomsprings",
+                "tier1",
+                "petstyletwoaphelios_spiritblossomsprings_tier1.skn");
+            string skinBinPath = Path.Combine(characterRoot, "skins", "skin2.bin");
+            string virtualSknPath =
+                "ASSETS/Characters/PetStyleTwoAphelios/Themes/SpiritBlossomSprings/Tier1/" +
+                "PetStyleTwoAphelios_SpiritBlossomSprings_Tier1.skn";
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(skinBinPath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+
+                BinTree tree = CreateSkinTree(
+                    "ASSETS/Characters/PetStyleTwoAphelios/Themes/SpiritBlossomSprings/" +
+                    "PetStyleTwoAphelios_SpiritBlossomSprings_Tier1_TX_CM.tex",
+                    simpleSkinPath: virtualSknPath);
+                using (var stream = File.Create(skinBinPath))
+                {
+                    tree.Write(stream);
+                }
+
+                Assert.Equal(skinBinPath, SknMaterialTextureResolver.TryResolveBinPath(sknPath));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Fact]
+        public void ResolveTextureDirectory_UsesCompanionThemeParent()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-textures-{Guid.NewGuid():N}");
+            string themeDirectory = Path.Combine(root, "pet", "themes", "theme");
+            string tierDirectory = Path.Combine(themeDirectory, "tier1");
+            string sknPath = Path.Combine(tierDirectory, "pet_theme_tier1.skn");
+
+            try
+            {
+                Directory.CreateDirectory(tierDirectory);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(Path.Combine(themeDirectory, "pet_theme_body_tx_cm.tex"), Array.Empty<byte>());
+
+                Assert.Equal(themeDirectory, SknLoadingService.ResolveTextureDirectory(sknPath));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void TryResolveReferencedTexturePath_FindsCompanionParticleTexture(bool retainsAssetPrefix)
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-companion-reference-{Guid.NewGuid():N}");
+            string characterRoot = retainsAssetPrefix
+                ? Path.Combine(root, "assets", "characters", "petstyletwoaphelios")
+                : Path.Combine(root, "petstyletwoaphelios");
+            string sknPath = Path.Combine(
+                characterRoot,
+                "themes",
+                "spiritblossomsprings",
+                "tier1",
+                "petstyletwoaphelios_spiritblossomsprings_tier1.skn");
+            string texturePath = Path.Combine(
+                characterRoot,
+                "skins",
+                "skin2",
+                "particles",
+                "petstyletwoaphelios_skin2_alune_tx.tex");
+            const string assetTexturePath =
+                "ASSETS/Characters/PetStyleTwoAphelios/Skins/Skin2/Particles/" +
+                "PetStyleTwoAphelios_Skin2_Alune_TX.tex";
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(texturePath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(texturePath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    texturePath,
+                    SknLoadingService.TryResolveReferencedTexturePath(sknPath, assetTexturePath),
+                    ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
         private static BinTree CreateSkinTree(
             string defaultTexturePath,
             BinTreeEmbedded materialOverride = null,
-            BinTreeObject material = null)
+            BinTreeObject material = null,
+            string simpleSkinPath = null)
         {
+            var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
+            {
+                new BinTreeString(Fnv1a.HashLower("texture"), defaultTexturePath)
+            };
+            if (!string.IsNullOrWhiteSpace(simpleSkinPath))
+            {
+                meshPropertyList.Add(new BinTreeString(Fnv1a.HashLower("simpleSkin"), simpleSkinPath));
+            }
+            if (materialOverride != null)
+            {
+                meshPropertyList.Add(
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("materialOverride"),
+                        BinPropertyType.Embedded,
+                        new[] { materialOverride }));
+            }
+
             var meshProperties = new BinTreeStruct(
                 Fnv1a.HashLower("skinMeshProperties"),
-                0,
-                materialOverride == null
-                    ? new BinTreeProperty[]
-                    {
-                        new BinTreeString(Fnv1a.HashLower("texture"), defaultTexturePath)
-                    }
-                    : new BinTreeProperty[]
-                    {
-                        new BinTreeString(Fnv1a.HashLower("texture"), defaultTexturePath),
-                        new BinTreeUnorderedContainer(
-                            Fnv1a.HashLower("materialOverride"),
-                            BinPropertyType.Embedded,
-                            new[] { materialOverride })
-                    });
+                Fnv1a.HashLower("SkinMeshDataProperties"),
+                meshPropertyList);
             var skin = new BinTreeObject(
                 "Characters/Belveth/Skins/Skin",
                 "SkinCharacterDataProperties",

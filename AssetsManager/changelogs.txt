@@ -125,6 +125,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer now resolves companion theme materials through their exact skin BIN, including textures referenced from external skin folders.
   - Explorer now clears Grid range selection and its anchor before opening a file.
   - VFX Studio now excludes authored-disabled systems and emitters from playback counts and timeline duration.
   - VFX Studio now presents Riot's authored forward direction toward the bottom of the viewport.

@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
-                var materialTextures = LoadMaterialTextures(filePath, loadedTextures.Keys);
+                var materialTextures = LoadMaterialTextures(filePath, loadedTextures, false);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                 return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath);
@@ -63,7 +63,7 @@ namespace AssetsManager.Services.Viewer
             try
             {
                 SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
-                string modelDirectory = Path.GetDirectoryName(filePath);
+                string modelDirectory = ResolveTextureDirectory(filePath);
 
                 if (string.IsNullOrEmpty(modelDirectory))
                 {
@@ -72,7 +72,7 @@ namespace AssetsManager.Services.Viewer
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
-                var materialTextures = LoadMaterialTextures(filePath, loadedTextures.Keys);
+                var materialTextures = LoadMaterialTextures(filePath, loadedTextures, true);
 
                 _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
                 return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath);
@@ -95,25 +95,62 @@ namespace AssetsManager.Services.Viewer
 
             foreach (string texPath in textureFiles)
             {
-                try
-                {
-                    using (Stream fileStream = File.OpenRead(texPath))
-                    {
-                        BitmapSource loadedTex = TextureUtils.LoadViewerTexture(fileStream, Path.GetExtension(texPath), _logService, texPath);
-                        if (loadedTex != null)
-                        {
-                            string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texPath));
-                            loadedTextures[textureKey] = loadedTex;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogError(ex, $"Failed to load texture file: {texPath}");
-                }
+                LoadTextureFile(texPath, loadedTextures);
             }
             return loadedTextures;
         }
+
+        private void LoadTextureFile(string texturePath, Dictionary<string, BitmapSource> loadedTextures)
+        {
+            try
+            {
+                using Stream fileStream = File.OpenRead(texturePath);
+                BitmapSource loadedTexture = TextureUtils.LoadViewerTexture(
+                    fileStream,
+                    Path.GetExtension(texturePath),
+                    _logService,
+                    texturePath);
+                if (loadedTexture != null)
+                {
+                    string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(texturePath));
+                    loadedTextures[textureKey] = loadedTexture;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"Failed to load texture file: {texturePath}");
+            }
+        }
+
+        internal static string ResolveTextureDirectory(string modelPath)
+        {
+            string modelDirectory = Path.GetDirectoryName(modelPath);
+            if (string.IsNullOrEmpty(modelDirectory))
+            {
+                return modelDirectory;
+            }
+
+            var directory = new DirectoryInfo(modelDirectory);
+            DirectoryInfo themeDirectory = directory.Parent;
+            if (themeDirectory?.Parent != null &&
+                themeDirectory.Parent.Name.Equals("themes", StringComparison.OrdinalIgnoreCase) &&
+                ContainsTextures(themeDirectory.FullName))
+            {
+                return themeDirectory.FullName;
+            }
+
+            if (ContainsTextures(modelDirectory))
+            {
+                return modelDirectory;
+            }
+
+            return modelDirectory;
+        }
+
+        private static bool ContainsTextures(string directoryPath) =>
+            Directory.EnumerateFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
+                .Any(path => path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
+                             path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase));
 
         private async Task<SceneModel> CreateSceneModel(
             SkinnedMesh skinnedMesh,
@@ -273,7 +310,10 @@ namespace AssetsManager.Services.Viewer
             return defaultTextureKey;
         }
 
-        private SknMaterialTextureResolution LoadMaterialTextures(string sknPath, IEnumerable<string> loadedTextureKeys)
+        private SknMaterialTextureResolution LoadMaterialTextures(
+            string sknPath,
+            Dictionary<string, BitmapSource> loadedTextures,
+            bool loadReferencedTextures)
         {
             string skinBinPath = SknMaterialTextureResolver.TryResolveBinPath(sknPath);
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath))
@@ -286,8 +326,24 @@ namespace AssetsManager.Services.Viewer
             {
                 using var stream = File.OpenRead(skinBinPath);
                 var binTree = new BinTree(stream);
+                if (loadReferencedTextures)
+                {
+                    foreach (string texturePath in SknMaterialTextureResolver.GetReferencedTexturePaths(binTree))
+                    {
+                        string resolvedPath = TryResolveReferencedTexturePath(sknPath, texturePath);
+                        if (resolvedPath != null)
+                        {
+                            string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(resolvedPath));
+                            if (!loadedTextures.ContainsKey(textureKey))
+                            {
+                                LoadTextureFile(resolvedPath, loadedTextures);
+                            }
+                        }
+                    }
+                }
+
                 SknMaterialTextureResolution resolution =
-                    SknMaterialTextureResolver.Resolve(binTree, loadedTextureKeys);
+                    SknMaterialTextureResolver.Resolve(binTree, loadedTextures.Keys);
                 _logService.LogDebug(
                     $"Loaded skin texture metadata from '{Path.GetFileName(skinBinPath)}': " +
                     $"default='{resolution.DefaultTextureKey ?? "none"}', overrides={resolution.Overrides.Count}.");
@@ -298,6 +354,73 @@ namespace AssetsManager.Services.Viewer
                 _logService.LogError(ex, $"Failed to read skin material bin: {skinBinPath}");
                 return null;
             }
+        }
+
+        internal static string TryResolveReferencedTexturePath(string sknPath, string assetTexturePath)
+        {
+            if (string.IsNullOrWhiteSpace(sknPath) || string.IsNullOrWhiteSpace(assetTexturePath))
+            {
+                return null;
+            }
+
+            string normalizedSknPath = Path.GetFullPath(sknPath)
+                .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            string characterRoot = FindCharacterRoot(normalizedSknPath);
+            if (characterRoot == null)
+            {
+                return null;
+            }
+
+            string characterName = Path.GetFileName(characterRoot);
+            string normalizedAssetPath = assetTexturePath.Replace('\\', '/').TrimStart('/');
+            string characterPrefix = $"assets/characters/{characterName}/";
+            if (!normalizedAssetPath.StartsWith(characterPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            string relativePath = normalizedAssetPath[characterPrefix.Length..]
+                .Replace('/', Path.DirectorySeparatorChar);
+            string candidatePath = Path.GetFullPath(Path.Combine(characterRoot, relativePath));
+            string rootedPrefix = characterRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!candidatePath.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) ||
+                (!candidatePath.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
+                 !candidatePath.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)))
+            {
+                return null;
+            }
+
+            return File.Exists(candidatePath) ? candidatePath : null;
+        }
+
+        private static string FindCharacterRoot(string normalizedSknPath)
+        {
+            string assetsMarker =
+                $"{Path.DirectorySeparatorChar}assets{Path.DirectorySeparatorChar}characters{Path.DirectorySeparatorChar}";
+            int assetsIndex = normalizedSknPath.IndexOf(assetsMarker, StringComparison.OrdinalIgnoreCase);
+            if (assetsIndex >= 0)
+            {
+                string characterRelativePath = normalizedSknPath[(assetsIndex + assetsMarker.Length)..];
+                int separatorIndex = characterRelativePath.IndexOf(Path.DirectorySeparatorChar);
+                if (separatorIndex > 0)
+                {
+                    return normalizedSknPath[
+                        ..(assetsIndex + assetsMarker.Length + separatorIndex)];
+                }
+            }
+
+            foreach (string directoryName in new[] { "themes", "skins" })
+            {
+                string marker =
+                    $"{Path.DirectorySeparatorChar}{directoryName}{Path.DirectorySeparatorChar}";
+                int markerIndex = normalizedSknPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex > 0)
+                {
+                    return normalizedSknPath[..markerIndex];
+                }
+            }
+
+            return null;
         }
 
         private record SubmeshData(

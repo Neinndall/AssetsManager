@@ -19,6 +19,7 @@ namespace AssetsManager.Services.Viewer
         private static readonly uint SkinPropertiesClass = Fnv1a.HashLower("SkinCharacterDataProperties");
         private static readonly uint StaticMaterialClass = Fnv1a.HashLower("StaticMaterialDef");
         private static readonly uint SkinMeshProperties = Fnv1a.HashLower("skinMeshProperties");
+        private static readonly uint SimpleSkin = Fnv1a.HashLower("simpleSkin");
         private static readonly uint MaterialOverride = Fnv1a.HashLower("materialOverride");
         private static readonly uint Texture = Fnv1a.HashLower("texture");
         private static readonly uint Submesh = Fnv1a.HashLower("submesh");
@@ -89,6 +90,54 @@ namespace AssetsManager.Services.Viewer
             return new SknMaterialTextureResolution(defaultTextureKey, overrides);
         }
 
+        internal static IReadOnlyCollection<string> GetReferencedTexturePaths(BinTree binTree)
+        {
+            var materialTexturePaths = BuildMaterialTexturePathMap(binTree);
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (BinTreeObject obj in binTree.Objects.Values)
+            {
+                if (obj.ClassHash != SkinPropertiesClass ||
+                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
+                    meshProperty is not BinTreeStruct meshProperties)
+                {
+                    continue;
+                }
+
+                if (TryGetString(meshProperties, Texture, out string defaultTexturePath))
+                {
+                    result.Add(defaultTexturePath);
+                }
+
+                if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
+                    overrideProperty is not BinTreeContainer materialOverrides)
+                {
+                    continue;
+                }
+
+                foreach (BinTreeProperty element in materialOverrides.Elements)
+                {
+                    if (element is not BinTreeStruct entry)
+                    {
+                        continue;
+                    }
+
+                    if (TryGetString(entry, Texture, out string directTexturePath))
+                    {
+                        result.Add(directTexturePath);
+                    }
+                    else if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
+                             linkProperty is BinTreeObjectLink materialLink &&
+                             materialTexturePaths.TryGetValue(materialLink.Value, out string materialTexturePath))
+                    {
+                        result.Add(materialTexturePath);
+                    }
+                }
+            }
+
+            return result;
+        }
+
         internal static string TryResolveBinPath(string sknPath)
         {
             if (string.IsNullOrWhiteSpace(sknPath))
@@ -102,7 +151,7 @@ namespace AssetsManager.Services.Viewer
             int markerIndex = normalizedPath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
             if (markerIndex < 0)
             {
-                return null;
+                return TryResolveCompanionBinPath(normalizedPath);
             }
 
             string rootPath = normalizedPath[..markerIndex];
@@ -110,7 +159,7 @@ namespace AssetsManager.Services.Viewer
                 .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 3 || !parts[1].Equals("skins", StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                return TryResolveCompanionBinPath(normalizedPath);
             }
 
             string skinBinName = GetSkinBinName(parts[2]);
@@ -129,6 +178,69 @@ namespace AssetsManager.Services.Viewer
             // Unknown paths extracted from a WAD retain their xxHash64 as the file name.
             string hashedPath = Path.Combine(rootPath, $"{XxHash64Ext.Hash(virtualPath):x16}.bin");
             return File.Exists(hashedPath) ? hashedPath : null;
+        }
+
+        private static string TryResolveCompanionBinPath(string normalizedSknPath)
+        {
+            string themesMarker = $"{Path.DirectorySeparatorChar}themes{Path.DirectorySeparatorChar}";
+            int themesIndex = normalizedSknPath.IndexOf(themesMarker, StringComparison.OrdinalIgnoreCase);
+            if (themesIndex < 0)
+            {
+                return null;
+            }
+
+            string characterRoot = normalizedSknPath[..themesIndex];
+            string characterName = Path.GetFileName(characterRoot);
+            string skinsDirectory = Path.Combine(characterRoot, "skins");
+            if (string.IsNullOrWhiteSpace(characterName) || !Directory.Exists(skinsDirectory))
+            {
+                return null;
+            }
+
+            string relativeModelPath = Path.GetRelativePath(characterRoot, normalizedSknPath)
+                .Replace(Path.DirectorySeparatorChar, '/');
+            string virtualModelPath = $"assets/characters/{characterName}/{relativeModelPath}";
+
+            foreach (string binPath in Directory.EnumerateFiles(
+                         skinsDirectory,
+                         "skin*.bin",
+                         SearchOption.TopDirectoryOnly)
+                     .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
+            {
+                using var stream = File.OpenRead(binPath);
+                var binTree = new BinTree(stream);
+                if (ReferencesModel(binTree, virtualModelPath))
+                {
+                    return binPath;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ReferencesModel(BinTree binTree, string virtualModelPath)
+        {
+            string expectedPath = NormalizeAssetPath(virtualModelPath);
+            foreach (BinTreeObject obj in binTree.Objects.Values)
+            {
+                if (obj.ClassHash != SkinPropertiesClass ||
+                    !obj.Properties.TryGetValue(SkinMeshProperties, out BinTreeProperty meshProperty) ||
+                    meshProperty is not BinTreeStruct meshProperties ||
+                    !meshProperties.Properties.TryGetValue(SimpleSkin, out BinTreeProperty simpleSkinProperty) ||
+                    simpleSkinProperty is not BinTreeString simpleSkin)
+                {
+                    continue;
+                }
+
+                if (NormalizeAssetPath(simpleSkin.Value).Equals(
+                        expectedPath,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal static string FindUnambiguousFallback(IEnumerable<string> availableTextureKeys)
@@ -154,6 +266,21 @@ namespace AssetsManager.Services.Viewer
         private static Dictionary<uint, string> BuildMaterialTextureMap(
             BinTree binTree,
             IReadOnlyList<string> textureKeys)
+        {
+            var result = new Dictionary<uint, string>();
+            foreach ((uint pathHash, string texturePath) in BuildMaterialTexturePathMap(binTree))
+            {
+                string textureKey = MatchTextureKey(texturePath, textureKeys);
+                if (textureKey != null)
+                {
+                    result[pathHash] = textureKey;
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<uint, string> BuildMaterialTexturePathMap(BinTree binTree)
         {
             var result = new Dictionary<uint, string>();
             foreach ((uint pathHash, BinTreeObject obj) in binTree.Objects)
@@ -184,10 +311,9 @@ namespace AssetsManager.Services.Viewer
                     }
                 }
 
-                string textureKey = MatchTextureKey(bestTexturePath, textureKeys);
-                if (textureKey != null)
+                if (bestTexturePath != null)
                 {
-                    result[pathHash] = textureKey;
+                    result[pathHash] = bestTexturePath;
                 }
             }
 
@@ -198,6 +324,7 @@ namespace AssetsManager.Services.Viewer
         {
             string normalized = NormalizeToken(slotName);
             if (normalized == "maintexture") return 300;
+            if (normalized == "layertex01") return 250;
             if (normalized == "diffusetexture") return 200;
 
             if (normalized.Contains("mask") ||
@@ -269,5 +396,8 @@ namespace AssetsManager.Services.Viewer
 
         private static string NormalizeToken(string value) =>
             Regex.Replace(value?.ToLowerInvariant() ?? string.Empty, @"[^a-z0-9]", string.Empty);
+
+        private static string NormalizeAssetPath(string value) =>
+            value?.Replace('\\', '/').Trim().ToLowerInvariant() ?? string.Empty;
     }
 }
