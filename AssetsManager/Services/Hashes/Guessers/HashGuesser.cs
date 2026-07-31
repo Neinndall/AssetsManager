@@ -203,7 +203,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string path in knownPaths)
             {
                 if (!IncludeNumberPath(path)) continue;
-                foreach (Match match in Regex.Matches(path, numberPattern + @"(?=[^/]*\.[^/]+$)"))
+                foreach (Match match in Regex.Matches(path, numberPattern))
                 {
                     formats.Add(path[..match.Index] + "{number}" + path[(match.Index + match.Length)..]);
                 }

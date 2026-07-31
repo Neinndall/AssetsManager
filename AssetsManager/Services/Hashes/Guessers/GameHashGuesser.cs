@@ -230,10 +230,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                 {
                     yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}.bin", HashGuessStrategy.CharacterTemplate);
                     yield return new HashGuessCandidate($"data/characters/{character}/animations/skin{skin}.bin", HashGuessStrategy.CharacterTemplate);
+                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skn", HashGuessStrategy.CharacterTemplate);
+                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skl", HashGuessStrategy.CharacterTemplate);
+                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.anm", HashGuessStrategy.CharacterTemplate);
+                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}_tx_cm.dds", HashGuessStrategy.CharacterTemplate);
                 }
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                     for (int tier = 0; tier < 10; tier++)
+                    {
                         yield return new HashGuessCandidate($"data/characters/{character}/tiers/tier{tier}.bin", HashGuessStrategy.CharacterTemplate);
+                        yield return new HashGuessCandidate($"assets/characters/{character}/hud/{character}_tier{tier}.png", HashGuessStrategy.CharacterTemplate);
+                    }
             }
         }
 

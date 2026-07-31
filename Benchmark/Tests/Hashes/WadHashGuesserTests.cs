@@ -1078,5 +1078,28 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Equal(expected, match.Path);
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
+
+        [Fact]
+        public void FolderNumberSubstitutionResolvesDirectoryHashes()
+        {
+            string knownPath = "assets/maps/map11/scene.dds";
+            string targetPath = "assets/maps/map12/scene.dds";
+            ulong targetHash = XxHash64Ext.Hash(targetPath);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownPath }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash });
+
+            int checkedCandidates = 0;
+            foreach (var candidate in game.SubstituteNumbers(maximum: 20))
+            {
+                checkedCandidates++;
+                game.Check(engine, candidate.Path, candidate.Strategy);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(targetPath, engine.Matches[targetHash].Path);
+            Assert.True(checkedCandidates <= 40);
+        }
     }
 }
