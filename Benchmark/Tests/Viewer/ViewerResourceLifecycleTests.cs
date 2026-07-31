@@ -184,9 +184,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Point3D target = camera.Position + camera.LookDirection;
 
             Assert.Equal(new Point3D(0, 0, 0), target);
-            Assert.True(camera.LookDirection.Length > 800);
-            Assert.True(camera.Position.X > 0);
-            Assert.Equal(0, camera.Position.Z);
+            Assert.True(camera.LookDirection.Length > 200);
+            Assert.Equal(0, camera.Position.X);
+            Assert.True(camera.Position.Z > 0);
         }
     }
 }

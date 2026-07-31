@@ -40,7 +40,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly OpenGlSnapshotService _snapshotService = new();
         private readonly Viewport3D _dummyViewport = new Viewport3D
         {
-            Camera = new PerspectiveCamera(new Point3D(0, 1130, 280), new Vector3D(0, -0.14, -0.99), new Vector3D(0, 0.99, -0.14), 45)
+            Camera = new PerspectiveCamera(new Point3D(0, 1118, 250), new Vector3D(0, -38, -250), new Vector3D(0, 1, 0), 45)
         };
         public Viewport3D Viewport3D => _dummyViewport;
         public Viewport3D Viewport => Viewport3D;
@@ -968,7 +968,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetCamera(bool smooth = true)
         {
             bool isMap = Panel?.ViewModel?.IsMapMode == true;
-            double baselineY = 1000;
 
             Point3D position;
             Vector3D lookDirection;
@@ -976,7 +975,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (TryGetModelBounds(out var center, out var maxDim))
             {
-                double distance = isMap ? maxDim * 0.55 : maxDim * 1.8;
+                double distance = isMap ? maxDim * 0.55 : maxDim * 1.25;
                 if (distance < 50) distance = 250;
 
                 double heightFactor = isMap ? 1.2 : 0.15;
@@ -998,8 +997,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             // Fallback coordinates
-            position = isMap ? new Point3D(0.00, 1386.00, 670.00) : new Point3D(0.00, 130.00 + baselineY, 280.00);
-            lookDirection = isMap ? new Vector3D(0.00, -250.00, -650.00) : new Vector3D(0.00, -40.00, -280.00);
+            position = isMap ? new Point3D(0.00, 1386.00, 670.00) : new Point3D(0.00, 1118.00, 250.00);
+            lookDirection = isMap ? new Vector3D(0.00, -250.00, -650.00) : new Vector3D(0.00, -38.00, -250.00);
 
             if (smooth)
             {
@@ -1038,7 +1037,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (TryGetModelBounds(out var center, out var maxDim))
             {
                 targetPoint = center;
-                distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.8) * maxDim;
+                distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.25) * maxDim;
                 if (distance < 50) distance = 250;
             }
 
