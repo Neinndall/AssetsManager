@@ -11,6 +11,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
+using BenchmarkApp.Diagnostics.Viewer;
 
 namespace BenchmarkApp
 {
@@ -38,7 +39,7 @@ namespace BenchmarkApp
             if (args.Length > 0 && string.Equals(args[0], "inspect-skn", StringComparison.OrdinalIgnoreCase))
             {
                 string targetPath = args.Length > 1 ? args[1] : null;
-                BenchmarkApp.Infrastructure.InspectSkn.Run(targetPath);
+                InspectSknDiagnostic.Run(targetPath);
                 return;
             }
 

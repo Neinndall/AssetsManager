@@ -3,21 +3,24 @@ using System.IO;
 using System.Linq;
 using LeagueToolkit.Core.Mesh;
 
-namespace BenchmarkApp.Infrastructure
+namespace BenchmarkApp.Diagnostics.Viewer
 {
-    public static class InspectSkn
+    internal static class InspectSknDiagnostic
     {
-        public static void Run(string sknPath = null)
+        public static void Run(string sknPath)
         {
-            if (string.IsNullOrEmpty(sknPath))
+            if (string.IsNullOrWhiteSpace(sknPath))
             {
-                sknPath = @"C:\Users\danielpriego\Desktop\Belveth.wad.client\assets\characters\belveth\skins\skin29\belveth_skin29.skn";
+                Console.WriteLine(
+                    "Usage: dotnet run --project Benchmark/BenchmarkApp.csproj -- " +
+                    "inspect-skn <path-to-skn>");
+                return;
             }
 
+            sknPath = Path.GetFullPath(sknPath);
             if (!File.Exists(sknPath))
             {
                 Console.WriteLine($"[InspectSkn] File not found: {sknPath}");
-                Console.WriteLine("Usage: dotnet run --project Benchmark/BenchmarkApp.csproj -- inspect-skn <path-to-skn>");
                 return;
             }
 
