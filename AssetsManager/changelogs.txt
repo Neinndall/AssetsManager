@@ -24,6 +24,7 @@ New Features
 
 Improvements
   - Viewer Browser now uses the compact shared breadcrumb navigation.
+  - Viewer model rendering now reuses animated mesh buffers and shared textures while releasing GPU resources as models are removed.
   - BIN Hash Lab now preserves observed casing and requires runtime evidence before promoting Meta Schema candidates.
   - BIN Hash Lab now discovers owner-matched entry names without class-specific whitelists.
   - BIN Hash Lab now preserves unpaired semantic matches as research and extracts embedded function names without partial block results.

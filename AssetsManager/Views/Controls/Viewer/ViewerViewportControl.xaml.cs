@@ -129,6 +129,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
         {
+            _meshRenderer.ProcessPendingReleases();
             _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
 
             // Clear color based on transparent background setting
@@ -635,6 +636,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             foreach (var model in _loadedModels)
             {
+                _meshRenderer?.QueueRelease(model);
                 if (Viewport.Children.Contains(model.RootVisual))
                     Viewport.Children.Remove(model.RootVisual);
                 model.PropertyChanged -= Model_PropertyChanged;
@@ -701,6 +703,7 @@ namespace AssetsManager.Views.Controls.Viewer
             model.PropertyChanged -= Model_PropertyChanged;
             _loadedModels.Remove(model);
             _lastModelUpdates.Remove(model);
+            _meshRenderer?.QueueRelease(model);
             if (_modelPlayers.TryGetValue(model, out var player))
             {
                 player.Dispose();

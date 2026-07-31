@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer;
+using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Viewer;
@@ -104,6 +107,57 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Equal(
                 0,
                 Vector3D.DotProduct(pose.Value.LookDirection, pose.Value.UpDirection));
+        }
+
+        [Fact]
+        public void MeshUploadDataReusesStaticUvsWhileRefreshingAnimatedGeometry()
+        {
+            var mesh = new MeshGeometry3D
+            {
+                Positions = new Point3DCollection
+                {
+                    new(0, 0, 0),
+                    new(1, 0, 0),
+                    new(0, 1, 0)
+                },
+                TriangleIndices = new Int32Collection { 0, 1, 2 },
+                TextureCoordinates = new PointCollection
+                {
+                    new(0, 0),
+                    new(1, 0),
+                    new(0, 1)
+                }
+            };
+            var vertexData = new GlMeshVertexData(mesh.Positions.Count);
+
+            vertexData.Update(mesh, updateTextureCoordinates: true);
+            float[] originalUvs =
+            {
+                vertexData.Data[6], vertexData.Data[7],
+                vertexData.Data[14], vertexData.Data[15],
+                vertexData.Data[22], vertexData.Data[23]
+            };
+
+            mesh.Positions = new Point3DCollection
+            {
+                new(0, 0, 1),
+                new(1, 0, 1),
+                new(0, 1, 1)
+            };
+            vertexData.Update(mesh, updateTextureCoordinates: false);
+
+            Assert.Equal(1f, vertexData.Data[2]);
+            Assert.Equal(1f, vertexData.Data[10]);
+            Assert.Equal(1f, vertexData.Data[18]);
+            Assert.Equal(originalUvs, new[]
+            {
+                vertexData.Data[6], vertexData.Data[7],
+                vertexData.Data[14], vertexData.Data[15],
+                vertexData.Data[22], vertexData.Data[23]
+            });
+            Assert.Equal(
+                Vector3.UnitZ,
+                new Vector3(vertexData.Data[3], vertexData.Data[4], vertexData.Data[5]));
         }
 
         [Theory]

@@ -18,19 +18,24 @@ namespace AssetsManager.Services.Viewer
     /// </summary>
     public sealed class GlMeshRenderer : IDisposable
     {
-        private class GlPartBuffers : IDisposable
+        private sealed class GlPartBuffers
         {
             public uint Vao;
             public uint Vbo;
             public uint Ebo;
             public int IndexCount;
             public uint Texture;
+            public bool TextureResolved;
             public string LoadedTextureKey;
+            public BitmapSource LoadedBitmap;
+            public Point3DCollection UploadedPositions;
+            public GlMeshVertexData VertexData;
+        }
 
-            public void Dispose()
-            {
-                // Managed by renderer, but safe fallback
-            }
+        private sealed class SharedTexture
+        {
+            public uint Id;
+            public int ReferenceCount;
         }
 
         private GL _gl = null!;
@@ -50,8 +55,10 @@ namespace AssetsManager.Services.Viewer
         private DrawElementsDelegate _drawElements = null!;
 
         private readonly ConditionalWeakTable<ModelPart, GlPartBuffers> _partBuffers = new();
-        private readonly List<uint> _allocatedTextures = new();
-        private readonly List<(uint Vao, uint Vbo, uint Ebo)> _allocatedBuffers = new();
+        private readonly HashSet<GlPartBuffers> _livePartBuffers = new();
+        private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly HashSet<ModelPart> _pendingReleases = new();
         private uint _whiteTex;
 
         public void Initialize(GL gl)
@@ -116,7 +123,7 @@ namespace AssetsManager.Services.Viewer
             {
                 if (!part.IsVisible) continue;
 
-                var buffers = EnsureBuffers(part, model);
+                var buffers = EnsureBuffers(part);
                 if (buffers.Vao == 0) continue;
 
                 _gl.BindVertexArray(buffers.Vao);
@@ -135,89 +142,29 @@ namespace AssetsManager.Services.Viewer
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
 
-        private GlPartBuffers EnsureBuffers(ModelPart part, SceneModel model)
+        private GlPartBuffers EnsureBuffers(ModelPart part)
         {
             if (!_partBuffers.TryGetValue(part, out var buffers))
             {
                 buffers = new GlPartBuffers();
                 _partBuffers.Add(part, buffers);
+                _livePartBuffers.Add(buffers);
             }
 
-            // If the selected texture changed in WPF UI, rebuild the OpenGL texture
-            if (buffers.LoadedTextureKey != part.SelectedTextureName)
-            {
-                if (buffers.Texture != 0)
-                {
-                    _gl.DeleteTexture(buffers.Texture);
-                    _allocatedTextures.Remove(buffers.Texture);
-                    buffers.Texture = 0;
-                }
-
-                var bitmap = TextureUtils.ResolveTexture(part.AllTextures, part.SelectedTextureName);
-                if (bitmap != null)
-                {
-                    buffers.Texture = UploadTexture(bitmap);
-                    buffers.LoadedTextureKey = part.SelectedTextureName;
-                }
-            }
+            EnsureTexture(part, buffers);
 
             // Build VAO/VBO/EBO if not already created
             if (buffers.Vao == 0 && part.Geometry?.Geometry is MeshGeometry3D mesh)
             {
                 var positions = mesh.Positions;
-                var texCoords = mesh.TextureCoordinates;
                 var indices = mesh.TriangleIndices;
 
                 if (positions != null && indices != null)
                 {
                     int vertexCount = positions.Count;
-                    // Interleaved: pos3 + normal3 + uv2 = 8 floats per vertex
-                    float[] vertices = new float[vertexCount * 8];
-
-                    // Generate smooth flat normals dynamically
-                    Vector3[] normals = new Vector3[vertexCount];
-                    for (int i = 0; i < indices.Count; i += 3)
-                    {
-                        if (i + 2 >= indices.Count) break;
-                        int idx0 = indices[i];
-                        int idx1 = indices[i + 1];
-                        int idx2 = indices[i + 2];
-
-                        if (idx0 < vertexCount && idx1 < vertexCount && idx2 < vertexCount)
-                        {
-                            var p0 = positions[idx0];
-                            var p1 = positions[idx1];
-                            var p2 = positions[idx2];
-
-                            Vector3 v0 = new Vector3((float)(p1.X - p0.X), (float)(p1.Y - p0.Y), (float)(p1.Z - p0.Z));
-                            Vector3 v1 = new Vector3((float)(p2.X - p0.X), (float)(p2.Y - p0.Y), (float)(p2.Z - p0.Z));
-                            Vector3 normal = Vector3.Normalize(Vector3.Cross(v0, v1));
-
-                            normals[idx0] += normal;
-                            normals[idx1] += normal;
-                            normals[idx2] += normal;
-                        }
-                    }
-
-                    for (int i = 0; i < vertexCount; i++)
-                    {
-                        var p = positions[i];
-                        vertices[i * 8 + 0] = (float)p.X;
-                        vertices[i * 8 + 1] = (float)p.Y;
-                        vertices[i * 8 + 2] = (float)p.Z;
-
-                        var norm = normals[i].LengthSquared() > 0f ? Vector3.Normalize(normals[i]) : Vector3.UnitY;
-                        vertices[i * 8 + 3] = norm.X;
-                        vertices[i * 8 + 4] = norm.Y;
-                        vertices[i * 8 + 5] = norm.Z;
-
-                        if (texCoords != null && i < texCoords.Count)
-                        {
-                            var uv = texCoords[i];
-                            vertices[i * 8 + 6] = (float)uv.X;
-                            vertices[i * 8 + 7] = (float)uv.Y;
-                        }
-                    }
+                    buffers.VertexData = new GlMeshVertexData(vertexCount);
+                    buffers.VertexData.Update(mesh, updateTextureCoordinates: true);
+                    buffers.UploadedPositions = positions;
 
                     uint[] indicesArray = new uint[indices.Count];
                     for (int i = 0; i < indices.Count; i++)
@@ -232,7 +179,10 @@ namespace AssetsManager.Services.Viewer
                     _gl.BindVertexArray(buffers.Vao);
 
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffers.Vbo);
-                    _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(vertices), BufferUsageARB.DynamicDraw);
+                    _gl.BufferData(
+                        BufferTargetARB.ArrayBuffer,
+                        new ReadOnlySpan<float>(buffers.VertexData.Data),
+                        BufferUsageARB.DynamicDraw);
 
                     _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, buffers.Ebo);
                     _gl.BufferData(BufferTargetARB.ElementArrayBuffer, new ReadOnlySpan<uint>(indicesArray), BufferUsageARB.StaticDraw);
@@ -250,70 +200,109 @@ namespace AssetsManager.Services.Viewer
                     _gl.BindVertexArray(0);
 
                     buffers.IndexCount = indices.Count;
-                    _allocatedBuffers.Add((buffers.Vao, buffers.Vbo, buffers.Ebo));
                 }
             }
-            else if (buffers.Vao != 0 && part.Geometry?.Geometry is MeshGeometry3D meshAnim && model.CurrentAnimation != null && !model.IsAnimationPaused)
+            else if (buffers.Vao != 0 &&
+                     part.Geometry?.Geometry is MeshGeometry3D meshAnim &&
+                     !ReferenceEquals(buffers.UploadedPositions, meshAnim.Positions))
             {
                 var positions = meshAnim.Positions;
-                var indices = meshAnim.TriangleIndices;
-                var texCoords = meshAnim.TextureCoordinates;
 
-                if (positions != null && indices != null)
+                if (positions != null)
                 {
-                    int vertexCount = positions.Count;
-                    float[] vertices = new float[vertexCount * 8];
-                    Vector3[] normals = new Vector3[vertexCount];
-
-                    for (int i = 0; i < indices.Count; i += 3)
+                    if (positions.Count != buffers.VertexData.VertexCount)
                     {
-                        int idx0 = indices[i];
-                        int idx1 = indices[i + 1];
-                        int idx2 = indices[i + 2];
-
-                        if (idx0 < vertexCount && idx1 < vertexCount && idx2 < vertexCount)
-                        {
-                            var p0 = positions[idx0];
-                            var p1 = positions[idx1];
-                            var p2 = positions[idx2];
-
-                            Vector3 v0 = new Vector3((float)(p1.X - p0.X), (float)(p1.Y - p0.Y), (float)(p1.Z - p0.Z));
-                            Vector3 v1 = new Vector3((float)(p2.X - p0.X), (float)(p2.Y - p0.Y), (float)(p2.Z - p0.Z));
-                            Vector3 normal = Vector3.Normalize(Vector3.Cross(v0, v1));
-
-                            normals[idx0] += normal;
-                            normals[idx1] += normal;
-                            normals[idx2] += normal;
-                        }
+                        ReleasePart(part);
+                        return EnsureBuffers(part);
                     }
 
-                    for (int i = 0; i < vertexCount; i++)
-                    {
-                        var p = positions[i];
-                        vertices[i * 8 + 0] = (float)p.X;
-                        vertices[i * 8 + 1] = (float)p.Y;
-                        vertices[i * 8 + 2] = (float)p.Z;
-
-                        var norm = normals[i].LengthSquared() > 0f ? Vector3.Normalize(normals[i]) : Vector3.UnitY;
-                        vertices[i * 8 + 3] = norm.X;
-                        vertices[i * 8 + 4] = norm.Y;
-                        vertices[i * 8 + 5] = norm.Z;
-
-                        if (texCoords != null && i < texCoords.Count)
-                        {
-                            var uv = texCoords[i];
-                            vertices[i * 8 + 6] = (float)uv.X;
-                            vertices[i * 8 + 7] = (float)uv.Y;
-                        }
-                    }
+                    buffers.VertexData.Update(meshAnim, updateTextureCoordinates: false);
 
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffers.Vbo);
-                    _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, new ReadOnlySpan<float>(vertices));
+                    _gl.BufferSubData(
+                        BufferTargetARB.ArrayBuffer,
+                        0,
+                        new ReadOnlySpan<float>(buffers.VertexData.Data));
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+                    buffers.UploadedPositions = positions;
                 }
             }
 
             return buffers;
+        }
+
+        private void EnsureTexture(ModelPart part, GlPartBuffers buffers)
+        {
+            string selectedTexture = part.SelectedTextureName;
+            if (buffers.TextureResolved && buffers.LoadedTextureKey == selectedTexture)
+            {
+                return;
+            }
+
+            BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
+            ReleaseTexture(buffers);
+            buffers.TextureResolved = true;
+            buffers.LoadedTextureKey = selectedTexture;
+            buffers.LoadedBitmap = bitmap;
+            if (bitmap == null) return;
+
+            if (!_sharedTextures.TryGetValue(bitmap, out SharedTexture sharedTexture))
+            {
+                sharedTexture = new SharedTexture { Id = UploadTexture(bitmap) };
+                _sharedTextures.Add(bitmap, sharedTexture);
+            }
+
+            sharedTexture.ReferenceCount++;
+            buffers.Texture = sharedTexture.Id;
+        }
+
+        private void ReleaseTexture(GlPartBuffers buffers)
+        {
+            if (buffers.LoadedBitmap != null &&
+                _sharedTextures.TryGetValue(buffers.LoadedBitmap, out SharedTexture sharedTexture))
+            {
+                sharedTexture.ReferenceCount--;
+                if (sharedTexture.ReferenceCount == 0)
+                {
+                    _gl.DeleteTexture(sharedTexture.Id);
+                    _sharedTextures.Remove(buffers.LoadedBitmap);
+                }
+            }
+
+            buffers.Texture = 0;
+            buffers.LoadedBitmap = null;
+        }
+
+        public void QueueRelease(SceneModel model)
+        {
+            if (model?.Parts == null) return;
+            foreach (ModelPart part in model.Parts)
+            {
+                _pendingReleases.Add(part);
+            }
+        }
+
+        public void ProcessPendingReleases()
+        {
+            if (!_ready || _pendingReleases.Count == 0) return;
+            foreach (ModelPart part in _pendingReleases)
+            {
+                ReleasePart(part);
+            }
+            _pendingReleases.Clear();
+        }
+
+        private void ReleasePart(ModelPart part)
+        {
+            if (!_partBuffers.TryGetValue(part, out GlPartBuffers buffers)) return;
+
+            ReleaseTexture(buffers);
+            if (buffers.Vao != 0) _gl.DeleteVertexArray(buffers.Vao);
+            if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
+            if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
+
+            _livePartBuffers.Remove(buffers);
+            _partBuffers.Remove(part);
         }
 
         private uint UploadTexture(BitmapSource bitmap)
@@ -344,7 +333,6 @@ namespace AssetsManager.Services.Viewer
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
 
-            _allocatedTextures.Add(tex);
             return tex;
         }
 
@@ -352,19 +340,20 @@ namespace AssetsManager.Services.Viewer
         {
             if (!_ready) return;
 
-            foreach (var tex in _allocatedTextures)
+            foreach (SharedTexture texture in _sharedTextures.Values)
             {
-                _gl.DeleteTexture(tex);
+                _gl.DeleteTexture(texture.Id);
             }
-            _allocatedTextures.Clear();
+            _sharedTextures.Clear();
 
-            foreach (var (vao, vbo, ebo) in _allocatedBuffers)
+            foreach (GlPartBuffers buffers in _livePartBuffers)
             {
-                _gl.DeleteVertexArray(vao);
-                _gl.DeleteBuffer(vbo);
-                _gl.DeleteBuffer(ebo);
+                if (buffers.Vao != 0) _gl.DeleteVertexArray(buffers.Vao);
+                if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
+                if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
             }
-            _allocatedBuffers.Clear();
+            _livePartBuffers.Clear();
+            _pendingReleases.Clear();
 
             if (_whiteTex != 0) _gl.DeleteTexture(_whiteTex);
             if (_program != 0) _gl.DeleteProgram(_program);
