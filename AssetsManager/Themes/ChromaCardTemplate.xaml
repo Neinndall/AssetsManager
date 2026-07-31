@@ -100,9 +100,6 @@
                 <Setter TargetName="CardBackground"
                         Property="Background"
                         Value="{StaticResource HoverColor}"/>
-                <Setter TargetName="CardBorder"
-                        Property="BorderBrush"
-                        Value="{StaticResource AccentBrush}"/>
             </Trigger>
             <DataTrigger Binding="{Binding IsSelected}"
                          Value="True">
