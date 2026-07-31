@@ -986,43 +986,57 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (distance < 50) distance = 250;
             }
 
-            Vector3D lookDirection;
-            Point3D cameraPosition;
-            Vector3D upDirection = new Vector3D(0, 1, 0);
+            var pose = CalculateCameraView(viewType, targetPoint, distance);
+            if (pose == null) return;
 
-            switch (viewType)
+            _cameraController.SnapTo(
+                pose.Value.Position,
+                pose.Value.LookDirection,
+                pose.Value.UpDirection);
+        }
+
+        internal static (
+            Point3D Position,
+            Vector3D LookDirection,
+            Vector3D UpDirection)? CalculateCameraView(
+                string viewType,
+                Point3D target,
+                double distance)
+        {
+            if (!double.IsFinite(distance) || distance <= 0)
             {
-                case "Front":
-                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y, targetPoint.Z + distance);
-                    lookDirection = new Vector3D(0, 0, -distance);
-                    break;
-                case "Back":
-                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y, targetPoint.Z - distance);
-                    lookDirection = new Vector3D(0, 0, distance);
-                    break;
-                case "Left":
-                    cameraPosition = new Point3D(targetPoint.X - distance, targetPoint.Y, targetPoint.Z);
-                    lookDirection = new Vector3D(distance, 0, 0);
-                    break;
-                case "Right":
-                    cameraPosition = new Point3D(targetPoint.X + distance, targetPoint.Y, targetPoint.Z);
-                    lookDirection = new Vector3D(-distance, 0, 0);
-                    break;
-                case "Top":
-                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y + distance, targetPoint.Z);
-                    lookDirection = new Vector3D(0, -distance, 0);
-                    upDirection = new Vector3D(0, 0, -1);
-                    break;
-                case "Bottom":
-                    cameraPosition = new Point3D(targetPoint.X, targetPoint.Y - distance, targetPoint.Z);
-                    lookDirection = new Vector3D(0, distance, 0);
-                    upDirection = new Vector3D(0, 0, 1);
-                    break;
-                default:
-                    return;
+                return null;
             }
 
-            _cameraController.FlyTo(cameraPosition, lookDirection, upDirection);
+            Vector3D worldUp = new Vector3D(0, 1, 0);
+            return viewType switch
+            {
+                "Front" => (
+                    target + new Vector3D(0, 0, distance),
+                    new Vector3D(0, 0, -distance),
+                    worldUp),
+                "Back" => (
+                    target + new Vector3D(0, 0, -distance),
+                    new Vector3D(0, 0, distance),
+                    worldUp),
+                "Left" => (
+                    target + new Vector3D(-distance, 0, 0),
+                    new Vector3D(distance, 0, 0),
+                    worldUp),
+                "Right" => (
+                    target + new Vector3D(distance, 0, 0),
+                    new Vector3D(-distance, 0, 0),
+                    worldUp),
+                "Top" => (
+                    target + new Vector3D(0, distance, 0),
+                    new Vector3D(0, -distance, 0),
+                    new Vector3D(0, 0, -1)),
+                "Bottom" => (
+                    target + new Vector3D(0, -distance, 0),
+                    new Vector3D(0, distance, 0),
+                    new Vector3D(0, 0, 1)),
+                _ => null
+            };
         }
 
         private bool TryGetModelBounds(out Point3D center, out double maxDim)

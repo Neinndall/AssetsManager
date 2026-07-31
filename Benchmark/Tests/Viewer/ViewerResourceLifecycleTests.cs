@@ -72,6 +72,41 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Theory]
+        [InlineData("Front", 0, 0, 25, 0, 0, -25, 0, 1, 0)]
+        [InlineData("Back", 0, 0, -25, 0, 0, 25, 0, 1, 0)]
+        [InlineData("Left", -25, 0, 0, 25, 0, 0, 0, 1, 0)]
+        [InlineData("Right", 25, 0, 0, -25, 0, 0, 0, 1, 0)]
+        [InlineData("Top", 0, 25, 0, 0, -25, 0, 0, 0, -1)]
+        [InlineData("Bottom", 0, -25, 0, 0, 25, 0, 0, 0, 1)]
+        public void CardinalCameraViewsKeepTheModelAtTheirExactTarget(
+            string view,
+            double positionX,
+            double positionY,
+            double positionZ,
+            double lookX,
+            double lookY,
+            double lookZ,
+            double upX,
+            double upY,
+            double upZ)
+        {
+            var target = new Point3D(10, 20, 30);
+
+            var pose = ViewerViewportControl.CalculateCameraView(view, target, 25);
+
+            Assert.NotNull(pose);
+            Assert.Equal(
+                target + new Vector3D(positionX, positionY, positionZ),
+                pose.Value.Position);
+            Assert.Equal(new Vector3D(lookX, lookY, lookZ), pose.Value.LookDirection);
+            Assert.Equal(new Vector3D(upX, upY, upZ), pose.Value.UpDirection);
+            Assert.Equal(target, pose.Value.Position + pose.Value.LookDirection);
+            Assert.Equal(
+                0,
+                Vector3D.DotProduct(pose.Value.LookDirection, pose.Value.UpDirection));
+        }
+
+        [Theory]
         [InlineData(1920, 1080, 3840, 2160)]
         [InlineData(800, 600, 2880, 2160)]
         [InlineData(3440, 1440, 3840, 1607)]
