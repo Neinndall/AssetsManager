@@ -1,14 +1,12 @@
-using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Viewer
 {
-    /// <summary>
-    /// Model for an individual skin/chroma entry in the selection gallery.
-    /// </summary>
     public class ChromaSkinModel : INotifyPropertyChanged
     {
         private bool _isSelected;
@@ -43,8 +41,6 @@ namespace AssetsManager.Views.Models.Viewer
             set { if (_modelPath != value) { _modelPath = value; OnPropertyChanged(); } }
         }
 
-        public string TypeText { get; set; } = "SKIN";
-
         public Color SwatchColor
         {
             get => _swatchColor;
@@ -64,23 +60,34 @@ namespace AssetsManager.Views.Models.Viewer
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
-    /// <summary>
-    /// Master model for the Chroma Selection Gallery. Orchestrates skin detection and selection.
-    /// </summary>
+    public class ChromaFamilyModel
+    {
+        public string Name { get; init; }
+        public string ModelName { get; init; }
+        public string ModelPath { get; init; }
+        public ImageSource PreviewImage { get; init; }
+        public Color SwatchColor { get; init; } = Colors.Transparent;
+        public ObservableRangeCollection<ChromaSkinModel> Chromas { get; } = new();
+        public int ChromaCount => Chromas.Count;
+        public string ChromaCountText => ChromaCount == 1
+            ? "1 CHROMA"
+            : $"{ChromaCount} CHROMAS";
+    }
+
     public class ChromaSelectionModel : INotifyPropertyChanged
     {
         private bool _isLoading;
         private string _statusText = "Ready to scan.";
-        private ChromaSkinModel _selectedSkin;
-        private string _modelPath;
+        private ChromaFamilyModel _selectedFamily;
 
-        public ObservableRangeCollection<ChromaSkinModel> AvailableSkins { get; } = new ObservableRangeCollection<ChromaSkinModel>();
+        public ObservableRangeCollection<ChromaFamilyModel> AvailableFamilies { get; } = new();
 
         public bool IsLoading
         {
@@ -94,44 +101,62 @@ namespace AssetsManager.Views.Models.Viewer
             private set { if (_statusText != value) { _statusText = value; OnPropertyChanged(); } }
         }
 
-        public ChromaSkinModel SelectedSkin
+        public ChromaFamilyModel SelectedFamily
         {
-            get => _selectedSkin;
+            get => _selectedFamily;
             set
             {
-                if (_selectedSkin != value)
-                {
-                    _selectedSkin = value;
-                    OnPropertyChanged();
-                }
+                if (_selectedFamily == value) return;
+                _selectedFamily = value;
+                OnPropertyChanged();
             }
         }
 
-        public string ModelPath
+        public int FamilyCount => AvailableFamilies.Count;
+        public int ChromaCount => AvailableFamilies.Sum(family => family.ChromaCount);
+        public int SelectedCount => AvailableFamilies.Sum(
+            family => family.Chromas.Count(chroma => chroma.IsSelected));
+        public bool HasSelection => SelectedCount > 0;
+        public string SelectionText => SelectedCount == 1
+            ? "1 CHROMA SELECTED"
+            : $"{SelectedCount} CHROMAS SELECTED";
+        public IEnumerable<ChromaSkinModel> SelectedChromas =>
+            AvailableFamilies.SelectMany(family => family.Chromas)
+                .Where(chroma => chroma.IsSelected);
+
+        public void SetFamilies(IEnumerable<ChromaFamilyModel> families)
         {
-            get => _modelPath;
-            set { if (_modelPath != value) { _modelPath = value; OnPropertyChanged(); } }
+            AvailableFamilies.ReplaceRange(families ?? Enumerable.Empty<ChromaFamilyModel>());
+            SelectedFamily = AvailableFamilies.FirstOrDefault();
+            RefreshCounts();
         }
 
-        // --- State Management Methods (v3.2.2.0) ---
+        public void RefreshSelection()
+        {
+            OnPropertyChanged(nameof(SelectedCount));
+            OnPropertyChanged(nameof(HasSelection));
+            OnPropertyChanged(nameof(SelectionText));
+        }
 
         public void SetScanningState(string folderName)
         {
             IsLoading = true;
-            AvailableSkins.Clear();
-            StatusText = $"Scanning chromas in: {folderName.ToUpper()}";
+            AvailableFamilies.Clear();
+            SelectedFamily = null;
+            RefreshCounts();
+            StatusText = $"Scanning chromas in: {folderName.ToUpperInvariant()}";
         }
 
         public void SetEmptyState()
         {
             IsLoading = false;
-            StatusText = "No chromas or textures found in this directory.";
+            StatusText = "No chroma families were found in this directory.";
         }
 
-        public void SetSuccessState(int count)
+        public void SetSuccessState()
         {
             IsLoading = false;
-            StatusText = $"Found {count} available chromas.";
+            StatusText = $"{FamilyCount} source skins · {ChromaCount} chromas detected";
         }
 
         public void SetErrorState(string message)
@@ -142,14 +167,22 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void Reset()
         {
-            AvailableSkins.Clear();
-            SelectedSkin = null;
-            ModelPath = null;
+            AvailableFamilies.Clear();
+            SelectedFamily = null;
             StatusText = "Ready to scan.";
             IsLoading = false;
+            RefreshCounts();
+        }
+
+        private void RefreshCounts()
+        {
+            OnPropertyChanged(nameof(FamilyCount));
+            OnPropertyChanged(nameof(ChromaCount));
+            RefreshSelection();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

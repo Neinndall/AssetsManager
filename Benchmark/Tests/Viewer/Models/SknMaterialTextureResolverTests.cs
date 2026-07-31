@@ -207,6 +207,44 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Models
             }
         }
 
+        [Fact]
+        public void TryResolveBinPath_UsesChromaDirectoryInsteadOfInheritedModelPath()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-chroma-{Guid.NewGuid():N}");
+            string chromaDirectory = Path.Combine(
+                root,
+                "assets",
+                "characters",
+                "belveth",
+                "skins",
+                "skin02");
+            string skinBinPath = Path.Combine(
+                root,
+                "data",
+                "characters",
+                "belveth",
+                "skins",
+                "skin2.bin");
+
+            try
+            {
+                Directory.CreateDirectory(chromaDirectory);
+                Directory.CreateDirectory(Path.GetDirectoryName(skinBinPath)!);
+                File.WriteAllBytes(skinBinPath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    skinBinPath,
+                    SknMaterialTextureResolver.TryResolveBinPath(chromaDirectory));
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
         [Theory]
         [InlineData(false)]
         [InlineData(true)]

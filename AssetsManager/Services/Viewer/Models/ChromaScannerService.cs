@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -13,10 +14,6 @@ using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Models
 {
-    /// <summary>
-    /// Service dedicated to scanning game directories for skins and chromas.
-    /// Connects the filesystem structure with the ChromaSelectionModel.
-    /// </summary>
     public class ChromaScannerService
     {
         private readonly LogService _logService;
@@ -26,100 +23,63 @@ namespace AssetsManager.Services.Viewer.Models
             _logService = logService;
         }
 
-        /// <summary>
-        /// Scans a directory for subdirectories containing textures (.tex) and links them to a model.
-        /// Implements a sequential look-back strategy for chromas sharing a parent skin model.
-        /// </summary>
-        public async Task<List<ChromaSkinModel>> ScanSkinsAsync(string rootPath)
+        public async Task<List<ChromaFamilyModel>> ScanSkinsAsync(string rootPath)
         {
             return await Task.Run(() =>
             {
-                var skins = new List<ChromaSkinModel>();
+                var families = new List<ChromaFamilyModel>();
                 try
                 {
-                    if (!Directory.Exists(rootPath)) return skins;
+                    if (!Directory.Exists(rootPath))
+                        return families;
 
-                    // 1. Get all subdirectories and sort them (base, skin01, skin02...)
-                    string[] subDirs = Directory.GetDirectories(rootPath)
-                                                .OrderBy(d => d)
-                                                .ToArray();
+                    string[] directories = Directory.GetDirectories(rootPath)
+                        .OrderBy(GetSkinOrder)
+                        .ThenBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    ChromaFamilyModel currentFamily = null;
+                    bool currentFamilyAdded = false;
 
-                    string lastFoundModelPath = null;
-
-                    foreach (var dir in subDirs)
+                    foreach (string directory in directories)
                     {
-                        string dirName = Path.GetFileName(dir);
-                        
-                        // Look for .tex files in the directory
-                        string[] texFiles = Directory.GetFiles(dir, "*.tex");
-                        if (texFiles.Length == 0) continue;
+                        string skinName = Path.GetFileName(directory);
+                        string[] textureFiles = Directory.GetFiles(directory, "*.tex")
+                            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+                            .ToArray();
+                        string modelPath = Directory.GetFiles(directory, "*.skn").FirstOrDefault();
 
-                        // Check if THIS specific directory has a .skn model
-                        string localSkn = Directory.GetFiles(dir, "*.skn").FirstOrDefault();
-                        bool hasOwnModel = localSkn != null;
-                        
-                        if (hasOwnModel)
+                        if (modelPath != null)
                         {
-                            lastFoundModelPath = localSkn;
+                            PreviewData preview = LoadPreview(textureFiles, skinName);
+                            currentFamily = new ChromaFamilyModel
+                            {
+                                Name = skinName.ToUpperInvariant(),
+                                ModelName = Path.GetFileNameWithoutExtension(modelPath),
+                                ModelPath = modelPath,
+                                PreviewImage = preview.Image,
+                                SwatchColor = preview.Color
+                            };
+                            currentFamilyAdded = false;
+                            continue;
                         }
 
-                        // 3. Only add to list if it's a CHROMA (inherits model, doesn't have its own)
-                        if (!hasOwnModel)
+                        if (currentFamily == null || textureFiles.Length == 0)
+                            continue;
+
+                        PreviewData chromaPreview = LoadPreview(textureFiles, skinName);
+                        currentFamily.Chromas.Add(new ChromaSkinModel
                         {
-                            var skinModel = new ChromaSkinModel
-                            {
-                                Name = dirName.ToUpper(),
-                                TexturePath = dir,
-                                ModelPath = lastFoundModelPath,
-                                IsSelected = false
-                            };
-
-                            // Extract preview...
-                            try
-                            {
-                                // Strategy: Find all valid candidates and pick the one that is most likely the main diffuse map.
-                                // We look for textures containing both the chroma ID (dirName) and '_tx_cm'.
-                                var candidates = texFiles.Where(f => f.Contains(dirName, StringComparison.OrdinalIgnoreCase) && 
-                                                                    f.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                                                         .ToList();
-
-                                string primaryTex = null;
-
-                                if (candidates.Count > 0)
-                                {
-                                    // If we have multiple (like bigscreens, loadscreens, etc.), pick the SHORTEST filename.
-                                    // The main texture is usually the cleanest one: mordekaiser_skin58_tx_cm...
-                                    primaryTex = candidates.OrderBy(f => Path.GetFileName(f).Length).First();
-                                }
-                                else
-                                {
-                                    // Fallback to any '_tx_cm' or just the first file
-                                    primaryTex = texFiles.FirstOrDefault(f => f.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase)) 
-                                                 ?? texFiles[0];
-                                }
-
-                                using (FileStream stream = new FileStream(primaryTex, FileMode.Open, FileAccess.Read, FileShare.Read))
-                                {
-                                    // Chroma previews are tiny gallery thumbnails, not full-size render assets.
-                                    // Capping the texture to 256px reduces GPU/CPU memory by 10-50x per chroma
-                                    // (typical 2K source → ~64x reduction in pixels) while preserving visual fidelity
-                                    // at the small card size used by ChromaSelectionControl.
-                                    BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex", 256, 256);
-                                    if (bitmap != null)
-                                    {
-                                        bitmap.Freeze();
-                                        skinModel.PreviewImage = bitmap;
-                                        skinModel.SwatchColor = ExtractDominantColor(bitmap);
-                                        skinModel.PreviewTextureName = Path.GetFileNameWithoutExtension(primaryTex);
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _logService.LogWarning($"Could not extract preview for chroma {dirName}: {ex.Message}");
-                            }
-
-                            skins.Add(skinModel);
+                            Name = skinName.ToUpperInvariant(),
+                            TexturePath = directory,
+                            ModelPath = currentFamily.ModelPath,
+                            PreviewImage = chromaPreview.Image,
+                            SwatchColor = chromaPreview.Color,
+                            PreviewTextureName = chromaPreview.TextureName
+                        });
+                        if (!currentFamilyAdded)
+                        {
+                            families.Add(currentFamily);
+                            currentFamilyAdded = true;
                         }
                     }
                 }
@@ -128,52 +88,107 @@ namespace AssetsManager.Services.Viewer.Models
                     _logService.LogError(ex, $"Error scanning for chromas in path: {rootPath}");
                 }
 
-                return skins;
+                return families;
             });
         }
 
-        /// <summary>
-        /// Simple algorithm to extract the dominant color of a bitmap for the UI Swatch.
-        /// Optimized to only sample a small region without copying the whole bitmap.
-        /// </summary>
-        private Color ExtractDominantColor(BitmapSource bitmap)
+        private PreviewData LoadPreview(IReadOnlyList<string> textureFiles, string skinName)
+        {
+            if (textureFiles.Count == 0)
+                return default;
+
+            string primaryTexture = textureFiles
+                .OrderByDescending(path => RankPreviewTexture(path, skinName))
+                .ThenBy(path => Path.GetFileName(path).Length)
+                .First();
+            try
+            {
+                using FileStream stream = new(
+                    primaryTexture,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read);
+                BitmapSource bitmap = TextureUtils.LoadTexture(stream, ".tex", 256, 256);
+                if (bitmap == null)
+                    return new PreviewData(
+                        null,
+                        Colors.Transparent,
+                        Path.GetFileNameWithoutExtension(primaryTexture));
+
+                bitmap.Freeze();
+                return new PreviewData(
+                    bitmap,
+                    ExtractDominantColor(bitmap),
+                    Path.GetFileNameWithoutExtension(primaryTexture));
+            }
+            catch (Exception ex)
+            {
+                _logService.LogWarning(
+                    $"Could not extract preview for chroma {skinName}: {ex.Message}");
+                return new PreviewData(
+                    null,
+                    Colors.Transparent,
+                    Path.GetFileNameWithoutExtension(primaryTexture));
+            }
+        }
+
+        private static int RankPreviewTexture(string path, string skinName)
+        {
+            string name = Path.GetFileNameWithoutExtension(path);
+            int rank = name.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
+            if (name.Contains(skinName, StringComparison.OrdinalIgnoreCase)) rank += 20;
+            if (name.Contains("_main_tx", StringComparison.OrdinalIgnoreCase)) rank += 50;
+            if (name.EndsWith("_tx_cm", StringComparison.OrdinalIgnoreCase)) rank += 25;
+            if (name.Contains("loadscreen", StringComparison.OrdinalIgnoreCase)) rank -= 200;
+            if (name.Contains("_ult_", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("_mask_", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("_recall_", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("_voidling", StringComparison.OrdinalIgnoreCase))
+            {
+                rank -= 40;
+            }
+            return rank;
+        }
+
+        private static Color ExtractDominantColor(BitmapSource bitmap)
         {
             try
             {
-                // Sampling a 64x64 area from the center is more than enough for a swatch
-                int sampleSize = 64;
+                const int sampleSize = 64;
                 int startX = Math.Max(0, (bitmap.PixelWidth - sampleSize) / 2);
                 int startY = Math.Max(0, (bitmap.PixelHeight - sampleSize) / 2);
                 int width = Math.Min(sampleSize, bitmap.PixelWidth);
                 int height = Math.Min(sampleSize, bitmap.PixelHeight);
-
-                Int32Rect sourceRect = new Int32Rect(startX, startY, width, height);
+                var sourceRect = new Int32Rect(startX, startY, width, height);
                 int stride = (width * bitmap.Format.BitsPerPixel + 7) / 8;
                 int bufferSize = stride * height;
-                
                 byte[] samplePixels = ArrayPool<byte>.Shared.Rent(bufferSize);
+
                 try
                 {
                     bitmap.CopyPixels(sourceRect, samplePixels, stride, 0);
-
-                    long r = 0, g = 0, b = 0;
+                    long red = 0;
+                    long green = 0;
+                    long blue = 0;
                     int samples = 0;
                     int bytesPerPixel = bitmap.Format.BitsPerPixel / 8;
 
-                    for (int i = 0; i < bufferSize; i += bytesPerPixel)
+                    for (int index = 0; index < bufferSize; index += bytesPerPixel)
                     {
-                        if (i + 2 < bufferSize)
-                        {
-                            // Assuming Bgra32 or Bgr32
-                            b += samplePixels[i];
-                            g += samplePixels[i + 1];
-                            r += samplePixels[i + 2];
-                            samples++;
-                        }
+                        if (index + 2 >= bufferSize)
+                            break;
+                        blue += samplePixels[index];
+                        green += samplePixels[index + 1];
+                        red += samplePixels[index + 2];
+                        samples++;
                     }
 
-                    if (samples == 0) return Colors.Gray;
-                    return Color.FromRgb((byte)(r / samples), (byte)(g / samples), (byte)(b / samples));
+                    return samples == 0
+                        ? Colors.Gray
+                        : Color.FromRgb(
+                            (byte)(red / samples),
+                            (byte)(green / samples),
+                            (byte)(blue / samples));
                 }
                 finally
                 {
@@ -186,34 +201,21 @@ namespace AssetsManager.Services.Viewer.Models
             }
         }
 
-        /// <summary>
-        /// Attempts to find the primary .skn model associated with a skins folder.
-        /// </summary>
-        public string FindAssociatedModel(string skinsPath)
+        private static int GetSkinOrder(string directoryPath)
         {
-            try
-            {
-                // Strategy 1: Look in the parent folder (character root)
-                string parent = Path.GetDirectoryName(skinsPath);
-                if (parent != null)
-                {
-                    string[] sknFiles = Directory.GetFiles(parent, "*.skn");
-                    if (sknFiles.Length > 0) return sknFiles[0];
-                }
+            string name = Path.GetFileName(directoryPath);
+            if (name.Equals("base", StringComparison.OrdinalIgnoreCase))
+                return 0;
 
-                // Strategy 2: Look in skin0 (the base skin usually has the model)
-                string skin0 = Path.Combine(skinsPath, "skin0");
-                if (Directory.Exists(skin0))
-                {
-                    string[] sknFiles = Directory.GetFiles(skin0, "*.skn");
-                    if (sknFiles.Length > 0) return sknFiles[0];
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, $"Could not find associated model for skins path: {skinsPath}");
-            }
-            return null;
+            Match match = Regex.Match(name, @"^skin0*(\d+)$", RegexOptions.IgnoreCase);
+            return match.Success && int.TryParse(match.Groups[1].Value, out int skinId)
+                ? skinId + 1
+                : int.MaxValue;
         }
+
+        private readonly record struct PreviewData(
+            BitmapSource Image,
+            Color Color,
+            string TextureName);
     }
 }

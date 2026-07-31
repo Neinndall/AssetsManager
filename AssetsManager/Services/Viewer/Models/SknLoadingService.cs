@@ -45,7 +45,7 @@ namespace AssetsManager.Services.Viewer.Models
                 }
 
                 var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
-                var materialTextures = LoadMaterialTextures(filePath, loadedTextures, false);
+                var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, false);
 
                 _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                 return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath);
@@ -306,14 +306,14 @@ namespace AssetsManager.Services.Viewer.Models
         }
 
         private SknMaterialTextureResolution LoadMaterialTextures(
-            string sknPath,
+            string assetPath,
             Dictionary<string, BitmapSource> loadedTextures,
             bool loadReferencedTextures)
         {
-            string skinBinPath = SknMaterialTextureResolver.TryResolveBinPath(sknPath);
+            string skinBinPath = SknMaterialTextureResolver.TryResolveBinPath(assetPath);
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath))
             {
-                _logService.LogDebug($"No exact skin material bin found for '{Path.GetFileName(sknPath)}'.");
+                _logService.LogDebug($"No exact skin material bin found for '{Path.GetFileName(assetPath)}'.");
                 return null;
             }
 
@@ -328,7 +328,7 @@ namespace AssetsManager.Services.Viewer.Models
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
                     {
                         string resolvedPath =
-                            SknMaterialTextureResolver.TryResolveTexturePath(sknPath, texturePath);
+                            SknMaterialTextureResolver.TryResolveTexturePath(assetPath, texturePath);
                         if (resolvedPath != null)
                         {
                             string textureKey = PathUtils.TruncateAtDot(Path.GetFileNameWithoutExtension(resolvedPath));

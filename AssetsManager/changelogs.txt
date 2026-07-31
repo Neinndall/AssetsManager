@@ -4,6 +4,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Chroma Library now groups variants by their source skin with family selection and a persistent selected count.
   - Viewer models can now be selected directly in the viewport and moved along XYZ axes with a transform gizmo, including CTRL toggles and SHIFT ranges.
   - Viewer can now auto-arrange selected models from left to right around the scene center using their model-list order.
   - Tree explorers and Grid View now support SHIFT and CTRL+SHIFT range selection.
@@ -129,6 +130,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer chromas now use their own skin BIN so every mesh receives the correct variant texture.
   - Viewer camera toolbar now switches reliably between exact front, back, side, top, and bottom views.
   - Viewer now resolves companion theme materials through their exact skin BIN, including textures referenced from external skin folders.
   - Explorer now clears Grid range selection and its anchor before opening a file.
