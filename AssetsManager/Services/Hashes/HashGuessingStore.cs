@@ -76,12 +76,8 @@ namespace AssetsManager.Services.Hashes
                 {
                     var newEntries = group.GroupBy(match => match.Hash)
                         .ToDictionary(matchesByHash => matchesByHash.Key, matchesByHash => matchesByHash.Last().Path);
-                    var pathsToUpdate = new[] { GetConfirmedResearchPath(group.Key), GetKnownHashFilePath(group.Key) };
-
-                    foreach (var targetPath in pathsToUpdate)
-                    {
-                        await MergeHashFileAsync(targetPath, newEntries, cancellationToken);
-                    }
+                    
+                    await MergeHashFileAsync(GetKnownHashFilePath(group.Key), newEntries, cancellationToken);
                 }
             }
             finally
@@ -89,8 +85,6 @@ namespace AssetsManager.Services.Hashes
                 _lock.Release();
             }
         }
-
-
 
         public async Task<HashSet<ulong>> LoadUnknownHashesAsync(HashGuessDomain domain, CancellationToken cancellationToken)
         {
@@ -146,18 +140,27 @@ namespace AssetsManager.Services.Hashes
         public async Task<HashUnknownSummary> LoadUnknownSummaryAsync(HashGuessDomain domain, CancellationToken cancellationToken)
         {
             string suffix = domain == HashGuessDomain.Game ? "game" : "lcu";
+            string metadataPath = Path.Combine(_directoriesCreator.HashLabPath, $"inventory.{suffix}.json");
+            
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                int current = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"current.{suffix}.txt"), cancellationToken);
-                int recent = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"recent.{suffix}.txt"), cancellationToken);
-                int historical = await CountHashLinesAsync(Path.Combine(_directoriesCreator.HashLabPath, $"historical.{suffix}.txt"), cancellationToken);
-                if (current + recent + historical == 0)
+                if (File.Exists(metadataPath))
                 {
-                    string legacyPath = Path.Combine(_directoriesCreator.HashLabPath, $"unknowns.{suffix}.txt");
-                    current = await CountHashLinesAsync(legacyPath, cancellationToken);
+                    await using var source = File.OpenRead(metadataPath);
+                    var records = await JsonSerializer.DeserializeAsync<List<HashUnknownRecord>>(source, cancellationToken: cancellationToken);
+                    if (records != null && records.Count > 0)
+                    {
+                        int current = records.Count(r => r.MissedPatchCount == 0);
+                        int recent = records.Count(r => r.MissedPatchCount is > 0 and <= RecentPatchThreshold);
+                        int historical = records.Count(r => r.MissedPatchCount > RecentPatchThreshold);
+                        return new HashUnknownSummary { Current = current, Recent = recent, Historical = historical };
+                    }
                 }
-                return new HashUnknownSummary { Current = current, Recent = recent, Historical = historical };
+
+                string legacyPath = Path.Combine(_directoriesCreator.HashLabPath, $"unknowns.{suffix}.txt");
+                int count = await CountHashLinesAsync(legacyPath, cancellationToken);
+                return new HashUnknownSummary { Current = count, Recent = 0, Historical = 0 };
             }
             finally
             {
@@ -294,10 +297,6 @@ namespace AssetsManager.Services.Hashes
 
             var ordered = UpdateInventoryRecords(domain, existing, pending, currentHashes, patchFingerprint);
             await WriteJsonAtomicallyAsync(metadataPath, ordered, cancellationToken);
-
-            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"current.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount == 0), cancellationToken);
-            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"recent.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount is > 0 and <= RecentPatchThreshold), cancellationToken);
-            await WriteHashViewAsync(Path.Combine(_directoriesCreator.HashLabPath, $"historical.{suffix}.txt"), ordered.Where(record => record.MissedPatchCount > RecentPatchThreshold), cancellationToken);
         }
 
         internal static List<HashUnknownRecord> UpdateInventoryRecords(

@@ -65,6 +65,7 @@ namespace AssetsManager.Services.Hashes
         {
             var result = new HashSet<ulong>();
             string path = GetCurrentPath(kind);
+            if (!File.Exists(path)) path = GetPrimaryUnknownPath(kind);
             if (!File.Exists(path)) return result;
             using var reader = new StreamReader(path);
             while (await reader.ReadLineAsync(cancellationToken) is string line)
@@ -116,7 +117,6 @@ namespace AssetsManager.Services.Hashes
                         historical.Remove(0);
                     }
                     await WriteUnknownAtomicallyAsync(GetPrimaryUnknownPath(pair.Key), historical, pair.Key, cancellationToken);
-                    await WriteUnknownAtomicallyAsync(GetCurrentPath(pair.Key), current, pair.Key, cancellationToken);
                 }
                 await WriteTextAtomicallyAsync(Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt"), new[] { patchFingerprint }, cancellationToken);
             }
@@ -141,7 +141,7 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in groups)
                 {
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
-                    foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
+                    foreach (string path in GetUnknownPaths(group.Key))
                     {
                         if (!File.Exists(path)) continue;
                         var remaining = new HashSet<ulong>();

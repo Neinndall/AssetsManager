@@ -3,16 +3,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF">
 
-
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Main Split (Config & Bento) -->
+            <RowDefinition Height="Auto"/> <!-- Config & Dashboard Bar -->
+            <RowDefinition Height="Auto"/> <!-- Algorithms & Strategies Bento -->
             <RowDefinition Height="*"/>    <!-- Results & Progress -->
         </Grid.RowDefinitions>
 
         <!-- DYNAMIC IDENTITY HEADER (SettingsCard Style) -->
-        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,24,32,0" Padding="24,20">
+        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,20,32,0" Padding="24,18">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Hero Icon -->
@@ -35,575 +35,433 @@
                 <!-- Dynamic Titles Area (22px / 12px) -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock Text="HASH GUESSING LAB" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Resolve unknown WAD hashes from embedded asset paths and merge verified matches into the main hash files." FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+                    <TextBlock Text="Resolve unknown WAD, BIN &amp; RST hashes using specialized guessing algorithms and merge verified matches." FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- MAIN SPLIT AREA -->
-        <Grid Grid.Row="1" Margin="32,20,32,0">
+        <!-- CONFIG & DASHBOARD STATS BAR -->
+        <Grid Grid.Row="1" Margin="32,16,32,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="350"/>
+                <ColumnDefinition Width="260"/> <!-- Target Client Domain -->
                 <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>   <!-- Stats Cards Grid -->
             </Grid.ColumnDefinitions>
 
-            <!-- LEFT: CONFIGURATION & STATS -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Lab Env Title -->
-                        <RowDefinition Height="10"/>
-                        <RowDefinition Height="Auto"/> <!-- Domain Selector -->
-                        <RowDefinition Height="16"/>  <!-- Spacer -->
-                        <RowDefinition Height="Auto"/> <!-- Divider -->
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="*"/>    <!-- Stats Details -->
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="CogOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBlock Text="ENVIRONMENT CONFIG" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+            <!-- DOMAIN SELECTOR CARD -->
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="14,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <materialIcons:MaterialIcon Kind="TuneVariant" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="TARGET CLIENT DOMAIN" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <ComboBox x:Name="DomainSelector" Style="{StaticResource ModernComboBox}" SelectedIndex="0" Height="36" VerticalContentAlignment="Center" SelectionChanged="DomainSelector_SelectionChanged">
+                        <ComboBoxItem Content="GAME (WAD Hashes)" Tag="Game"/>
+                        <ComboBoxItem Content="LCU (Client Hashes)" Tag="Lcu"/>
+                        <ComboBoxItem Content="BIN (Internal Hashes)" Tag="Bin"/>
+                        <ComboBoxItem Content="RST (String Table Keys)" Tag="Rst"/>
+                    </ComboBox>
+                </StackPanel>
+            </Border>
 
-                    <!-- Domain Selector -->
-                    <StackPanel Grid.Row="2">
-                        <TextBlock Text="Target Client Domain" FontSize="10" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="DomainSelector" Style="{StaticResource ModernComboBox}" SelectedIndex="0" Height="36" VerticalContentAlignment="Center" SelectionChanged="DomainSelector_SelectionChanged">
-                            <ComboBoxItem Content="GAME" Tag="Game"/>
-                            <ComboBoxItem Content="LCU" Tag="Lcu"/>
-                            <ComboBoxItem Content="BIN" Tag="Bin"/>
-                            <ComboBoxItem Content="RST" Tag="Rst"/>
-                        </ComboBox>
-                    </StackPanel>
+            <!-- STATS OVERVIEW CARDS -->
+            <Grid Grid.Column="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-                    <Border Grid.Row="4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderColor}" Opacity="0.5"/>
-
-                    <!-- Stats / State -->
-                    <StackPanel Grid.Row="6" VerticalAlignment="Top">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <materialIcons:MaterialIcon Kind="ChartBar" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock Text="LAB STATS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                <!-- Card 1: Unresolved Hashes -->
+                <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,8,0" VerticalAlignment="Center">
+                            <TextBlock Text="UNRESOLVED HASHES IN SCOPE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock x:Name="TxtUnknownCount" Text="Loading..." FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,3,0,0"/>
+                            <TextBlock x:Name="TxtUnknownBreakdown" Text="Loading..." FontSize="9.5" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
-                        
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="8" Padding="12" Margin="0,0,0,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,8,0">
-                                    <TextBlock Text="Unresolved Hashes" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
-                                    <TextBlock x:Name="TxtUnknownCount" Text="Loading..." FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0"/>
-                                    <TextBlock x:Name="TxtUnknownBreakdown" Text="Loading..." FontSize="9" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" TextWrapping="Wrap" LineHeight="13" LineStackingStrategy="BlockLineHeight"/>
-                                </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="1" Kind="HelpCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
-                            </Grid>
+                        <Border Grid.Column="1" Background="{StaticResource HoverColor}" CornerRadius="8" Width="36" Height="36" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                    </Grid>
+                </Border>
 
-                        <Border Background="{StaticResource HoverColor}" CornerRadius="8" Padding="12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="Matches Found" FontSize="10" Foreground="{StaticResource TextSecondary}"/>
-                                    <TextBlock Text="{Binding Matches.Count, FallbackValue='0'}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,4,0,0"/>
-                                </StackPanel>
-                                <materialIcons:MaterialIcon Grid.Column="1" Kind="CheckCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
-                            </Grid>
+                <!-- Card 2: Matches Found -->
+                <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="DETERMINISTIC MATCHES FOUND" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
+                            <TextBlock Text="{Binding Matches.Count, FallbackValue='0'}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="0,3,0,0"/>
+                            <TextBlock Text="Verified and committed to dictionary" FontSize="9.5" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="{StaticResource HoverColor}" CornerRadius="8" Width="36" Height="36" VerticalAlignment="Center">
+                            <materialIcons:MaterialIcon Kind="CheckCircleOutline" Width="20" Height="20" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- RIGHT: SELECTION CARD ACTIONS (Matches ManageVersionsControl buttons style) -->
-            <Border Grid.Column="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/> <!-- Title -->
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="*"/>    <!-- Bento Menu -->
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Orientation="Horizontal">
-                        <materialIcons:MaterialIcon Kind="Brain" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBlock Text="GUESSING ALGORITHMS &amp; STRATEGIES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                    </StackPanel>
-
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,0">
-                        <Grid>
-                            <!-- GAME OPTIONS -->
-                            <StackPanel x:Name="GameOptionsPanel">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="0">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <Button Click="RunGrepGame_Click" Margin="4,0,4,16" Padding="12">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                    <Setter Property="IsEnabled" Value="False"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                    <Grid HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                            <TextBlock Text="Extract game paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Button>
-
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="GamepadVariantOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="GAME RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <UniformGrid Columns="2" Margin="0,0,0,16">
-                                    <!-- GAME Basic -->
-                                    <Button Click="RunGameBasic_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="ShieldOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="GAME Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Standard canonical &amp; short ranges" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- GAME Extended -->
-                                    <Button Click="RunGameExtended_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="CrownOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="GAME Extended" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Chromas, bins, textures &amp; banners" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-                                </UniformGrid>
-
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="WrenchOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <UniformGrid Columns="2" Margin="0,0,0,12">
-                                    <!-- Canonical -->
-                                    <Button Click="RunCanonical_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Standard paths" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- Locales -->
-                                    <Button Click="RunLocales_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Region &amp; lang tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- Numbers -->
-                                    <Button Click="RunNumbers_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Numeric Ranges" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Iterate numeric indexes" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-                                </UniformGrid>
-                            </StackPanel>
-
-                            <!-- LCU OPTIONS -->
-                            <StackPanel x:Name="LcuOptionsPanel">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="1">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                
-                                <!-- Keep extraction and the opt-in v1 resolver on one compact row. -->
-                                <UniformGrid Columns="2" Margin="0,0,0,16">
-                                    <StackPanel>
-                                        <StackPanel Margin="4,0,4,6">
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialIcons:MaterialIcon Kind="FileSearch" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                <TextBlock Text="WAD PATH EXTRACTION" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <Button Click="RunGrepLcu_Click" Margin="4,0" Padding="12">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                            <Setter Property="IsEnabled" Value="False"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <Grid HorizontalAlignment="Stretch">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                    <TextBlock Text="Extract client paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
-                                    </StackPanel>
-
-                                    <StackPanel>
-                                        <StackPanel Margin="4,0,4,6">
-                                            <StackPanel Orientation="Horizontal">
-                                                <materialIcons:MaterialIcon Kind="FileCodeOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                                <TextBlock Text="LCU V1 PATHS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <Button Click="RunLcuV1Paths_Click" Margin="4,0" Padding="12">
-                                            <Button.Style>
-                                                <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                            <Setter Property="IsEnabled" Value="False"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                            <Grid HorizontalAlignment="Stretch">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCodeOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                    <TextBlock Text="LCU V1 Paths" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                    <TextBlock Text="Intensive word-pair and locale patterns" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Button>
-                                    </StackPanel>
-                                </UniformGrid>
-
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="Lan" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="LCU RESOLVERS" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <UniformGrid Columns="2" Margin="0,0,0,16">
-                                    <!-- LCU Basic -->
-                                    <Button Click="RunLcuBasic_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCabinet" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="LCU Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Canonical &amp; LCU plugin structure" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- LCU Advanced -->
-                                    <Button Click="RunLcuAdvanced_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="LightningBolt" Width="24" Height="24" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="LCU Advanced" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="SVGs, PNGs, word insertion &amp; TFTs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                </UniformGrid>
-
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="WrenchOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                    <TextBlock Text="UTILITY STRATEGIES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <UniformGrid Columns="2" Margin="0,0,0,12">
-                                    <!-- Canonical -->
-                                    <Button Click="RunCanonical_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Standard paths" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- Locales -->
-                                    <Button Click="RunLocales_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Region &amp; lang tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-
-                                    <!-- Numbers -->
-                                    <Button Click="RunNumbers_Click" Margin="4" Padding="12">
-                                        <Button.Style>
-                                            <Style TargetType="Button" BasedOn="{StaticResource SelectionCardButtonStyle}">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                        <Setter Property="IsEnabled" Value="False"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                        <Grid HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="Numeric Ranges" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="Iterate numeric indexes" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Button>
-                                </UniformGrid>
-                            </StackPanel>
-
-                            <!-- BIN OPTIONS -->
-                            <StackPanel x:Name="BinOptionsPanel">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="2">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                <Setter Property="IsEnabled" Value="False"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="FileCabinet" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="BIN INTERNAL HASHES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                </StackPanel>
-                                <Button Click="BuildInternalInventory_Click" Margin="4,0,4,12" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                    <Grid HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                                        <StackPanel Grid.Column="1"><TextBlock Text="Build BIN Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="BIN runtime + active Meta Schema" FontSize="9.5" Foreground="{StaticResource TextSecondary}"/></StackPanel>
-                                    </Grid>
-                                </Button>
-                                <UniformGrid Columns="2">
-                                    <Button Click="RunInternalContent_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="CodeBraces" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="BIN Context" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Verified context-linked values" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
-                                    </Button>
-                                    <Button Click="RunInternalStructural_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="Meta Schema Guess" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Review-only type/field candidates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
-                                    </Button>
-                                </UniformGrid>
-                            </StackPanel>
-
-                            <!-- RST OPTIONS -->
-                            <StackPanel x:Name="RstOptionsPanel">
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="3">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                <Setter Property="IsEnabled" Value="False"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <StackPanel Orientation="Horizontal" Margin="4,0,0,6">
-                                    <materialIcons:MaterialIcon Kind="Translate" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="RST STRINGTABLE HASHES" FontSize="9.5" FontWeight="Bold" Foreground="{StaticResource TextMuted}"/>
-                                </StackPanel>
-                                <Button Click="BuildInternalInventory_Click" Margin="4,0,4,12" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                    <Grid HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                        <materialIcons:MaterialIcon Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/>
-                                        <StackPanel Grid.Column="1"><TextBlock Text="Build RST Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Parse XXH3/XXH64 unknown keys" FontSize="9.5" Foreground="{StaticResource TextSecondary}"/></StackPanel>
-                                    </Grid>
-                                </Button>
-                                <UniformGrid Columns="2">
-                                    <Button Click="RunInternalContent_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="RST Content GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="BIN strings and text resources" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
-                                    </Button>
-                                    <Button Click="RunInternalStructural_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                                        <Grid HorizontalAlignment="Stretch"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><materialIcons:MaterialIcon Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/><StackPanel Grid.Column="1"><TextBlock Text="RST Structural" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/><TextBlock Text="Cross-version and numeric keys" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/></StackPanel></Grid>
-                                    </Button>
-                                </UniformGrid>
-                            </StackPanel>
-                        </Grid>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
 
-        <!-- RESULTS AND POLISHED PROGRESS SECTION -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="32,20,32,24">
+        <!-- ALGORITHMS & STRATEGIES BENTO MENU -->
+        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="32,16,32,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Title -->
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/> <!-- Content Panels -->
+                </Grid.RowDefinitions>
+
+                <StackPanel Orientation="Horizontal">
+                    <materialIcons:MaterialIcon Kind="Brain" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="GUESSING ALGORITHMS &amp; STRATEGIES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- GAME OPTIONS PANEL -->
+                <StackPanel x:Name="GameOptionsPanel" Grid.Row="2">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    
+                    <UniformGrid Columns="3">
+                        <!-- WAD Path GREP -->
+                        <Button Click="RunGrepGame_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Extract game paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- GAME Basic -->
+                        <Button Click="RunGameBasic_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="ShieldOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="GAME Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Canonical &amp; short ranges" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- GAME Extended -->
+                        <Button Click="RunGameExtended_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="CrownOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="GAME Extended" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Chromas, bins &amp; textures" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Canonical -->
+                        <Button Click="RunCanonical_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Standard path templates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Locales -->
+                        <Button Click="RunLocales_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Region &amp; language tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Numbers -->
+                        <Button Click="RunNumbers_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Numeric Ranges" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Iterate numeric indexes" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+
+                <!-- LCU OPTIONS PANEL -->
+                <StackPanel x:Name="LcuOptionsPanel" Grid.Row="2">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="1">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    
+                    <UniformGrid Columns="3">
+                        <!-- LCU GREP -->
+                        <Button Click="RunGrepLcu_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="WAD Path GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Extract client paths from WADs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- LCU Basic -->
+                        <Button Click="RunLcuBasic_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCabinet" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="LCU Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Canonical &amp; plugin structure" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- LCU Advanced -->
+                        <Button Click="RunLcuAdvanced_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="LightningBolt" Width="24" Height="24" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="LCU Advanced" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="SVGs, PNGs &amp; TFTs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- LCU V1 Paths -->
+                        <Button Click="RunLcuV1Paths_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCodeOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="LCU V1 Paths" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Intensive word-pair patterns" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Canonical -->
+                        <Button Click="RunCanonical_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Standard path templates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- Locales -->
+                        <Button Click="RunLocales_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Region &amp; language tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+
+                <!-- BIN OPTIONS PANEL -->
+                <StackPanel x:Name="BinOptionsPanel" Grid.Row="2">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="2">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    
+                    <UniformGrid Columns="3">
+                        <Button Click="BuildInternalInventory_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Build BIN Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="BIN runtime + active Meta Schema" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <Button Click="RunInternalContent_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="CodeBraces" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="BIN Context" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Verified context-linked values" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <Button Click="RunInternalStructural_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Meta Schema Guess" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Review-only type/field candidates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+
+                <!-- RST OPTIONS PANEL -->
+                <StackPanel x:Name="RstOptionsPanel" Grid.Row="2">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedIndex, ElementName=DomainSelector}" Value="3">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    
+                    <UniformGrid Columns="3">
+                        <Button Click="BuildInternalInventory_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="FileSearchOutline" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Build RST Inventory" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Parse XXH3/XXH64 unknown keys" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <Button Click="RunInternalContent_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="RST Content GREP" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="BIN strings and text resources" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <Button Click="RunInternalStructural_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="RST Structural" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Cross-version and numeric keys" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+                    </UniformGrid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- RESULTS AND POLISHED PROGRESS SECTION (FLEXIBLE HEIGHT *) -->
+        <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="32,16,32,20">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/> <!-- Title & Promotion Button -->
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="10"/>
                     <RowDefinition Height="Auto"/> <!-- Polished Progress Bar area -->
-                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="10"/>
                     <RowDefinition Height="*"/>    <!-- ListView results -->
                 </Grid.RowDefinitions>
                 
