@@ -8,7 +8,7 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Models
 {
     internal sealed record SknMaterialTextureResolution(
         string DefaultTextureKey,

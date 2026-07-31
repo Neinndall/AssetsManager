@@ -7,11 +7,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Vfx
 {
     /// <summary>
     /// UI-facing playback adapter for the authored VFX graph runtime.

@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Models;
 using AssetsManager.Utils;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Helpers;

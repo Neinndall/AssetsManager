@@ -20,7 +20,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
 
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Models
 {
     public class SknLoadingService
     {

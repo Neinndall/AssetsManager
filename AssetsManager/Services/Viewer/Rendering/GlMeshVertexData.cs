@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using System.Windows.Media.Media3D;
 
-namespace AssetsManager.Utils.Rendering
+namespace AssetsManager.Services.Viewer.Rendering
 {
     internal sealed class GlMeshVertexData
     {

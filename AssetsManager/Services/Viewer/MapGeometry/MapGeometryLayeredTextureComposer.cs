@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.MapGeometry
 {
     internal static class MapGeometryLayeredTextureComposer
     {

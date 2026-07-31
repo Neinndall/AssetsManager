@@ -11,7 +11,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Models
 {
     /// <summary>
     /// Service dedicated to scanning game directories for skins and chromas.

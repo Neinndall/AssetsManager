@@ -4,7 +4,8 @@ using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.MapGeometry;
+using AssetsManager.Services.Viewer.Models;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 

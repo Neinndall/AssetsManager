@@ -440,7 +440,7 @@ namespace BenchmarkApp
 
             using var logger = new LoggerConfiguration().CreateLogger();
             var logService = new AssetsManager.Services.Core.LogService(logger);
-            var service = new AssetsManager.Services.Viewer.VfxDataService(logService);
+            var service = new AssetsManager.Services.Viewer.Vfx.VfxDataService(logService);
 
             string sknPath = Path.GetFullPath(args[0]);
             string rootPath = Path.GetFullPath(args[1]);

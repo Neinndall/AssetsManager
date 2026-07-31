@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.MapGeometry;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Tests.Viewer
+namespace AssetsManager.BenchmarkTests.Tests.Viewer.MapGeometry
 {
     public class MapGeometryMaterialResolverTests
     {

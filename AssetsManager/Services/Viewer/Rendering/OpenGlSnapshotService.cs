@@ -7,7 +7,7 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
 using Silk.NET.OpenGL;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// Renders lossless UHD snapshots through a temporary OpenGL framebuffer.

@@ -16,7 +16,7 @@ using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.MapGeometry
 {
     public class MapGeometryLoadingService
     {

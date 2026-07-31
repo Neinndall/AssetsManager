@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Services.Viewer
+namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 {
     public sealed class VfxPlaybackStateTests
     {

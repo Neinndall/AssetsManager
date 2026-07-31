@@ -3,10 +3,10 @@ using System.Numerics;
 using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.MapGeometry;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Tests.Viewer
+namespace AssetsManager.BenchmarkTests.Tests.Viewer.MapGeometry
 {
     public class MapGeometryLayeredTextureComposerTests
     {

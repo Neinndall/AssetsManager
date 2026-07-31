@@ -12,7 +12,7 @@ using System.Windows.Media.Media3D;
 using Vector = System.Windows.Vector;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;

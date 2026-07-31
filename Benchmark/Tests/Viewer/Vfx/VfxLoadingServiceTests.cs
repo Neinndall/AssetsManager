@@ -10,7 +10,7 @@ using LeagueToolkit.Hashing;
 using Serilog;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Services.Viewer
+namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 {
     public sealed class VfxLoadingServiceTests
     {

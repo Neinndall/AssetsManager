@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using AssetsManager.Services.Viewer;
+using AssetsManager.Services.Viewer.Models;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer

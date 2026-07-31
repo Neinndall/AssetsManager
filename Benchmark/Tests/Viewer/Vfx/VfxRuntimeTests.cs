@@ -2,13 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
-using AssetsManager.Services.Viewer;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Services.Viewer
+namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 {
     public sealed class VfxRuntimeTests
     {

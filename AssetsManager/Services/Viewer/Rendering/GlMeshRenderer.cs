@@ -10,7 +10,7 @@ using AssetsManager.Utils.Rendering;
 using AssetsManager.Utils;
 using System.Linq;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>
     /// Handles 3D mesh uploads, texture generation, and drawing for character models using Silk.NET.

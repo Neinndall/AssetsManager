@@ -5,10 +5,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Vfx
 {
     /// <summary>
     /// Discovers the BIN graph associated with a model and exposes authored VFX

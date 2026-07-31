@@ -13,7 +13,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using Quaternion = System.Numerics.Quaternion;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Animation
 {
     public class AnimationPlayer : IDisposable
     {

@@ -4,7 +4,7 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
 
-namespace AssetsManager.Services.Viewer
+namespace AssetsManager.Services.Viewer.Rendering
 {
     /// <summary>Editor ground grid and directional axes.</summary>
     public sealed class GridRenderer : IDisposable
