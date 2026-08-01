@@ -135,6 +135,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / The yellow loop boundary now follows natural particle and child-system completion instead of treating externally triggered particle/emitter linger values as extra playback time.
   - Viewer VFX Studio / Prevented particleColorTexture-only emitters from rendering the opaque white fallback quad, and exposed base, multiplier, and color-lookup texture roles in Emitters Breakdown.
   - Viewer VFX Studio / Corrected ground-layer arbitrary quads authored with a downward-facing basis so their visual orientation faces upward and follows the expected 2D direction.
   - Viewer chromas now use their own skin BIN so every mesh receives the correct variant texture.

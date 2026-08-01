@@ -51,7 +51,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             double systemEnd = 0;
             foreach (VfxEmitterDefinition emitter in system.Emitters.Where(item => !item.Disabled))
             {
-                if (emitter.EmitterLifetime is null || emitter.IsLoop)
+                if (emitter.IsLoop)
                 {
                     path.Remove(system);
                     return double.PositiveInfinity;
@@ -64,9 +64,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                     return double.PositiveInfinity;
                 }
                 double lastEmission = emitter.TimeBeforeFirstEmission +
-                    (emitter.IsSingleParticle ? 0 : Math.Max(0, emitter.EmitterLifetime.Value));
-                double residual = Math.Max(0, Math.Max(emitter.ParticleLinger, emitter.EmitterLinger));
-                double emitterEnd = lastEmission + particleLifetime + residual;
+                    (emitter.IsSingleParticle ? 0 : Math.Max(0, emitter.EmitterLifetime ?? 0));
+                double emitterEnd = lastEmission + particleLifetime;
 
                 if (depth < MaximumGraphDepth && emitter.ChildParticleSet is { Children.Count: > 0 } childSet)
                 {

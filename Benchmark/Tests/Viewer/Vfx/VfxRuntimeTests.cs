@@ -409,7 +409,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void DurationIncludesResidualLifeAndChildSystems()
+        public void DurationIncludesParticleAndChildLifeButNotExternalLinger()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -422,7 +422,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 IsSingleParticle = false,
                 EmitterLifetime = 1f,
                 ParticleLifetime = VfxCurveF.Const(0.5f),
-                ParticleLinger = 0.25f,
+                ParticleLinger = 10.75f,
                 ChildParticleSet = new VfxChildParticleSetDefinition(
                     new[] { new VfxChildSystemReference("child", 2, 0) },
                     true,
@@ -438,6 +438,20 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 new Dictionary<uint, uint>());
 
             Assert.Equal(1.9, duration, precision: 3);
+
+            VfxEmitterDefinition externalLifetime = parentEmitter with
+            {
+                EmitterLifetime = null,
+                ParticleLifetime = VfxCurveF.Const(0.3f),
+                ParticleLinger = 10.3f,
+                ChildParticleSet = null
+            };
+            Assert.Equal(
+                0.3,
+                VfxDurationCalculator.Calculate(new VfxSystemDefinition(3, "external", "external", new[] { externalLifetime })),
+                precision: 3);
+            Assert.True(double.IsInfinity(VfxDurationCalculator.Calculate(
+                new VfxSystemDefinition(4, "loop", "loop", new[] { externalLifetime with { IsLoop = true } }))));
         }
 
         [Fact]
