@@ -249,6 +249,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.ActiveTexture(TextureUnit.Texture0);
 
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
+            bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
+            bool blend = _gl.IsEnabled(EnableCap.Blend);
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(false);
             _gl.Disable(EnableCap.CullFace);
@@ -398,6 +400,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.DepthMask(true);
             _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             if (!depthTest) _gl.Disable(EnableCap.DepthTest);
+            if (cullFace) _gl.Enable(EnableCap.CullFace);
+            else _gl.Disable(EnableCap.CullFace);
+            if (blend) _gl.Enable(EnableCap.Blend);
+            else _gl.Disable(EnableCap.Blend);
             _gl.BindVertexArray(0);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture1);
@@ -661,6 +667,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
             if (es.MeshVao == 0 || es.MeshIndexCount == 0) return;
+            bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
@@ -805,6 +812,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                 else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
             }
             if (es.UsesExternalAttachedMesh) _gl.DepthFunc(DepthFunction.Less);
+            if (cullFace) _gl.Enable(EnableCap.CullFace);
+            else _gl.Disable(EnableCap.CullFace);
             _gl.UseProgram(_program);
             _gl.BindVertexArray(_vao);
         }

@@ -64,9 +64,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             return mesh;
         }
 
-        public string ResolveBin(string authoredPath, string searchDirectory)
-            => ResolvePath(authoredPath, searchDirectory, BinExtensions);
-
         public VfxAnimatedMesh ResolveMeshAnimation(
             string meshPath,
             string skeletonPath,
