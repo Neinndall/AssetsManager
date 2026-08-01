@@ -296,11 +296,11 @@
                                                         <DataTemplate>
                                                             <Grid Height="24" Margin="0,2">
                                                                 <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="20"/>
+                                                                    <ColumnDefinition Width="28"/>
                                                                     <ColumnDefinition Width="18"/>
                                                                     <ColumnDefinition Width="*"/>
                                                                 </Grid.ColumnDefinitions>
-                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" Margin="0" Width="26" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
                                                                 <TextBlock Grid.Column="1" Text="{Binding IndexNumber}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                                 <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                                             </Grid>
