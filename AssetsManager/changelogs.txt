@@ -27,6 +27,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - VFX Studio now applies consistent BIN blend modes across rendering and diagnostics without exposing black particle backgrounds.
   - VFX Studio / Removed unused animation-event and sound-event parsing from VFX BIN loading.
   - Viewer services and tests are now organized by animation, models, map geometry, rendering, and VFX domains.
   - Viewer Browser now uses the compact shared breadcrumb navigation.

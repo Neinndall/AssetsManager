@@ -508,6 +508,11 @@ namespace BenchmarkApp
                         $"particleLife={emitter.ParticleLifetime.Constant} | single={emitter.IsSingleParticle} | " +
                         $"birthScale={emitter.BirthScale.Constant} | scale0={emitter.ScaleOverLife?.Constant} | " +
                         $"uniform={emitter.IsUniformScale} | position={emitter.EmitterPosition.Constant} | " +
+                        $"blend={emitter.BlendMode}/{AssetsManager.Views.Models.Viewer.VfxBlendModes.Describe(emitter.BlendMode)} | " +
+                        $"texture={emitter.TexturePath ?? "-"} | textureMult={emitter.TextureMultPath ?? "-"} | " +
+                        $"birthColor={emitter.BirthColor.Constant} | color={emitter.ColorOverLife?.Constant} | " +
+                        $"birthRotation={emitter.BirthRotation?.Constant} | renderState={emitter.RenderState} | " +
+                        $"reflection={emitter.Reflection} | erosion={emitter.AlphaErosion} | " +
                         $"spawn={spawn} | velocity={emitter.BirthVelocity?.Constant} | " +
                         $"acceleration={emitter.Acceleration?.Constant} | mesh={emitter.MeshPath ?? "-"} | " +
                         $"meshBounds={meshBounds} | " +

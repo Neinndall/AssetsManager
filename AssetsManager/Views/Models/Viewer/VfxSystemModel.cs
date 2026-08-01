@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using AssetsManager.Services.Viewer.Vfx;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -75,22 +74,9 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 StartColor { get; set; } = Vector4.One;
         public Vector4 EndColor { get; set; } = Vector4.One;
 
-        public int BlendMode { get; set; } = 0; // 0/1/4/5: Additive, 2: AlphaBlend, 3: Multiply
+        public int BlendMode { get; set; } = 0; // raw authored BIN value
         public ushort NumFrames { get; set; } = 1;
         public bool IsLooping { get; set; } = true;
     }
 
-    public class VfxParticleInstance
-    {
-        public Vector3 Position;
-        public Vector3 Velocity;
-        public Vector3 Scale;
-        public Vector4 Color;
-        public float Age;
-        public float MaxLifetime;
-        public float Rotation;
-        public ushort FrameIndex;
-
-        public bool IsAlive => Age < MaxLifetime;
-    }
 }

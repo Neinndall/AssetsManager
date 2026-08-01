@@ -441,12 +441,22 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void ApplyBlendMode(int blendMode, bool distortion = false)
         {
-            if (distortion || blendMode == 2)
-                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-            else if (blendMode == 3)
-                _gl.BlendFunc(BlendingFactor.DstColor, BlendingFactor.Zero);
-            else
-                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
+            VfxBlendModeKind kind = distortion
+                ? VfxBlendModeKind.Alpha
+                : VfxBlendModes.Resolve(blendMode);
+
+            switch (kind)
+            {
+                case VfxBlendModeKind.Multiply:
+                    _gl.BlendFunc(BlendingFactor.DstColor, BlendingFactor.Zero);
+                    break;
+                case VfxBlendModeKind.Additive:
+                    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
+                    break;
+                default:
+                    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                    break;
+            }
         }
 
         private static Vector2 EffectiveCenter(Vector2 center)
@@ -460,7 +470,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _ownedTextures.Clear();
             _ownedTextures.Add(_fallbackWhiteTexture);
             ReleaseMeshes();
-            _whiteTex = 0;
         }
 
         public void Dispose()
@@ -496,7 +505,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
         private int _muReflectionTex, _muHasReflection, _muReflectionOpacity, _muReflectionColor;
         private int _muSceneDepthTex, _muHasSoftParticle, _muSoftParticleParams, _muViewportSize;
-        private uint _whiteTex;
 
         private void EnsureMeshProgram()
         {
@@ -557,7 +565,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muSoftParticleParams = _gl.GetUniformLocation(_meshProgram, "uSoftParticleParams");
                 _muViewportSize = _gl.GetUniformLocation(_meshProgram, "uViewportSize");
             }
-            if (_whiteTex == 0) _whiteTex = UploadTexture(new byte[] { 255, 255, 255, 255 }, 1, 1);
         }
 
         public void UploadEmitterMesh(VfxPlaybackRuntime.EmitterState es, float[] positions, float[] uvs, uint[] indices = null)
@@ -696,7 +703,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform3(_muPlacementUp, es.PlacementUp.X, es.PlacementUp.Y, es.PlacementUp.Z);
             _gl.Uniform3(_muPlacementForward, es.PlacementForward.X, es.PlacementForward.Y, es.PlacementForward.Z);
             _gl.ActiveTexture(TextureUnit.Texture0);
-            _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _whiteTex);
+            _gl.BindTexture(TextureTarget.Texture2D, es.Texture != 0 ? es.Texture : _fallbackWhiteTexture);
             var renderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
             ApplyAddressMode(renderState.TextureAddressMode);
             _gl.Uniform1(_muAlphaCutoff, renderState.AlphaCutoff);

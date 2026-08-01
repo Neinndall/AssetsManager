@@ -47,7 +47,7 @@ namespace AssetsManager.Views.Models.Viewer
         float TimeBeforeFirstEmission,
         bool IsSingleParticle,          // burst of exactly one particle
         bool Disabled,
-        int BlendMode,                  // 0/1/4/5 additive, 2 alpha, 3 multiply
+        int BlendMode,                  // raw authored BIN value; VfxBlendModes owns its rendering semantics
         VfxCurve3 BirthScale,           // ABSOLUTE size at birth (birthScale0), world units
         VfxCurve3? ScaleOverLife,       // scale0: normalised MULTIPLIER over age → effective size = BirthScale * this
         VfxCurve4 BirthColor,           // rgba at birth

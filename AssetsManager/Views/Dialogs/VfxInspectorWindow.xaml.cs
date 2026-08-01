@@ -725,15 +725,7 @@ namespace AssetsManager.Views.Dialogs
 
         #endregion
 
-        private static string GetBlendModeName(int blendMode) => blendMode switch
-        {
-            0 or 1 => "Additive (0/1)",
-            2 => "AlphaBlend (2)",
-            3 => "Multiply (3)",
-            4 => "Additive (4)",
-            5 => "Additive (5)",
-            _ => $"Custom ({blendMode})"
-        };
+        private static string GetBlendModeName(int blendMode) => VfxBlendModes.Describe(blendMode);
 
         private static string DescribeTextureSources(VfxEmitterDefinition emitter)
         {
