@@ -488,7 +488,7 @@
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
 
-                                        <GridViewColumn Header="Texture Path" Width="200">
+                                        <GridViewColumn Header="Texture Sources" Width="230">
                                             <GridViewColumn.HeaderContainerStyle>
                                                 <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                                     <EventSetter Event="SizeChanged" Handler="TableColumnHeader_SizeChanged"/>
@@ -497,7 +497,7 @@
                                             </GridViewColumn.HeaderContainerStyle>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding TexturePath}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding TextureSources}" ToolTip="{Binding TextureSources}" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>

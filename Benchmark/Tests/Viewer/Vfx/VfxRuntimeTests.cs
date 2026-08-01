@@ -366,6 +366,21 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ParticleColorLookupAloneDoesNotCreateABillboard()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                TexturePath = null,
+                TextureMultPath = null,
+                ParticleColorTexturePath = "color-lookup.tex"
+            };
+
+            Assert.False(emitter.IsVisual);
+        }
+
+        [Fact]
         public void SamiraSpotlightRaysUseAuthoredForwardAxisTowardSceneCenter()
         {
             Vector3 leftAxis = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
@@ -398,6 +413,20 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(1f, side.Length(), precision: 5);
             Assert.Equal(0f, Vector3.Dot(side, direction), precision: 5);
             Assert.Equal(0f, Vector3.Dot(side, cameraForward), precision: 5);
+        }
+
+        [Fact]
+        public void GroundPlaneRotatesAuthoredDownwardFacingBasisIntoViewportDirection()
+        {
+            Vector3 right = Vector3.UnitZ;
+            Vector3 authoredForward = -Vector3.UnitX;
+
+            (Vector3 correctedRight, Vector3 correctedForward) =
+                VfxOpenGlRenderer.GetGroundPlaneAxes(right, authoredForward);
+
+            Assert.Equal(Vector3.UnitX, correctedRight);
+            Assert.Equal(-Vector3.UnitZ, correctedForward);
+            Assert.True(Vector3.Dot(Vector3.Cross(correctedRight, correctedForward), Vector3.UnitY) > 0f);
         }
 
         [Fact]

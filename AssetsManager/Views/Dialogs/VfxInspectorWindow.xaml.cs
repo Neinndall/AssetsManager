@@ -352,7 +352,9 @@ namespace AssetsManager.Views.Dialogs
                         PathHash = hash,
                         Definition = sysDef,
                         EmitterCount = playableEmitters.Length,
-                        TextureCount = playableEmitters.Count(e => !string.IsNullOrEmpty(e.TexturePath)),
+                        TextureCount = playableEmitters.Count(e =>
+                            !string.IsNullOrWhiteSpace(e.TexturePath) ||
+                            !string.IsNullOrWhiteSpace(e.TextureMultPath)),
                         MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive),
                         Status = "Ready",
                         StatusBrush = Brushes.LightGreen
@@ -459,14 +461,17 @@ namespace AssetsManager.Views.Dialogs
                     ? _resolver.ResolveMesh(meshPath, searchDir)
                     : null;
 
+                (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
+
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {
                     Name = emitter.Name ?? "Emitter",
                     IsEnabled = true,
                     EmitterDef = emitter,
                     TexturePath = texPath ?? "N/A",
-                    TextureStatus = tex != null ? "Resolved" : (string.IsNullOrEmpty(texPath) ? "None" : "MISSING"),
-                    TextureStatusBrush = tex != null ? Brushes.LightGreen : (string.IsNullOrEmpty(texPath) ? Brushes.Gray : Brushes.OrangeRed),
+                    TextureSources = DescribeTextureSources(emitter),
+                    TextureStatus = textureStatus,
+                    TextureStatusBrush = textureStatusBrush,
                     MeshPath = usesSceneMesh ? "Active scene mesh" : emitter.IsMeshPrimitive ? (meshPath ?? "N/A") : "N/A",
                     MeshStatus = usesSceneMesh ? "Attached" : emitter.IsMeshPrimitive ? (mesh != null ? "Resolved" : "MISSING") : "N/A",
                     MeshStatusBrush = usesSceneMesh ? Brushes.LightGreen : emitter.IsMeshPrimitive ? (mesh != null ? Brushes.LightGreen : Brushes.OrangeRed) : Brushes.Gray,
@@ -725,6 +730,48 @@ namespace AssetsManager.Views.Dialogs
             _ => $"Custom ({blendMode})"
         };
 
+        private static string DescribeTextureSources(VfxEmitterDefinition emitter)
+        {
+            if (emitter is null) return "N/A";
+
+            var sources = new List<string>();
+            bool hasVisualTexture = !string.IsNullOrWhiteSpace(emitter.TexturePath) ||
+                                    !string.IsNullOrWhiteSpace(emitter.TextureMultPath);
+            AddTextureSource(sources, "Base", emitter.TexturePath);
+            AddTextureSource(sources, "Mult", emitter.TextureMultPath);
+            AddTextureSource(sources, "Distortion", emitter.Distortion?.NormalMapTexturePath);
+            AddTextureSource(sources, "Erosion", emitter.AlphaErosion?.TexturePath);
+            AddTextureSource(sources, "Reflection", emitter.Reflection?.TexturePath);
+            if (!hasVisualTexture || !string.Equals(
+                    emitter.ParticleColorTexturePath,
+                    "ASSETS/Shared/Particles/DefaultColorOverlifetime.dds",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                AddTextureSource(sources, "Color LUT", emitter.ParticleColorTexturePath);
+            }
+            return sources.Count == 0 ? "N/A" : string.Join(" | ", sources);
+        }
+
+        private static (string Status, Brush Brush) DescribeTextureStatus(
+            VfxEmitterDefinition emitter,
+            BitmapSource texture)
+        {
+            if (texture != null) return ("Resolved", Brushes.LightGreen);
+            if (!string.IsNullOrWhiteSpace(emitter.TexturePath)) return ("MISSING", Brushes.OrangeRed);
+            if (!string.IsNullOrWhiteSpace(emitter.TextureMultPath)) return ("Mult stage", Brushes.DarkOrange);
+            if (!string.IsNullOrWhiteSpace(emitter.Distortion?.NormalMapTexturePath))
+                return ("Distortion stage", Brushes.DarkOrange);
+            if (!string.IsNullOrWhiteSpace(emitter.ParticleColorTexturePath))
+                return ("LUT only", Brushes.DarkOrange);
+            return ("None", Brushes.Gray);
+        }
+
+        private static void AddTextureSource(List<string> sources, string role, string path)
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+                sources.Add($"{role}: {path}");
+        }
+
         private void SearchQuery_TextChanged(object sender, TextChangedEventArgs e)
         {
             string query = _model.SearchQuery?.Trim() ?? "";
@@ -873,6 +920,8 @@ namespace AssetsManager.Views.Dialogs
                 sb.AppendLine($"  - Tipo Primitiva: {(d?.IsMeshPrimitive == true ? "MALLA 3D (.scb/.sco)" : (d?.IsGroundLayer == true ? "CAPA SUELO 3D" : "QUAD BILLBOARD 2D"))}");
                 sb.AppendLine($"  - Malla 3D Ruta: {emitter.MeshPath} (Estado GPU: {emitter.MeshStatus})");
                 sb.AppendLine($"  - Textura Principal: {emitter.TexturePath} (Estado GPU: {emitter.TextureStatus})");
+                sb.AppendLine($"  - Textura Multiplicadora: {d?.TextureMultPath ?? "N/A"}");
+                sb.AppendLine($"  - Textura Color Lookup: {d?.ParticleColorTexturePath ?? "N/A"}");
                 sb.AppendLine($"  - Rejilla Atlas (TexDiv): {emitter.TexDiv}");
                 if (d != null)
                 {

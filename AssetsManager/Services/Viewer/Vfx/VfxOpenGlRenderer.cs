@@ -262,6 +262,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     if (es.MeshVao != 0) RenderMeshEmitter(es, viewProj);
                     continue;
                 }
+                if (!es.Def.IsVisual) continue;
                 bool isDistortion = es.Def.Distortion is not null;
                 if (isDistortion && (es.DistortionTexture == 0 || _sceneTexture == 0)) continue;
 
@@ -855,6 +856,18 @@ namespace AssetsManager.Services.Viewer.Vfx
             return Vector3.Normalize(side);
         }
 
+        internal static (Vector3 Right, Vector3 Forward) GetGroundPlaneAxes(
+            Vector3 groundRight,
+            Vector3 authoredForward)
+        {
+            if (groundRight.LengthSquared() <= 1e-8f || authoredForward.LengthSquared() <= 1e-8f)
+                return (groundRight, authoredForward);
+
+            return Vector3.Dot(Vector3.Cross(groundRight, authoredForward), Vector3.UnitY) < 0f
+                ? (-authoredForward, -groundRight)
+                : (groundRight, authoredForward);
+        }
+
         internal static float GetGroundContactRayLength(
             Vector3 origin,
             Vector3 direction,
@@ -1147,6 +1160,11 @@ void main(){
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
         vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
         vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
+        if (dot(cross(groundRight, groundForward), vec3(0.0, 1.0, 0.0)) < 0.0) {
+            vec3 authoredRight = groundRight;
+            groundRight = -groundForward;
+            groundForward = -authoredRight;
+        }
         world = aCenter + groundRight * (rc.x * aSize.x) + groundForward * (rc.y * aSize.y) + vec3(0.0, 0.02, 0.0);
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);

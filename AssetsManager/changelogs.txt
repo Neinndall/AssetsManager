@@ -131,6 +131,8 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Prevented particleColorTexture-only emitters from rendering the opaque white fallback quad, and exposed base, multiplier, and color-lookup texture roles in Emitters Breakdown.
+  - Viewer VFX Studio / Corrected ground-layer arbitrary quads authored with a downward-facing basis so their visual orientation faces upward and follows the expected 2D direction.
   - Viewer chromas now use their own skin BIN so every mesh receives the correct variant texture.
   - Viewer camera toolbar now switches reliably between exact front, back, side, top, and bottom views.
   - Viewer now resolves companion theme materials through their exact skin BIN, including textures referenced from external skin folders.

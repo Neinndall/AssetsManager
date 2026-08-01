@@ -87,6 +87,7 @@ namespace AssetsManager.Views.Models.Viewer
         private string _name;
         private VfxEmitterDefinition _emitterDef;
         private string _texturePath;
+        private string _textureSources;
         private string _textureStatus;
         private Brush _textureStatusBrush;
         private string _meshPath;
@@ -130,6 +131,12 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _texturePath;
             set { _texturePath = value; OnPropertyChanged(); }
+        }
+
+        public string TextureSources
+        {
+            get => _textureSources;
+            set { _textureSources = value; OnPropertyChanged(); }
         }
 
         public string TextureStatus
