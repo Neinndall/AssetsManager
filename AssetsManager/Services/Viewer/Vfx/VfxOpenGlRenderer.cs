@@ -257,6 +257,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             foreach (var es in sim.Emitters)
             {
+                if (!es.IsVisible) continue;
                 if (es.Def.IsMeshPrimitive)
                 {
                     if (es.MeshVao != 0) RenderMeshEmitter(es, viewProj);

@@ -203,6 +203,13 @@ namespace AssetsManager.Views.Models.Viewer
         private Brush _trackBrush = Brushes.MediumTurquoise;
         private Thickness _trackMargin;
         private double _trackWidth = 100;
+        private int _sourceOrder;
+
+        public int SourceOrder
+        {
+            get => _sourceOrder;
+            set { _sourceOrder = value; OnPropertyChanged(); }
+        }
 
         public int IndexNumber
         {

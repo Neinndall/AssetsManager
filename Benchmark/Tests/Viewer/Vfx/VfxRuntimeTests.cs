@@ -524,6 +524,24 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void EmitterVisibilityOnlyAffectsViewportRendering()
+        {
+            VfxEmitterDefinition first = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with { Name = "first" };
+            VfxEmitterDefinition second = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with { Name = "second" };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "visibility", "visibility", new[] { first, second }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            Assert.True(runtime.SetEmitterVisibility(0, false));
+            Assert.False(runtime.Emitters[0].IsVisible);
+            Assert.Equal(2, runtime.LiveParticleCount);
+            Assert.Equal(1, runtime.Emitters[0].InstanceCount);
+            Assert.Equal(1, runtime.Emitters[1].InstanceCount);
+            Assert.False(runtime.SetEmitterVisibility(99, false));
+        }
+
+        [Fact]
         public void InspectorTimelineIgnoresAuthoredDisabledEmitters()
         {
             VfxEmitterDefinition playable = CreateEmitter(

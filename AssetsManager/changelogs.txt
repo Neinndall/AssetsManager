@@ -10,6 +10,7 @@ New Features
   - Tree explorers and Grid View now support SHIFT and CTRL+SHIFT range selection.
   - VFX Studio / Extended the filtered BIN audit with emitter importance, spawn volumes, motion values, child links, and decoded mesh bounds for reproducible scale and placement diagnostics.
   - VFX Studio / Added multi-layer Emitters / Layers timeline deck matching Riot editor layout, placing Master VFX System bar at Row 0 with emission delay markers for secondary emitters.
+  - VFX Studio / Added per-emitter visibility toggles so individual particle and mesh layers can be isolated in the viewport during playback.
   - VFX Studio / Added automatic dependency resolution from BIN headers (PROP v2+ Dependencies) to recursively pre-load companion sub-systems, static meshes, textures, and sounds.
   - VFX Studio / Added CPU skinning for authored `.skn + .skl + .anm` particle meshes and indexed skeleton/animation resources from extracted WAD trees.
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.

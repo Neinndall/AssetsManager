@@ -114,6 +114,9 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
+        public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
+            => _graph?.Root.SetEmitterVisibility(sourceOrder, isVisible) ?? false;
+
         public void Play()
         {
             _isPlaying = true;

@@ -300,7 +300,7 @@
                                                                     <ColumnDefinition Width="18"/>
                                                                     <ColumnDefinition Width="*"/>
                                                                 </Grid.ColumnDefinitions>
-                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center"/>
+                                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" VerticalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
                                                                 <TextBlock Grid.Column="1" Text="{Binding IndexNumber}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                                                 <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                                             </Grid>
@@ -469,7 +469,7 @@
                                             <GridViewColumnHeader Content="Active"/>
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate>
-                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Center"/>
+                                                    <CheckBox IsChecked="{Binding IsEnabled, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" HorizontalAlignment="Center" ToolTip="Show or hide this emitter in the viewport without stopping its simulation."/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>

@@ -449,8 +449,11 @@ namespace AssetsManager.Views.Dialogs
             _model.IsPlaying = true;
 
             // 2. Audit Emitters
-            foreach (var emitter in def.Emitters.Where(item => !item.Disabled))
+            for (int emitterIndex = 0; emitterIndex < def.Emitters.Count; emitterIndex++)
             {
+                var emitter = def.Emitters[emitterIndex];
+                if (emitter.Disabled) continue;
+
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
                 bool usesSceneMesh = emitter.PrimitiveKind == VfxPrimitiveKind.AttachedMesh &&
@@ -466,6 +469,7 @@ namespace AssetsManager.Views.Dialogs
                 var emitterDiagnostic = new VfxEmitterDiagnosticItem
                 {
                     Name = emitter.Name ?? "Emitter",
+                    SourceOrder = emitterIndex,
                     IsEnabled = true,
                     EmitterDef = emitter,
                     TexturePath = texPath ?? "N/A",
@@ -483,6 +487,7 @@ namespace AssetsManager.Views.Dialogs
 
                 emitterDiagnostic.OnEnabledChanged += (item, enabled) =>
                 {
+                    _vfxRenderer?.SetEmitterVisibility(item.SourceOrder, enabled);
                     _model.LogMessages.Add($"[EMITTER TOGGLE] {item.Name} set to {(enabled ? "ENABLED" : "DISABLED")}");
                 };
 

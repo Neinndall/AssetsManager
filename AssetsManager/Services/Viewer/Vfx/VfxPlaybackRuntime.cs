@@ -17,6 +17,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             public required VfxEmitterDefinition Def { get; init; }
             public int SourceOrder { get; init; }
+            public bool IsVisible { get; set; } = true;
             public Vector3 BasePos;                 // world spawn origin (placement + emitterPosition)
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
@@ -143,6 +144,18 @@ namespace AssetsManager.Services.Viewer.Vfx
                 });
             }
             Reset();
+        }
+
+        public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
+        {
+            foreach (EmitterState emitter in _emitters)
+            {
+                if (emitter.SourceOrder != sourceOrder) continue;
+                emitter.IsVisible = isVisible;
+                return true;
+            }
+
+            return false;
         }
 
         public void ApplyRenderOrder()
