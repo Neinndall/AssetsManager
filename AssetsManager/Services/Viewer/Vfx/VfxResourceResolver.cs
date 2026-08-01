@@ -9,6 +9,7 @@ using LeagueToolkit.Core.Memory;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
 using System.Numerics;
+using AssetsManager.Services.Core;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
@@ -68,7 +69,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             string meshPath,
             string skeletonPath,
             string animationPath,
-            string searchDirectory)
+            string searchDirectory,
+            LogService log = null)
         {
             if (string.IsNullOrWhiteSpace(meshPath) ||
                 string.IsNullOrWhiteSpace(skeletonPath) ||
@@ -95,8 +97,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _meshAnimations[key] = animation;
                 return animation;
             }
-            catch
+            catch (Exception ex)
             {
+                log?.LogError(
+                    ex,
+                    $"Failed to load VFX mesh animation: {resolvedAnimation} (mesh: {resolvedMesh}, skeleton: {resolvedSkeleton}).");
                 _meshAnimations[key] = null;
                 return null;
             }
@@ -263,10 +268,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static string CreateKey(string path, string directory)
             => path.Replace('\\', '/').ToLowerInvariant() + "|" + Path.GetFullPath(directory);
 
-        public static uint Fnv1a(string text)
-        {
-            return string.IsNullOrEmpty(text) ? 0 : LeagueToolkit.Hashing.Fnv1a.HashLower(text);
-        }
     }
 
     /// <summary>CPU skinning state for an authored VFX .skn + .skl + .anm resource.</summary>

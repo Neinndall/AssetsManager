@@ -60,6 +60,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 {
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "DefaultEmitter"),
                     new BinTreeU8(Fnv1a.HashLower("importance"), 3),
+                    new BinTreeVector4(Fnv1a.HashLower("birthColor"), new Vector4(0.1f, 0.2f, 0.3f, 0.4f)),
                     textureMult
                 });
             var effectObject = new BinTreeObject(
@@ -85,6 +86,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.True(parsed.TextureMultFlipV);
             Assert.True(parsed.TextureMultRandomStartFrame);
             Assert.Equal(3, parsed.Importance);
+            Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 0.4f), parsed.BirthColor.Constant);
             Assert.Equal(0.5f, parsed.UvTransformCenter.X);
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);
         }

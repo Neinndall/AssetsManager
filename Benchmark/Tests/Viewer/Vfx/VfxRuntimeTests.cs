@@ -76,7 +76,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 Scale = 2
             };
 
-            Matrix4x4 transform = GlVfxRenderer.CreateSceneWorldTransform(model);
+            Matrix4x4 transform = VfxRenderSession.CreateSceneWorldTransform(model);
             Vector3 origin = Vector3.Transform(Vector3.Zero, transform);
             Vector3 scaledAxis = Vector3.TransformNormal(Vector3.UnitX, transform);
 
@@ -333,6 +333,114 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void PlaybackGraphPreservesChildPlacementWhenRootTransformChanges()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterPosition = VfxCurve3.Const(new Vector3(2f, 0f, 0f)),
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    false,
+                    VfxCurveF.Const(1f),
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+            var graph = new VfxPlaybackGraphRuntime(
+                parent,
+                Matrix4x4.Identity,
+                7,
+                new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
+                new Dictionary<uint, uint>(),
+                (definition, transform, seed) =>
+                {
+                    var runtime = new VfxPlaybackRuntime(seed);
+                    runtime.SetSystem(definition, transform);
+                    return runtime;
+                });
+
+            graph.Update(0.02f);
+            VfxPlaybackRuntime childRuntime = graph.Runtimes[1];
+            Assert.Equal(2f, childRuntime.Emitters[0].BasePos.X, precision: 4);
+
+            graph.SetTransform(Matrix4x4.CreateTranslation(10f, 0f, 0f));
+
+            Assert.Equal(12f, childRuntime.Emitters[0].BasePos.X, precision: 4);
+        }
+
+        [Fact]
+        public void RuntimeConsumesTheCompleteDeltaUsingStableSubsteps()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "timing", "timing", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.25f);
+
+            Assert.Equal(0.25f, runtime.Emitters[0].EmitterAge, precision: 4);
+        }
+
+        [Fact]
+        public void RuntimeResetRestoresTheInitialRandomSequence()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                NumFrames = 8,
+                RandomStartFrame = true
+            };
+            var runtime = new VfxPlaybackRuntime(17);
+            runtime.SetSystem(new VfxSystemDefinition(1, "deterministic", "deterministic", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+            float firstFrame = runtime.Emitters[0].Instances[10];
+            runtime.Reset();
+            runtime.Update(0.02f);
+
+            Assert.Equal(firstFrame, runtime.Emitters[0].Instances[10]);
+        }
+
+        [Fact]
+        public void DurationIncludesResidualLifeAndChildSystems()
+        {
+            VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 0.1f,
+                ParticleLifetime = VfxCurveF.Const(0.4f)
+            };
+            var child = new VfxSystemDefinition(2, "child", "child", new[] { childEmitter });
+            VfxEmitterDefinition parentEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                EmitterLifetime = 1f,
+                ParticleLifetime = VfxCurveF.Const(0.5f),
+                ParticleLinger = 0.25f,
+                ChildParticleSet = new VfxChildParticleSetDefinition(
+                    new[] { new VfxChildSystemReference("child", 2, 0) },
+                    true,
+                    VfxCurveF.Const(1f),
+                    VfxCurve3.Const(Vector3.Zero),
+                    0)
+            };
+            var parent = new VfxSystemDefinition(1, "parent", "parent", new[] { parentEmitter });
+
+            double duration = VfxDurationCalculator.Calculate(
+                parent,
+                new Dictionary<uint, VfxSystemDefinition> { [1] = parent, [2] = child },
+                new Dictionary<uint, uint>());
+
+            Assert.Equal(1.9, duration, precision: 3);
+        }
+
+        [Fact]
         public void RenderStateNormalizesAlphaReference()
         {
             var state = new VfxEmitterRenderState(3, 128, 1, true, true, false, true);
@@ -381,106 +489,6 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void SamiraSpotlightRaysUseAuthoredForwardAxisTowardSceneCenter()
-        {
-            Vector3 leftAxis = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
-                VfxPrimitiveKind.Ray,
-                new Vector3(50f, 90f, 0f) * (MathF.PI / 180f));
-            Vector3 rightAxis = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
-                VfxPrimitiveKind.Ray,
-                new Vector3(130f, 90f, 0f) * (MathF.PI / 180f));
-            Vector3 leftToCenter = Vector3.Normalize(new Vector3(520f, -800f, 0f));
-            Vector3 rightToCenter = Vector3.Normalize(new Vector3(-520f, -800f, 0f));
-
-            Assert.True(Vector3.Dot(leftAxis, leftToCenter) > 0.98f);
-            Assert.True(Vector3.Dot(rightAxis, rightToCenter) > 0.98f);
-            Assert.True(leftAxis.Y < 0f);
-            Assert.True(rightAxis.Y < 0f);
-        }
-
-        [Fact]
-        public void RayWidthFacesCameraWithoutChangingAuthoredDirection()
-        {
-            Vector3 direction = Vector3.Normalize(new Vector3(0.64f, -0.77f, 0f));
-            Vector3 cameraForward = Vector3.Normalize(new Vector3(0f, -0.61f, -0.79f));
-            Vector3 cameraUp = Vector3.Normalize(new Vector3(0f, 0.79f, -0.61f));
-
-            Vector3 side = VfxOpenGlRenderer.GetCameraFacingPrimitiveSide(
-                direction,
-                cameraForward,
-                cameraUp);
-
-            Assert.Equal(1f, side.Length(), precision: 5);
-            Assert.Equal(0f, Vector3.Dot(side, direction), precision: 5);
-            Assert.Equal(0f, Vector3.Dot(side, cameraForward), precision: 5);
-        }
-
-        [Fact]
-        public void GroundPlaneRotatesAuthoredDownwardFacingBasisIntoViewportDirection()
-        {
-            Vector3 right = Vector3.UnitZ;
-            Vector3 authoredForward = -Vector3.UnitX;
-
-            (Vector3 correctedRight, Vector3 correctedForward) =
-                VfxOpenGlRenderer.GetGroundPlaneAxes(right, authoredForward);
-
-            Assert.Equal(Vector3.UnitX, correctedRight);
-            Assert.Equal(-Vector3.UnitZ, correctedForward);
-            Assert.True(Vector3.Dot(Vector3.Cross(correctedRight, correctedForward), Vector3.UnitY) > 0f);
-        }
-
-        [Fact]
-        public void DownwardSpotlightRayReachesTheGroundContact()
-        {
-            Vector3 origin = new(-520f, 800f, 0f);
-            Vector3 direction = VfxOpenGlRenderer.GetAuthoredPrimitiveLongitudinalAxis(
-                VfxPrimitiveKind.Ray,
-                new Vector3(50f, 90f, 0f) * (MathF.PI / 180f));
-
-            float length = VfxOpenGlRenderer.GetGroundContactRayLength(origin, direction, 900f);
-            Vector3 endpoint = origin + direction * length;
-
-            Assert.True(length > 900f);
-            Assert.True(endpoint.Y < 0f);
-            Assert.True(endpoint.Y > -2f);
-        }
-
-        [Fact]
-        public void RaysChooseTheGroundImpactAlignedWithTheirAuthoredCrossing()
-        {
-            VfxEmitterDefinition leftRay = CreateEmitter(new Vector3(600f, 900f, 0f), VfxEmitterRenderState.Default) with
-            {
-                Name = "left-ray",
-                IsMeshPrimitive = false,
-                PrimitiveKind = VfxPrimitiveKind.Ray,
-                EmitterPosition = VfxCurve3.Const(new Vector3(-520f, 800f, 0f)),
-                BirthRotation = VfxCurve3.Const(new Vector3(50f, 90f, 0f))
-            };
-            VfxEmitterDefinition leftImpact = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
-            {
-                Name = "left-impact",
-                EmitterPosition = VfxCurve3.Const(new Vector3(-125f, 2f, 0f))
-            };
-            VfxEmitterDefinition rightRay = leftRay with
-            {
-                Name = "right-ray",
-                EmitterPosition = VfxCurve3.Const(new Vector3(520f, 800f, 0f)),
-                BirthRotation = VfxCurve3.Const(new Vector3(130f, 90f, 0f))
-            };
-            VfxEmitterDefinition rightImpact = leftImpact with
-            {
-                Name = "right-impact",
-                EmitterPosition = VfxCurve3.Const(new Vector3(125f, 2f, 0f))
-            };
-            var emitters = new List<VfxEmitterDefinition> { leftRay, leftImpact, rightRay, rightImpact };
-
-            VfxGraphParser.LinkRayImpacts(emitters);
-
-            Assert.Equal(new Vector3(645f, -798f, 0f), emitters[0].RayTargetOffset);
-            Assert.Equal(new Vector3(-645f, -798f, 0f), emitters[2].RayTargetOffset);
-        }
-
-        [Fact]
         public void MeshParticlesAdvanceAuthoredRotationOnAllThreeAxes()
         {
             VfxEmitterDefinition emitter = CreateEmitter(
@@ -506,17 +514,17 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         [Fact]
         public void FinitePlaybackWaitsForTimelineBoundaryAfterParticlesExpire()
         {
-            Assert.False(GlVfxRenderer.ShouldRestartPlayback(
+            Assert.False(VfxRenderSession.ShouldRestartPlayback(
                 hasFiniteDuration: true,
                 currentTime: 0.83,
                 totalDuration: 1.25,
                 graphIsComplete: true));
-            Assert.True(GlVfxRenderer.ShouldRestartPlayback(
+            Assert.True(VfxRenderSession.ShouldRestartPlayback(
                 hasFiniteDuration: true,
                 currentTime: 1.25,
                 totalDuration: 1.25,
                 graphIsComplete: true));
-            Assert.True(GlVfxRenderer.ShouldRestartPlayback(
+            Assert.True(VfxRenderSession.ShouldRestartPlayback(
                 hasFiniteDuration: false,
                 currentTime: 0.83,
                 totalDuration: 0,

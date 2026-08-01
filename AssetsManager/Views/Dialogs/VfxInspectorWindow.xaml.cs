@@ -32,7 +32,7 @@ namespace AssetsManager.Views.Dialogs
         private readonly VfxResourceResolver _resolver = new();
         private readonly LogService _logService;
         private Silk.NET.OpenGL.GL _gl;
-        private GlVfxRenderer _vfxRenderer;
+        private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
@@ -103,7 +103,7 @@ namespace AssetsManager.Views.Dialogs
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, false);
-                _vfxRenderer = new GlVfxRenderer(_logService);
+                _vfxRenderer = new VfxRenderSession(_logService);
                 _vfxRenderer.Initialize(_gl);
                 _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
@@ -164,6 +164,8 @@ namespace AssetsManager.Views.Dialogs
             if (_model.IsPlaying && !_isUserSeeking)
             {
                 _vfxRenderer.Update(dt);
+                if (_vfxRenderer.ActiveSystem != null)
+                    _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
                 double loopBoundary = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : _model.TotalDuration;
                 if (_model.CurrentTime >= loopBoundary)
                 {
@@ -174,10 +176,6 @@ namespace AssetsManager.Views.Dialogs
             _vfxRenderer.Render(viewProj, view);
 
             _model.LiveParticleCount = _vfxRenderer.LiveParticleCount;
-            if (_model.IsPlaying && !_isUserSeeking && _vfxRenderer.ActiveSystem != null)
-            {
-                _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
-            }
             Dispatcher.InvokeAsync(UpdatePlayheadPosition);
         }
 
@@ -381,21 +379,7 @@ namespace AssetsManager.Views.Dialogs
             => definition?.Emitters.Any(emitter => !emitter.Disabled) == true;
 
         internal static double CalculatePlaybackDuration(VfxSystemDefinition definition)
-        {
-            double maximum = 0;
-            if (definition == null) return 1.5;
-
-            foreach (VfxEmitterDefinition emitter in definition.Emitters.Where(item => !item.Disabled))
-            {
-                double particleLifetime = GetMaximumParticleLifetime(emitter);
-                double duration = emitter.IsSingleParticle
-                    ? emitter.TimeBeforeFirstEmission + particleLifetime
-                    : emitter.TimeBeforeFirstEmission + (emitter.EmitterLifetime ?? 0.0) + particleLifetime;
-                maximum = Math.Max(maximum, duration);
-            }
-
-            return maximum > 0 ? maximum : 1.5;
-        }
+            => VfxDurationCalculator.Calculate(definition);
 
         #endregion
 
@@ -424,9 +408,16 @@ namespace AssetsManager.Views.Dialogs
                 searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
             }
 
-            double maxDur = CalculatePlaybackDuration(def);
-            double timelineMax = Math.Max(maxDur, 3.0);
-            _model.ActiveLoopDuration = maxDur;
+            double authoredDuration = VfxDurationCalculator.Calculate(
+                def,
+                _activeBundle?.Systems,
+                _activeBundle?.ResourceMap);
+            double timelineMax = double.IsFinite(authoredDuration)
+                ? Math.Max(authoredDuration, 3.0)
+                : 10.0;
+            _model.ActiveLoopDuration = double.IsFinite(authoredDuration) && authoredDuration > 0
+                ? authoredDuration
+                : timelineMax;
             _model.TotalDuration = timelineMax;
 
             // 1. Prepare playback in OpenGL Viewport
@@ -437,11 +428,10 @@ namespace AssetsManager.Views.Dialogs
                 SystemCatalog = _activeBundle?.Systems ?? new Dictionary<uint, VfxSystemDefinition>(),
                 ResourceMap = _activeBundle?.ResourceMap ?? new Dictionary<uint, uint>(),
                 SearchDirectory = searchDir,
-                TotalDuration = timelineMax,
+                TotalDuration = authoredDuration,
                 Speed = _model.Speed
             };
 
-            _model.TotalDuration = maxDur;
             _model.CurrentTime = 0;
 
             _vfxRenderer?.SetVfxSystem(systemModel);
@@ -612,12 +602,7 @@ namespace AssetsManager.Views.Dialogs
         }
 
         private static double GetMaximumParticleLifetime(VfxEmitterDefinition emitter)
-        {
-            double maximum = emitter.ParticleLifetime.Constant;
-            if (emitter.ParticleLifetime.Values is { Length: > 0 })
-                maximum = Math.Max(maximum, emitter.ParticleLifetime.Values.Max());
-            return maximum > 0 ? maximum : 1.5;
-        }
+            => VfxDurationCalculator.GetMaximumParticleLifetime(emitter);
 
         private void UpdatePlayheadPosition()
         {

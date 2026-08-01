@@ -27,7 +27,8 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
-  - VFX Studio now restores OpenGL culling and blending state between particle layers and the surrounding viewport.
+  - VFX effects now keep child layers aligned and replay with consistent timing and placement.
+  - VFX Studio now restores the complete OpenGL render state, isolates animated mesh buffers, skips unnecessary scene captures, honors authored system transforms, and accepts direct vector birth colors from BIN data.
   - VFX Studio now applies consistent BIN blend modes across rendering and diagnostics without exposing black particle backgrounds.
   - VFX Studio / Removed unused animation-event and sound-event parsing from VFX BIN loading.
   - Viewer services and tests are now organized by animation, models, map geometry, rendering, and VFX domains.

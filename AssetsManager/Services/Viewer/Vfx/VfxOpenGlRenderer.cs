@@ -15,7 +15,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     {
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo, _fallbackWhiteTexture;
-        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uUvScrollRate, _uEmitterUvOffset;
+        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uTexSizeMult, _uUvScrollRateMult, _uFlipUMult, _uFlipVMult;
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private readonly List<uint> _ownedTextures = new();
         private uint _sceneTexture, _sceneDepthTexture;
         private int _sceneWidth, _sceneHeight;
+        private int _sceneColorWidth, _sceneColorHeight, _sceneDepthWidth, _sceneDepthHeight;
 
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -43,10 +44,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             _gl = gl;
             var proc = gl.Context.GetProcAddress("glDrawElements");
-            if (proc != IntPtr.Zero)
-            {
-                _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
-            }
+            if (proc == IntPtr.Zero)
+                throw new NotSupportedException("The active OpenGL context does not expose glDrawElements.");
+            _drawElements = System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<DrawElementsDelegate>(proc);
             bool gles = GlShaderCompiler.UsesEmbeddedProfile(gl);
             _gles = gles;
             _program = GlShaderCompiler.CreateProgram(gl, gles, Vert, Frag);
@@ -68,7 +68,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uAddressMode = gl.GetUniformLocation(_program, "uAddressMode");
             _uAddressModeMult = gl.GetUniformLocation(_program, "uAddressModeMult");
             _uClampUvMult = gl.GetUniformLocation(_program, "uClampUvMult");
-            _uUvScrollRate = gl.GetUniformLocation(_program, "uUvScrollRate");
             _uEmitterUvOffset = gl.GetUniformLocation(_program, "uEmitterUvOffset");
             _uIsDistortion = gl.GetUniformLocation(_program, "uIsDistortion");
             _uDistortionTex = gl.GetUniformLocation(_program, "uDistortionTex");
@@ -181,45 +180,56 @@ namespace AssetsManager.Services.Viewer.Vfx
             return tex;
         }
 
-        public void CaptureScene(uint width, uint height)
+        public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
         {
-            if (!_ready || width == 0 || height == 0) return;
-            bool resized = _sceneWidth != (int)width || _sceneHeight != (int)height;
-            if (_sceneTexture == 0)
+            if (!_ready || width == 0 || height == 0 || (!captureColor && !captureDepth)) return;
+            _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
+            _gl.ActiveTexture(TextureUnit.Texture0);
+            _gl.GetInteger(GLEnum.TextureBinding2D, out int textureBinding);
+            if (captureColor)
             {
-                _sceneTexture = _gl.GenTexture();
-                _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            }
-            else _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
+                bool created = _sceneTexture == 0;
+                if (created)
+                {
+                    _sceneTexture = _gl.GenTexture();
+                    _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                }
+                else _gl.BindTexture(TextureTarget.Texture2D, _sceneTexture);
 
-            if (resized)
-            {
-                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, width, height, 0,
-                    PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+                if (created || _sceneColorWidth != (int)width || _sceneColorHeight != (int)height)
+                    _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, width, height, 0,
+                        PixelFormat.Rgba, PixelType.UnsignedByte, ReadOnlySpan<byte>.Empty);
+                _gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, width, height);
+                _sceneColorWidth = (int)width;
+                _sceneColorHeight = (int)height;
             }
-            _gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, width, height);
 
-            if (_sceneDepthTexture == 0)
+            if (captureDepth)
             {
-                _sceneDepthTexture = _gl.GenTexture();
-                _gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTexture);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-                _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                bool created = _sceneDepthTexture == 0;
+                if (created)
+                {
+                    _sceneDepthTexture = _gl.GenTexture();
+                    _gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTexture);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+                    _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+                }
+                else _gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTexture);
+                if (created || _sceneDepthWidth != (int)width || _sceneDepthHeight != (int)height)
+                    _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent24, width, height, 0,
+                        PixelFormat.DepthComponent, PixelType.Float, ReadOnlySpan<byte>.Empty);
+                _gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, width, height);
+                _sceneDepthWidth = (int)width;
+                _sceneDepthHeight = (int)height;
             }
-            else _gl.BindTexture(TextureTarget.Texture2D, _sceneDepthTexture);
-            if (resized)
-            {
-                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent24, width, height, 0,
-                    PixelFormat.DepthComponent, PixelType.Float, ReadOnlySpan<byte>.Empty);
-            }
-            _gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, width, height);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _gl.BindTexture(TextureTarget.Texture2D, (uint)textureBinding);
+            _gl.ActiveTexture((TextureUnit)activeTexture);
             _sceneWidth = (int)width;
             _sceneHeight = (int)height;
         }
@@ -232,6 +242,30 @@ namespace AssetsManager.Services.Viewer.Vfx
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
 
+            bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
+            bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
+            bool blend = _gl.IsEnabled(EnableCap.Blend);
+            _gl.GetInteger(GLEnum.DepthWritemask, out int depthWrite);
+            _gl.GetInteger(GLEnum.DepthFunc, out int depthFunction);
+            _gl.GetInteger(GLEnum.BlendSrcRgb, out int blendSource);
+            _gl.GetInteger(GLEnum.BlendDstRgb, out int blendDestination);
+            _gl.GetInteger(GLEnum.BlendSrcAlpha, out int blendSourceAlpha);
+            _gl.GetInteger(GLEnum.BlendDstAlpha, out int blendDestinationAlpha);
+            _gl.GetInteger(GLEnum.BlendEquationRgb, out int blendEquation);
+            _gl.GetInteger(GLEnum.BlendEquationAlpha, out int blendEquationAlpha);
+            _gl.GetInteger(GLEnum.CurrentProgram, out int program);
+            _gl.GetInteger(GLEnum.VertexArrayBinding, out int vertexArray);
+            _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
+            _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
+            var textureBindings = new int[7];
+            for (int unit = 0; unit < textureBindings.Length; unit++)
+            {
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                _gl.GetInteger(GLEnum.TextureBinding2D, out textureBindings[unit]);
+            }
+
+            try
+            {
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
@@ -248,9 +282,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindVertexArray(_vao);
             _gl.ActiveTexture(TextureUnit.Texture0);
 
-            bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
-            bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
-            bool blend = _gl.IsEnabled(EnableCap.Blend);
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(false);
             _gl.Disable(EnableCap.CullFace);
@@ -260,9 +291,9 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (!es.IsVisible) continue;
-                if (es.Def.IsMeshPrimitive)
+                if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
-                    if (es.MeshVao != 0) RenderMeshEmitter(es, viewProj);
+                    RenderMeshEmitter(es, viewProj);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
@@ -287,7 +318,6 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 _gl.Uniform2(_uTexDiv, es.Def.TexDiv.X <= 0 ? 1f : es.Def.TexDiv.X, es.Def.TexDiv.Y <= 0 ? 1f : es.Def.TexDiv.Y);
                 _gl.Uniform2(_uTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
-                _gl.Uniform2(_uUvScrollRate, 0f, 0f);
                 Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
                 Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
@@ -397,28 +427,30 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.DrawArraysInstanced(PrimitiveType.TriangleFan, 0, 4, (uint)es.InstanceCount);
             }
 
-            _gl.DepthMask(true);
-            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-            if (!depthTest) _gl.Disable(EnableCap.DepthTest);
-            if (cullFace) _gl.Enable(EnableCap.CullFace);
-            else _gl.Disable(EnableCap.CullFace);
-            if (blend) _gl.Enable(EnableCap.Blend);
-            else _gl.Disable(EnableCap.Blend);
-            _gl.BindVertexArray(0);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture1);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture2);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture3);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture4);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture5);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture6);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
-            _gl.ActiveTexture(TextureUnit.Texture0);
+            }
+            finally
+            {
+                _gl.DepthMask(depthWrite != 0);
+                _gl.DepthFunc((DepthFunction)depthFunction);
+                _gl.BlendEquationSeparate((GLEnum)blendEquation, (GLEnum)blendEquationAlpha);
+                _gl.BlendFuncSeparate(
+                    (BlendingFactor)blendSource,
+                    (BlendingFactor)blendDestination,
+                    (BlendingFactor)blendSourceAlpha,
+                    (BlendingFactor)blendDestinationAlpha);
+                if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
+                if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
+                if (blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
+                for (int unit = 0; unit < textureBindings.Length; unit++)
+                {
+                    _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
+                    _gl.BindTexture(TextureTarget.Texture2D, (uint)textureBindings[unit]);
+                }
+                _gl.ActiveTexture((TextureUnit)activeTexture);
+                _gl.BindVertexArray((uint)vertexArray);
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)arrayBuffer);
+                _gl.UseProgram((uint)program);
+            }
         }
 
         private void ApplyAddressMode(int addressMode)
@@ -499,7 +531,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
 
         private uint _meshProgram;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muUvOffset, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muEmitterUvOffset;
         private int _muUseAttachedWorld, _muAttachedWorld;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
@@ -525,7 +557,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
-                _muUvOffset = _gl.GetUniformLocation(_meshProgram, "uUvOffset");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
                 _muTexDiv = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muTexSize = _gl.GetUniformLocation(_meshProgram, "uTexSize");
@@ -666,8 +697,11 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
         {
-            if (es.MeshVao == 0 || es.MeshIndexCount == 0) return;
+            if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
+            if (es.MeshAnimation != null)
+                UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
+            _gl.GetInteger(GLEnum.DepthFunc, out int depthFunction);
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
@@ -773,7 +807,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             ApplyBlendMode(es.Def.BlendMode);
             if (es.UsesExternalAttachedMesh) _gl.DepthFunc(DepthFunction.Lequal);
 
-            _gl.Uniform2(_muUvOffset, 0f, 0f);
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
             int drawInstanceCount = es.UsesExternalAttachedMesh ? Math.Min(1, es.InstanceCount) : es.InstanceCount;
@@ -811,7 +844,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
                 else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
             }
-            if (es.UsesExternalAttachedMesh) _gl.DepthFunc(DepthFunction.Less);
+            if (es.UsesExternalAttachedMesh) _gl.DepthFunc((DepthFunction)depthFunction);
             if (cullFace) _gl.Enable(EnableCap.CullFace);
             else _gl.Disable(EnableCap.CullFace);
             _gl.UseProgram(_program);
@@ -828,77 +861,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                !definition.IsFollowingTerrain &&
                definition.PrimitiveKind != VfxPrimitiveKind.PlanarProjection;
 
-        internal static Vector3 GetAuthoredPrimitiveLongitudinalAxis(
-            VfxPrimitiveKind primitiveKind,
-            Vector3 rotationRadians)
-        {
-            Vector3 axis = primitiveKind is VfxPrimitiveKind.Ray or VfxPrimitiveKind.Beam
-                ? Vector3.UnitZ
-                : Vector3.UnitY;
-            float sz = MathF.Sin(rotationRadians.Z);
-            float cz = MathF.Cos(rotationRadians.Z);
-            axis = new Vector3(axis.X * cz - axis.Y * sz, axis.X * sz + axis.Y * cz, axis.Z);
-            float sx = MathF.Sin(rotationRadians.X);
-            float cx = MathF.Cos(rotationRadians.X);
-            axis = new Vector3(axis.X, axis.Y * cx - axis.Z * sx, axis.Y * sx + axis.Z * cx);
-            float sy = MathF.Sin(rotationRadians.Y);
-            float cy = MathF.Cos(rotationRadians.Y);
-            return Vector3.Normalize(new Vector3(
-                axis.X * cy + axis.Z * sy,
-                axis.Y,
-                -axis.X * sy + axis.Z * cy));
-        }
-
-        internal static Vector3 GetCameraFacingPrimitiveSide(
-            Vector3 longitudinalAxis,
-            Vector3 cameraForward,
-            Vector3 cameraUp)
-        {
-            Vector3 direction = longitudinalAxis.LengthSquared() > 1e-8f
-                ? Vector3.Normalize(longitudinalAxis)
-                : Vector3.UnitY;
-            Vector3 forward = cameraForward.LengthSquared() > 1e-8f
-                ? Vector3.Normalize(cameraForward)
-                : Vector3.UnitZ;
-            Vector3 side = Vector3.Cross(direction, forward);
-            if (side.LengthSquared() <= 1e-8f)
-            {
-                Vector3 up = cameraUp.LengthSquared() > 1e-8f
-                    ? Vector3.Normalize(cameraUp)
-                    : Vector3.UnitY;
-                side = Vector3.Cross(direction, up);
-            }
-            if (side.LengthSquared() <= 1e-8f)
-                side = Vector3.Cross(direction, Vector3.UnitX);
-            return Vector3.Normalize(side);
-        }
-
-        internal static (Vector3 Right, Vector3 Forward) GetGroundPlaneAxes(
-            Vector3 groundRight,
-            Vector3 authoredForward)
-        {
-            if (groundRight.LengthSquared() <= 1e-8f || authoredForward.LengthSquared() <= 1e-8f)
-                return (groundRight, authoredForward);
-
-            return Vector3.Dot(Vector3.Cross(groundRight, authoredForward), Vector3.UnitY) < 0f
-                ? (-authoredForward, -groundRight)
-                : (groundRight, authoredForward);
-        }
-
-        internal static float GetGroundContactRayLength(
-            Vector3 origin,
-            Vector3 direction,
-            float authoredLength)
-        {
-            float length = MathF.Max(0f, authoredLength);
-            if (origin.Y <= 0f || direction.Y >= -1e-5f) return length;
-
-            float groundDistance = origin.Y / -direction.Y;
-            return groundDistance > length && groundDistance <= length * 1.25f
-                ? groundDistance + 2f
-                : length;
-        }
-
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
@@ -908,7 +870,6 @@ uniform mat4 uAttachedWorld;
 uniform vec3 uWorldPos;
 uniform vec3 uScale;
 uniform vec3 uRotation;
-uniform vec2 uUvOffset;
 uniform vec2 uEmitterUvOffset;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
@@ -971,7 +932,7 @@ void main(){
     baseUv = centeredUv + uUvTransformCenter + uBirthUvOffset;
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
-    vec2 mainScroll = uUvOffset + uEmitterUvOffset;
+    vec2 mainScroll = uEmitterUvOffset;
     if (uClampUv != 0) mainScroll = clamp(mainScroll, -baseUv, vec2(1.0) - baseUv);
     baseUv = addressUv(baseUv + mainScroll, uAddressMode);
     vLocalUv = baseUv;
@@ -1079,7 +1040,6 @@ uniform vec3 uCamRight;
 uniform vec3 uCamUp;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
-uniform vec2 uUvScrollRate;
 uniform vec2 uEmitterUvOffset;
 uniform vec2 uTexDivMult;
 uniform vec2 uTexSizeMult;
@@ -1201,7 +1161,7 @@ void main(){
     localUv = centeredUv + uUvTransformCenter + aUvOffset;
     if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
     if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
-    vec2 scroll = uUvScrollRate * aAgeVelX.x + uEmitterUvOffset;
+    vec2 scroll = uEmitterUvOffset;
     if (uClampUv != 0) scroll = clamp(scroll, -localUv, vec2(1.0) - localUv);
     localUv = addressUv(localUv + scroll, uAddressMode);
     vLocalUv = localUv;

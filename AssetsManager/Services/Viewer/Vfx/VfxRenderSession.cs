@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// Resource decoding stays on the loader side and all GL uploads happen on
     /// the active viewport context during Render.
     /// </summary>
-    public sealed class GlVfxRenderer : IDisposable
+    public sealed class VfxRenderSession : IDisposable
     {
         private readonly LogService _logService;
         private readonly VfxLoadingService _loadingService = new();
@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        public GlVfxRenderer(LogService logService = null)
+        public VfxRenderSession(LogService logService = null)
         {
             _logService = logService;
         }
@@ -207,7 +207,13 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (!_ready || _graph == null) return;
 
             UploadPendingResources();
-            _renderer.CaptureScene(_viewportWidth, _viewportHeight);
+            IEnumerable<VfxPlaybackRuntime.EmitterState> emitters =
+                _graph.Runtimes.SelectMany(runtime => runtime.Emitters).Where(emitter => emitter.IsVisible);
+            _renderer.CaptureScene(
+                _viewportWidth,
+                _viewportHeight,
+                emitters.Any(emitter => emitter.Def.Distortion != null),
+                emitters.Any(emitter => VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true)));
             foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
             {
                 _renderer.Render(runtime, viewProjection, view);
@@ -247,11 +253,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                     {
                         _renderer.UploadEmitterMesh(emitter, mesh.Positions, mesh.Uvs, mesh.Indices);
                         emitter.PendingMesh = null;
-                    }
-                    if (emitter.MeshAnimation != null && emitter.MeshVao != 0)
-                    {
-                        float[] positions = emitter.MeshAnimation.Evaluate(emitter.EmitterAge);
-                        _renderer.UpdateEmitterMeshPositions(emitter, positions);
                     }
                 }
             }

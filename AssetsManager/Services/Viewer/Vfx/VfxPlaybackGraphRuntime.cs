@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Vfx
 {
@@ -17,8 +18,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         private readonly List<VfxPlaybackRuntime> _runtimes = new();
         private readonly List<VfxPlaybackRuntime> _pendingChildren = new();
         private readonly Dictionary<VfxPlaybackRuntime, int> _depth = new();
-        private readonly Random _random;
+        private readonly Dictionary<VfxPlaybackRuntime, Matrix4x4> _localTransforms = new();
+        private readonly int _initialSeed;
+        private Random _random;
         private int _nextSeed;
+        private Matrix4x4 _rootTransform;
 
         public VfxPlaybackGraphRuntime(
             VfxSystemDefinition rootDefinition,
@@ -32,10 +36,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             _systems = systems ?? throw new ArgumentNullException(nameof(systems));
             _resourceMap = resourceMap ?? throw new ArgumentNullException(nameof(resourceMap));
             _runtimeFactory = runtimeFactory ?? throw new ArgumentNullException(nameof(runtimeFactory));
+            _initialSeed = seed;
             _random = new Random(seed);
             _nextSeed = seed;
+            _rootTransform = rootTransform;
 
-            Root = CreateRuntime(rootDefinition, rootTransform, 0);
+            Root = CreateRuntime(rootDefinition, Matrix4x4.Identity, 0);
             _runtimes.Add(Root);
         }
 
@@ -50,9 +56,10 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public void SetTransform(Matrix4x4 transform)
         {
+            _rootTransform = transform;
             foreach (VfxPlaybackRuntime runtime in _runtimes)
             {
-                runtime.SetTransform(transform);
+                runtime.SetTransform(_localTransforms[runtime] * _rootTransform);
             }
         }
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
@@ -64,18 +71,33 @@ namespace AssetsManager.Services.Viewer.Vfx
                 VfxPlaybackRuntime runtime = _runtimes[index];
                 runtime.ParticleLifecycle -= OnParticleLifecycle;
                 _depth.Remove(runtime);
+                _localTransforms.Remove(runtime);
                 _runtimes.RemoveAt(index);
             }
             foreach (VfxPlaybackRuntime pending in _pendingChildren)
             {
                 pending.ParticleLifecycle -= OnParticleLifecycle;
                 _depth.Remove(pending);
+                _localTransforms.Remove(pending);
             }
             _pendingChildren.Clear();
+            _random = new Random(_initialSeed);
+            _nextSeed = unchecked(_initialSeed + 1);
             Root.Reset();
         }
 
         public void Update(float deltaTime)
+        {
+            if (deltaTime <= 0f || !float.IsFinite(deltaTime)) return;
+            while (deltaTime > 0f)
+            {
+                float step = MathF.Min(deltaTime, 0.1f);
+                UpdateStep(step);
+                deltaTime -= step;
+            }
+        }
+
+        private void UpdateStep(float deltaTime)
         {
             int runtimeCount = _runtimes.Count;
             for (int index = 0; index < runtimeCount; index++)
@@ -93,15 +115,22 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (!runtime.IsComplete) continue;
                 runtime.ParticleLifecycle -= OnParticleLifecycle;
                 _depth.Remove(runtime);
+                _localTransforms.Remove(runtime);
                 _runtimes.RemoveAt(index);
             }
         }
 
-        private VfxPlaybackRuntime CreateRuntime(VfxSystemDefinition definition, Matrix4x4 transform, int depth)
+        private VfxPlaybackRuntime CreateRuntime(VfxSystemDefinition definition, Matrix4x4 localTransform, int depth)
         {
-            VfxPlaybackRuntime runtime = _runtimeFactory(definition, transform, unchecked(++_nextSeed));
+            Matrix4x4 effectiveLocalTransform =
+                definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * localTransform;
+            VfxPlaybackRuntime runtime = _runtimeFactory(
+                definition,
+                localTransform * _rootTransform,
+                unchecked(++_nextSeed));
             runtime.ParticleLifecycle += OnParticleLifecycle;
             _depth[runtime] = depth;
+            _localTransforms[runtime] = effectiveLocalTransform;
             return runtime;
         }
 
@@ -121,30 +150,42 @@ namespace AssetsManager.Services.Viewer.Vfx
             float probability = Math.Clamp(childSet.Probability.SampleBirth(_random), 0f, 1f);
             if (_random.NextDouble() > probability) return;
 
-            Vector3 relativeOffset = childSet.RelativeOffset.SampleBirth(_random);
-            relativeOffset = parentRuntime.TransformOffset(relativeOffset);
-            Matrix4x4 childTransform = Matrix4x4.CreateTranslation(particlePosition + relativeOffset);
+            Vector3 relativeOffset = parentRuntime.TransformOffset(childSet.RelativeOffset.SampleBirth(_random));
+            Vector3 childPosition = particlePosition + relativeOffset;
+            Matrix4x4 childWorldTransform = parentRuntime.WorldTransform;
+            childWorldTransform.M41 = childPosition.X;
+            childWorldTransform.M42 = childPosition.Y;
+            childWorldTransform.M43 = childPosition.Z;
+
+            Matrix4x4 childLocalTransform = childWorldTransform;
+            if (Matrix4x4.Invert(_rootTransform, out Matrix4x4 inverseRoot))
+                childLocalTransform = childWorldTransform * inverseRoot;
 
             foreach (VfxChildSystemReference child in childSet.Children)
             {
-                uint systemHash = child.SystemHash;
-                VfxSystemDefinition definition = null;
-                if (systemHash != 0) _systems.TryGetValue(systemHash, out definition);
-                if (definition is null && child.EffectKey != 0)
-                {
-                    if (_resourceMap.TryGetValue(child.EffectKey, out uint mappedHash))
-                        _systems.TryGetValue(mappedHash, out definition);
-                    if (definition is null) _systems.TryGetValue(child.EffectKey, out definition);
-                }
-                if (definition is null && !string.IsNullOrEmpty(child.Name))
-                {
-                    uint lowerHash = VfxResourceResolver.Fnv1a(child.Name);
-                    _systems.TryGetValue(lowerHash, out definition);
-                }
+                VfxSystemDefinition definition = ResolveSystem(child, _systems, _resourceMap);
                 if (definition is null) continue;
                 if (_runtimes.Count + _pendingChildren.Count >= MaximumActiveChildSystems) break;
-                _pendingChildren.Add(CreateRuntime(definition, childTransform, parentDepth + 1));
+                _pendingChildren.Add(CreateRuntime(definition, childLocalTransform, parentDepth + 1));
             }
+        }
+
+        internal static VfxSystemDefinition ResolveSystem(
+            VfxChildSystemReference reference,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap)
+        {
+            if (reference.SystemHash != 0 && systems.TryGetValue(reference.SystemHash, out VfxSystemDefinition definition))
+                return definition;
+            if (reference.EffectKey != 0)
+            {
+                if (resourceMap.TryGetValue(reference.EffectKey, out uint mappedHash) &&
+                    systems.TryGetValue(mappedHash, out definition)) return definition;
+                if (systems.TryGetValue(reference.EffectKey, out definition)) return definition;
+            }
+            if (!string.IsNullOrWhiteSpace(reference.Name) &&
+                systems.TryGetValue(Fnv1a.HashLower(reference.Name), out definition)) return definition;
+            return null;
         }
 
     }

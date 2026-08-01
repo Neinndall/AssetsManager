@@ -31,6 +31,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
 
         public Bundle Load(string skinBinPath, LogService log)
+            => Load(skinBinPath, log, CancellationToken.None);
+
+        private Bundle Load(string skinBinPath, LogService log, CancellationToken cancellationToken)
         {
             var bundle = new Bundle();
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath)) return bundle;
@@ -58,6 +61,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                 while (queue.Count > 0)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     string currentBinPath = queue.Dequeue();
                     try
                     {
@@ -79,6 +83,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                         string currentDir = Path.GetDirectoryName(currentBinPath);
                         foreach (var dep in document.Dependencies)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (string.IsNullOrEmpty(dep)) continue;
                             string normalizedDep = dep.Replace('/', Path.DirectorySeparatorChar);
                             string relativeDepPath = dep
@@ -132,6 +137,10 @@ namespace AssetsManager.Services.Viewer.Vfx
                                 Enqueue(multiBin);
                         }
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         log?.LogError(ex, $"Error scanning bin dependency file: {currentBinPath}");
@@ -139,6 +148,10 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
 
                 log?.Log($"Loaded {bundle.Systems.Count} VFX systems.");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -153,7 +166,9 @@ namespace AssetsManager.Services.Viewer.Vfx
             await _catalogGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await Task.Run(() => Load(skinBinPath, log), cancellationToken).ConfigureAwait(false);
+                return await Task.Run(
+                    () => Load(skinBinPath, log, cancellationToken),
+                    cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -170,7 +185,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             ArgumentNullException.ThrowIfNull(definition);
             var runtime = new VfxPlaybackRuntime(seed);
-            runtime.SetSystem(definition, transform);
+            runtime.SetSystem(definition, definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform);
 
             foreach (var emitter in runtime.Emitters)
             {
@@ -220,7 +235,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                                 emitter.Def.MeshPath,
                                 emitter.Def.MeshSkeletonPath,
                                 emitter.Def.MeshAnimationPath,
-                                searchDirectory);
+                                searchDirectory,
+                                log);
                             if (emitter.MeshAnimation == null)
                             {
                                 log?.Log(

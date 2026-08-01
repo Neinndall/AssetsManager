@@ -77,7 +77,8 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public IReadOnlyList<EmitterState> Emitters => _emitters;
         private readonly List<EmitterState> _emitters = new();
-        private readonly Random _rng;
+        private readonly int _seed;
+        private Random _rng;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
         private Vector3 _worldScale = Vector3.One;
@@ -85,6 +86,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         public object UserTag { get; set; }
         public event Action<VfxPlaybackRuntime, VfxEmitterDefinition, Vector3, bool> ParticleLifecycle;
         private const int MaxParticlesPerEmitter = 4000;
+        private const float MaximumSimulationStep = 0.1f;
+
+        internal Matrix4x4 WorldTransform => _worldTransform;
 
         public void SetTransform(Matrix4x4 worldTransform)
         {
@@ -115,7 +119,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        public VfxPlaybackRuntime(int seed = 1234) => _rng = new Random(seed);
+        public VfxPlaybackRuntime(int seed = 1234)
+        {
+            _seed = seed;
+            _rng = new Random(seed);
+        }
 
         /// <summary>Configure from a system placed at worldPos. Only visual emitters are simulated.</summary>
         public void SetSystem(VfxSystemDefinition system, Vector3 worldPos, bool includeNonVisual = false)
@@ -188,12 +196,19 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public void Reset()
         {
+            _rng = new Random(_seed);
+            _startDelay = _configuredStartDelay;
             foreach (var s in _emitters) { s.Particles.Clear(); s.SpawnAccum = 0; s.Age = 0; s.BurstDone = false; s.InstanceCount = 0; }
             LiveParticleCount = 0;
         }
 
+        private float _configuredStartDelay;
         private float _startDelay;
-        public void SetStartDelay(float seconds) => _startDelay = MathF.Max(0f, seconds);
+        public void SetStartDelay(float seconds)
+        {
+            _configuredStartDelay = MathF.Max(0f, seconds);
+            _startDelay = _configuredStartDelay;
+        }
 
         public Vector3 TransformOffset(Vector3 localOffset)
             => Vector3.TransformNormal(localOffset, _worldTransform);
@@ -205,7 +220,17 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         public void Update(float dt)
         {
-            if (dt <= 0f) return;
+            if (dt <= 0f || !float.IsFinite(dt)) return;
+            while (dt > 0f)
+            {
+                float step = MathF.Min(dt, MaximumSimulationStep);
+                UpdateStep(step);
+                dt -= step;
+            }
+        }
+
+        private void UpdateStep(float dt)
+        {
             if (_startDelay > 0f)
             {
                 _startDelay -= dt;
@@ -214,7 +239,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _startDelay = 0f;
                 if (dt <= 0f) return;
             }
-            dt = MathF.Min(dt, 0.1f);   // clamp big frame gaps so bursts don't teleport
             int live = 0;
             foreach (var s in _emitters)
             {

@@ -441,38 +441,38 @@ namespace BenchmarkApp
         {
             if (args.Length < 2)
             {
-                Console.WriteLine("Usage: vfx-audit <model.skn> <project-root> [system-filter]");
+                Console.WriteLine("Usage: vfx-audit <skin.bin> <project-root> [system-filter]");
                 return;
             }
 
             using var logger = new LoggerConfiguration().CreateLogger();
             var logService = new AssetsManager.Services.Core.LogService(logger);
-            var service = new AssetsManager.Services.Viewer.Vfx.VfxDataService(logService);
+            var service = new AssetsManager.Services.Viewer.Vfx.VfxLoadingService();
 
-            string sknPath = Path.GetFullPath(args[0]);
+            string binPath = Path.GetFullPath(args[0]);
             string rootPath = Path.GetFullPath(args[1]);
 
-            Console.WriteLine($"Testing VfxDataService.LoadVfxSystemsForModel...");
-            Console.WriteLine($"sknPath: {sknPath}");
+            Console.WriteLine($"Testing VfxLoadingService.Load...");
+            Console.WriteLine($"binPath: {binPath}");
             Console.WriteLine($"rootPath: {rootPath}");
 
-            var systems = service.LoadVfxSystemsForModel(sknPath, rootPath);
-            Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {systems.Count}");
+            var bundle = service.Load(binPath, logService);
+            Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {bundle.Systems.Count}");
             var meshResolver = new AssetsManager.Services.Viewer.Vfx.VfxResourceResolver();
 
             string systemFilter = args.Length > 2 ? args[2] : null;
             var selectedSystems = string.IsNullOrWhiteSpace(systemFilter)
-                ? systems.Take(20)
-                : systems.Where(system => system.Name.Contains(systemFilter, StringComparison.OrdinalIgnoreCase));
+                ? bundle.Systems.Values.Take(20)
+                : bundle.Systems.Values.Where(system =>
+                    system.Name.Contains(systemFilter, StringComparison.OrdinalIgnoreCase));
 
             foreach (var sys in selectedSystems)
             {
                 Console.WriteLine(
                     $" - System: '{sys.Name}' | Emitters: {sys.Emitters.Count} | " +
-                    $"VisibilityRadius: {sys.Definition?.VisibilityRadius ?? 0f} | " +
-                    $"Transform: {sys.Definition?.Transform}");
-                if (string.IsNullOrWhiteSpace(systemFilter) || sys.Definition is null) continue;
-                foreach (var emitter in sys.Definition.Emitters)
+                    $"VisibilityRadius: {sys.VisibilityRadius} | Transform: {sys.Transform}");
+                if (string.IsNullOrWhiteSpace(systemFilter)) continue;
+                foreach (var emitter in sys.Emitters)
                 {
                     string children = emitter.ChildParticleSet is null
                         ? "-"

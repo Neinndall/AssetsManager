@@ -157,7 +157,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 RandomStartFrame: false,
                 IsMeshPrimitive: true,
                 PrimitiveKind: VfxPrimitiveKind.AttachedMesh);
-            var definition = new VfxSystemDefinition(1, "attached", "Characters/Hero/Skins/Skin30/Attached", new[] { emitter });
+            Matrix4x4 authoredTransform = Matrix4x4.CreateScale(0.5f);
+            var definition = new VfxSystemDefinition(
+                1, "attached", "Characters/Hero/Skins/Skin30/Attached", new[] { emitter }, Transform: authoredTransform);
 
             try
             {
@@ -166,13 +168,14 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 VfxPlaybackRuntime runtime = service.PreparePlayback(
                     definition,
                     searchDirectory,
-                    Matrix4x4.Identity,
+                    Matrix4x4.CreateTranslation(3f, 0f, 0f),
                     7,
                     new LogService(logger));
 
                 var state = Assert.Single(runtime.Emitters);
                 Assert.Null(state.PendingMesh);
                 Assert.Equal(VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
+                Assert.Equal(authoredTransform * Matrix4x4.CreateTranslation(3f, 0f, 0f), runtime.WorldTransform);
             }
             finally
             {

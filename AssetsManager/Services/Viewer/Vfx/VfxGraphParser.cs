@@ -239,10 +239,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 tree.Dependencies.ToArray());
         }
 
-        /// <summary>Extract effect-key hash to VfxSystemDefinitionData object hash mapping.</summary>
-        public static IReadOnlyDictionary<uint, uint> ExtractResourceMap(byte[] data)
-            => ExtractResourceMap(ParseTree(data));
-
         private static IReadOnlyDictionary<uint, uint> ExtractResourceMap(BinTree tree)
         {
             var map = new Dictionary<uint, uint>();
@@ -265,13 +261,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             return map;
         }
 
-        /// <summary>Extract linked-bin dependencies.</summary>
-        public static IReadOnlyList<string> ExtractDependencies(byte[] bin)
-        {
-            return ParseTree(bin).Dependencies.ToArray();
-        }        /// <summary>Parse every VfxSystemDefinitionData in the bin, keyed by object path-hash.</summary>
-        public static IReadOnlyDictionary<uint, VfxSystemDefinition> ExtractAll(byte[] materialsBin)
-            => ExtractAll(ParseTree(materialsBin));
 
         private static IReadOnlyDictionary<uint, VfxSystemDefinition> ExtractAll(BinTree bin)
         {
@@ -299,7 +288,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                     if (el is BinTreeStruct s && s.ClassHash == EmitterClass)
                         emitters.Add(ParseEmitter(s));
             }
-            LinkRayImpacts(emitters);
             float radius = GetF32(o.Properties, F_visibilityRadius) ?? 0f;
             Matrix4x4? transform = Get(o.Properties, F_transform) is BinTreeMatrix44 matrix
                 ? matrix.Value
@@ -311,52 +299,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 emitters,
                 radius,
                 transform);
-        }
-
-        internal static void LinkRayImpacts(List<VfxEmitterDefinition> emitters)
-        {
-            for (int index = 0; index < emitters.Count; index++)
-            {
-                VfxEmitterDefinition ray = emitters[index];
-                if (ray.PrimitiveKind != VfxPrimitiveKind.Ray) continue;
-
-                float authoredLength = MathF.Abs(ray.BirthScale.Constant.Y);
-                if (authoredLength <= 1e-5f) continue;
-
-                Vector3 rotation = ray.BirthRotation?.Constant ?? Vector3.Zero;
-                Vector3 authoredDirection = RotateRayAxis(rotation * (MathF.PI / 180f));
-                Vector3? bestOffset = null;
-                float bestAlignment = 0.9f;
-                foreach (VfxEmitterDefinition impact in emitters)
-                {
-                    if (!impact.IsMeshPrimitive) continue;
-                    Vector3 offset = impact.EmitterPosition.Constant - ray.EmitterPosition.Constant;
-                    float distance = offset.Length();
-                    if (offset.Y >= 0f || distance < authoredLength * 0.5f || distance > authoredLength * 1.25f)
-                        continue;
-
-                    float alignment = Vector3.Dot(authoredDirection, Vector3.Normalize(offset));
-                    if (alignment <= bestAlignment) continue;
-                    bestAlignment = alignment;
-                    bestOffset = offset;
-                }
-                if (bestOffset is { } targetOffset)
-                    emitters[index] = ray with { RayTargetOffset = targetOffset };
-            }
-        }
-
-        private static Vector3 RotateRayAxis(Vector3 rotation)
-        {
-            float sz = MathF.Sin(rotation.Z), cz = MathF.Cos(rotation.Z);
-            float sx = MathF.Sin(rotation.X), cx = MathF.Cos(rotation.X);
-            float sy = MathF.Sin(rotation.Y), cy = MathF.Cos(rotation.Y);
-            Vector3 axis = Vector3.UnitZ;
-            axis = new Vector3(axis.X * cz - axis.Y * sz, axis.X * sz + axis.Y * cz, axis.Z);
-            axis = new Vector3(axis.X, axis.Y * cx - axis.Z * sx, axis.Y * sx + axis.Z * cx);
-            return Vector3.Normalize(new Vector3(
-                axis.X * cy + axis.Z * sy,
-                axis.Y,
-                -axis.X * sy + axis.Z * cy));
         }
 
         private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s)
@@ -792,13 +734,14 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private static VfxCurve4? ReadCurve4(IReadOnlyDictionary<uint, BinTreeProperty> p, uint field)
         {
-            if (p.TryGetValue(field, out var prop) && prop is BinTreeStruct v)
+            if (!p.TryGetValue(field, out var prop)) return null;
+            if (prop is BinTreeStruct v)
             {
                 var c = AsVec4(Get(v.Properties, F_constantValue)) ?? Vector4.One;
                 var (times, vals) = ReadDynamics(v.Properties, AsVec4);
                 return new VfxCurve4(c, times, vals, ReadNestedProbTables(v.Properties));
             }
-            return null;
+            return AsVec4(prop) is { } vector ? VfxCurve4.Const(vector) : null;
         }
 
         private static VfxProbTable[] ReadProbTables(IReadOnlyDictionary<uint, BinTreeProperty> valueProps)

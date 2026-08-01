@@ -31,7 +31,7 @@ namespace AssetsManager.Views.Controls.Viewer
     {
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
-        private GlVfxRenderer _vfxRenderer;
+        private VfxRenderSession _vfxRenderer;
         private GridRenderer _gridRenderer;
 
         private readonly ViewerViewportModel _viewModel;
@@ -83,7 +83,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _meshRenderer = new GlMeshRenderer();
                 _meshRenderer.Initialize(_gl);
 
-                _vfxRenderer = new GlVfxRenderer(LogService);
+                _vfxRenderer = new VfxRenderSession(LogService);
                 _vfxRenderer.Initialize(_gl);
 
                 _gridRenderer = new GridRenderer();
@@ -226,7 +226,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_activeSceneModel != null)
                 {
                     _vfxRenderer.SetWorldTransform(
-                        GlVfxRenderer.CreateSceneWorldTransform(_activeSceneModel));
+                        VfxRenderSession.CreateSceneWorldTransform(_activeSceneModel));
                 }
                 _vfxRenderer.SetAttachedMeshSource(_activeSceneModel);
                 _vfxRenderer.SetViewportSize(framebufferWidth, framebufferHeight);
