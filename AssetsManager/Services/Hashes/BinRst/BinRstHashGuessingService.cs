@@ -926,7 +926,7 @@ namespace AssetsManager.Services.Hashes
 
             // 4. Prefix & Suffix addition
             string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
-            string[] suffixes = { "s", "es", "list", "map", "array", "hash", "id", "name", "type", "file", "path", "vector", "color", "override", "data", "config", "event", "trigger" };
+            string[] suffixes = { "s", "es", "value", "values", "level", "levels", "amount", "multiplier", "override", "overrides", "list", "map", "array", "hash", "id", "name", "type", "file", "path", "vector", "color", "data", "config", "event", "trigger", "table" };
 
             foreach (string token in topTokens.Take(500))
             {
