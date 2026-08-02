@@ -1111,8 +1111,11 @@ void main(){
         float lenSq = dot(vel, vel);
         if (lenSq > 0.0001) {
             vec3 dir = vel * inversesqrt(lenSq);
-            vec3 side = cross(dir, cameraForward);
-            if (dot(side, side) < 0.0001) side = cross(dir, uCamUp);
+            vec3 side = uArbitraryQuad != 0 ? cross(placedForward, dir) : cross(dir, cameraForward);
+            if (dot(side, side) < 0.0001)
+                side = uArbitraryQuad != 0 ? cross(placedUp, dir) : cross(dir, uCamUp);
+            if (dot(side, side) < 0.0001)
+                side = uArbitraryQuad != 0 ? cross(placedRight, dir) : cross(dir, uCamRight);
             right = normalize(side);
             up = dir;
         } else {

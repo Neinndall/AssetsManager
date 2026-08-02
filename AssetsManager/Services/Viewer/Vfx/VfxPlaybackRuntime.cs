@@ -62,6 +62,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         internal struct Particle
         {
             public Vector3 Pos, Vel, BirthAccel, BirthOrbitalVelocity, BirthDrag;
+            public Quaternion SpawnRotation;
             public float Age, Life;
             public Vector3 BirthSize;
             public Vector4 BirthColor;
@@ -303,6 +304,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 var drag = Vector3.Max(Vector3.Zero, p.BirthDrag + dragOverLife + fieldDrag);
                 p.Vel *= new Vector3(MathF.Exp(-drag.X * dt), MathF.Exp(-drag.Y * dt), MathF.Exp(-drag.Z * dt));
                 var authoredVelocity = d.VelocityOverLife?.Sample(particleT) ?? Vector3.Zero;
+                authoredVelocity = Vector3.Transform(authoredVelocity, p.SpawnRotation);
                 authoredVelocity = Vector3.TransformNormal(authoredVelocity, _worldTransform);
                 p.Pos += (p.Vel + authoredVelocity) * dt;
                 if (p.BirthOrbitalVelocity.LengthSquared() > 1e-8f)
@@ -343,8 +345,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ?? d.TextureMultUvScrollRate;
             float textureMultBirthUvRotateRate = d.TextureMultBirthUvRotateRate?.SampleBirth(emitterT, _rng) ?? 0f;
 
-            var localOffset = d.SpawnShape?.SampleOffset(_rng, emitterT) ?? Vector3.Zero;
+            Matrix4x4 spawnRotation = Matrix4x4.Identity;
+            var localOffset = d.SpawnShape is { } shape
+                ? shape.SampleOffset(_rng, emitterT, out spawnRotation)
+                : Vector3.Zero;
             var worldOffset = Vector3.Transform(localOffset, _worldTransform) - Vector3.Transform(Vector3.Zero, _worldTransform);
+            vel = Vector3.TransformNormal(vel, spawnRotation);
+            birthAccel = Vector3.TransformNormal(birthAccel, spawnRotation);
+            birthOrbitalVelocity = Vector3.TransformNormal(birthOrbitalVelocity, spawnRotation);
             vel = Vector3.TransformNormal(vel, _worldTransform);
             birthAccel = Vector3.TransformNormal(birthAccel, _worldTransform);
             Vector3 finalBirthSize = birthScale * _worldScale;
@@ -356,6 +364,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthAccel = birthAccel,
                 BirthOrbitalVelocity = birthOrbitalVelocity,
                 BirthDrag = birthDrag,
+                SpawnRotation = Quaternion.CreateFromRotationMatrix(spawnRotation),
                 Age = 0f,
                 Life = life,
                 BirthSize = finalBirthSize,
@@ -452,7 +461,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
                 Vector3 lifeRotation = d.RotationOverLife?.Sample(t) ?? Vector3.Zero;
                 lifeRotation *= MathF.PI / 180f;
-                if (d.IsDirectionOriented && direction.LengthSquared() > 1e-6f)
+                bool authoredPlane = d.IsArbitraryQuad || d.ParticleIsLocalOrientation || d.PrimitiveKind is
+                    VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
+                if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 1e-6f)
                 {
                     Vector3 dir = Vector3.Normalize(direction);
                     float yaw = MathF.Atan2(dir.X, dir.Z);

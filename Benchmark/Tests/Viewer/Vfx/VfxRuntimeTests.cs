@@ -703,6 +703,61 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             }
         }
 
+        [Fact]
+        public void LegacySpawnRotationKeepsOffsetAndMotionInTheSameFrame()
+        {
+            var shape = new VfxSpawnShape(
+                VfxSpawnShapeKind.Legacy,
+                VfxCurve3.Const(new Vector3(3f, 0f, 0f)),
+                new[] { Vector3.UnitY },
+                new[] { VfxCurveF.Const(90f) });
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                SpawnShape = shape,
+                BirthVelocity = VfxCurve3.Const(new Vector3(5f, 0f, 0f))
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "radial", "radial", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.Particle particle = Assert.Single(Assert.Single(runtime.Emitters).Particles);
+            Matrix4x4 rotation = Matrix4x4.CreateRotationY(MathF.PI / 2f);
+            Vector3 expectedVelocity = Vector3.TransformNormal(new Vector3(5f, 0f, 0f), rotation);
+            Vector3 expectedPosition = Vector3.Transform(new Vector3(3f, 0f, 0f), rotation) + expectedVelocity * 0.02f;
+            Assert.Equal(expectedVelocity.X, particle.Vel.X, precision: 5);
+            Assert.Equal(expectedVelocity.Y, particle.Vel.Y, precision: 5);
+            Assert.Equal(expectedVelocity.Z, particle.Vel.Z, precision: 5);
+            Assert.Equal(expectedPosition.X, particle.Pos.X, precision: 5);
+            Assert.Equal(expectedPosition.Y, particle.Pos.Y, precision: 5);
+            Assert.Equal(expectedPosition.Z, particle.Pos.Z, precision: 5);
+        }
+
+        [Fact]
+        public void DirectionOrientedArbitraryQuadKeepsItsAuthoredPlane()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                IsArbitraryQuad = true,
+                IsDirectionOriented = true,
+                BirthVelocity = VfxCurve3.Const(Vector3.UnitX),
+                BirthRotation = VfxCurve3.Const(new Vector3(90f, 0f, 0f))
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "oriented", "oriented", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(MathF.PI / 2f, state.Instances[15], precision: 5);
+            Assert.Equal(0f, state.Instances[16], precision: 5);
+            Assert.Equal(0f, state.Instances[17], precision: 5);
+        }
+
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale, VfxEmitterRenderState renderState)
             => new(
                 Name: "mesh",

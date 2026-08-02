@@ -232,8 +232,9 @@ namespace AssetsManager.Views.Models.Viewer
         float Height = 0f,
         byte Flags = 0)
     {
-        public Vector3 SampleOffset(Random rng, float t = 0f)
+        public Vector3 SampleOffset(Random rng, float t, out Matrix4x4 rotation)
         {
+            rotation = Matrix4x4.Identity;
             var offset = (Kind switch
             {
                 VfxSpawnShapeKind.Box => new Vector3(
@@ -250,8 +251,9 @@ namespace AssetsManager.Views.Models.Viewer
                 var axis = RotationAxes[i];
                 if (axis.LengthSquared() <= 1e-8f) continue;
                 float radians = RotationAngles[i].SampleBirth(t, rng) * (MathF.PI / 180f);
-                offset = Vector3.Transform(offset,
-                    Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), radians));
+                Matrix4x4 step = Matrix4x4.CreateFromAxisAngle(Vector3.Normalize(axis), radians);
+                offset = Vector3.Transform(offset, step);
+                rotation *= step;
             }
             return offset;
         }
