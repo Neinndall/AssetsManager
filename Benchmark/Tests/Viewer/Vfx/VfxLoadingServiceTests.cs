@@ -124,6 +124,78 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void DoesNotResolveLinkedBinByBasenameOutsideDeclaredPath()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxStrictLinks", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string unrelatedDirectory = Path.Combine(root, "data", "characters", "other");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            Directory.CreateDirectory(skinsDirectory);
+            Directory.CreateDirectory(unrelatedDirectory);
+
+            string skinBin = Path.Combine(skinsDirectory, "skin0.bin");
+            string unrelatedBin = Path.Combine(unrelatedDirectory, "missing.bin");
+            WriteBin(
+                skinBin,
+                Array.Empty<BinTreeObject>(),
+                new[] { "DATA/Characters/Hero/missing.bin" });
+            WriteBin(
+                unrelatedBin,
+                new[] { CreateSystem("Effects/Unrelated", "Unrelated") },
+                Array.Empty<string>());
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skinBin, new LogService(logger));
+
+                Assert.Empty(bundle.Systems);
+                Assert.Contains("DATA/Characters/Hero/missing.bin", bundle.MissingDependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void DoesNotScanUnlinkedSiblingBinsWhenRootHasNoDependencies()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxNoLegacyScan", Guid.NewGuid().ToString("N"));
+            string championDirectory = Path.Combine(root, "data", "characters", "hero");
+            string skinsDirectory = Path.Combine(championDirectory, "skins");
+            string animationsDirectory = Path.Combine(championDirectory, "animations");
+            Directory.CreateDirectory(skinsDirectory);
+            Directory.CreateDirectory(animationsDirectory);
+
+            string skinBin = Path.Combine(skinsDirectory, "skin0.bin");
+            WriteBin(skinBin, Array.Empty<BinTreeObject>(), Array.Empty<string>());
+            WriteBin(
+                Path.Combine(championDirectory, "hero.bin"),
+                new[] { CreateSystem("Effects/UnlinkedChampion", "UnlinkedChampion") },
+                Array.Empty<string>());
+            WriteBin(
+                Path.Combine(animationsDirectory, "skin0.bin"),
+                new[] { CreateSystem("Effects/UnlinkedAnimation", "UnlinkedAnimation") },
+                Array.Empty<string>());
+
+            try
+            {
+                using var logger = new LoggerConfiguration().CreateLogger();
+                var service = new VfxLoadingService();
+                VfxLoadingService.Bundle bundle = service.Load(skinBin, new LogService(logger));
+
+                Assert.Empty(bundle.Systems);
+                Assert.Empty(bundle.MissingDependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void AttachedMeshWithoutPathDoesNotLoadASecondChampionBody()
         {
             string root = Path.Combine(Path.GetTempPath(), "AssetsManagerAttachedMesh", Guid.NewGuid().ToString("N"));

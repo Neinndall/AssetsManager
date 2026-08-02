@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -55,8 +54,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                         queue.Enqueue(p);
                 }
 
-                string charName = Path.GetFileName(charFolder);
-                string skinName = Path.GetFileNameWithoutExtension(skinBinPath);
                 Enqueue(skinBinPath);
 
                 while (queue.Count > 0)
@@ -80,46 +77,20 @@ namespace AssetsManager.Services.Viewer.Vfx
                         foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
 
-                        string currentDir = Path.GetDirectoryName(currentBinPath);
                         foreach (var dep in document.Dependencies)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             if (string.IsNullOrEmpty(dep)) continue;
-                            string normalizedDep = dep.Replace('/', Path.DirectorySeparatorChar);
-                            string relativeDepPath = dep
-                                .Replace("DATA/", "", StringComparison.OrdinalIgnoreCase)
-                                .Replace("data/", "", StringComparison.OrdinalIgnoreCase)
-                                .Replace('/', Path.DirectorySeparatorChar);
-
-                            bool enqueued = false;
-                            foreach (var root in new[] { wadRoot, searchFolder, currentDir })
+                            IReadOnlyList<string> resolvedDependencies =
+                                _resources.ResolveLinkedBins(dep, wadRoot, searchFolder);
+                            bool enqueued = resolvedDependencies.Count > 0;
+                            if (resolvedDependencies.Count > 1)
                             {
-                                if (string.IsNullOrEmpty(root)) continue;
-
-                                string p1 = Path.Combine(root, normalizedDep);
-                                string p2 = Path.Combine(root, "data", relativeDepPath);
-                                string p3 = Path.Combine(root, relativeDepPath);
-
-                                if (File.Exists(p1)) { Enqueue(p1); enqueued = true; break; }
-                                if (File.Exists(p2)) { Enqueue(p2); enqueued = true; break; }
-                                if (File.Exists(p3)) { Enqueue(p3); enqueued = true; break; }
+                                bundle.AmbiguousDependencies.Add(dep);
+                                log?.Log($"VFX BIN dependency matched {resolvedDependencies.Count} extracted files: {dep}.");
                             }
-
-                            if (!enqueued)
-                            {
-                                IReadOnlyList<string> resolvedDependencies =
-                                    _resources.ResolveBins(dep, currentDir ?? searchFolder);
-                                if (resolvedDependencies.Count > 1)
-                                {
-                                    bundle.AmbiguousDependencies.Add(dep);
-                                    log?.Log($"VFX BIN dependency matched {resolvedDependencies.Count} extracted files: {dep}.");
-                                }
-                                foreach (string resolvedDependency in resolvedDependencies)
-                                {
-                                    Enqueue(resolvedDependency);
-                                    enqueued = true;
-                                }
-                            }
+                            foreach (string resolvedDependency in resolvedDependencies)
+                                Enqueue(resolvedDependency);
 
                             if (!enqueued)
                             {
@@ -128,14 +99,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                             }
                         }
 
-                        if (currentBinPath.Equals(skinBinPath, StringComparison.OrdinalIgnoreCase) &&
-                            document.Dependencies.Count == 0)
-                        {
-                            Enqueue(Path.Combine(charFolder, "animations", skinName + ".bin"));
-                            Enqueue(Path.Combine(charFolder, charName + ".bin"));
-                            foreach (string multiBin in FindLegacyMultiSkinBins(charFolder, skinName))
-                                Enqueue(multiBin);
-                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -315,20 +278,5 @@ namespace AssetsManager.Services.Viewer.Vfx
             return string.Empty;
         }
 
-        private static IEnumerable<string> FindLegacyMultiSkinBins(string charFolder, string skinName)
-        {
-            var target = System.Text.RegularExpressions.Regex.Match(
-                skinName ?? string.Empty,
-                @"^skin0*(\d+)$",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (!target.Success) return Array.Empty<string>();
-            string token = "skin" + int.Parse(target.Groups[1].Value);
-            return Directory.GetFiles(charFolder, "*multi_skins*.bin", SearchOption.TopDirectoryOnly)
-                .Where(path => System.Text.RegularExpressions.Regex.IsMatch(
-                    Path.GetFileNameWithoutExtension(path),
-                    $@"(?:^|_)skin0*{System.Text.RegularExpressions.Regex.Escape(token[4..])}(?:_|$)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
-        }
     }
 }

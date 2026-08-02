@@ -56,17 +56,69 @@ namespace AssetsManager.Services.Viewer.Vfx
         public string Resolve(string authoredPath, IReadOnlyList<string> extensions)
             => ResolveAll(authoredPath, extensions).FirstOrDefault();
 
+        /// <summary>
+        /// Resolves a declared BIN dependency by authored path.
+        /// Truncated extraction names remain supported; unrelated basename matches do not.
+        /// </summary>
+        public IReadOnlyList<string> ResolveLinkedAll(string authoredPath, IReadOnlyList<string> extensions)
+        {
+            if (string.IsNullOrWhiteSpace(authoredPath)) return Array.Empty<string>();
+
+            string normalized = Normalize(authoredPath);
+            IReadOnlyList<string> exact = ResolveExact(normalized, extensions);
+            if (exact.Count > 0) return exact;
+
+            return ResolveTruncated(normalized, extensions);
+        }
+
         public IReadOnlyList<string> ResolveAll(string authoredPath, IReadOnlyList<string> extensions)
         {
             if (string.IsNullOrWhiteSpace(authoredPath)) return Array.Empty<string>();
 
             string normalized = Normalize(authoredPath);
+            IReadOnlyList<string> exact = ResolveExact(normalized, extensions);
+            if (exact.Count > 0) return exact;
+
+            IReadOnlyList<string> truncated = ResolveTruncated(normalized, extensions);
+            if (truncated.Count > 0) return truncated;
+
+            string authoredDirectory = Normalize(Path.GetDirectoryName(normalized) ?? string.Empty);
+            foreach (string extension in extensions)
+            {
+                string fileName = Path.GetFileNameWithoutExtension(normalized) + extension;
+                if (!_byFileName.TryGetValue(fileName, out string[] candidates)) continue;
+
+                int bestScore = candidates.Max(path => SharedSuffixLength(
+                    authoredDirectory,
+                    Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)));
+                return candidates
+                    .Where(path => SharedSuffixLength(
+                        authoredDirectory,
+                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)) == bestScore)
+                    .OrderByDescending(path => SharedSuffixLength(
+                        authoredDirectory,
+                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)))
+                    .ThenBy(path => path.Length)
+                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+
+            return Array.Empty<string>();
+        }
+
+        private IReadOnlyList<string> ResolveExact(string normalized, IReadOnlyList<string> extensions)
+        {
             foreach (string extension in extensions)
             {
                 string candidate = Normalize(Path.ChangeExtension(normalized, extension));
                 if (_byRelativePath.TryGetValue(candidate, out string exact)) return new[] { exact };
             }
 
+            return Array.Empty<string>();
+        }
+
+        private IReadOnlyList<string> ResolveTruncated(string normalized, IReadOnlyList<string> extensions)
+        {
             string authoredDirectory = Normalize(Path.GetDirectoryName(normalized) ?? string.Empty);
             foreach (string extension in extensions)
             {
@@ -89,26 +141,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                     .Select(pair => pair.Value)
                     .ToArray();
                 if (truncated.Length > 0) return truncated;
-            }
-
-            foreach (string extension in extensions)
-            {
-                string fileName = Path.GetFileNameWithoutExtension(normalized) + extension;
-                if (!_byFileName.TryGetValue(fileName, out string[] candidates)) continue;
-
-                int bestScore = candidates.Max(path => SharedSuffixLength(
-                    authoredDirectory,
-                    Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)));
-                return candidates
-                    .Where(path => SharedSuffixLength(
-                        authoredDirectory,
-                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)) == bestScore)
-                    .OrderByDescending(path => SharedSuffixLength(
-                        authoredDirectory,
-                        Normalize(Path.GetDirectoryName(Path.GetRelativePath(_root, path)) ?? string.Empty)))
-                    .ThenBy(path => path.Length)
-                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
             }
 
             return Array.Empty<string>();

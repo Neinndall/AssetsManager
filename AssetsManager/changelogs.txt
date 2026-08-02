@@ -28,6 +28,7 @@ New Features
 
 Improvements
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
+  - VFX Studio now follows declared BIN links from the selected skin root, avoiding unrelated sibling or basename matches while preserving truncated extraction collisions.
   - VFX Studio now places the loop boundary at the final particle frame produced by playback.
   - Viewer / Simplified manual map geometry loading to 1-step file dialog using automatic root texture resolution.
   - Viewer / Updated Load Project description to "Explore models & map environments".

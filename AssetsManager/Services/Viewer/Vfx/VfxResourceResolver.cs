@@ -107,24 +107,20 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        public IReadOnlyList<string> ResolveBins(string authoredPath, string searchDirectory)
+        public IReadOnlyList<string> ResolveLinkedBins(
+            string authoredPath,
+            string wadRoot,
+            string searchDirectory)
         {
             if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory))
                 return Array.Empty<string>();
 
-            string directPath = Path.Combine(
-                searchDirectory,
-                authoredPath.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar));
-            foreach (string extension in OrderedExtensions(authoredPath, BinExtensions))
-            {
-                string candidate = Path.ChangeExtension(directPath, extension);
-                if (File.Exists(candidate)) return new[] { Path.GetFullPath(candidate) };
-            }
-
-            string root = FindAssetRoot(searchDirectory);
+            string root = !string.IsNullOrWhiteSpace(wadRoot) && Directory.Exists(wadRoot)
+                ? Path.GetFullPath(wadRoot)
+                : FindAssetRoot(searchDirectory);
             return root == null
                 ? Array.Empty<string>()
-                : GetIndex(root).ResolveAll(authoredPath, OrderedExtensions(authoredPath, BinExtensions));
+                : GetIndex(root).ResolveLinkedAll(authoredPath, OrderedExtensions(authoredPath, BinExtensions));
         }
 
         public void ClearCaches()
