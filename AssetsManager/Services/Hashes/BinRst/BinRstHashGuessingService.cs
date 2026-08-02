@@ -924,9 +924,9 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            // 4. Prefix & Suffix addition
+            // 4. Dynamic Prefix & Suffix addition (Derived 100% from known hash tokens)
             string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
-            string[] suffixes = { "s", "es", "value", "values", "level", "levels", "amount", "multiplier", "override", "overrides", "list", "map", "array", "hash", "id", "name", "type", "file", "path", "vector", "color", "data", "config", "event", "trigger", "table" };
+            var dynamicSuffixes = wordlist.AllTokens.Take(60).ToList();
 
             foreach (string token in topTokens.Take(500))
             {
@@ -940,7 +940,7 @@ namespace AssetsManager.Services.Hashes
                         if (count >= budget) yield break;
                     }
                 }
-                foreach (string suff in suffixes)
+                foreach (string suff in dynamicSuffixes)
                 {
                     string candidate = token + UpperFirst(suff);
                     if (Emit(candidate))
