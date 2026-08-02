@@ -17,6 +17,7 @@ namespace AssetsManager.Views.Models.Viewer
         public IReadOnlyDictionary<uint, uint> ResourceMap { get; set; }
             = new Dictionary<uint, uint>();
         public string SearchDirectory { get; set; } = string.Empty;
+        public int PlaybackSeed { get; set; }
         public int EmitterCount => Definition?.Emitters.Count ?? Emitters.Count;
         public double TotalDuration { get; set; }
         public bool HasFiniteDuration => !double.IsInfinity(TotalDuration) && TotalDuration > 0;

@@ -490,6 +490,42 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void PreviewDurationMatchesDeterministicParticleCompletion()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                EmitterLifetime = 1f,
+                ParticleLifetime = new VfxCurveF(
+                    1f,
+                    null,
+                    null,
+                    new[] { new VfxProbTable(new[] { 0f, 1f }, new[] { 0.25f, 0.25f }) })
+            };
+            var system = new VfxSystemDefinition(1, "preview", "preview", new[] { emitter });
+
+            double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
+
+            Assert.Equal(0.25d, duration, precision: 5);
+        }
+
+        [Fact]
+        public void PreviewDurationDoesNotCountParticlesTheRuntimeNeverEmits()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(2f),
+                EmitterLifetime = 0.5f,
+                ParticleLifetime = VfxCurveF.Const(5f)
+            };
+            var system = new VfxSystemDefinition(1, "finite", "finite", new[] { emitter });
+
+            double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
+
+            Assert.Equal(0.5d, duration, precision: 5);
+        }
+
+        [Fact]
         public void RenderStateNormalizesAlphaReference()
         {
             var state = new VfxEmitterRenderState(3, 128, 1, true, true, false, true);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Services.Viewer.Vfx
@@ -8,6 +9,8 @@ namespace AssetsManager.Services.Viewer.Vfx
     public static class VfxDurationCalculator
     {
         private const int MaximumGraphDepth = 8;
+        private const double PreviewStep = 1d / 60d;
+        private const double MaximumPreviewSimulation = 10d;
 
         public static double Calculate(
             VfxSystemDefinition system,
@@ -28,15 +31,62 @@ namespace AssetsManager.Services.Viewer.Vfx
         public static double GetMaximumParticleLifetime(VfxEmitterDefinition emitter)
         {
             if (emitter is null) return 0;
-            if (emitter.ParticleLifetime.Constant < 0 ||
-                emitter.ParticleLifetime.Values?.Any(value => value < 0) == true)
+            float[] authoredValues = emitter.ParticleLifetime.Values is { Length: > 0 } values
+                ? values.Append(emitter.ParticleLifetime.Constant).ToArray()
+                : new[] { emitter.ParticleLifetime.Constant };
+            float[] probabilityValues = emitter.ParticleLifetime.Prob is { Length: > 0 } probabilityTables &&
+                                        !probabilityTables[0].IsEmpty
+                ? probabilityTables[0].Values
+                : new[] { 1f };
+            double[] possibleLifetimes = authoredValues
+                .SelectMany(value => probabilityValues.Select(probability => (double)value * probability))
+                .ToArray();
+            if (possibleLifetimes.Any(value => value < 0))
             {
                 return double.PositiveInfinity;
             }
-            double maximum = emitter.ParticleLifetime.Constant;
-            if (emitter.ParticleLifetime.Values is { Length: > 0 })
-                maximum = Math.Max(maximum, emitter.ParticleLifetime.Values.Max());
+            double maximum = possibleLifetimes.Max();
             return Math.Max(0.05, maximum);
+        }
+
+        public static double CalculatePreview(
+            VfxSystemDefinition system,
+            int seed,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems = null,
+            IReadOnlyDictionary<uint, uint> resourceMap = null)
+        {
+            double authoredDuration = Calculate(system, systems, resourceMap);
+            if (!double.IsFinite(authoredDuration) || authoredDuration <= 0 ||
+                authoredDuration > MaximumPreviewSimulation ||
+                system.Emitters.Any(emitter => !emitter.Disabled && emitter.EmitterLifetime is null))
+            {
+                return authoredDuration;
+            }
+
+            systems ??= new Dictionary<uint, VfxSystemDefinition>();
+            resourceMap ??= new Dictionary<uint, uint>();
+            var runtime = new VfxPlaybackGraphRuntime(
+                system,
+                Matrix4x4.Identity,
+                seed,
+                systems,
+                resourceMap,
+                static (definition, transform, runtimeSeed) =>
+                {
+                    var childRuntime = new VfxPlaybackRuntime(runtimeSeed);
+                    childRuntime.SetSystem(definition, transform);
+                    return childRuntime;
+                });
+
+            double elapsed = 0;
+            double simulationLimit = Math.Min(MaximumPreviewSimulation, authoredDuration + 1d);
+            while (!runtime.IsComplete && elapsed < simulationLimit)
+            {
+                runtime.Update((float)PreviewStep);
+                elapsed += PreviewStep;
+            }
+
+            return runtime.IsComplete ? elapsed : authoredDuration;
         }
 
         private static double CalculateSystem(

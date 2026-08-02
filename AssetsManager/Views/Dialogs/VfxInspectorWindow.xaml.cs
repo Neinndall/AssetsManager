@@ -408,15 +408,17 @@ namespace AssetsManager.Views.Dialogs
                 searchDir = Path.GetDirectoryName(searchDir) ?? searchDir;
             }
 
-            double authoredDuration = VfxDurationCalculator.Calculate(
+            int playbackSeed = HashCode.Combine(def.PathHash, systemItem.Name);
+            double playbackDuration = VfxDurationCalculator.CalculatePreview(
                 def,
+                playbackSeed,
                 _activeBundle?.Systems,
                 _activeBundle?.ResourceMap);
-            double timelineMax = double.IsFinite(authoredDuration)
-                ? Math.Max(authoredDuration, 3.0)
+            double timelineMax = double.IsFinite(playbackDuration)
+                ? Math.Max(playbackDuration, 3.0)
                 : 10.0;
-            _model.ActiveLoopDuration = double.IsFinite(authoredDuration) && authoredDuration > 0
-                ? authoredDuration
+            _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
+                ? playbackDuration
                 : timelineMax;
             _model.TotalDuration = timelineMax;
 
@@ -428,7 +430,8 @@ namespace AssetsManager.Views.Dialogs
                 SystemCatalog = _activeBundle?.Systems ?? new Dictionary<uint, VfxSystemDefinition>(),
                 ResourceMap = _activeBundle?.ResourceMap ?? new Dictionary<uint, uint>(),
                 SearchDirectory = searchDir,
-                TotalDuration = authoredDuration,
+                PlaybackSeed = playbackSeed,
+                TotalDuration = playbackDuration,
                 Speed = _model.Speed
             };
 

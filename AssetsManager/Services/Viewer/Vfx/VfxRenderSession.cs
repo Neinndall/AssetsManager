@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     system.ResourceMap,
                     system.SearchDirectory,
                     _worldTransform,
-                    HashCode.Combine(system.Definition.PathHash, system.Name),
+                    system.PlaybackSeed,
                     _logService);
             }
         }
