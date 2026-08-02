@@ -15,7 +15,9 @@ namespace AssetsManager.Views.Models.Viewer
 
         public static bool IsAdditive(int rawMode) => rawMode is 2 or 4;
 
-        public static float ResolveEmissiveStrength(int rawMode) => IsAdditive(rawMode) ? 8f : 1f;
+        // Additive blending already uses the authored source alpha. Do not amplify
+        // RGB outside the BIN material, or authored highlights become overexposed.
+        public static float ResolveEmissiveStrength(int rawMode) => 1f;
 
         public static bool ShouldAlphaTest(int rawMode, int alphaReference)
             => !IsAdditive(rawMode) && alphaReference > 0;

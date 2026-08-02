@@ -21,9 +21,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         [Theory]
         [InlineData(0, false, 1f)]
         [InlineData(1, false, 1f)]
-        [InlineData(2, true, 8f)]
+        [InlineData(2, true, 1f)]
         [InlineData(3, false, 1f)]
-        [InlineData(4, true, 8f)]
+        [InlineData(4, true, 1f)]
         [InlineData(5, false, 1f)]
         public void ResolvesAdditiveMaterialSemantics(int rawMode, bool expectedAdditive, float expectedEmissiveStrength)
         {
