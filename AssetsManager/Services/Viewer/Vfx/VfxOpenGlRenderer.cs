@@ -460,6 +460,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 1 => TextureWrapMode.ClampToEdge,
                 2 => TextureWrapMode.MirroredRepeat,
+                3 => TextureWrapMode.ClampToBorder,
                 _ => TextureWrapMode.Repeat,
             };
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)wrap);
@@ -889,8 +890,9 @@ uniform float uUvRotation;
 out vec2 vUv;
 out vec2 vUvMult;
 out vec2 vLocalUv;
+out vec2 vLocalUvMult;
 vec2 addressUv(vec2 uv, int mode){
-    if (mode == 1) return clamp(uv, vec2(0.0), vec2(1.0));
+    if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
     if (mode == 2) {
         vec2 mirrored = mod(uv, vec2(2.0));
         return vec2(1.0) - abs(mirrored - vec2(1.0));
@@ -919,8 +921,8 @@ void main(){
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
     vec2 mainScroll = uEmitterUvOffset;
     if (uClampUv != 0) mainScroll = clamp(mainScroll, -baseUv, vec2(1.0) - baseUv);
-    baseUv = addressUv(baseUv + mainScroll, uAddressMode);
-    vLocalUv = baseUv;
+    vLocalUv = baseUv + mainScroll;
+    baseUv = addressUv(vLocalUv, uAddressMode);
     vec2 mainDiv = max(uTexDiv, vec2(1.0));
     float mainCols = mainDiv.x;
     float frame = floor(uFrame + 0.0001);
@@ -939,7 +941,8 @@ void main(){
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vec2 multScroll = uEmitterUvOffsetMult;
     if (uClampUvMult != 0) multScroll = clamp(multScroll, -multUv, vec2(1.0) - multUv);
-    multUv = addressUv(multUv + multScroll, uAddressModeMult);
+    vLocalUvMult = multUv + multScroll;
+    multUv = addressUv(vLocalUvMult, uAddressModeMult);
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
     float multFrame = floor(uTextureMultFrame + 0.0001);
@@ -954,9 +957,12 @@ void main(){
 in vec2 vUv;
 in vec2 vUvMult;
 in vec2 vLocalUv;
+in vec2 vLocalUvMult;
 uniform sampler2D uTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
+uniform int uAddressMode;
+uniform int uAddressModeMult;
 uniform vec4 uColor;
 uniform float uAlphaCutoff;
 uniform sampler2D uErosionTex;
@@ -974,9 +980,14 @@ uniform int uHasReflection;
 uniform vec2 uReflectionOpacity;
 uniform vec4 uReflectionColor;
 out vec4 fragColor;
+float addressMask(vec2 uv, int mode){
+    if (mode != 3) return 1.0;
+    return all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) ? 1.0 : 0.0;
+}
 void main(){
-    vec4 texel = texture(uTex, vUv);
-    if (uHasTexMult != 0) texel *= texture(uTexMult, vUvMult);
+    vec4 texel = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
+    if (uHasTexMult != 0)
+        texel *= texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), uErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(uErosionDrive, 0.0, 1.0)));
@@ -1052,6 +1063,7 @@ out vec4 vColor;
 out float vErosionDrive;
 out vec4 vErosionMixer;
 out vec2 vLocalUv;
+out vec2 vLocalUvMult;
 vec3 rotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
     p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
@@ -1061,7 +1073,7 @@ vec3 rotateEuler(vec3 p, vec3 r){
     return vec3(p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy);
 }
 vec2 addressUv(vec2 uv, int mode){
-    if (mode == 1) return clamp(uv, vec2(0.0), vec2(1.0));
+    if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
     if (mode == 2) {
         vec2 mirrored = mod(uv, vec2(2.0));
         return vec2(1.0) - abs(mirrored - vec2(1.0));
@@ -1151,8 +1163,8 @@ void main(){
     if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
     vec2 scroll = uEmitterUvOffset;
     if (uClampUv != 0) scroll = clamp(scroll, -localUv, vec2(1.0) - localUv);
-    localUv = addressUv(localUv + scroll, uAddressMode);
-    vLocalUv = localUv;
+    vLocalUv = localUv + scroll;
+    localUv = addressUv(vLocalUv, uAddressMode);
     vec2 halfTexel = 0.5 / max(uTexSize, vec2(1.0));
     vec2 atlasUv = (vec2(fx, fy) + localUv) / vec2(cols, rows);
     vec2 cellMin = vec2(fx, fy) / vec2(cols, rows) + halfTexel;
@@ -1169,7 +1181,8 @@ void main(){
     if (uFlipVMult != 0) multUv.y = 1.0 - multUv.y;
     vec2 multScroll = uUvScrollRateMult;
     if (uClampUvMult != 0) multScroll = clamp(multScroll, -multUv, vec2(1.0) - multUv);
-    multUv = addressUv(multUv + multScroll, uAddressModeMult);
+    vLocalUvMult = multUv + multScroll;
+    multUv = addressUv(vLocalUvMult, uAddressModeMult);
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
     float multFrame = floor(aTextureMultFrame + 0.0001);
@@ -1190,9 +1203,12 @@ in vec4 vColor;
 in float vErosionDrive;
 in vec4 vErosionMixer;
 in vec2 vLocalUv;
+in vec2 vLocalUvMult;
 uniform sampler2D uTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
+uniform int uAddressMode;
+uniform int uAddressModeMult;
 uniform int uIsDistortion;
 uniform sampler2D uDistortionTex;
 uniform sampler2D uSceneTex;
@@ -1211,9 +1227,14 @@ uniform int uHasReflection;
 uniform vec2 uReflectionOpacity;
 uniform vec4 uReflectionColor;
 out vec4 fragColor;
+float addressMask(vec2 uv, int mode){
+    if (mode != 3) return 1.0;
+    return all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))) ? 1.0 : 0.0;
+}
 void main(){
-    vec4 t = texture(uTex, vUv);
-    if (uHasTexMult != 0) t *= texture(uTexMult, vUvMult);
+    vec4 t = texture(uTex, vUv) * addressMask(vLocalUv, uAddressMode);
+    if (uHasTexMult != 0)
+        t *= texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
     if (uHasErosion != 0) {
         float erosion = dot(texture(uErosionTex, vUv), vErosionMixer);
         float feather = max(0.001, mix(uErosionFeatherIn, uErosionFeatherOut, clamp(vErosionDrive, 0.0, 1.0)));

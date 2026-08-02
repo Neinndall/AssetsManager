@@ -12,6 +12,9 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
 using BenchmarkApp.Diagnostics.Viewer;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
+using LeagueToolkit.Hashing;
 
 namespace BenchmarkApp
 {
@@ -29,6 +32,11 @@ namespace BenchmarkApp
             if (args.Length > 0 && args[0] == "vfx-audit")
             {
                 AuditVfxBins(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "vfx-raw-audit")
+            {
+                AuditRawVfxBins(args.Skip(1).ToArray());
                 return;
             }
             if (args.Length > 0 && args[0] == "list-extensions")
@@ -519,6 +527,172 @@ namespace BenchmarkApp
                         $"children={children}");
                 }
             }
+        }
+
+        private static readonly Dictionary<uint, string> RawVfxNames = BuildRawVfxNames();
+
+        private static Dictionary<uint, string> BuildRawVfxNames()
+        {
+            string[] names =
+            {
+                "particleName", "particlePath", "VfxSystemDefinitionData", "VfxEmitterDefinitionData",
+                "doesParticleLifetimeScale", "colorRenderFlags", "StencilReferenceId", "timeActiveDuringPeriod",
+                "meshRenderFlags", "stencilMode", "birthRotationalVelocity0", "numFrames", "emissionMeshName",
+                "timeBeforeFirstEmission", "particleLinger", "flexBirthUVOffset", "colorLookUpTypeX", "uvMode",
+                "colorLookUpTypeY", "isGroundLayer", "particleLifetime", "isLocalOrientation", "flexScaleBirthScale",
+                "TextureFlipV", "TextureFlipU", "textureMult", "acceleration", "texAddressModeBase", "velocity",
+                "birthUvRotateRate", "materialOverrideDefinitions", "disabled", "isUniformScale",
+                "birthRotationalAcceleration", "particleIsLocalOrientation", "particleLingerType", "emitterLinger",
+                "SpawnShape", "texture", "disableBackfaceCull", "emitterName", "color", "reflectionDefinition",
+                "isSingleParticle", "colorblindVisibility", "CustomMaterial", "offsetLifeScalingSymmetryMode",
+                "FlexShapeDefinition", "rateByVelocityFunction", "birthOrbitalVelocity", "WriteAlphaOnly",
+                "emitterUvScrollRate", "lifetime", "HasVariableStartTime", "emissionSurfaceDefinition",
+                "EmitterPosition", "birthRotation0", "particleUVScrollRate", "miscRenderFlags", "modulationFactor",
+                "ParticlesShareRandomValue", "depthBiasFactors", "offsetLifetimeScaling", "flexParticleLifetime",
+                "rotation0", "uvTransformCenter", "startFrame", "renderPhaseOverride", "flexRate",
+                "flexBirthRotationalVelocity0", "doesLifetimeScale", "directionVelocityScale", "primitive",
+                "stencilRef", "pass", "useEmissionMeshNormalForBirth", "FlexInstanceScale", "birthDrag",
+                "birthColor", "texDiv", "paletteDefinition", "censorModulateValue", "isRotationEnabled", "uvRotation",
+                "period", "frameRate", "flexBirthVelocity", "childParticleSetDefinition", "birthAcceleration",
+                "falloffTexture", "sliceTechniqueRange", "uvScrollClamp", "IsEmitterSpace", "fieldCollectionDefinition",
+                "rate", "translationOverride", "doesCastShadow", "particleColorTexture", "rotationOverride", "drag",
+                "birthUVOffset", "Linger", "importance", "alphaRef", "isFollowingTerrain", "LegacySimple",
+                "distortionDefinition", "SortEmittersByPos", "emissionMeshScale", "flexBirthUVScrollRate",
+                "softParticleParams", "particleUVRotateRate", "alphaErosionDefinition", "birthFrameRate",
+                "isTexturePixelated", "MaximumRateByVelocity", "bindWeight", "colorLookUpOffsets", "ChanceToNotExist",
+                "birthUvScrollRate", "scale0", "useNavmeshMask", "isDirectionOriented", "Audio", "isRandomStartFrame",
+                "scaleOverride", "worldAcceleration", "directionVelocityMinScale", "hasPostRotateOrientation",
+                "uvScale", "colorLookUpScales", "birthScale0", "Filtering", "uvParallaxScale", "birthVelocity",
+                "postRotateOrientationAxis", "blendMode",
+                "isRandomStartFrameMult", "texDivMult", "ParticleIntegratedUvScrollMult", "birthUvScrollRateMult",
+                "UvRotationMult", "TextureMultFilpV", "uvTransformCenterMult", "TextureMultFilpU",
+                "texAddressModeMult", "birthUVOffsetMult", "uvScrollClampMult", "flexBirthUVScrollRateMult",
+                "uvScaleMult", "ParticleIntegratedUvRotateMult", "emitterUvScrollRateMult", "uvScrollAlphaMult",
+                "birthUvRotateRateMult", "constantValue", "dynamics", "times", "values", "keyTimes", "keyValues",
+                "mMeshName", "mSimpleMeshName", "mAnimationName", "mTrail", "mBirthTilingSize", "mSmoothingMode",
+                "mMode", "mMaxAddedPerFrame", "mCutoff", "erosionMapName", "erosionDriveCurve", "erosionFeatherIn",
+                "erosionFeatherOut", "erosionMapAddressMode", "erosionMapChannelMixer", "normalMapTexture",
+                "distortion", "distortionMode", "beginIn", "deltaIn", "beginOut", "deltaOut"
+            };
+            return names
+                .Select(name => (Hash: Fnv1a.HashLower(name), Name: name))
+                .GroupBy(item => item.Hash)
+                .ToDictionary(group => group.Key, group => group.First().Name);
+        }
+
+        private static void AuditRawVfxBins(string[] args)
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: vfx-raw-audit <skin.bin> <system-filter> [emitter-filter]");
+                return;
+            }
+
+            string binPath = Path.GetFullPath(args[0]);
+            string systemFilter = args[1];
+            string emitterFilter = args.Length > 2 ? args[2] : null;
+            using var stream = File.OpenRead(binPath);
+            var tree = new BinTree(stream);
+            uint systemClass = Fnv1a.HashLower("VfxSystemDefinitionData");
+            uint emitterClass = Fnv1a.HashLower("VfxEmitterDefinitionData");
+            uint particleName = Fnv1a.HashLower("particleName");
+            uint emitterName = Fnv1a.HashLower("emitterName");
+
+            Console.WriteLine($"[RAW VFX] {binPath}");
+            Console.WriteLine($"Objects={tree.Objects.Count} Dependencies={tree.Dependencies.Count}");
+            foreach (var system in tree.Objects.Values.Where(item => item.ClassHash == systemClass))
+            {
+                string name = RawString(system.Properties, particleName) ?? $"0x{system.PathHash:x8}";
+                if (!name.Contains(systemFilter, StringComparison.OrdinalIgnoreCase)) continue;
+
+                Console.WriteLine($"\nSYSTEM {name} path=0x{system.PathHash:x8}");
+                var emitters = system.Properties.Values
+                    .OfType<BinTreeContainer>()
+                    .SelectMany(container => container.Elements)
+                    .OfType<BinTreeStruct>()
+                    .Where(item => item.ClassHash == emitterClass)
+                    .ToArray();
+                foreach (var emitter in emitters)
+                {
+                    string nameValue = RawString(emitter.Properties, emitterName) ?? "(emitter)";
+                    if (!string.IsNullOrWhiteSpace(emitterFilter) &&
+                        !nameValue.Contains(emitterFilter, StringComparison.OrdinalIgnoreCase)) continue;
+
+                    Console.WriteLine($"  EMITTER {nameValue} properties={emitter.Properties.Count}");
+                    foreach (var property in emitter.Properties.OrderBy(item => item.Key))
+                    {
+                        string propertyName = RawVfxNames.TryGetValue(property.Key, out string knownName)
+                            ? knownName
+                            : $"0x{property.Key:x8}";
+                        if (!IsRawVisualField(propertyName) && knownName is not null) continue;
+                        Console.WriteLine($"    {propertyName} [{property.Value.Type}] = {DescribeRaw(property.Value)}");
+                    }
+                }
+            }
+        }
+
+        private static bool IsRawVisualField(string name) => name switch
+        {
+            "emitterName" or "primitive" or "texture" or "textureMult" or "texAddressModeBase" or "texDiv" or
+            "uvMode" or "uvScale" or "uvRotation" or "uvTransformCenter" or "birthUVOffset" or "birthUvScrollRate" or
+            "particleUVScrollRate" or "uvScrollClamp" or "emitterUvScrollRate" or "TextureFlipU" or "TextureFlipV" or
+            "texAddressModeMult" or "uvScrollAlphaMult" or "TextureMultFilpU" or "TextureMultFilpV" or
+            "isLocalOrientation" or "particleIsLocalOrientation" or "isGroundLayer" or "isFollowingTerrain" or
+            "IsEmitterSpace" or "isUniformScale" or "birthScale0" or "scale0" or "birthRotation0" or "rotation0" or
+            "birthRotationalVelocity0" or "birthRotationalAcceleration" or "isRotationEnabled" or "rotationOverride" or
+            "colorRenderFlags" or "modulationFactor" or "WriteAlphaOnly" or "birthColor" or "color" or
+            "alphaErosionDefinition" or "distortionDefinition" or "softParticleParams" or "CustomMaterial" or
+            "materialOverrideDefinitions" or "Linger" or "particleLinger" or "particleLingerType" or "emitterLinger" or
+            "lifetime" or "particleLifetime" or "rate" or "isSingleParticle" or "pass" or "renderPhaseOverride" or
+            "miscRenderFlags" or "meshRenderFlags" or "disableBackfaceCull" or "EmitterPosition" or "SpawnShape" or
+            "birthVelocity" or "velocity" or "birthAcceleration" or "acceleration" or "worldAcceleration" or "birthDrag" or
+            "drag" or "birthOrbitalVelocity" or "fieldCollectionDefinition" or "emissionSurfaceDefinition" or
+            "childParticleSetDefinition" or "frameRate" or "birthFrameRate" or "numFrames" or "startFrame" or
+            "isRandomStartFrame" or "particleColorTexture" or "isDirectionOriented" => true,
+            _ => false
+        };
+
+        private static string RawString(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint hash) =>
+            properties.TryGetValue(hash, out BinTreeProperty property) && property is BinTreeString value
+                ? value.Value
+                : null;
+
+        private static string DescribeRaw(BinTreeProperty property, int depth = 0)
+        {
+            if (property is BinTreeOptional optional)
+                return optional.Value is null ? "<none>" : $"optional({DescribeRaw(optional.Value, depth + 1)})";
+            if (property is BinTreeStruct structure)
+            {
+                if (depth >= 3) return $"struct 0x{structure.ClassHash:x8} ({structure.Properties.Count})";
+                string contents = string.Join(
+                    ", ",
+                    structure.Properties.OrderBy(item => item.Key).Select(item =>
+                    {
+                        string name = RawVfxNames.TryGetValue(item.Key, out string knownName)
+                            ? knownName
+                            : $"0x{item.Key:x8}";
+                        return $"{name}={DescribeRaw(item.Value, depth + 1)}";
+                    }));
+                return $"struct 0x{structure.ClassHash:x8} {{{contents}}}";
+            }
+            if (property is BinTreeContainer container)
+            {
+                if (depth >= 4) return $"container[{container.Elements.Count}]";
+                return $"container[{container.Elements.Count}]" +
+                    (container.Elements.Count == 0 ? "" : $" [{string.Join(", ", container.Elements.Take(6).Select(item => DescribeRaw(item, depth + 1)))}]");
+            }
+            object value = property.GetType().GetProperty("Value")?.GetValue(property);
+            return value switch
+            {
+                null => "<null>",
+                float number => number.ToString("G9", CultureInfo.InvariantCulture),
+                double number => number.ToString("G9", CultureInfo.InvariantCulture),
+                System.Numerics.Vector2 vector => $"<{vector.X:G9},{vector.Y:G9}>",
+                System.Numerics.Vector3 vector => $"<{vector.X:G9},{vector.Y:G9},{vector.Z:G9}>",
+                System.Numerics.Vector4 vector => $"<{vector.X:G9},{vector.Y:G9},{vector.Z:G9},{vector.W:G9}>",
+                string text => $"\"{text}\"",
+                _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.ToString()
+            };
         }
     }
 }

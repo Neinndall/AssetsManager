@@ -53,6 +53,13 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 {
                     new BinTreeString(textureMultHash, "Effects/TestMult.dds")
                 });
+            var alphaErosion = new BinTreeStruct(
+                Fnv1a.HashLower("alphaErosionDefinition"),
+                Fnv1a.HashLower("VfxAlphaErosionDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("erosionMapName"), "Effects/TestErosion.dds")
+                });
             var emitter = new BinTreeStruct(
                 0,
                 Fnv1a.HashLower("VfxEmitterDefinitionData"),
@@ -61,7 +68,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "DefaultEmitter"),
                     new BinTreeU8(Fnv1a.HashLower("importance"), 3),
                     new BinTreeVector4(Fnv1a.HashLower("birthColor"), new Vector4(0.1f, 0.2f, 0.3f, 0.4f)),
-                    textureMult
+                    textureMult,
+                    alphaErosion
                 });
             var effectObject = new BinTreeObject(
                 "Effects/Defaults",
@@ -89,6 +97,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 0.4f), parsed.BirthColor.Constant);
             Assert.Equal(0.5f, parsed.UvTransformCenter.X);
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);
+            Assert.Equal(0.1f, parsed.AlphaErosion.FeatherIn);
+            Assert.Equal(0.1f, parsed.AlphaErosion.FeatherOut);
+            Assert.Equal(2, parsed.AlphaErosion.AddressMode);
         }
     }
 }

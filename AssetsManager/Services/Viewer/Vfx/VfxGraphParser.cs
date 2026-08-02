@@ -405,9 +405,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 alphaErosion = new VfxAlphaErosionDefinition(
                     GetString(ep, F_erosionMapName),
                     ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Zero,
-                    GetF32(ep, F_erosionFeatherIn) ?? 0f,
-                    GetF32(ep, F_erosionFeatherOut) ?? 0f,
-                    GetU8(ep, F_erosionMapAddressMode) ?? 0,
+                    GetF32(ep, F_erosionFeatherIn) ?? 0.1f,
+                    GetF32(ep, F_erosionFeatherOut) ?? 0.1f,
+                    GetU8(ep, F_erosionMapAddressMode) ?? 2,
                     ReadCurve4(ep, F_erosionMapChannelMixer));
             }
             VfxChildParticleSetDefinition childParticleSet = ReadChildParticleSet(p);

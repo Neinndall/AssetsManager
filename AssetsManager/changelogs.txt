@@ -143,6 +143,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Fixed rotated circular particle masks rendering as repeated corner fragments or stretched quads by honoring transparent texture borders and authored erosion defaults.
   - Viewer VFX Studio / Restored radial particle waves by rotating Legacy spawn motion with its authored emission angle and preserving direction-oriented arbitrary-quad planes.
   - Viewer VFX Studio / Fixed emitter visibility checkboxes in the timeline so their full shape remains visible inside compact rows.
   - Viewer VFX Studio / The yellow loop boundary now follows natural particle and child-system completion instead of treating externally triggered particle/emitter linger values as extra playback time.
