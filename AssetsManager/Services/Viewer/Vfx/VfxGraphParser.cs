@@ -71,6 +71,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_scale0        = HashAlgorithms.Fnv1a("scale0");
         private static readonly uint F_birthColor    = HashAlgorithms.Fnv1a("birthColor");
         private static readonly uint F_color         = HashAlgorithms.Fnv1a("color");
+        private static readonly uint F_modulationFactor = HashAlgorithms.Fnv1a("modulationFactor");
         private static readonly uint F_particleColorTex = HashAlgorithms.Fnv1a("particleColorTexture");
         private static readonly uint F_colorLookUpX  = HashAlgorithms.Fnv1a("colorLookUpTypeX");
         private static readonly uint F_colorLookUpY  = HashAlgorithms.Fnv1a("colorLookUpTypeY");
@@ -570,6 +571,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ColorLookUpOffsets: GetVec2(p, F_colorLookUpOffsets) ?? Vector2.Zero,
                 ColorLookUpScales: GetVec2(p, F_colorLookUpScales) ?? Vector2.One,
                 ColorRenderFlags: (byte)(GetU8(p, F_colorRenderFlags) ?? 0),
+                ModulationFactor: GetVec4(p, F_modulationFactor),
                 IsTexturePixelated: GetBool(p, F_isTexturePixelated),
                 UvTransformCenter: GetVec2(p, F_uvTransformCenter) ?? new Vector2(0.5f, 0.5f),
                 TextureMultFlipU: textureMultFlipU,

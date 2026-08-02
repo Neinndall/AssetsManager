@@ -76,6 +76,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                     new BinTreeBool(Fnv1a.HashLower("isRotationEnabled"), false),
                     new BinTreeU8(Fnv1a.HashLower("uvMode"), 2),
                     new BinTreeF32(Fnv1a.HashLower("directionVelocityScale"), 0.002f),
+                    new BinTreeVector4(
+                        Fnv1a.HashLower("modulationFactor"),
+                        new Vector4(0.25f, 0.5f, 0.75f, 0.8f)),
                     new BinTreeStruct(
                         Fnv1a.HashLower("FlexShapeDefinition"),
                         Fnv1a.HashLower("VfxFlexShapeDefinitionData"),
@@ -133,6 +136,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.False(parsed.IsRotationEnabled);
             Assert.Equal(2, parsed.UvMode);
             Assert.Equal(0.002f, parsed.DirectionVelocityScale);
+            Assert.Equal(
+                new Vector4(0.25f, 0.5f, 0.75f, 0.8f),
+                parsed.ModulationFactor);
             Assert.Equal(0.004f, parsed.FlexShape.ScaleBirthScaleByBoundObjectSize);
             Assert.Equal(16, parsed.PaletteDefinition.PaletteCount);
             Assert.Equal(4f, parsed.PaletteDefinition.PaletteSelector.Constant.X);
@@ -145,6 +151,36 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(0.1f, parsed.AlphaErosion.FeatherIn);
             Assert.Equal(0.1f, parsed.AlphaErosion.FeatherOut);
             Assert.Equal(2, parsed.AlphaErosion.AddressMode);
+        }
+
+        [Fact]
+        public void LeavesModulationFactorNeutralWhenBinOmitsIt()
+        {
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "NoModulation")
+                });
+            var system = new BinTreeObject(
+                "Effects/NoModulation",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("particleName"), "NoModulation"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { system }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Null(parsed.ModulationFactor);
         }
     }
 }

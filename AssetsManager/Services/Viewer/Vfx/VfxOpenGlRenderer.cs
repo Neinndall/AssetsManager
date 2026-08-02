@@ -28,7 +28,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _uDirectionOriented, _uArbitraryQuad;
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uDeriveAlphaFromRgb, _uEmissiveStrength, _uFlipU, _uFlipV, _uClampUv;
-        private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive;
+        private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
         private int _uErosionTex, _uHasErosion, _uErosionFeatherIn, _uErosionFeatherOut;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
@@ -98,6 +98,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uHasColor = gl.GetUniformLocation(_program, "uHasColor");
             _uColorRenderFlags = gl.GetUniformLocation(_program, "uColorRenderFlags");
             _uIsAdditive = gl.GetUniformLocation(_program, "uIsAdditive");
+            _uModulationFactor = gl.GetUniformLocation(_program, "uModulationFactor");
             _uColorLookUpTypeX = gl.GetUniformLocation(_program, "uColorLookUpTypeX");
             _uColorLookUpTypeY = gl.GetUniformLocation(_program, "uColorLookUpTypeY");
             _uColorLookUpScales = gl.GetUniformLocation(_program, "uColorLookUpScales");
@@ -380,6 +381,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                     VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
                 _gl.Uniform1(_uDeriveAlphaFromRgb, es.DeriveAlphaFromRgb ? 1 : 0);
                 _gl.Uniform1(_uEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
+                Vector4 modulationFactor = es.Def.ModulationFactor ?? Vector4.One;
+                _gl.Uniform4(
+                    _uModulationFactor,
+                    modulationFactor.X,
+                    modulationFactor.Y,
+                    modulationFactor.Z,
+                    modulationFactor.W);
                 _gl.Uniform1(_uHasColor, es.ColorGradientTexture != 0 ? 1 : 0);
                 _gl.Uniform1(
                     _uColorRenderFlags,
@@ -613,7 +621,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
-        private int _muAlphaCutoff, _muAlphaTest, _muDeriveAlphaFromRgb, _muEmissiveStrength, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muAlphaCutoff, _muAlphaTest, _muDeriveAlphaFromRgb, _muEmissiveStrength, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
         private int _muReflectionTex, _muHasReflection, _muReflectionOpacity, _muReflectionColor;
@@ -662,6 +670,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muHasColor = _gl.GetUniformLocation(_meshProgram, "uHasColor");
                 _muColorRenderFlags = _gl.GetUniformLocation(_meshProgram, "uColorRenderFlags");
                 _muIsAdditive = _gl.GetUniformLocation(_meshProgram, "uIsAdditive");
+                _muModulationFactor = _gl.GetUniformLocation(_meshProgram, "uModulationFactor");
                 _muColorLookUpTypeX = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeX");
                 _muColorLookUpTypeY = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeY");
                 _muColorLookUpScales = _gl.GetUniformLocation(_meshProgram, "uColorLookUpScales");
@@ -864,6 +873,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                 VfxBlendModes.ShouldAlphaTest(es.Def.BlendMode, renderState.AlphaReference) ? 1 : 0);
             _gl.Uniform1(_muDeriveAlphaFromRgb, es.DeriveAlphaFromRgb ? 1 : 0);
             _gl.Uniform1(_muEmissiveStrength, VfxBlendModes.ResolveEmissiveStrength(es.Def.BlendMode));
+            Vector4 meshModulationFactor = es.Def.ModulationFactor ?? Vector4.One;
+            _gl.Uniform4(
+                _muModulationFactor,
+                meshModulationFactor.X,
+                meshModulationFactor.Y,
+                meshModulationFactor.Z,
+                meshModulationFactor.W);
             _gl.Uniform1(_muHasColor, es.ColorGradientTexture != 0 ? 1 : 0);
             _gl.Uniform1(
                 _muColorRenderFlags,
@@ -1132,6 +1148,7 @@ uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
 uniform int uIsAdditive;
+uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
 uniform int uColorLookUpTypeY;
 uniform vec2 uColorLookUpScales;
@@ -1215,7 +1232,7 @@ void main(){
         float opacity = mix(uReflectionOpacity.x, uReflectionOpacity.y, edge);
         texel.rgb = mix(texel.rgb, reflection.rgb * uReflectionColor.rgb, clamp(opacity * reflection.a, 0.0, 1.0));
     }
-    vec4 authoredColor = uColor * vMeshColor;
+    vec4 authoredColor = uColor * vMeshColor * uModulationFactor;
     float effectiveAlpha = texel.a * authoredColor.a;
     if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
     fragColor = texel * authoredColor;
@@ -1437,6 +1454,7 @@ uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
 uniform int uIsAdditive;
+uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
 uniform int uColorLookUpTypeY;
 uniform vec2 uColorLookUpScales;
@@ -1517,7 +1535,8 @@ void main(){
         float opacity = mix(uReflectionOpacity.x, uReflectionOpacity.y, edge);
         t.rgb = mix(t.rgb, reflection.rgb * uReflectionColor.rgb, clamp(opacity * reflection.a, 0.0, 1.0));
     }
-    float effectiveAlpha = t.a * vColor.a;
+    vec4 authoredColor = vColor * uModulationFactor;
+    float effectiveAlpha = t.a * authoredColor.a;
     if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
     if (uIsDistortion != 0) {
         vec4 normalSample = texture(uDistortionTex, vUv);
@@ -1529,7 +1548,7 @@ void main(){
         fragColor = vec4(refracted.rgb, mask);
         return;
     }
-    fragColor = vec4(t.rgb * vColor.rgb, effectiveAlpha);
+    fragColor = vec4(t.rgb * authoredColor.rgb, effectiveAlpha);
     fragColor.rgb *= uEmissiveStrength;
 }        ";
 
