@@ -210,6 +210,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                     UploadTexture(ref emitter.PendingDistortionTexture, texture => emitter.DistortionTexture = texture);
                     UploadTexture(ref emitter.PendingErosionTexture, texture => emitter.ErosionTexture = texture);
                     UploadTexture(ref emitter.PendingReflectionTexture, texture => emitter.ReflectionTexture = texture);
+                    UploadTexture(ref emitter.PendingColorGradient, texture =>
+                        emitter.ColorGradientTexture = texture);
 
                     if (emitter.PendingMesh is { } mesh)
                     {

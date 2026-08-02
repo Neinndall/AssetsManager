@@ -86,6 +86,43 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void EmitterSpaceParticlesFollowAnimatedEmitterPosition()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(10f),
+                EmitterLifetime = 1f,
+                IsEmitterSpace = true,
+                EmitterPosition = new VfxCurve3(
+                    Vector3.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) })
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "emitter-space", "emitter-space", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.1f);
+            runtime.Update(0.1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(2f, state.Particles[0].Pos.X, precision: 5);
+        }
+
+        [Fact]
+        public void AttachedMeshWithoutGpuMeshIsNotRenderedAsABillboard()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                PrimitiveKind = VfxPrimitiveKind.AttachedMesh,
+                IsMeshPrimitive = true
+            };
+
+            Assert.True(VfxOpenGlRenderer.ShouldSkipStandaloneAttachedMesh(emitter, meshVao: 0));
+            Assert.False(VfxOpenGlRenderer.ShouldSkipStandaloneAttachedMesh(emitter, meshVao: 17));
+        }
+
+        [Fact]
         public void MeshInstancesPreserveAuthoredZeroScaleComponents()
         {
             var emitter = CreateEmitter(new Vector3(7f, 0f, 7f), VfxEmitterRenderState.Default);
@@ -556,6 +593,13 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(terrain, hasSceneDepth: true));
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(projection, hasSceneDepth: true));
             Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(regular, hasSceneDepth: false));
+
+            VfxEmitterDefinition groundRotation = regular with
+            {
+                BirthRotation = VfxCurve3.Const(new Vector3(-90f, -90f, 0f))
+            };
+            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(groundRotation.BirthRotation));
+            Assert.False(VfxOpenGlRenderer.ShouldUseSoftParticles(groundRotation, hasSceneDepth: true));
         }
 
         [Fact]
@@ -597,6 +641,55 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void BirthScaleAndRotationRangesUseTheAuthoredSecondEndpoint()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BirthScale = VfxCurve3.Const(new Vector3(2f, 4f, 6f)),
+                BirthScale1 = VfxCurve3.Const(new Vector3(4f, 8f, 10f)),
+                RotationOverLife = VfxCurve3.Const(new Vector3(10f, 20f, 30f)),
+                Rotation1 = VfxCurve3.Const(new Vector3(20f, 40f, 50f)),
+                ParticleLifetime = VfxCurveF.Const(2f)
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "ranges", "ranges", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            float range = state.Particles[0].RangeRandom;
+            Assert.Equal(2f + (4f - 2f) * range, state.Instances[3], precision: 5);
+            Assert.Equal((10f + (20f - 10f) * range) * MathF.PI / 180f, state.Instances[15], precision: 5);
+        }
+
+        [Fact]
+        public void FlexShapeUsesTheLargestAttachedObjectExtentForScaleAndOffset()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                BirthScale = VfxCurve3.Const(new Vector3(10f, 20f, 30f)),
+                EmitterPosition = VfxCurve3.Const(Vector3.Zero),
+                SpawnShape = new VfxSpawnShape(
+                    VfxSpawnShapeKind.Point,
+                    VfxCurve3.Const(new Vector3(1f, 0f, 0f)),
+                    Array.Empty<Vector3>(),
+                    Array.Empty<VfxCurveF>()),
+                FlexShape = new VfxFlexShapeDefinition(0.01f, 0.02f)
+            };
+            var runtime = new VfxPlaybackRuntime(7)
+            {
+                BoundObjectSize = new Vector3(10f, 25f, 5f)
+            };
+            runtime.SetSystem(new VfxSystemDefinition(1, "flex", "flex", new[] { emitter }), Vector3.Zero);
+
+            runtime.Update(0.02f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(runtime.Emitters);
+            Assert.Equal(new Vector3(12.5f, 25f, 37.5f), new Vector3(state.Instances[3], state.Instances[4], state.Instances[18]));
+            Assert.Equal(1.5f, state.Instances[0]);
+        }
+
+        [Fact]
         public void FinitePlaybackWaitsForTimelineBoundaryAfterParticlesExpire()
         {
             Assert.False(VfxRenderSession.ShouldRestartPlayback(
@@ -632,6 +725,36 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(1, runtime.Emitters[0].InstanceCount);
             Assert.Equal(1, runtime.Emitters[1].InstanceCount);
             Assert.False(runtime.SetEmitterVisibility(99, false));
+        }
+
+        [Fact]
+        public void RenderOrderUsesPassThenImportanceThenSourceOrder()
+        {
+            var first = CreateEmitter(Vector3.One, new VfxEmitterRenderState(2, 0, 0, false, false, false, false)) with
+            {
+                Name = "importance-low",
+                Importance = 1
+            };
+            var second = CreateEmitter(Vector3.One, new VfxEmitterRenderState(2, 0, 0, false, false, false, false)) with
+            {
+                Name = "importance-high",
+                Importance = 5
+            };
+            var third = CreateEmitter(Vector3.One, new VfxEmitterRenderState(3, 0, 0, false, false, false, false)) with
+            {
+                Name = "later-pass",
+                Importance = 0
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(
+                new VfxSystemDefinition(1, "render-order", "render-order", new[] { third, second, first }),
+                Vector3.Zero);
+
+            runtime.ApplyRenderOrder();
+
+            Assert.Equal("importance-low", runtime.Emitters[0].Def.Name);
+            Assert.Equal("importance-high", runtime.Emitters[1].Def.Name);
+            Assert.Equal("later-pass", runtime.Emitters[2].Def.Name);
         }
 
         [Fact]

@@ -13,10 +13,28 @@ namespace AssetsManager.Views.Models.Viewer
     {
         public static bool IsKnown(int rawMode) => rawMode is >= 0 and <= 5;
 
+        public static bool IsAdditive(int rawMode) => rawMode is 2 or 4;
+
+        public static float ResolveEmissiveStrength(int rawMode) => IsAdditive(rawMode) ? 8f : 1f;
+
+        public static bool ShouldAlphaTest(int rawMode, int alphaReference)
+            => !IsAdditive(rawMode) && alphaReference > 0;
+
+        public static bool ShouldWriteDepth(int rawMode, int alphaReference)
+            => !IsAdditive(rawMode) && alphaReference > 0;
+
+        /// <summary>
+        /// Riot's miscRenderFlags bit 0 requests inverted mesh faces for normal/multiply
+        /// materials. The renderer uses this to choose a safe double-sided fallback because
+        /// VFX mesh buffers do not carry normals.
+        /// </summary>
+        public static bool ShouldFlipFaces(int miscRenderFlags, int rawMode, bool disableBackfaceCull)
+            => (miscRenderFlags & 1) != 0 && !disableBackfaceCull && rawMode is 1 or 3;
+
         public static VfxBlendModeKind Resolve(int rawMode)
             => rawMode switch
             {
-                0 or 1 or 4 or 5 => VfxBlendModeKind.Additive,
+                2 or 4 => VfxBlendModeKind.Additive,
                 3 => VfxBlendModeKind.Multiply,
                 _ => VfxBlendModeKind.Alpha
             };

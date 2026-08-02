@@ -50,6 +50,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_isSingle      = HashAlgorithms.Fnv1a("isSingleParticle");
         private static readonly uint F_disabled      = HashAlgorithms.Fnv1a("disabled");
         private static readonly uint F_importance    = HashAlgorithms.Fnv1a("importance");
+        private static readonly uint F_miscRenderFlags = HashAlgorithms.Fnv1a("miscRenderFlags");
+        private static readonly uint F_meshRenderFlags = HashAlgorithms.Fnv1a("meshRenderFlags");
+        private static readonly uint F_useNavmeshMask = HashAlgorithms.Fnv1a("useNavmeshMask");
+        private static readonly uint F_depthBiasFactors = HashAlgorithms.Fnv1a("depthBiasFactors");
+        private static readonly uint F_isRotationEnabled = HashAlgorithms.Fnv1a("isRotationEnabled");
         private static readonly uint F_rateIsPeriod  = HashAlgorithms.Fnv1a("rateIsPeriod");
         private static readonly uint F_birthTimePeriod = HashAlgorithms.Fnv1a("birthTimePeriod");
         private static readonly uint F_isLoop        = HashAlgorithms.Fnv1a("isLoop");
@@ -62,6 +67,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_textureFlipV  = HashAlgorithms.Fnv1a("TextureFlipV");
         private static readonly uint F_disableCull   = HashAlgorithms.Fnv1a("disableBackfaceCull");
         private static readonly uint F_birthScale0   = HashAlgorithms.Fnv1a("birthScale0");
+        private static readonly uint F_birthScale1   = HashAlgorithms.Fnv1a("birthScale1");
         private static readonly uint F_scale0        = HashAlgorithms.Fnv1a("scale0");
         private static readonly uint F_birthColor    = HashAlgorithms.Fnv1a("birthColor");
         private static readonly uint F_color         = HashAlgorithms.Fnv1a("color");
@@ -82,6 +88,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_drag          = HashAlgorithms.Fnv1a("drag");
         private static readonly uint F_birthRotation = HashAlgorithms.Fnv1a("birthRotation0");
         private static readonly uint F_rotation      = HashAlgorithms.Fnv1a("rotation0");
+        private static readonly uint F_rotation1     = HashAlgorithms.Fnv1a("rotation1");
         private static readonly uint F_birthRotVel0  = HashAlgorithms.Fnv1a("birthRotationalVelocity0");
         private static readonly uint F_emitterPos    = HashAlgorithms.Fnv1a("emitterPosition");
         private static readonly uint F_isEmitterSpace = HashAlgorithms.Fnv1a("IsEmitterSpace");
@@ -90,6 +97,25 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_isFollowingTerrain = HashAlgorithms.Fnv1a("isFollowingTerrain");
         private static readonly uint F_isGroundLayer = HashAlgorithms.Fnv1a("isGroundLayer");
         private static readonly uint F_isUniformScale = HashAlgorithms.Fnv1a("isUniformScale");
+        private static readonly uint F_uvMode        = HashAlgorithms.Fnv1a("uvMode");
+        private static readonly uint F_bindWeight    = HashAlgorithms.Fnv1a("bindWeight");
+        private static readonly uint F_flexShapeDefinition = HashAlgorithms.Fnv1a("FlexShapeDefinition");
+        private static readonly uint F_scaleBirthScaleByBoundObjectSize =
+            HashAlgorithms.Fnv1a("scaleBirthScaleByBoundObjectSize");
+        private static readonly uint F_scaleEmitOffsetByBoundObjectSize =
+            HashAlgorithms.Fnv1a("scaleEmitOffsetByBoundObjectSize");
+        private static readonly uint F_directionVelocityScale = HashAlgorithms.Fnv1a("directionVelocityScale");
+        private static readonly uint F_rateByVelocityFunction = HashAlgorithms.Fnv1a("rateByVelocityFunction");
+        private static readonly uint F_paletteDefinition = HashAlgorithms.Fnv1a("paletteDefinition");
+        private static readonly uint F_paletteCount = HashAlgorithms.Fnv1a("paletteCount");
+        private static readonly uint F_paletteSelector = HashAlgorithms.Fnv1a("paletteSelector");
+        private static readonly uint F_audio = HashAlgorithms.Fnv1a("Audio");
+        private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("SoundOnCreate");
+        private static readonly uint F_hasPostRotateOrientation = HashAlgorithms.Fnv1a("hasPostRotateOrientation");
+        private static readonly uint F_particlesShareRandomValue = HashAlgorithms.Fnv1a("ParticlesShareRandomValue");
+        private static readonly uint F_falloffTexture = HashAlgorithms.Fnv1a("falloffTexture");
+        private static readonly uint F_filtering = HashAlgorithms.Fnv1a("Filtering");
+        private static readonly uint F_keywordsExcluded = HashAlgorithms.Fnv1a("keywordsExcluded");
         private const uint F_spawnShape              = 0x3bf0b4ed; // SpawnShape
         private static readonly uint F_emitOffset    = HashAlgorithms.Fnv1a("emitOffset");
         private static readonly uint F_emitRotAxes   = HashAlgorithms.Fnv1a("emitRotationAxes");
@@ -308,7 +334,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             var legacy = Get(p, F_legacySimple) as BinTreeStruct;
             var legacyBirthScale = legacy is null ? null : ReadCurveF(legacy.Properties, F_legacyBirthScale);
             var birthScale = ReadCurve3(p, F_birthScale0)
-                ?? (legacyBirthScale is { } lbs ? ScalarSizeCurve(lbs) : VfxCurve3.Const(new Vector3(15f, 15f, 15f)));
+                ?? (legacyBirthScale is { } lbs ? ScalarSizeCurve(lbs) : VfxCurve3.Const(Vector3.One));
+            var birthScale1 = ReadCurve3(p, F_birthScale1);
             var scaleOverLife = ReadCurve3(p, F_scale0);
             if (scaleOverLife is null && legacy is not null && ReadCurveF(legacy.Properties, F_legacyScale) is { } legacyScale)
                 scaleOverLife = ScalarScaleCurve(legacyScale);
@@ -319,6 +346,15 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (birthRotationalVelocity is null && legacy is not null && ReadCurveF(legacy.Properties, F_legacyBirthRotVel) is { } legacyRotVel)
                 birthRotationalVelocity = ScalarRotationCurve(legacyRotVel);
             var birthColor = ReadCurve4(p, F_birthColor) ?? VfxCurve4.Const(Vector4.One);
+            var flexShape = ReadFlexShape(p);
+            var palette = ReadPalette(p);
+            string audioSoundOnCreate = Get(p, F_audio) is BinTreeStruct audio
+                ? GetString(audio.Properties, F_soundOnCreate)
+                : null;
+            IReadOnlyList<string> filteringKeywords = ReadStringContainer(
+                Get(p, F_filtering) is BinTreeStruct filtering
+                    ? Get(filtering.Properties, F_keywordsExcluded)
+                    : null);
 
             p.TryGetValue(F_primitive, out var prim);
             uint primitiveClass = prim is BinTreeStruct primitive ? primitive.ClassHash : PrimCameraQuad;
@@ -404,7 +440,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 var ep = erosionData.Properties;
                 alphaErosion = new VfxAlphaErosionDefinition(
                     GetString(ep, F_erosionMapName),
-                    ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Zero,
+                    ReadCurveF(ep, F_erosionDriveCurve) ?? VfxCurveF.Const(1f),
                     GetF32(ep, F_erosionFeatherIn) ?? 0.1f,
                     GetF32(ep, F_erosionFeatherOut) ?? 0.1f,
                     GetU8(ep, F_erosionMapAddressMode) ?? 2,
@@ -439,8 +475,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             bool isSingle = GetBool(p, F_isSingle);
             return new VfxEmitterDefinition(
                 Name: GetString(p, F_emitterName) ?? "(emitter)",
-                Rate: ReadCurveF(p, F_rate) ?? (isSingle ? VfxCurveF.Zero : VfxCurveF.Const(10f)),
-                ParticleLifetime: ReadCurveF(p, F_particleLife) ?? VfxCurveF.Const(1.5f),
+                Rate: ReadCurveF(p, F_rate) ?? (isSingle ? VfxCurveF.Zero : VfxCurveF.Const(1f)),
+                ParticleLifetime: ReadCurveF(p, F_particleLife) ?? VfxCurveF.Const(1f),
                 EmitterLifetime: GetOptionalF32(p, F_lifetime),
                 ParticleLinger: GetOptionalF32(p, F_particleLinger) ?? 0f,
                 TimeBeforeFirstEmission: GetF32(p, F_timeBefore) ?? 0f,
@@ -449,7 +485,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 RateIsPeriod: GetBool(p, F_rateIsPeriod),
                 BirthTimePeriod: GetF32(p, F_birthTimePeriod) ?? 0f,
                 IsLoop: GetBool(p, F_isLoop),
-                BlendMode: GetU8(p, F_blendMode) ?? (byte?)(AsU32(Get(p, F_blendMode))) ?? 0,
+                BlendMode: GetU8(p, F_blendMode) ?? (byte?)(AsU32(Get(p, F_blendMode))) ?? 1,
                 BirthScale: birthScale,
                 ScaleOverLife: scaleOverLife,
                 BirthColor: birthColor,
@@ -483,18 +519,22 @@ namespace AssetsManager.Services.Viewer.Vfx
                 StartFrame: GetU16(p, F_startFrame) ?? 0,
                 UseTextureAspect: legacy is not null,
                 Distortion: distortion,
-                ParticleColorTexturePath: GetString(p, F_particleColorTex) ??
-                    "ASSETS/Shared/Particles/DefaultColorOverlifetime.dds",
-                ColorLookUpTypeX: GetU8(p, F_colorLookUpX) ?? 1,
+                ParticleColorTexturePath: GetString(p, F_particleColorTex),
+                ColorLookUpTypeX: GetU8(p, F_colorLookUpX) ?? 0,
                 ColorLookUpTypeY: GetU8(p, F_colorLookUpY) ?? 0,
                 RenderState: new VfxEmitterRenderState(
                     RenderPass: GetI16(p, F_renderPass) ?? 0,
-                    AlphaReference: (byte)(GetU8(p, F_alphaRef) ?? 5),
+                    AlphaReference: (byte)(GetU8(p, F_alphaRef) ?? 0),
                     TextureAddressMode: GetU8(p, F_texAddress) ?? 0,
                     ClampUvScroll: GetBool(p, F_uvScrollClamp),
                     FlipU: GetBool(p, F_textureFlipU),
                     FlipV: GetBool(p, F_textureFlipV),
                     DisableBackfaceCull: GetBool(p, F_disableCull)),
+                MiscRenderFlags: (byte)(GetU8(p, F_miscRenderFlags) ?? 0),
+                MeshRenderFlags: (byte)(GetU8(p, F_meshRenderFlags) ?? 0),
+                UseNavmeshMask: GetBool(p, F_useNavmeshMask),
+                DepthBiasFactors: GetVec2(p, F_depthBiasFactors),
+                IsRotationEnabled: GetBool(p, F_isRotationEnabled),
                 PrimitiveKind: primitiveKind,
                 VelocityOverLife: ReadCurve3(p, F_velocity),
                 RotationOverLife: ReadCurve3(p, F_rotation),
@@ -540,7 +580,49 @@ namespace AssetsManager.Services.Viewer.Vfx
                 TextureMultScrollAlpha: textureMultScrollAlpha,
                 SoftParticle: softParticle,
                 Reflection: reflection,
-                Importance: (byte)(GetU8(p, F_importance) ?? 1));
+                Importance: (byte)(GetU8(p, F_importance) ?? 0),
+                BirthScale1: birthScale1,
+                Rotation1: ReadCurve3(p, F_rotation1),
+                UvMode: (byte)(GetU8(p, F_uvMode) ?? 0),
+                BindWeight: ReadCurveF(p, F_bindWeight),
+                FlexShape: flexShape,
+                PaletteDefinition: palette,
+                DirectionVelocityScale: GetF32(p, F_directionVelocityScale) ?? 0f,
+                RateByVelocityFunction: ReadCurve2(p, F_rateByVelocityFunction),
+                HasPostRotateOrientation: GetBool(p, F_hasPostRotateOrientation),
+                ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
+                FalloffTexturePath: GetString(p, F_falloffTexture),
+                AudioSoundOnCreate: audioSoundOnCreate,
+                FilteringKeywordsExcluded: filteringKeywords);
+        }
+
+        private static VfxFlexShapeDefinition ReadFlexShape(
+            IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
+        {
+            if (Get(emitterProperties, F_flexShapeDefinition) is not BinTreeStruct flex) return null;
+            return new VfxFlexShapeDefinition(
+                GetF32(flex.Properties, F_scaleBirthScaleByBoundObjectSize) ?? 0f,
+                GetF32(flex.Properties, F_scaleEmitOffsetByBoundObjectSize) ?? 0f);
+        }
+
+        private static VfxPaletteDefinition ReadPalette(
+            IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
+        {
+            if (Get(emitterProperties, F_paletteDefinition) is not BinTreeStruct palette) return null;
+            return new VfxPaletteDefinition(
+                Math.Max(1, GetI32(palette.Properties, F_paletteCount) ?? 1),
+                ReadCurve3(palette.Properties, F_paletteSelector) ?? VfxCurve3.Const(Vector3.Zero));
+        }
+
+        private static IReadOnlyList<string> ReadStringContainer(BinTreeProperty property)
+        {
+            if (property is not BinTreeContainer container || container.Elements.Count == 0)
+                return Array.Empty<string>();
+            return container.Elements
+                .OfType<BinTreeString>()
+                .Select(static value => value.Value)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
         }
 
         private static VfxFieldCollectionDefinition ReadFields(

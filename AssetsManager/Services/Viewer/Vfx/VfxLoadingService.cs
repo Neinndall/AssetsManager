@@ -183,7 +183,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BitmapSource gradient = _resources.ResolveTexture(
                     emitter.Def.ParticleColorTexturePath,
                     searchDirectory);
-                if (gradient != null) ApplyColorGradient(emitter, gradient);
+                if (gradient != null) emitter.PendingColorGradient = gradient;
 
                 if (emitter.Def.IsMeshPrimitive)
                 {
@@ -240,30 +240,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
 
         public void ClearCaches() => _resources.ClearCaches();
-
-        private static void ApplyColorGradient(VfxPlaybackRuntime.EmitterState emitter, BitmapSource bitmap)
-        {
-            if (bitmap.Format != PixelFormats.Bgra32)
-            {
-                var converted = new FormatConvertedBitmap();
-                converted.BeginInit();
-                converted.Source = bitmap;
-                converted.DestinationFormat = PixelFormats.Bgra32;
-                converted.EndInit();
-                bitmap = converted;
-            }
-
-            int width = bitmap.PixelWidth;
-            int height = bitmap.PixelHeight;
-            var pixels = new byte[width * height * 4];
-            bitmap.CopyPixels(pixels, width * 4, 0);
-            for (int offset = 0; offset < pixels.Length; offset += 4)
-                (pixels[offset], pixels[offset + 2]) = (pixels[offset + 2], pixels[offset]);
-
-            emitter.ColorGradient = pixels;
-            emitter.ColorGradientW = width;
-            emitter.ColorGradientH = height;
-        }
 
         private static string ResolveWadRoot(string skinBinPath)
         {

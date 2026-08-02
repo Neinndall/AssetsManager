@@ -66,7 +66,37 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 new BinTreeProperty[]
                 {
                     new BinTreeString(Fnv1a.HashLower("emitterName"), "DefaultEmitter"),
+                    new BinTreeU8(Fnv1a.HashLower("blendMode"), 2),
                     new BinTreeU8(Fnv1a.HashLower("importance"), 3),
+                    new BinTreeU8(Fnv1a.HashLower("colorRenderFlags"), 1),
+                    new BinTreeU8(Fnv1a.HashLower("miscRenderFlags"), 1),
+                    new BinTreeU8(Fnv1a.HashLower("meshRenderFlags"), 2),
+                    new BinTreeBool(Fnv1a.HashLower("useNavmeshMask"), true),
+                    new BinTreeVector2(Fnv1a.HashLower("depthBiasFactors"), new Vector2(-1f, -200f)),
+                    new BinTreeBool(Fnv1a.HashLower("isRotationEnabled"), false),
+                    new BinTreeU8(Fnv1a.HashLower("uvMode"), 2),
+                    new BinTreeF32(Fnv1a.HashLower("directionVelocityScale"), 0.002f),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("FlexShapeDefinition"),
+                        Fnv1a.HashLower("VfxFlexShapeDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeF32(Fnv1a.HashLower("scaleBirthScaleByBoundObjectSize"), 0.004f)
+                        }),
+                    new BinTreeStruct(
+                        Fnv1a.HashLower("paletteDefinition"),
+                        Fnv1a.HashLower("VfxPaletteDefinitionData"),
+                        new BinTreeProperty[]
+                        {
+                            new BinTreeI32(Fnv1a.HashLower("paletteCount"), 16),
+                            new BinTreeStruct(
+                                Fnv1a.HashLower("paletteSelector"),
+                                Fnv1a.HashLower("ValueVector3"),
+                                new BinTreeProperty[]
+                                {
+                                    new BinTreeVector3(Fnv1a.HashLower("constantValue"), new Vector3(4f, 0f, 0f))
+                                })
+                        }),
                     new BinTreeVector4(Fnv1a.HashLower("birthColor"), new Vector4(0.1f, 0.2f, 0.3f, 0.4f)),
                     textureMult,
                     alphaErosion
@@ -88,12 +118,27 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             VfxBinDocument document = VfxGraphParser.ParseDocument(stream.ToArray());
 
             var parsed = Assert.Single(Assert.Single(document.Systems).Value.Emitters);
-            Assert.Equal("ASSETS/Shared/Particles/DefaultColorOverlifetime.dds", parsed.ParticleColorTexturePath);
-            Assert.Equal(1, parsed.ColorLookUpTypeX);
+            Assert.Null(parsed.ParticleColorTexturePath);
+            Assert.Equal(0, parsed.ColorLookUpTypeX);
             Assert.Equal(0, parsed.ColorLookUpTypeY);
             Assert.True(parsed.TextureMultFlipV);
             Assert.True(parsed.TextureMultRandomStartFrame);
             Assert.Equal(3, parsed.Importance);
+            Assert.Equal(2, parsed.BlendMode);
+            Assert.Equal(1, parsed.ColorRenderFlags);
+            Assert.Equal(1, parsed.MiscRenderFlags);
+            Assert.Equal(2, parsed.MeshRenderFlags);
+            Assert.True(parsed.UseNavmeshMask);
+            Assert.Equal(new Vector2(-1f, -200f), parsed.DepthBiasFactors);
+            Assert.False(parsed.IsRotationEnabled);
+            Assert.Equal(2, parsed.UvMode);
+            Assert.Equal(0.002f, parsed.DirectionVelocityScale);
+            Assert.Equal(0.004f, parsed.FlexShape.ScaleBirthScaleByBoundObjectSize);
+            Assert.Equal(16, parsed.PaletteDefinition.PaletteCount);
+            Assert.Equal(4f, parsed.PaletteDefinition.PaletteSelector.Constant.X);
+            Assert.Equal(1f, parsed.BirthScale.Constant.X);
+            Assert.Equal(1f, parsed.Rate.Constant);
+            Assert.Equal(1f, parsed.ParticleLifetime.Constant);
             Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 0.4f), parsed.BirthColor.Constant);
             Assert.Equal(0.5f, parsed.UvTransformCenter.X);
             Assert.Equal(0.5f, parsed.TextureMultTransformCenter.Y);

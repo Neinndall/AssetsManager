@@ -85,6 +85,11 @@ namespace AssetsManager.Views.Models.Viewer
         int? ColorLookUpTypeX = null,
         int? ColorLookUpTypeY = null,
         VfxEmitterRenderState RenderState = null,
+        byte MiscRenderFlags = 0,
+        byte MeshRenderFlags = 0,
+        bool UseNavmeshMask = false,
+        Vector2? DepthBiasFactors = null,
+        bool IsRotationEnabled = true,
         VfxPrimitiveKind PrimitiveKind = VfxPrimitiveKind.CameraQuad,
         VfxCurve3? VelocityOverLife = null,
         VfxCurve3? RotationOverLife = null,
@@ -134,7 +139,20 @@ namespace AssetsManager.Views.Models.Viewer
         VfxSoftParticleDefinition SoftParticle = null,
         VfxReflectionDefinition Reflection = null,
         Vector3? RayTargetOffset = null,
-        byte Importance = 1)
+        byte Importance = 0,
+        VfxCurve3? BirthScale1 = null,
+        VfxCurve3? Rotation1 = null,
+        byte UvMode = 0,
+        VfxCurveF? BindWeight = null,
+        VfxFlexShapeDefinition FlexShape = null,
+        VfxPaletteDefinition PaletteDefinition = null,
+        float DirectionVelocityScale = 0f,
+        VfxCurve2? RateByVelocityFunction = null,
+        bool HasPostRotateOrientation = false,
+        bool ParticlesShareRandomValue = false,
+        string FalloffTexturePath = null,
+        string AudioSoundOnCreate = null,
+        IReadOnlyList<string> FilteringKeywordsExcluded = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
@@ -151,12 +169,20 @@ namespace AssetsManager.Views.Models.Viewer
         bool FlipV,
         bool DisableBackfaceCull)
     {
-        public static readonly VfxEmitterRenderState Default = new(0, 5, 0, false, false, false, false);
+        public static readonly VfxEmitterRenderState Default = new(0, 0, 0, false, false, false, false);
         public float AlphaCutoff => AlphaReference / 255f;
     }
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>
     public sealed record VfxDistortionDefinition(float Strength, int Mode, string NormalMapTexturePath);
+
+    public sealed record VfxFlexShapeDefinition(
+        float ScaleBirthScaleByBoundObjectSize,
+        float ScaleEmitOffsetByBoundObjectSize);
+
+    public sealed record VfxPaletteDefinition(
+        int PaletteCount,
+        VfxCurve3 PaletteSelector);
 
     public sealed record VfxSoftParticleDefinition(
         float BeginIn,

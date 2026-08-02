@@ -35,17 +35,17 @@ namespace AssetsManager.Services.Viewer.Vfx
             /// <summary>Pending mesh data for deferred GL upload of .scb/.sco mesh primitives.</summary>
             public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? PendingMesh;
             internal VfxAnimatedMesh MeshAnimation;
-            // CPU copy of particleColorTexture (RGBA8, top-left origin).
-            public byte[] ColorGradient;
-            public int ColorGradientW, ColorGradientH;
+            /// <summary>GPU handle for particleColorTexture (0 = unavailable).</summary>
+            public uint ColorGradientTexture;
+            public object PendingColorGradient;
             public float SpriteAspect = 1f;         // legacy scalar quads preserve one atlas cell's width/height
             internal float SpawnAccum;
             internal float Age;                     // emitter age (seconds)
             internal bool BurstDone;                // for isSingleParticle
             internal readonly List<Particle> Particles = new();
 
-            /// <summary>Packed instance data for the renderer: position, 3D scale, color,
-            /// rotation/frame, age/velocity, and Euler rotation.</summary>
+            /// <summary>Packed instance data for the renderer: position, 3D scale, authored color,
+            /// rotation/frame, age/velocity, Euler rotation, and both UV stages.</summary>
             public float[] Instances = System.Array.Empty<float>();
             public int InstanceCount;
 
@@ -66,12 +66,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector4 BirthColor;
             public Vector3 BirthRotation;
             public Vector3 RotationalVelocity;
+            public float RangeRandom;
             public Vector2 BirthUvOffset, BirthUvScrollRate;
             public Vector2 TextureMultBirthUvOffset, TextureMultBirthUvScrollRate;
             public float BirthUvRotateRate, TextureMultBirthUvRotateRate;
             public float Rot, RotVel;
             public float StartFrame, FrameRate, TextureMultFrame;
-            public float ColorRandom;   // stable per-particle 0..1 roll for the colour-gradient variant axis
         }
 
         public IReadOnlyList<EmitterState> Emitters => _emitters;
@@ -83,6 +83,11 @@ namespace AssetsManager.Services.Viewer.Vfx
         private Vector3 _worldScale = Vector3.One;
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
+        /// <summary>
+        /// Optional attached-object bounds in authored LoL units. The UI can provide this
+        /// when a champion scene is available; null keeps the standalone VFX preview neutral.
+        /// </summary>
+        public Vector3? BoundObjectSize { get; set; }
         public event Action<VfxPlaybackRuntime, VfxEmitterDefinition, Vector3, bool> ParticleLifecycle;
         private const int MaxParticlesPerEmitter = 4000;
         private const float MaximumSimulationStep = 0.1f;
@@ -172,7 +177,12 @@ namespace AssetsManager.Services.Viewer.Vfx
                 int leftPass = (left.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
                 int rightPass = (right.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
                 int passOrder = leftPass.CompareTo(rightPass);
-                return passOrder != 0 ? passOrder : left.SourceOrder.CompareTo(right.SourceOrder);
+                if (passOrder != 0) return passOrder;
+
+                int importanceOrder = left.Def.Importance.CompareTo(right.Def.Importance);
+                return importanceOrder != 0
+                    ? importanceOrder
+                    : left.SourceOrder.CompareTo(right.SourceOrder);
             });
         }
 
@@ -251,13 +261,28 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             var d = s.Def;
             s.Age += dt;
-            float emitterT = EmitterTime(s);
-            s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), _worldTransform);
 
             if (d.IsLoop && d.EmitterLifetime is { } loopLife && s.Age > d.TimeBeforeFirstEmission + loopLife)
             {
                 s.Age = d.TimeBeforeFirstEmission;
                 s.BurstDone = false;
+            }
+
+            float emitterT = EmitterTime(s);
+            Vector3 previousBasePos = s.BasePos;
+            s.BasePos = Vector3.Transform(d.EmitterPosition.Sample(emitterT), _worldTransform);
+            if (d.IsEmitterSpace && s.Particles.Count > 0)
+            {
+                Vector3 emitterDelta = s.BasePos - previousBasePos;
+                if (emitterDelta.LengthSquared() > 1e-12f)
+                {
+                    for (int particleIndex = 0; particleIndex < s.Particles.Count; particleIndex++)
+                    {
+                        Particle particle = s.Particles[particleIndex];
+                        particle.Pos += emitterDelta;
+                        s.Particles[particleIndex] = particle;
+                    }
+                }
             }
 
             bool emitting = s.Age >= d.TimeBeforeFirstEmission
@@ -312,8 +337,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                     var orbit = Quaternion.CreateFromYawPitchRoll(angularStep.Y, angularStep.X, angularStep.Z);
                     p.Pos = s.BasePos + Vector3.TransformNormal(Vector3.Transform(localRelative, orbit), _worldTransform);
                 }
-                p.Rot += p.RotVel * dt;
-                p.BirthRotation += p.RotationalVelocity * dt;
+                if (d.IsRotationEnabled)
+                {
+                    p.Rot += p.RotVel * dt;
+                    p.BirthRotation += p.RotationalVelocity * dt;
+                }
                 s.Particles[i] = p;
             }
 
@@ -326,7 +354,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             var d = s.Def;
             float sampledLife = d.ParticleLifetime.SampleBirth(emitterT, _rng);
             float life = sampledLife < 0f ? float.PositiveInfinity : MathF.Max(0.05f, sampledLife);
+            bool hasRange = d.BirthScale1 is { } || d.Rotation1 is { };
+            var rangeRandom = hasRange ? (float)_rng.NextDouble() : 0f;
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
+            if (d.BirthScale1 is { } birthScale1)
+                birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng), rangeRandom);
+            birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
             if (d.IsUniformScale)
                 birthScale = new Vector3(birthScale.X);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
@@ -347,6 +380,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var localOffset = d.SpawnShape is { } shape
                 ? shape.SampleOffset(_rng, emitterT, out spawnRotation)
                 : Vector3.Zero;
+            localOffset *= ResolveFlexMultiplier(d.FlexShape?.ScaleEmitOffsetByBoundObjectSize);
             var worldOffset = Vector3.Transform(localOffset, _worldTransform) - Vector3.Transform(Vector3.Zero, _worldTransform);
             vel = Vector3.TransformNormal(vel, spawnRotation);
             birthAccel = Vector3.TransformNormal(birthAccel, spawnRotation);
@@ -368,9 +402,10 @@ namespace AssetsManager.Services.Viewer.Vfx
                 BirthSize = finalBirthSize,
                 BirthColor = d.BirthColor.SampleBirth(emitterT, _rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
-                RotationalVelocity = rotVel * (MathF.PI / 180f),
+                RotationalVelocity = d.IsRotationEnabled ? rotVel * (MathF.PI / 180f) : Vector3.Zero,
                 Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
-                RotVel = rotVel.X * (MathF.PI / 180f),
+                RotVel = d.IsRotationEnabled ? rotVel.X * (MathF.PI / 180f) : 0f,
+                RangeRandom = rangeRandom,
                 StartFrame = d.RandomStartFrame && d.NumFrames > 1
                     ? _rng.Next(d.NumFrames)
                     : Math.Clamp(d.StartFrame, 0f, Math.Max(0, d.NumFrames - 1)),
@@ -380,7 +415,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                         (int)MathF.Max(1f, d.TextureMultTexDiv.X) *
                         (int)MathF.Max(1f, d.TextureMultTexDiv.Y)))
                     : 0f,
-                ColorRandom = (float)_rng.NextDouble(),
                 BirthUvOffset = birthUvOffset,
                 BirthUvScrollRate = birthUvScrollRate,
                 BirthUvRotateRate = birthUvRotateRate,
@@ -410,19 +444,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                     scaleMul = new Vector3(scaleMul.X);
                 var colMul = d.ColorOverLife?.Sample(t) ?? Vector4.One;
                 var col = p.BirthColor * colMul;
-
-                if (s.ColorGradient is { } grad && s.ColorGradientW > 0 && s.ColorGradientH > 0)
-                {
-                    float speed = p.Vel.Length();
-                    Vector2 lookupScale = d.ColorLookUpScales == Vector2.Zero
-                        ? Vector2.One
-                        : d.ColorLookUpScales;
-                    float u = LookupCoord(d.ColorLookUpTypeX ?? 1, t, speed, p.ColorRandom) *
-                        lookupScale.X + d.ColorLookUpOffsets.X;
-                    float v = LookupCoord(d.ColorLookUpTypeY ?? 0, t, speed, p.ColorRandom) *
-                        lookupScale.Y + d.ColorLookUpOffsets.Y;
-                    col *= SampleGradient(grad, s.ColorGradientW, s.ColorGradientH, u, v);
-                }
 
                 float frame = 0f;
                 if (d.NumFrames > 1)
@@ -462,8 +483,15 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = frame;
                 buf[k++] = p.Age;
                 buf[k++] = direction.X; buf[k++] = direction.Y; buf[k++] = direction.Z;
-                Vector3 lifeRotation = d.RotationOverLife?.Sample(t) ?? Vector3.Zero;
-                lifeRotation *= MathF.PI / 180f;
+                Vector3 lifeRotation = Vector3.Zero;
+                if (d.IsRotationEnabled && d.RotationOverLife is { } rotationCurve)
+                {
+                    lifeRotation = rotationCurve.Sample(t);
+                    if (d.Rotation1 is { } rotationMax)
+                        lifeRotation = Vector3.Lerp(lifeRotation, rotationMax.Sample(t), p.RangeRandom);
+                    // rotation0 is an authored angular velocity, not an absolute angle.
+                    lifeRotation *= p.Age * (MathF.PI / 180f);
+                }
                 bool authoredPlane = d.IsArbitraryQuad || d.ParticleIsLocalOrientation || d.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 1e-6f)
@@ -536,6 +564,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                 integrated += (previousValue + currentValue) * (0.5f * (normalizedAge - previousTime));
             }
             return integrated * life;
+        }
+
+        private float ResolveFlexMultiplier(float? coefficient)
+        {
+            if (coefficient is not { } value || BoundObjectSize is not { } bounds) return 1f;
+            float extent = MathF.Max(MathF.Abs(bounds.X), MathF.Max(MathF.Abs(bounds.Y), MathF.Abs(bounds.Z)));
+            return MathF.Max(0f, 1f + value * extent);
         }
 
         private static float SampleIntegrated(VfxCurveF? curve, float normalizedAge, float age, float life)
@@ -617,31 +652,5 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        private static float LookupCoord(int type, float age, float speed, float random) => type switch
-        {
-            1 => age,
-            2 => Math.Clamp(speed / 400f, 0f, 1f),
-            3 => random,
-            _ => 0.5f,
-        };
-
-        private static Vector4 SampleGradient(byte[] rgba, int w, int h, float u, float v)
-        {
-            u = Math.Clamp(u, 0f, 1f);
-            v = Math.Clamp(v, 0f, 1f);
-            float fx = u * (w - 1), fy = v * (h - 1);
-            int x0 = (int)fx, y0 = (int)fy;
-            int x1 = Math.Min(x0 + 1, w - 1), y1 = Math.Min(y0 + 1, h - 1);
-            float tx = fx - x0, tyf = fy - y0;
-            Vector4 c00 = Texel(rgba, w, x0, y0), c10 = Texel(rgba, w, x1, y0);
-            Vector4 c01 = Texel(rgba, w, x0, y1), c11 = Texel(rgba, w, x1, y1);
-            return Vector4.Lerp(Vector4.Lerp(c00, c10, tx), Vector4.Lerp(c01, c11, tx), tyf);
-        }
-
-        private static Vector4 Texel(byte[] rgba, int w, int x, int y)
-        {
-            int i = (y * w + x) * 4;
-            return new Vector4(rgba[i] / 255f, rgba[i + 1] / 255f, rgba[i + 2] / 255f, rgba[i + 3] / 255f);
-        }
     }
 }

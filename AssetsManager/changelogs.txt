@@ -27,6 +27,9 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - VFX Studio / Audited real BIN-driven texture alpha, UV multiplier blending, emitter-space placement, and AttachedMesh fallback rendering.
+  - VFX Studio / Corrected additive blend handling and alpha clipping while preserving authored texture output.
+  - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
   - VFX Studio now follows declared BIN links from the selected skin root, avoiding unrelated sibling or basename matches while preserving truncated extraction collisions.
   - VFX Studio now places the loop boundary at the final particle frame produced by playback.
