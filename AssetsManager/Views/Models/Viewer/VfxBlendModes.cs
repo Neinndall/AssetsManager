@@ -23,6 +23,9 @@ namespace AssetsManager.Views.Models.Viewer
         public static bool ShouldWriteDepth(int rawMode, int alphaReference)
             => !IsAdditive(rawMode) && alphaReference > 0;
 
+        public static int ResolveColorRenderFlags(int rawFlags, bool hasParticleColorTexture)
+            => hasParticleColorTexture ? rawFlags | 1 : rawFlags;
+
         /// <summary>
         /// Riot's miscRenderFlags bit 0 requests inverted mesh faces for normal/multiply
         /// materials. The renderer uses this to choose a safe double-sided fallback because

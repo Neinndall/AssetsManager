@@ -27,6 +27,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.
   - VFX Studio / Audited real BIN-driven texture alpha, UV multiplier blending, emitter-space placement, and AttachedMesh fallback rendering.
   - VFX Studio / Corrected additive blend handling and alpha clipping while preserving authored texture output.
   - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
@@ -149,6 +150,7 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Removed white particle squares caused by additive color and multiplier textures overriding authored transparency.
   - Viewer VFX Studio / Preserved authored SCB/SCO vertex-color gradients so mesh walls and ground layers retain their intended tint and vertical transparency fades.
   - Viewer VFX Studio / Restored authored arbitrary-quad diameters so expanding rings reach their matching mesh boundaries before fading.
   - Viewer VFX Studio / Fixed rotated circular particle masks rendering as repeated corner fragments or stretched quads by honoring transparent texture borders and authored erosion defaults.

@@ -149,6 +149,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             ArgumentNullException.ThrowIfNull(definition);
             var runtime = new VfxPlaybackRuntime(seed);
             runtime.SetSystem(definition, definition.Transform.GetValueOrDefault(Matrix4x4.Identity) * transform);
+            var alphaSemantics = new Dictionary<BitmapSource, bool>(ReferenceEqualityComparer.Instance);
 
             foreach (var emitter in runtime.Emitters)
             {
@@ -156,6 +157,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (texture != null)
                 {
                     emitter.PendingTexture = texture;
+                    if (!alphaSemantics.TryGetValue(texture, out bool hasOpaqueAlpha))
+                    {
+                        hasOpaqueAlpha = VfxTextureAlphaSemantics.HasOpaqueAlpha(texture);
+                        alphaSemantics[texture] = hasOpaqueAlpha;
+                    }
+                    emitter.DeriveAlphaFromRgb = VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                        hasOpaqueAlpha,
+                        emitter.Def.BlendMode);
                     if (emitter.Def.UseTextureAspect)
                     {
                         float cellWidth = texture.PixelWidth / Math.Max(1f, emitter.Def.TexDiv.X);

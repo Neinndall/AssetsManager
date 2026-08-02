@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             public Vector3 PlacementRight, PlacementUp, PlacementForward;
             public uint Texture;                    // GL handle for this emitter's sprite (0 = not uploaded/skip)
             public int TextureWidth, TextureHeight;
+            public bool DeriveAlphaFromRgb;
             public uint TextureMult;                // optional Riot multiplier/noise texture stage
             public int TextureMultWidth, TextureMultHeight;
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
