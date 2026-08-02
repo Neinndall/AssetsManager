@@ -43,7 +43,14 @@ namespace AssetsManager.Utils
                     GenerateCache();
                 }
 
-                InitializeFromCache();
+                if (File.Exists(_binPath))
+                {
+                    InitializeFromCache();
+                }
+                else
+                {
+                    _count = 0;
+                }
                 _isLoaded = true;
             }
             catch (Exception ex)
