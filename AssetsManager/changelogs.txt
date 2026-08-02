@@ -27,6 +27,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
   - VFX Studio now places the loop boundary at the final particle frame produced by playback.
   - Viewer / Simplified manual map geometry loading to 1-step file dialog using automatic root texture resolution.
   - Viewer / Updated Load Project description to "Explore models & map environments".

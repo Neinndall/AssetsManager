@@ -378,11 +378,11 @@ namespace AssetsManager.Services.Core
             {
                 try
                 {
-                    return await _contentFormatterService.GetBinDiffJsonAsync(oldData, newData);
+                    return await _contentFormatterService.GetBinDiffRitobinAsync(oldData, newData);
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, "Failed to create semantic BIN diff; falling back to full JSON comparison.");
+                    _logService.LogError(ex, "Failed to create semantic BIN diff; falling back to full Ritobin comparison.");
                 }
             }
 

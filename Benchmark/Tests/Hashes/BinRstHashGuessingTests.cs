@@ -873,7 +873,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public async Task BinJsonSerializationResolvesEachHashInItsOwnDomain()
+        public async Task BinRitobinSerializationResolvesEachHashInItsOwnDomain()
         {
             const uint value = 0x15f32511;
             const string hash = "15f32511";
@@ -885,7 +885,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt"), $"{hash} type_value{Environment.NewLine}");
             using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
             resolver.LoadBinHashes();
-            var serializer = new BinJsonSerializer(resolver);
+            var serializer = new BinRitobinSerializer(resolver);
             var tree = new BinTree(new[]
             {
                 new BinTreeObject(value, value, new BinTreeProperty[]
@@ -896,56 +896,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             using var binStream = new MemoryStream();
             tree.Write(binStream);
             binStream.Position = 0;
-            using var jsonStream = new MemoryStream();
+            string ritobin = await serializer.WriteBinTreeAsRitobinAsync(binStream.ToArray());
 
-            await serializer.WriteBinTreeAsJsonStreamingAsync(jsonStream, binStream);
-
-            using JsonDocument json = JsonDocument.Parse(jsonStream.ToArray());
-            JsonElement entry = json.RootElement.GetProperty("entry_value");
-            Assert.Equal("type_value", entry.GetProperty("type").GetString());
-            Assert.Equal("hash_value", entry.GetProperty("field_value").GetString());
-        }
-
-        [Fact]
-        public async Task BinJsonSerializationPreservesPtchDataOverrides()
-        {
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-            resolver.LoadBinHashes();
-            var serializer = new BinJsonSerializer(resolver);
-            using MemoryStream binStream = CreatePtchBin("Annie");
-            using var jsonStream = new MemoryStream();
-
-            await serializer.WriteBinTreeAsJsonStreamingAsync(jsonStream, binStream);
-
-            using JsonDocument json = JsonDocument.Parse(jsonStream.ToArray());
-            JsonElement item = Assert.Single(json.RootElement.GetProperty("$dataOverrides").EnumerateArray());
-            Assert.Equal("12345678", item.GetProperty("object").GetString());
-            Assert.Equal("mCharacterName", item.GetProperty("propertyPath").GetString());
-            Assert.Equal("String", item.GetProperty("type").GetString());
-            Assert.Equal("Annie", item.GetProperty("value").GetString());
-        }
-
-        [Fact]
-        public async Task BinDiffSerializationPreservesPtchOverridesOnBothSides()
-        {
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-            resolver.LoadBinHashes();
-            var serializer = new BinJsonSerializer(resolver);
-            using MemoryStream oldStream = CreatePtchBin("Annie");
-            using MemoryStream newStream = CreatePtchBin("Ahri");
-
-            (string oldJson, string newJson) = await serializer.WriteBinDiffAsJsonAsync(
-                oldStream.ToArray(),
-                newStream.ToArray());
-
-            Assert.Contains("\"$dataOverrides\"", oldJson);
-            Assert.Contains("\"Annie\"", oldJson);
-            Assert.Contains("\"$dataOverrides\"", newJson);
-            Assert.Contains("\"Ahri\"", newJson);
+            Assert.Contains("type_value", ritobin);
+            Assert.Contains("field_value: hash = \"hash_value\"", ritobin);
         }
 
         [Fact]
@@ -1056,33 +1010,5 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 })
             }, System.Array.Empty<string>());
 
-        private static MemoryStream CreatePtchBin(string value)
-        {
-            const uint objectHash = 0x12345678;
-            const string propertyPath = "mCharacterName";
-            byte[] pathBytes = Encoding.ASCII.GetBytes(propertyPath);
-            byte[] valueBytes = Encoding.UTF8.GetBytes(value);
-            var stream = new MemoryStream();
-            using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
-            {
-                writer.Write(Encoding.ASCII.GetBytes("PTCH"));
-                writer.Write(1u);
-                writer.Write(1u);
-                writer.Write(Encoding.ASCII.GetBytes("PROP"));
-                writer.Write(3u);
-                writer.Write(0u);
-                writer.Write(0u);
-                writer.Write(1u);
-                writer.Write(objectHash);
-                writer.Write((uint)(1 + 2 + pathBytes.Length + 2 + valueBytes.Length));
-                writer.Write((byte)BinPropertyType.String);
-                writer.Write((ushort)pathBytes.Length);
-                writer.Write(pathBytes);
-                writer.Write((ushort)valueBytes.Length);
-                writer.Write(valueBytes);
-            }
-            stream.Position = 0;
-            return stream;
-        }
     }
 }

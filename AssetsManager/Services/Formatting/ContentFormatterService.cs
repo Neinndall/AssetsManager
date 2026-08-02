@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using LeagueToolkit.Core.Meta;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Explorer;
@@ -18,11 +16,10 @@ namespace AssetsManager.Services.Formatting
         private readonly LogService _logService;
         private readonly JsBeautifierService _jsBeautifierService;
         private readonly CSSParserService _cssParserService;
-        private readonly HashResolverService _hashResolverService;
         private readonly AudioBankService _audioBankService;
         private readonly WadContentProvider _wadContentProvider;
         private readonly JsonFormatterService _jsonFormatterService;
-        private readonly BinJsonSerializer _binJsonSerializer;
+        private readonly BinRitobinSerializer _binRitobinSerializer;
         private readonly TroybinParser _troybinParser;
         private readonly PreloadParser _preloadParser;
         private readonly StringTableParser _stringTableParser;
@@ -32,11 +29,10 @@ namespace AssetsManager.Services.Formatting
             LogService logService, 
             JsBeautifierService jsBeautifierService, 
             CSSParserService cssParserService, 
-            HashResolverService hashResolverService, 
             AudioBankService audioBankService, 
             WadContentProvider wadContentProvider, 
             JsonFormatterService jsonFormatterService,
-            BinJsonSerializer binJsonSerializer,
+            BinRitobinSerializer binRitobinSerializer,
             TroybinParser troybinParser,
             PreloadParser preloadParser,
             StringTableParser stringTableParser,
@@ -45,11 +41,10 @@ namespace AssetsManager.Services.Formatting
             _logService = logService;
             _jsBeautifierService = jsBeautifierService;
             _cssParserService = cssParserService;
-            _hashResolverService = hashResolverService;
             _audioBankService = audioBankService;
             _wadContentProvider = wadContentProvider;
             _jsonFormatterService = jsonFormatterService;
-            _binJsonSerializer = binJsonSerializer;
+            _binRitobinSerializer = binRitobinSerializer;
             _troybinParser = troybinParser;
             _preloadParser = preloadParser;
             _stringTableParser = stringTableParser;
@@ -101,7 +96,7 @@ namespace AssetsManager.Services.Formatting
             switch (dataType)
             {
                 case "bin":
-                    formattedContent = await GetBinJsonStringAsync(data);
+                    formattedContent = await GetBinRitobinStringAsync(data);
                     break;
                 case "troybin":
                     formattedContent = await GetTroybinJsonStringAsync(data);
@@ -153,8 +148,8 @@ namespace AssetsManager.Services.Formatting
             return formattedContent;
         }
 
-        public Task<(string OldJson, string NewJson)> GetBinDiffJsonAsync(byte[] oldData, byte[] newData) =>
-            _binJsonSerializer.WriteBinDiffAsJsonAsync(oldData, newData);
+        public Task<(string OldRitobin, string NewRitobin)> GetBinDiffRitobinAsync(byte[] oldData, byte[] newData) =>
+            _binRitobinSerializer.WriteBinDiffAsRitobinAsync(oldData, newData);
 
         private async Task<string> GetBnkJsonStringAsync(byte[] data)
         {
@@ -176,7 +171,7 @@ namespace AssetsManager.Services.Formatting
             }
         }
 
-        private async Task<string> GetBinJsonStringAsync(byte[] data)
+        private async Task<string> GetBinRitobinStringAsync(byte[] data)
         {
             if (data == null || data.Length == 0)
             {
@@ -185,15 +180,7 @@ namespace AssetsManager.Services.Formatting
 
             try
             {
-                using var jsonStream = new MemoryStream();
-                using (var binStream = new MemoryStream(data))
-                {
-                    await _binJsonSerializer.WriteBinTreeAsJsonStreamingAsync(jsonStream, binStream);
-                } 
-                
-                jsonStream.Position = 0;
-                using var reader = new StreamReader(jsonStream, Encoding.UTF8);
-                return await reader.ReadToEndAsync();
+                return await _binRitobinSerializer.WriteBinTreeAsRitobinAsync(data);
             }
             catch (Exception ex)
             {
