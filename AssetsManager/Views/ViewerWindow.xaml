@@ -24,7 +24,7 @@
                                 <TextBlock Text="INTERACTIVE STUDIO" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Opacity="0.7"/>
                             </StackPanel>
                             <TextBlock Text="Model Viewer" FontSize="42" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Visualize characters, animations, and map geometry in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
+                            <TextBlock Text="Visualize 3D champions, animations, maps, and visual effects in real-time." FontSize="14" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,8,0,0" Opacity="0.8"/>
                         </StackPanel>
 
                         <!-- Action Cards -->
@@ -42,7 +42,7 @@
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Explore and visualize models"
+                                    <TextBlock Text="Explore models &amp; map environments"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"
@@ -60,12 +60,12 @@
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="Palette" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Chroma"
+                                    <TextBlock Text="Chroma Library"
                                                FontWeight="SemiBold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import skn with textures"
+                                    <TextBlock Text="Browse variants &amp; textures"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"
@@ -83,12 +83,12 @@
                                     <Border Background="{StaticResource SidebarBackground}" CornerRadius="25" Width="50" Height="50" Margin="0,0,0,16">
                                         <materialIcons:MaterialIcon Kind="Map" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Load Map"
+                                    <TextBlock Text="Map Environment"
                                                FontWeight="SemiBold"
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Import mapgeo"
+                                    <TextBlock Text="Render 3D maps &amp; textures"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"
@@ -111,7 +111,7 @@
                                                FontSize="14"
                                                Foreground="{StaticResource TextPrimary}"
                                                HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Inspect &amp; debug champion VFX"
+                                    <TextBlock Text="Inspect &amp; replay visual effects"
                                                FontSize="12"
                                                Foreground="{StaticResource TextMuted}"
                                                HorizontalAlignment="Center"

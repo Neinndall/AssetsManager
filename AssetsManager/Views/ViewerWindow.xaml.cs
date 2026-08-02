@@ -118,6 +118,20 @@ namespace AssetsManager.Views
             {
                 PanelControl.LoadAnimationDirectly(filePath);
             }
+            else if (extension == ".mapgeo")
+            {
+                string materialsBinPath = System.IO.Path.ChangeExtension(filePath, ".materials.bin");
+                string gameDataPath = !string.IsNullOrEmpty(ProjectExplorer?.CurrentRootFolder)
+                    ? ProjectExplorer.CurrentRootFolder
+                    : System.IO.Path.GetDirectoryName(filePath);
+                _viewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
+                _viewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
+                _viewModel.IsLoadingVisible = true;
+
+                await PanelControl.LoadMapGeometry(filePath, materialsBinPath, gameDataPath);
+
+                _viewModel.IsLoadingVisible = false;
+            }
             else
             {
                 PanelControl.ViewModel.ShowMainContent();

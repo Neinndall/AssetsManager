@@ -506,23 +506,44 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                 return null;
 
             string normalizedPath = PathUtils.ToVirtualPath(texturePath).Replace('/', Path.DirectorySeparatorChar);
-            string rootPath = Path.GetFullPath(gameDataPath);
-            string candidatePath = Path.GetFullPath(Path.Combine(rootPath, normalizedPath));
-            if (!PathUtils.IsSameOrSubPath(rootPath, candidatePath))
-                return null;
+            var searchDirs = new List<string>();
 
-            if (File.Exists(candidatePath))
-                return candidatePath;
-
-            string extension = Path.GetExtension(candidatePath);
-            foreach (string alternativeExtension in new[] { ".tex", ".dds", ".png", ".tga" })
+            if (Directory.Exists(gameDataPath))
             {
-                if (extension.Equals(alternativeExtension, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                var dir = new DirectoryInfo(gameDataPath);
+                while (dir != null)
+                {
+                    searchDirs.Add(dir.FullName);
+                    dir = dir.Parent;
+                }
+            }
+            else if (File.Exists(gameDataPath))
+            {
+                var dir = new FileInfo(gameDataPath).Directory;
+                while (dir != null)
+                {
+                    searchDirs.Add(dir.FullName);
+                    dir = dir.Parent;
+                }
+            }
 
-                string alternativePath = Path.ChangeExtension(candidatePath, alternativeExtension);
-                if (File.Exists(alternativePath))
-                    return alternativePath;
+            foreach (string rootPath in searchDirs)
+            {
+                string candidatePath = Path.GetFullPath(Path.Combine(rootPath, normalizedPath));
+
+                if (File.Exists(candidatePath))
+                    return candidatePath;
+
+                string extension = Path.GetExtension(candidatePath);
+                foreach (string alternativeExtension in new[] { ".tex", ".dds", ".png", ".tga" })
+                {
+                    if (extension.Equals(alternativeExtension, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string alternativePath = Path.ChangeExtension(candidatePath, alternativeExtension);
+                    if (File.Exists(alternativePath))
+                        return alternativePath;
+                }
             }
 
             return null;

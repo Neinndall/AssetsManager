@@ -996,19 +996,17 @@ namespace AssetsManager.Views.Controls.Viewer
                 string mapGeoPath = openMapGeoDialog.FileName;
                 string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");
 
-                var openGameDataDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select asset directory root" };
-                if (openGameDataDialog.ShowDialog() == CommonFileDialogResult.Ok)
+                if (WindowViewModel != null)
                 {
-                    if (WindowViewModel != null)
-                    {
-                        WindowViewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
-                        WindowViewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
-                        WindowViewModel.IsLoadingVisible = true;
-                    }
-                    await LoadMapGeometry(mapGeoPath, materialsBinPath, openGameDataDialog.FileName);
-                    if (WindowViewModel != null)
-                        WindowViewModel.IsLoadingVisible = false;
+                    WindowViewModel.LoadingTitle = ViewerWindowModel.MapGeoLoadingTitle;
+                    WindowViewModel.LoadingDescription = ViewerWindowModel.MapGeoLoadingDescription;
+                    WindowViewModel.IsLoadingVisible = true;
                 }
+
+                await LoadMapGeometry(mapGeoPath, materialsBinPath, Path.GetDirectoryName(mapGeoPath));
+
+                if (WindowViewModel != null)
+                    WindowViewModel.IsLoadingVisible = false;
             }
         }
 

@@ -27,6 +27,12 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer / Simplified manual map geometry loading to 1-step file dialog using automatic root texture resolution.
+  - Viewer / Updated Load Project description to "Explore models & map environments".
+  - Viewer / Improved map texture resolution with recursive parent root fallback when loading maps from Project Explorer.
+  - Viewer / Supported .mapgeo file selection directly inside Project Explorer browser tree.
+  - Viewer / Updated landing descriptions for 3D Workspace hero header, Load Map, and VFX Studio cards.
+  - Viewer / Collapsed bottom dock in Map mode to remove obsolete button and empty spacing.
   - VFX Studio / Removed the incomplete AttachedMesh model-binding and rendering path; these emitters remain identified but are skipped until proper owner-model support is implemented.
   - Viewer / Synchronized model visibility toggle in Scene list to enable or hide all submeshes at once.
   - VFX effects now keep child layers aligned and replay with consistent timing and placement.

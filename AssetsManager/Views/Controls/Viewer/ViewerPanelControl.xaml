@@ -1067,13 +1067,13 @@
             <!-- ============================================ -->
             <!-- BOTTOM DOCK (Quick Actions)                 -->
             <!-- ============================================ -->
-            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="14,12">
+            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="14,12" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                 <Grid>
                     <!-- Collapsed buttons to preserve code-behind bindings without breaking layout -->
                     <Button x:Name="LoadModelButton" Visibility="Collapsed" Click="LoadModelButton_Click"/>
                     <Button x:Name="LoadChromaModelButton" Visibility="Collapsed" Click="LoadChromaModelButton_Click"/>
                     
-                    <!-- LoadAnimationButton takes full width -->
+                    <!-- LoadAnimationButton takes full width when NOT in map mode -->
                     <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="40" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="AnimationPlay" Width="15" Height="15" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
