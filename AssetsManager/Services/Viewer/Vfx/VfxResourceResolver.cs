@@ -25,7 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private readonly Dictionary<string, VfxResourceIndex> _indexes = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, BitmapSource> _textures = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _missingTextures = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, (float[] Positions, float[] Uvs, uint[] Indices)?> _meshes =
+        private readonly Dictionary<string, (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)?> _meshes =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, VfxAnimatedMesh> _meshAnimations =
             new(StringComparer.OrdinalIgnoreCase);
@@ -50,7 +50,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             return texture;
         }
 
-        public (float[] Positions, float[] Uvs, uint[] Indices)? ResolveMesh(
+        public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? ResolveMesh(
             string authoredPath,
             string searchDirectory)
         {
@@ -196,7 +196,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 .ToArray();
         }
 
-        private static (float[] Positions, float[] Uvs, uint[] Indices)? DecodeMesh(string path)
+        private static (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? DecodeMesh(string path)
         {
             if (path.EndsWith(".skn", StringComparison.OrdinalIgnoreCase))
                 return DecodeSkinnedMesh(path);
@@ -210,9 +210,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             int vertexCount = source.Faces.Count * 3;
             var positions = new float[vertexCount * 3];
             var uvs = new float[vertexCount * 2];
+            var colors = new float[vertexCount * 4];
             var indices = new uint[vertexCount];
             int positionOffset = 0;
             int uvOffset = 0;
+            int colorOffset = 0;
 
             foreach (var face in source.Faces)
             {
@@ -226,14 +228,21 @@ namespace AssetsManager.Services.Viewer.Vfx
                     positions[positionOffset++] = position.Z;
                     uvs[uvOffset++] = faceUvs[corner].X;
                     uvs[uvOffset++] = faceUvs[corner].Y;
+                    var color = source.HasVertexColors && vertexIds[corner] < source.VertexColors.Count
+                        ? source.VertexColors[vertexIds[corner]]
+                        : LeagueToolkit.Core.Primitives.Color.One;
+                    colors[colorOffset++] = color.R;
+                    colors[colorOffset++] = color.G;
+                    colors[colorOffset++] = color.B;
+                    colors[colorOffset++] = color.A;
                     indices[(positionOffset / 3) - 1] = (uint)((positionOffset / 3) - 1);
                 }
             }
 
-            return (positions, uvs, indices);
+            return (positions, uvs, colors, indices);
         }
 
-        private static (float[] Positions, float[] Uvs, uint[] Indices)? DecodeSkinnedMesh(string path)
+        private static (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? DecodeSkinnedMesh(string path)
         {
             using var mesh = LeagueToolkit.Core.Mesh.SkinnedMesh.ReadFromSimpleSkin(path);
             var sourcePositions = mesh.VerticesView
@@ -245,12 +254,17 @@ namespace AssetsManager.Services.Viewer.Vfx
 
             var positions = new float[sourcePositions.Count * 3];
             var uvs = new float[sourceUvs.Count * 2];
+            var colors = new float[sourcePositions.Count * 4];
             for (int index = 0; index < sourcePositions.Count; index++)
             {
                 var position = sourcePositions[index];
                 positions[index * 3] = position.X;
                 positions[index * 3 + 1] = position.Y;
                 positions[index * 3 + 2] = position.Z;
+                colors[index * 4] = 1f;
+                colors[index * 4 + 1] = 1f;
+                colors[index * 4 + 2] = 1f;
+                colors[index * 4 + 3] = 1f;
             }
             for (int index = 0; index < sourceUvs.Count; index++)
             {
@@ -262,7 +276,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             var indices = new uint[mesh.Indices.Count];
             for (int index = 0; index < indices.Length; index++)
                 indices[index] = mesh.Indices[index];
-            return indices.Length == 0 ? null : (positions, uvs, indices);
+            return indices.Length == 0 ? null : (positions, uvs, colors, indices);
         }
 
         private static string CreateKey(string path, string directory)

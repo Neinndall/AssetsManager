@@ -183,6 +183,49 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             }
         }
 
+        [Fact]
+        public void StaticMeshDecodePreservesAuthoredVertexColors()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "AssetsManagerVfxMesh", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            string meshPath = Path.Combine(root, "gradient.sco");
+            File.WriteAllLines(meshPath, new[]
+            {
+                "[ObjectBegin]",
+                "Name= gradient",
+                "CentralPoint= 0 0 0",
+                "VertexColors= 1",
+                "Verts= 3",
+                "0 0 0",
+                "1 0 0",
+                "0 1 0",
+                "255 128 0 64",
+                "0 255 128 192",
+                "64 0 255 255",
+                "Faces= 1",
+                "3 0 1 2 material 0 0 1 0 0 1"
+            });
+
+            try
+            {
+                var resolver = new VfxResourceResolver();
+                var mesh = resolver.ResolveMesh("gradient.sco", root);
+
+                Assert.True(mesh.HasValue);
+                Assert.Equal(12, mesh.Value.Colors.Length);
+                Assert.Equal(1f, mesh.Value.Colors[0]);
+                Assert.Equal(128f / 255f, mesh.Value.Colors[1], precision: 6);
+                Assert.Equal(64f / 255f, mesh.Value.Colors[3], precision: 6);
+                Assert.Equal(192f / 255f, mesh.Value.Colors[7], precision: 6);
+                Assert.Equal(1f, mesh.Value.Colors[10]);
+                Assert.Equal(1f, mesh.Value.Colors[11]);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
         private static BinTreeObject CreateSystem(string path, string name)
             => new(
                 path,

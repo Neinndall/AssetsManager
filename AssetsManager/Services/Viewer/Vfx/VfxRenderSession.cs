@@ -213,7 +213,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
                     if (emitter.PendingMesh is { } mesh)
                     {
-                        _renderer.UploadEmitterMesh(emitter, mesh.Positions, mesh.Uvs, mesh.Indices);
+                        _renderer.UploadEmitterMesh(emitter, mesh.Positions, mesh.Uvs, mesh.Colors, mesh.Indices);
                         emitter.PendingMesh = null;
                     }
                 }

@@ -32,8 +32,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             public object PendingDistortionTexture;
             public object PendingErosionTexture;
             public object PendingReflectionTexture;
-            /// <summary>Pending mesh data (positions, uvs, indices) for deferred GL upload of .scb/.sco mesh primitives.</summary>
-            public (float[] Positions, float[] Uvs, uint[] Indices)? PendingMesh;
+            /// <summary>Pending mesh data for deferred GL upload of .scb/.sco mesh primitives.</summary>
+            public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? PendingMesh;
             internal VfxAnimatedMesh MeshAnimation;
             // CPU copy of particleColorTexture (RGBA8, top-left origin).
             public byte[] ColorGradient;

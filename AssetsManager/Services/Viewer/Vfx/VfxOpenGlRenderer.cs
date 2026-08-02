@@ -13,6 +13,10 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxOpenGlRenderer : IDisposable
     {
+        internal const int MeshVertexStride = 9;
+        private const int MeshUvOffset = 3;
+        private const int MeshColorOffset = 5;
+
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo, _fallbackWhiteTexture;
         private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
@@ -603,7 +607,12 @@ namespace AssetsManager.Services.Viewer.Vfx
             }
         }
 
-        public void UploadEmitterMesh(VfxPlaybackRuntime.EmitterState es, float[] positions, float[] uvs, uint[] indices = null)
+        public void UploadEmitterMesh(
+            VfxPlaybackRuntime.EmitterState es,
+            float[] positions,
+            float[] uvs,
+            float[] colors,
+            uint[] indices = null)
         {
             if (!_ready) return;
             EnsureMeshProgram();
@@ -618,15 +627,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 return;
             }
             int verts = positions.Length / 3;
-            var inter = new float[verts * 5];
-            for (int i = 0; i < verts; i++)
-            {
-                inter[i * 5 + 0] = positions[i * 3 + 0];
-                inter[i * 5 + 1] = positions[i * 3 + 1];
-                inter[i * 5 + 2] = positions[i * 3 + 2];
-                inter[i * 5 + 3] = i * 2 + 0 < uvs.Length ? uvs[i * 2 + 0] : 0f;
-                inter[i * 5 + 4] = i * 2 + 1 < uvs.Length ? uvs[i * 2 + 1] : 0f;
-            }
+            float[] inter = BuildMeshInterleaved(positions, uvs, colors);
             var vao = _gl.GenVertexArray();
             var vbo = _gl.GenBuffer();
             _gl.BindVertexArray(vao);
@@ -634,9 +635,11 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<float>(inter), BufferUsageARB.DynamicDraw);
 
             _gl.EnableVertexAttribArray(0);
-            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), IntPtr.Zero);
+            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, MeshVertexStride * sizeof(float), IntPtr.Zero);
             _gl.EnableVertexAttribArray(1);
-            _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float), new IntPtr(3 * sizeof(float)));
+            _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, MeshVertexStride * sizeof(float), new IntPtr(MeshUvOffset * sizeof(float)));
+            _gl.EnableVertexAttribArray(2);
+            _gl.VertexAttribPointer(2, 4, VertexAttribPointerType.Float, false, MeshVertexStride * sizeof(float), new IntPtr(MeshColorOffset * sizeof(float)));
             uint ebo = 0;
             if (indices is { Length: > 0 })
             {
@@ -659,6 +662,34 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
         private readonly Dictionary<float[], MeshGpuResource> _meshCache =
             new(ReferenceEqualityComparer.Instance);
+
+        internal static float[] BuildMeshInterleaved(float[] positions, float[] uvs, float[] colors)
+        {
+            ArgumentNullException.ThrowIfNull(positions);
+            uvs ??= Array.Empty<float>();
+            colors ??= Array.Empty<float>();
+
+            int vertexCount = positions.Length / 3;
+            var interleaved = new float[vertexCount * MeshVertexStride];
+            for (int vertex = 0; vertex < vertexCount; vertex++)
+            {
+                int target = vertex * MeshVertexStride;
+                int position = vertex * 3;
+                int uv = vertex * 2;
+                int color = vertex * 4;
+                interleaved[target] = positions[position];
+                interleaved[target + 1] = positions[position + 1];
+                interleaved[target + 2] = positions[position + 2];
+                interleaved[target + MeshUvOffset] = uv < uvs.Length ? uvs[uv] : 0f;
+                interleaved[target + MeshUvOffset + 1] = uv + 1 < uvs.Length ? uvs[uv + 1] : 0f;
+                for (int channel = 0; channel < 4; channel++)
+                {
+                    interleaved[target + MeshColorOffset + channel] =
+                        color + channel < colors.Length ? colors[color + channel] : 1f;
+                }
+            }
+            return interleaved;
+        }
 
         private sealed record MeshGpuResource(
             uint Vao,
@@ -685,12 +716,15 @@ namespace AssetsManager.Services.Viewer.Vfx
             int verts = Math.Min(es.MeshVertexCount, positions.Length / 3);
             for (int i = 0; i < verts; i++)
             {
-                inter[i * 5 + 0] = positions[i * 3 + 0];
-                inter[i * 5 + 1] = positions[i * 3 + 1];
-                inter[i * 5 + 2] = positions[i * 3 + 2];
+                inter[i * MeshVertexStride] = positions[i * 3];
+                inter[i * MeshVertexStride + 1] = positions[i * 3 + 1];
+                inter[i * MeshVertexStride + 2] = positions[i * 3 + 2];
             }
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, es.MeshVbo);
-            _gl.BufferSubData(BufferTargetARB.ArrayBuffer, 0, new ReadOnlySpan<float>(inter, 0, verts * 5));
+            _gl.BufferSubData(
+                BufferTargetARB.ArrayBuffer,
+                0,
+                new ReadOnlySpan<float>(inter, 0, verts * MeshVertexStride));
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
@@ -856,6 +890,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private const string MeshVert = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
+layout(location=2) in vec4 aColor;
 uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
 uniform vec3 uScale;
@@ -891,6 +926,7 @@ out vec2 vUv;
 out vec2 vUvMult;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
+out vec4 vMeshColor;
 vec2 addressUv(vec2 uv, int mode){
     if (mode == 1 || mode == 3) return clamp(uv, vec2(0.0), vec2(1.0));
     if (mode == 2) {
@@ -951,6 +987,7 @@ void main(){
     vec2 multCellMin = multCell / multDiv + multHalfTexel;
     vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
     vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
+    vMeshColor = aColor;
 }";
 
         private const string MeshFrag = @"
@@ -958,6 +995,7 @@ in vec2 vUv;
 in vec2 vUvMult;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
+in vec4 vMeshColor;
 uniform sampler2D uTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
@@ -1010,8 +1048,9 @@ void main(){
         float opacity = mix(uReflectionOpacity.x, uReflectionOpacity.y, edge);
         texel.rgb = mix(texel.rgb, reflection.rgb * uReflectionColor.rgb, clamp(opacity * reflection.a, 0.0, 1.0));
     }
-    if (texel.a * uColor.a <= uAlphaCutoff) discard;
-    fragColor = texel * uColor;
+    vec4 authoredColor = uColor * vMeshColor;
+    if (texel.a * authoredColor.a <= uAlphaCutoff) discard;
+    fragColor = texel * authoredColor;
 }";
 
         private const string Vert = @"

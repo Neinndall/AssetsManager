@@ -138,6 +138,40 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void ArbitraryQuadScaleUsesAuthoredHalfExtentAsItsRadius()
+        {
+            var emitter = CreateEmitter(new Vector3(345f, 400f, 50f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                IsArbitraryQuad = true,
+                IsUniformScale = true
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "ring", "ring", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(690f, state.Instances[3]);
+            Assert.Equal(690f, state.Instances[4]);
+        }
+
+        [Fact]
+        public void MeshInterleavingPreservesPositionUvAndVertexColor()
+        {
+            float[] interleaved = VfxOpenGlRenderer.BuildMeshInterleaved(
+                new[] { 1f, 2f, 3f },
+                new[] { 0.25f, 0.75f },
+                new[] { 0.1f, 0.2f, 0.3f, 0.4f });
+
+            Assert.Equal(VfxOpenGlRenderer.MeshVertexStride, interleaved.Length);
+            Assert.Equal(
+                new[] { 1f, 2f, 3f, 0.25f, 0.75f, 0.1f, 0.2f, 0.3f, 0.4f },
+                interleaved);
+        }
+
+        [Fact]
         public void BirthColorDynamicsUseEmitterTimeAtParticleCreation()
         {
             var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
