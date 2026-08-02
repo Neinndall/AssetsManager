@@ -515,7 +515,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     // rotation0 is an authored angular velocity, not an absolute angle.
                     lifeRotation *= p.Age * (MathF.PI / 180f);
                 }
-                bool authoredPlane = d.IsArbitraryQuad || d.ParticleIsLocalOrientation || d.PrimitiveKind is
+                bool authoredPlane = d.IsArbitraryQuad || d.IsLocalOrientation || d.ParticleIsLocalOrientation || d.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 if (d.IsDirectionOriented && !authoredPlane && direction.LengthSquared() > 1e-6f)
                 {

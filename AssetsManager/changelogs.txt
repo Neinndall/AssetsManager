@@ -30,6 +30,8 @@ Improvements
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.
   - VFX Studio / Audited real BIN-driven texture alpha, UV multiplier blending, emitter-space placement, and AttachedMesh fallback rendering.
   - VFX Studio / Corrected additive blend handling and alpha clipping while preserving authored texture output.
+  - VFX Studio / Recovered legacy opaque RGB masks for billboard-like effects while preserving authored mesh alpha.
+  - VFX Studio / Honored BIN local-orientation flags in both particle basis selection and quad shader geometry.
   - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
   - VFX Studio now follows declared BIN links from the selected skin root, avoiding unrelated sibling or basename matches while preserving truncated extraction collisions.

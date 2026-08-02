@@ -87,7 +87,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                             if (resolvedDependencies.Count > 1)
                             {
                                 bundle.AmbiguousDependencies.Add(dep);
-                                log?.Log($"VFX BIN dependency matched {resolvedDependencies.Count} extracted files: {dep}.");
                             }
                             foreach (string resolvedDependency in resolvedDependencies)
                                 Enqueue(resolvedDependency);
@@ -95,7 +94,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                             if (!enqueued)
                             {
                                 bundle.MissingDependencies.Add(dep);
-                                log?.Log($"VFX BIN dependency missing: {dep}.");
                             }
                         }
 
@@ -157,14 +155,15 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (texture != null)
                 {
                     emitter.PendingTexture = texture;
-                    if (!alphaSemantics.TryGetValue(texture, out bool hasEffectivelyOpaqueAlpha))
+                    if (!alphaSemantics.TryGetValue(texture, out bool isLegacyOpaqueRgbMask))
                     {
-                        hasEffectivelyOpaqueAlpha = VfxTextureAlphaSemantics.HasEffectivelyOpaqueAlpha(texture);
-                        alphaSemantics[texture] = hasEffectivelyOpaqueAlpha;
+                        isLegacyOpaqueRgbMask = VfxTextureAlphaSemantics.IsLegacyOpaqueRgbMask(texture);
+                        alphaSemantics[texture] = isLegacyOpaqueRgbMask;
                     }
                     emitter.DeriveAlphaFromRgb = VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
-                        hasEffectivelyOpaqueAlpha,
-                        emitter.Def.BlendMode);
+                        isLegacyOpaqueRgbMask,
+                        emitter.Def.BlendMode,
+                        emitter.Def.PrimitiveKind);
                     if (emitter.Def.UseTextureAspect)
                     {
                         float cellWidth = texture.PixelWidth / Math.Max(1f, emitter.Def.TexDiv.X);
@@ -173,11 +172,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                             emitter.SpriteAspect = Math.Clamp(cellWidth / cellHeight, 0.05f, 20f);
                     }
                 }
-                else if (!string.IsNullOrWhiteSpace(emitter.Def.TexturePath))
-                {
-                    log?.Log($"VFX resource missing: {emitter.Def.TexturePath} ({definition.Name}/{emitter.Def.Name}).");
-                }
-
                 emitter.PendingTextureMult = _resources.ResolveTexture(emitter.Def.TextureMultPath, searchDirectory);
                 emitter.PendingDistortionTexture = _resources.ResolveTexture(
                     emitter.Def.Distortion?.NormalMapTexturePath,
@@ -199,9 +193,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     {
                         emitter.PendingMesh = _resources.ResolveMesh(emitter.Def.MeshPath, searchDirectory);
-                        if (emitter.PendingMesh == null)
-                            log?.Log($"VFX mesh missing: {emitter.Def.MeshPath} ({definition.Name}/{emitter.Def.Name}).");
-                        else if (!string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath))
+                        if (emitter.PendingMesh != null && !string.IsNullOrWhiteSpace(emitter.Def.MeshAnimationPath))
                         {
                             emitter.MeshAnimation = _resources.ResolveMeshAnimation(
                                 emitter.Def.MeshPath,
@@ -209,12 +201,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                                 emitter.Def.MeshAnimationPath,
                                 searchDirectory,
                                 log);
-                            if (emitter.MeshAnimation == null)
-                            {
-                                log?.Log(
-                                    $"VFX mesh animation missing: {emitter.Def.MeshAnimationPath} " +
-                                    $"({definition.Name}/{emitter.Def.Name}).");
-                            }
                         }
                     }
                 }

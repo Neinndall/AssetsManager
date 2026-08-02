@@ -362,7 +362,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_uClampUvMult, es.Def.TextureMultClampUvScroll ? 1 : 0);
                 bool directional = es.Def.IsDirectionOriented || es.Def.PrimitiveKind is
                     VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.Ray or VfxPrimitiveKind.Beam;
-                bool arbitrary = es.Def.IsArbitraryQuad || es.Def.ParticleIsLocalOrientation || es.Def.PrimitiveKind is
+                bool arbitrary = es.Def.IsArbitraryQuad || es.Def.IsLocalOrientation || es.Def.ParticleIsLocalOrientation || es.Def.PrimitiveKind is
                     VfxPrimitiveKind.ArbitraryTrail or VfxPrimitiveKind.PlanarProjection;
                 _gl.Uniform1(_uDirectionOriented, directional ? 1 : 0);
                 _gl.Uniform1(_uArbitraryQuad, arbitrary ? 1 : 0);

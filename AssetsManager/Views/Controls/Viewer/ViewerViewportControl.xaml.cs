@@ -807,7 +807,6 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_vfxRenderer == null) return;
             _vfxRenderer.SetVfxSystem(vfxSystem);
-            LogService?.LogDebug($"[VFX] Selected VFX system '{vfxSystem?.Name ?? "none"}'.");
         }
 
         public void PlayVfx() => _vfxRenderer?.Play();

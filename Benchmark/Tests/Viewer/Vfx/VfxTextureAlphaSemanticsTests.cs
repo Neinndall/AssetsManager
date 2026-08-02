@@ -9,13 +9,42 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
     public sealed class VfxTextureAlphaSemanticsTests
     {
         [Fact]
-        public void AlphaBlendWithOpaqueDecodedChannelUsesRgbOpacity()
+        public void FullyOpaqueMeshTexturePreservesAuthoredAlpha()
         {
             BitmapSource texture = CreateTexture(
                 0, 0, 0, 255,
                 255, 255, 255, 255);
 
-            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.Mesh));
+        }
+
+        [Fact]
+        public void OpaqueGradientTexturePreservesAuthoredAlpha()
+        {
+            BitmapSource texture = CreateTexture(
+                82, 81, 82, 255,
+                247, 251, 247, 255);
+
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.ArbitraryQuad));
+        }
+
+        [Fact]
+        public void OpaqueBillboardMaskUsesDarkRgbAsOpacity()
+        {
+            BitmapSource texture = CreateTexture(
+                0, 0, 0, 255,
+                255, 255, 255, 255);
+
+            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.ArbitraryQuad));
         }
 
         [Fact]
@@ -25,7 +54,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 0, 0, 0, 0,
                 255, 255, 255, 255);
 
-            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.CameraQuad));
         }
 
         [Fact]
@@ -43,7 +75,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             BitmapSource texture = CreateTexture(pixels);
 
-            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.CameraQuad));
         }
 
         [Fact]
@@ -53,7 +88,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 0, 0, 0, 128,
                 255, 255, 255, 255);
 
-            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.CameraQuad));
         }
 
         [Fact]
@@ -63,7 +101,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 0, 0, 0, 255,
                 255, 255, 255, 255);
 
-            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 4));
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 4,
+                VfxPrimitiveKind.CameraQuad));
         }
 
         [Theory]
