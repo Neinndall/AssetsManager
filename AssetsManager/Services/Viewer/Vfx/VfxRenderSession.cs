@@ -5,7 +5,6 @@ using System.Numerics;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Viewer;
 using Silk.NET.OpenGL;
@@ -30,35 +29,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         private bool _ready;
         private uint _viewportWidth;
         private uint _viewportHeight;
-        private SceneModel _attachedMeshSource;
-        private AttachedMeshBinding _attachedMeshBinding;
-
-        private sealed record AttachedMeshSegment(MeshGeometry3D Geometry, int VertexOffset, int VertexCount);
-
-        private sealed class AttachedMeshBinding
-        {
-            public required float[] Positions { get; init; }
-            public required float[] Uvs { get; init; }
-            public required uint[] Indices { get; init; }
-            public required IReadOnlyList<AttachedMeshSegment> Segments { get; init; }
-
-            public bool UpdatePositions()
-            {
-                foreach (AttachedMeshSegment segment in Segments)
-                {
-                    if (segment.Geometry.Positions.Count != segment.VertexCount) return false;
-                    for (int index = 0; index < segment.VertexCount; index++)
-                    {
-                        Point3D position = segment.Geometry.Positions[index];
-                        int target = (segment.VertexOffset + index) * 3;
-                        Positions[target] = (float)position.X;
-                        Positions[target + 1] = (float)position.Y;
-                        Positions[target + 2] = (float)position.Z;
-                    }
-                }
-                return true;
-            }
-        }
 
         public VfxRenderSession(LogService logService = null)
         {
@@ -143,13 +113,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _graph?.SetTransform(_worldTransform);
         }
 
-        public void SetAttachedMeshSource(SceneModel model)
-        {
-            if (ReferenceEquals(_attachedMeshSource, model)) return;
-            _attachedMeshSource = model;
-            _attachedMeshBinding = null;
-        }
-
         public void SetViewportSize(double width, double height)
         {
             _viewportWidth = (uint)Math.Max(0, width);
@@ -222,7 +185,6 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private void UploadPendingResources()
         {
-            SyncAttachedMeshes();
             foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
             {
                 foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
@@ -256,99 +218,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                     }
                 }
             }
-        }
-
-        private void SyncAttachedMeshes()
-        {
-            if (_attachedMeshSource?.Parts == null) return;
-            VfxPlaybackRuntime.EmitterState[] attachedEmitters = _graph.Runtimes
-                .SelectMany(runtime => runtime.Emitters)
-                .Where(emitter => emitter.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh)
-                .ToArray();
-            if (attachedEmitters.Length == 0) return;
-
-            _attachedMeshBinding ??= CreateAttachedMeshBinding(_attachedMeshSource);
-            if (_attachedMeshBinding == null || !_attachedMeshBinding.UpdatePositions()) return;
-
-            Matrix4x4 world = CreateSceneWorldTransform(_attachedMeshSource);
-            foreach (VfxPlaybackRuntime.EmitterState emitter in attachedEmitters)
-            {
-                emitter.UsesExternalAttachedMesh = true;
-                emitter.AttachedMeshWorld = world;
-                if (emitter.MeshVao == 0)
-                {
-                    _renderer.UploadEmitterMesh(
-                        emitter,
-                        _attachedMeshBinding.Positions,
-                        _attachedMeshBinding.Uvs,
-                        _attachedMeshBinding.Indices);
-                }
-                else
-                {
-                    _renderer.UpdateEmitterMeshPositions(emitter, _attachedMeshBinding.Positions);
-                }
-            }
-        }
-
-        private static AttachedMeshBinding CreateAttachedMeshBinding(SceneModel model)
-        {
-            var parts = model.Parts
-                .Where(part => part.IsVisible && part.Geometry?.Geometry is MeshGeometry3D)
-                .Select(part => (MeshGeometry3D)part.Geometry.Geometry)
-                .Where(geometry => geometry.Positions.Count > 0 && geometry.TriangleIndices.Count > 0)
-                .ToArray();
-            if (parts.Length == 0) return null;
-
-            int vertexCount = parts.Sum(geometry => geometry.Positions.Count);
-            int indexCount = parts.Sum(geometry => geometry.TriangleIndices.Count);
-            var positions = new float[vertexCount * 3];
-            var uvs = new float[vertexCount * 2];
-            var indices = new uint[indexCount];
-            var segments = new List<AttachedMeshSegment>(parts.Length);
-            int vertexOffset = 0;
-            int indexOffset = 0;
-
-            foreach (MeshGeometry3D geometry in parts)
-            {
-                int partVertexCount = geometry.Positions.Count;
-                segments.Add(new AttachedMeshSegment(geometry, vertexOffset, partVertexCount));
-                for (int index = 0; index < partVertexCount; index++)
-                {
-                    if (index >= geometry.TextureCoordinates.Count) continue;
-                    System.Windows.Point uv = geometry.TextureCoordinates[index];
-                    int target = (vertexOffset + index) * 2;
-                    uvs[target] = (float)uv.X;
-                    uvs[target + 1] = (float)uv.Y;
-                }
-                for (int index = 0; index < geometry.TriangleIndices.Count; index++)
-                    indices[indexOffset + index] = (uint)(vertexOffset + geometry.TriangleIndices[index]);
-
-                vertexOffset += partVertexCount;
-                indexOffset += geometry.TriangleIndices.Count;
-            }
-
-            var binding = new AttachedMeshBinding
-            {
-                Positions = positions,
-                Uvs = uvs,
-                Indices = indices,
-                Segments = segments,
-            };
-            binding.UpdatePositions();
-            return binding;
-        }
-
-        internal static Matrix4x4 CreateSceneWorldTransform(SceneModel model)
-        {
-            float pitch = (float)(model.RotationX * (Math.PI / 180.0));
-            float yaw = (float)(model.RotationY * (Math.PI / 180.0));
-            float roll = (float)(model.RotationZ * (Math.PI / 180.0));
-            return Matrix4x4.CreateScale((float)model.Scale) *
-                   Matrix4x4.CreateFromYawPitchRoll(yaw, pitch, roll) *
-                   Matrix4x4.CreateTranslation(
-                       (float)model.PositionX,
-                       (float)model.PositionY,
-                       (float)model.PositionZ);
         }
 
         private void UploadTexture(ref object pending, Action<uint> assign)
@@ -394,8 +263,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             _loadingService.ClearCaches();
             _graph = null;
             _activeSystem = null;
-            _attachedMeshSource = null;
-            _attachedMeshBinding = null;
         }
     }
 }

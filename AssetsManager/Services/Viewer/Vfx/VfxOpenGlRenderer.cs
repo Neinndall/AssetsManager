@@ -291,6 +291,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (!es.IsVisible) continue;
+                if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh) continue;
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
                     RenderMeshEmitter(es, viewProj);
@@ -532,7 +533,6 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private uint _meshProgram;
         private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muEmitterUvOffset;
-        private int _muUseAttachedWorld, _muAttachedWorld;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
@@ -550,8 +550,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 _meshProgram = GlShaderCompiler.CreateProgram(_gl, _gles, MeshVert, MeshFrag);
                 _muViewProj = _gl.GetUniformLocation(_meshProgram, "uViewProj");
-                _muUseAttachedWorld = _gl.GetUniformLocation(_meshProgram, "uUseAttachedWorld");
-                _muAttachedWorld = _gl.GetUniformLocation(_meshProgram, "uAttachedWorld");
                 _muWorldPos = _gl.GetUniformLocation(_meshProgram, "uWorldPos");
                 _muScale = _gl.GetUniformLocation(_meshProgram, "uScale");
                 _muRotation = _gl.GetUniformLocation(_meshProgram, "uRotation");
@@ -701,14 +699,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (es.MeshAnimation != null)
                 UpdateEmitterMeshPositions(es, es.MeshAnimation.Evaluate(es.EmitterAge));
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
-            _gl.GetInteger(GLEnum.DepthFunc, out int depthFunction);
             EnsureMeshProgram();
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
-            _gl.Uniform1(_muUseAttachedWorld, es.UsesExternalAttachedMesh ? 1 : 0);
-            Matrix4x4 attachedWorld = es.AttachedMeshWorld;
-            _gl.UniformMatrix4(_muAttachedWorld, 1, false, in attachedWorld.M11);
             _gl.Uniform1(_muTex, 0);
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muErosionTex, 4);
@@ -805,12 +799,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (renderState.DisableBackfaceCull) _gl.Disable(EnableCap.CullFace);
             else _gl.Enable(EnableCap.CullFace);
             ApplyBlendMode(es.Def.BlendMode);
-            if (es.UsesExternalAttachedMesh) _gl.DepthFunc(DepthFunction.Lequal);
 
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
             _gl.Uniform2(_muEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
-            int drawInstanceCount = es.UsesExternalAttachedMesh ? Math.Min(1, es.InstanceCount) : es.InstanceCount;
-            for (int i = 0; i < drawInstanceCount; i++)
+            for (int i = 0; i < es.InstanceCount; i++)
             {
                 int o = i * Stride;
                 _gl.Uniform3(_muWorldPos, es.Instances[o], es.Instances[o + 1], es.Instances[o + 2]);
@@ -844,7 +836,6 @@ namespace AssetsManager.Services.Viewer.Vfx
                 }
                 else _gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)es.MeshVertexCount);
             }
-            if (es.UsesExternalAttachedMesh) _gl.DepthFunc((DepthFunction)depthFunction);
             if (cullFace) _gl.Enable(EnableCap.CullFace);
             else _gl.Disable(EnableCap.CullFace);
             _gl.UseProgram(_program);
@@ -865,8 +856,6 @@ namespace AssetsManager.Services.Viewer.Vfx
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
 uniform mat4 uViewProj;
-uniform int uUseAttachedWorld;
-uniform mat4 uAttachedWorld;
 uniform vec3 uWorldPos;
 uniform vec3 uScale;
 uniform vec3 uRotation;
@@ -911,19 +900,15 @@ vec2 addressUv(vec2 uv, int mode){
     return clamp(uv, vec2(0.0), vec2(1.0));
 }
 void main(){
-    if (uUseAttachedWorld != 0) {
-        gl_Position = uViewProj * uAttachedWorld * vec4(aPos, 1.0);
-    } else {
-        vec3 scaled = aPos * uScale;
-        float sz = sin(uRotation.z); float cz = cos(uRotation.z);
-        vec3 local = vec3(scaled.x * cz - scaled.y * sz, scaled.x * sz + scaled.y * cz, scaled.z);
-        float sx = sin(uRotation.x); float cx = cos(uRotation.x);
-        local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
-        float sy = sin(uRotation.y); float cy = cos(uRotation.y);
-        local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
-        vec3 p = uPlacementRight * local.x + uPlacementUp * local.y + uPlacementForward * local.z + uWorldPos;
-        gl_Position = uViewProj * vec4(p, 1.0);
-    }
+    vec3 scaled = aPos * uScale;
+    float sz = sin(uRotation.z); float cz = cos(uRotation.z);
+    vec3 local = vec3(scaled.x * cz - scaled.y * sz, scaled.x * sz + scaled.y * cz, scaled.z);
+    float sx = sin(uRotation.x); float cx = cos(uRotation.x);
+    local = vec3(local.x, local.y * cx - local.z * sx, local.y * sx + local.z * cx);
+    float sy = sin(uRotation.y); float cy = cos(uRotation.y);
+    local = vec3(local.x * cy + local.z * sy, local.y, -local.x * sy + local.z * cy);
+    vec3 p = uPlacementRight * local.x + uPlacementUp * local.y + uPlacementForward * local.z + uWorldPos;
+    gl_Position = uViewProj * vec4(p, 1.0);
     vec2 baseUv = aUv;
     vec2 centeredUv = (baseUv - uUvTransformCenter) * uUvScale;
     float uvSin = sin(uUvRotation); float uvCos = cos(uUvRotation);

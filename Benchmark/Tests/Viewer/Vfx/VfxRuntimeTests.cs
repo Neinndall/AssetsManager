@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Models.Viewer;
@@ -76,7 +77,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 Scale = 2
             };
 
-            Matrix4x4 transform = VfxRenderSession.CreateSceneWorldTransform(model);
+            Matrix4x4 transform = ViewerInteractionService.CreateWorldMatrix(model);
             Vector3 origin = Vector3.Transform(Vector3.Zero, transform);
             Vector3 scaledAxis = Vector3.TransformNormal(Vector3.UnitX, transform);
 

@@ -226,9 +226,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 if (_activeSceneModel != null)
                 {
                     _vfxRenderer.SetWorldTransform(
-                        VfxRenderSession.CreateSceneWorldTransform(_activeSceneModel));
+                        ViewerInteractionService.CreateWorldMatrix(_activeSceneModel));
                 }
-                _vfxRenderer.SetAttachedMeshSource(_activeSceneModel);
                 _vfxRenderer.SetViewportSize(framebufferWidth, framebufferHeight);
                 if (updateVfx)
                     _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));

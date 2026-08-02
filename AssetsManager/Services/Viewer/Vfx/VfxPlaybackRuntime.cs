@@ -53,8 +53,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
             public float[] MeshInterleaved;
-            public bool UsesExternalAttachedMesh;
-            public Matrix4x4 AttachedMeshWorld = Matrix4x4.Identity;
             /// <summary>Emitter age in seconds — drives UV scroll + wing-flap animation time.</summary>
             public float EmitterAge => Age;
         }
