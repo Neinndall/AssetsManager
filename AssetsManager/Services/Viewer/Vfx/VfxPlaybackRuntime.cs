@@ -433,6 +433,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Vector3 position = p.Pos;
                 float sizeX = p.BirthSize.X * scaleMul.X;
                 float sizeY = p.BirthSize.Y * scaleMul.Y;
+                if (d.PrimitiveKind == VfxPrimitiveKind.ArbitraryQuad)
+                {
+                    sizeX *= 2f;
+                    sizeY *= 2f;
+                }
                 Vector3 direction = p.Vel;
                 if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)
                     direction = Vector3.TransformNormal(targetOffset, _worldTransform);
