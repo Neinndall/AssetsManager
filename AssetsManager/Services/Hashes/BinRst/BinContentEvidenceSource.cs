@@ -290,10 +290,65 @@ namespace AssetsManager.Services.Hashes
                         MatchStringsInField(item, "SpecifiedGameModes");
                     else if (classHash == Fnv1a.HashLower("ViewControllerList"))
                         foreach (BinTreeProperty property in item.Properties.Values) VisitStrings(property, MatchAnyEntry);
+                    else if (classHash == Fnv1a.HashLower("CharacterSkinData") || classHash == Fnv1a.HashLower("SkinData"))
+                        MatchSkinData(entryHash, item);
+                    else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") || classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
+                        MatchVfxData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("ResourceResolver") || classHash == Fnv1a.HashLower("GlobalResourceResolver"))
                         MatchHashLinkMap(item, "resourceMap");
                     else if (classHash == Fnv1a.HashLower("MapContainer"))
                         MatchHashLinkMap(item, "chunks");
+                }
+            }
+
+            void MatchSkinData(uint entryHash, BinTreeObject item)
+            {
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
+                    int charIdx = normalizedPath.IndexOf("characters/", StringComparison.OrdinalIgnoreCase);
+                    if (charIdx >= 0)
+                    {
+                        string sub = normalizedPath[(charIdx + 11)..];
+                        int slash = sub.IndexOf('/');
+                        if (slash > 0)
+                        {
+                            string champName = sub[..slash];
+                            MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Base");
+                            for (int skin = 0; skin < 50; skin++)
+                            {
+                                MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Skin{skin}");
+                                MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Skin{skin:00}");
+                            }
+                        }
+                    }
+                }
+            }
+
+            void MatchVfxData(uint entryHash, BinTreeObject item)
+            {
+                if (TryGetString(item.Properties, "particleName", out string vfxName) ||
+                    TryGetString(item.Properties, "systemName", out vfxName))
+                {
+                    var candidates = new List<string> { $"DATA/Effects/Shared/{vfxName}", $"DATA/Shared/VFX/{vfxName}" };
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
+                        int charIdx = normalizedPath.IndexOf("characters/", StringComparison.OrdinalIgnoreCase);
+                        if (charIdx >= 0)
+                        {
+                            string sub = normalizedPath[(charIdx + 11)..];
+                            int slash = sub.IndexOf('/');
+                            if (slash > 0)
+                            {
+                                string champName = sub[..slash];
+                                candidates.Add($"DATA/Characters/{champName}/VFX/{vfxName}");
+                                candidates.Add($"Characters/{champName}/VFX/{vfxName}");
+                            }
+                        }
+                    }
+                    foreach (string candidate in candidates)
+                        if (MatchObservedEntry(entryHash, candidate)) break;
                 }
             }
 
@@ -305,6 +360,24 @@ namespace AssetsManager.Services.Hashes
                     candidates.AddRange(new[] { 11, 12, 21, 22, 30, 33, 35 }.Select(map => $"Maps/Shipping/Map{map}/Spells/{name}"));
                     int digitCount = name.TakeWhile(char.IsAsciiDigit).Count();
                     if (digitCount > 0) candidates.Add($"Items/{name[..digitCount]}/Spells/{name}");
+
+                    // Extract champion name if path contains characters directory
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
+                        int charIdx = normalizedPath.IndexOf("characters/", StringComparison.OrdinalIgnoreCase);
+                        if (charIdx >= 0)
+                        {
+                            string sub = normalizedPath[(charIdx + 11)..];
+                            int slash = sub.IndexOf('/');
+                            if (slash > 0)
+                            {
+                                string champName = sub[..slash];
+                                candidates.Add($"Characters/{champName}/Spells/{name}");
+                            }
+                        }
+                    }
+
                     foreach (string candidate in candidates)
                         if (MatchObservedEntry(entryHash, candidate)) break;
                 }
