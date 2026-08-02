@@ -926,7 +926,7 @@ namespace AssetsManager.Services.Hashes
 
             // 4. Dynamic Prefix & Suffix addition (Derived 100% from known hash tokens)
             string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
-            var dynamicSuffixes = wordlist.AllTokens.Take(60).ToList();
+            var dynamicSuffixes = wordlist.AllTokens.Take(300).ToList();
 
             foreach (string token in topTokens.Take(500))
             {
