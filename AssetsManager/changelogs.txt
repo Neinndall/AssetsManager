@@ -27,6 +27,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
 
 Improvements
+  - Viewer / Synchronized model visibility toggle in Scene list to enable or hide all submeshes at once.
   - VFX effects now keep child layers aligned and replay with consistent timing and placement.
   - VFX Studio now restores the complete OpenGL render state, isolates animated mesh buffers, skips unnecessary scene captures, honors authored system transforms, and accepts direct vector birth colors from BIN data.
   - VFX Studio now applies consistent BIN blend modes across rendering and diagnostics without exposing black particle backgrounds.

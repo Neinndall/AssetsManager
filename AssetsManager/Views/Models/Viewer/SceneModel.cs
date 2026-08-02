@@ -103,11 +103,38 @@ namespace AssetsManager.Views.Models.Viewer
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
+        private bool _isUpdatingVisibility;
+
         private bool _isVisible = true;
         public bool IsVisible
         {
             get => _isVisible;
-            set => SetField(ref _isVisible, value);
+            set
+            {
+                if (SetField(ref _isVisible, value))
+                {
+                    if (!_isUpdatingVisibility)
+                    {
+                        try
+                        {
+                            _isUpdatingVisibility = true;
+                            if (Parts != null)
+                            {
+                                foreach (var part in Parts)
+                                {
+                                    part.IsVisible = value;
+                                }
+                            }
+                            _areAllPartsVisible = value;
+                            OnPropertyChanged(nameof(AreAllPartsVisible));
+                        }
+                        finally
+                        {
+                            _isUpdatingVisibility = false;
+                        }
+                    }
+                }
+            }
         }
 
         private bool _isMeshSyncEnabled;
@@ -130,11 +157,23 @@ namespace AssetsManager.Views.Models.Viewer
             get => _areAllPartsVisible;
             set
             {
-                if (SetField(ref _areAllPartsVisible, value))
+                _areAllPartsVisible = value;
+                OnPropertyChanged();
+                if (Parts != null && !_isUpdatingVisibility)
                 {
-                    foreach (var part in Parts)
+                    try
                     {
-                        part.IsVisible = value;
+                        _isUpdatingVisibility = true;
+                        foreach (var part in Parts)
+                        {
+                            part.IsVisible = value;
+                        }
+                        _isVisible = value;
+                        OnPropertyChanged(nameof(IsVisible));
+                    }
+                    finally
+                    {
+                        _isUpdatingVisibility = false;
                     }
                 }
             }
@@ -264,8 +303,20 @@ namespace AssetsManager.Views.Models.Viewer
 
         private void UpdateMasterVisibility()
         {
-            var allVisible = Parts.All(p => p.IsVisible);
-            SetField(ref _areAllPartsVisible, allVisible, nameof(AreAllPartsVisible));
+            if (_isUpdatingVisibility) return;
+            try
+            {
+                _isUpdatingVisibility = true;
+                bool allVisible = Parts != null && Parts.Count > 0 && Parts.All(p => p.IsVisible);
+                bool anyVisible = Parts != null && Parts.Any(p => p.IsVisible);
+
+                SetField(ref _areAllPartsVisible, allVisible, nameof(AreAllPartsVisible));
+                SetField(ref _isVisible, anyVisible, nameof(IsVisible));
+            }
+            finally
+            {
+                _isUpdatingVisibility = false;
+            }
         }
 
         public void Dispose()
