@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Viewer.Vfx
 
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo, _fallbackTransparentTexture;
-        private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
+        private int _uViewProj, _uCamRight, _uCamUp, _uCameraPosition, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
         private int _uTexMult, _uHasTexMult, _uTexDivMult, _uTexSizeMult, _uUvScrollRateMult, _uFlipUMult, _uFlipVMult;
         private int _uUvTransformCenter, _uUvTransformCenterMult, _uAddressMode, _uAddressModeMult, _uClampUvMult;
         private int _uIsDistortion, _uDistortionTex, _uSceneTex, _uViewportSize, _uDistortionStrength;
@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uDeriveAlphaFromRgb, _uEmissiveStrength, _uFlipU, _uFlipV, _uClampUv;
         private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
+        private int _uUvParallaxScale;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
         private int _uErosionTex, _uHasErosion, _uErosionFeatherIn, _uErosionFeatherOut;
         private int _uPlacementRight, _uPlacementUp, _uPlacementForward, _uIsGroundLayer;
@@ -59,6 +60,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uCamRight = gl.GetUniformLocation(_program, "uCamRight");
             _uCamUp = gl.GetUniformLocation(_program, "uCamUp");
+            _uCameraPosition = gl.GetUniformLocation(_program, "uCameraPosition");
             _uTexDiv = gl.GetUniformLocation(_program, "uTexDiv");
             _uTexSize = gl.GetUniformLocation(_program, "uTexSize");
             _uTex = gl.GetUniformLocation(_program, "uTex");
@@ -99,6 +101,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uColorRenderFlags = gl.GetUniformLocation(_program, "uColorRenderFlags");
             _uIsAdditive = gl.GetUniformLocation(_program, "uIsAdditive");
             _uModulationFactor = gl.GetUniformLocation(_program, "uModulationFactor");
+            _uUvParallaxScale = gl.GetUniformLocation(_program, "uUvParallaxScale");
             _uColorLookUpTypeX = gl.GetUniformLocation(_program, "uColorLookUpTypeX");
             _uColorLookUpTypeY = gl.GetUniformLocation(_program, "uColorLookUpTypeY");
             _uColorLookUpScales = gl.GetUniformLocation(_program, "uColorLookUpScales");
@@ -259,6 +262,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
             var camUp = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, inv));
+            var cameraPosition = Vector3.Transform(Vector3.Zero, inv);
 
             bool depthTest = _gl.IsEnabled(EnableCap.DepthTest);
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
@@ -289,6 +293,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
             _gl.Uniform3(_uCamUp, camUp.X, camUp.Y, camUp.Z);
+            _gl.Uniform3(_uCameraPosition, cameraPosition.X, cameraPosition.Y, cameraPosition.Z);
             _gl.Uniform1(_uTex, 0);
             _gl.Uniform1(_uTexMult, 1);
             _gl.Uniform1(_uColorMap, 7);
@@ -318,7 +323,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: false);
-                    RenderMeshEmitter(es, viewProj);
+                    RenderMeshEmitter(es, viewProj, cameraPosition);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
@@ -347,6 +352,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform2(_uEmitterUvOffset, emitterUvOffset.X, emitterUvOffset.Y);
                 Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
                 _gl.Uniform2(_uUvTransformCenter, uvCenter.X, uvCenter.Y);
+                _gl.Uniform1(_uUvParallaxScale, es.Def.UvParallaxScale);
                 _gl.Uniform1(_uHasTexMult, es.TextureMult != 0 ? 1 : 0);
                 var multDiv = es.Def.TextureMultTexDiv;
                 _gl.Uniform2(_uTexDivMult, multDiv.X <= 0 ? 1f : multDiv.X, multDiv.Y <= 0 ? 1f : multDiv.Y);
@@ -615,13 +621,14 @@ namespace AssetsManager.Services.Viewer.Vfx
         }
 
         private uint _meshProgram;
-        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muEmitterUvOffset;
+        private int _muViewProj, _muWorldPos, _muScale, _muRotation, _muColor, _muTex, _muEmitterUvOffset, _muCameraPosition;
         private int _muTexDiv, _muTexSize, _muFrame, _muAddressMode, _muClampUv, _muUvTransformCenter;
         private int _muTexMult, _muHasTexMult, _muTexDivMult, _muTexSizeMult, _muUvOffsetMult, _muUvScaleMult, _muUvRotationMult;
         private int _muTextureMultFrame, _muEmitterUvOffsetMult, _muFlipUMult, _muFlipVMult;
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muAlphaTest, _muDeriveAlphaFromRgb, _muEmissiveStrength, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muUvParallaxScale;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
         private int _muReflectionTex, _muHasReflection, _muReflectionOpacity, _muReflectionColor;
@@ -639,6 +646,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muColor = _gl.GetUniformLocation(_meshProgram, "uColor");
                 _muTex = _gl.GetUniformLocation(_meshProgram, "uTex");
                 _muEmitterUvOffset = _gl.GetUniformLocation(_meshProgram, "uEmitterUvOffset");
+                _muCameraPosition = _gl.GetUniformLocation(_meshProgram, "uCameraPosition");
                 _muTexDiv = _gl.GetUniformLocation(_meshProgram, "uTexDiv");
                 _muTexSize = _gl.GetUniformLocation(_meshProgram, "uTexSize");
                 _muFrame = _gl.GetUniformLocation(_meshProgram, "uFrame");
@@ -671,6 +679,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muColorRenderFlags = _gl.GetUniformLocation(_meshProgram, "uColorRenderFlags");
                 _muIsAdditive = _gl.GetUniformLocation(_meshProgram, "uIsAdditive");
                 _muModulationFactor = _gl.GetUniformLocation(_meshProgram, "uModulationFactor");
+                _muUvParallaxScale = _gl.GetUniformLocation(_meshProgram, "uUvParallaxScale");
                 _muColorLookUpTypeX = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeX");
                 _muColorLookUpTypeY = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeY");
                 _muColorLookUpScales = _gl.GetUniformLocation(_meshProgram, "uColorLookUpScales");
@@ -818,7 +827,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
-        private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
+        private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj, Vector3 cameraPosition)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             if (es.MeshAnimation != null)
@@ -828,6 +837,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.UseProgram(_meshProgram);
             _gl.BindVertexArray(es.MeshVao);
             _gl.UniformMatrix4(_muViewProj, 1, false, in viewProj.M11);
+            _gl.Uniform3(_muCameraPosition, cameraPosition.X, cameraPosition.Y, cameraPosition.Z);
             _gl.Uniform1(_muTex, 0);
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muColorMap, 7);
@@ -839,6 +849,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform2(_muTexSize, Math.Max(1f, es.TextureWidth), Math.Max(1f, es.TextureHeight));
             Vector2 uvCenter = EffectiveCenter(es.Def.UvTransformCenter);
             _gl.Uniform2(_muUvTransformCenter, uvCenter.X, uvCenter.Y);
+            _gl.Uniform1(_muUvParallaxScale, es.Def.UvParallaxScale);
             _gl.Uniform1(_muHasTexMult, es.TextureMult != 0 ? 1 : 0);
             Vector2 textureMultTexDiv = es.Def.TextureMultTexDiv;
             _gl.Uniform2(
@@ -1031,6 +1042,7 @@ layout(location=1) in vec2 aUv;
 layout(location=2) in vec4 aColor;
 uniform mat4 uViewProj;
 uniform vec3 uWorldPos;
+uniform vec3 uCameraPosition;
 uniform vec3 uScale;
 uniform vec3 uRotation;
 uniform vec2 uEmitterUvOffset;
@@ -1060,6 +1072,7 @@ uniform int uClampUvMult;
 uniform vec2 uBirthUvOffset;
 uniform vec2 uUvScale;
 uniform float uUvRotation;
+uniform float uUvParallaxScale;
 out vec2 vUv;
 out vec2 vUvMult;
 out vec2 vLocalUv;
@@ -1090,7 +1103,11 @@ void main(){
     float uvSin = sin(uUvRotation); float uvCos = cos(uUvRotation);
     centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
                       centeredUv.x * uvSin + centeredUv.y * uvCos);
-    baseUv = centeredUv + uUvTransformCenter + uBirthUvOffset;
+    vec3 viewDelta = uCameraPosition - uWorldPos;
+    vec2 parallaxUv = vec2(
+        dot(viewDelta, uPlacementRight),
+        dot(viewDelta, uPlacementUp)) * uUvParallaxScale;
+    baseUv = centeredUv + uUvTransformCenter + uBirthUvOffset + parallaxUv;
     if (uFlipU != 0) baseUv.x = 1.0 - baseUv.x;
     if (uFlipV != 0) baseUv.y = 1.0 - baseUv.y;
     vec2 mainScroll = uEmitterUvOffset;
@@ -1259,6 +1276,7 @@ layout(location=15) in float aTextureMultFrame;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
+uniform vec3 uCameraPosition;
 uniform vec2 uTexDiv;
 uniform vec2 uTexSize;
 uniform vec2 uEmitterUvOffset;
@@ -1279,6 +1297,7 @@ uniform int uAddressMode;
 uniform int uAddressModeMult;
 uniform vec2 uUvTransformCenter;
 uniform vec2 uUvTransformCenterMult;
+uniform float uUvParallaxScale;
 uniform vec3 uPlacementRight;
 uniform vec3 uPlacementUp;
 uniform vec3 uPlacementForward;
@@ -1319,6 +1338,8 @@ void main(){
     vec3 placedForward = uPlacementRight * localForward.x + uPlacementUp * localForward.y + uPlacementForward * localForward.z;
     vec3 right = uArbitraryQuad != 0 ? placedRight : uCamRight;
     vec3 up = uArbitraryQuad != 0 ? placedUp : uCamUp;
+    vec3 uvRight = right;
+    vec3 uvUp = up;
     vec3 cameraForward = normalize(cross(uCamRight, uCamUp));
 
     if (rayPrimitive) {
@@ -1370,6 +1391,8 @@ void main(){
             groundRight = -groundForward;
             groundForward = -authoredRight;
         }
+        uvRight = groundRight;
+        uvUp = groundForward;
         world = aCenter + groundRight * (rc.x * aSize.x) + groundForward * (rc.y * aSize.y) + vec3(0.0, 0.02, 0.0);
     } else {
         world = aCenter + right * (rc.x * aSize.x) + up * (rc.y * aSize.y);
@@ -1388,7 +1411,11 @@ void main(){
     float uvSin = sin(aUvRotation); float uvCos = cos(aUvRotation);
     centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
                       centeredUv.x * uvSin + centeredUv.y * uvCos);
-    localUv = centeredUv + uUvTransformCenter + aUvOffset;
+    vec3 viewDelta = uCameraPosition - aCenter;
+    vec2 parallaxUv = vec2(
+        dot(viewDelta, uvRight),
+        dot(viewDelta, uvUp)) * uUvParallaxScale;
+    localUv = centeredUv + uUvTransformCenter + aUvOffset + parallaxUv;
     if (uFlipU != 0) localUv.x = 1.0 - localUv.x;
     if (uFlipV != 0) localUv.y = 1.0 - localUv.y;
     vec2 scroll = uEmitterUvOffset;

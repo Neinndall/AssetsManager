@@ -634,7 +634,7 @@ namespace BenchmarkApp
         private static bool IsRawVisualField(string name) => name switch
         {
             "emitterName" or "primitive" or "texture" or "textureMult" or "texAddressModeBase" or "texDiv" or
-            "uvMode" or "uvScale" or "uvRotation" or "uvTransformCenter" or "birthUVOffset" or "birthUvScrollRate" or
+            "uvMode" or "uvScale" or "uvParallaxScale" or "uvRotation" or "uvTransformCenter" or "birthUVOffset" or "birthUvScrollRate" or
             "particleUVScrollRate" or "uvScrollClamp" or "emitterUvScrollRate" or "TextureFlipU" or "TextureFlipV" or
             "texAddressModeMult" or "uvScrollAlphaMult" or "TextureMultFilpU" or "TextureMultFilpV" or
             "isLocalOrientation" or "particleIsLocalOrientation" or "isGroundLayer" or "isFollowingTerrain" or

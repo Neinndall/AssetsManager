@@ -79,6 +79,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                     new BinTreeVector4(
                         Fnv1a.HashLower("modulationFactor"),
                         new Vector4(0.25f, 0.5f, 0.75f, 0.8f)),
+                    new BinTreeF32(Fnv1a.HashLower("uvParallaxScale"), 0.00125f),
                     new BinTreeStruct(
                         Fnv1a.HashLower("FlexShapeDefinition"),
                         Fnv1a.HashLower("VfxFlexShapeDefinitionData"),
@@ -139,6 +140,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(
                 new Vector4(0.25f, 0.5f, 0.75f, 0.8f),
                 parsed.ModulationFactor);
+            Assert.Equal(0.00125f, parsed.UvParallaxScale);
             Assert.Equal(0.004f, parsed.FlexShape.ScaleBirthScaleByBoundObjectSize);
             Assert.Equal(16, parsed.PaletteDefinition.PaletteCount);
             Assert.Equal(4f, parsed.PaletteDefinition.PaletteSelector.Constant.X);

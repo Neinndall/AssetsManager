@@ -153,7 +153,8 @@ namespace AssetsManager.Views.Models.Viewer
         string FalloffTexturePath = null,
         string AudioSoundOnCreate = null,
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
-        Vector4? ModulationFactor = null)
+        Vector4? ModulationFactor = null,
+        float UvParallaxScale = 0f)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
