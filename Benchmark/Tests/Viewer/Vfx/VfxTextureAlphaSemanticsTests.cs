@@ -29,6 +29,34 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void CompressedNearOpaqueAlphaUsesRgbOpacity()
+        {
+            byte[] pixels = new byte[4 * 100];
+            for (int i = 0; i < 100; i++)
+            {
+                bool compressedSample = i < 2;
+                pixels[i * 4] = compressedSample ? (byte)0 : byte.MaxValue;
+                pixels[i * 4 + 1] = compressedSample ? (byte)0 : byte.MaxValue;
+                pixels[i * 4 + 2] = compressedSample ? (byte)0 : byte.MaxValue;
+                pixels[i * 4 + 3] = compressedSample ? (byte)225 : byte.MaxValue;
+            }
+
+            BitmapSource texture = CreateTexture(pixels);
+
+            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+        }
+
+        [Fact]
+        public void MeaningfulPartialAlphaIsPreserved()
+        {
+            BitmapSource texture = CreateTexture(
+                0, 0, 0, 128,
+                255, 255, 255, 255);
+
+            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(texture, blendMode: 1));
+        }
+
+        [Fact]
         public void AdditiveTextureDoesNotReplaceAuthoredAlpha()
         {
             BitmapSource texture = CreateTexture(

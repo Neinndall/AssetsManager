@@ -157,13 +157,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (texture != null)
                 {
                     emitter.PendingTexture = texture;
-                    if (!alphaSemantics.TryGetValue(texture, out bool hasOpaqueAlpha))
+                    if (!alphaSemantics.TryGetValue(texture, out bool hasEffectivelyOpaqueAlpha))
                     {
-                        hasOpaqueAlpha = VfxTextureAlphaSemantics.HasOpaqueAlpha(texture);
-                        alphaSemantics[texture] = hasOpaqueAlpha;
+                        hasEffectivelyOpaqueAlpha = VfxTextureAlphaSemantics.HasEffectivelyOpaqueAlpha(texture);
+                        alphaSemantics[texture] = hasEffectivelyOpaqueAlpha;
                     }
                     emitter.DeriveAlphaFromRgb = VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
-                        hasOpaqueAlpha,
+                        hasEffectivelyOpaqueAlpha,
                         emitter.Def.BlendMode);
                     if (emitter.Def.UseTextureAspect)
                     {
