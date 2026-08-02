@@ -43,6 +43,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             internal float SpawnAccum;
             internal float Age;                     // emitter age (seconds)
             internal bool BurstDone;                // for isSingleParticle
+            internal bool InitialEmissionDone;
             internal readonly List<Particle> Particles = new();
 
             /// <summary>Packed instance data for the renderer: position, 3D scale, authored color,
@@ -208,7 +209,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         {
             _rng = new Random(_seed);
             _startDelay = _configuredStartDelay;
-            foreach (var s in _emitters) { s.Particles.Clear(); s.SpawnAccum = 0; s.Age = 0; s.BurstDone = false; s.InstanceCount = 0; }
+            foreach (var s in _emitters) { s.Particles.Clear(); s.SpawnAccum = 0; s.Age = 0; s.BurstDone = false; s.InitialEmissionDone = false; s.InstanceCount = 0; }
             LiveParticleCount = 0;
         }
 
@@ -267,6 +268,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             {
                 s.Age = d.TimeBeforeFirstEmission;
                 s.BurstDone = false;
+                s.InitialEmissionDone = false;
             }
 
             float emitterT = EmitterTime(s);
@@ -299,11 +301,25 @@ namespace AssetsManager.Services.Viewer.Vfx
                     float rawRate = MathF.Max(0f, d.Rate.Sample(emitterT));
                     float rate = d.RateIsPeriod ? (rawRate > 0.001f ? 1f / rawRate : 0f) : rawRate;
                     s.SpawnAccum += rate * dt;
-                    while (s.SpawnAccum >= 1f && s.Particles.Count < MaxParticlesPerEmitter)
+                    int addedThisStep = 0;
+                    int maxAdded = d.Trail?.MaxAddedPerFrame is > 0
+                        ? d.Trail.MaxAddedPerFrame
+                        : int.MaxValue;
+                    if (!s.InitialEmissionDone && rate > 0f && maxAdded > 0)
+                    {
+                        Spawn(s, emitterT);
+                        s.InitialEmissionDone = true;
+                        addedThisStep++;
+                    }
+                    while (s.SpawnAccum >= 1f &&
+                           s.Particles.Count < MaxParticlesPerEmitter &&
+                           addedThisStep < maxAdded)
                     {
                         Spawn(s, emitterT);
                         s.SpawnAccum -= 1f;
+                        addedThisStep++;
                     }
+                    if (addedThisStep >= maxAdded) s.SpawnAccum = MathF.Min(s.SpawnAccum, 1f);
                     if (s.Particles.Count >= MaxParticlesPerEmitter) s.SpawnAccum = 0f;
                 }
             }
@@ -436,9 +452,20 @@ namespace AssetsManager.Services.Viewer.Vfx
                 s.Instances = new float[Math.Max(instanceCount * InstanceStride, InstanceStride * 4)];
             var buf = s.Instances;
             int k = 0;
+            float trailDistance = 0f;
             for (int i = isTrail ? 1 : 0; i < n; i++)
             {
                 var p = s.Particles[i];
+                Vector3 trailSegment = Vector3.Zero;
+                float trailLength = 0f;
+                if (isTrail)
+                {
+                    trailSegment = p.Pos - s.Particles[i - 1].Pos;
+                    trailLength = trailSegment.Length();
+                    float cutoff = d.Trail?.Cutoff ?? 0f;
+                    if (trailLength <= 1e-5f || (cutoff > 0f && trailLength > cutoff))
+                        continue;
+                }
                 float t = float.IsPositiveInfinity(p.Life) ? 0f : Math.Clamp(p.Age / p.Life, 0f, 1f);
                 var scaleMul = d.ScaleOverLife?.Sample(t) ?? Vector3.One;
                 if (d.IsUniformScale)
@@ -466,14 +493,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 if (isTrail)
                 {
                     Vector3 start = s.Particles[i - 1].Pos;
-                    Vector3 segment = p.Pos - start;
-                    float length = segment.Length();
-                    if (length > 1e-5f)
-                    {
-                        position = (start + p.Pos) * 0.5f;
-                        direction = segment;
-                        sizeY = length;
-                    }
+                    position = (start + p.Pos) * 0.5f;
+                    direction = trailSegment;
+                    sizeY = trailLength;
                 }
                 if (d.UseTextureAspect) sizeX *= s.SpriteAspect;
                 buf[k++] = position.X; buf[k++] = position.Y; buf[k++] = position.Z;
@@ -515,6 +537,13 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Vector2 uvOffset = p.BirthUvOffset + p.BirthUvScrollRate * p.Age
                     + SampleIntegrated(d.ParticleUvScrollRate, t, p.Age, p.Life);
                 Vector2 uvScale = d.UvScale?.Sample(t) ?? Vector2.One;
+                Vector3 trailTiling = d.Trail?.BirthTilingSize.Sample(t) ?? Vector3.Zero;
+                if (isTrail && trailTiling.X > 1e-5f)
+                {
+                    float longitudinalScale = -trailLength / trailTiling.X;
+                    uvScale.X *= longitudinalScale;
+                    uvOffset.X += trailDistance / trailTiling.X - 0.5f - 0.5f * uvScale.X;
+                }
                 float uvRotationDegrees = (d.UvRotation?.Sample(t) ?? 0f) + p.BirthUvRotateRate * p.Age
                     + SampleIntegrated(d.ParticleUvRotateRate, t, p.Age, p.Life);
                 float uvRotation = uvRotationDegrees * (MathF.PI / 180f);
@@ -529,6 +558,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                     + p.TextureMultBirthUvScrollRate * p.Age
                     + SampleIntegrated(d.TextureMultParticleUvScroll, t, p.Age, p.Life);
                 Vector2 textureMultUvScale = d.TextureMultUvScale?.Sample(t) ?? Vector2.One;
+                if (isTrail && trailTiling.X > 1e-5f)
+                {
+                    textureMultUvScale.X *= -trailLength / trailTiling.X;
+                    textureMultUvOffset.X += trailDistance / trailTiling.X - 0.5f - 0.5f * textureMultUvScale.X;
+                }
                 float textureMultUvRotationDegrees = (d.TextureMultUvRotation?.Sample(t) ?? 0f)
                     + p.TextureMultBirthUvRotateRate * p.Age
                     + SampleIntegrated(d.TextureMultParticleUvRotate, t, p.Age, p.Life);
@@ -536,8 +570,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = p.TextureMultFrame;
+                if (isTrail) trailDistance += trailLength;
             }
-            s.InstanceCount = instanceCount;
+            s.InstanceCount = k / InstanceStride;
         }
 
         private static Vector2 SampleIntegrated(VfxCurve2? curve, float normalizedAge, float age, float life)

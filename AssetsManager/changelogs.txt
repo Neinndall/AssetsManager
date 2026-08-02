@@ -150,6 +150,9 @@ Improvements
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
 
 Bug Fixes
+  - Viewer VFX Studio / Marked AttachedMesh emitters as non-renderable until owner-model binding is available.
+  - Viewer VFX Studio / Restored short-lived mesh emitters that must produce their first particle immediately on activation.
+  - Viewer VFX Studio / Rebuilt trail segments with authored orientation, longitudinal tiling, sample limits, and cutoff while removing stationary rectangular artifacts.
   - Viewer VFX Studio / Removed white particle squares caused by additive color and multiplier textures overriding authored transparency.
   - Viewer VFX Studio / Preserved authored SCB/SCO vertex-color gradients so mesh walls and ground layers retain their intended tint and vertical transparency fades.
   - Viewer VFX Studio / Restored authored arbitrary-quad diameters so expanding rings reach their matching mesh boundaries before fading.

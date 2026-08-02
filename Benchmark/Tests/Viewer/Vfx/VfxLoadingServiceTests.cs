@@ -228,7 +228,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 NumFrames: 1,
                 RandomStartFrame: false,
                 IsMeshPrimitive: true,
-                PrimitiveKind: VfxPrimitiveKind.AttachedMesh);
+                PrimitiveKind: VfxPrimitiveKind.AttachedMesh,
+                MeshPath: "assets/characters/hero/skins/skin30/hero_skin30.scb");
             Matrix4x4 authoredTransform = Matrix4x4.CreateScale(0.5f);
             var definition = new VfxSystemDefinition(
                 1, "attached", "Characters/Hero/Skins/Skin30/Attached", new[] { emitter }, Transform: authoredTransform);
@@ -247,6 +248,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 var state = Assert.Single(runtime.Emitters);
                 Assert.Null(state.PendingMesh);
                 Assert.Equal(VfxPrimitiveKind.AttachedMesh, state.Def.PrimitiveKind);
+                Assert.False(state.Def.IsVisual);
                 Assert.Equal(authoredTransform * Matrix4x4.CreateTranslation(3f, 0f, 0f), runtime.WorldTransform);
             }
             finally

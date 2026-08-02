@@ -155,7 +155,7 @@ namespace AssetsManager.Views.Models.Viewer
         IReadOnlyList<string> FilteringKeywordsExcluded = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
-        public bool IsVisual => !Disabled && (!string.IsNullOrEmpty(TexturePath) ||
+        public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
             !string.IsNullOrEmpty(TextureMultPath) || !string.IsNullOrEmpty(MeshPath) ||
             Distortion is { NormalMapTexturePath.Length: > 0 });
     }

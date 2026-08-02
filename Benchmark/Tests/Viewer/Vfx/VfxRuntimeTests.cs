@@ -110,7 +110,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void AttachedMeshWithoutGpuMeshIsNotRenderedAsABillboard()
+        public void AttachedMeshIsNotStandaloneVisual()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -118,8 +118,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 IsMeshPrimitive = true
             };
 
-            Assert.True(VfxOpenGlRenderer.ShouldSkipStandaloneAttachedMesh(emitter, meshVao: 0));
-            Assert.False(VfxOpenGlRenderer.ShouldSkipStandaloneAttachedMesh(emitter, meshVao: 17));
+            Assert.False(emitter.IsVisual);
         }
 
         [Fact]
@@ -227,7 +226,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             for (int i = 0; i < 5; i++) simulator.Update(0.1f);
 
             var state = Assert.Single(simulator.Emitters);
-            Assert.Equal(5, state.InstanceCount);
+            Assert.Equal(6, state.InstanceCount);
             int last = (state.InstanceCount - 1) * VfxPlaybackRuntime.InstanceStride;
             Assert.InRange(state.Instances[last + 8], 0.499f, 0.501f);
         }
@@ -245,7 +244,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 EmitterPosition = new VfxCurve3(
                     Vector3.Zero,
                     new[] { 0f, 1f },
-                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) })
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) }),
+                Trail = new VfxTrailDefinition(VfxCurve3.Const(new Vector3(2f, 0f, 0f)), 2, 1, 30, 10000f)
             };
             var simulator = new VfxPlaybackRuntime(7);
             simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
@@ -257,6 +257,96 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(1, state.InstanceCount);
             Assert.Equal(2f, state.Instances[3], 3);
             Assert.Equal(1f, state.Instances[4], 3);
+            Assert.Equal(-0.5f, state.Instances[21], 3);
+            Assert.Equal(-0.25f, state.Instances[19], 3);
+        }
+
+        [Fact]
+        public void StaticTrailDoesNotRenderDegenerateParticleQuads()
+        {
+            var emitter = CreateEmitter(new Vector3(20f, 150f, 2f), VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(120f),
+                EmitterLifetime = 1f,
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                IsMeshPrimitive = false
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.1f);
+
+            Assert.Equal(0, Assert.Single(simulator.Emitters).InstanceCount);
+        }
+
+        [Fact]
+        public void ShortRateEmitterSpawnsAtActivation()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(1f),
+                EmitterLifetime = 0.2f,
+                ParticleLifetime = VfxCurveF.Const(0.2f),
+                IsMeshPrimitive = true,
+                PrimitiveKind = VfxPrimitiveKind.Mesh
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "beam", "beam", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.02f);
+
+            Assert.Equal(1, Assert.Single(simulator.Emitters).InstanceCount);
+        }
+
+        [Fact]
+        public void TrailHonorsMaximumSamplesAddedPerSimulationStep()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(100f),
+                EmitterLifetime = 1f,
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                EmitterPosition = new VfxCurve3(
+                    Vector3.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) }),
+                Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.Zero), 0, 0, 2, 10000f)
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.1f);
+
+            VfxPlaybackRuntime.EmitterState state = Assert.Single(simulator.Emitters);
+            Assert.Equal(2, state.Particles.Count);
+            Assert.Equal(0, state.InstanceCount);
+        }
+
+        [Fact]
+        public void TrailRejectsSegmentsBeyondAuthoredCutoff()
+        {
+            var emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
+            {
+                IsSingleParticle = false,
+                Rate = VfxCurveF.Const(10f),
+                EmitterLifetime = 1f,
+                PrimitiveKind = VfxPrimitiveKind.CameraTrail,
+                EmitterPosition = new VfxCurve3(
+                    Vector3.Zero,
+                    new[] { 0f, 1f },
+                    new[] { Vector3.Zero, new Vector3(10f, 0f, 0f) }),
+                Trail = new VfxTrailDefinition(VfxCurve3.Const(Vector3.Zero), 0, 0, 30, 0.5f)
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+            simulator.SetSystem(new VfxSystemDefinition(1, "trail", "trail", new[] { emitter }), Vector3.Zero);
+
+            simulator.Update(0.1f);
+            simulator.Update(0.1f);
+
+            Assert.Equal(0, Assert.Single(simulator.Emitters).InstanceCount);
         }
 
         [Fact]
@@ -546,7 +636,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void PreviewDurationDoesNotCountParticlesTheRuntimeNeverEmits()
+        public void PreviewDurationIncludesInitialContinuousEmission()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
             {
@@ -559,7 +649,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             double duration = VfxDurationCalculator.CalculatePreview(system, seed: 17);
 
-            Assert.Equal(0.5d, duration, precision: 5);
+            Assert.Equal(5d, duration, precision: 5);
         }
 
         [Fact]

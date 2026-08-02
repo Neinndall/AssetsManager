@@ -311,9 +311,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             foreach (var es in sim.Emitters)
             {
                 if (!es.IsVisible) continue;
-                // AttachedMesh is owned by the champion scene. Rendering its texture as a
-                // standalone billboard would create a duplicate floating body/overlay.
-                if (ShouldSkipStandaloneAttachedMesh(es.Def, es.MeshVao))
+                // AttachedMesh requires the owner champion scene and is intentionally not standalone-rendered.
+                if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh)
                     continue;
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
@@ -991,9 +990,6 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static float ClampScale(float value)
             => float.IsFinite(value) ? value : 1f;
 
-        internal static bool ShouldSkipStandaloneAttachedMesh(VfxEmitterDefinition definition, uint meshVao)
-            => definition?.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && meshVao == 0;
-
         internal static bool ShouldUseSoftParticles(VfxEmitterDefinition definition, bool hasSceneDepth)
             => hasSceneDepth &&
                definition?.SoftParticle != null &&
@@ -1296,7 +1292,8 @@ vec2 addressUv(vec2 uv, int mode){
 }
 void main(){
     bool rayPrimitive = uPrimitiveKind == 7 || uPrimitiveKind == 8;
-    float rotation = (uArbitraryQuad != 0 || rayPrimitive) ? 0.0 : aRotFrame.x;
+    bool trailPrimitive = uPrimitiveKind == 5 || uPrimitiveKind == 6;
+    float rotation = (uArbitraryQuad != 0 || rayPrimitive || trailPrimitive) ? 0.0 : aRotFrame.x;
     vec3 localRight = rotateEuler(vec3(1.0, 0.0, 0.0), aRotation);
     vec3 localUp = rotateEuler(vec3(0.0, 1.0, 0.0), aRotation);
     vec3 localForward = rotateEuler(vec3(0.0, 0.0, 1.0), aRotation);
@@ -1346,6 +1343,8 @@ void main(){
                 rayLength = groundDistance + 2.0;
         }
         world = aCenter + up * (alongRay * rayLength) + right * (rc.x * aSize.x);
+    } else if (trailPrimitive) {
+        world = aCenter + up * (rc.y * aSize.y) + right * (rc.x * aSize.x);
     } else if (uIsGroundLayer != 0 || uPrimitiveKind == 9) {
         vec3 groundForward = uArbitraryQuad != 0 ? (uPlacementRight * localUp.x + uPlacementUp * localUp.y + uPlacementForward * localUp.z) : vec3(0.0, 0.0, 1.0);
         vec3 groundRight = uArbitraryQuad != 0 ? placedRight : vec3(1.0, 0.0, 0.0);
@@ -1365,7 +1364,9 @@ void main(){
     float frame = floor(aRotFrame.y + 0.0001);
     float fx = mod(frame, cols);
     float fy = floor(frame / cols);
-    vec2 localUv = vec2(cell.x, 1.0 - cell.y);
+    vec2 localUv = trailPrimitive
+        ? vec2(1.0 - cell.y, cell.x)
+        : vec2(cell.x, 1.0 - cell.y);
     vec2 centeredUv = (localUv - uUvTransformCenter) * aUvScale;
     float uvSin = sin(aUvRotation); float uvCos = cos(aUvRotation);
     centeredUv = vec2(centeredUv.x * uvCos - centeredUv.y * uvSin,
@@ -1383,7 +1384,9 @@ void main(){
     vec2 cellMax = vec2(fx + 1.0, fy + 1.0) / vec2(cols, rows) - halfTexel;
     atlasUv = clamp(atlasUv, cellMin, cellMax);
     vUv = atlasUv;
-    vec2 multUv = vec2(cell.x, 1.0 - cell.y);
+    vec2 multUv = trailPrimitive
+        ? vec2(1.0 - cell.y, cell.x)
+        : vec2(cell.x, 1.0 - cell.y);
     vec2 centeredMultUv = (multUv - uUvTransformCenterMult) * aUvScaleMult;
     float multSin = sin(aUvRotationMult); float multCos = cos(aUvRotationMult);
     centeredMultUv = vec2(centeredMultUv.x * multCos - centeredMultUv.y * multSin,

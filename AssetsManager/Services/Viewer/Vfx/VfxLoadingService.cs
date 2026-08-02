@@ -194,7 +194,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                     searchDirectory);
                 if (gradient != null) emitter.PendingColorGradient = gradient;
 
-                if (emitter.Def.IsMeshPrimitive)
+                if (emitter.Def.IsMeshPrimitive && emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh)
                 {
                     if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     {
