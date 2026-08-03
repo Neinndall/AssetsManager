@@ -11,6 +11,7 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Info;
 
 namespace AssetsManager.Services.Updater
@@ -243,8 +244,8 @@ namespace AssetsManager.Services.Updater
                     notificationService.AddNotification(
                         "Installing Update",
                         $"Extracting build for commit {shortSha}...",
-                        AssetsManager.Views.Models.Notifications.NotificationType.Info,
-                        category: AssetsManager.Views.Models.Notifications.NotificationCategory.Updates);
+                        NotificationType.Info,
+                        category: NotificationCategory.Updates);
 
                     bool saveSettings = dialog.SelectedMode == UpdateMode.CleanWithSaving;
                     await _updateExtractor.ExtractAndRestart(downloadPath, saveSettings, owner);
