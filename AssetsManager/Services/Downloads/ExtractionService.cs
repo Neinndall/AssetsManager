@@ -4,44 +4,31 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Explorer;
-using AssetsManager.Services.Audio;
 using AssetsManager.Services.Formatting;
-using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
+using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Models.Explorer;
 using AssetsManager.Views.Models.Wad;
-using AssetsManager.Views.Models.Audio;
 using AssetsManager.Views.Models.Settings;
-using AssetsManager.Utils.Framework;
+using AssetsManager.Views.Models.Dialogs.Controls;
 
 namespace AssetsManager.Services.Downloads
 {
+    /// <summary>
+    /// Orchestrates asset extraction. Picks the export mode (EXTRACT = raw,
+    /// SAVE = smart) and maps the user Settings to the target formats; the actual
+    /// export work is delegated to <see cref="AssetExportService"/>.
+    /// </summary>
     public class ExtractionService
     {
         private readonly AppSettings _appSettings;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
-        private readonly WadExportService _wadExportService;
-        private readonly WadContentProvider _wadContentProvider;
-        private readonly ContentFormatterService _contentFormatterService;
-        private readonly AudioBankService _audioBankService;
-        private readonly AudioBankLinkerService _audioBankLinkerService;
-        private readonly AudioConversionService _audioConversionService;
-        private readonly WadNodeLoaderService _wadNodeLoaderService;
+        private readonly AssetExportService _assetExportService;
 
-        private readonly record struct ExportFormats(
-            WadExportMode AudioMode,
-            AudioExportFormat AudioTarget,
-            ImageExportFormat Image,
-            DataExportFormat Data)
-        {
-            public static ExportFormats ExplorerSmart(AudioExportFormat audio) => new(
-                WadExportMode.Smart, audio, ImageExportFormat.Png, DataExportFormat.Json);
-        }
+        private static readonly ExportFormats RawFormats = new(
+            WadExportMode.Original, AudioExportFormat.Ogg, ImageExportFormat.Original, DataExportFormat.Original);
 
         public event Action<int> ExtractionStarted;
         public event Action<int, int, string> ExtractionProgressChanged;
@@ -55,66 +42,129 @@ namespace AssetsManager.Services.Downloads
             AppSettings appSettings,
             LogService logService,
             DirectoriesCreator directoriesCreator,
-            WadExportService wadExportService,
-            WadContentProvider wadContentProvider,
-            ContentFormatterService contentFormatterService,
-            AudioBankService audioBankService,
-            AudioBankLinkerService audioBankLinkerService,
-            AudioConversionService audioConversionService,
-            WadNodeLoaderService wadNodeLoaderService)
+            AssetExportService assetExportService)
         {
             _appSettings = appSettings;
             _logService = logService;
             _directoriesCreator = directoriesCreator;
-            _wadExportService = wadExportService;
-            _wadContentProvider = wadContentProvider;
-            _contentFormatterService = contentFormatterService;
-            _audioBankService = audioBankService;
-            _audioBankLinkerService = audioBankLinkerService;
-            _audioConversionService = audioConversionService;
-            _wadNodeLoaderService = wadNodeLoaderService;
+            _assetExportService = assetExportService;
         }
 
         #region Public Interface (Save, Extract, Extract New Assets)
 
-        public async Task ExtractNewFilesFromComparisonAsync(
+        /// <summary>
+        /// Auto-extract after a comparison. The only flow driven by the user Settings:
+        /// textures use ImageExportFormat, data uses DataExportFormat. Audio is always
+        /// exported raw (banks .bnk/.wpk and standalone .wem), because AudioExportFormat
+        /// only applies to the Explorer Save flow.
+        /// </summary>
+        public async Task<List<ExtractResultItem>> ExtractNewFilesFromComparisonAsync(
             List<SerializableChunkDiff> allDiffs,
             string newLolPath,
             CancellationToken cancellationToken)
         {
             var newDiffs = allDiffs.Where(d => d.Type == ChunkDiffType.New).ToList();
 
-            if (!newDiffs.Any())
+            if (newDiffs.Count == 0)
             {
                 _logService.Log("No new assets to extract from the comparison.");
                 ExtractionCompleted?.Invoke();
-                return;
+                return new List<ExtractResultItem>();
             }
 
-            int totalFiles = newDiffs.Count;
-
-            ExtractionStarted?.Invoke(totalFiles);
-
-            string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
-            int extractedCount = 0;
-            var exportFormats = new ExportFormats(
+            var settingsFormats = new ExportFormats(
                 WadExportMode.Original,
-                AudioExportFormat.Ogg,
+                _appSettings.AudioExportFormat,
                 _appSettings.ImageExportFormat,
                 _appSettings.DataExportFormat);
 
+            return await ExtractDiffsCoreAsync(
+                newDiffs, newLolPath, cancellationToken,
+                diff => IsRawByDefault(diff) ? WadExportMode.Original : WadExportMode.Smart,
+                settingsFormats);
+        }
+
+        /// <summary>Manual "Extract" action: raw data, no conversion (same as Explorer Extract).</summary>
+        public async Task<List<ExtractResultItem>> ExtractRawAsync(
+            List<SerializableChunkDiff> diffs,
+            string newLolPath,
+            CancellationToken cancellationToken)
+        {
+            if (diffs == null || diffs.Count == 0)
+            {
+                ExtractionCompleted?.Invoke();
+                return new List<ExtractResultItem>();
+            }
+
+            return await ExtractDiffsCoreAsync(
+                diffs, newLolPath, cancellationToken,
+                _ => WadExportMode.Original,
+                RawFormats);
+        }
+
+        /// <summary>
+        /// Manual "Save (Smart)" action: converts to PNG/JSON/audio (same as Explorer Save).
+        /// Audio banks (.bnk/.wpk) are always exported raw, exactly like in the Explorer flow.
+        /// </summary>
+        public async Task<List<ExtractResultItem>> ExtractSmartAsync(
+            List<SerializableChunkDiff> diffs,
+            string newLolPath,
+            CancellationToken cancellationToken)
+        {
+            if (diffs == null || diffs.Count == 0)
+            {
+                ExtractionCompleted?.Invoke();
+                return new List<ExtractResultItem>();
+            }
+
+            return await ExtractDiffsCoreAsync(
+                diffs, newLolPath, cancellationToken,
+                diff => IsRawByDefault(diff) ? WadExportMode.Original : WadExportMode.Smart,
+                ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
+        }
+
+        private static bool IsRawByDefault(SerializableChunkDiff diff)
+        {
+            string ext = Path.GetExtension(diff.FileName).ToLower();
+            return ext == ".bnk" || ext == ".wpk";
+        }
+
+        /// <summary>
+        /// Shared extraction engine. Each file is isolated in its own try/catch so a
+        /// single failure no longer aborts the whole batch; every diff produces a
+        /// result item with its own status, mode and output folder.
+        /// </summary>
+        private async Task<List<ExtractResultItem>> ExtractDiffsCoreAsync(
+            List<SerializableChunkDiff> diffs,
+            string newLolPath,
+            CancellationToken cancellationToken,
+            Func<SerializableChunkDiff, WadExportMode> modeSelector,
+            ExportFormats smartFormats)
+        {
+            int totalFiles = diffs.Count;
+            ExtractionStarted?.Invoke(totalFiles);
+
+            string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
+
             _logService.Log($"Starting extraction of {totalFiles} new assets.");
 
-            try
+            var results = new List<ExtractResultItem>(totalFiles);
+            int processed = 0;
+
+            foreach (var diff in diffs)
             {
-                foreach (var diff in newDiffs)
+                processed++;
+                ExtractionProgressChanged?.Invoke(processed, totalFiles, diff.FileName);
+
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    _logService.LogWarning("Extraction was cancelled by the user.");
+                    break;
+                }
 
-                    extractedCount++;
-                    string progressMessage = $"{diff.FileName}";
-                    ExtractionProgressChanged?.Invoke(extractedCount, totalFiles, progressMessage);
-
+                var result = new ExtractResultItem { Diff = diff };
+                try
+                {
                     string sourceWadFullPath = PathUtils.ResolveWadPath(newLolPath, diff.SourceWadFile);
                     var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
                     {
@@ -134,34 +184,48 @@ namespace AssetsManager.Services.Downloads
 
                     _directoriesCreator.CreateDirectory(fileDestinationDirectory);
 
-                    string ext = Path.GetExtension(diff.FileName).ToLower();
-                    var mode = (ext == ".bnk" || ext == ".wpk") ? WadExportMode.Original : WadExportMode.Smart;
+                    result.Mode = modeSelector(diff);
+                    result.OutputPath = fileDestinationDirectory;
 
-                    if (mode == WadExportMode.Original)
+                    if (result.Mode == WadExportMode.Original)
                     {
-                        await _wadExportService.ExportAsync(node, fileDestinationDirectory, cancellationToken, null);
+                        await _assetExportService.ExportAsync(node, fileDestinationDirectory, cancellationToken, null);
                     }
                     else
                     {
-                        await ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null, exportFormats);
+                        await _assetExportService.ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null, smartFormats);
                     }
+
+                    result.Success = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logService.LogWarning("Extraction was cancelled by the user.");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = ex.Message;
+                    _logService.LogError(ex, $"Failed to extract '{diff.FileName}'.");
                 }
 
-                string relativePath = Path.Combine("AssetsDownloaded", Path.GetFileName(destinationRootPath));
-                _logService.LogInteractiveSuccess($"Extraction completed of {extractedCount} assets in", destinationRootPath, relativePath);
+                results.Add(result);
             }
-            catch (OperationCanceledException)
+
+            int failedCount = results.Count(r => !r.Success);
+            string relativePath = Path.Combine("AssetsDownloaded", Path.GetFileName(destinationRootPath));
+            if (failedCount > 0)
             {
-                _logService.LogWarning("Extraction was cancelled by the user.");
+                _logService.LogWarning($"Extraction finished: {results.Count - failedCount} exported, {failedCount} failed.");
             }
-            catch (Exception ex)
+            else
             {
-                _logService.LogError(ex, "An unexpected error occurred during extraction.");
+                _logService.LogInteractiveSuccess($"Extraction completed of {results.Count} assets in", destinationRootPath, relativePath);
             }
-            finally
-            {
-                ExtractionCompleted?.Invoke();
-            }
+
+            ExtractionCompleted?.Invoke();
+            return results;
         }
 
         public async Task ExtractNodesAsync(
@@ -178,14 +242,14 @@ namespace AssetsManager.Services.Downloads
                 return;
             }
 
-            int totalFiles = await _wadExportService.CalculateTotalAsync(nodes, rootNodes, currentRootPath, cancellationToken);
+            int totalFiles = await _assetExportService.CalculateTotalAsync(nodes, rootNodes, currentRootPath, cancellationToken);
             ExtractionStarted?.Invoke(totalFiles);
 
             _logService.Log($"Starting extraction of {nodes.Count} selected items.");
 
             try
             {
-                await _wadExportService.ExportNodesAsync(
+                await _assetExportService.ExportNodesAsync(
                     nodes,
                     destinationPath,
                     rootNodes,
@@ -226,7 +290,7 @@ namespace AssetsManager.Services.Downloads
                 return;
             }
 
-            int totalFiles = await CalculateTotalSmartAsync(nodes, rootNodes, currentRootPath, cancellationToken);
+            int totalFiles = await _assetExportService.CalculateTotalSmartAsync(nodes, rootNodes, currentRootPath, cancellationToken);
             SavingStarted?.Invoke(totalFiles);
 
             _logService.Log($"Starting save of {nodes.Count} selected items.");
@@ -238,7 +302,7 @@ namespace AssetsManager.Services.Downloads
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    await ExportSmartAsync(node, destinationPath, rootNodes, currentRootPath, cancellationToken,
+                    await _assetExportService.ExportSmartAsync(node, destinationPath, rootNodes, currentRootPath, cancellationToken,
                         (path) =>
                         {
                             processedCount++;
@@ -260,398 +324,6 @@ namespace AssetsManager.Services.Downloads
             finally
             {
                 SavingCompleted?.Invoke();
-            }
-        }
-
-        #endregion
-
-        #region Traversal & Smart Total Calculation
-
-        private async Task<int> CalculateTotalSmartAsync(IEnumerable<FileSystemNodeModel> nodes, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken)
-        {
-            int count = 0;
-            foreach (var node in nodes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (node.Type == NodeType.VirtualFile || node.Type == NodeType.RealFile || node.Type == NodeType.WemFile)
-                {
-                    count++;
-                }
-                else if (node.Type == NodeType.SoundBank)
-                {
-                    if (!SupportedFileTypes.IsExpandableAudioBank(node.Name) || node.Children == null || node.Children.Count == 0) continue;
-
-                    if (node.Children.Count > 1 || (node.Children.Count == 1 && node.Children[0].Name != "Loading..."))
-                    {
-                        count += CountSoundsInAudioTree(node.Children);
-                    }
-                    else
-                    {
-                        var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
-                        if (linkedBank != null)
-                        {
-                            byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
-                            byte[] audioBnkData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
-                            byte[] eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
-
-                            List<AudioEventNode> audioTree;
-                            if (linkedBank.BinData != null)
-                                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkData, eventsData, linkedBank.BinData, linkedBank.BaseName);
-                            else
-                                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkData, eventsData);
-
-                            int soundsCount = 0;
-                            foreach (var eventNode in audioTree)
-                            {
-                                if (eventNode.IsTechnicalNode) continue;
-                                soundsCount += eventNode.Sounds.Count;
-                                foreach (var containerNode in eventNode.Containers)
-                                {
-                                    soundsCount += containerNode.Sounds.Count;
-                                }
-                            }
-
-                            count += (soundsCount > 0) ? soundsCount : 1;
-                        }
-                        else count++;
-                    }
-                }
-                else if (node.Type == NodeType.AudioEvent || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory || node.Type == NodeType.WadFile)
-                {
-                    if ((node.Type == NodeType.VirtualDirectory || node.Type == NodeType.WadFile) &&
-                        node.Children.Count == 1 && node.Children[0].Name == "Loading...")
-                    {
-                        var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
-                        node.Children.ReplaceRange(loadedChildren);
-                    }
-                    count += await CalculateTotalSmartAsync(node.Children, rootNodes, currentRootPath, cancellationToken);
-                }
-            }
-            return count;
-        }
-
-        private int CountSoundsInAudioTree(IEnumerable<FileSystemNodeModel> nodes)
-        {
-            int count = 0;
-            foreach (var node in nodes)
-            {
-                if (node.Type == NodeType.WemFile) count++;
-                else if (node.Children != null) count += CountSoundsInAudioTree(node.Children);
-            }
-            return count;
-        }
-
-        #endregion
-
-        #region Smart Export Logic & Handlers
-
-        private async Task ExportSmartAsync(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, CancellationToken cancellationToken, Action<string> onFileSavedCallback, ExportFormats formats)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
-            {
-                string cleanName = PathUtils.GetLogName(node.Name);
-                string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));
-                _directoriesCreator.CreateDirectory(currentDestinationPath);
-
-                if (node.Children.Count == 1 && node.Children[0].Name == "Loading...")
-                {
-                    var loadedChildren = await _wadNodeLoaderService.LoadChildrenAsync(node, cancellationToken);
-                    node.Children.ReplaceRange(loadedChildren);
-                }
-
-                foreach (var child in node.Children)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await ExportSmartAsync(child, currentDestinationPath, rootNodes, currentRootPath, cancellationToken, onFileSavedCallback, formats);
-                }
-                return;
-            }
-
-            if (node.Type == NodeType.AudioEvent)
-            {
-                if (node.IsTechnicalNode) return;
-                if (formats.AudioMode == WadExportMode.Original) return;
-
-                string eventPath = Path.Combine(destinationPath, PathUtils.SanitizeName(node.Name));
-                _directoriesCreator.CreateDirectory(eventPath);
-
-                async Task ExportSoundsRecursiveAsync(FileSystemNodeModel parentNode, string currentPath)
-                {
-                    foreach (var childNode in parentNode.Children)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (childNode.Type == NodeType.WemFile)
-                        {
-                            await HandleWemFileAsync(childNode, currentPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
-                        }
-                        else if (childNode.Type == NodeType.VirtualDirectory)
-                        {
-                            string subFolderPath = Path.Combine(currentPath, PathUtils.SanitizeName(childNode.Name));
-                            _directoriesCreator.CreateDirectory(subFolderPath);
-                            await ExportSoundsRecursiveAsync(childNode, subFolderPath);
-                        }
-                    }
-                }
-
-                await ExportSoundsRecursiveAsync(node, eventPath);
-                return;
-            }
-
-            // Single File Smart Handling
-            string extension = Path.GetExtension(node.Name).ToLower();
-            switch (extension)
-            {
-                case ".wpk":
-                case ".bnk":
-                    if (SupportedFileTypes.IsExpandableAudioBank(node.Name) && node.Children.Count > 0)
-                    {
-                        if (formats.AudioMode == WadExportMode.Smart)
-                        {
-                            await HandleAudioBankFile(node, destinationPath, rootNodes, currentRootPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
-                        }
-                        else
-                        {
-                            await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                        }
-                    }
-                    break;
-
-                case ".tex":
-                case ".dds":
-                    await HandleTextureFile(node, destinationPath, formats.Image, cancellationToken, onFileSavedCallback);
-                    break;
-
-                case ".bin":
-                case ".stringtable":
-                case ".css":
-                case ".troybin":
-                case ".preload":
-                    await HandleDataFile(node, destinationPath, extension.TrimStart('.'), formats.Data, cancellationToken, onFileSavedCallback);
-                    break;
-
-                case ".luabin64":
-                    await HandleLuaFile(node, destinationPath, formats.Data, cancellationToken, onFileSavedCallback);
-                    break;
-
-                case ".js":
-                    await HandleJsFile(node, destinationPath, formats.Data, cancellationToken, onFileSavedCallback);
-                    break;
-
-                case ".wem":
-                    if (formats.AudioMode == WadExportMode.Smart)
-                    {
-                        await HandleWemFileAsync(node, destinationPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
-                    }
-                    else
-                    {
-                        await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                    }
-                    break;
-
-                case ".ogg":
-                    if (formats.AudioMode == WadExportMode.Smart)
-                    {
-                        await HandleStandardAudioFileAsync(node, destinationPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
-                    }
-                    else
-                    {
-                        await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                    }
-                    break;
-
-                default:
-                    // Fall back to raw export via WadExportService
-                    await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                    break;
-            }
-        }
-
-        private async Task HandleTextureFile(FileSystemNodeModel node, string destinationPath, ImageExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            if (format == ImageExportFormat.Original)
-            {
-                await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                return;
-            }
-
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
-
-            using (var memoryStream = new MemoryStream(fileBytes))
-            {
-                var bitmapSource = TextureUtils.LoadTexture(memoryStream, Path.GetExtension(node.Name));
-                if (bitmapSource != null)
-                {
-                    await TextureUtils.SaveBitmapSourceAsImageAsync(bitmapSource, node.Name, destinationPath, format, onFileSavedCallback, cancellationToken);
-                }
-            }
-        }
-
-        private async Task HandleDataFile(FileSystemNodeModel node, string destinationPath, string type, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            if (format == DataExportFormat.Original)
-            {
-                await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                return;
-            }
-
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
-
-            var formattedContent = await _contentFormatterService.GetFormattedStringAsync(type, fileBytes);
-            string fileName = Path.ChangeExtension(node.Name, ".json");
-            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
-            onFileSavedCallback?.Invoke(filePath);
-        }
-
-        private async Task HandleJsFile(FileSystemNodeModel node, string destinationPath, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            if (format == DataExportFormat.Original)
-            {
-                await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                return;
-            }
-
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
-
-            var formattedContent = await _contentFormatterService.GetFormattedStringAsync("js", fileBytes);
-            string filePath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
-
-            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
-            onFileSavedCallback?.Invoke(filePath);
-        }
-
-        private async Task HandleLuaFile(FileSystemNodeModel node, string destinationPath, DataExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            if (format == DataExportFormat.Original)
-            {
-                await _wadExportService.ExportAsync(node, destinationPath, cancellationToken, onFileSavedCallback);
-                return;
-            }
-
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
-
-            var formattedContent = await _contentFormatterService.GetFormattedStringAsync("luabin64", fileBytes);
-            string fileName = Path.ChangeExtension(node.Name, ".json");
-            string filePath = PathUtils.GetUniqueFilePath(destinationPath, fileName);
-
-            await File.WriteAllTextAsync(filePath, formattedContent, cancellationToken);
-            onFileSavedCallback?.Invoke(filePath);
-        }
-
-        private async Task HandleStandardAudioFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat targetFormat, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            var fileBytes = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
-            if (fileBytes == null) return;
-
-            string currentExtension = Path.GetExtension(node.Name).ToLower();
-            
-            if (targetFormat != AudioExportFormat.Ogg || currentExtension != ".ogg")
-            {
-                byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(fileBytes, ".wem", targetFormat, cancellationToken);
-                if (convertedData != null)
-                {
-                    string extension = targetFormat switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
-                    string filePath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(node.Name, extension));
-                    await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
-                    onFileSavedCallback?.Invoke(filePath);
-                    return;
-                }
-            }
-
-            string fallbackPath = PathUtils.GetUniqueFilePath(destinationPath, node.Name);
-            await File.WriteAllBytesAsync(fallbackPath, fileBytes, cancellationToken);
-            onFileSavedCallback?.Invoke(fallbackPath);
-        }
-
-        private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            var wemData = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken);
-            if (wemData == null) return;
-
-            byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
-            if (convertedData != null)
-            {
-                string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
-                string filePath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(node.Name, extension));
-                await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
-                onFileSavedCallback?.Invoke(filePath);
-            }
-        }
-
-        private async Task HandleAudioBankFile(FileSystemNodeModel node, string destinationPath, ObservableRangeCollection<FileSystemNodeModel> rootNodes, string currentRootPath, AudioExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
-        {
-            var linkedBank = await _audioBankLinkerService.LinkAudioBankAsync(node, rootNodes, currentRootPath);
-            if (linkedBank == null) return;
-
-            string audioBankPath = Path.Combine(destinationPath, PathUtils.SanitizeName(Path.GetFileNameWithoutExtension(node.Name)));
-            _directoriesCreator.CreateDirectory(audioBankPath);
-
-            var eventsData = linkedBank.EventsBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.EventsBnkNode, cancellationToken) : null;
-            byte[] wpkData = linkedBank.WpkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.WpkNode, cancellationToken) : null;
-            byte[] audioBnkFileData = linkedBank.AudioBnkNode != null ? await _wadContentProvider.GetVirtualFileBytesAsync(linkedBank.AudioBnkNode, cancellationToken) : null;
-            
-            List<AudioEventNode> audioTree;
-            if (linkedBank.BinData != null)
-                audioTree = _audioBankService.ParseAudioBank(wpkData, audioBnkFileData, eventsData, linkedBank.BinData, linkedBank.BaseName);
-            else
-                audioTree = _audioBankService.ParseGenericAudioBank(wpkData, audioBnkFileData, eventsData);
-
-            async Task ExportSoundNodeAsync(WemFileNode soundNode, string eventPath)
-            {
-                byte[] wemData = null;
-                if (soundNode.Source == AudioSourceType.Wpk && wpkData != null)
-                {
-                    wemData = wpkData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                }
-                else if (audioBnkFileData != null)
-                {
-                    wemData = audioBnkFileData.AsSpan((int)soundNode.Offset, (int)soundNode.Size).ToArray();
-                }
-
-                if (wemData != null)
-                {
-                    byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
-                    if (convertedData != null)
-                    {
-                        string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
-                        string filePath = PathUtils.GetUniqueFilePath(eventPath, Path.ChangeExtension(soundNode.Name, extension));
-                        await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
-                        onFileSavedCallback?.Invoke(filePath);
-                    }
-                }
-            }
-
-            foreach (var eventNode in audioTree)
-            {
-                if (eventNode.IsTechnicalNode) continue;
-
-                string eventPath = Path.Combine(audioBankPath, PathUtils.SanitizeName(eventNode.Name));
-                _directoriesCreator.CreateDirectory(eventPath);
-
-                // Export root-level sounds
-                foreach (var soundNode in eventNode.Sounds)
-                {
-                    await ExportSoundNodeAsync(soundNode, eventPath);
-                }
-
-                // Export sounds in sub-containers (families)
-                foreach (var containerNode in eventNode.Containers)
-                {
-                    string containerPath = Path.Combine(eventPath, PathUtils.SanitizeName(containerNode.Name));
-                    _directoriesCreator.CreateDirectory(containerPath);
-                    foreach (var soundNode in containerNode.Sounds)
-                    {
-                        await ExportSoundNodeAsync(soundNode, containerPath);
-                    }
-                }
             }
         }
 

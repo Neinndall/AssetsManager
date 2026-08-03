@@ -120,8 +120,8 @@ namespace AssetsManager
       services.AddTransient<MediaTempFileStore>();
       services.AddTransient<MediaWebViewPreviewService>();
       services.AddTransient<ExplorerPreviewService>();
-      services.AddSingleton<WadExportService>();
-      services.AddSingleton<WadContentProvider>();
+       services.AddSingleton<AssetExportService>();
+       services.AddSingleton<WadContentProvider>();
       services.AddSingleton<WadNodeLoaderService>();
       services.AddSingleton<WadSearchBoxService>();
       services.AddTransient<TreeBuilderService>();
