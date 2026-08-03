@@ -96,7 +96,7 @@ Improvements
   - RST content guessing now resolves text sources from both GAME and LCU WAD path indexes.
   - BIN and RST guessing now streams resolved hashes to the results list and preserves matches when a run is cancelled.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
-  - LCU Basic Suite now caps basename and basename-word substitution at 500K candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
+  - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.
   - LCU V1 Paths now avoids generating locale variants already discoverable from installed WADs.
   - Generated hash paths now use exact matching with shared batch processing and avoid repeated hash-file access.
