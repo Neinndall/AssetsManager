@@ -290,6 +290,8 @@ namespace AssetsManager.Services.Hashes
                         MatchStringsInField(item, "SpecifiedGameModes");
                     else if (classHash == Fnv1a.HashLower("ViewControllerList"))
                         foreach (BinTreeProperty property in item.Properties.Values) VisitStrings(property, MatchAnyEntry);
+                    else if (classHash == Fnv1a.HashLower("AnimationGraphData") || classHash == Fnv1a.HashLower("AnimationGraphDataContainer"))
+                        MatchAnimationGraphData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("CharacterSkinData") || classHash == Fnv1a.HashLower("SkinData"))
                         MatchSkinData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") || classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
@@ -298,6 +300,30 @@ namespace AssetsManager.Services.Hashes
                         MatchHashLinkMap(item, "resourceMap");
                     else if (classHash == Fnv1a.HashLower("MapContainer"))
                         MatchHashLinkMap(item, "chunks");
+                }
+            }
+
+            void MatchAnimationGraphData(uint entryHash, BinTreeObject item)
+            {
+                if (!string.IsNullOrEmpty(path))
+                {
+                    string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
+                    int charIdx = normalizedPath.IndexOf("characters/", StringComparison.OrdinalIgnoreCase);
+                    if (charIdx >= 0)
+                    {
+                        string sub = normalizedPath[(charIdx + 11)..];
+                        int slash = sub.IndexOf('/');
+                        if (slash > 0)
+                        {
+                            string champName = sub[..slash];
+                            MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Base");
+                            for (int skin = 0; skin < 50; skin++)
+                            {
+                                MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Skin{skin}");
+                                MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Skin{skin:00}");
+                            }
+                        }
+                    }
                 }
             }
 
