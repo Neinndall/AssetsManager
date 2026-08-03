@@ -73,10 +73,7 @@
                         </Border>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="TARGET INSTALLATION" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                <TextBlock Text="Target: " FontSize="11" Foreground="{StaticResource TextSecondary}"/>
-                                <TextBlock Text="{Binding SelectedTargetInstallation.DisplayName, FallbackValue='MAIN (PBE)'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
-                            </StackPanel>
+                            <TextBlock Text="{Binding SelectedTargetInstallation.TargetSummary, FallbackValue='Target: League of Legends PBE (MAIN)'}" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </StackPanel>
 
@@ -95,7 +92,23 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <materialIcons:MaterialIcon Grid.Column="0" Kind="FolderZipOutline" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    
+                                    <!-- Left Icon -->
+                                    <materialIcons:MaterialIcon Grid.Column="0" Width="18" Height="18" Foreground="{StaticResource TextMuted}" Margin="0,0,12,0" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon.Style>
+                                            <Style TargetType="materialIcons:MaterialIcon">
+                                                <Setter Property="Kind" Value="FolderZipOutline"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMain}" Value="True">
+                                                        <Setter Property="Kind" Value="DesktopClassic"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialIcons:MaterialIcon.Style>
+                                    </materialIcons:MaterialIcon>
+
+                                    <!-- Middle Stack: DisplayName + Version + Badge -->
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,1"/>
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -133,8 +146,11 @@
                                             </Border>
                                         </StackPanel>
                                     </StackPanel>
+
+                                    <!-- Right Column: Stacked Date & Time -->
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="16,0,4,0">
-                                        <TextBlock Text="{Binding DateDisplay}" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{Binding CreationDate, StringFormat={}{0:dd/MM/yyyy}}" FontSize="10" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{Binding CreationDate, StringFormat={}{0:HH:mm}}" FontSize="9" Foreground="{StaticResource TextMuted}" Opacity="0.6" HorizontalAlignment="Right"/>
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>

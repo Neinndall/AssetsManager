@@ -23,7 +23,9 @@ namespace AssetsManager.Views.Models.Versions
         public bool IsMain { get; set; }
         public bool IsPbe { get; set; }
         public string Version { get; set; }
-        public string DateDisplay { get; set; }
+        public DateTime? CreationDate { get; set; }
+
+        public string TargetSummary => $"Target: {DisplayName} ({(IsMain ? "MAIN" : "BACKUP")})";
 
         public override string ToString() => DisplayName;
     }
@@ -123,29 +125,33 @@ namespace AssetsManager.Views.Models.Versions
                 if (preferredClient == PreferredClient.PBE && !string.IsNullOrWhiteSpace(appSettings.LolPbeDirectory) && System.IO.Directory.Exists(appSettings.LolPbeDirectory))
                 {
                     string pbeVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolPbeDirectory) : null;
+                    DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolPbeDirectory);
+
                     TargetInstallations.Add(new TargetInstallationOption
                     {
                         Name = "League of Legends PBE",
-                        DisplayName = "MAIN (PBE)",
+                        DisplayName = "League of Legends PBE",
                         Path = appSettings.LolPbeDirectory,
                         IsMain = true,
                         IsPbe = true,
                         Version = !string.IsNullOrEmpty(pbeVer) ? $"v{pbeVer}" : "Active PBE",
-                        DateDisplay = "Configured"
+                        CreationDate = lastWriteTime
                     });
                 }
                 else if (preferredClient == PreferredClient.LIVE && !string.IsNullOrWhiteSpace(appSettings.LolLiveDirectory) && System.IO.Directory.Exists(appSettings.LolLiveDirectory))
                 {
                     string liveVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolLiveDirectory) : null;
+                    DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolLiveDirectory);
+
                     TargetInstallations.Add(new TargetInstallationOption
                     {
                         Name = "League of Legends LIVE",
-                        DisplayName = "MAIN (LIVE)",
+                        DisplayName = "League of Legends LIVE",
                         Path = appSettings.LolLiveDirectory,
                         IsMain = true,
                         IsPbe = false,
                         Version = !string.IsNullOrEmpty(liveVer) ? $"v{liveVer}" : "Active LIVE",
-                        DateDisplay = "Configured"
+                        CreationDate = lastWriteTime
                     });
                 }
             }
@@ -162,12 +168,12 @@ namespace AssetsManager.Views.Models.Versions
                         TargetInstallations.Add(new TargetInstallationOption
                         {
                             Name = backup.Name,
-                            DisplayName = backup.Name,
+                            DisplayName = backup.DisplayName,
                             Path = backup.Path,
                             IsMain = false,
                             IsPbe = backup.IsPbe,
                             Version = !string.IsNullOrEmpty(backup.Version) ? $"v{backup.Version}" : "Backup",
-                            DateDisplay = backup.CreationDate.ToString("dd/MM/yyyy HH:mm")
+                            CreationDate = backup.CreationDate
                         });
                     }
                 }
