@@ -154,8 +154,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.EnableVertexAttribArray(12); gl.VertexAttribPointer(12, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(29 * sizeof(float)));
             gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(31 * sizeof(float)));
             gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
-            gl.EnableVertexAttribArray(15); gl.VertexAttribPointer(15, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(34 * sizeof(float)));
-            gl.EnableVertexAttribArray(16); gl.VertexAttribPointer(16, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(35 * sizeof(float)));
+            gl.EnableVertexAttribArray(15); gl.VertexAttribPointer(15, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(34 * sizeof(float)));
 
             gl.VertexAttribDivisor(1, 1);
             gl.VertexAttribDivisor(2, 1);
@@ -172,7 +171,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.VertexAttribDivisor(13, 1);
             gl.VertexAttribDivisor(14, 1);
             gl.VertexAttribDivisor(15, 1);
-            gl.VertexAttribDivisor(16, 1);
 
             gl.BindVertexArray(0);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -1341,8 +1339,7 @@ layout(location=11) in vec4 aErosionMixer;
 layout(location=12) in vec2 aUvOffsetMult;
 layout(location=13) in vec2 aUvScaleMult;
 layout(location=14) in float aUvRotationMult;
-layout(location=15) in float aTextureMultFrame;
-layout(location=16) in float aPaletteSelector;
+layout(location=15) in vec2 aTextureMultFramePalette;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
@@ -1515,14 +1512,14 @@ void main(){
     multUv = addressUv(vLocalUvMult, uAddressModeMult);
     vec2 multDiv = max(uTexDivMult, vec2(1.0));
     float multCols = multDiv.x;
-    float multFrame = floor(aTextureMultFrame + 0.0001);
+    float multFrame = floor(aTextureMultFramePalette.x + 0.0001);
     vec2 multCell = vec2(mod(multFrame, multCols), floor(multFrame / multCols));
     vec2 multHalfTexel = 0.5 / max(uTexSizeMult, vec2(1.0));
     vec2 multCellMin = multCell / multDiv + multHalfTexel;
     vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
     vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
     vColor = aColor;
-    vPaletteSelector = aPaletteSelector;
+    vPaletteSelector = aTextureMultFramePalette.y;
     vErosionDrive = aErosionDrive;
     vErosionMixer = aErosionMixer;
 }";
