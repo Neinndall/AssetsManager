@@ -160,7 +160,7 @@ Improvements
   - The global search box now also filters the assets listed in the Comparison Results tab.
   - Export failures no longer stop the whole batch; failed assets can be retried from the Comparison Results tab.
   - Unified the Extract and Save export engine so both act consistently: Extract exports original raw files and Save applies your configured conversions.
-  - Manage Versions / Added a Hero-styled target installation selector with live path preview and rich badges to select destination client (MAIN or Backups filtered by preferred environment) when installing client plugins or game files.
+  - Manage Versions / Added a Quick Select toggle button for Target Installation to select destination client (MAIN or Backups filtered by preferred environment) when installing client plugins or game files.
 
 Bug Fixes
   - Explorer / Fixed an issue where selecting specific files in the Grid View would extract or save the entire parent WAD or folder instead of only the selected items.
