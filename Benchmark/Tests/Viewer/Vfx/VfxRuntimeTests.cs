@@ -731,6 +731,60 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void GroundMeshRotationKeepsOnlyInPlaneSpin()
+        {
+            VfxEmitterDefinition groundMesh = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = true,
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                IsGroundLayer = true,
+                BirthRotation = VfxCurve3.Const(new Vector3(90f, 20f, 30f))
+            };
+
+            Vector3 rotation = VfxOpenGlRenderer.ResolveMeshRotation(
+                groundMesh,
+                new Vector3(90f, 20f, 30f) * (MathF.PI / 180f));
+
+            Assert.Equal(new Vector3(0f, 0f, 30f * (MathF.PI / 180f)), rotation);
+        }
+
+        [Fact]
+        public void NegativeNinetyMeshRotationIsRecognizedAsGroundLike()
+        {
+            VfxEmitterDefinition mesh = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = true,
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                BirthRotation = VfxCurve3.Const(new Vector3(-90f, 0f, 0f))
+            };
+
+            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(mesh.BirthRotation));
+            Assert.Equal(
+                Vector3.Zero,
+                VfxOpenGlRenderer.ResolveMeshRotation(mesh, new Vector3(-MathF.PI / 2f, 0f, 0f)));
+        }
+
+        [Fact]
+        public void NonGroundMeshRotationKeepsAllAxes()
+        {
+            VfxEmitterDefinition mesh = CreateEmitter(
+                Vector3.One,
+                VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = true,
+                PrimitiveKind = VfxPrimitiveKind.Mesh,
+                BirthRotation = VfxCurve3.Const(new Vector3(10f, 20f, 30f))
+            };
+            Vector3 authored = new(0.1f, 0.2f, 0.3f);
+
+            Assert.Equal(authored, VfxOpenGlRenderer.ResolveMeshRotation(mesh, authored));
+        }
+
+        [Fact]
         public void BirthScaleAndRotationRangesUseTheAuthoredSecondEndpoint()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with

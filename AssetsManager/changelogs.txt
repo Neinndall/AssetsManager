@@ -33,6 +33,7 @@ Improvements
   - VFX Studio / Recovered legacy opaque RGB masks for billboard-like effects while preserving authored mesh alpha.
   - VFX Studio / Applied authored `modulationFactor` values from VFX BIN emitters to particle and mesh color output with a neutral fallback.
   - VFX Studio / Applied authored UV parallax scaling to particle and mesh textures with a neutral fallback when absent.
+  - VFX Studio / Corrected ground-mesh orientation so authored ±90° ground alignment is not applied twice.
   - VFX Studio / Honored BIN local-orientation flags in both particle basis selection and quad shader geometry.
   - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.

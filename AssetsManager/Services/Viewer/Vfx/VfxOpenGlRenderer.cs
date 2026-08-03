@@ -982,11 +982,14 @@ namespace AssetsManager.Services.Viewer.Vfx
                 float scaleY = ClampScale(es.Instances[o + 4]);
                 float scaleZ = ClampScale(es.Instances[o + 18]);
                 _gl.Uniform3(_muScale, scaleX, scaleY, scaleZ);
+                Vector3 meshRotation = ResolveMeshRotation(
+                    es.Def,
+                    new Vector3(es.Instances[o + 15], es.Instances[o + 16], es.Instances[o + 17]));
                 _gl.Uniform3(
                     _muRotation,
-                    es.Instances[o + 15],
-                    es.Instances[o + 16],
-                    es.Instances[o + 17]);
+                    meshRotation.X,
+                    meshRotation.Y,
+                    meshRotation.Z);
                 _gl.Uniform4(_muColor, es.Instances[o + 5], es.Instances[o + 6], es.Instances[o + 7], es.Instances[o + 8]);
                 _gl.Uniform2(_muBirthUvOffset, es.Instances[o + 19], es.Instances[o + 20]);
                 _gl.Uniform2(_muUvScale, es.Instances[o + 21], es.Instances[o + 22]);
@@ -1033,7 +1036,18 @@ namespace AssetsManager.Services.Viewer.Vfx
             float tiltY = MathF.Abs(MathF.Abs(rotation.Y) - 90f);
             return (tiltX < 45f && tiltY < 45f) ||
                    MathF.Abs(rotation.X - 270f) < 45f ||
-                   (MathF.Abs(rotation.X - 90f) < 45f && MathF.Abs(rotation.Z) < 45f);
+                   (MathF.Abs(MathF.Abs(rotation.X) - 90f) < 45f && MathF.Abs(rotation.Z) < 45f);
+        }
+
+        internal static Vector3 ResolveMeshRotation(VfxEmitterDefinition definition, Vector3 authoredRotation)
+        {
+            bool groundMesh = definition.IsGroundLayer ||
+                definition.IsFollowingTerrain ||
+                definition.PrimitiveKind == VfxPrimitiveKind.PlanarProjection ||
+                IsGroundLikeBirthRotation(definition.BirthRotation);
+            return groundMesh
+                ? new Vector3(0f, 0f, authoredRotation.Z)
+                : authoredRotation;
         }
 
         private const string MeshVert = @"
