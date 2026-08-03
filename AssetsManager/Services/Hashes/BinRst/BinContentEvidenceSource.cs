@@ -290,6 +290,8 @@ namespace AssetsManager.Services.Hashes
                         MatchStringsInField(item, "SpecifiedGameModes");
                     else if (classHash == Fnv1a.HashLower("ViewControllerList"))
                         foreach (BinTreeProperty property in item.Properties.Values) VisitStrings(property, MatchAnyEntry);
+                    else if (classHash == Fnv1a.HashLower("AtomicClipData") || classHash == Fnv1a.HashLower("SequencerClipData"))
+                        MatchAtomicClipData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("AnimationGraphData") || classHash == Fnv1a.HashLower("AnimationGraphDataContainer"))
                         MatchAnimationGraphData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("CharacterSkinData") || classHash == Fnv1a.HashLower("SkinData"))
@@ -300,6 +302,44 @@ namespace AssetsManager.Services.Hashes
                         MatchHashLinkMap(item, "resourceMap");
                     else if (classHash == Fnv1a.HashLower("MapContainer"))
                         MatchHashLinkMap(item, "chunks");
+                }
+            }
+
+            void MatchAtomicClipData(uint entryHash, BinTreeObject item)
+            {
+                string animPath = null;
+                VisitForAnimPath(item.Properties.Values);
+
+                if (!string.IsNullOrEmpty(animPath))
+                {
+                    string fileName = Path.GetFileNameWithoutExtension(animPath);
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        MatchObservedEntry(entryHash, fileName);
+                        int underscore = fileName.IndexOf('_');
+                        if (underscore > 0 && underscore < fileName.Length - 1)
+                        {
+                            string shortName = fileName[(underscore + 1)..];
+                            MatchObservedEntry(entryHash, shortName);
+                        }
+                    }
+                }
+
+                void VisitForAnimPath(IEnumerable<BinTreeProperty> properties)
+                {
+                    foreach (var prop in properties)
+                    {
+                        if (animPath != null) return;
+                        if (prop is BinTreeString strProp && !string.IsNullOrWhiteSpace(strProp.Value) &&
+                            strProp.Value.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                        {
+                            animPath = strProp.Value;
+                            return;
+                        }
+                        if (prop is BinTreeStruct strct) VisitForAnimPath(strct.Properties.Values);
+                        else if (prop is BinTreeContainer ctr) VisitForAnimPath(ctr.Elements);
+                        else if (prop is BinTreeOptional opt && opt.Value != null) VisitForAnimPath(new[] { opt.Value });
+                    }
                 }
             }
 
