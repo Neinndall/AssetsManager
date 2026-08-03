@@ -93,6 +93,7 @@
                       Margin="6,0,0,0" 
                       ItemsSource="{Binding RootNodes}"
                       SelectedItemChanged="FileTreeView_SelectedItemChanged"
+                      PreviewMouseLeftButtonDown="FileTreeView_PreviewMouseLeftButtonDown"
                       Style="{StaticResource ModernTreeView}"
                       Visibility="{Binding IsTreeReady, Converter={StaticResource BoolToVisibilityConverter}}">
                 <TreeView.Resources>

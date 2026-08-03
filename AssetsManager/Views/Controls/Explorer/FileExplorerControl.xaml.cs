@@ -963,6 +963,14 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
+        private void FileTreeView_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (FilePreviewer != null && FilePreviewer.ViewModel.IsGridMode)
+            {
+                FilePreviewer.FileGridControl?.ClearSelectionSession(resetAnchor: false);
+            }
+        }
+
         public void HandleSearchTextChanged()
         {
             _searchTimer.Stop();

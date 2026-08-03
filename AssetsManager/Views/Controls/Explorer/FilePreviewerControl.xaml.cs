@@ -487,7 +487,10 @@ namespace AssetsManager.Views.Controls.Explorer
         private void Breadcrumbs_ItemClicked(object sender, BreadcrumbItemClickedEventArgs e)
         {
             if (e.Value is FileSystemNodeModel node)
+            {
+                FileGridControl?.ClearSelectionSession(resetAnchor: false);
                 HandleNodeClicked(node);
+            }
         }
     }
 }
