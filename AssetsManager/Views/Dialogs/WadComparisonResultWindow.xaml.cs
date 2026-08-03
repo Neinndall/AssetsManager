@@ -410,25 +410,31 @@ namespace AssetsManager.Views.Dialogs
                     diff.BackupChunkPath = WadNodeLoaderService.GetBackupChunkPath(backupRoot, diff);
                 }
 
-                // Optimization: Skip if already has a readable name. Only attempt if empty or a raw hex hash.
-                if (diff.OldPathHash != 0 && (string.IsNullOrEmpty(diff.OldPath) || IsHexHash(diff.OldPath)))
-                {
-                    string resolved = _hashResolverService.ResolveHash(diff.OldPathHash);
-                    if (resolved != null) diff.OldPath = resolved;
-                }
-
-                if (diff.NewPathHash != 0 && (string.IsNullOrEmpty(diff.NewPath) || IsHexHash(diff.NewPath)))
-                {
-                    string resolved = _hashResolverService.ResolveHash(diff.NewPathHash);
-                    if (resolved != null) diff.NewPath = resolved;
-                }
+                ResolveStoredPath(diff.OldPathHash, diff.OldPath, value => diff.OldPath = value);
+                ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
             }
         }
 
-        private bool IsHexHash(string path)
+        // Re-attempts hash resolution for stored hex-based names (the shape produced by
+        // Smart Guessing when a hash was unknown at comparison time). Only applies the
+        // result when the catalog returns a real game path, preserving the stored name
+        // otherwise.
+        private void ResolveStoredPath(ulong pathHash, string currentPath, Action<string> assign)
+        {
+            if (pathHash == 0) return;
+            if (!string.IsNullOrEmpty(currentPath) && !IsHexHash(currentPath)) return;
+
+            string resolved = _hashResolverService.ResolveHash(pathHash);
+            if (resolved != pathHash.ToString("x16")) assign(resolved);
+        }
+
+        // Matches a raw 16-char hex hash with or without an extension, the shape
+        // produced by Smart Guessing when a hash was unknown at comparison time.
+        private static bool IsHexHash(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
-            return path.Length == 16 && System.Text.RegularExpressions.Regex.IsMatch(path, @"^[0-9a-fA-F]+$");
+            string name = Path.GetFileNameWithoutExtension(path);
+            return name.Length == 16 && name.All(Uri.IsHexDigit);
         }
 
         private List<WadGroupViewModel> PrepareGroupedResults(List<SerializableChunkDiff> diffs)
@@ -515,8 +521,8 @@ namespace AssetsManager.Views.Dialogs
                     await _hashResolverService.ForceReloadHashesAsync();
                     foreach (var diff in _serializableDiffs)
                     {
-                        if (diff.OldPathHash != 0) diff.OldPath = _hashResolverService.ResolveHash(diff.OldPathHash);
-                        if (diff.NewPathHash != 0) diff.NewPath = _hashResolverService.ResolveHash(diff.NewPathHash);
+                        ResolveStoredPath(diff.OldPathHash, diff.OldPath, value => diff.OldPath = value);
+                        ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
                     }
                 });
                 PopulateResults(_serializableDiffs);

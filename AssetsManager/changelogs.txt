@@ -166,6 +166,7 @@ Improvements
   - Notifications / Removed redundant ISSUES tab from Notification Hub as warnings and errors are already reported in the log console and log files.
 
 Bug Fixes
+  - Comparator / Historical comparison results now re-resolve their hashes when reopened, so assets that were unnamed at comparison time show their real game paths once the hash catalogs are available.
   - Notifications / Fixed notification category classification so Watcher updates, Comparator/PBE status discoveries, and App/Hash updates appear under their respective tabs instead of defaulting to System.
   - Comparator / Fixed export mode labels in results tab to accurately reflect configured protocol settings (Original vs Smart).
   - Explorer / Fixed an issue where selecting specific files in the Grid View would extract or save the entire parent WAD or folder instead of only the selected items.
