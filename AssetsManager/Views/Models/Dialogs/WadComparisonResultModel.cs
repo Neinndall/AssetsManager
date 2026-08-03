@@ -1,21 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Views.Models.Wad;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Utils;
-using AssetsManager.Utils.Framework;
 
 namespace AssetsManager.Views.Models.Dialogs
 {
     public enum ComparisonViewMode
     {
         Overview,
-        Discovery,
-        Advanced
+        Advanced,
+        Results
     }
 
     public enum ComparisonLoadingState
@@ -33,6 +31,7 @@ namespace AssetsManager.Views.Models.Dialogs
     {
         private bool _isLoading;
         private string _summaryText = "Analyzing differences...";
+        private string _resultsSummaryText = string.Empty;
         private string _countNew = "0";
         private string _countModified = "0";
         private string _countRemoved = "0";
@@ -47,12 +46,11 @@ namespace AssetsManager.Views.Models.Dialogs
         public ComparisonViewMode ActiveView
         {
             get => _activeView;
-            set { if (_activeView != value) { _activeView = value; OnPropertyChanged(); } }
+            set { if (_activeView != value) { _activeView = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
         }
 
         // Sub-Models (Encapsulated responsibilities)
         public WadResultsTreeModel TreeModel { get; } = new WadResultsTreeModel();
-        public ObservableRangeCollection<SerializableChunkDiff> DiscoveryItems { get; } = new();
 
         public SerializableChunkDiff SelectedItem
         {
@@ -143,7 +141,7 @@ namespace AssetsManager.Views.Models.Dialogs
         public string SummaryText
         {
             get => _summaryText;
-            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); } }
+            set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
         }
 
         public string ComparisonSummary
@@ -151,6 +149,14 @@ namespace AssetsManager.Views.Models.Dialogs
             get => _summaryText; // They are the same for now, but let's keep the alias for future expansion
             set { if (_summaryText != value) { _summaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(SummaryText)); } }
         }
+
+        public string ResultsSummaryText
+        {
+            get => _resultsSummaryText;
+            set { if (_resultsSummaryText != value) { _resultsSummaryText = value; OnPropertyChanged(); OnPropertyChanged(nameof(FooterSummaryText)); } }
+        }
+
+        public string FooterSummaryText => ActiveView == ComparisonViewMode.Results ? ResultsSummaryText : SummaryText;
 
         public string CountNew
         {
@@ -208,13 +214,7 @@ namespace AssetsManager.Views.Models.Dialogs
             // 1. Update Technical Tree
             TreeModel.WadGroups.ReplaceRange(groups);
             
-            // 2. Populate Discovery Grid (Visual Assets)
-            var visualAssets = diffs
-                .Where(d => SupportedFileTypes.IsImage(d.Path))
-                .ToList();
-            DiscoveryItems.ReplaceRange(visualAssets);
-
-            // 3. Update Summary & Stats
+            // 2. Update Summary & Stats
             if (diffs.Count == _totalDiffsCount)
             {
                 SummaryText = $"Found {diffs.Count} differences across {groups.Count} WAD files.";

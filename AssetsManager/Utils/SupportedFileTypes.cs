@@ -88,6 +88,24 @@ namespace AssetsManager.Utils
                    Html.Contains(extension);
         }
 
+        /// <summary>
+        /// Shared predicate used by the segmented "FILTER BY" control: "All", "Images",
+        /// "Audio", "3D" or "Data". Accepts a file name or extension.
+        /// </summary>
+        public static bool MatchesFilter(string filterType, string fileName)
+        {
+            if (string.IsNullOrEmpty(filterType) || filterType == "All") return true;
+
+            return filterType switch
+            {
+                "Images" => IsImage(fileName),
+                "Audio" => IsAudio(fileName),
+                "3D" => Is3D(fileName),
+                "Data" => IsText(fileName),
+                _ => true
+            };
+        }
+
         public static bool IsDiffSupported(string fileName)
         {
             if (string.IsNullOrEmpty(fileName)) return false;

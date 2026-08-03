@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,6 +12,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
@@ -38,13 +39,16 @@ namespace AssetsManager.Views.Dialogs
         private readonly WadContentProvider _wadContentProvider;
         private readonly VersionService _versionService;
         private readonly BackupManager _backupManager;
-        private readonly SemaphoreSlim _galleryLoadLimiter = new(2, 2);
-        private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _galleryLoads = new();
+        private readonly ExtractionService _extractionService;
+        private readonly DirectoriesCreator _directoriesCreator;
+        private readonly SemaphoreSlim _thumbnailLoadLimiter = new(2, 2);
+        private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _thumbnailLoads = new();
 
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath;
         private string _version;
+        private List<ExtractResultItem> _extractionResults;
 
         private readonly WadComparisonResultModel _viewModel;
 
@@ -65,13 +69,18 @@ namespace AssetsManager.Views.Dialogs
             _wadContentProvider = serviceProvider.GetRequiredService<WadContentProvider>();
             _versionService = serviceProvider.GetRequiredService<VersionService>();
             _backupManager = serviceProvider.GetRequiredService<BackupManager>();
+            _extractionService = serviceProvider.GetRequiredService<ExtractionService>();
+            _directoriesCreator = serviceProvider.GetRequiredService<DirectoriesCreator>();
 
             // Peer Injection
             ResultsTree.ParentWindow = this;
+            ResultsControl.ParentWindow = this;
 
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-            Gallery.ItemVisibilityChanged += OnGalleryItemVisibilityChanged;
+            ResultsControl.ItemVisibilityChanged += OnResultsItemVisibilityChanged;
+            ResultsControl.DiffTypeChanged += OnResultsDiffTypeChanged;
+            ResultsControl.FilterApplied += OnResultsFilterApplied;
 
             Loaded += WadComparisonResultWindow_Loaded;
             Closed += OnWindowClosed;
@@ -81,15 +90,66 @@ namespace AssetsManager.Views.Dialogs
         {
             if (e.PropertyName == nameof(WadComparisonResultModel.ActiveView))
             {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
+                UpdateFooterSummary();
+                if (_viewModel.ActiveView == ComparisonViewMode.Results)
                 {
-                    QueueGalleryThumbnailLoading();
+                    QueueResultsThumbnailLoading();
                 }
                 else
                 {
-                    ResetGalleryLoading();
+                    ResetThumbnailLoading();
                 }
             }
+        }
+
+        private void OnResultsFilterApplied()
+        {
+            UpdateFooterSummary();
+        }
+
+        private void UpdateFooterSummary()
+        {
+            if (_viewModel == null || _viewModel.ActiveView != ComparisonViewMode.Results)
+            {
+                return;
+            }
+
+            int total = ResultsControl.TotalCount;
+            int visible = ResultsControl.VisibleCount;
+            if (total == 0)
+            {
+                _viewModel.ResultsSummaryText = "No results to show.";
+            }
+            else if (visible == total)
+            {
+                _viewModel.ResultsSummaryText = $"Showing {visible} {ResultsControl.SelectedDiffType} results.";
+            }
+            else
+            {
+                _viewModel.ResultsSummaryText = $"Showing {visible} of {total} {ResultsControl.SelectedDiffType} results.";
+            }
+        }
+
+        private void OnResultsItemVisibilityChanged(SerializableChunkDiff item, bool isVisible)
+        {
+            if (!isVisible || _viewModel.ActiveView != ComparisonViewMode.Results)
+            {
+                CancelThumbnail(item);
+                return;
+            }
+
+            LoadThumbnail(item);
+        }
+
+        private void QueueResultsThumbnailLoading()
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (_viewModel.ActiveView == ComparisonViewMode.Results)
+                {
+                    ResultsControl.LoadRealizedItems();
+                }
+            }, DispatcherPriority.Loaded);
         }
 
         private void OnTreeFilterChanged(object sender, EventArgs e)
@@ -97,53 +157,31 @@ namespace AssetsManager.Views.Dialogs
             Dispatcher.InvokeAsync(() => ApplyFilters());
         }
 
-        private void OnGalleryItemVisibilityChanged(SerializableChunkDiff item, bool isVisible)
+        private void ResetThumbnailLoading()
         {
-            if (!isVisible || _viewModel.ActiveView != ComparisonViewMode.Discovery)
-            {
-                CancelGalleryThumbnail(item);
-                return;
-            }
-
-            LoadGalleryThumbnail(item);
-        }
-
-        private void QueueGalleryThumbnailLoading()
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (_viewModel.ActiveView == ComparisonViewMode.Discovery)
-                {
-                    Gallery.LoadRealizedItems();
-                }
-            }, DispatcherPriority.Loaded);
-        }
-
-        private void ResetGalleryLoading()
-        {
-            foreach (var cancellation in _galleryLoads.Values) cancellation.Cancel();
-            _galleryLoads.Clear();
+            foreach (var cancellation in _thumbnailLoads.Values) cancellation.Cancel();
+            _thumbnailLoads.Clear();
             foreach (var item in _serializableDiffs ?? Enumerable.Empty<SerializableChunkDiff>())
             {
                 item.ImagePreview = null;
             }
         }
 
-        private async void LoadGalleryThumbnail(SerializableChunkDiff item)
+        private async void LoadThumbnail(SerializableChunkDiff item)
         {
-            if (item.ImagePreview != null || _galleryLoads.ContainsKey(item)) return;
+            if (item.ImagePreview != null || _thumbnailLoads.ContainsKey(item)) return;
 
             var cancellation = new CancellationTokenSource();
-            _galleryLoads.Add(item, cancellation);
+            _thumbnailLoads.Add(item, cancellation);
             bool acquiredSlot = false;
             try
             {
-                await _galleryLoadLimiter.WaitAsync(cancellation.Token);
+                await _thumbnailLoadLimiter.WaitAsync(cancellation.Token);
                 acquiredSlot = true;
                 var preview = await _wadContentProvider.GetDiffThumbnailAsync(
                     item, _oldPbePath, _newPbePath, 256, cancellation.Token);
 
-                if (_galleryLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                if (_thumbnailLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
                     item.ImagePreview = preview;
             }
             catch (OperationCanceledException)
@@ -152,20 +190,20 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, $"Failed to load gallery thumbnail. WAD='{item.SourceWadFile}', Path='{item.Path}'");
+                _logService.LogError(ex, $"Failed to load thumbnail. WAD='{item.SourceWadFile}', Path='{item.Path}'");
             }
             finally
             {
-                if (acquiredSlot) _galleryLoadLimiter.Release();
-                if (_galleryLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
-                    _galleryLoads.Remove(item);
+                if (acquiredSlot) _thumbnailLoadLimiter.Release();
+                if (_thumbnailLoads.TryGetValue(item, out var active) && ReferenceEquals(active, cancellation))
+                    _thumbnailLoads.Remove(item);
                 cancellation.Dispose();
             }
         }
 
-        private void CancelGalleryThumbnail(SerializableChunkDiff item)
+        private void CancelThumbnail(SerializableChunkDiff item)
         {
-            if (_galleryLoads.Remove(item, out var cancellation)) cancellation.Cancel();
+            if (_thumbnailLoads.Remove(item, out var cancellation)) cancellation.Cancel();
         }
 
         public void ApplyFilters()
@@ -188,8 +226,6 @@ namespace AssetsManager.Views.Dialogs
 
             var wadGroups = PrepareGroupedResults(filtered);
             _viewModel.SetResults(filtered, wadGroups);
-            QueueGalleryThumbnailLoading();
-
         }
 
         public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
@@ -212,21 +248,30 @@ namespace AssetsManager.Views.Dialogs
             }).ToList();
         }
 
-        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null)
+        public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null, List<ExtractResultItem> extractionResults = null)
         {
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
             _version = version;
+            _extractionResults = extractionResults;
+
+            // Default to the Results view when a batch extraction just finished.
+            if (extractionResults != null && extractionResults.Count > 0)
+            {
+                _viewModel.ActiveView = ComparisonViewMode.Results;
+            }
         }
 
         private void OnWindowClosed(object sender, System.EventArgs e)
         {
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
-            Gallery.ItemVisibilityChanged -= OnGalleryItemVisibilityChanged;
-            ResetGalleryLoading();
+            ResultsControl.ItemVisibilityChanged -= OnResultsItemVisibilityChanged;
+            ResultsControl.DiffTypeChanged -= OnResultsDiffTypeChanged;
+            ResultsControl.FilterApplied -= OnResultsFilterApplied;
+            ResetThumbnailLoading();
 
             if (_viewModel != null)
             {
@@ -237,7 +282,6 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
             _serializableDiffs = null;
-            _viewModel.DiscoveryItems.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();
             DataContext = null;
@@ -258,8 +302,32 @@ namespace AssetsManager.Views.Dialogs
             if (_serializableDiffs != null)
             {
                 _viewModel.SetResults(diffs, wadGroups);
-                QueueGalleryThumbnailLoading();
+                PopulateResults(ChunkDiffType.New);
+                QueueResultsThumbnailLoading();
             }
+        }
+
+        private void OnResultsDiffTypeChanged(ChunkDiffType type)
+        {
+            if (_serializableDiffs == null) return;
+            PopulateResults(type);
+        }
+
+        private void PopulateResults(ChunkDiffType type)
+        {
+            if (_serializableDiffs == null) return;
+
+            var diffs = _serializableDiffs.Where(d => d.Type == type).ToList();
+            var resultMap = (type == ChunkDiffType.New ? _extractionResults ?? new List<ExtractResultItem>() : new List<ExtractResultItem>())
+                .GroupBy(r => r.Diff)
+                .ToDictionary(g => g.Key, g => g.Last());
+
+            var items = diffs.Select(diff =>
+                resultMap.TryGetValue(diff, out var result)
+                    ? new WadResultItemModel(result)
+                    : new WadResultItemModel(diff)).ToList();
+
+            ResultsControl.SetItems(items);
         }
 
         // --- Handle methods for direct peer communication ---
@@ -268,12 +336,14 @@ namespace AssetsManager.Views.Dialogs
         {
             _viewModel.FilterText = globalSearchBox.Text;
             ApplyFilters();
+            ResultsControl.SetSearchText(globalSearchBox.Text);
         }
 
         public void HandleSearchTextChanged(string text)
         {
             _viewModel.FilterText = text;
             ApplyFilters();
+            ResultsControl.SetSearchText(text);
         }
 
         public void HandleTreeSelectionChanged(object selectedItem)
@@ -457,6 +527,113 @@ namespace AssetsManager.Views.Dialogs
                 _viewModel.SetLoadingState(ComparisonLoadingState.Ready);
                 _customMessageBoxService.ShowError("Error", $"Failed to reload hashes: {ex.Message}", this);
                 _logService.LogError(ex, "Failed to reload hashes.");
+            }
+        }
+
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Results View Actions
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+        public async void HandleResultsAction(string action, List<WadResultItemModel> items)
+        {
+            if (items == null || items.Count == 0) return;
+
+            try
+            {
+                switch (action)
+                {
+                    case "Retry":
+                        await ReExportAsync(items);
+                        break;
+
+                    case "Extract":
+                        await ReExportAsync(items, WadExportMode.Original);
+                        break;
+
+                    case "Save":
+                        await ReExportAsync(items, WadExportMode.Smart);
+                        break;
+
+                    case "CopyPaths":
+                        Clipboard.SetText(string.Join(Environment.NewLine, items.Select(i => i.Diff.Path)));
+                        break;
+
+                    case "OpenFolder":
+                        OpenOutputFolder(items.FirstOrDefault(i => !string.IsNullOrEmpty(i.OutputPath)) ?? items.FirstOrDefault());
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Failed to handle Results action.");
+                _customMessageBoxService.ShowError("Error", $"Action failed: {ex.Message}", this);
+            }
+        }
+
+        public void OpenOutputFolder(WadResultItemModel item)
+        {
+            string folder = item?.OutputPath;
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                _customMessageBoxService.ShowInfo("Folder not found", "This asset has not been extracted yet.", this);
+                return;
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = folder,
+                UseShellExecute = true
+            });
+        }
+
+        private async Task ReExportAsync(List<WadResultItemModel> items, WadExportMode? mode = null)
+        {
+            if (string.IsNullOrEmpty(_newPbePath)) return;
+
+            var diffs = items.Select(i => i.Diff).Where(d => d.Type == ChunkDiffType.New).ToList();
+            if (diffs.Count == 0) return;
+
+            using var cancellation = new CancellationTokenSource();
+            var results = new List<ExtractResultItem>();
+
+            if (mode == WadExportMode.Smart)
+            {
+                results.AddRange(await _extractionService.ExtractSmartAsync(diffs, _newPbePath, cancellation.Token));
+            }
+            else if (mode == WadExportMode.Original)
+            {
+                results.AddRange(await _extractionService.ExtractRawAsync(diffs, _newPbePath, cancellation.Token));
+            }
+            else
+            {
+                // Retry: re-export each failed item with the mode it was attempted with.
+                var rawDiffs = items.Where(i => i.Mode == WadExportMode.Original).Select(i => i.Diff).ToList();
+                var smartDiffs = items.Where(i => i.Mode == WadExportMode.Smart).Select(i => i.Diff).ToList();
+                results.AddRange(await _extractionService.ExtractRawAsync(rawDiffs, _newPbePath, cancellation.Token));
+                results.AddRange(await _extractionService.ExtractSmartAsync(smartDiffs, _newPbePath, cancellation.Token));
+            }
+
+            if (results.Count == 0) return;
+
+            var resultMap = results.ToDictionary(r => r.Diff, r => r);
+            foreach (var item in ResultsControl.GetAllItems())
+            {
+                if (resultMap.TryGetValue(item.Diff, out var result))
+                {
+                    item.UpdateResult(result);
+                }
+            }
+
+            int failedCount = results.Count(r => !r.Success);
+            ResultsControl.UpdateRetryButton();
+            ResultsControl.RefreshOpenFolderButton();
+            if (failedCount == 0)
+            {
+                _customMessageBoxService.ShowSuccess("Extraction Complete", $"{results.Count} asset(s) exported successfully.", this);
+            }
+            else
+            {
+                _customMessageBoxService.ShowWarning("Extraction Finished", $"{results.Count - failedCount} exported, {failedCount} failed.", this);
             }
         }
     }

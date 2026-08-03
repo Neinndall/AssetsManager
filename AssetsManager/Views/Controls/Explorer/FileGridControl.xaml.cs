@@ -33,6 +33,7 @@ namespace AssetsManager.Views.Controls.Explorer
         {
             InitializeComponent();
             FileGridListBox.ItemsSource = DisplayItems;
+            FileTypeFilter.FilterChanged += FileTypeFilter_FilterChanged;
         }
 
         private bool _isUpdatingItemsSource = false;
@@ -90,13 +91,13 @@ namespace AssetsManager.Views.Controls.Explorer
 
 
 
-        private void FilterButton_Click(object sender, RoutedEventArgs e)
+        private void FileTypeFilter_FilterChanged(string filterType)
         {
-            if (sender is RadioButton rb && rb.Tag is string filterType && ViewModel != null)
+            if (ViewModel != null)
             {
                 ViewModel.CurrentFilter = filterType;
-                ApplyFilter(filterType);
             }
+            ApplyFilter(filterType);
         }
 
         private void ApplyFilter(string type)
@@ -110,17 +111,7 @@ namespace AssetsManager.Views.Controls.Explorer
                 return;
             }
 
-            var filtered = _allItems.Where(item =>
-            {
-                return type switch
-                {
-                    "Images" => SupportedFileTypes.IsImage(item.Node.Extension),
-                    "Audio" => SupportedFileTypes.IsAudio(item.Node.Extension),
-                    "3D" => SupportedFileTypes.Is3D(item.Node.Extension),
-                    "Data" => SupportedFileTypes.IsText(item.Node.Extension),
-                    _ => true
-                };
-            }).ToList();
+            var filtered = _allItems.Where(item => SupportedFileTypes.MatchesFilter(type, item.Node.Extension)).ToList();
 
             DisplayItems.ReplaceRange(filtered);
         }

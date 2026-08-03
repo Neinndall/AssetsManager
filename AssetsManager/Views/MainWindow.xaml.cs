@@ -58,7 +58,6 @@ namespace AssetsManager.Views
         private string _latestAppVersionAvailable;
         
         // New fields to manage the state of the extraction after comparison
-        private bool _isExtractingAfterComparison = false;
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
         private string _extractionVersion;
@@ -219,18 +218,14 @@ namespace AssetsManager.Views
             Dispatcher.Invoke(() =>
             {
                 _progressUIManager.OnExtractionCompleted();
-                if (_isExtractingAfterComparison)
-                {
-                    ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion);
-                    _isExtractingAfterComparison = false; // Reset flag
-                }
             });
         }
 
         private async void StartExtractionAsync()
         {
             var cancellationToken = _taskCancellationManager.PrepareNewOperation();
-            await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+            var results = await _extractionService.ExtractNewFilesFromComparisonAsync(_diffsForExtraction, _extractionNewLolPath, cancellationToken);
+            ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion, results);
         }
         
         private async void OnWadComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
@@ -284,7 +279,6 @@ namespace AssetsManager.Views
             }
             else if (_appSettings.EnableExtraction)
             {
-                _isExtractingAfterComparison = true;
                 _diffsForExtraction = serializableDiffs;
                 _extractionOldLolPath = oldPath;
                 _extractionNewLolPath = newPath;
@@ -311,10 +305,10 @@ namespace AssetsManager.Views
             return string.IsNullOrEmpty(folderName) ? "Root" : folderName;
         }
 
-        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version)
+        private void ShowComparisonResultWindow(List<SerializableChunkDiff> diffs, string oldPath, string newPath, string version, List<ExtractResultItem> extractionResults = null)
         {
             var resultWindow = _serviceProvider.GetRequiredService<WadComparisonResultWindow>();
-            resultWindow.Initialize(diffs, oldPath, newPath, null, version);
+            resultWindow.Initialize(diffs, oldPath, newPath, null, version, extractionResults);
             resultWindow.Owner = this;
             resultWindow.Show();
         }

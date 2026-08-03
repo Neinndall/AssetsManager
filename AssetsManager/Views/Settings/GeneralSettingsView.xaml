@@ -180,7 +180,7 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Audio encoding target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Preferred audio format for SMART method in the Explorer" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Format for audio in Explorer Save (Smart)" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding AudioFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
@@ -191,7 +191,7 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Texture export target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Preferred format for textures in asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Format for textures when auto-extracting new assets" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding ImageFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"
@@ -202,7 +202,7 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="Data export target" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Preferred format for data in asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Format for data when auto-extracting new assets" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <ComboBox Grid.Column="1" Width="120" Height="30" Style="{StaticResource ModernComboBox}"
                               ItemsSource="{Binding DataFormatOptions}" DisplayMemberPath="Name" SelectedValuePath="Value"

@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
+             xmlns:controls="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d">
     
     <Grid>
@@ -16,26 +17,7 @@
         <!-- 1. Header -->
         <Border Grid.Row="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="16,12" Margin="1,0,5,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <TextBlock Text="FILTER BY" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                <Border Background="{StaticResource SidebarBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" IsChecked="True" Tag="All" Click="FilterButton_Click" ToolTip="Show All Assets" Padding="10,4">
-                            <materialIcons:MaterialIcon Kind="BorderAll" Width="16" Height="16"/>
-                        </RadioButton>
-                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Images" Click="FilterButton_Click" ToolTip="Images &amp; Textures" Padding="10,4">
-                            <materialIcons:MaterialIcon Kind="TextureBox" Width="16" Height="16"/>
-                        </RadioButton>
-                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Audio" Click="FilterButton_Click" ToolTip="Audio Banks &amp; Media" Padding="10,4">
-                            <materialIcons:MaterialIcon Kind="VolumeHigh" Width="16" Height="16"/>
-                        </RadioButton>
-                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="3D" Click="FilterButton_Click" ToolTip="3D Models &amp; Animations" Padding="10,4">
-                            <materialIcons:MaterialIcon Kind="CubeOutline" Width="16" Height="16"/>
-                        </RadioButton>
-                        <RadioButton Style="{StaticResource SegmentedRadioButtonStyle}" Tag="Data" Click="FilterButton_Click" ToolTip="Text &amp; Data" Padding="10,4">
-                            <materialIcons:MaterialIcon Kind="FileDocumentOutline" Width="16" Height="16"/>
-                        </RadioButton>
-                    </StackPanel>
-                </Border>
+                <controls:FileTypeFilterControl x:Name="FileTypeFilter"/>
             </StackPanel>
         </Border>
 

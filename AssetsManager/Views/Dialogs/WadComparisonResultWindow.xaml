@@ -36,13 +36,13 @@
                     </Grid>
                 </RadioButton>
 
-                <!-- Discovery (Gallery) -->
+                <!-- Results -->
                 <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
-                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}, Mode=TwoWay}"
-                             Margin="0,4,0,0" ToolTip="Gallery"
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Results}, Mode=TwoWay}"
+                             Margin="0,4,0,0" ToolTip="Results"
                              GroupName="ExplorerNavigation">
                     <Grid Width="64">
-                        <icons:MaterialIcon Kind="ImageMultipleOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <icons:MaterialIcon Kind="FolderPlusOutline" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
                 </RadioButton>
 
@@ -155,9 +155,9 @@
                 <!-- Overview View -->
                 <controls:WadComparisonOverviewControl Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Overview}}"/>
                 
-                <!-- Discovery View -->
-                <controls:WadComparisonGalleryControl x:Name="Gallery"
-                                                      Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Discovery}}"/>
+                <!-- Results View -->
+                <controls:WadResultsControl x:Name="ResultsControl"
+                                            Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Results}}"/>
                 
                 <!-- Advanced View (Hierarchy + Details) -->
                 <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
@@ -180,7 +180,7 @@
                 <Grid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <icons:MaterialIcon Kind="InformationOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding SummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding FooterSummaryText}" FontSize="11" Foreground="{StaticResource TextSecondary}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
