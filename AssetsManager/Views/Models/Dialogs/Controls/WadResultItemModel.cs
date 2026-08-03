@@ -27,10 +27,12 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
 
         private ExtractResultItem _result;
         private bool _isMultiSelected;
+        private readonly WadExportMode _defaultMode;
 
-        public WadResultItemModel(SerializableChunkDiff diff)
+        public WadResultItemModel(SerializableChunkDiff diff, WadExportMode defaultMode = WadExportMode.Original)
         {
             Diff = diff;
+            _defaultMode = defaultMode;
             Diff.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(SerializableChunkDiff.ImagePreview))
@@ -40,7 +42,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             };
         }
 
-        public WadResultItemModel(ExtractResultItem result) : this(result.Diff)
+        public WadResultItemModel(ExtractResultItem result) : this(result.Diff, result.Mode)
         {
             _result = result;
         }
@@ -58,10 +60,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public string ErrorMessage => _result?.ErrorMessage;
         public string OutputPath => _result?.OutputPath;
 
-        public WadExportMode Mode =>
-            _result?.Mode ?? ((Path.GetExtension(Diff.FileName).ToLower() is ".bnk" or ".wpk")
-                ? WadExportMode.Original
-                : WadExportMode.Smart);
+        public WadExportMode Mode => _result?.Mode ?? _defaultMode;
 
         public string ExtensionDisplay => Path.GetExtension(Diff.FileName).TrimStart('.').ToUpper();
 
@@ -105,19 +104,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             }
         }
 
-        public string ModeText
-        {
-            get
-            {
-                if (_result != null)
-                {
-                    return _result.Mode == WadExportMode.Smart ? "Smart" : "Original";
-                }
-
-                string ext = Path.GetExtension(Diff.FileName).ToLower();
-                return (ext == ".bnk" || ext == ".wpk") ? "Original" : "Smart";
-            }
-        }
+        public string ModeText => Mode == WadExportMode.Smart ? "Smart" : "Original";
 
         public ImageSource ImagePreview
         {

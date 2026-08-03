@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -325,7 +325,7 @@ namespace AssetsManager.Views.Dialogs
             var items = diffs.Select(diff =>
                 resultMap.TryGetValue(diff, out var result)
                     ? new WadResultItemModel(result)
-                    : new WadResultItemModel(diff)).ToList();
+                    : new WadResultItemModel(diff, _extractionService != null ? _extractionService.GetModeFromSettings(diff) : WadExportMode.Original)).ToList();
 
             ResultsControl.SetItems(items);
         }
