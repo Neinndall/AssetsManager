@@ -47,7 +47,6 @@
     <Color x:Key="DiffNavigationAdded">#FF00E676</Color>
     <Color x:Key="DiffNavigationRemoved">#FFFF5252</Color>
     <Color x:Key="DiffNavigationModified">#FFFF9100</Color>
-    <Color x:Key="DiffNavigationImaginary">#FF2D314D</Color>
 
     <Color x:Key="BackgroundPanelNavigation">#FF161925</Color>
     <Color x:Key="DiffNavigationViewPort">#FF5C85FF</Color>

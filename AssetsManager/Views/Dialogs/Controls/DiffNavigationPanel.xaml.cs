@@ -24,7 +24,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         private readonly List<int> _diffLines;
         public int CurrentLine { get; set; }
 
-        private readonly SolidColorBrush _backgroundPanelBrush, _addedBrush, _removedBrush, _modifiedBrush, _imaginaryBrush, _viewportBrush;
+        private readonly SolidColorBrush _backgroundPanelBrush, _addedBrush, _removedBrush, _modifiedBrush, _viewportBrush;
         private readonly Pen _viewportPen;
         private DrawingVisual _oldViewportGuide, _newViewportGuide;
 
@@ -37,14 +37,12 @@ namespace AssetsManager.Views.Dialogs.Controls
             _addedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffNavigationAdded"));
             _removedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffNavigationRemoved"));
             _modifiedBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffNavigationModified"));
-            _imaginaryBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffNavigationImaginary"));
             _viewportBrush = new SolidColorBrush((Color)Application.Current.FindResource("DiffNavigationViewPort"));
 
             _backgroundPanelBrush.Freeze();
             _addedBrush.Freeze();
             _removedBrush.Freeze();
             _modifiedBrush.Freeze();
-            _imaginaryBrush.Freeze();
             _viewportBrush.Freeze();
 
             _viewportPen = new Pen(_viewportBrush, 1);
