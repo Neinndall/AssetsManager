@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
-using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Toolkit.Ritobin;
@@ -197,7 +196,7 @@ namespace AssetsManager.Services.Parsers
                 Resolve(entryHashes, _hashResolver.ResolveBinEntry),
                 Resolve(classHashes, _hashResolver.ResolveBinType),
                 Resolve(propertyHashes, _hashResolver.ResolveBinField),
-                Resolve(binHashes, _hashResolver.ResolveBinHashGeneral),
+                Resolve(binHashes, _hashResolver.ResolveBinHash),
                 ResolveWadHashes(wadHashes));
         }
 

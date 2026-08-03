@@ -235,6 +235,14 @@ namespace AssetsManager.Services.Hashes
             return false;
         }
 
+        public string ResolveBinHash(uint hash) => ResolveBinDomain(hash, 0);
+
+        public string ResolveBinEntry(uint hash) => ResolveBinDomain(hash, 1);
+
+        public string ResolveBinField(uint hash) => ResolveBinDomain(hash, 2);
+
+        public string ResolveBinType(uint hash) => ResolveBinDomain(hash, 3);
+
         public string ResolveBinHashGeneral(uint hash)
         {
             foreach (var cache in _binCaches)
