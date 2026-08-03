@@ -57,8 +57,8 @@
                                 </Border.Background>
                             </Border>
 
-                            <!-- Top Type Badge -->
-                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
+                            <!-- Top Left Type Badge -->
+                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
                                     Background="#CC000000" CornerRadius="3" Padding="4,1">
                                 <TextBlock Text="{Binding ExtensionDisplay}" FontSize="8" FontWeight="SemiBold" Foreground="White"/>
                             </Border>
@@ -93,8 +93,8 @@
                             BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
                             Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}"
-                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                                Margin="0,0,12,12"
+                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,8,8,0"
                                                 Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 </Grid>
             </Border>
