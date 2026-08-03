@@ -144,7 +144,7 @@ namespace AssetsManager.Services.Explorer.Tree
 
             if (selected.Count > 0)
             {
-                if (currentSelectedItem != null && !selected.Contains(currentSelectedItem))
+                if (currentSelectedItem != null && !selected.Contains(currentSelectedItem) && !selected.Any(n => IsAncestor(currentSelectedItem, n)))
                 {
                     selected.Insert(0, currentSelectedItem);
                 }
@@ -152,6 +152,15 @@ namespace AssetsManager.Services.Explorer.Tree
             }
 
             return currentSelectedItem != null ? new List<FileSystemNodeModel> { currentSelectedItem } : new List<FileSystemNodeModel>();
+        }
+
+        private bool IsAncestor(FileSystemNodeModel potentialAncestor, FileSystemNodeModel node)
+        {
+            for (var p = node.Parent; p != null; p = p.Parent)
+            {
+                if (p == potentialAncestor) return true;
+            }
+            return false;
         }
 
         private void FindMultiSelectedNodes(IEnumerable<FileSystemNodeModel> nodes, List<FileSystemNodeModel> result)
