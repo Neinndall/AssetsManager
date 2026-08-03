@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 
+using AssetsManager.Utils;
+using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Versions;
 
@@ -38,6 +40,21 @@ namespace AssetsManager.Views.Models.Versions
         }
 
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
+        public ObservableCollection<TargetInstallationOption> TargetInstallations { get; } = new();
+
+        private TargetInstallationOption _selectedTargetInstallation;
+        public TargetInstallationOption SelectedTargetInstallation
+        {
+            get => _selectedTargetInstallation;
+            set
+            {
+                if (_selectedTargetInstallation != value)
+                {
+                    _selectedTargetInstallation = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         public ManageVersions(VersionService versionService, LogService logService)
         {
@@ -78,6 +95,71 @@ namespace AssetsManager.Views.Models.Versions
 
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions, preservePage);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions, preservePage);
+            }
+        }
+
+        public async Task LoadTargetInstallationsAsync(BackupManager backupManager, AppSettings appSettings)
+        {
+            var previousSelectedPath = SelectedTargetInstallation?.Path;
+            TargetInstallations.Clear();
+
+            var preferredClient = appSettings?.PreferredClient ?? PreferredClient.PBE;
+
+            if (appSettings != null)
+            {
+                if (preferredClient == PreferredClient.PBE && !string.IsNullOrWhiteSpace(appSettings.LolPbeDirectory) && System.IO.Directory.Exists(appSettings.LolPbeDirectory))
+                {
+                    TargetInstallations.Add(new TargetInstallationOption
+                    {
+                        DisplayName = $"MAIN (PBE) - {appSettings.LolPbeDirectory}",
+                        Path = appSettings.LolPbeDirectory,
+                        IsMain = true,
+                        IsPbe = true
+                    });
+                }
+                else if (preferredClient == PreferredClient.LIVE && !string.IsNullOrWhiteSpace(appSettings.LolLiveDirectory) && System.IO.Directory.Exists(appSettings.LolLiveDirectory))
+                {
+                    TargetInstallations.Add(new TargetInstallationOption
+                    {
+                        DisplayName = $"MAIN (LIVE) - {appSettings.LolLiveDirectory}",
+                        Path = appSettings.LolLiveDirectory,
+                        IsMain = true,
+                        IsPbe = false
+                    });
+                }
+            }
+
+            if (backupManager != null)
+            {
+                try
+                {
+                    var backups = await backupManager.GetBackupsAsync(includeStorageMetrics: false, client: preferredClient);
+                    foreach (var backup in backups)
+                    {
+                        if (backup.IsMainClient) continue;
+
+                        string versionStr = !string.IsNullOrEmpty(backup.Version) ? $" (v{backup.Version})" : "";
+                        TargetInstallations.Add(new TargetInstallationOption
+                        {
+                            DisplayName = $"Backup: {backup.Name}{versionStr}",
+                            Path = backup.Path,
+                            IsMain = false,
+                            IsPbe = backup.IsPbe,
+                            Version = backup.Version
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "Failed to load backup installations for version management dropdown.");
+                }
+            }
+
+            if (TargetInstallations.Count > 0)
+            {
+                SelectedTargetInstallation = TargetInstallations.FirstOrDefault(t => t.Path != null && t.Path.Equals(previousSelectedPath, StringComparison.OrdinalIgnoreCase))
+                                           ?? TargetInstallations.FirstOrDefault(t => t.IsMain)
+                                           ?? TargetInstallations.FirstOrDefault();
             }
         }
 

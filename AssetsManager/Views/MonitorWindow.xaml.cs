@@ -55,6 +55,7 @@ namespace AssetsManager.Views
             ManageVersionsControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
             ManageVersionsControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
             ManageVersionsControl.TaskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
+            ManageVersionsControl.BackupManager = serviceProvider.GetRequiredService<BackupManager>();
  
             // Setup and inject dependencies for BackupsControl
             BackupsControl.BackupManager = serviceProvider.GetRequiredService<BackupManager>();

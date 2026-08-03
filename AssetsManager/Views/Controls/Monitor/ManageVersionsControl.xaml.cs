@@ -17,6 +17,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public AppSettings AppSettings { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }
+        public BackupManager BackupManager { get; set; }
         
         private ManageVersions _viewModel;
         public ManageVersions ViewModel => _viewModel;
@@ -34,6 +35,11 @@ namespace AssetsManager.Views.Controls.Monitor
                 _viewModel = new ManageVersions(VersionService, LogService);
                 this.DataContext = _viewModel;
                 await _viewModel.LoadVersionFilesAsync();
+            }
+
+            if (_viewModel != null)
+            {
+                await _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings);
             }
         }
 
@@ -68,9 +74,10 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            var targetInstallation = _viewModel?.SelectedTargetInstallation;
+            if (targetInstallation == null || string.IsNullOrEmpty(targetInstallation.Path))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "No target installation selected or directory is invalid. Please configure it in Settings > Default Paths or select a valid target.", Window.GetWindow(this));
                 return;
             }
 
@@ -86,7 +93,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-            await VersionService.DownloadPluginsAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
+            await VersionService.DownloadPluginsAsync(selectedVersion.Content, targetInstallation.Path, locales, cancellationToken);
         }
 
         private async void GetLoLGameClient_Click(object sender, RoutedEventArgs e)
@@ -104,11 +111,13 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             var selectedVersion = selectedVersions.Single();
 
-            if (string.IsNullOrEmpty(AppSettings.LolPbeDirectory))
+            var targetInstallation = _viewModel?.SelectedTargetInstallation;
+            if (targetInstallation == null || string.IsNullOrEmpty(targetInstallation.Path))
             {
-                CustomMessageBoxService.ShowError("Error", "League of Legends directory is not configured. Please set it in Settings > Default Paths.", Window.GetWindow(this));
+                CustomMessageBoxService.ShowError("Error", "No target installation selected or directory is invalid. Please configure it in Settings > Default Paths or select a valid target.", Window.GetWindow(this));
                 return;
             }
+
             var locales = _viewModel.AvailableLocales
                 .Where(l => l.IsSelected)
                 .Select(l => l.Code)
@@ -121,7 +130,7 @@ namespace AssetsManager.Views.Controls.Monitor
             }
 
             var cancellationToken = TaskCancellationManager.PrepareNewOperation();
-            await VersionService.DownloadGameClientAsync(selectedVersion.Content, AppSettings.LolPbeDirectory, locales, cancellationToken);
+            await VersionService.DownloadGameClientAsync(selectedVersion.Content, targetInstallation.Path, locales, cancellationToken);
         }
 
         private void TabClient_Checked(object sender, RoutedEventArgs e)
