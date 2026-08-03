@@ -120,7 +120,9 @@ namespace AssetsManager.Views.Models.Notifications
             Title = title;
             Message = message;
             Type = type;
-            Category = category;
+            Category = (category == NotificationCategory.System && (type == NotificationType.Error || type == NotificationType.Warning))
+                ? NotificationCategory.Issues
+                : category;
             Timestamp = DateTime.Now;
             IsRead = false;
         }

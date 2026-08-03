@@ -193,7 +193,7 @@ namespace AssetsManager.Views
         }
 
         // --- End Taskbar Logic ---
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
@@ -210,7 +210,16 @@ namespace AssetsManager.Views
             }
 
             // Always update internal notification system
-            ShowNotification(true, message);
+            string notificationTitle = !string.IsNullOrEmpty(title) ? title : category switch
+            {
+                NotificationCategory.Watcher => "Watcher Notification",
+                NotificationCategory.Comparator => "Comparator Notification",
+                NotificationCategory.Updates => "App Update Notification",
+                NotificationCategory.Issues => "Issue Notification",
+                _ => "System Notification"
+            };
+
+            ShowNotification(true, message, category, notificationTitle);
         }
         
         private void OnExtractionCompleted()
@@ -313,11 +322,11 @@ namespace AssetsManager.Views
             resultWindow.Show();
         }
 
-        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.")
+        public void ShowNotification(bool show, string message = "Updates have been detected. Click to dismiss.", NotificationCategory category = NotificationCategory.System, string title = "System Notification")
         {
             if (show)
             {
-                _notificationService.AddNotification("System Notification", message, NotificationType.Info);
+                _notificationService.AddNotification(title, message, NotificationType.Info, category: category);
             }
         }
 

@@ -10,6 +10,7 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Info;
+using AssetsManager.Views.Models.Notifications;
 
 namespace AssetsManager.Services.Core
 {
@@ -28,7 +29,7 @@ namespace AssetsManager.Services.Core
         private readonly BackgroundJobGate _assetTrackerJob = new();
         private readonly BackgroundJobGate _pbeStatusJob = new();
 
-        public event Action<string, string> UpdatesFound;
+        public event Action<string, string, NotificationCategory, string> UpdatesFound;
 
         public string AvailableVersion { get; private set; }
 
@@ -111,24 +112,18 @@ namespace AssetsManager.Services.Core
 
             if (_updateTimer != null)
             {
-                _updateTimer.Enabled = false;
-                _updateTimer.Elapsed -= UpdateTimer_Elapsed;
                 _updateTimer.Dispose();
                 _updateTimer = null;
                 _logService.LogDebug("Background update timer stopped.");
             }
             if (_assetTrackerTimer != null)
             {
-                _assetTrackerTimer.Enabled = false;
-                _assetTrackerTimer.Elapsed -= AssetTrackerTimer_Elapsed;
                 _assetTrackerTimer.Dispose();
                 _assetTrackerTimer = null;
                 _logService.LogDebug("Asset Tracker timer stopped.");
             }
             if (_pbeStatusTimer != null)
             {
-                _pbeStatusTimer.Enabled = false;
-                _pbeStatusTimer.Elapsed -= PbeStatusTimer_Elapsed;
                 _pbeStatusTimer.Dispose();
                 _pbeStatusTimer = null;
                 _logService.LogDebug("PBE Status timer stopped.");
@@ -158,12 +153,12 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null);
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Comparator, "Asset Tracker Discovery");
                     }
                     else
                     {
                         string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null);
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Comparator, "Asset Tracker Discovery");
                     }
                 }
             });
@@ -181,7 +176,7 @@ namespace AssetsManager.Services.Core
             {
                 string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null);
+                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.Comparator, "PBE Status Update");
             });
             if (!completed) _logService.LogDebug("PBE status check skipped because it is already running or monitoring stopped.");
         }
@@ -204,7 +199,7 @@ namespace AssetsManager.Services.Core
                     tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
                     {
                         if (silent && !cancellationToken.IsCancellationRequested)
-                            UpdatesFound?.Invoke("New hashes are available!", null);
+                            UpdatesFound?.Invoke("New hashes are available!", null, NotificationCategory.Updates, "Hash Update");
                     }));
                 }
 
@@ -228,7 +223,7 @@ namespace AssetsManager.Services.Core
                     string message = ApplicationInfos.IsQA && latestVer <= currentVer
                         ? $"New stable version {newVersion} is available!"
                         : $"New version {newVersion} is available!";
-                    UpdatesFound?.Invoke(message, newVersion);
+                    UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available");
                 }
 
                 async Task CheckMonitoredAssetsAsync()
@@ -240,7 +235,7 @@ namespace AssetsManager.Services.Core
                     string message = updatedNames.Count > 0
                         ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
                         : "Some monitored local assets have been updated!";
-                    UpdatesFound?.Invoke(message, null);
+                    UpdatesFound?.Invoke(message, null, NotificationCategory.Watcher, "Monitored Assets Updated");
                 }
             });
             if (!completed) _logService.LogDebug("General update check skipped because it is already running or monitoring stopped.");

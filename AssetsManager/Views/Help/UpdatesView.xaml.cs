@@ -43,7 +43,7 @@ namespace AssetsManager.Views.Help
             _updateCheckService.UpdatesFound -= OnUpdatesFound;
         }
 
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, Views.Models.Notifications.NotificationCategory category, string title)
         {
             UpdateModelState();
         }

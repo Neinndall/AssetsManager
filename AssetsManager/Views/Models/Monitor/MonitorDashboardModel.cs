@@ -531,7 +531,7 @@ namespace AssetsManager.Views.Models.Monitor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        private void OnUpdatesFound(string message, string latestVersion)
+        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
