@@ -68,19 +68,14 @@ namespace AssetsManager.Views.Dialogs
             ViewModel?.SetCategoryFilter(NotificationCategory.Watcher);
         }
 
-        private void FilterComparator_Click(object sender, RoutedEventArgs e)
+        private void FilterTracker_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.SetCategoryFilter(NotificationCategory.Comparator);
+            ViewModel?.SetCategoryFilter(NotificationCategory.Tracker);
         }
 
         private void FilterUpdates_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.SetCategoryFilter(NotificationCategory.Updates);
-        }
-
-        private void FilterIssues_Click(object sender, RoutedEventArgs e)
-        {
-            ViewModel?.SetCategoryFilter(NotificationCategory.Issues);
         }
 
         protected override void OnClosed(EventArgs e)

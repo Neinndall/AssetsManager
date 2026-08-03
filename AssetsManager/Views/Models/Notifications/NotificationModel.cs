@@ -17,9 +17,8 @@ namespace AssetsManager.Views.Models.Notifications
     {
         System,
         Watcher,
-        Comparator,
-        Updates,
-        Issues
+        Tracker,
+        Updates
     }
 
     public class NotificationModel : INotifyPropertyChanged
@@ -120,9 +119,7 @@ namespace AssetsManager.Views.Models.Notifications
             Title = title;
             Message = message;
             Type = type;
-            Category = (category == NotificationCategory.System && (type == NotificationType.Error || type == NotificationType.Warning))
-                ? NotificationCategory.Issues
-                : category;
+            Category = category;
             Timestamp = DateTime.Now;
             IsRead = false;
         }

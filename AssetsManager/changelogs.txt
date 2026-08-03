@@ -162,6 +162,8 @@ Improvements
   - Unified the Extract and Save export engine so both act consistently: Extract exports original raw files and Save applies your configured conversions.
   - Manage Versions / Added a Quick Select toggle button for Target Installation to select destination client (MAIN or Backups filtered by preferred environment) when installing client plugins or game files.
   - Comparator / Repositioned file extension badge to top-left and selection checkmark tick to top-right on Results cards for improved visual balance.
+  - Notifications / Renamed COMPARATOR tab to TRACKER for dedicated Asset Tracker notifications.
+  - Notifications / Removed redundant ISSUES tab from Notification Hub as warnings and errors are already reported in the log console and log files.
 
 Bug Fixes
   - Notifications / Fixed notification category classification so Watcher updates, Comparator/PBE status discoveries, and App/Hash updates appear under their respective tabs instead of defaulting to System.

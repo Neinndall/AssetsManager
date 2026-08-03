@@ -153,12 +153,12 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Comparator, "Asset Tracker Discovery");
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Tracker, "Asset Tracker Discovery");
                     }
                     else
                     {
                         string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Comparator, "Asset Tracker Discovery");
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Tracker, "Asset Tracker Discovery");
                     }
                 }
             });
@@ -176,7 +176,7 @@ namespace AssetsManager.Services.Core
             {
                 string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.Comparator, "PBE Status Update");
+                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.System, "PBE Status Update");
             });
             if (!completed) _logService.LogDebug("PBE status check skipped because it is already running or monitoring stopped.");
         }

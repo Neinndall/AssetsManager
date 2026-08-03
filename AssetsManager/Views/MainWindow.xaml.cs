@@ -213,9 +213,8 @@ namespace AssetsManager.Views
             string notificationTitle = !string.IsNullOrEmpty(title) ? title : category switch
             {
                 NotificationCategory.Watcher => "Watcher Notification",
-                NotificationCategory.Comparator => "Comparator Notification",
+                NotificationCategory.Tracker => "Tracker Notification",
                 NotificationCategory.Updates => "App Update Notification",
-                NotificationCategory.Issues => "Issue Notification",
                 _ => "System Notification"
             };
 
