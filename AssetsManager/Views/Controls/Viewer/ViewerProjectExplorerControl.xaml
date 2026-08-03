@@ -6,7 +6,6 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              xmlns:explorer="clr-namespace:AssetsManager.Views.Controls.Explorer"
-             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Viewer"
              mc:Ignorable="d" 
              d:DesignHeight="300" d:DesignWidth="900">
@@ -105,79 +104,51 @@
                               ResizeBehavior="PreviousAndNext"
                               ResizeDirection="Columns"/>
 
-                <!-- 2. Files List (horizontal WrapPanel grid) -->
+                <!-- 2. Files List (grid tiles) -->
                 <ListBox Grid.Column="2"
                          x:Name="FilesListBox"
                          Margin="4"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         SelectionMode="Extended"
-                         Style="{StaticResource SmoothScrollListBox}">
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" Margin="2"/>
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="helpers:SelectionBehavior.EnableUnifiedSelection" Value="True"/>
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="BorderThickness" Value="0"/>
-                            <Setter Property="Padding" Value="4"/>
-                            <Setter Property="Margin" Value="4"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="ItemBorder" CornerRadius="8" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" Padding="4" Width="95" Height="95" Cursor="Hand">
-                                            <ContentPresenter/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="#15FFFFFF"/>
-                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-                                            </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="Transparent"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                            <EventSetter Event="helpers:SelectionBehavior.PrimaryAction"
-                                         Handler="SelectionBehavior_PrimaryAction"/>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-
+                         Style="{StaticResource ModernFileGridListBox}">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type local:ProjectExplorerNode}">
-                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>    <!-- Large Icon -->
-                                    <RowDefinition Height="Auto"/> <!-- File/Folder name -->
-                                </Grid.RowDefinitions>
-                                
-                                <materialIcons:MaterialIcon Grid.Row="0"
-                                                            Kind="{Binding IconKind}"
-                                                            Foreground="{Binding IconColor}"
-                                                            Width="36" Height="36"
-                                                            HorizontalAlignment="Center"
-                                                            VerticalAlignment="Center"
-                                                            Margin="0,4,0,4"/>
-                                
-                                <TextBlock Grid.Row="1"
-                                           Text="{Binding Name}"
-                                           FontSize="10"
-                                           Foreground="{StaticResource TextPrimary}"
-                                           TextAlignment="Center"
-                                           TextWrapping="Wrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxHeight="26"
-                                           MaxWidth="82"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Top"/>
-                            </Grid>
+                            <Border x:Name="ItemBorder" CornerRadius="8" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" Padding="4" Width="95" Height="95" Cursor="Hand">
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>    <!-- Large Icon -->
+                                        <RowDefinition Height="Auto"/> <!-- File/Folder name -->
+                                    </Grid.RowDefinitions>
+                                    
+                                    <materialIcons:MaterialIcon Grid.Row="0"
+                                                                Kind="{Binding IconKind}"
+                                                                Foreground="{Binding IconColor}"
+                                                                Width="36" Height="36"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"
+                                                                Margin="0,4,0,4"/>
+                                    
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}"
+                                               FontSize="10"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxHeight="26"
+                                               MaxWidth="82"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Top"/>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="#15FFFFFF"/>
+                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
+                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="Transparent"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

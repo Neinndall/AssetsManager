@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Explorer
             InitializeComponent();
             FileGridListBox.ItemsSource = DisplayItems;
             FileTypeFilter.FilterChanged += FileTypeFilter_FilterChanged;
+            SelectionBehavior.AddPrimaryActionHandler(FileGridListBox, SelectionBehavior_PrimaryAction);
         }
 
         private bool _isUpdatingItemsSource = false;

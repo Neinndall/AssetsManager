@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+                    xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
                     xmlns:vwp="clr-namespace:WpfToolkit.Controls;assembly=VirtualizingWrapPanel">
     
     <ResourceDictionary.MergedDictionaries>
@@ -111,6 +112,8 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
+        <Setter Property="helpers:SelectionBehavior.EnableUnifiedSelection" Value="True"/>
+        <Setter Property="helpers:SelectionBehavior.PreserveSelectionOnRightClick" Value="True"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">

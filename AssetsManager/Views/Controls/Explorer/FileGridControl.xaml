@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:helpers="clr-namespace:AssetsManager.Views.Helpers"
              xmlns:controls="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d">
     
@@ -25,15 +24,7 @@
         <ListBox Grid.Row="1" x:Name="FileGridListBox"
                  Style="{StaticResource ModernFileGridListBox}"
                  ItemTemplate="{StaticResource FileGridItemTemplate}"
-                 SelectionChanged="FileGridListBox_SelectionChanged">
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">
-                    <Setter Property="helpers:SelectionBehavior.EnableUnifiedSelection" Value="True"/>
-                    <Setter Property="helpers:SelectionBehavior.PreserveSelectionOnRightClick" Value="True"/>
-                    <EventSetter Event="helpers:SelectionBehavior.PrimaryAction" Handler="SelectionBehavior_PrimaryAction"/>
-                </Style>
-            </ListBox.ItemContainerStyle>
-        </ListBox>
+                 SelectionChanged="FileGridListBox_SelectionChanged"/>
 
         <!-- 3. Floating Action Bar (Visible on Multi-selection) -->
         <Border x:Name="ActionBarBorder" Grid.Row="1" 

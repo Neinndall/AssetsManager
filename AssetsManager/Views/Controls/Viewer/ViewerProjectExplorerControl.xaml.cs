@@ -82,6 +82,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public ViewerProjectExplorerControl()
         {
             InitializeComponent();
+            SelectionBehavior.AddPrimaryActionHandler(FilesListBox, SelectionBehavior_PrimaryAction);
         }
 
         public void LoadProjectFolder(string rootPath)
