@@ -17,72 +17,155 @@
             <RowDefinition Height="*"/>    <!-- 4. Content Area -->
         </Grid.RowDefinitions>
         
-        <!-- 1. DOWNLOAD CONFIGURATION -->
-        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="20,14" Margin="0,0,0,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <!-- 1. DOWNLOAD CONFIGURATION CARD (Hero Layout) -->
+        <Border Grid.Row="0" Background="{StaticResource CardBackground}" CornerRadius="16" Padding="24,20" Margin="0,0,0,20" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0" VerticalAlignment="Top">
-                    <materialIcons:MaterialIcon Kind="CogOutline" Foreground="{StaticResource AccentOrange}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <!-- ROW 1: Locales -->
+                <Grid Grid.Row="0" Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- ROW 1: Locales -->
-                    <Grid Grid.Row="0" Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Choose your locales" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select available game languages to download" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                    <StackPanel Orientation="Horizontal" Grid.Column="0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="40" Height="40" Margin="0,0,14,0">
+                            <materialIcons:MaterialIcon Kind="Translate" Foreground="{StaticResource AccentOrange}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="DOWNLOAD LOCALES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentOrange}"/>
+                            <TextBlock Text="Select game languages to download" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                         </StackPanel>
-                        
-                        <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" MaxWidth="500"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernChipToggleButton}" Margin="4,0,0,4"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
+                    </StackPanel>
+                    
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding AvailableLocales}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" MaxWidth="500"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Code}" IsChecked="{Binding IsSelected}" Style="{StaticResource ModernChipToggleButton}" Margin="4,0,0,4"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
 
-                    <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,12"/>
+                <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,16"/>
 
-                    <!-- ROW 2: Target Installation Dropdown -->
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Target Installation" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
-                            <TextBlock Text="Select destination client or backup installation to update" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                <!-- ROW 2: Target Installation (Hero Dropdown with Live Path Preview & Badges) -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Header & Icon -->
+                    <StackPanel Orientation="Horizontal" Grid.Column="0">
+                        <Border Background="#1A00E676" CornerRadius="10" Width="40" Height="40" Margin="0,0,14,0">
+                            <materialIcons:MaterialIcon Kind="FolderCog" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="TARGET INSTALLATION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
+                            <TextBlock Text="Destination client or backup to apply updates" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                         </StackPanel>
+                    </StackPanel>
 
-                        <ComboBox Grid.Column="1" 
-                                  HorizontalAlignment="Right" 
-                                  VerticalAlignment="Center"
-                                  MinWidth="300" Height="34"
-                                  Style="{StaticResource ModernComboBox}"
-                                  ItemsSource="{Binding TargetInstallations}"
-                                  SelectedItem="{Binding SelectedTargetInstallation}"
-                                  DisplayMemberPath="DisplayName"/>
-                    </Grid>
+                    <!-- Center: Active Path Preview Pill -->
+                    <Border Grid.Column="1" Background="{StaticResource DarkBackground}" CornerRadius="8" Padding="10,6" Margin="24,0,16,0" VerticalAlignment="Center">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding SelectedTargetInstallation.Path, FallbackValue='No installation selected'}" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Right: Rich Modern Dropdown -->
+                    <ComboBox Grid.Column="2" 
+                              Style="{StaticResource ModernComboBox}" 
+                              MinWidth="260" Height="40"
+                              ItemsSource="{Binding TargetInstallations}"
+                              SelectedItem="{Binding SelectedTargetInstallation}"
+                              VerticalAlignment="Center">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Left Icon -->
+                                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="6" Background="{StaticResource DarkBackground}" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <materialIcons:MaterialIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <materialIcons:MaterialIcon.Style>
+                                                <Style TargetType="materialIcons:MaterialIcon">
+                                                    <Setter Property="Kind" Value="FolderZipOutline"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource AccentPurple}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMain}" Value="True">
+                                                            <Setter Property="Kind" Value="DesktopClassic"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </materialIcons:MaterialIcon.Style>
+                                        </materialIcons:MaterialIcon>
+                                    </Border>
+
+                                    <!-- Middle Info -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
+                                            <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                            
+                                            <!-- MAIN vs BACKUP Badge -->
+                                            <Border CornerRadius="4" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsMain}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock FontSize="8" FontWeight="Bold" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Text" Value="BACKUP"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsMain}" Value="True">
+                                                                    <Setter Property="Text" Value="MAIN"/>
+                                                                    <Setter Property="Foreground" Value="White"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Right Date -->
+                                    <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="14,0,2,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </Grid>
             </Grid>
         </Border>

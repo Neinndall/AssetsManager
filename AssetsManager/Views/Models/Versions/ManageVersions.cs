@@ -17,11 +17,13 @@ namespace AssetsManager.Views.Models.Versions
 {
     public class TargetInstallationOption
     {
+        public string Name { get; set; }
         public string DisplayName { get; set; }
         public string Path { get; set; }
         public bool IsMain { get; set; }
         public bool IsPbe { get; set; }
         public string Version { get; set; }
+        public string DateDisplay { get; set; }
 
         public override string ToString() => DisplayName;
     }
@@ -120,22 +122,30 @@ namespace AssetsManager.Views.Models.Versions
             {
                 if (preferredClient == PreferredClient.PBE && !string.IsNullOrWhiteSpace(appSettings.LolPbeDirectory) && System.IO.Directory.Exists(appSettings.LolPbeDirectory))
                 {
+                    string pbeVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolPbeDirectory) : null;
                     TargetInstallations.Add(new TargetInstallationOption
                     {
-                        DisplayName = $"MAIN (PBE) - {appSettings.LolPbeDirectory}",
+                        Name = "League of Legends PBE",
+                        DisplayName = "MAIN (PBE)",
                         Path = appSettings.LolPbeDirectory,
                         IsMain = true,
-                        IsPbe = true
+                        IsPbe = true,
+                        Version = !string.IsNullOrEmpty(pbeVer) ? $"v{pbeVer}" : "Active PBE",
+                        DateDisplay = "Configured"
                     });
                 }
                 else if (preferredClient == PreferredClient.LIVE && !string.IsNullOrWhiteSpace(appSettings.LolLiveDirectory) && System.IO.Directory.Exists(appSettings.LolLiveDirectory))
                 {
+                    string liveVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolLiveDirectory) : null;
                     TargetInstallations.Add(new TargetInstallationOption
                     {
-                        DisplayName = $"MAIN (LIVE) - {appSettings.LolLiveDirectory}",
+                        Name = "League of Legends LIVE",
+                        DisplayName = "MAIN (LIVE)",
                         Path = appSettings.LolLiveDirectory,
                         IsMain = true,
-                        IsPbe = false
+                        IsPbe = false,
+                        Version = !string.IsNullOrEmpty(liveVer) ? $"v{liveVer}" : "Active LIVE",
+                        DateDisplay = "Configured"
                     });
                 }
             }
@@ -149,14 +159,15 @@ namespace AssetsManager.Views.Models.Versions
                     {
                         if (backup.IsMainClient) continue;
 
-                        string versionStr = !string.IsNullOrEmpty(backup.Version) ? $" (v{backup.Version})" : "";
                         TargetInstallations.Add(new TargetInstallationOption
                         {
-                            DisplayName = $"Backup: {backup.Name}{versionStr}",
+                            Name = backup.Name,
+                            DisplayName = backup.Name,
                             Path = backup.Path,
                             IsMain = false,
                             IsPbe = backup.IsPbe,
-                            Version = backup.Version
+                            Version = !string.IsNullOrEmpty(backup.Version) ? $"v{backup.Version}" : "Backup",
+                            DateDisplay = backup.CreationDate.ToString("dd/MM/yyyy HH:mm")
                         });
                     }
                 }
