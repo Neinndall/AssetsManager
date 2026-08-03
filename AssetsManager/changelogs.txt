@@ -163,6 +163,7 @@ Improvements
   - Manage Versions / Added a Quick Select toggle button for Target Installation to select destination client (MAIN or Backups filtered by preferred environment) when installing client plugins or game files.
 
 Bug Fixes
+  - Comparator / Fixed export mode labels in results tab to accurately reflect configured protocol settings (Original vs Smart).
   - Explorer / Fixed an issue where selecting specific files in the Grid View would extract or save the entire parent WAD or folder instead of only the selected items.
   - Explorer / Fixed a bug where navigating or selecting a file in the tree would leave stale selections active in the Grid View, incorrectly displaying the floating action bar when returning to the folder.
   - Viewer VFX Studio / Fixed preview startup on GPUs with standard OpenGL vertex attribute limits.

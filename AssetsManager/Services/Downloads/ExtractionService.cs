@@ -80,7 +80,7 @@ namespace AssetsManager.Services.Downloads
 
             return await ExtractDiffsCoreAsync(
                 newDiffs, newLolPath, cancellationToken,
-                diff => IsRawByDefault(diff) ? WadExportMode.Original : WadExportMode.Smart,
+                diff => GetModeFromSettings(diff),
                 settingsFormats);
         }
 
@@ -119,14 +119,33 @@ namespace AssetsManager.Services.Downloads
 
             return await ExtractDiffsCoreAsync(
                 diffs, newLolPath, cancellationToken,
-                diff => IsRawByDefault(diff) ? WadExportMode.Original : WadExportMode.Smart,
+                diff => GetModeForSmartExport(diff),
                 ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
         }
 
-        private static bool IsRawByDefault(SerializableChunkDiff diff)
+        public WadExportMode GetModeFromSettings(SerializableChunkDiff diff)
         {
-            string ext = Path.GetExtension(diff.FileName).ToLower();
-            return ext == ".bnk" || ext == ".wpk";
+            if (SupportedFileTypes.IsAudioBank(diff.FileName))
+                return WadExportMode.Original;
+
+            if (SupportedFileTypes.IsImage(diff.FileName))
+                return _appSettings.ImageExportFormat == ImageExportFormat.Original ? WadExportMode.Original : WadExportMode.Smart;
+
+            if (SupportedFileTypes.IsText(diff.FileName))
+                return _appSettings.DataExportFormat == DataExportFormat.Original ? WadExportMode.Original : WadExportMode.Smart;
+
+            return WadExportMode.Original;
+        }
+
+        private WadExportMode GetModeForSmartExport(SerializableChunkDiff diff)
+        {
+            if (SupportedFileTypes.IsAudioBank(diff.FileName))
+                return WadExportMode.Original;
+
+            if (SupportedFileTypes.IsAudio(diff.FileName) && _appSettings.AudioExportFormat == AudioExportFormat.Ogg)
+                return WadExportMode.Original;
+
+            return WadExportMode.Smart;
         }
 
         /// <summary>
