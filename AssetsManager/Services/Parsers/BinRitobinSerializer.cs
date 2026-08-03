@@ -254,16 +254,8 @@ namespace AssetsManager.Services.Parsers
             foreach (uint hash in hashes)
             {
                 string value = resolver(hash);
-                if (string.IsNullOrWhiteSpace(value)) continue;
-
-                string hex = hash.ToString("x8", CultureInfo.InvariantCulture);
-                if (string.Equals(value, hex, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(value, "0x" + hex, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                yield return new KeyValuePair<uint, string>(hash, value);
+                if (!string.Equals(value, hash.ToString("x8", CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase))
+                    yield return new KeyValuePair<uint, string>(hash, value);
             }
         }
 
