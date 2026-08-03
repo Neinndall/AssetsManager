@@ -59,12 +59,11 @@
 
                 <Border Grid.Row="1" Height="1" Background="{StaticResource BorderColor}" Margin="0,0,0,16"/>
 
-                <!-- ROW 2: Target Installation (Hero Dropdown with Live Path Preview & Badges) -->
+                <!-- ROW 2: Target Installation Dropdown -->
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Header & Icon -->
@@ -73,95 +72,57 @@
                             <materialIcons:MaterialIcon Kind="FolderCog" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="TARGET INSTALLATION" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentGreen}"/>
-                            <TextBlock Text="Destination client or backup to apply updates" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
+                            <TextBlock Text="Target Installation" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                            <TextBlock Text="Select destination client or backup to apply updates" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Center: Active Path Preview Pill -->
-                    <Border Grid.Column="1" Background="{StaticResource DarkBackground}" CornerRadius="8" Padding="10,6" Margin="24,0,16,0" VerticalAlignment="Center">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14" Foreground="{StaticResource TextMuted}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="{Binding SelectedTargetInstallation.Path, FallbackValue='No installation selected'}" FontSize="11" FontFamily="Consolas" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                        </Grid>
-                    </Border>
-
-                    <!-- Right: Rich Modern Dropdown -->
-                    <ComboBox Grid.Column="2" 
+                    <!-- Right: Clean & Compact ComboBox -->
+                    <ComboBox Grid.Column="1" 
                               Style="{StaticResource ModernComboBox}" 
-                              MinWidth="260" Height="40"
+                              HorizontalAlignment="Right"
+                              Width="210" Height="34"
                               ItemsSource="{Binding TargetInstallations}"
                               SelectedItem="{Binding SelectedTargetInstallation}"
                               VerticalAlignment="Center">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="4,3">
+                                <Grid Margin="2,1">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- Left Icon -->
-                                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="6" Background="{StaticResource DarkBackground}" Margin="0,0,10,0" VerticalAlignment="Center">
-                                        <materialIcons:MaterialIcon Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <materialIcons:MaterialIcon.Style>
-                                                <Style TargetType="materialIcons:MaterialIcon">
-                                                    <Setter Property="Kind" Value="FolderZipOutline"/>
-                                                    <Setter Property="Foreground" Value="{StaticResource AccentPurple}"/>
+                                    <!-- Name -->
+                                    <TextBlock Grid.Column="0" Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+                                    <!-- MAIN vs BACKUP Badge -->
+                                    <Border Grid.Column="1" CornerRadius="4" Padding="5,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMain}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock FontSize="8" FontWeight="Bold" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="BACKUP"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsMain}" Value="True">
-                                                            <Setter Property="Kind" Value="DesktopClassic"/>
-                                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                                            <Setter Property="Text" Value="MAIN"/>
+                                                            <Setter Property="Foreground" Value="White"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </materialIcons:MaterialIcon.Style>
-                                        </materialIcons:MaterialIcon>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </Border>
-
-                                    <!-- Middle Info -->
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
-                                            <TextBlock Text="{Binding Version}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                            
-                                            <!-- MAIN vs BACKUP Badge -->
-                                            <Border CornerRadius="4" Padding="4,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsMain}" Value="True">
-                                                                <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
-                                                <TextBlock FontSize="8" FontWeight="Bold" VerticalAlignment="Center">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Text" Value="BACKUP"/>
-                                                            <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsMain}" Value="True">
-                                                                    <Setter Property="Text" Value="MAIN"/>
-                                                                    <Setter Property="Foreground" Value="White"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!-- Right Date -->
-                                    <TextBlock Grid.Column="2" Text="{Binding DateDisplay}" FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="14,0,2,0"/>
                                 </Grid>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
