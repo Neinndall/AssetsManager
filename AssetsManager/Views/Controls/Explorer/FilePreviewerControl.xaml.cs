@@ -357,6 +357,11 @@ namespace AssetsManager.Views.Controls.Explorer
                     FileGridControl.ItemsSource = null; // Clear immediately to prevent visual ghosting/flashing of previous folder items
                     RefreshGridItems(_currentFolderNode);
                 }
+                else if (node != previousNode)
+                {
+                    // Clear the active selection in the Grid View when focusing a different node in the same folder context
+                    FileGridControl.ClearSelectionSession(resetAnchor: false);
+                }
 
                 if (!isContainer && !ViewModel.IsGridMode && !ViewModel.HasEverPreviewedAFile)
                 {

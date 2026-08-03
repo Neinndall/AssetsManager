@@ -163,6 +163,7 @@ Improvements
 
 Bug Fixes
   - Explorer / Fixed an issue where selecting specific files in the Grid View would extract or save the entire parent WAD or folder instead of only the selected items.
+  - Explorer / Fixed a bug where navigating or selecting a file in the tree would leave stale selections active in the Grid View, incorrectly displaying the floating action bar when returning to the folder.
   - Viewer VFX Studio / Fixed preview startup on GPUs with standard OpenGL vertex attribute limits.
   - Viewer VFX Studio / Restored authored mesh rotations and non-uniform particle dimensions, removing displaced effects and square overlay planes.
   - Viewer VFX Studio / Removed the artificial 8x additive RGB gain so authored spotlight colors and alpha no longer render overexposed.

@@ -126,7 +126,7 @@ namespace AssetsManager.Views.Controls.Explorer
             }
         }
 
-        private void ClearSelectionSession(bool resetAnchor)
+        public void ClearSelectionSession(bool resetAnchor)
         {
             foreach (FileGridViewModel item in FileGridListBox.SelectedItems)
                 item.IsMultiSelected = false;
