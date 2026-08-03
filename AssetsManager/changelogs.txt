@@ -36,6 +36,7 @@ Improvements
   - VFX Studio / Honored BIN local-orientation flags in both particle basis selection and quad shader geometry.
   - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
   - VFX Studio / Applied authored ValueColor animation, palette gradients, and per-particle color selectors from VFX BIN data.
+  - VFX Studio / Kept standalone particle meshes double-sided so thin rotating confetti surfaces remain visible.
   - BIN files and comparisons now use the canonical Ritobin structure with linked dependencies, typed properties, and property-level diff filtering; removed the legacy JSON BIN serializer.
   - VFX Studio now follows declared BIN links from the selected skin root, avoiding unrelated sibling or basename matches while preserving truncated extraction collisions.
   - VFX Studio now places the loop boundary at the final particle frame produced by playback.

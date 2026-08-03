@@ -990,10 +990,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             ApplyAddressMode(1);
             ApplyTextureSampling(false);
             _gl.ActiveTexture(TextureUnit.Texture0);
-            if (renderState.DisableBackfaceCull ||
-                VfxBlendModes.ShouldFlipFaces(es.Def.MiscRenderFlags, es.Def.BlendMode, renderState.DisableBackfaceCull))
-                _gl.Disable(EnableCap.CullFace);
-            else _gl.Enable(EnableCap.CullFace);
+            // Standalone VFX meshes are particle surfaces, not champion meshes. Their
+            // authored .scb assets can be thin or single-sided, so culling would make
+            // rotating particles disappear. AttachedMesh is skipped before this path.
+            _gl.Disable(EnableCap.CullFace);
             ApplyBlendMode(es.Def.BlendMode);
 
             Vector2 emitterUvOffset = es.Def.EmitterUvScrollRate * es.EmitterAge;
