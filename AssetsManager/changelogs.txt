@@ -25,6 +25,8 @@ New Features
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
   - Enhanced numeric variant guessing to support padded formats (2-digit D2 and 3-digit D3 layouts).
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
+  - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
+  - Comparison Results now offer direct access to the output folder of any exported asset.
 
 Improvements
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.
@@ -154,6 +156,10 @@ Improvements
     * Encrypted Riot esports textures are now identified explicitly in the preview panel instead of being reported as unsupported or failed files.
   - Significantly accelerated hash guessing speed when scanning localized game client containers.
   - Optimized WAD file discovery by searching only inside relevant subfolders (Plugins for LCU, Game for GAME) when they exist.
+  - Sound banks (.bnk/.wpk) and standalone audio are now always exported in their original raw format outside the Explorer, preserving byte-for-byte integrity.
+  - The global search box now also filters the assets listed in the Comparison Results tab.
+  - Export failures no longer stop the whole batch; failed assets can be retried from the Comparison Results tab.
+  - Unified the Extract and Save export engine so both act consistently: Extract exports original raw files and Save applies your configured conversions.
 
 Bug Fixes
   - Viewer VFX Studio / Fixed preview startup on GPUs with standard OpenGL vertex attribute limits.
