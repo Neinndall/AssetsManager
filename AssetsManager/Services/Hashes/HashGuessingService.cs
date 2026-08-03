@@ -510,6 +510,7 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates += _lcuGuesser.SubstituteBasenames(
                         engine,
                         cancellationToken,
+                        candidateBudget: 500_000,
                         progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", progressOffset + count)));
                 }
                 if (engine.RemainingUnknownCount > 0)
@@ -519,6 +520,7 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates += _lcuGuesser.SubstituteBasenameWords(
                         engine,
                         cancellationToken,
+                        candidateBudget: 500_000,
                         progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", progressOffset + count)));
                 }
 

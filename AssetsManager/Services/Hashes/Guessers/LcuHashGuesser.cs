@@ -174,6 +174,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             IEnumerable<string> words = null,
             int oldWordCount = 1,
             int newWordCount = 1,
+            int candidateBudget = int.MaxValue,
             Action<int> progress = null)
         {
             IEnumerable<string> paths = KnownPaths;
@@ -183,7 +184,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 paths = paths.Where(path => path.EndsWith(fileExtension, StringComparison.OrdinalIgnoreCase));
             return RunBasenameWordSubstitution(
                 engine, paths, words ?? BuildWordlist(), oldWordCount, newWordCount,
-                cancellationToken, int.MaxValue, "LCU basename word substitution", progress);
+                cancellationToken, candidateBudget, "LCU basename word substitution", progress);
         }
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken) =>

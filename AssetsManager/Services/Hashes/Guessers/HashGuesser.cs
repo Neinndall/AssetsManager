@@ -198,7 +198,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             int? effectiveDigits = inferDigits
                 ? Math.Max(1, Math.Max(0, numberLimit - 1).ToString(CultureInfo.InvariantCulture).Length)
                 : digits;
-            string numberPattern = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}" : "[0-9]+";
+            string numberPattern = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}(?=[^/]*\\.[^/]+$)" : @"[0-9]+(?=[^/]*\.[^/]+$)";
             var formats = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in knownPaths)
             {
