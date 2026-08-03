@@ -95,6 +95,11 @@ Improvements
   - BIN inventory and content scans now discard non-GAME WAD containers centrally while RST scans retain full container coverage.
   - RST content guessing now resolves text sources from both GAME and LCU WAD path indexes.
   - BIN and RST guessing now streams resolved hashes to the results list and preserves matches when a run is cancelled.
+  - BIN/RST Hash Lab / Content scanning now certifies literal strings discovered in the file that owns the target hash (OwningFileString), so findings are saved directly into the verified BIN dictionaries instead of staying as research candidates.
+  - BIN/RST Hash Lab / Remaining counters now decrease with every finding, sessions only target the current patch (current.*.txt), and RST inventories capture full 64-bit hashes in addition to masked ones.
+  - BIN/RST Hash Lab / Content scans are now bounded by a candidate budget and skip XXH hashing when no RST targets remain.
+  - BIN/RST Hash Lab / Verified catalogs now reload incrementally after each run instead of reloading every hash catalog, and conflicting FNV1a collisions are excluded from promotion and reported in internal.collisions.json.
+  - BIN/RST Hash Lab / Meta Schema unknown class and property hashes are no longer injected into the BIN inventory as guessing targets.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
   - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.

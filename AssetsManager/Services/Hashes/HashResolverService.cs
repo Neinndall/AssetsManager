@@ -263,6 +263,27 @@ namespace AssetsManager.Services.Hashes
             return rstHash.ToString("x16");
         }
 
+        public void ReloadVerifiedHashes()
+        {
+            bool loadVerified = HasCurrentVerificationSchema();
+            ReloadVerifiedCatalog(_binHashCatalog, "hashes.binhashes.txt", loadVerified);
+            ReloadVerifiedCatalog(_binEntryCatalog, "hashes.binentries.txt", loadVerified);
+            ReloadVerifiedCatalog(_binFieldCatalog, "hashes.binfields.txt", loadVerified);
+            ReloadVerifiedCatalog(_binTypeCatalog, "hashes.bintypes.txt", loadVerified);
+            ReloadVerifiedCatalog(_rstXxh3Catalog, "hashes.rst.xxh3.txt", loadVerified);
+            ReloadVerifiedCatalog(_rstXxh64Catalog, "hashes.rst.xxh64.txt", loadVerified);
+            _cachedRstXxh3Hashes = null;
+            _cachedRstXxh64Hashes = null;
+        }
+
+        private void ReloadVerifiedCatalog(HashCatalog catalog, string fileName, bool loadVerified)
+        {
+            catalog.Verified?.Dispose();
+            catalog.Verified = loadVerified
+                ? LoadHashCache(Path.Combine(_directoriesCreator.HashLabPath, "verified", fileName))
+                : null;
+        }
+
         public Task ForceReloadHashesAsync()
         {
             Dispose();

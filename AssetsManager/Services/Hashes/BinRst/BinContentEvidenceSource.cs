@@ -58,9 +58,56 @@ namespace AssetsManager.Services.Hashes
             MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
             MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
-            if (matcher.GetRemaining(InternalHashKind.RstXxh3).Count > 0 ||
-                matcher.GetRemaining(InternalHashKind.RstXxh64).Count > 0)
-                VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path));
+            if (matcher.Remaining > 0)
+            {
+                IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
+                VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
+            }
+        }
+
+        private static IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> CollectLocalTargets(BinTree tree)
+        {
+            var targets = new Dictionary<InternalHashKind, HashSet<ulong>>
+            {
+                [InternalHashKind.BinEntries] = new(),
+                [InternalHashKind.BinFields] = new(),
+                [InternalHashKind.BinTypes] = new(),
+                [InternalHashKind.BinHashes] = new()
+            };
+            foreach (var pair in tree.Objects)
+            {
+                targets[InternalHashKind.BinEntries].Add(pair.Key);
+                if (pair.Value.ClassHash != 0) targets[InternalHashKind.BinTypes].Add(pair.Value.ClassHash);
+                foreach (BinTreeProperty property in pair.Value.Properties.Values) Visit(property);
+            }
+            foreach (var item in tree.DataOverrides)
+            {
+                if (item.ObjectPathHash != 0) targets[InternalHashKind.BinEntries].Add(item.ObjectPathHash);
+                Visit(item.Property);
+            }
+
+            void Visit(BinTreeProperty property)
+            {
+                if (property.NameHash != 0) targets[InternalHashKind.BinFields].Add(property.NameHash);
+                switch (property)
+                {
+                    case BinTreeHash hash when hash.Value != 0: targets[InternalHashKind.BinHashes].Add(hash.Value); break;
+                    case BinTreeObjectLink link when link.Value != 0: targets[InternalHashKind.BinEntries].Add(link.Value); break;
+                    case BinTreeStruct structure:
+                        if (structure.ClassHash != 0) targets[InternalHashKind.BinTypes].Add(structure.ClassHash);
+                        foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements) Visit(child);
+                        break;
+                    case BinTreeOptional option when option.Value != null: Visit(option.Value); break;
+                    case BinTreeMap map:
+                        foreach (var child in map) { Visit(child.Key); Visit(child.Value); }
+                        break;
+                }
+            }
+
+            return targets;
         }
 
         internal static void MatchOwningEntryStringEvidence(

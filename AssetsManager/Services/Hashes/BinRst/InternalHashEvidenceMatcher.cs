@@ -12,16 +12,29 @@ namespace AssetsManager.Services.Hashes
     internal sealed class InternalHashEvidenceMatcher
     {
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
+        private readonly Dictionary<InternalHashKind, HashSet<ulong>> _matched;
         private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
         private readonly List<InternalHashGuessMatch> _pendingMatches = new();
 
-        internal InternalHashEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets) =>
+        internal InternalHashEvidenceMatcher(Dictionary<InternalHashKind, HashSet<ulong>> targets)
+        {
+            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
+                if (!targets.ContainsKey(kind)) targets[kind] = new HashSet<ulong>();
             _targets = targets;
+            _matched = Enum.GetValues<InternalHashKind>().ToDictionary(
+                kind => kind,
+                kind => new HashSet<ulong>());
+        }
 
         internal IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
-        internal int Remaining => _targets.Values.Sum(values => values.Count);
+        internal int Remaining => _targets.Sum(pair => Math.Max(0, pair.Value.Count - _matched[pair.Key].Count));
         internal long CheckedCandidates { get; private set; }
         internal long DiscardedCandidates { get; private set; }
+
+        internal int GetRemainingCount(InternalHashKind kind) =>
+            _targets.TryGetValue(kind, out HashSet<ulong> values)
+                ? Math.Max(0, values.Count - _matched[kind].Count)
+                : 0;
 
         internal IReadOnlyList<InternalHashGuessMatch> TakePendingMatches()
         {
@@ -68,13 +81,18 @@ namespace AssetsManager.Services.Hashes
 
             if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
             {
-                int byteCount = Encoding.UTF8.GetByteCount(candidate);
-                Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
-                Encoding.UTF8.GetBytes(candidate, bytes);
-                ulong xxh3 = XxHash3.HashToUInt64(bytes);
-                CheckRst(InternalHashKind.RstXxh3, xxh3, candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
-                ulong xxh64 = XxHash64.HashToUInt64(bytes);
-                CheckRst(InternalHashKind.RstXxh64, xxh64, candidate, strategy, source, new[] { 64, 38, 39, 40 }, sourceWad, sourceBin);
+                bool hasXxh3 = _targets[InternalHashKind.RstXxh3].Count > 0;
+                bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;
+                if (hasXxh3 || hasXxh64)
+                {
+                    int byteCount = Encoding.UTF8.GetByteCount(candidate);
+                    Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
+                    Encoding.UTF8.GetBytes(candidate, bytes);
+                    if (hasXxh3)
+                        CheckRst(InternalHashKind.RstXxh3, XxHash3.HashToUInt64(bytes), candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
+                    if (hasXxh64)
+                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, new[] { 64, 38, 39, 40 }, sourceWad, sourceBin);
+                }
             }
         }
 
@@ -153,6 +171,7 @@ namespace AssetsManager.Services.Hashes
                 DiscardedCandidates++;
                 return false;
             }
+            _matched[kind].Add(hash);
 
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;
@@ -218,6 +237,7 @@ namespace AssetsManager.Services.Hashes
                 DiscardedCandidates++;
                 return false;
             }
+            _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;
             var match = new InternalHashGuessMatch
@@ -269,6 +289,8 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence evidence = InternalHashEvidence.RuntimeContext)
         {
             if (!hasLocalEvidence || !_targets[kind].Contains(hash)) return;
+            if (hasLocalEvidence && evidence == InternalHashEvidence.RuntimeContext)
+                evidence = InternalHashEvidence.OwningFileString;
             bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
             if (verified)
             {
@@ -277,6 +299,7 @@ namespace AssetsManager.Services.Hashes
                     .Where(key => key.Kind == kind && key.Hash == hash).ToList())
                     _matches.Remove(candidateKey);
             }
+            _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, value);
             if (_matches.ContainsKey(key)) return;
             var match = new InternalHashGuessMatch
@@ -348,7 +371,8 @@ namespace AssetsManager.Services.Hashes
         {
             InternalHashEvidence.ObservedHashPair or
             InternalHashEvidence.OwningEntryString or
-            InternalHashEvidence.OwningEntryPrefix => InternalHashEvidenceOrigin.RuntimeCorrelation,
+            InternalHashEvidence.OwningEntryPrefix or
+            InternalHashEvidence.OwningFileString => InternalHashEvidenceOrigin.RuntimeCorrelation,
             InternalHashEvidence.RstHashMatch => InternalHashEvidenceOrigin.ShippedData,
             InternalHashEvidence.MetaSchemaWordset or
             InternalHashEvidence.MetaSchemaRelation or

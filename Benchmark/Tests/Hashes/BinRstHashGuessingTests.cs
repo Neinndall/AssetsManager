@@ -66,7 +66,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void SameFileDomainEvidenceRemainsCandidateWithoutObservedPair()
+        public void SameFileDomainEvidencePromotesAsOwningFileString()
         {
             const string candidate = "data/characters/illaoi/skins/skin38/birthscale0/spec_intensity";
             uint hash = Fnv1a.HashLower(candidate);
@@ -84,9 +84,10 @@ namespace AssetsManager.BenchmarkTests.Hashes
             matcher.Check(candidate, InternalHashGuessStrategy.BinContent, "illaoi.bin", localTargets: localTargets);
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.False(match.IsVerified);
-            Assert.False(match.CanPromote);
-            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+            Assert.Equal(InternalHashEvidence.OwningFileString, match.Evidence);
+            Assert.True(match.IsVerified);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
         }
 
         [Fact]
@@ -209,7 +210,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void HashEvidenceFromAnotherObjectCannotResolveIdentifier()
+        public void FileLevelStringResolvesIdentifierOwnedByAnotherObject()
         {
             const string candidate = "apheliospluffas";
             uint hash = Fnv1a.HashLower(candidate);
@@ -230,12 +231,16 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "aphelios.bin");
 
-            Assert.Empty(matcher.Matches);
-            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+            Assert.Equal(candidate, match.Value);
+            Assert.Equal(InternalHashEvidence.OwningFileString, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
         }
 
         [Fact]
-        public void HashAndStringFromDifferentMapPairsCannotResolveIdentifier()
+        public void FileLevelStringAndHashFromDifferentMapPairsResolveIdentifier()
         {
             const string candidate = "play_sfx_akali_joke3d_loop";
             uint hash = Fnv1a.HashLower(candidate);
@@ -268,8 +273,12 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "akali.bin");
 
-            Assert.Empty(matcher.Matches);
-            Assert.Contains(hash, targets[InternalHashKind.BinHashes]);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+            Assert.Equal(candidate, match.Value);
+            Assert.Equal(InternalHashEvidence.OwningFileString, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinHashes]);
         }
 
         [Fact]
@@ -989,6 +998,66 @@ namespace AssetsManager.BenchmarkTests.Hashes
                     Confidence = InternalHashConfidence.Verified,
                     Evidence = InternalHashEvidence.RstHashMatch
                 };
+        }
+
+        [Fact]
+        public void SameFileDiscoverySavesIntoVerifiedCatalog()
+        {
+            const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
+            uint hash = Fnv1a.HashLower(candidate);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(hash, Fnv1a.HashLower("PreviouslyUnknownClass"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mParticleName"), candidate)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "cassiopeia.bin");
+
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            store.SaveMatchesAsync(matcher.Matches, CancellationToken.None).GetAwaiter().GetResult();
+
+            string verified = File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries));
+            Assert.Contains($"{hash:x8} {candidate}", verified);
+        }
+
+        [Fact]
+        public void CollidingFileStringsNeverReachVerifiedCatalog()
+        {
+            const string first = "yafhet0d6pup";
+            const string second = "aye79o8723jl";
+            uint hash = Fnv1a.HashLower(first);
+            Assert.Equal(hash, Fnv1a.HashLower(second));
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(hash, Fnv1a.HashLower("PreviouslyUnknownClass"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("first"), first),
+                    new BinTreeString(Fnv1a.HashLower("second"), second)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            store.SaveMatchesAsync(matcher.Matches, CancellationToken.None).GetAwaiter().GetResult();
+
+            Assert.Equal(string.Empty, File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries)));
+            Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "internal.collisions.json")));
         }
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateTargets() => new()

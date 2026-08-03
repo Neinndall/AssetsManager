@@ -116,6 +116,7 @@ namespace AssetsManager.Services.Hashes
                         current.Remove(0);
                         historical.Remove(0);
                     }
+                    await WriteUnknownAtomicallyAsync(GetCurrentPath(pair.Key), current, pair.Key, cancellationToken);
                     await WriteUnknownAtomicallyAsync(GetPrimaryUnknownPath(pair.Key), historical, pair.Key, cancellationToken);
                 }
                 await WriteTextAtomicallyAsync(Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt"), new[] { patchFingerprint }, cancellationToken);
@@ -141,7 +142,7 @@ namespace AssetsManager.Services.Hashes
                 foreach (var group in groups)
                 {
                     var resolvedLookups = group.Select(match => match.LookupHash).ToHashSet();
-                    foreach (string path in GetUnknownPaths(group.Key))
+                    foreach (string path in GetUnknownPaths(group.Key).Append(GetCurrentPath(group.Key)))
                     {
                         if (!File.Exists(path)) continue;
                         var remaining = new HashSet<ulong>();
@@ -215,6 +216,19 @@ namespace AssetsManager.Services.Hashes
                 .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
                 .ToList();
 
+            IReadOnlyList<InternalHashGuessMatch> collisions = research
+                .Where(match => match.CanPromote)
+                .GroupBy(match => (match.Kind, match.Hash))
+                .Where(group => group
+                    .Select(match => match.Value)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(2)
+                    .Count() > 1)
+                .SelectMany(group => group)
+                .OrderBy(match => match.Kind).ThenBy(match => match.Hash).ThenBy(match => match.Value, StringComparer.Ordinal)
+                .ToList();
+            await WriteCollisionsAsync(collisions, cancellationToken);
+
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
             {
                 int width = IsRst(kind) ? 16 : 8;
@@ -230,6 +244,42 @@ namespace AssetsManager.Services.Hashes
                 new[] { InternalHashGuessMatch.CurrentVerificationSchema.ToString(CultureInfo.InvariantCulture) },
                 cancellationToken);
             return verified;
+        }
+
+        private async Task WriteCollisionsAsync(
+            IReadOnlyCollection<InternalHashGuessMatch> collisions,
+            CancellationToken cancellationToken)
+        {
+            string path = Path.Combine(_directories.HashLabPath, "internal.collisions.json");
+            if (collisions.Count == 0)
+            {
+                if (File.Exists(path)) File.Delete(path);
+                return;
+            }
+            var payload = collisions
+                .GroupBy(match => new { match.Kind, match.Hash })
+                .Select(group => new
+                {
+                    Kind = group.Key.Kind.ToString(),
+                    group.Key.Hash,
+                    Values = group.Select(match => match.Value)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(value => value, StringComparer.Ordinal)
+                        .ToList()
+                })
+                .OrderBy(item => item.Kind).ThenBy(item => item.Hash)
+                .ToList();
+            string temporary = path + ".tmp";
+            try
+            {
+                await using (var output = File.Create(temporary))
+                    await JsonSerializer.SerializeAsync(output, payload, cancellationToken: cancellationToken);
+                File.Move(temporary, path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
 
         private bool HasCurrentVerificationSchema()

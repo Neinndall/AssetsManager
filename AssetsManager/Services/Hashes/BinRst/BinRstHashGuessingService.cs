@@ -34,6 +34,7 @@ namespace AssetsManager.Services.Hashes
 
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
         private const int NumericBudget = 5_000_000;
+        private const int ContentBudget = 25_000_000;
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
         private readonly BinRstHashGuessingStore _store;
         private readonly HashGuessPersistenceService _persistence;
@@ -77,8 +78,6 @@ namespace AssetsManager.Services.Hashes
             MetaSchemaHashSnapshot metaSchema = includeBin
                 ? await _metaSchema.GetSnapshotAsync(cancellationToken)
                 : new MetaSchemaHashSnapshot();
-            observed[InternalHashKind.BinTypes].UnionWith(metaSchema.UnknownTypes);
-            observed[InternalHashKind.BinFields].UnionWith(metaSchema.UnknownFields);
 
             await Task.Run(() =>
             {
@@ -138,7 +137,7 @@ namespace AssetsManager.Services.Hashes
                                 }
                                 else
                                 {
-                                    ReadRstInventory(stream, observed[InternalHashKind.RstXxh3]);
+                                    ReadRstInventory(stream, observed[InternalHashKind.RstXxh3], observed[InternalHashKind.RstXxh64]);
                                     scannedRst++;
                                 }
                             }
@@ -209,12 +208,17 @@ namespace AssetsManager.Services.Hashes
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             int scanned = 0;
+            int contentStartedCandidates = matcher.CheckedCandidates > int.MaxValue
+                ? int.MaxValue
+                : (int)matcher.CheckedCandidates;
+
+            bool ContentBudgetExceeded() => matcher.CheckedCandidates - contentStartedCandidates >= ContentBudget;
 
             try
             {
                 await Task.Run(() =>
                 {
-                    for (int index = 0; index < wads.Length && matcher.Remaining > 0; index++)
+                    for (int index = 0; index < wads.Length && matcher.Remaining > 0 && !ContentBudgetExceeded(); index++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         string wadPath = wads[index];
@@ -223,6 +227,7 @@ namespace AssetsManager.Services.Hashes
                             using var wad = new WadFile(wadPath);
                             foreach (var pair in wad.Chunks)
                             {
+                                if (ContentBudgetExceeded()) break;
                                 cancellationToken.ThrowIfCancellationRequested();
                                 string path = null;
                                 bool isBin = false;
@@ -264,7 +269,11 @@ namespace AssetsManager.Services.Hashes
                                     }
                                     else
                                     {
-                                        CheckTextCandidates(data.Memory.Span, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, path, wadPath, path));
+                                        CheckTextCandidates(data.Memory.Span, value =>
+                                        {
+                                            if (ContentBudgetExceeded()) return;
+                                            matcher.Check(value, InternalHashGuessStrategy.TextContent, path, wadPath, path);
+                                        });
                                     }
                                     scanned++;
                                 }
@@ -282,7 +291,7 @@ namespace AssetsManager.Services.Hashes
                     }
                 }, cancellationToken);
 
-                if (includeRst && matcher.Remaining > 0)
+                if (includeRst && matcher.Remaining > 0 && !ContentBudgetExceeded())
                 {
                     var filesToScan = Directory.EnumerateFiles(rootDirectory, "*.*", SearchOption.AllDirectories)
                     .Where(file =>
@@ -294,11 +303,19 @@ namespace AssetsManager.Services.Hashes
 
                     foreach (string file in filesToScan)
                     {
-                        if (matcher.Remaining == 0) break;
+                        if (matcher.Remaining == 0 || ContentBudgetExceeded()) break;
                         cancellationToken.ThrowIfCancellationRequested();
                         try
                         {
-                            await ScanTextFileAsync(file, value => matcher.Check(value, InternalHashGuessStrategy.TextContent, file, null, file), cancellationToken);
+                            await ScanTextFileAsync(
+                                file,
+                                value =>
+                                {
+                                    if (ContentBudgetExceeded()) return;
+                                    matcher.Check(value, InternalHashGuessStrategy.TextContent, file, null, file);
+                                },
+                                cancellationToken,
+                                () => !ContentBudgetExceeded());
                             scanned++;
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -307,7 +324,7 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
                 }
-                if (includeBin && matcher.GetRemaining(InternalHashKind.BinEntries).Count > 0)
+                if (includeBin && matcher.GetRemainingCount(InternalHashKind.BinEntries) > 0)
                 {
                     string gameHashesPath = Path.Combine(_directories.HashesPath, "hashes.game.txt");
                     if (File.Exists(gameHashesPath))
@@ -479,12 +496,12 @@ namespace AssetsManager.Services.Hashes
             try
             {
                 await _persistence.CommitInternalMatchesAsync(materialized, CancellationToken.None);
+                if (materialized.Count > 0) _resolver.ReloadVerifiedHashes();
             }
             finally
             {
                 HashResolverService._hashFileAccessLock.Release();
             }
-            if (materialized.Count > 0) await _resolver.ForceReloadHashesAsync();
         }
 
         private static InternalHashProgress CreateProgress(
@@ -566,7 +583,7 @@ namespace AssetsManager.Services.Hashes
                 bool isRst = kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64;
                 if (isRst)
                     targets[kind] = includeRst
-                        ? await _store.LoadUnknownAsync(kind, cancellationToken)
+                        ? await _store.LoadCurrentUnknownAsync(kind, cancellationToken)
                         : new HashSet<ulong>();
                 else if (IsBinKind(kind))
                     targets[kind] = includeBin
@@ -649,7 +666,7 @@ namespace AssetsManager.Services.Hashes
         }
 
 
-        private static void ReadRstInventory(Stream stream, HashSet<ulong> observed)
+        private static void ReadRstInventory(Stream stream, HashSet<ulong> observedMasked, HashSet<ulong> observedFull)
         {
             using var reader = new BinaryReader(stream, Encoding.UTF8, true);
             if (Encoding.ASCII.GetString(reader.ReadBytes(3)) != "RST") throw new InvalidDataException("Invalid RST signature.");
@@ -660,7 +677,12 @@ namespace AssetsManager.Services.Hashes
             if (version is < 2 or > 5) throw new InvalidDataException($"Unsupported RST version {version}.");
             ulong mask = (1UL << bits) - 1;
             uint count = reader.ReadUInt32();
-            for (int index = 0; index < count; index++) observed.Add(reader.ReadUInt64() & mask);
+            for (int index = 0; index < count; index++)
+            {
+                ulong hash = reader.ReadUInt64();
+                observedMasked.Add(hash & mask);
+                observedFull.Add(hash);
+            }
         }
 
         private static void CheckTextCandidates(ReadOnlySpan<byte> data, Action<string> check)
@@ -670,13 +692,13 @@ namespace AssetsManager.Services.Hashes
             scanner.Complete();
         }
 
-        private static async Task ScanTextFileAsync(string path, Action<string> check, CancellationToken cancellationToken)
+        private static async Task ScanTextFileAsync(string path, Action<string> check, CancellationToken cancellationToken, Func<bool> shouldContinue = null)
         {
             const int blockSize = 4 * 1024 * 1024;
             byte[] buffer = new byte[blockSize];
             var scanner = new BinaryTextCandidateScanner(check);
             await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, blockSize, true);
-            while (true)
+            while (shouldContinue?.Invoke() != false)
             {
                 int read = await stream.ReadAsync(buffer, cancellationToken);
                 if (read == 0) break;
