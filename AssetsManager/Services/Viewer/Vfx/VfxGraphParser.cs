@@ -107,7 +107,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             HashAlgorithms.Fnv1a("scaleEmitOffsetByBoundObjectSize");
         private static readonly uint F_directionVelocityScale = HashAlgorithms.Fnv1a("directionVelocityScale");
         private static readonly uint F_rateByVelocityFunction = HashAlgorithms.Fnv1a("rateByVelocityFunction");
-        private static readonly uint F_uvParallaxScale = HashAlgorithms.Fnv1a("uvParallaxScale");
         private static readonly uint F_paletteDefinition = HashAlgorithms.Fnv1a("paletteDefinition");
         private static readonly uint F_paletteCount = HashAlgorithms.Fnv1a("paletteCount");
         private static readonly uint F_paletteSelector = HashAlgorithms.Fnv1a("paletteSelector");
@@ -599,8 +598,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
                 FalloffTexturePath: GetString(p, F_falloffTexture),
                 AudioSoundOnCreate: audioSoundOnCreate,
-                FilteringKeywordsExcluded: filteringKeywords,
-                UvParallaxScale: GetF32(p, F_uvParallaxScale) ?? 0f);
+                FilteringKeywordsExcluded: filteringKeywords);
         }
 
         private static VfxFlexShapeDefinition ReadFlexShape(

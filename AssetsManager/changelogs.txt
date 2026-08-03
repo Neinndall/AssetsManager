@@ -32,7 +32,6 @@ Improvements
   - VFX Studio / Corrected additive blend handling and alpha clipping while preserving authored texture output.
   - VFX Studio / Recovered legacy opaque RGB masks for billboard-like effects while preserving authored mesh alpha.
   - VFX Studio / Applied authored `modulationFactor` values from VFX BIN emitters to particle and mesh color output with a neutral fallback.
-  - VFX Studio / Applied authored UV parallax scaling to particle and mesh textures with a neutral fallback when absent.
   - VFX Studio / Corrected ground-mesh orientation so authored ±90° ground alignment is not applied twice.
   - VFX Studio / Honored BIN local-orientation flags in both particle basis selection and quad shader geometry.
   - VFX Studio / Applied particle color textures with their authored colorRenderFlags across billboard and mesh emitters.
@@ -157,6 +156,7 @@ Improvements
 
 Bug Fixes
   - Viewer VFX Studio / Fixed preview startup on GPUs with standard OpenGL vertex attribute limits.
+  - Viewer VFX Studio / Restored authored mesh rotations and non-uniform particle dimensions, removing displaced effects and square overlay planes.
   - Viewer VFX Studio / Removed the artificial 8x additive RGB gain so authored spotlight colors and alpha no longer render overexposed.
   - Viewer VFX Studio / Recovered RGB opacity masks from near-opaque compressed alpha channels, removing black particle quads while preserving meaningful transparency.
   - Viewer VFX Studio / Marked AttachedMesh emitters as non-renderable until owner-model binding is available.

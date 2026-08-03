@@ -30,7 +30,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void UniformScaleCurveUsesItsAuthoredScalarForEveryMeshAxis()
+        public void UniformScaleCurveUsesItsAuthoredScalarForDynamicScale()
         {
             var emitter = CreateEmitter(new Vector3(8f, 1f, 1f), VfxEmitterRenderState.Default) with
             {
@@ -44,8 +44,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(4.8f, state.Instances[3], precision: 5);
-            Assert.Equal(4.8f, state.Instances[4], precision: 5);
-            Assert.Equal(4.8f, state.Instances[18], precision: 5);
+            Assert.Equal(0.6f, state.Instances[4], precision: 5);
+            Assert.Equal(0.6f, state.Instances[18], precision: 5);
         }
 
         [Fact]
@@ -137,7 +137,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void UniformMeshBirthScaleUsesTheAuthoredScalarComponent()
+        public void UniformMeshBirthScalePreservesAuthoredAxes()
         {
             var emitter = CreateEmitter(new Vector3(1f, 45f, 40f), VfxEmitterRenderState.Default) with
             {
@@ -150,12 +150,12 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(1f, state.Instances[3]);
-            Assert.Equal(1f, state.Instances[4]);
-            Assert.Equal(1f, state.Instances[18]);
+            Assert.Equal(45f, state.Instances[4]);
+            Assert.Equal(40f, state.Instances[18]);
         }
 
         [Fact]
-        public void UniformBillboardBirthScaleUsesOneAuthoredDimension()
+        public void UniformBillboardBirthScalePreservesAuthoredAxes()
         {
             var emitter = CreateEmitter(new Vector3(100f, 230f, 0f), VfxEmitterRenderState.Default) with
             {
@@ -170,11 +170,11 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(100f, state.Instances[3]);
-            Assert.Equal(100f, state.Instances[4]);
+            Assert.Equal(230f, state.Instances[4]);
         }
 
         [Fact]
-        public void ArbitraryQuadScaleUsesAuthoredHalfExtentAsItsRadius()
+        public void ArbitraryQuadScalePreservesAuthoredAxes()
         {
             var emitter = CreateEmitter(new Vector3(345f, 400f, 50f), VfxEmitterRenderState.Default) with
             {
@@ -190,7 +190,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(690f, state.Instances[3]);
-            Assert.Equal(690f, state.Instances[4]);
+            Assert.Equal(800f, state.Instances[4]);
         }
 
         [Fact]
@@ -731,7 +731,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void GroundMeshRotationKeepsOnlyInPlaneSpin()
+        public void GroundLikeBirthRotationDetectionRecognizesAuthoredTilt()
         {
             VfxEmitterDefinition groundMesh = CreateEmitter(
                 Vector3.One,
@@ -743,15 +743,11 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 BirthRotation = VfxCurve3.Const(new Vector3(90f, 20f, 30f))
             };
 
-            Vector3 rotation = VfxOpenGlRenderer.ResolveMeshRotation(
-                groundMesh,
-                new Vector3(90f, 20f, 30f) * (MathF.PI / 180f));
-
-            Assert.Equal(new Vector3(0f, 0f, 30f * (MathF.PI / 180f)), rotation);
+            Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(groundMesh.BirthRotation));
         }
 
         [Fact]
-        public void NegativeNinetyMeshRotationIsRecognizedAsGroundLike()
+        public void NegativeNinetyBirthRotationIsRecognizedAsGroundLike()
         {
             VfxEmitterDefinition mesh = CreateEmitter(
                 Vector3.One,
@@ -763,25 +759,6 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             };
 
             Assert.True(VfxOpenGlRenderer.IsGroundLikeBirthRotation(mesh.BirthRotation));
-            Assert.Equal(
-                Vector3.Zero,
-                VfxOpenGlRenderer.ResolveMeshRotation(mesh, new Vector3(-MathF.PI / 2f, 0f, 0f)));
-        }
-
-        [Fact]
-        public void NonGroundMeshRotationKeepsAllAxes()
-        {
-            VfxEmitterDefinition mesh = CreateEmitter(
-                Vector3.One,
-                VfxEmitterRenderState.Default) with
-            {
-                IsMeshPrimitive = true,
-                PrimitiveKind = VfxPrimitiveKind.Mesh,
-                BirthRotation = VfxCurve3.Const(new Vector3(10f, 20f, 30f))
-            };
-            Vector3 authored = new(0.1f, 0.2f, 0.3f);
-
-            Assert.Equal(authored, VfxOpenGlRenderer.ResolveMeshRotation(mesh, authored));
         }
 
         [Fact]

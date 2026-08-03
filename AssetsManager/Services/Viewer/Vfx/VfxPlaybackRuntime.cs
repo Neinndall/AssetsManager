@@ -379,8 +379,6 @@ namespace AssetsManager.Services.Viewer.Vfx
             if (d.BirthScale1 is { } birthScale1)
                 birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng), rangeRandom);
             birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
-            if (d.IsUniformScale)
-                birthScale = new Vector3(birthScale.X);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthOrbitalVelocity = d.BirthOrbitalVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
