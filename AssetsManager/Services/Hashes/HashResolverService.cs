@@ -25,11 +25,14 @@ namespace AssetsManager.Services.Hashes
     {
         internal static readonly SemaphoreSlim _hashFileAccessLock = new SemaphoreSlim(1, 1);
 
-        private readonly List<BinaryHashCache> _gameCaches = new();
-        private readonly List<BinaryHashCache> _binCaches = new();
-        private readonly List<BinaryHashCache> _binVerifiedCaches = new();
-        private readonly List<BinaryHashCache> _rstCaches = new();
-        private readonly List<BinaryHashCache> _rstVerifiedCaches = new();
+        private BinaryHashCache _gameCache;
+        private BinaryHashCache _lcuCache;
+        private readonly HashCatalog _binHashCatalog = new();
+        private readonly HashCatalog _binEntryCatalog = new();
+        private readonly HashCatalog _binFieldCatalog = new();
+        private readonly HashCatalog _binTypeCatalog = new();
+        private readonly HashCatalog _rstXxh3Catalog = new();
+        private readonly HashCatalog _rstXxh64Catalog = new();
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -83,87 +86,49 @@ namespace AssetsManager.Services.Hashes
         {
             if (_gameLcuHashesLoaded) return;
             var hashesDir = _directoriesCreator.HashesPath;
-            var files = new[] { "hashes.game.txt", "hashes.lcu.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(hashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _gameCaches.Add(cache);
-                }
-            }
+            _gameCache = LoadHashCache(Path.Combine(hashesDir, "hashes.game.txt"));
+            _lcuCache = LoadHashCache(Path.Combine(hashesDir, "hashes.lcu.txt"));
             _gameLcuHashesLoaded = true;
         }
 
         public void LoadBinHashes()
         {
             if (_binHashesLoaded) return;
-            var binHashesDir = _directoriesCreator.HashesPath;
             bool loadVerified = HasCurrentVerificationSchema();
-            var files = new[] { "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binfields.txt", "hashes.bintypes.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(binHashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _binCaches.Add(cache);
-                }
-                else
-                {
-                    _binCaches.Add(null);
-                }
 
-                var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
-                if (loadVerified && File.Exists(verifiedPath))
-                {
-                    var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
-                    verifiedCache.Load();
-                    _binVerifiedCaches.Add(verifiedCache);
-                }
-                else
-                {
-                    _binVerifiedCaches.Add(null);
-                }
-            }
+            LoadHashCatalog(_binHashCatalog, "hashes.binhashes.txt", loadVerified);
+            LoadHashCatalog(_binEntryCatalog, "hashes.binentries.txt", loadVerified);
+            LoadHashCatalog(_binFieldCatalog, "hashes.binfields.txt", loadVerified);
+            LoadHashCatalog(_binTypeCatalog, "hashes.bintypes.txt", loadVerified);
             _binHashesLoaded = true;
+        }
+
+        private void LoadHashCatalog(HashCatalog catalog, string fileName, bool loadVerified)
+        {
+            catalog.Official = LoadHashCache(Path.Combine(_directoriesCreator.HashesPath, fileName));
+
+            if (loadVerified)
+            {
+                catalog.Verified = LoadHashCache(
+                    Path.Combine(_directoriesCreator.HashLabPath, "verified", fileName));
+            }
+        }
+
+        private BinaryHashCache LoadHashCache(string path)
+        {
+            if (!File.Exists(path)) return null;
+
+            var cache = new BinaryHashCache(path, _logService);
+            cache.Load();
+            return cache;
         }
 
         public void LoadRstHashes()
         {
             if (_rstHashesLoaded) return;
-            var rstHashesDir = _directoriesCreator.HashesPath;
             bool loadVerified = HasCurrentVerificationSchema();
-            var files = new[] { "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt" };
-            foreach (var file in files)
-            {
-                var path = Path.Combine(rstHashesDir, file);
-                if (File.Exists(path))
-                {
-                    var cache = new BinaryHashCache(path, _logService);
-                    cache.Load();
-                    _rstCaches.Add(cache);
-                }
-                else
-                {
-                    _rstCaches.Add(null);
-                }
-
-                var verifiedPath = Path.Combine(_directoriesCreator.HashLabPath, "verified", file);
-                if (loadVerified && File.Exists(verifiedPath))
-                {
-                    var verifiedCache = new BinaryHashCache(verifiedPath, _logService);
-                    verifiedCache.Load();
-                    _rstVerifiedCaches.Add(verifiedCache);
-                }
-                else
-                {
-                    _rstVerifiedCaches.Add(null);
-                }
-            }
+            LoadHashCatalog(_rstXxh3Catalog, "hashes.rst.xxh3.txt", loadVerified);
+            LoadHashCatalog(_rstXxh64Catalog, "hashes.rst.xxh64.txt", loadVerified);
             _rstHashesLoaded = true;
         }
 
@@ -186,12 +151,9 @@ namespace AssetsManager.Services.Hashes
         private Dictionary<ulong, string> _cachedRstXxh64Hashes;
 
         public Dictionary<ulong, string> RstXxh3Hashes => _cachedRstXxh3Hashes ??=
-            GetMergedCacheDictionary(GetCache(_rstCaches, 0), GetCache(_rstVerifiedCaches, 0));
+            GetMergedCacheDictionary(_rstXxh3Catalog.Official, _rstXxh3Catalog.Verified);
         public Dictionary<ulong, string> RstXxh64Hashes => _cachedRstXxh64Hashes ??=
-            GetMergedCacheDictionary(GetCache(_rstCaches, 1), GetCache(_rstVerifiedCaches, 1));
-
-        private static BinaryHashCache GetCache(IReadOnlyList<BinaryHashCache> caches, int index) =>
-            index >= 0 && index < caches.Count ? caches[index] : null;
+            GetMergedCacheDictionary(_rstXxh64Catalog.Official, _rstXxh64Catalog.Verified);
 
         private static Dictionary<ulong, string> GetMergedCacheDictionary(
             BinaryHashCache officialCache,
@@ -218,80 +180,86 @@ namespace AssetsManager.Services.Hashes
 
         public string ResolveHash(ulong pathHash)
         {
-            foreach (var cache in _gameCaches)
-            {
-                var result = cache.Resolve(pathHash);
-                if (result != null) return result;
-            }
+            string result = _gameCache?.Resolve(pathHash);
+            if (result != null) return result;
+            result = _lcuCache?.Resolve(pathHash);
+            if (result != null) return result;
+
             return pathHash.ToString("x16");
         }
 
         public bool IsKnownHash(ulong pathHash)
         {
-            foreach (var cache in _gameCaches)
-            {
-                if (cache.Resolve(pathHash) != null) return true;
-            }
-            return false;
+            return _gameCache?.Resolve(pathHash) != null ||
+                   _lcuCache?.Resolve(pathHash) != null;
         }
 
-        public string ResolveBinHash(uint hash) => ResolveBinDomain(hash, 0);
+        public string ResolveBinHash(uint hash) => ResolveBinHashDetailed(hash).Value;
 
-        public string ResolveBinEntry(uint hash) => ResolveBinDomain(hash, 1);
+        public string ResolveBinEntry(uint hash) => ResolveBinEntryDetailed(hash).Value;
 
-        public string ResolveBinField(uint hash) => ResolveBinDomain(hash, 2);
+        public string ResolveBinField(uint hash) => ResolveBinFieldDetailed(hash).Value;
 
-        public string ResolveBinType(uint hash) => ResolveBinDomain(hash, 3);
+        public string ResolveBinType(uint hash) => ResolveBinTypeDetailed(hash).Value;
 
+        // BinTreeHash does not carry a domain marker, so generic values need all BIN catalogs.
         public string ResolveBinHashGeneral(uint hash)
         {
-            foreach (var cache in _binCaches)
-            {
-                if (cache == null) continue;
-                var result = cache.Resolve(hash);
-                if (result != null) return result;
-            }
-            foreach (var cache in _binVerifiedCaches)
-            {
-                if (cache == null) continue;
-                var result = cache.Resolve(hash);
-                if (result != null) return result;
-            }
+            string result = _binHashCatalog.Official?.Resolve(hash);
+            if (result != null) return result;
+            result = _binEntryCatalog.Official?.Resolve(hash);
+            if (result != null) return result;
+            result = _binFieldCatalog.Official?.Resolve(hash);
+            if (result != null) return result;
+            result = _binTypeCatalog.Official?.Resolve(hash);
+            if (result != null) return result;
+
+            result = _binHashCatalog.Verified?.Resolve(hash);
+            if (result != null) return result;
+            result = _binEntryCatalog.Verified?.Resolve(hash);
+            if (result != null) return result;
+            result = _binFieldCatalog.Verified?.Resolve(hash);
+            if (result != null) return result;
+            result = _binTypeCatalog.Verified?.Resolve(hash);
+            if (result != null) return result;
+
             return hash.ToString("x8");
         }
 
-        internal string ResolveBinDomain(uint hash, int index)
-            => ResolveBinDomainDetailed(hash, index).Value;
+        internal HashResolution ResolveBinHashDetailed(uint hash)
+            => ResolveBinCatalog(_binHashCatalog, hash);
 
-        internal HashResolution ResolveBinDomainDetailed(uint hash, int index)
+        internal HashResolution ResolveBinEntryDetailed(uint hash)
+            => ResolveBinCatalog(_binEntryCatalog, hash);
+
+        internal HashResolution ResolveBinFieldDetailed(uint hash)
+            => ResolveBinCatalog(_binFieldCatalog, hash);
+
+        internal HashResolution ResolveBinTypeDetailed(uint hash)
+            => ResolveBinCatalog(_binTypeCatalog, hash);
+
+        private static HashResolution ResolveBinCatalog(HashCatalog catalog, uint hash)
         {
-            if (index >= 0 && index < _binCaches.Count && _binCaches[index] != null)
-            {
-                string result = _binCaches[index].Resolve(hash);
-                if (result != null) return new HashResolution(result, HashResolutionOrigin.Official);
-            }
-            if (index >= 0 && index < _binVerifiedCaches.Count && _binVerifiedCaches[index] != null)
-            {
-                string result = _binVerifiedCaches[index].Resolve(hash);
-                if (result != null) return new HashResolution(result, HashResolutionOrigin.LocalVerified);
-            }
+            string result = catalog.Official?.Resolve(hash);
+            if (result != null) return new HashResolution(result, HashResolutionOrigin.Official);
+
+            result = catalog.Verified?.Resolve(hash);
+            if (result != null) return new HashResolution(result, HashResolutionOrigin.LocalVerified);
+
             return new HashResolution(hash.ToString("x8"), HashResolutionOrigin.Unknown);
         }
 
         public string ResolveRstHash(ulong rstHash)
         {
-            foreach (var cache in _rstCaches)
-            {
-                if (cache == null) continue;
-                var result = cache.Resolve(rstHash);
-                if (result != null) return result;
-            }
-            foreach (var cache in _rstVerifiedCaches)
-            {
-                if (cache == null) continue;
-                var result = cache.Resolve(rstHash);
-                if (result != null) return result;
-            }
+            string result = _rstXxh3Catalog.Official?.Resolve(rstHash);
+            if (result != null) return result;
+            result = _rstXxh64Catalog.Official?.Resolve(rstHash);
+            if (result != null) return result;
+            result = _rstXxh3Catalog.Verified?.Resolve(rstHash);
+            if (result != null) return result;
+            result = _rstXxh64Catalog.Verified?.Resolve(rstHash);
+            if (result != null) return result;
+
             return rstHash.ToString("x16");
         }
 
@@ -309,16 +277,30 @@ namespace AssetsManager.Services.Hashes
 
         public void Dispose()
         {
-            foreach (var c in _gameCaches) c.Dispose();
-            foreach (var c in _binCaches) c?.Dispose();
-            foreach (var c in _binVerifiedCaches) c?.Dispose();
-            foreach (var c in _rstCaches) c?.Dispose();
-            foreach (var c in _rstVerifiedCaches) c?.Dispose();
-            _gameCaches.Clear();
-            _binCaches.Clear();
-            _binVerifiedCaches.Clear();
-            _rstCaches.Clear();
-            _rstVerifiedCaches.Clear();
+            _gameCache?.Dispose();
+            _lcuCache?.Dispose();
+            _binHashCatalog.Dispose();
+            _binEntryCatalog.Dispose();
+            _binFieldCatalog.Dispose();
+            _binTypeCatalog.Dispose();
+            _rstXxh3Catalog.Dispose();
+            _rstXxh64Catalog.Dispose();
+            _gameCache = null;
+            _lcuCache = null;
+        }
+
+        private sealed class HashCatalog : IDisposable
+        {
+            public BinaryHashCache Official { get; set; }
+            public BinaryHashCache Verified { get; set; }
+
+            public void Dispose()
+            {
+                Official?.Dispose();
+                Verified?.Dispose();
+                Official = null;
+                Verified = null;
+            }
         }
     }
 }

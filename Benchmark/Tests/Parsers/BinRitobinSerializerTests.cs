@@ -79,6 +79,41 @@ namespace AssetsManager.BenchmarkTests.Parsers
             Assert.DoesNotContain("new-value", oldRitobin);
         }
 
+        [Fact]
+        public async Task SerializerResolvesGenericHashValuesAcrossBinDomains()
+        {
+            const uint objectPathHash = 0x27f20d91;
+            const string objectPath = "Characters/Aatrox/Animations/Skin0";
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt"),
+                string.Empty);
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{objectPathHash:x8} {objectPath}{Environment.NewLine}");
+            WriteHashes(bridge, "hashes.bintypes.txt", "RootType");
+            WriteHashes(bridge, "hashes.binfields.txt", "objectPath");
+
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+            var serializer = new BinRitobinSerializer(resolver);
+            BinTree tree = new BinTree(new[]
+            {
+                new BinTreeObject(
+                    Fnv1a.HashLower("test/entry"),
+                    Fnv1a.HashLower("RootType"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeHash(Fnv1a.HashLower("objectPath"), objectPathHash)
+                    })
+            }, Array.Empty<string>());
+
+            string ritobin = await serializer.WriteBinTreeAsRitobinAsync(WriteTree(tree));
+
+            Assert.Contains($"objectPath: hash = \"{objectPath}\"", ritobin);
+        }
+
         private static BinTree CreateTypedTree(string nestedValue, string dependency)
         {
             var embedded = new BinTreeEmbedded(

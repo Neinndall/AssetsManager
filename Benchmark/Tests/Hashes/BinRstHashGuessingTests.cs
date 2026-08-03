@@ -865,11 +865,11 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             Assert.Equal(
                 new HashResolution("official_entry", HashResolutionOrigin.Official),
-                resolver.ResolveBinDomainDetailed(officialHash, 1));
+                resolver.ResolveBinEntryDetailed(officialHash));
             Assert.Equal(
                 new HashResolution("verified_entry", HashResolutionOrigin.LocalVerified),
-                resolver.ResolveBinDomainDetailed(verifiedHash, 1));
-            Assert.Equal(HashResolutionOrigin.Unknown, resolver.ResolveBinDomainDetailed(legacyHash, 1).Origin);
+                resolver.ResolveBinEntryDetailed(verifiedHash));
+            Assert.Equal(HashResolutionOrigin.Unknown, resolver.ResolveBinEntryDetailed(legacyHash).Origin);
         }
 
         [Fact]
