@@ -29,6 +29,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _uPrimitiveKind;
         private int _uAlphaCutoff, _uAlphaTest, _uDeriveAlphaFromRgb, _uEmissiveStrength, _uFlipU, _uFlipV, _uClampUv;
         private int _uColorMap, _uHasColor, _uColorRenderFlags, _uIsAdditive, _uModulationFactor;
+        private int _uPaletteMap, _uHasPalette, _uPaletteCount, _uPaletteMixMask;
         private int _uUvParallaxScale;
         private int _uColorLookUpTypeX, _uColorLookUpTypeY, _uColorLookUpScales, _uColorLookUpOffsets;
         private int _uErosionTex, _uHasErosion, _uErosionFeatherIn, _uErosionFeatherOut;
@@ -101,6 +102,10 @@ namespace AssetsManager.Services.Viewer.Vfx
             _uColorRenderFlags = gl.GetUniformLocation(_program, "uColorRenderFlags");
             _uIsAdditive = gl.GetUniformLocation(_program, "uIsAdditive");
             _uModulationFactor = gl.GetUniformLocation(_program, "uModulationFactor");
+            _uPaletteMap = gl.GetUniformLocation(_program, "uPaletteMap");
+            _uHasPalette = gl.GetUniformLocation(_program, "uHasPalette");
+            _uPaletteCount = gl.GetUniformLocation(_program, "uPaletteCount");
+            _uPaletteMixMask = gl.GetUniformLocation(_program, "uPaletteMixMask");
             _uUvParallaxScale = gl.GetUniformLocation(_program, "uUvParallaxScale");
             _uColorLookUpTypeX = gl.GetUniformLocation(_program, "uColorLookUpTypeX");
             _uColorLookUpTypeY = gl.GetUniformLocation(_program, "uColorLookUpTypeY");
@@ -150,6 +155,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.EnableVertexAttribArray(13); gl.VertexAttribPointer(13, 2, VertexAttribPointerType.Float, false, bstride, new IntPtr(31 * sizeof(float)));
             gl.EnableVertexAttribArray(14); gl.VertexAttribPointer(14, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(33 * sizeof(float)));
             gl.EnableVertexAttribArray(15); gl.VertexAttribPointer(15, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(34 * sizeof(float)));
+            gl.EnableVertexAttribArray(16); gl.VertexAttribPointer(16, 1, VertexAttribPointerType.Float, false, bstride, new IntPtr(35 * sizeof(float)));
 
             gl.VertexAttribDivisor(1, 1);
             gl.VertexAttribDivisor(2, 1);
@@ -166,6 +172,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             gl.VertexAttribDivisor(13, 1);
             gl.VertexAttribDivisor(14, 1);
             gl.VertexAttribDivisor(15, 1);
+            gl.VertexAttribDivisor(16, 1);
 
             gl.BindVertexArray(0);
             gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -280,7 +287,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.GetInteger(GLEnum.VertexArrayBinding, out int vertexArray);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
             _gl.GetInteger(GLEnum.ActiveTexture, out int activeTexture);
-            var textureBindings = new int[8];
+            var textureBindings = new int[9];
             for (int unit = 0; unit < textureBindings.Length; unit++)
             {
                 _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
@@ -297,6 +304,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform1(_uTex, 0);
             _gl.Uniform1(_uTexMult, 1);
             _gl.Uniform1(_uColorMap, 7);
+            _gl.Uniform1(_uPaletteMap, 8);
             _gl.Uniform1(_uSceneTex, 2);
             _gl.Uniform1(_uDistortionTex, 3);
             _gl.Uniform1(_uErosionTex, 4);
@@ -400,6 +408,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                     VfxBlendModes.ResolveColorRenderFlags(
                         es.Def.ColorRenderFlags,
                         !string.IsNullOrWhiteSpace(es.Def.ParticleColorTexturePath)));
+                VfxPaletteDefinition palette = es.Def.PaletteDefinition;
+                _gl.Uniform1(_uHasPalette, es.PaletteTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_uPaletteCount, Math.Max(1, palette?.PaletteCount ?? 1));
+                Vector4 paletteMask = palette?.PaletteSourceMixColor ?? Vector4.UnitX;
+                _gl.Uniform4(_uPaletteMixMask, paletteMask.X, paletteMask.Y, paletteMask.Z, paletteMask.W);
                 _gl.Uniform1(_uIsAdditive, VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 1 : 0);
                 _gl.Uniform1(_uColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
                 _gl.Uniform1(_uColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
@@ -489,6 +502,12 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.ActiveTexture(TextureUnit.Texture7);
                 _gl.BindTexture(TextureTarget.Texture2D, es.ColorGradientTexture != 0
                     ? es.ColorGradientTexture
+                    : _fallbackTransparentTexture);
+                ApplyAddressMode(1);
+                ApplyTextureSampling(false);
+                _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
+                _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
+                    ? es.PaletteTexture
                     : _fallbackTransparentTexture);
                 ApplyAddressMode(1);
                 ApplyTextureSampling(false);
@@ -628,6 +647,7 @@ namespace AssetsManager.Services.Viewer.Vfx
         private int _muAddressModeMult, _muClampUvMult, _muUvTransformCenterMult;
         private int _muPlacementRight, _muPlacementUp, _muPlacementForward;
         private int _muAlphaCutoff, _muAlphaTest, _muDeriveAlphaFromRgb, _muEmissiveStrength, _muColorMap, _muHasColor, _muColorRenderFlags, _muIsAdditive, _muModulationFactor, _muColorLookUpTypeX, _muColorLookUpTypeY, _muColorLookUpScales, _muColorLookUpOffsets, _muFlipU, _muFlipV;
+        private int _muPaletteMap, _muHasPalette, _muPaletteCount, _muPaletteSelector, _muPaletteMixMask;
         private int _muUvParallaxScale;
         private int _muBirthUvOffset, _muUvScale, _muUvRotation;
         private int _muErosionTex, _muHasErosion, _muErosionDrive, _muErosionFeatherIn, _muErosionFeatherOut, _muErosionMixer;
@@ -679,6 +699,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _muColorRenderFlags = _gl.GetUniformLocation(_meshProgram, "uColorRenderFlags");
                 _muIsAdditive = _gl.GetUniformLocation(_meshProgram, "uIsAdditive");
                 _muModulationFactor = _gl.GetUniformLocation(_meshProgram, "uModulationFactor");
+                _muPaletteMap = _gl.GetUniformLocation(_meshProgram, "uPaletteMap");
+                _muHasPalette = _gl.GetUniformLocation(_meshProgram, "uHasPalette");
+                _muPaletteCount = _gl.GetUniformLocation(_meshProgram, "uPaletteCount");
+                _muPaletteSelector = _gl.GetUniformLocation(_meshProgram, "uPaletteSelector");
+                _muPaletteMixMask = _gl.GetUniformLocation(_meshProgram, "uPaletteMixMask");
                 _muUvParallaxScale = _gl.GetUniformLocation(_meshProgram, "uUvParallaxScale");
                 _muColorLookUpTypeX = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeX");
                 _muColorLookUpTypeY = _gl.GetUniformLocation(_meshProgram, "uColorLookUpTypeY");
@@ -841,6 +866,7 @@ namespace AssetsManager.Services.Viewer.Vfx
             _gl.Uniform1(_muTex, 0);
             _gl.Uniform1(_muTexMult, 1);
             _gl.Uniform1(_muColorMap, 7);
+            _gl.Uniform1(_muPaletteMap, 8);
             _gl.Uniform1(_muErosionTex, 4);
             _gl.Uniform1(_muReflectionTex, 5);
             _gl.Uniform1(_muSceneDepthTex, 6);
@@ -897,6 +923,11 @@ namespace AssetsManager.Services.Viewer.Vfx
                 VfxBlendModes.ResolveColorRenderFlags(
                     es.Def.ColorRenderFlags,
                     !string.IsNullOrWhiteSpace(es.Def.ParticleColorTexturePath)));
+            VfxPaletteDefinition meshPalette = es.Def.PaletteDefinition;
+            _gl.Uniform1(_muHasPalette, es.PaletteTexture != 0 ? 1 : 0);
+            _gl.Uniform1(_muPaletteCount, Math.Max(1, meshPalette?.PaletteCount ?? 1));
+            Vector4 meshPaletteMask = meshPalette?.PaletteSourceMixColor ?? Vector4.UnitX;
+            _gl.Uniform4(_muPaletteMixMask, meshPaletteMask.X, meshPaletteMask.Y, meshPaletteMask.Z, meshPaletteMask.W);
             _gl.Uniform1(_muIsAdditive, VfxBlendModes.IsAdditive(es.Def.BlendMode) ? 1 : 0);
             _gl.Uniform1(_muColorLookUpTypeX, es.Def.ColorLookUpTypeX ?? 0);
             _gl.Uniform1(_muColorLookUpTypeY, es.Def.ColorLookUpTypeY ?? 0);
@@ -965,6 +996,12 @@ namespace AssetsManager.Services.Viewer.Vfx
                 : _fallbackTransparentTexture);
             ApplyAddressMode(1);
             ApplyTextureSampling(false);
+            _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + 8));
+            _gl.BindTexture(TextureTarget.Texture2D, es.PaletteTexture != 0
+                ? es.PaletteTexture
+                : _fallbackTransparentTexture);
+            ApplyAddressMode(1);
+            ApplyTextureSampling(false);
             _gl.ActiveTexture(TextureUnit.Texture0);
             if (renderState.DisableBackfaceCull ||
                 VfxBlendModes.ShouldFlipFaces(es.Def.MiscRenderFlags, es.Def.BlendMode, renderState.DisableBackfaceCull))
@@ -1001,6 +1038,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 _gl.Uniform1(_muUvRotationMult, es.Instances[o + 33]);
                 _gl.Uniform1(_muFrame, es.Instances[o + 10]);
                 _gl.Uniform1(_muTextureMultFrame, es.Instances[o + 34]);
+                _gl.Uniform1(_muPaletteSelector, es.Instances[o + 35]);
 
                 if (es.MeshIndexCount > 0)
                 {
@@ -1178,6 +1216,11 @@ uniform float uEmissiveStrength;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
+uniform sampler2D uPaletteMap;
+uniform int uHasPalette;
+uniform int uPaletteCount;
+uniform float uPaletteSelector;
+uniform vec4 uPaletteMixMask;
 uniform int uIsAdditive;
 uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
@@ -1236,6 +1279,18 @@ void main(){
     if (uDeriveAlphaFromRgb != 0)
         texel.a = dot(texel.rgb, vec3(0.2126, 0.7152, 0.0722));
     texel = applyParticleColor(texel);
+    if (uHasPalette != 0) {
+        float paletteIndex = dot(texel, uPaletteMixMask);
+        float paletteU = clamp((uPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
+        vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
+        if (uIsAdditive != 0) {
+            texel.rgb = palette.rgb * max(texel.a, palette.a);
+            texel.a = max(texel.a, palette.a);
+        } else {
+            texel.rgb = mix(texel.rgb, palette.rgb, palette.a * texel.a);
+            texel.a = max(texel.a, palette.a * texel.a);
+        }
+    }
     if (uHasTexMult != 0) {
         vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
         texel.rgb *= mult.rgb;
@@ -1287,6 +1342,7 @@ layout(location=12) in vec2 aUvOffsetMult;
 layout(location=13) in vec2 aUvScaleMult;
 layout(location=14) in float aUvRotationMult;
 layout(location=15) in float aTextureMultFrame;
+layout(location=16) in float aPaletteSelector;
 uniform mat4 uViewProj;
 uniform vec3 uCamRight;
 uniform vec3 uCamUp;
@@ -1322,6 +1378,7 @@ out float vErosionDrive;
 out vec4 vErosionMixer;
 out vec2 vLocalUv;
 out vec2 vLocalUvMult;
+out float vPaletteSelector;
 vec3 rotateEuler(vec3 p, vec3 r){
     float sz = sin(r.z); float cz = cos(r.z);
     p = vec3(p.x * cz - p.y * sz, p.x * sz + p.y * cz, p.z);
@@ -1465,6 +1522,7 @@ void main(){
     vec2 multCellMax = (multCell + vec2(1.0)) / multDiv - multHalfTexel;
     vUvMult = clamp((multCell + multUv) / multDiv, multCellMin, multCellMax);
     vColor = aColor;
+    vPaletteSelector = aPaletteSelector;
     vErosionDrive = aErosionDrive;
     vErosionMixer = aErosionMixer;
 }";
@@ -1477,6 +1535,7 @@ in float vErosionDrive;
 in vec4 vErosionMixer;
 in vec2 vLocalUv;
 in vec2 vLocalUvMult;
+in float vPaletteSelector;
 uniform sampler2D uTex;
 uniform sampler2D uTexMult;
 uniform int uHasTexMult;
@@ -1494,6 +1553,10 @@ uniform float uEmissiveStrength;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
+uniform sampler2D uPaletteMap;
+uniform int uHasPalette;
+uniform int uPaletteCount;
+uniform vec4 uPaletteMixMask;
 uniform int uIsAdditive;
 uniform vec4 uModulationFactor;
 uniform int uColorLookUpTypeX;
@@ -1549,6 +1612,18 @@ void main(){
     if (uDeriveAlphaFromRgb != 0)
         t.a = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
     t = applyParticleColor(t);
+    if (uHasPalette != 0) {
+        float paletteIndex = dot(t, uPaletteMixMask);
+        float paletteU = clamp((vPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
+        vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
+        if (uIsAdditive != 0) {
+            t.rgb = palette.rgb * max(t.a, palette.a);
+            t.a = max(t.a, palette.a);
+        } else {
+            t.rgb = mix(t.rgb, palette.rgb, palette.a * t.a);
+            t.a = max(t.a, palette.a * t.a);
+        }
+    }
     if (uHasTexMult != 0) {
         vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
         t.rgb *= mult.rgb;

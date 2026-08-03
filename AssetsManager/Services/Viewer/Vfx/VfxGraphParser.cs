@@ -111,6 +111,9 @@ namespace AssetsManager.Services.Viewer.Vfx
         private static readonly uint F_paletteDefinition = HashAlgorithms.Fnv1a("paletteDefinition");
         private static readonly uint F_paletteCount = HashAlgorithms.Fnv1a("paletteCount");
         private static readonly uint F_paletteSelector = HashAlgorithms.Fnv1a("paletteSelector");
+        private static readonly uint F_paletteTexture = HashAlgorithms.Fnv1a("paletteTexture");
+        private static readonly uint F_paletteSourceMixColor = HashAlgorithms.Fnv1a("paletteSrcMixColor");
+        private static readonly uint F_palleteSourceMixColor = HashAlgorithms.Fnv1a("palleteSrcMixColor");
         private static readonly uint F_audio = HashAlgorithms.Fnv1a("Audio");
         private static readonly uint F_soundOnCreate = HashAlgorithms.Fnv1a("SoundOnCreate");
         private static readonly uint F_hasPostRotateOrientation = HashAlgorithms.Fnv1a("hasPostRotateOrientation");
@@ -613,9 +616,13 @@ namespace AssetsManager.Services.Viewer.Vfx
             IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
         {
             if (Get(emitterProperties, F_paletteDefinition) is not BinTreeStruct palette) return null;
+            VfxCurve4? sourceMixColor = ReadCurve4(palette.Properties, F_paletteSourceMixColor)
+                ?? ReadCurve4(palette.Properties, F_palleteSourceMixColor);
             return new VfxPaletteDefinition(
                 Math.Max(1, GetI32(palette.Properties, F_paletteCount) ?? 1),
-                ReadCurve3(palette.Properties, F_paletteSelector) ?? VfxCurve3.Const(Vector3.Zero));
+                ReadCurve3(palette.Properties, F_paletteSelector) ?? VfxCurve3.Const(Vector3.Zero),
+                GetString(palette.Properties, F_paletteTexture),
+                sourceMixColor?.Constant ?? Vector4.UnitX);
         }
 
         private static IReadOnlyList<string> ReadStringContainer(BinTreeProperty property)

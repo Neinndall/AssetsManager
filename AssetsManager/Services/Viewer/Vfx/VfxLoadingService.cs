@@ -182,6 +182,9 @@ namespace AssetsManager.Services.Viewer.Vfx
                 emitter.PendingReflectionTexture = _resources.ResolveTexture(
                     emitter.Def.Reflection?.TexturePath,
                     searchDirectory);
+                emitter.PendingPaletteTexture = _resources.ResolveTexture(
+                    emitter.Def.PaletteDefinition?.PaletteTexturePath,
+                    searchDirectory);
 
                 BitmapSource gradient = _resources.ResolveTexture(
                     emitter.Def.ParticleColorTexturePath,

@@ -92,6 +92,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                         Fnv1a.HashLower("VfxPaletteDefinitionData"),
                         new BinTreeProperty[]
                         {
+                            new BinTreeString(Fnv1a.HashLower("paletteTexture"), "Effects/TestPalette.dds"),
                             new BinTreeI32(Fnv1a.HashLower("paletteCount"), 16),
                             new BinTreeStruct(
                                 Fnv1a.HashLower("paletteSelector"),
@@ -99,6 +100,15 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                                 new BinTreeProperty[]
                                 {
                                     new BinTreeVector3(Fnv1a.HashLower("constantValue"), new Vector3(4f, 0f, 0f))
+                                }),
+                            new BinTreeStruct(
+                                Fnv1a.HashLower("paletteSrcMixColor"),
+                                Fnv1a.HashLower("ValueColor"),
+                                new BinTreeProperty[]
+                                {
+                                    new BinTreeVector4(
+                                        Fnv1a.HashLower("constantValue"),
+                                        new Vector4(0f, 1f, 0f, 0f))
                                 })
                         }),
                     new BinTreeVector4(Fnv1a.HashLower("birthColor"), new Vector4(0.1f, 0.2f, 0.3f, 0.4f)),
@@ -144,6 +154,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(0.004f, parsed.FlexShape.ScaleBirthScaleByBoundObjectSize);
             Assert.Equal(16, parsed.PaletteDefinition.PaletteCount);
             Assert.Equal(4f, parsed.PaletteDefinition.PaletteSelector.Constant.X);
+            Assert.Equal("Effects/TestPalette.dds", parsed.PaletteDefinition.PaletteTexturePath);
+            Assert.Equal(new Vector4(0f, 1f, 0f, 0f), parsed.PaletteDefinition.PaletteSourceMixColor);
             Assert.Equal(1f, parsed.BirthScale.Constant.X);
             Assert.Equal(1f, parsed.Rate.Constant);
             Assert.Equal(1f, parsed.ParticleLifetime.Constant);

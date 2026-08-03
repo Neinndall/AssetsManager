@@ -184,7 +184,9 @@ namespace AssetsManager.Views.Models.Viewer
 
     public sealed record VfxPaletteDefinition(
         int PaletteCount,
-        VfxCurve3 PaletteSelector);
+        VfxCurve3 PaletteSelector,
+        string PaletteTexturePath = null,
+        Vector4? PaletteSourceMixColor = null);
 
     public sealed record VfxSoftParticleDefinition(
         float BeginIn,

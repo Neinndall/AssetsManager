@@ -352,7 +352,9 @@ namespace AssetsManager.Views.Dialogs
                         EmitterCount = playableEmitters.Length,
                         TextureCount = playableEmitters.Count(e =>
                             !string.IsNullOrWhiteSpace(e.TexturePath) ||
-                            !string.IsNullOrWhiteSpace(e.TextureMultPath)),
+                            !string.IsNullOrWhiteSpace(e.TextureMultPath) ||
+                            !string.IsNullOrWhiteSpace(e.ParticleColorTexturePath) ||
+                            !string.IsNullOrWhiteSpace(e.PaletteDefinition?.PaletteTexturePath)),
                         MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive),
                         Status = "Ready",
                         StatusBrush = Brushes.LightGreen
@@ -725,6 +727,7 @@ namespace AssetsManager.Views.Dialogs
             AddTextureSource(sources, "Distortion", emitter.Distortion?.NormalMapTexturePath);
             AddTextureSource(sources, "Erosion", emitter.AlphaErosion?.TexturePath);
             AddTextureSource(sources, "Reflection", emitter.Reflection?.TexturePath);
+            AddTextureSource(sources, "Palette", emitter.PaletteDefinition?.PaletteTexturePath);
             if (!hasVisualTexture || !string.Equals(
                     emitter.ParticleColorTexturePath,
                     "ASSETS/Shared/Particles/DefaultColorOverlifetime.dds",
@@ -905,6 +908,7 @@ namespace AssetsManager.Views.Dialogs
                 sb.AppendLine($"  - Textura Principal: {emitter.TexturePath} (Estado GPU: {emitter.TextureStatus})");
                 sb.AppendLine($"  - Textura Multiplicadora: {d?.TextureMultPath ?? "N/A"}");
                 sb.AppendLine($"  - Textura Color Lookup: {d?.ParticleColorTexturePath ?? "N/A"}");
+                sb.AppendLine($"  - Textura Paleta: {d?.PaletteDefinition?.PaletteTexturePath ?? "N/A"}");
                 sb.AppendLine($"  - Rejilla Atlas (TexDiv): {emitter.TexDiv}");
                 if (d != null)
                 {

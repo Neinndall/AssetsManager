@@ -10,7 +10,7 @@ namespace AssetsManager.Services.Viewer.Vfx
     /// </summary>
     public sealed class VfxPlaybackRuntime
     {
-        public const int InstanceStride = 35;
+        public const int InstanceStride = 36;
 
         /// <summary>Per-emitter live state + drawable output. One batch renders with one texture/blend.</summary>
         public sealed class EmitterState
@@ -28,11 +28,13 @@ namespace AssetsManager.Services.Viewer.Vfx
             public uint DistortionTexture;          // normal map for screen-space heat haze/refraction
             public uint ErosionTexture;
             public uint ReflectionTexture;
+            public uint PaletteTexture;
             public object PendingTexture;
             public object PendingTextureMult;
             public object PendingDistortionTexture;
             public object PendingErosionTexture;
             public object PendingReflectionTexture;
+            public object PendingPaletteTexture;
             /// <summary>Pending mesh data for deferred GL upload of .scb/.sco mesh primitives.</summary>
             public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? PendingMesh;
             internal VfxAnimatedMesh MeshAnimation;
@@ -46,8 +48,8 @@ namespace AssetsManager.Services.Viewer.Vfx
             internal bool InitialEmissionDone;
             internal readonly List<Particle> Particles = new();
 
-            /// <summary>Packed instance data for the renderer: position, 3D scale, authored color,
-            /// rotation/frame, age/velocity, Euler rotation, and both UV stages.</summary>
+            /// <summary>Packed instance data for the renderer: position, color, motion, UV stages,
+            /// erosion state, and the authored palette selector.</summary>
             public float[] Instances = System.Array.Empty<float>();
             public int InstanceCount;
 
@@ -417,7 +419,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 Age = 0f,
                 Life = life,
                 BirthSize = finalBirthSize,
-                BirthColor = d.BirthColor.SampleBirth(emitterT, _rng),
+                BirthColor = VfxColorSemantics.ResolveBirth(d.BirthColor, emitterT, _rng),
                 BirthRotation = birthRotation * (MathF.PI / 180f),
                 RotationalVelocity = d.IsRotationEnabled ? rotVel * (MathF.PI / 180f) : Vector3.Zero,
                 Rot = d.IsMeshPrimitive ? 0f : birthRotation.X * (MathF.PI / 180f),
@@ -470,8 +472,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 var scaleMul = d.ScaleOverLife?.Sample(t) ?? Vector3.One;
                 if (d.IsUniformScale)
                     scaleMul = new Vector3(scaleMul.X);
-                var colMul = d.ColorOverLife?.Sample(t) ?? Vector4.One;
-                var col = p.BirthColor * colMul;
+                var col = VfxColorSemantics.ResolveParticle(p.BirthColor, d.ColorOverLife, t);
 
                 float frame = 0f;
                 if (d.NumFrames > 1)
@@ -570,6 +571,7 @@ namespace AssetsManager.Services.Viewer.Vfx
                 buf[k++] = textureMultUvScale.X; buf[k++] = textureMultUvScale.Y;
                 buf[k++] = textureMultUvRotationDegrees * (MathF.PI / 180f);
                 buf[k++] = p.TextureMultFrame;
+                buf[k++] = d.PaletteDefinition?.PaletteSelector.Sample(t).X ?? 0f;
                 if (isTrail) trailDistance += trailLength;
             }
             s.InstanceCount = k / InstanceStride;

@@ -452,7 +452,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             float secondFrame = Assert.Single(second.Emitters).Instances[34];
             Assert.Equal(firstFrame, secondFrame);
             Assert.InRange(firstFrame, 0f, 7f);
-            Assert.Equal(35, VfxPlaybackRuntime.InstanceStride);
+            Assert.Equal(36, VfxPlaybackRuntime.InstanceStride);
         }
 
         [Fact]

@@ -212,6 +212,8 @@ namespace AssetsManager.Services.Viewer.Vfx
                     UploadTexture(ref emitter.PendingReflectionTexture, texture => emitter.ReflectionTexture = texture);
                     UploadTexture(ref emitter.PendingColorGradient, texture =>
                         emitter.ColorGradientTexture = texture);
+                    UploadTexture(ref emitter.PendingPaletteTexture, texture =>
+                        emitter.PaletteTexture = texture);
 
                     if (emitter.PendingMesh is { } mesh)
                     {
