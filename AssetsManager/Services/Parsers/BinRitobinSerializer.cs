@@ -197,7 +197,7 @@ namespace AssetsManager.Services.Parsers
                 Resolve(entryHashes, _hashResolver.ResolveBinEntry),
                 Resolve(classHashes, _hashResolver.ResolveBinType),
                 Resolve(propertyHashes, _hashResolver.ResolveBinField),
-                Resolve(binHashes, _hashResolver.ResolveBinHash),
+                Resolve(binHashes, _hashResolver.ResolveBinHashGeneral),
                 ResolveWadHashes(wadHashes));
         }
 
