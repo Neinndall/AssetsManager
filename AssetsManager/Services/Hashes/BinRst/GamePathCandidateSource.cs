@@ -10,16 +10,20 @@ namespace AssetsManager.Services.Hashes
 {
     internal static class GamePathCandidateSource
     {
+        // Skins enumerate skin00..skin49 and sets set01..set29; cap generated variants.
+        private const int VariantBudget = 5_000_000;
+
         internal static void Discover(
             IEnumerable<string> gameHashLines,
             InternalHashEvidenceMatcher matcher,
             string source,
             CancellationToken cancellationToken = default)
         {
-            HashSet<ulong> targets = matcher.GetRemaining(InternalHashKind.BinEntries).ToHashSet();
-            if (targets.Count == 0) return;
+            HashSet<ulong> entryTargets = matcher.GetRemaining(InternalHashKind.BinEntries).ToHashSet();
+            HashSet<ulong> hashTargets = matcher.GetRemaining(InternalHashKind.BinHashes).ToHashSet();
+            if (entryTargets.Count == 0 && hashTargets.Count == 0) return;
+            int generatedVariants = 0;
 
-            var formsByGroup = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             foreach (string line in gameHashLines)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -29,51 +33,85 @@ namespace AssetsManager.Services.Hashes
                 path = InternalHashEvidenceMatcher.NormalizeCandidate(path);
                 if (path.Length < 3 || !path.Contains('/')) continue;
 
-                AddForm(path);
+                // Exact known path: entry name only (asset paths are never entry keys).
+                Consider(path, checkHashes: false, includeTruncatedRst: true);
+
                 int extensionIndex = path.LastIndexOf('.');
                 int slashIndex = path.LastIndexOf('/');
                 if (extensionIndex > slashIndex + 1)
-                    AddForm(path[..extensionIndex]);
+                {
+                    // Extension-stripped known path: entry name and file hash alike.
+                    Consider(path[..extensionIndex], checkHashes: true, includeTruncatedRst: true);
+                    if (generatedVariants < VariantBudget)
+                        ConsiderVariants(path[..extensionIndex], checkHashes: true);
+                }
+                if (generatedVariants < VariantBudget)
+                    ConsiderVariants(path, checkHashes: false);
+
+                // Parent directories are real shipped paths too; check them both.
+                int dirEnd = path.Length;
+                while ((dirEnd = path.LastIndexOf('/', dirEnd - 1)) > 0)
+                    Consider(path[..dirEnd], checkHashes: true, includeTruncatedRst: true);
             }
 
-            foreach (var pair in formsByGroup)
+            void Consider(string value, bool checkHashes, bool includeTruncatedRst)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var matches = pair.Value
-                    .Select(value => (Value: value, Hash: (ulong)Fnv1a.HashLower(value)))
-                    .Where(candidate => targets.Contains(candidate.Hash))
-                    .GroupBy(candidate => candidate.Hash)
-                    .Select(group => group.First())
-                    .ToArray();
-                double expected = pair.Value.Count * (double)targets.Count / 4294967296d;
-
-                // Statistical enrichment is useful discovery evidence, never proof.
-                // Require several observations and a 10x signal over random collisions.
-                if (matches.Length < 3 || expected > 1 || matches.Length < expected * 10) continue;
-                foreach (var match in matches)
+                uint hash = Fnv1a.HashLower(value);
+                if (entryTargets.Remove(hash))
                 {
                     matcher.CheckResearchCandidate(
                         InternalHashKind.BinEntries,
-                        match.Value,
+                        value,
                         InternalHashGuessStrategy.GamePath,
-                        $"{source} [{pair.Key}]",
-                        InternalHashEvidence.GamePathStatisticalMatch,
-                        matches.Length,
-                        expected);
+                        source,
+                        InternalHashEvidence.GamePathExactMatch,
+                        verified: true);
+                }
+                if (checkHashes && hashTargets.Count > 0 && hashTargets.Remove(hash))
+                {
+                    matcher.CheckResearchCandidate(
+                        InternalHashKind.BinHashes,
+                        value,
+                        InternalHashGuessStrategy.GamePath,
+                        source,
+                        InternalHashEvidence.GamePathExactMatch,
+                        verified: true);
+                }
+                // Known paths are real string-table strings; resolve RST targets too.
+                // Synthetic variants keep only full 64-bit XXH64 checks (a 38-bit
+                // prefix match cannot prove a derived string).
+                if (matcher.GetRemaining(InternalHashKind.RstXxh3).Count > 0 ||
+                    matcher.GetRemaining(InternalHashKind.RstXxh64).Count > 0)
+                {
+                    matcher.Check(
+                        value,
+                        InternalHashGuessStrategy.GamePath,
+                        source,
+                        includeTruncatedRst: includeTruncatedRst);
                 }
             }
 
-            void AddForm(string value)
+            // Sibling skin/set enumeration: every variant is an exact FNV1a hit on a
+            // real catalog template, so any match is proof of the entry name.
+            void ConsiderVariants(string value, bool checkHashes)
             {
-                int slash = value.IndexOf('/');
-                if (slash <= 0) return;
-                string group = value[..slash];
-                if (!formsByGroup.TryGetValue(group, out HashSet<string> forms))
+                foreach ((string marker, int min, int max) in new[] { ("skins/skin", 0, 49), ("sets/set", 1, 29) })
                 {
-                    forms = new HashSet<string>(StringComparer.Ordinal);
-                    formsByGroup[group] = forms;
+                    int markerIndex = value.IndexOf(marker, StringComparison.Ordinal);
+                    if (markerIndex < 0) continue;
+                    int digitsStart = markerIndex + marker.Length;
+                    int digitsEnd = digitsStart;
+                    while (digitsEnd < value.Length && char.IsDigit(value[digitsEnd])) digitsEnd++;
+                    if (digitsEnd == digitsStart) continue;
+                    string head = value[..digitsStart];
+                    string tail = value[digitsEnd..];
+                    for (int number = min; number <= max; number++)
+                    {
+                        generatedVariants++;
+                        if (generatedVariants > VariantBudget) return;
+                        Consider(head + number.ToString("D2") + tail, checkHashes, includeTruncatedRst: false);
+                    }
                 }
-                forms.Add(value);
             }
         }
     }

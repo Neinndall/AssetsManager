@@ -50,7 +50,8 @@ namespace AssetsManager.Services.Hashes
             string source,
             string sourceWad = null,
             string sourceBin = null,
-            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null)
+            IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = null,
+            bool includeTruncatedRst = true)
         {
             CheckedCandidates++;
             if (string.IsNullOrWhiteSpace(value) || value.Length < 3 || value.Length > 512)
@@ -79,9 +80,9 @@ namespace AssetsManager.Services.Hashes
                 Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinTypes));
             }
 
-            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant)
+            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath)
             {
-                bool hasXxh3 = _targets[InternalHashKind.RstXxh3].Count > 0;
+                bool hasXxh3 = includeTruncatedRst && _targets[InternalHashKind.RstXxh3].Count > 0;
                 bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;
                 if (hasXxh3 || hasXxh64)
                 {
@@ -91,7 +92,7 @@ namespace AssetsManager.Services.Hashes
                     if (hasXxh3)
                         CheckRst(InternalHashKind.RstXxh3, XxHash3.HashToUInt64(bytes), candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
                     if (hasXxh64)
-                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, new[] { 64, 38, 39, 40 }, sourceWad, sourceBin);
+                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? new[] { 64, 38, 39, 40 } : new[] { 64 }, sourceWad, sourceBin);
                 }
             }
         }
@@ -153,7 +154,8 @@ namespace AssetsManager.Services.Hashes
             int occurrences = 1,
             double expectedRandomMatches = 0,
             string sourceWad = null,
-            bool countCheck = true)
+            bool countCheck = true,
+            bool verified = false)
         {
             if (countCheck) CheckedCandidates++;
             if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 ||
@@ -175,6 +177,13 @@ namespace AssetsManager.Services.Hashes
 
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;
+            if (verified)
+            {
+                _targets[kind].Remove(hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(item => item.Kind == kind && item.Hash == hash).ToList())
+                    _matches.Remove(candidateKey);
+            }
             var match = new InternalHashGuessMatch
             {
                 Hash = hash,
@@ -186,9 +195,9 @@ namespace AssetsManager.Services.Hashes
                 Source = source,
                 SourceWad = sourceWad,
                 SourceBin = source,
-                IsVerified = false,
+                IsVerified = verified,
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                Confidence = InternalHashConfidence.Candidate,
+                Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
                 Evidence = evidence,
                 EvidenceOrigin = GetEvidenceOrigin(evidence),
                 EvidenceOccurrences = occurrences,
@@ -240,6 +249,14 @@ namespace AssetsManager.Services.Hashes
             _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;
+            bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
+            if (verified)
+            {
+                _targets[kind].Remove(hash);
+                foreach (var candidateKey in _matches.Keys
+                    .Where(item => item.Kind == kind && item.Hash == hash).ToList())
+                    _matches.Remove(candidateKey);
+            }
             var match = new InternalHashGuessMatch
             {
                 Hash = hash,
@@ -249,9 +266,9 @@ namespace AssetsManager.Services.Hashes
                 Kind = kind,
                 Strategy = strategy,
                 Source = source,
-                IsVerified = false,
+                IsVerified = verified,
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                Confidence = InternalHashConfidence.Candidate,
+                Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
                 Evidence = evidence,
                 EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
@@ -373,11 +390,11 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidence.OwningEntryString or
             InternalHashEvidence.OwningEntryPrefix or
             InternalHashEvidence.OwningFileString => InternalHashEvidenceOrigin.RuntimeCorrelation,
-            InternalHashEvidence.RstHashMatch => InternalHashEvidenceOrigin.ShippedData,
+            InternalHashEvidence.RstHashMatch or
+            InternalHashEvidence.GamePathExactMatch => InternalHashEvidenceOrigin.ShippedData,
             InternalHashEvidence.MetaSchemaWordset or
             InternalHashEvidence.MetaSchemaRelation or
             InternalHashEvidence.MetaSchemaUnique => InternalHashEvidenceOrigin.ExternalSchema,
-            InternalHashEvidence.GamePathStatisticalMatch => InternalHashEvidenceOrigin.StatisticalInference,
             InternalHashEvidence.SemanticReference => InternalHashEvidenceOrigin.StructuralInference,
             _ => InternalHashEvidenceOrigin.Unknown
         };

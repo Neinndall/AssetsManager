@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Hashing;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -481,7 +482,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void EnrichedGamePathGroupCreatesResearchCandidatesWithoutPromotion()
+        public void GamePathCatalogPathsVerifyDirectlyAsBinEntries()
         {
             string[] paths =
             {
@@ -500,15 +501,15 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Equal(3, matcher.Matches.Count);
             Assert.All(matcher.Matches, match =>
             {
-                Assert.False(match.CanPromote);
-                Assert.Equal(InternalHashEvidence.GamePathStatisticalMatch, match.Evidence);
-                Assert.Equal(3, match.EvidenceOccurrences);
+                Assert.True(match.CanPromote);
+                Assert.Equal(InternalHashConfidence.Verified, match.Confidence);
+                Assert.Equal(InternalHashEvidence.GamePathExactMatch, match.Evidence);
             });
-            Assert.Equal(3, targets[InternalHashKind.BinEntries].Count);
+            Assert.Empty(targets[InternalHashKind.BinEntries]);
         }
 
         [Fact]
-        public void IsolatedGamePathCollisionIsNotReported()
+        public void IsolatedGamePathExactHitVerifiesSingleEntry()
         {
             const string path = "assets/test/single.dds";
             var targets = CreateTargets();
@@ -520,7 +521,92 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 matcher,
                 "hashes.game.txt");
 
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.True(match.CanPromote);
+            Assert.Equal(path, match.Value);
+            Assert.Empty(targets[InternalHashKind.BinEntries]);
+        }
+
+        [Fact]
+        public void GamePathParentDirectoriesResolveEntryAndHashTargets()
+        {
+            const string path = "data/characters/x/skins/skin00/body.dds";
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower("data/characters/x/skins/skin00"));
+            targets[InternalHashKind.BinHashes].Add(Fnv1a.HashLower("data/characters/x/skins"));
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            GamePathCandidateSource.Discover(
+                new[] { $"0000000000000000 {path}" },
+                matcher,
+                "hashes.game.txt");
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == "data/characters/x/skins/skin00");
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinHashes && match.Value == "data/characters/x/skins");
+            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+        }
+
+        [Fact]
+        public void GamePathCatalogPathResolvesFullRstXxh64Target()
+        {
+            const string path = "data/characters/x/skin00/body.dds";
+            ulong full = XxHash64.HashToUInt64(Encoding.UTF8.GetBytes(path));
+            var targets = CreateTargets();
+            targets[InternalHashKind.RstXxh64].Add(full);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            GamePathCandidateSource.Discover(
+                new[] { $"0000000000000000 {path}" },
+                matcher,
+                "hashes.game.txt");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.RstXxh64, match.Kind);
+            Assert.Equal(64, match.HashBits);
+            Assert.True(match.CanPromote);
+            Assert.Equal(path, match.Value);
+            Assert.Empty(targets[InternalHashKind.RstXxh64]);
+        }
+
+        [Fact]
+        public void GamePathSkinVariantsDoNotResolveTruncatedRstTargets()
+        {
+            const string path = "data/characters/aatrox/skins/skin03/aatrox_skin03.skn";
+            string variant = "data/characters/aatrox/skins/skin17/aatrox_skin17.skn";
+            ulong truncated = XxHash3.HashToUInt64(Encoding.UTF8.GetBytes(variant)) & 0x3FFFFFFFFFUL;
+            var targets = CreateTargets();
+            targets[InternalHashKind.RstXxh3].Add(truncated);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            GamePathCandidateSource.Discover(
+                new[] { $"0000000000000000 {path}" },
+                matcher,
+                "hashes.game.txt");
+
             Assert.Empty(matcher.Matches);
+            Assert.Contains(truncated, targets[InternalHashKind.RstXxh3]);
+        }
+        {
+            const string path = "data/characters/aatrox/skins/skin03/aatrox_skin03.skn";
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower("data/characters/aatrox/skins/skin17/aatrox_skin17.skn"));
+            targets[InternalHashKind.BinHashes].Add(Fnv1a.HashLower("data/characters/aatrox/skins/skin17/aatrox_skin17"));
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            GamePathCandidateSource.Discover(
+                new[] { $"0000000000000000 {path}" },
+                matcher,
+                "hashes.game.txt");
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinEntries && match.Value == "data/characters/aatrox/skins/skin17/aatrox_skin17.skn");
+            Assert.Contains(matcher.Matches, match =>
+                match.Kind == InternalHashKind.BinHashes && match.Value == "data/characters/aatrox/skins/skin17/aatrox_skin17");
+            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
         }
 
         [Fact]
@@ -568,7 +654,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void SchemaCandidateDoesNotResolveTarget()
+        public void SchemaCandidateResolvesTargetAsVerifiedType()
         {
             const string candidate = "VfxGeComponentDef";
             uint hash = Fnv1a.HashLower(candidate);
@@ -583,13 +669,13 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 "test schema"));
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.False(match.CanPromote);
-            Assert.Equal(InternalHashConfidence.Candidate, match.Confidence);
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            Assert.True(match.CanPromote);
+            Assert.Equal(InternalHashConfidence.Verified, match.Confidence);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
         [Fact]
-        public void UniqueMetaSchemaCandidateRemainsResearchEvidence()
+        public void UniqueMetaSchemaCandidateVerifiesAsTypeName()
         {
             const string candidate = "VfxGeComponentDef";
             uint hash = Fnv1a.HashLower(candidate);
@@ -603,14 +689,14 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 "Meta Schema class names");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.False(match.CanPromote);
+            Assert.True(match.CanPromote);
             Assert.Equal(InternalHashEvidence.MetaSchemaWordset, match.Evidence);
             Assert.Equal(InternalHashEvidenceOrigin.ExternalSchema, match.EvidenceOrigin);
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
         [Fact]
-        public void CollidingMetaSchemaNamesRemainSeparateResearchCandidates()
+        public void CollidingMetaSchemaNamesYieldSingleVerifiedMatch()
         {
             const string first = "yafhet0d6pup";
             const string second = "aye79o8723jl";
@@ -630,13 +716,14 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 InternalHashGuessStrategy.CrossDictionary,
                 "Meta Schema class names");
 
-            Assert.Equal(2, matcher.Matches.Count);
-            Assert.All(matcher.Matches, match => Assert.False(match.CanPromote));
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.True(match.CanPromote);
+            Assert.Equal(first, match.Value);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
         [Fact]
-        public void GeneratedSchemaCandidateCannotUseMetaPromotion()
+        public void GeneratedSchemaCandidateVerifiesAsExactNameMatch()
         {
             const string candidate = "VfxGeComponentDef42";
             uint hash = Fnv1a.HashLower(candidate);
@@ -650,12 +737,13 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 "Advanced Structural Generation");
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.False(match.CanPromote);
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
+            Assert.True(match.CanPromote);
+            Assert.Equal(InternalHashEvidence.MetaSchemaWordset, match.Evidence);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
         [Fact]
-        public void MetaSchemaNameCannotPromoteAcrossHashDomains()
+        public void MetaSchemaNameVerifiesInMatchingHashDomain()
         {
             const string candidate = "VfxGeComponentDef";
             uint hash = Fnv1a.HashLower(candidate);
@@ -668,8 +756,8 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 InternalHashGuessStrategy.CrossDictionary,
                 "Meta Schema class names");
 
-            Assert.False(Assert.Single(matcher.Matches).CanPromote);
-            Assert.Contains(hash, targets[InternalHashKind.BinFields]);
+            Assert.True(Assert.Single(matcher.Matches).CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinFields]);
         }
 
         [Fact]

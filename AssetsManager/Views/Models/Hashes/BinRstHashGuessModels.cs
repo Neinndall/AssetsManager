@@ -36,13 +36,13 @@ namespace AssetsManager.Views.Models.Hashes
         ObservedHashPair,
         SemanticReference,
         OwningEntryPrefix,
-        GamePathStatisticalMatch,
         MetaSchemaWordset,
         MetaSchemaRelation,
         RstHashMatch,
         MetaSchemaUnique,
         OwningEntryString,
-        OwningFileString
+        OwningFileString,
+        GamePathExactMatch
     }
 
     public enum InternalHashEvidenceOrigin
@@ -85,7 +85,11 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.OwningEntryString or
                 InternalHashEvidence.OwningEntryPrefix or
                 InternalHashEvidence.OwningFileString or
-                InternalHashEvidence.RstHashMatch;
+                InternalHashEvidence.RstHashMatch or
+                InternalHashEvidence.GamePathExactMatch or
+                InternalHashEvidence.MetaSchemaWordset or
+                InternalHashEvidence.MetaSchemaRelation or
+                InternalHashEvidence.MetaSchemaUnique;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");
