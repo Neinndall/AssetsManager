@@ -102,6 +102,7 @@ Improvements
   - BIN/RST Hash Lab / Meta Schema unknown class and property hashes are no longer injected into the BIN inventory as guessing targets.
   - BIN/RST Hash Lab / Game path catalog matches now verify directly as BIN entries and hashes instead of statistical research candidates, covering exact paths, extension-stripped paths, parent directories and skin/set sibling enumeration (skin00-49, set01-29, 5M variant budget); exact catalog strings also resolve full XXH64 RST targets while synthetic variants skip truncated 38-bit RST checks to avoid prefix false positives.
   - BIN/RST Hash Lab / Meta Schema wordset, relation and unique exact name matches now verify directly as BIN field and type names instead of research candidates.
+  - BIN/RST Hash Lab / Unpaired structural string references (species links, view controller lists and spell data names without an observed hash pair) now verify directly as BIN entries and hashes (SemanticReference) using the same collision guard that reports conflicting FNV1a forms in internal.collisions.json.
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
   - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.

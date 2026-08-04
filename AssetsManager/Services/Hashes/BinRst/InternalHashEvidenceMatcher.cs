@@ -127,7 +127,8 @@ namespace AssetsManager.Services.Hashes
                     source,
                     InternalHashEvidence.SemanticReference,
                     sourceWad: sourceWad,
-                    countCheck: false);
+                    countCheck: false,
+                    verified: true);
             }
 
             int before = _matches.Count;

@@ -107,7 +107,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void UnpairedContextualStringRemainsResearchCandidate()
+        public void UnpairedContextualStringVerifiesAsSemanticReference()
         {
             const string candidate = "Characters/Test/LinkedEntry";
             uint hash = Fnv1a.HashLower(candidate);
@@ -123,9 +123,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.True(found);
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(InternalHashEvidence.SemanticReference, match.Evidence);
-            Assert.False(match.IsVerified);
-            Assert.False(match.CanPromote);
-            Assert.Contains(hash, targets[InternalHashKind.BinEntries]);
+            Assert.True(match.IsVerified);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinEntries]);
         }
 
         [Fact]

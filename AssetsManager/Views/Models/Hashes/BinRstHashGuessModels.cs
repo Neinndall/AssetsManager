@@ -88,7 +88,8 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.GamePathExactMatch or
                 InternalHashEvidence.MetaSchemaWordset or
                 InternalHashEvidence.MetaSchemaRelation or
-                InternalHashEvidence.MetaSchemaUnique;
+                InternalHashEvidence.MetaSchemaUnique or
+                InternalHashEvidence.SemanticReference;
         public string HashText => Kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64
             ? Hash.ToString("x16")
             : ((uint)Hash).ToString("x8");
