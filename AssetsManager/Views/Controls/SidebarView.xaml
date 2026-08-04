@@ -108,6 +108,17 @@
                         <TextBlock Grid.Column="1" Text="Monitor" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
                     </Grid>
                 </RadioButton>
+
+                <RadioButton x:Name="NewsButton" Style="{StaticResource ModernSidebarNavigationStyle}" Click="MenuButton_Click" Tag="News" GroupName="SidebarNavigation">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="64"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <materialIcons:MaterialIcon Grid.Column="0" Kind="NewspaperVariantOutline" Width="20" Height="20" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="News" FontWeight="Normal" FontSize="12" VerticalAlignment="Center" Margin="0,0,16,0" Style="{StaticResource SidebarMenuTextStyle}"/>
+                    </Grid>
+                </RadioButton>
             </StackPanel>
 
             <!-- Bottom System Links -->

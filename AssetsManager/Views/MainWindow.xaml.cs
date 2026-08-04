@@ -430,6 +430,7 @@ namespace AssetsManager.Views
                 case "Viewer": LoadViewerWindow(); break;
                 case "Monitor": LoadMonitorWindow(); break;
                 case "HashLab": LoadHashGuessingWindow(); break;
+                case "News": LoadNewsWindow(); break;
                 case "Settings": btnSettings_Click(null, null); break;
                 case "Help": btnHelp_Click(null, null); break;
             }
@@ -458,6 +459,7 @@ namespace AssetsManager.Views
         private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
         private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
         private void LoadHashGuessingWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<HashGuessingWindow>();
+        private void LoadNewsWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<NewsWindow>();
 
         private void btnHelp_Click(object sender, RoutedEventArgs e)
         {

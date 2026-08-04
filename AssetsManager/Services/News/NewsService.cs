@@ -1,0 +1,278 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using AssetsManager.Services.Core;
+using AssetsManager.Views.Models.News;
+
+namespace AssetsManager.Services.News
+{
+    public class NewsService
+    {
+        private const string NewsApiBaseUrl = "https://soraclee.github.io/riotgames-news-api/data/lol/";
+        private const string BrowserUserAgent =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(15);
+
+        private readonly HttpClient _httpClient;
+        private readonly LogService _logService;
+        private readonly object _cacheSyncRoot = new();
+        private readonly Dictionary<NewsCategory, CacheEntry> _cache = new();
+
+        public NewsService(HttpClient httpClient, LogService logService)
+        {
+            _httpClient = httpClient;
+            _logService = logService;
+        }
+
+        public async Task<IReadOnlyList<NewsItemModel>> GetNewsAsync(NewsCategory category, bool forceRefresh = false, CancellationToken cancellationToken = default)
+        {
+            lock (_cacheSyncRoot)
+            {
+                if (!forceRefresh && _cache.TryGetValue(category, out var cached) && !cached.IsExpired)
+                {
+                    return cached.Items;
+                }
+            }
+
+            var items = await FetchAsync(category, cancellationToken);
+
+            lock (_cacheSyncRoot)
+            {
+                _cache[category] = new CacheEntry(items);
+            }
+            return items;
+        }
+
+        private async Task<List<NewsItemModel>> FetchAsync(NewsCategory category, CancellationToken cancellationToken)
+        {
+            string url = NewsApiBaseUrl + GetEndpoint(category);
+            var items = new List<NewsItemModel>();
+            try
+            {
+                using var response = await _httpClient.GetAsync(url, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+                if (doc.RootElement.ValueKind != JsonValueKind.Array) return items;
+
+                foreach (var element in doc.RootElement.EnumerateArray())
+                {
+                    var item = NewsItemModel.FromJson(element);
+                    if (item != null) items.Add(item);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logService.LogError(ex, $"Failed to fetch news feed for category: {category}");
+                throw;
+            }
+            return items;
+        }
+
+        public async Task<string> FetchArticleFullTextAsync(string articleUrl, CancellationToken cancellationToken = default)
+        {
+            var content = await FetchArticleFullContentAsync(articleUrl, cancellationToken);
+            return content?.Html ?? content?.PlainText ?? content?.Description;
+        }
+
+        public async Task<ArticleFullContent> FetchArticleFullContentAsync(string articleUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrEmpty(articleUrl)) return null;
+
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, articleUrl);
+                request.Headers.TryAddWithoutValidation("User-Agent", BrowserUserAgent);
+
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode) return null;
+
+                string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logService.LogDebug($"FetchArticleFullContentAsync: status={response.StatusCode}, len={html?.Length ?? 0} from {articleUrl}");
+
+                var content = ExtractNextDataArticleContent(html);
+                if (content != null)
+                {
+                    _logService.LogDebug($"FetchArticleFullContentAsync: __NEXT_DATA__ content extracted (html={content.Html?.Length ?? 0}).");
+                    return content;
+                }
+
+                // Fallback: server-rendered HTML extraction (plain text).
+                string fallback = ExtractArticleBodyFromHtml(html);
+                _logService.LogDebug($"FetchArticleFullContentAsync: fallback text extraction (len={fallback?.Length ?? 0}).");
+                return new ArticleFullContent { PlainText = fallback };
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logService.LogWarning($"Failed to fetch full article content from {articleUrl}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static ArticleFullContent ExtractNextDataArticleContent(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return null;
+
+            const string marker = "id=\"__NEXT_DATA__\"";
+            int markerIndex = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0) return null;
+
+            int jsonStart = html.IndexOf('>', markerIndex);
+            if (jsonStart < 0) return null;
+            jsonStart++;
+
+            int jsonEnd = html.IndexOf("</script>", jsonStart, StringComparison.OrdinalIgnoreCase);
+            if (jsonEnd < 0) return null;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(html.Substring(jsonStart, jsonEnd - jsonStart));
+                if (!doc.RootElement.TryGetProperty("props", out var props) ||
+                    !props.TryGetProperty("pageProps", out var pageProps) ||
+                    !pageProps.TryGetProperty("page", out var page) ||
+                    !page.TryGetProperty("blades", out var blades) ||
+                    blades.ValueKind != JsonValueKind.Array)
+                {
+                    return null;
+                }
+
+                var content = new ArticleFullContent();
+                var bodies = new List<string>();
+
+                foreach (var blade in blades.EnumerateArray())
+                {
+                    if (!blade.TryGetProperty("type", out var typeElement)) continue;
+                    string bladeType = typeElement.GetString() ?? string.Empty;
+
+                    if (string.Equals(bladeType, "articleMasthead", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (blade.TryGetProperty("banner", out var banner) && banner.TryGetProperty("url", out var bannerUrl))
+                        {
+                            content.BannerUrl = bannerUrl.GetString();
+                        }
+                        if (blade.TryGetProperty("title", out var title)) content.Title = title.GetString();
+                        if (blade.TryGetProperty("description", out var description) &&
+                            description.TryGetProperty("body", out var descriptionBody))
+                        {
+                            content.Description = descriptionBody.GetString();
+                        }
+                        if (blade.TryGetProperty("publishDate", out var publishDate) &&
+                            DateTime.TryParse(publishDate.GetString(), out var parsedDate))
+                        {
+                            content.PublishDate = parsedDate;
+                        }
+                        if (blade.TryGetProperty("category", out var category) &&
+                            category.TryGetProperty("title", out var categoryTitle))
+                        {
+                            content.CategoryTitle = categoryTitle.GetString();
+                        }
+                        if (blade.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array)
+                        {
+                            content.Tags = tags.EnumerateArray()
+                                .Where(t => t.TryGetProperty("title", out var tagTitle))
+                                .Select(t => t.GetProperty("title").GetString())
+                                .Where(t => !string.IsNullOrWhiteSpace(t))
+                                .ToList();
+                        }
+                        continue;
+                    }
+
+                    // Article body: any rich text blade (articleRichText, patchNotesRichText, ...).
+                    if (!bladeType.EndsWith("RichText", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!blade.TryGetProperty("richText", out var richText) ||
+                        !richText.TryGetProperty("body", out var body) ||
+                        body.ValueKind != JsonValueKind.String)
+                    {
+                        continue;
+                    }
+
+                    string bodyHtml = body.GetString();
+                    if (!string.IsNullOrWhiteSpace(bodyHtml)) bodies.Add(bodyHtml);
+                }
+
+                if (bodies.Count > 0) content.Html = string.Join("\n", bodies);
+                return content.Html != null || content.BannerUrl != null || content.Title != null ? content : null;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static string ExtractArticleBodyFromHtml(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html)) return null;
+
+            // Remove script, style, nav, footer, header, svg, iframe tags and their contents
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<(script|style|nav|footer|header|svg|iframe)\b[^>]*>.*?</\1>", "", System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Convert HTML formatting to text linebreaks
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"</?(h1|h2|h3|h4|h5|h6)\b[^>]*>", "\n\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"</?p\b[^>]*>", "\n\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<li\b[^>]*>", "\n\u2022 ", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<br\s*/?>", "\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<hr\s*/?>", "\n---\n", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Strip remaining HTML tags
+            html = System.Text.RegularExpressions.Regex.Replace(html, @"<[^>]+>", "", System.Text.RegularExpressions.RegexOptions.Singleline);
+            
+            // Decode HTML entities
+            html = System.Net.WebUtility.HtmlDecode(html);
+
+            // Filter out short JS strings/noise lines and keep real article sentences
+            var lines = html.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(line => line.Trim())
+                            .Where(line => line.Length > 15 && 
+                                           !line.StartsWith("window.", StringComparison.OrdinalIgnoreCase) &&
+                                           !line.StartsWith("function", StringComparison.OrdinalIgnoreCase) &&
+                                           !line.StartsWith("self.__next", StringComparison.OrdinalIgnoreCase) &&
+                                           !line.Contains("Cookie", StringComparison.OrdinalIgnoreCase) &&
+                                           !line.Contains("Privacy Notice", StringComparison.OrdinalIgnoreCase));
+
+            string result = string.Join("\n\n", lines);
+            return string.IsNullOrWhiteSpace(result) ? null : result;
+        }
+
+        private static string GetEndpoint(NewsCategory category) => category switch
+        {
+            NewsCategory.Dev => "devEn.json",
+            NewsCategory.Esports => "esportsEn.json",
+            NewsCategory.GameUpdates => "gameUpdatesEn.json",
+            NewsCategory.Lore => "loreEn.json",
+            NewsCategory.Media => "mediaEn.json",
+            NewsCategory.PatchNotes => "patchNoteEn.json",
+            _ => "allNewsEn.json"
+        };
+
+        private sealed class CacheEntry
+        {
+            public IReadOnlyList<NewsItemModel> Items { get; }
+            private readonly DateTime _fetchedAtUtc;
+
+            public CacheEntry(IReadOnlyList<NewsItemModel> items)
+            {
+                Items = items;
+                _fetchedAtUtc = DateTime.UtcNow;
+            }
+
+            public bool IsExpired => DateTime.UtcNow - _fetchedAtUtc > CacheLifetime;
+        }
+    }
+
+    public class ArticleFullContent
+    {
+        public string Html { get; set; }
+        public string PlainText { get; set; }
+        public string BannerUrl { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public DateTime? PublishDate { get; set; }
+        public string CategoryTitle { get; set; }
+        public List<string> Tags { get; set; }
+    }
+}

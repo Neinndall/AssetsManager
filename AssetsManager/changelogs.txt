@@ -27,6 +27,7 @@ New Features
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
   - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
   - Comparison Results now offer direct access to the output folder of any exported asset.
+  - Added a News section with categorized Riot news feeds, search filtering, and full article reading.
 
 Improvements
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.

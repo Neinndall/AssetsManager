@@ -27,6 +27,7 @@ using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Audio;
 using AssetsManager.Services.Parsers;
+using AssetsManager.Services.News;
 
 namespace AssetsManager
 {
@@ -150,6 +151,9 @@ namespace AssetsManager
       services.AddSingleton<RmanService>();
       services.AddSingleton<RmanApiService>();
 
+      // News Services
+      services.AddSingleton<NewsService>();
+
       // Hashes Services
       services.AddSingleton<HashResolverService>();
       services.AddSingleton<HashService>();
@@ -183,6 +187,7 @@ namespace AssetsManager
       services.AddTransient<ViewerWindow>();
       services.AddTransient<MonitorWindow>();
       services.AddTransient<HashGuessingWindow>();
+      services.AddTransient<NewsWindow>();
       services.AddTransient<HelpWindow>();
       services.AddTransient<SettingsWindow>();
             

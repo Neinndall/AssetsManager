@@ -3,6 +3,7 @@
     
     <!-- BRAND ACCENTS (More vibrant & professional) -->
     <SolidColorBrush x:Key="AccentBrush" Color="#FF5C85FF"/> <!-- Blue-ish Indigo -->
+    <Color x:Key="AccentBrushColor">#FF5C85FF</Color>
     <SolidColorBrush x:Key="ModernButtonHoverBrush" Color="#FF7094FF"/>
     <SolidColorBrush x:Key="ModernButtonPressedBrush" Color="#FF4A6EDF"/>
 

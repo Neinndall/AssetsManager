@@ -1,0 +1,101 @@
+<UserControl x:Class="AssetsManager.Views.Controls.News.NewsArticleReaderControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1000">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- 0: Back Toolbar -->
+            <RowDefinition Height="*"/>    <!-- 1: Article Content -->
+        </Grid.RowDefinitions>
+
+        <!-- 0. BACK TO NEWS ONLY -->
+        <Button Grid.Row="0" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Click="Back_Click" Padding="16,8">
+            <StackPanel Orientation="Horizontal">
+                <materialIcons:MaterialIcon Kind="ArrowLeft" Width="16" Height="16" Foreground="{StaticResource TextPrimary}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="BACK TO NEWS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+
+        <!-- 1. ARTICLE CONTENT -->
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- 0: Article Header (image/title/date) -->
+                <RowDefinition Height="*"/>    <!-- 1: Article Body -->
+            </Grid.RowDefinitions>
+
+            <!-- 0. ARTICLE HEADER -->
+            <StackPanel Grid.Row="0" x:Name="ArticleHeader" Margin="0,8,0,0">
+                <!-- Lead image (article banner, or thumbnail for videos) -->
+                <Border x:Name="BannerPanel" Height="240" CornerRadius="12" ClipToBounds="True" Background="{StaticResource SidebarBackground}"
+                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                        Visibility="Collapsed" Margin="0,0,0,28">
+                    <Grid>
+                        <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Image x:Name="BannerImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+
+                <!-- Title -->
+                <TextBlock x:Name="ArticleTitleText" TextWrapping="Wrap" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" LineHeight="34" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,10"/>
+
+                <!-- Meta row: category chip + date -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <Border x:Name="ArticleCategoryChip" Padding="9,4" CornerRadius="6" BorderThickness="1" VerticalAlignment="Center" Visibility="Collapsed">
+                        <Border.Background>
+                            <SolidColorBrush Color="{StaticResource AccentBrushColor}" Opacity="0.15"/>
+                        </Border.Background>
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="{StaticResource AccentBrushColor}" Opacity="0.9"/>
+                        </Border.BorderBrush>
+                        <TextBlock x:Name="ArticleCategoryText" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock x:Name="ArticleDateText" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 1. ARTICLE BODY -->
+            <Grid Grid.Row="1">
+                <!-- VIDEO ARTICLE PANEL (description + watch on YouTube) -->
+                <ScrollViewer x:Name="VideoPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                    <StackPanel Margin="0,12,0,0">
+                        <TextBlock x:Name="VideoDescriptionText" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="22" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,20"/>
+                        <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Click="WatchVideo_Click" Padding="18,10">
+                            <StackPanel Orientation="Horizontal">
+                                <materialIcons:MaterialIcon Kind="Youtube" Width="16" Height="16" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBlock Text="WATCH ON YOUTUBE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Plain-text body (articles without rich HTML, e.g. external sites) -->
+                <ScrollViewer x:Name="PlainTextPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="2" Margin="0,12,0,0" Visibility="Collapsed">
+                    <TextBlock Text="{Binding DataContext.FullArticleText, RelativeSource={RelativeSource AncestorType=UserControl}}" FontSize="13" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="22" LineStackingStrategy="BlockLineHeight"/>
+                </ScrollViewer>
+
+                <!-- Rich HTML article body rendered as native WPF content -->
+                <FlowDocumentScrollViewer x:Name="ArticleDocumentViewer" Visibility="Collapsed" Margin="0,12,0,0"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto"
+                                          IsToolBarVisible="False"
+                                          IsSelectionEnabled="True"
+                                          Zoom="1"/>
+
+                <!-- Loading overlay -->
+                <StackPanel x:Name="LoadingOverlay" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <materialIcons:MaterialIcon Kind="Loading" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="LOADING ARTICLE..." FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
