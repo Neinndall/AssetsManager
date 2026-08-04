@@ -36,6 +36,7 @@ namespace AssetsManager.Views.Models.Hashes
         ObservedHashPair,
         SemanticReference,
         OwningEntryPrefix,
+        GamePathStatisticalMatch,
         MetaSchemaWordset,
         MetaSchemaRelation,
         RstHashMatch,
