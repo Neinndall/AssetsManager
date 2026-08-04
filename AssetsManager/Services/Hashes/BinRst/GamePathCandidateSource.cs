@@ -80,15 +80,11 @@ namespace AssetsManager.Services.Hashes
                 // Known paths are real string-table strings; resolve RST targets too.
                 // Synthetic variants keep only full 64-bit XXH64 checks (a 38-bit
                 // prefix match cannot prove a derived string).
-                if (matcher.GetRemaining(InternalHashKind.RstXxh3).Count > 0 ||
-                    matcher.GetRemaining(InternalHashKind.RstXxh64).Count > 0)
-                {
-                    matcher.Check(
-                        value,
-                        InternalHashGuessStrategy.GamePath,
-                        source,
-                        includeTruncatedRst: includeTruncatedRst);
-                }
+                matcher.Check(
+                    value,
+                    InternalHashGuessStrategy.GamePath,
+                    source,
+                    includeTruncatedRst: includeTruncatedRst);
             }
 
             // Sibling skin/set enumeration: every variant is an exact FNV1a hit on a

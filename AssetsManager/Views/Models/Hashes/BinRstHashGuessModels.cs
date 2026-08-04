@@ -72,8 +72,6 @@ namespace AssetsManager.Views.Models.Hashes
         public InternalHashConfidence Confidence { get; init; }
         public InternalHashEvidence Evidence { get; init; }
         public InternalHashEvidenceOrigin EvidenceOrigin { get; init; }
-        public int EvidenceOccurrences { get; init; }
-        public double ExpectedRandomMatches { get; init; }
         public DateTime FoundAtUtc { get; init; } = DateTime.UtcNow;
         public bool CanPromote =>
             IsVerified &&

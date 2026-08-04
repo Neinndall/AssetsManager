@@ -63,8 +63,7 @@ namespace AssetsManager.Services.Hashes
             uint fnv = Fnv1a.HashLower(candidate);
             bool content = strategy is InternalHashGuessStrategy.BinContent or InternalHashGuessStrategy.TextContent;
             bool crossDictionary = strategy == InternalHashGuessStrategy.CrossDictionary;
-            bool gamePath = strategy == InternalHashGuessStrategy.GamePath;
-            if (content || crossDictionary || gamePath)
+            if (content || crossDictionary)
             {
                 bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                 if (!isAssetPath)
@@ -151,8 +150,6 @@ namespace AssetsManager.Services.Hashes
             InternalHashGuessStrategy strategy,
             string source,
             InternalHashEvidence evidence,
-            int occurrences = 1,
-            double expectedRandomMatches = 0,
             string sourceWad = null,
             bool countCheck = true,
             bool verified = false)
@@ -199,9 +196,7 @@ namespace AssetsManager.Services.Hashes
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
                 Evidence = evidence,
-                EvidenceOrigin = GetEvidenceOrigin(evidence),
-                EvidenceOccurrences = occurrences,
-                ExpectedRandomMatches = expectedRandomMatches
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
             _pendingMatches.Add(match);
@@ -334,8 +329,7 @@ namespace AssetsManager.Services.Hashes
                 VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
                 Confidence = verified ? InternalHashConfidence.Verified : InternalHashConfidence.Candidate,
                 Evidence = evidence,
-                EvidenceOrigin = GetEvidenceOrigin(evidence),
-                EvidenceOccurrences = 1
+                EvidenceOrigin = GetEvidenceOrigin(evidence)
             };
             _matches[key] = match;
             _pendingMatches.Add(match);
