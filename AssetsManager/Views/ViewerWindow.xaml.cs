@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.MapGeometry;
@@ -25,30 +24,37 @@ namespace AssetsManager.Views
         private bool _isCleanedUp;
         private double _lastExplorerHeight = 220;
 
-        public ViewerWindow(IServiceProvider serviceProvider)
+        public ViewerWindow(
+            LogService logService,
+            TaskCancellationManager taskCancellationManager,
+            AppSettings appSettings,
+            SknLoadingService sknLoadingService,
+            MapGeometryLoadingService mapGeometryLoadingService,
+            ChromaScannerService chromaScannerService,
+            CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
  
             _viewModel = new ViewerWindowModel();
             DataContext = _viewModel;
  
-            _logService = serviceProvider.GetRequiredService<LogService>();
-            _taskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
+            _logService = logService;
+            _taskCancellationManager = taskCancellationManager;
  
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
-            ViewportControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
+            ViewportControl.AppSettings = appSettings;
  
-            PanelControl.SknLoadingService = serviceProvider.GetRequiredService<SknLoadingService>();
-            PanelControl.MapGeometryLoadingService = serviceProvider.GetRequiredService<MapGeometryLoadingService>();
-            PanelControl.ChromaScannerService = serviceProvider.GetRequiredService<ChromaScannerService>();
+            PanelControl.SknLoadingService = sknLoadingService;
+            PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
+            PanelControl.ChromaScannerService = chromaScannerService;
             PanelControl.LogService = _logService;
-            PanelControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
+            PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
             PanelControl.ProjectExplorer = ProjectExplorer;
  
-            ChromaSelectionOverlay.ScannerService = serviceProvider.GetRequiredService<ChromaScannerService>();
+            ChromaSelectionOverlay.ScannerService = chromaScannerService;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;

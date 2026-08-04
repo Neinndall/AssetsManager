@@ -14,15 +14,15 @@ namespace AssetsManager.Views
         private readonly HomeModel _model;
         private readonly IServiceProvider _serviceProvider;
 
-        public HomeWindow(IServiceProvider serviceProvider)
+        public HomeWindow(
+            IServiceProvider serviceProvider,
+            AppSettings appSettings,
+            DirectoriesCreator directoriesCreator)
         {
             InitializeComponent();
             
             _serviceProvider = serviceProvider;
-            _model = new HomeModel(
-                serviceProvider.GetRequiredService<AppSettings>(), 
-                serviceProvider.GetRequiredService<DirectoriesCreator>()
-            );
+            _model = new HomeModel(appSettings, directoriesCreator);
             DataContext = _model;
             
             Unloaded += HomeWindow_Unloaded;

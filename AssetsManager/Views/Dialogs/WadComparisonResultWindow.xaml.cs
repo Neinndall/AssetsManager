@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
@@ -28,7 +27,6 @@ namespace AssetsManager.Views.Dialogs
     public partial class WadComparisonResultWindow : HudWindow
     {
         private List<SerializableChunkDiff> _serializableDiffs;
-        private readonly IServiceProvider _serviceProvider;
         private readonly CustomMessageBoxService _customMessageBoxService;
         private readonly AssetDownloader _assetDownloaderService;
         private readonly LogService _logService;
@@ -52,25 +50,36 @@ namespace AssetsManager.Views.Dialogs
 
         private readonly WadComparisonResultModel _viewModel;
 
-        public WadComparisonResultWindow(IServiceProvider serviceProvider)
+        public WadComparisonResultWindow(
+            CustomMessageBoxService customMessageBoxService,
+            AssetDownloader assetDownloaderService,
+            LogService logService,
+            ComparisonHistoryService comparisonHistoryService,
+            DiffViewService diffViewService,
+            HashResolverService hashResolverService,
+            AppSettings appSettings,
+            WadContentProvider wadContentProvider,
+            VersionService versionService,
+            BackupManager backupManager,
+            ExtractionService extractionService,
+            DirectoriesCreator directoriesCreator)
         {
             InitializeComponent();
             _viewModel = new WadComparisonResultModel();
             DataContext = _viewModel;
 
-            _serviceProvider = serviceProvider;
-            _customMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
-            _assetDownloaderService = serviceProvider.GetRequiredService<AssetDownloader>();
-            _logService = serviceProvider.GetRequiredService<LogService>();
-            _comparisonHistoryService = serviceProvider.GetRequiredService<ComparisonHistoryService>();
-            _diffViewService = serviceProvider.GetRequiredService<DiffViewService>();
-            _hashResolverService = serviceProvider.GetRequiredService<HashResolverService>();
-            _appSettings = serviceProvider.GetRequiredService<AppSettings>();
-            _wadContentProvider = serviceProvider.GetRequiredService<WadContentProvider>();
-            _versionService = serviceProvider.GetRequiredService<VersionService>();
-            _backupManager = serviceProvider.GetRequiredService<BackupManager>();
-            _extractionService = serviceProvider.GetRequiredService<ExtractionService>();
-            _directoriesCreator = serviceProvider.GetRequiredService<DirectoriesCreator>();
+            _customMessageBoxService = customMessageBoxService;
+            _assetDownloaderService = assetDownloaderService;
+            _logService = logService;
+            _comparisonHistoryService = comparisonHistoryService;
+            _diffViewService = diffViewService;
+            _hashResolverService = hashResolverService;
+            _appSettings = appSettings;
+            _wadContentProvider = wadContentProvider;
+            _versionService = versionService;
+            _backupManager = backupManager;
+            _extractionService = extractionService;
+            _directoriesCreator = directoriesCreator;
 
             // Peer Injection
             ResultsTree.ParentWindow = this;

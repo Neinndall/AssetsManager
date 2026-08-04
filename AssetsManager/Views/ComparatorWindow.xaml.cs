@@ -4,7 +4,6 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Utils;
 using System.Windows.Controls;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Models.Comparator;
 
 namespace AssetsManager.Views
@@ -13,7 +12,14 @@ namespace AssetsManager.Views
     {
         private readonly WadComparisonModel _viewModel;
 
-        public ComparatorWindow(IServiceProvider serviceProvider)
+        public ComparatorWindow(
+            CustomMessageBoxService customMessageBoxService,
+            WadComparatorService wadComparatorService,
+            LogService logService,
+            AppSettings appSettings,
+            TaskCancellationManager taskCancellationManager,
+            BackupManager backupManager,
+            VersionService versionService)
         {
             InitializeComponent();
 
@@ -21,13 +27,13 @@ namespace AssetsManager.Views
             WadComparisonControl.DataContext = _viewModel;
 
             // Set services for WadComparisonControl
-            WadComparisonControl.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
-            WadComparisonControl.WadComparatorService = serviceProvider.GetRequiredService<WadComparatorService>();
-            WadComparisonControl.LogService = serviceProvider.GetRequiredService<LogService>();
-            WadComparisonControl.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
-            WadComparisonControl.TaskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
-            WadComparisonControl.BackupManager = serviceProvider.GetRequiredService<BackupManager>();
-            WadComparisonControl.VersionService = serviceProvider.GetRequiredService<VersionService>();
+            WadComparisonControl.CustomMessageBoxService = customMessageBoxService;
+            WadComparisonControl.WadComparatorService = wadComparatorService;
+            WadComparisonControl.LogService = logService;
+            WadComparisonControl.AppSettings = appSettings;
+            WadComparisonControl.TaskCancellationManager = taskCancellationManager;
+            WadComparisonControl.BackupManager = backupManager;
+            WadComparisonControl.VersionService = versionService;
         }
     }
 }

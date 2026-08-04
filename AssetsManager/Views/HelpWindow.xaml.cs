@@ -1,6 +1,5 @@
 using System;
 using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Views.Help;
 using AssetsManager.Views.Helpers;
 
@@ -8,16 +7,29 @@ namespace AssetsManager.Views
 {
     public partial class HelpWindow : HudWindow
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly AboutView _aboutView;
+        private readonly DocumentationView _documentationView;
+        private readonly ChangelogsView _changelogsView;
+        private readonly BugReportsView _bugReportsView;
+        private readonly UpdatesView _updatesView;
 
-        public HelpWindow(IServiceProvider serviceProvider)
+        public HelpWindow(
+            AboutView aboutView,
+            DocumentationView documentationView,
+            ChangelogsView changelogsView,
+            BugReportsView bugReportsView,
+            UpdatesView updatesView)
         {
             InitializeComponent();
-            _serviceProvider = serviceProvider;
+            _aboutView = aboutView;
+            _documentationView = documentationView;
+            _changelogsView = changelogsView;
+            _bugReportsView = bugReportsView;
+            _updatesView = updatesView;
 
             SetupNavigation();
             // Load initial view
-            NavigateToView(_serviceProvider.GetRequiredService<AboutView>());
+            NavigateToView(_aboutView);
             Closed += HelpWindow_Closed;
         }
 
@@ -30,11 +42,11 @@ namespace AssetsManager.Views
             NavUpdates.Checked += NavUpdates_Checked;
         }
 
-        private void NavAbout_Checked(object sender, RoutedEventArgs e) => NavigateToView(_serviceProvider.GetRequiredService<AboutView>());
-        private void NavDocumentation_Checked(object sender, RoutedEventArgs e) => NavigateToView(_serviceProvider.GetRequiredService<DocumentationView>());
-        private void NavChangelogs_Checked(object sender, RoutedEventArgs e) => NavigateToView(_serviceProvider.GetRequiredService<ChangelogsView>());
-        private void NavBugsReport_Checked(object sender, RoutedEventArgs e) => NavigateToView(_serviceProvider.GetRequiredService<BugReportsView>());
-        private void NavUpdates_Checked(object sender, RoutedEventArgs e) => NavigateToView(_serviceProvider.GetRequiredService<UpdatesView>());
+        private void NavAbout_Checked(object sender, RoutedEventArgs e) => NavigateToView(_aboutView);
+        private void NavDocumentation_Checked(object sender, RoutedEventArgs e) => NavigateToView(_documentationView);
+        private void NavChangelogs_Checked(object sender, RoutedEventArgs e) => NavigateToView(_changelogsView);
+        private void NavBugsReport_Checked(object sender, RoutedEventArgs e) => NavigateToView(_bugReportsView);
+        private void NavUpdates_Checked(object sender, RoutedEventArgs e) => NavigateToView(_updatesView);
 
         private void NavigateToView(object view)
         {

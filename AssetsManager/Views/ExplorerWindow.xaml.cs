@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Explorer;
@@ -20,37 +19,60 @@ namespace AssetsManager.Views
 {
     public partial class ExplorerWindow : UserControl
     {
-        public ExplorerWindow(IServiceProvider serviceProvider)
+        public ExplorerWindow(
+            LogService logService,
+            CustomMessageBoxService customMessageBoxService,
+            WadContentProvider wadContentProvider,
+            WadNodeLoaderService wadNodeLoaderService,
+            WadSearchBoxService wadSearchBoxService,
+            DiffViewService diffViewService,
+            DirectoriesCreator directoriesCreator,
+            AppSettings appSettings,
+            TreeBuilderService treeBuilderService,
+            TreeUIManager treeUIManager,
+            AudioBankService audioBankService,
+            AudioBankLinkerService audioBankLinkerService,
+            HashResolverService hashResolverService,
+            VersionService versionService,
+            TaskCancellationManager taskCancellationManager,
+            FavoritesManager favoritesManager,
+            ImageMergerService imageMergerService,
+            MonitorService monitorService,
+            BackupManager backupManager,
+            AssetWatcherService assetWatcherService,
+            ProgressUIManager progressUIManager,
+            ExtractionService extractionService,
+            ExplorerPreviewService explorerPreviewService)
         {
             InitializeComponent();
-            FileExplorer.LogService = serviceProvider.GetRequiredService<LogService>();
-            FileExplorer.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
-            FileExplorer.WadContentProvider = serviceProvider.GetRequiredService<WadContentProvider>();
-            FileExplorer.WadNodeLoaderService = serviceProvider.GetRequiredService<WadNodeLoaderService>();
-            FileExplorer.WadSearchBoxService = serviceProvider.GetRequiredService<WadSearchBoxService>();
-            FileExplorer.DiffViewService = serviceProvider.GetRequiredService<DiffViewService>();
-            FileExplorer.DirectoriesCreator = serviceProvider.GetRequiredService<DirectoriesCreator>();
-            FileExplorer.AppSettings = serviceProvider.GetRequiredService<AppSettings>();
-            FileExplorer.TreeBuilderService = serviceProvider.GetRequiredService<TreeBuilderService>();
-            FileExplorer.TreeUIManager = serviceProvider.GetRequiredService<TreeUIManager>();
-            FileExplorer.AudioBankService = serviceProvider.GetRequiredService<AudioBankService>();
-            FileExplorer.AudioBankLinkerService = serviceProvider.GetRequiredService<AudioBankLinkerService>();
-            FileExplorer.HashResolverService = serviceProvider.GetRequiredService<HashResolverService>();
-            FileExplorer.VersionService = serviceProvider.GetRequiredService<VersionService>();
-            FileExplorer.TaskCancellationManager = serviceProvider.GetRequiredService<TaskCancellationManager>();
-            FileExplorer.FavoritesManager = serviceProvider.GetRequiredService<FavoritesManager>();
-            FileExplorer.ImageMergerService = serviceProvider.GetRequiredService<ImageMergerService>();
-            FileExplorer.MonitorService = serviceProvider.GetRequiredService<MonitorService>();
-            FileExplorer.BackupManager = serviceProvider.GetRequiredService<BackupManager>();
-            FileExplorer.AssetWatcherService = serviceProvider.GetRequiredService<AssetWatcherService>();
-            FileExplorer.ProgressUIManager = serviceProvider.GetRequiredService<ProgressUIManager>();
-            FileExplorer.ExtractionService = serviceProvider.GetRequiredService<ExtractionService>();
+            FileExplorer.LogService = logService;
+            FileExplorer.CustomMessageBoxService = customMessageBoxService;
+            FileExplorer.WadContentProvider = wadContentProvider;
+            FileExplorer.WadNodeLoaderService = wadNodeLoaderService;
+            FileExplorer.WadSearchBoxService = wadSearchBoxService;
+            FileExplorer.DiffViewService = diffViewService;
+            FileExplorer.DirectoriesCreator = directoriesCreator;
+            FileExplorer.AppSettings = appSettings;
+            FileExplorer.TreeBuilderService = treeBuilderService;
+            FileExplorer.TreeUIManager = treeUIManager;
+            FileExplorer.AudioBankService = audioBankService;
+            FileExplorer.AudioBankLinkerService = audioBankLinkerService;
+            FileExplorer.HashResolverService = hashResolverService;
+            FileExplorer.VersionService = versionService;
+            FileExplorer.TaskCancellationManager = taskCancellationManager;
+            FileExplorer.FavoritesManager = favoritesManager;
+            FileExplorer.ImageMergerService = imageMergerService;
+            FileExplorer.MonitorService = monitorService;
+            FileExplorer.BackupManager = backupManager;
+            FileExplorer.AssetWatcherService = assetWatcherService;
+            FileExplorer.ProgressUIManager = progressUIManager;
+            FileExplorer.ExtractionService = extractionService;
  
-            FilePreviewer.LogService = serviceProvider.GetRequiredService<LogService>();
-            FilePreviewer.CustomMessageBoxService = serviceProvider.GetRequiredService<CustomMessageBoxService>();
-            FilePreviewer.DirectoriesCreator = serviceProvider.GetRequiredService<DirectoriesCreator>();
-            FilePreviewer.ExplorerPreviewService = serviceProvider.GetRequiredService<ExplorerPreviewService>();
-            FilePreviewer.TreeUIManager = serviceProvider.GetRequiredService<TreeUIManager>();
+            FilePreviewer.LogService = logService;
+            FilePreviewer.CustomMessageBoxService = customMessageBoxService;
+            FilePreviewer.DirectoriesCreator = directoriesCreator;
+            FilePreviewer.ExplorerPreviewService = explorerPreviewService;
+            FilePreviewer.TreeUIManager = treeUIManager;
  
             FileExplorer.FilePreviewer = FilePreviewer;
             FilePreviewer.FileExplorer = FileExplorer;
