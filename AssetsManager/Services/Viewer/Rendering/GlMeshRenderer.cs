@@ -362,44 +362,44 @@ namespace AssetsManager.Services.Viewer.Rendering
         }
 
         private const string MeshVert = @"
-layout(location=0) in vec3 aPos;
-layout(location=1) in vec3 aNormal;
-layout(location=2) in vec2 aUv;
-uniform mat4 uViewProj;
-uniform mat4 uWorld;
-out vec3 vNormal;
-out vec2 vUv;
-void main(){
-    vec4 worldPos = uWorld * vec4(aPos, 1.0);
-    gl_Position = uViewProj * worldPos;
-    vNormal = normalize(mat3(uWorld) * aNormal);
-    vUv = aUv;
-}";
+					layout(location=0) in vec3 aPos;
+					layout(location=1) in vec3 aNormal;
+					layout(location=2) in vec2 aUv;
+					uniform mat4 uViewProj;
+					uniform mat4 uWorld;
+					out vec3 vNormal;
+					out vec2 vUv;
+					void main(){
+							vec4 worldPos = uWorld * vec4(aPos, 1.0);
+							gl_Position = uViewProj * worldPos;
+							vNormal = normalize(mat3(uWorld) * aNormal);
+							vUv = aUv;
+				}";
 
         private const string MeshFrag = @"
-in vec3 vNormal;
-in vec2 vUv;
-uniform sampler2D uTex;
-uniform vec3 uLightDir;
-uniform vec3 uLightColor;
-uniform vec3 uLightDir2;
-uniform vec3 uLightColor2;
-uniform vec3 uAmbient;
-out vec4 fragColor;
-void main(){
-    vec4 texColor = texture(uTex, vUv);
-    if (texColor.a < 0.1) discard;
-    
-    // Light 1 (Key Light)
-    float diff1 = max(dot(vNormal, uLightDir), 0.0);
-    vec3 diffuse1 = diff1 * uLightColor;
-    
-    // Light 2 (Fill Light)
-    float diff2 = max(dot(vNormal, uLightDir2), 0.0);
-    vec3 diffuse2 = diff2 * uLightColor2;
-    
-    vec3 finalLight = clamp(uAmbient + diffuse1 + diffuse2, 0.0, 1.0);
-    fragColor = vec4(texColor.rgb * finalLight, texColor.a);
-}";
+					in vec3 vNormal;
+					in vec2 vUv;
+					uniform sampler2D uTex;
+					uniform vec3 uLightDir;
+					uniform vec3 uLightColor;
+					uniform vec3 uLightDir2;
+					uniform vec3 uLightColor2;
+					uniform vec3 uAmbient;
+					out vec4 fragColor;
+					void main(){
+							vec4 texColor = texture(uTex, vUv);
+							if (texColor.a < 0.1) discard;
+							
+							// Light 1 (Key Light)
+							float diff1 = max(dot(vNormal, uLightDir), 0.0);
+							vec3 diffuse1 = diff1 * uLightColor;
+							
+							// Light 2 (Fill Light)
+							float diff2 = max(dot(vNormal, uLightDir2), 0.0);
+							vec3 diffuse2 = diff2 * uLightColor2;
+							
+							vec3 finalLight = clamp(uAmbient + diffuse1 + diffuse2, 0.0, 1.0);
+							fragColor = vec4(texColor.rgb * finalLight, texColor.a);
+				}";
     }
 }
