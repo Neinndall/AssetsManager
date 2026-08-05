@@ -64,6 +64,21 @@ namespace BenchmarkApp
                 LcuWadContentProbe.Run(rootPath, filter);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-string-search", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string needles = args.Length > 2 ? args[2] : null;
+                LcuStringSearchProbe.Run(rootPath, needles);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-methods", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string hashesPath = args.Length > 2 ? args[2] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager", "hashes");
+                string targets = args.Length > 3 ? args[3] : null;
+                LcuMethodsProbe.Run(rootPath, hashesPath, targets);
+                return;
+            }
 
             if (args.Length == 0 || !string.Equals(args[0], "guessing", StringComparison.OrdinalIgnoreCase))
             {
