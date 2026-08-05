@@ -140,10 +140,6 @@
                                          Checked="Mode_Checked" ToolTip="Onion Skin Mode" Width="30" Height="30">
                                 <icons:MaterialIcon Kind="Opacity" Width="16" Height="16"/>
                             </RadioButton>
-                            <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
-                                         Checked="Mode_Checked" ToolTip="Mathematical Difference Map" Width="30" Height="30">
-                                <icons:MaterialIcon Kind="Contrast" Width="16" Height="16"/>
-                            </RadioButton>
                             <RadioButton x:Name="TimelineBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
                                          Checked="Mode_Checked" ToolTip="Timeline Frame Sequence" Width="30" Height="30">
                                 <icons:MaterialIcon Kind="TimelineClockOutline" Width="16" Height="16"/>
@@ -330,9 +326,6 @@
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=OnionSkinBtn}" Value="True">
                                                             <Setter Property="Text" Value="Onion Skin Transparency"/>
                                                         </DataTrigger>
-                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
-                                                            <Setter Property="Text" Value="Mathematical Difference Map"/>
-                                                        </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=TimelineBtn}" Value="True">
                                                             <Setter Property="Text" Value="Timeline Frame Sequence"/>
                                                         </DataTrigger>
@@ -374,14 +367,6 @@
                                     <Image.Clip>
                                         <RectangleGeometry x:Name="SliderClip" Rect="0,0,9999,9999"/>
                                     </Image.Clip>
-                                </Image>
-                                <Image x:Name="DiffImageOverlay" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" Visibility="{Binding IsChecked, ElementName=DiffBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image.RenderTransform>
-                                        <TransformGroup>
-                                            <ScaleTransform x:Name="DiffOverlayScale"/>
-                                            <TranslateTransform x:Name="DiffOverlayTranslate"/>
-                                        </TransformGroup>
-                                    </Image.RenderTransform>
                                 </Image>
                                 <!-- Slider Visual Separator Line -->
                                 <Border x:Name="SliderSeparatorLine" 

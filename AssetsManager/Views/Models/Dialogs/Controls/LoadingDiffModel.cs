@@ -16,7 +16,6 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         CalculatingDifferences,
         RenderingUI,
         DecodingTextures,
-        GeneratingDiffMap,
         Parsing3DModel,
         ParsingOldModel,
         ParsingNewModel,
@@ -105,7 +104,7 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                     ProgressValue = 90;
                     break;
 
-                // IMAGE PROCESS (Progression: 25 → 60 → 85 → 100)
+                // IMAGE PROCESS (Progression: 25 → 60 → 100)
                 case DiffLoadingState.AcquiringTextureData:
                     Description = "Acquiring texture data from WADs...";
                     ProgressValue = 25;
@@ -113,10 +112,6 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
                 case DiffLoadingState.DecodingTextures:
                     Description = "Decoding texture surfaces...";
                     ProgressValue = 60;
-                    break;
-                case DiffLoadingState.GeneratingDiffMap:
-                    Description = "Generating visual difference map...";
-                    ProgressValue = 85;
                     break;
 
 								// SKN PROCESS ()

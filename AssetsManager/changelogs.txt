@@ -202,6 +202,9 @@ Improvements
   - Home / Each card now shows a subtle accent-colored corner watermark of its module that does not affect the layout.
   - Core / PBE maintenance, Automated CDN tracking and background news checks now also run once at application startup, gated by their own Advanced settings and frequencies, so enabled features report updates even when the app is closed before the next timer tick.
 
+Changes
+  - Image Comparison / Removed the Mathematical Difference Map mode as it became obsolete; the image loading progression now reflects the real remaining steps (acquire 25% - decode 60% - ready 100%).
+
 Bug Fixes
   - Comparator / Historical comparison results now re-resolve their hashes when reopened, so assets that were unnamed at comparison time show their real game paths once the hash catalogs are available.
   - Notifications / Fixed notification category classification so Watcher updates, Comparator/PBE status discoveries, and App/Hash updates appear under their respective tabs instead of defaulting to System.

@@ -301,7 +301,6 @@ namespace AssetsManager.Services.Core
             var oldImage = await Task.Run(() => TextureUtils.LoadTexture(oldData, extension));
             var newImage = await Task.Run(() => TextureUtils.LoadTexture(newData, extension));
 
-            await SetStateAndRenderAsync(loadingWindow, DiffLoadingState.GeneratingDiffMap);
             var imageDiffWindow = new ImageDiffWindow(oldImage, newImage, oldPath, newPath);
             imageDiffWindow.Owner = owner;
             imageDiffWindow.LoadingWindow = loadingWindow;

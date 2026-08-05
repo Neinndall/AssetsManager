@@ -55,7 +55,6 @@ namespace AssetsManager.Views.Dialogs
         private Point _lastMousePosition;
         private bool _isDragging = false;
         private double _currentZoom = 1.0;
-        private WriteableBitmap _diffMap;
 
         // Timeline Frame Sequence State
         private readonly DispatcherTimer _timelineTimer;
@@ -161,10 +160,6 @@ namespace AssetsManager.Views.Dialogs
                 ApplyTimelineFrame(0);
             }
 
-            // Clear previous diff map
-            _diffMap = null;
-            DiffImageOverlay.Source = null;
-
             // Set data for both modes
             OldImage.Source = oldImage;
             NewImage.Source = newImage;
@@ -173,11 +168,7 @@ namespace AssetsManager.Views.Dialogs
 
             OldFileNameLabel.Text = oldFileName ?? "N/A";
             NewFileNameLabel.Text = newFileName ?? "N/A";
-
-            if (diffBtn_IsChecked()) GenerateDifferenceMap();
         }
-
-        private bool diffBtn_IsChecked() => DiffBtn?.IsChecked == true;
 
         public void LoadAndDisplayPreloadedBatchAsync(
             List<(BitmapSource oldImage, BitmapSource newImage, string oldPath, string newPath)> items,
@@ -218,48 +209,6 @@ namespace AssetsManager.Views.Dialogs
                 LoadCurrentBatchItem();
             }
         }
-
-        #region Difference Map Logic
-
-        private void GenerateDifferenceMap()
-        {
-            if (_diffMap != null || OldImage.Source is not BitmapSource oldS || NewImage.Source is not BitmapSource newS) return;
-
-            // Normalize formats to Bgra32
-            var oldC = new FormatConvertedBitmap(oldS, PixelFormats.Bgra32, null, 0);
-            var newC = new FormatConvertedBitmap(newS, PixelFormats.Bgra32, null, 0);
-
-            int w = Math.Max(oldC.PixelWidth, newC.PixelWidth);
-            int h = Math.Max(oldC.PixelHeight, newC.PixelHeight);
-            _diffMap = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgra32, null);
-
-            // Using uint arrays for faster pixel manipulation
-            uint[] oldD = new uint[oldC.PixelWidth * oldC.PixelHeight];
-            uint[] newD = new uint[newC.PixelWidth * newC.PixelHeight];
-            oldC.CopyPixels(oldD, oldC.PixelWidth * 4, 0);
-            newC.CopyPixels(newD, newC.PixelWidth * 4, 0);
-
-            uint[] diff = new uint[w * h];
-            for (int y = 0; y < h; y++)
-            {
-                for (int x = 0; x < w; x++)
-                {
-                    bool inO = x < oldC.PixelWidth && y < oldC.PixelHeight;
-                    bool inN = x < newC.PixelWidth && y < newC.PixelHeight;
-                    
-                    uint p1 = inO ? oldD[y * oldC.PixelWidth + x] : 0;
-                    uint p2 = inN ? newD[y * newC.PixelWidth + x] : 0;
-
-                    // Black (identical) or Magenta (different)
-                    diff[y * w + x] = (inO == inN && p1 == p2) ? 0xFF000000 : 0xFFFF00FF;
-                }
-            }
-
-            _diffMap.WritePixels(new Int32Rect(0, 0, w, h), diff, w * 4, 0);
-            DiffImageOverlay.Source = _diffMap;
-        }
-
-        #endregion
 
         #region Zoom & Pan Logic (Mouse Centered)
 
@@ -319,7 +268,6 @@ namespace AssetsManager.Views.Dialogs
             UpdateTransformGroup(NewScale, NewTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(OldOverlayScale, OldOverlayTranslate, scale, deltaX, deltaY);
             UpdateTransformGroup(NewOverlayScale, NewOverlayTranslate, scale, deltaX, deltaY);
-            UpdateTransformGroup(DiffOverlayScale, DiffOverlayTranslate, scale, deltaX, deltaY);
             if (SliderSeparatorScale != null && SliderSeparatorTranslate != null)
                 UpdateTransformGroup(SliderSeparatorScale, SliderSeparatorTranslate, scale, deltaX, deltaY);
             UpdateSliderEffect();
@@ -379,11 +327,7 @@ namespace AssetsManager.Views.Dialogs
                 SliderClip.Rect = new Rect(0, 0, 99999, 99999);
             }
 
-            if (DiffBtn.IsChecked == true)
-            {
-                GenerateDifferenceMap();
-            }
-            else if (SliderBtn.IsChecked == true)
+            if (SliderBtn.IsChecked == true)
             {
                 // Force layout update and then update the effect
                 this.Dispatcher.InvokeAsync(() => UpdateSliderEffect(), DispatcherPriority.Loaded);
@@ -701,8 +645,6 @@ namespace AssetsManager.Views.Dialogs
             NewImage.Source = null;
             OldImageOverlay.Source = null;
             NewImageOverlay.Source = null;
-            DiffImageOverlay.Source = null;
-            _diffMap = null;
         }
     }
 }
