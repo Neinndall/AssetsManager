@@ -60,13 +60,25 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Timeline OLD/NEW badge chip (accent color and visibility set per badge) -->
+        <Style x:Key="TimelineBadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="#CC1B1B1F"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
     </Window.Resources>
 
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 0: Professional Toolbar Area -->
             <RowDefinition Height="*"/>    <!-- 1: Main Content Area -->
-            <RowDefinition Height="Auto"/> <!-- 2: Status Bar -->
+            <RowDefinition Height="Auto"/> <!-- 2: Timeline Transport Bar -->
+            <RowDefinition Height="Auto"/> <!-- 3: Status Bar -->
         </Grid.RowDefinitions>
 
         <!-- 1. Professional Toolbar Area -->
@@ -131,6 +143,10 @@
                             <RadioButton x:Name="DiffBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
                                          Checked="Mode_Checked" ToolTip="Mathematical Difference Map" Width="30" Height="30">
                                 <icons:MaterialIcon Kind="Contrast" Width="16" Height="16"/>
+                            </RadioButton>
+                            <RadioButton x:Name="TimelineBtn" Style="{StaticResource ModernIconRadioButton}" GroupName="ComparisonMode"
+                                         Checked="Mode_Checked" ToolTip="Timeline Frame Sequence" Width="30" Height="30">
+                                <icons:MaterialIcon Kind="TimelineClockOutline" Width="16" Height="16"/>
                             </RadioButton>
 
                             <!-- SEPARATOR -->
@@ -199,7 +215,7 @@
         </Border>
 
         <!-- 2. Main Content Area -->
-        <Grid Grid.Row="1" x:Name="MainContentArea" Background="Transparent" Margin="24">
+        <Grid Grid.Row="1" x:Name="MainContentArea" Background="Transparent" Margin="24,12,24,12">
             <!-- Side by Side -->
             <Grid x:Name="SideBySidePanel" Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
@@ -208,7 +224,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Border Grid.Column="0" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent" Margin="0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -246,7 +262,7 @@
 
                 <GridSplitter Grid.Column="1" Width="12" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" ResizeBehavior="PreviousAndNext" ShowsPreview="False"/>
 
-                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Border Grid.Column="2" Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent" Margin="0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -285,7 +301,7 @@
 
             <!-- Overlay Panel -->
             <Grid x:Name="OverlayPanel" Visibility="{Binding IsChecked, ElementName=SideBySideBtn, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <Border Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent">
+                <Border Style="{StaticResource SettingsCard}" Padding="0" Background="Transparent" Margin="0">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -316,6 +332,9 @@
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsChecked, ElementName=DiffBtn}" Value="True">
                                                             <Setter Property="Text" Value="Mathematical Difference Map"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsChecked, ElementName=TimelineBtn}" Value="True">
+                                                            <Setter Property="Text" Value="Timeline Frame Sequence"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -369,8 +388,17 @@
                                         Width="2" 
                                         Background="{StaticResource AccentBrush}" 
                                         HorizontalAlignment="Left" 
-                                        VerticalAlignment="Stretch"
-                                        Visibility="{Binding IsChecked, ElementName=SliderBtn, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                        VerticalAlignment="Stretch">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsChecked, ElementName=SliderBtn}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Border.RenderTransform>
                                         <TransformGroup>
                                             <TranslateTransform x:Name="SliderOffsetTranslate"/>
@@ -379,6 +407,13 @@
                                         </TransformGroup>
                                     </Border.RenderTransform>
                                 </Border>
+                                <!-- Timeline OLD / NEW badges -->
+                                <Border x:Name="OldBadge" HorizontalAlignment="Left" Style="{StaticResource TimelineBadgeStyle}" BorderBrush="{StaticResource AccentOrange}">
+                                    <TextBlock Text="OLD" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentOrange}"/>
+                                </Border>
+                                <Border x:Name="NewBadge" HorizontalAlignment="Right" Style="{StaticResource TimelineBadgeStyle}" BorderBrush="{StaticResource AccentGreen}">
+                                    <TextBlock Text="NEW" FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentGreen}"/>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>
@@ -386,8 +421,176 @@
             </Grid>
         </Grid>
 
+        <!-- 2.5 Timeline Transport Bar (Frame Sequence Studio) -->
+        <Border Grid.Row="2" x:Name="TimelineBar" Padding="12" Margin="24,0,24,12">
+            <Border.Style>
+                <Style TargetType="Border" BasedOn="{StaticResource SettingsCard}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsChecked, ElementName=TimelineBtn}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <!-- Row 0: Transport Controls & Scrubber -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="TimelinePlayPauseBtn" Click="TimelinePlayPauseBtn_Click"
+                                Style="{StaticResource TransparentIconButton}"
+                                Width="32" Height="32"
+                                ToolTip="Play / Pause Sequence (Space)">
+                            <icons:MaterialIcon x:Name="TimelinePlayIcon" Kind="Play" Width="18" Height="18"/>
+                        </Button>
+                        <Button x:Name="TimelineStopBtn" Click="TimelineStopBtn_Click"
+                                Style="{StaticResource TransparentIconButton}"
+                                Width="32" Height="32"
+                                ToolTip="Stop and Reset to Start">
+                            <icons:MaterialIcon Kind="Stop" Width="18" Height="18"/>
+                        </Button>
+                        <Button x:Name="TimelineLoopBtn" Click="TimelineLoopBtn_Click"
+                                Style="{StaticResource TransparentIconButton}"
+                                Width="32" Height="32"
+                                ToolTip="Loop Playback">
+                            <icons:MaterialIcon x:Name="TimelineLoopIcon" Kind="Repeat" Width="18" Height="18"/>
+                        </Button>
+
+                        <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="12,0" VerticalAlignment="Center" Opacity="0.8"/>
+                        <TextBlock Text="TIMELINE" Style="{StaticResource ToolSectionLabel}" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="TimelineSlider" Minimum="0" Maximum="100" Value="0" Margin="0"
+                                VerticalAlignment="Center" Style="{StaticResource HUDSliderStyle}"
+                                IsMoveToPointEnabled="True" ValueChanged="TimelineSlider_ValueChanged"
+                                ToolTip="Sequence Position - drag to scrub frame by frame"/>
+                        <TextBlock Grid.Column="1" x:Name="TimelineTimeCode" FontFamily="Consolas" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}" Width="130" TextAlignment="Right"
+                                   VerticalAlignment="Center" Margin="10,0,0,0" Text="00:00.0 / 00:01.0"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Row divider -->
+                <Border Height="1" Background="{StaticResource BorderColor}" Opacity="0.6" Margin="0,10"/>
+
+                <!-- Row 1: Effect, Options, Zoom & Export -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="EFFECT" Style="{StaticResource ToolSectionLabel}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <Border Background="{StaticResource CardBackground}" CornerRadius="8" Padding="2" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,14,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="WipeEffectBtn" Style="{StaticResource SegmentedRadioButtonStyle}" GroupName="TimelineEffect"
+                                         IsChecked="True" Checked="TimelineEffect_Checked"
+                                         ToolTip="Wipe: NEW reveals over OLD horizontally" Padding="12,4">
+                                <TextBlock Text="WIPE" FontSize="10" FontWeight="Bold"/>
+                            </RadioButton>
+                            <RadioButton x:Name="FadeEffectBtn" Style="{StaticResource SegmentedRadioButtonStyle}" GroupName="TimelineEffect"
+                                         Checked="TimelineEffect_Checked"
+                                         ToolTip="Fade: NEW fades in over OLD" Padding="12,4">
+                                <TextBlock Text="FADE" FontSize="10" FontWeight="Bold"/>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="SEQUENCE" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="TimelineSequenceCombo" Style="{StaticResource ModernComboBox}" Width="100" Height="26"
+                              SelectedIndex="0" SelectionChanged="TimelineSequence_SelectionChanged" Margin="0,0,14,0"
+                              ToolTip="Forward: OLD to NEW; Round trip: OLD to NEW and back to OLD">
+                        <ComboBoxItem Content="Forward" Tag="Forward"/>
+                        <ComboBoxItem Content="Round trip" Tag="RoundTrip"/>
+                    </ComboBox>
+
+                    <TextBlock Text="CYCLES" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="TimelineCyclesCombo" Style="{StaticResource ModernComboBox}" Width="52" Height="26"
+                              SelectedIndex="0" SelectionChanged="TimelineCycles_SelectionChanged" Margin="0,0,14,0"
+                              ToolTip="How many times the sequence repeats within the sweep">
+                        <ComboBoxItem Content="1" Tag="1"/>
+                        <ComboBoxItem Content="2" Tag="2"/>
+                        <ComboBoxItem Content="3" Tag="3"/>
+                        <ComboBoxItem Content="4" Tag="4"/>
+                    </ComboBox>
+
+                    <TextBlock Text="DURATION" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="TimelineDurationCombo" Style="{StaticResource ModernComboBox}" Width="64" Height="26"
+                              SelectedIndex="0" SelectionChanged="TimelineDuration_SelectionChanged" Margin="0,0,14,0"
+                              ToolTip="Hold time per state. Total = 2x per cycle (Forward) or (cycles+2)x (Round trip); short 0.5s wipe/fade folded into the state boundaries">
+                        <ComboBoxItem Content="2s" Tag="2"/>
+                        <ComboBoxItem Content="3s" Tag="3"/>
+                        <ComboBoxItem Content="4s" Tag="4"/>
+                        <ComboBoxItem Content="5s" Tag="5"/>
+                    </ComboBox>
+
+                    <TextBlock Text="FPS" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="TimelineFpsCombo" Style="{StaticResource ModernComboBox}" Width="56" Height="26"
+                              SelectedIndex="1" Margin="0,0,14,0" ToolTip="Frames per second of the GIF export">
+                        <ComboBoxItem Content="12" Tag="12"/>
+                        <ComboBoxItem Content="24" Tag="24"/>
+                        <ComboBoxItem Content="30" Tag="30"/>
+                    </ComboBox>
+
+                    <TextBlock Text="SIZE" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="TimelineSizeCombo" Style="{StaticResource ModernComboBox}" Width="76" Height="26"
+                              SelectedIndex="0" Margin="0,0,14,0" ToolTip="Maximum GIF dimension in pixels; Original keeps the source resolution">
+                        <ComboBoxItem Content="1024" Tag="1024"/>
+                        <ComboBoxItem Content="2048" Tag="2048"/>
+                        <ComboBoxItem Content="Original" Tag="0"/>
+                    </ComboBox>
+
+                    <Border Width="1" Height="20" Background="{StaticResource BorderColor}" Margin="0,0,14,0" VerticalAlignment="Center" Opacity="0.8"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="ZOOM" Style="{StaticResource ToolSectionLabel}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Button x:Name="ZoomOutBtn" Click="ZoomOutBtn_Click"
+                            Style="{StaticResource TransparentIconButton}"
+                            Width="28" Height="28"
+                            ToolTip="Zoom Out">
+                        <icons:MaterialIcon Kind="MagnifyMinus" Width="16" Height="16"/>
+                    </Button>
+                    <Slider x:Name="ZoomSlider" Minimum="25" Maximum="400" Value="100" Width="90" Margin="2,0"
+                            VerticalAlignment="Center" Style="{StaticResource HUDSliderStyle}"
+                            IsMoveToPointEnabled="True" ValueChanged="ZoomSlider_ValueChanged"
+                            ToolTip="Zoom Level (25% - 400%)"/>
+                    <Button x:Name="ZoomInBtn" Click="ZoomInBtn_Click"
+                            Style="{StaticResource TransparentIconButton}"
+                            Width="28" Height="28"
+                            ToolTip="Zoom In">
+                        <icons:MaterialIcon Kind="MagnifyPlus" Width="16" Height="16"/>
+                    </Button>
+                    <Button x:Name="ZoomResetBtn" Click="ZoomResetBtn_Click"
+                            Style="{StaticResource TransparentIconButton}"
+                            Width="28" Height="28" Margin="2,0,10,0"
+                            ToolTip="Reset to Fit">
+                        <icons:MaterialIcon Kind="FitToPageOutline" Width="16" Height="16"/>
+                    </Button>
+
+                    <Button x:Name="ExportGifBtn" Click="ExportGifBtn_Click"
+                            Style="{StaticResource TransparentIconButton}"
+                            Width="28" Height="28" Margin="0,0,2,0"
+                            ToolTip="Export Frame Sequence as Animated GIF">
+                        <icons:MaterialIcon Kind="FileGifBox" Width="18" Height="18"/>
+                    </Button>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
         <!-- 3. Footer (HUD Style with bottom rounding) -->
-        <Border Grid.Row="2" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
+        <Border Grid.Row="3" Background="{StaticResource CardBackground}" CornerRadius="0,0,11,11" Padding="20,8" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" ClipToBounds="True">
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <icons:MaterialIcon Kind="GestureTap" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="0,0,8,0" Opacity="0.8"/>

@@ -32,8 +32,15 @@ New Features
   - News / Feeds are now limited to the 10 most recent articles per category, reducing transfer and memory usage.
   - News / The feed cache no longer auto-expires; lists are refreshed only on demand (Refresh button or notification click-through).
   - Notifications / The hub's Clear button now removes only the notifications of the active category tab instead of everything.
+  - Image Comparison / Timeline Mode: new playable frame sequence that animates the OLD-to-NEW transition with Forward / Round trip shapes, 1-4 repeatable cycles, Play/Pause, Stop, Loop and manual frame scrubbing (Space shortcut).
+  - Image Comparison / Timeline Mode: added Wipe and Fade transition effects, selectable in the transport bar.
+  - Image Comparison / Timeline Mode: added zoom controls (25%-400% slider, +/- buttons and reset to fit) synchronized with wheel zoom.
+  - Image Comparison / Timeline Mode: export the frame sequence as an animated GIF with a configurable hold time per state (2s-5s; the total stays an exact multiple of it - 2x per cycle Forward, (cycles+2)x Round trip - while the short 0.5s wipe/fade is folded into the state boundaries), FPS (12/24/30) and size (1024px, 2048px or original resolution), with Floyd-Steinberg dithering for smoother gradients, following the selected sequence and cycles.
+  - Image Comparison / Timeline Mode: OLD/NEW badges identify which image belongs to each side of the transition, both on the viewport and baked into the exported GIF.
+  - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
 
 Improvements
+  - Image Comparison / Wheel zoom now stays within the 25%-400% range and keeps the zoom slider in sync.
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.
   - VFX Studio / Audited real BIN-driven texture alpha, UV multiplier blending, emitter-space placement, and AttachedMesh fallback rendering.
   - VFX Studio / Corrected additive blend handling and alpha clipping while preserving authored texture output.
