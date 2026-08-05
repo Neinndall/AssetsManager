@@ -65,8 +65,7 @@ namespace AssetsManager.Services.Hashes
                 bool isAssetPath = candidate.Contains('.') && !candidate.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                 if (!isAssetPath)
                 {
-                    if (candidate.Contains('/'))
-                        Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinEntries));
+                    Check32(InternalHashKind.BinEntries, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinEntries));
                     Check32(InternalHashKind.BinHashes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinHashes));
                 }
             }
@@ -287,20 +286,25 @@ namespace AssetsManager.Services.Hashes
             bool hasLocalEvidence,
             InternalHashEvidence evidence = InternalHashEvidence.RuntimeContext)
         {
-            if (!hasLocalEvidence || !_targets[kind].Contains(hash)) return;
-            if (hasLocalEvidence && evidence == InternalHashEvidence.RuntimeContext)
+            if (!hasLocalEvidence) return;
+            bool alreadyMatched = _matched[kind].Contains(hash);
+            if (!alreadyMatched && !_targets[kind].Contains(hash)) return;
+            if (evidence == InternalHashEvidence.RuntimeContext)
                 evidence = InternalHashEvidence.OwningFileString;
+            var key = (kind, (ulong)hash, value);
+            if (_matches.ContainsKey(key)) return;
+            // A second literal for the same hash stays a candidate instead of
+            // promoting the first one: the store quarantines the collision.
+            bool conflicting = _matches.Keys.Any(item => item.Kind == kind && item.Hash == (ulong)hash);
             bool verified = InternalHashGuessMatch.IsPromotableEvidence(evidence);
-            if (verified)
+            if (verified && !conflicting)
             {
                 _targets[kind].Remove(hash);
                 foreach (var candidateKey in _matches.Keys
-                    .Where(key => key.Kind == kind && key.Hash == hash).ToList())
+                    .Where(item => item.Kind == kind && item.Hash == (ulong)hash).ToList())
                     _matches.Remove(candidateKey);
             }
             _matched[kind].Add(hash);
-            var key = (kind, (ulong)hash, value);
-            if (_matches.ContainsKey(key)) return;
             var match = new InternalHashGuessMatch
             {
                 Hash = hash,

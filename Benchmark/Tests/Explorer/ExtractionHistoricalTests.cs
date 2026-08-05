@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.BenchmarkTests.Infrastructure;
 using AssetsManager.Services.Explorer;
+using AssetsManager.Services.Formatting;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
 using AssetsManager.Utils.Framework;
@@ -139,10 +140,18 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
                 CreateLoader(bridge).LoadFromBackupAsync(jsonPath, true, cancellation.Token));
         }
 
-        private static WadExportService CreateExporter(AssetsManagerTestBridge bridge, WadNodeLoaderService loader = null)
+        private static AssetExportService CreateExporter(AssetsManagerTestBridge bridge, WadNodeLoaderService loader = null)
         {
             loader ??= CreateLoader(bridge);
-            return new WadExportService(bridge.LogService, CreateProvider(bridge, loader), loader, bridge.Directories);
+            return new AssetExportService(
+                bridge.LogService,
+                CreateProvider(bridge, loader),
+                loader,
+                bridge.Directories,
+                null!,
+                null!,
+                null!,
+                null!);
         }
 
         private static WadContentProvider CreateProvider(AssetsManagerTestBridge bridge, WadNodeLoaderService loader = null) =>

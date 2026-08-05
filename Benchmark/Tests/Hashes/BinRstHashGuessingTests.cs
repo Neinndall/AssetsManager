@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using AssetsManager.BenchmarkTests.Infrastructure;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Parsers;
+using static AssetsManager.Services.Hashes.BinRstHashGuessingService;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
@@ -721,7 +722,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.True(match.CanPromote);
-            Assert.Equal(first, match.Value);
+            Assert.Equal("Yafhet0d6pup", match.Value);
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 

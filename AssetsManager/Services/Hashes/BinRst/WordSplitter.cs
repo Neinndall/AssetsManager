@@ -10,7 +10,9 @@ namespace AssetsManager.Services.Hashes
     ///   1. A capital run closes the word if no lowercase follows (so the last
     ///      capital belongs to the next word: AIGenericCommon -> AI Generic
     ///      Common); a digit tail and, only after digits, lowercase/digits are
-    ///      annexed (IX3dShadingModel -> IX3d Shading Model).
+    ///      annexed (IX3dShadingModel -> IX3d Shading Model). A run that is
+    ///      preceded by a word is annexed to it (MapSSAOSettings -> MapSSAO
+    ///      Settings); only a leading run stands alone.
     ///   2. A capital plus lowercase/digit tail (Detection2, Vector3).
     ///   3. A lowercase run (catches camelCase: abilityHaste).
     ///   4. A bare digit run.
@@ -49,6 +51,11 @@ namespace AssetsManager.Services.Hashes
                 if (word.Length == 0) continue;
                 bool isAllLower = IsAllLower(word);
                 if (words.Count == 0 && isAllLower && word.Length <= prefixMax) continue;
+                if (words.Count > 0 && word.Length >= 2 && char.IsUpper(word[0]) && char.IsUpper(word[1]))
+                {
+                    words[words.Count - 1] += word;
+                    continue;
+                }
                 if (isAllLower) word = char.ToUpperInvariant(word[0]) + word[1..];
                 words.Add(word);
             }

@@ -61,7 +61,7 @@ namespace AssetsManager.BenchmarkTests.Services.Core
                 "The report is ready.",
                 NotificationType.Success,
                 () => { },
-                NotificationCategory.Comparator,
+                NotificationCategory.Updates,
                 "View report");
 
             string json = File.ReadAllText(_directories.NotificationsHistoryPath);

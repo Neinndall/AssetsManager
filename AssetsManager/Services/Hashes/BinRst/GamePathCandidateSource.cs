@@ -21,7 +21,9 @@ namespace AssetsManager.Services.Hashes
         {
             HashSet<ulong> entryTargets = matcher.GetRemaining(InternalHashKind.BinEntries).ToHashSet();
             HashSet<ulong> hashTargets = matcher.GetRemaining(InternalHashKind.BinHashes).ToHashSet();
-            if (entryTargets.Count == 0 && hashTargets.Count == 0) return;
+            if (entryTargets.Count == 0 && hashTargets.Count == 0 &&
+                matcher.GetRemainingCount(InternalHashKind.RstXxh3) == 0 &&
+                matcher.GetRemainingCount(InternalHashKind.RstXxh64) == 0) return;
             int generatedVariants = 0;
 
             foreach (string line in gameHashLines)
@@ -89,6 +91,8 @@ namespace AssetsManager.Services.Hashes
 
             // Sibling skin/set enumeration: every variant is an exact FNV1a hit on a
             // real catalog template, so any match is proof of the entry name.
+            // The skin/set digits renumber everywhere in the path, so the directory
+            // and the basename (aatrox_skin03.skn -> aatrox_skin17.skn) both follow.
             void ConsiderVariants(string value, bool checkHashes)
             {
                 foreach ((string marker, int min, int max) in new[] { ("skins/skin", 0, 49), ("sets/set", 1, 29) })
@@ -99,13 +103,13 @@ namespace AssetsManager.Services.Hashes
                     int digitsEnd = digitsStart;
                     while (digitsEnd < value.Length && char.IsDigit(value[digitsEnd])) digitsEnd++;
                     if (digitsEnd == digitsStart) continue;
-                    string head = value[..digitsStart];
-                    string tail = value[digitsEnd..];
+                    string segment = $"{marker[(marker.LastIndexOf('/') + 1)..]}{value[digitsStart..digitsEnd]}";
                     for (int number = min; number <= max; number++)
                     {
                         generatedVariants++;
                         if (generatedVariants > VariantBudget) return;
-                        Consider(head + number.ToString("D2") + tail, checkHashes, includeTruncatedRst: false);
+                        string replacement = $"{segment[..^value[digitsStart..digitsEnd].Length]}{number:D2}";
+                        Consider(value.Replace(segment, replacement), checkHashes, includeTruncatedRst: false);
                     }
                 }
             }
