@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.News;
 
 namespace AssetsManager.Views.Controls.News

@@ -176,7 +176,7 @@ Improvements
   - Redesigned the Hash Guessing Lab interface with a clean Bento Grid layout, real-time statistical tracking of centralized unknowns, and automatic PBE directory configuration from AppSettings.
   - Alternates Bento buttons dynamically between GAME and LCU options panel, optimizing vertical workspace.
   - Added auto-promotion of successfully guessed hashes on execution completion, saving results directly to main hash files.
-  - Restructured Home dashboard to use a beautiful 4-column Bento grid, positioning Public Beta (PBE) as a double-width hero card on the far left.
+  - Restructured Home dashboard to use a uniform 4-column Bento grid with a dedicated Riot News tile, giving every card identical sizing.
   - Optimized Home screen text wrapping and card spacing to prevent label clipping across all client modes.
   - Enriched the application navigation, sidebar, and Guessing Lab sections with high-visibility icon sets (cogs, graphs, brains, network).
   - LCU Basic guessing now completes plugin, extension, and built-in pattern searches as independent phases.
@@ -197,6 +197,10 @@ Improvements
   - Comparator / Repositioned file extension badge to top-left and selection checkmark tick to top-right on Results cards for improved visual balance.
   - Notifications / Renamed COMPARATOR tab to TRACKER for dedicated Asset Tracker notifications.
   - Notifications / Removed redundant ISSUES tab from Notification Hub as warnings and errors are already reported in the log console and log files.
+  - Home / Standardized every dashboard tile (40px icons, 10.5 labels, 16px titles, 12px descriptions) so all eight cards align perfectly.
+  - Home / Status badges (READY / SETUP / MISSING) are now pinned to the right edge of each card header without clipping at any window width.
+  - Home / Each card now shows a subtle accent-colored corner watermark of its module that does not affect the layout.
+  - Core / PBE maintenance, Automated CDN tracking and background news checks now also run once at application startup, gated by their own Advanced settings and frequencies, so enabled features report updates even when the app is closed before the next timer tick.
 
 Bug Fixes
   - Comparator / Historical comparison results now re-resolve their hashes when reopened, so assets that were unnamed at comparison time show their real game paths once the hash catalogs are available.
@@ -331,6 +335,7 @@ Bug Fixes
   - Fixed 3D viewer model rendering as completely white when loading models containing custom file extensions.
   - Fixed a texture mismatch issue where models could load incorrect textures (such as Ahri textures on Locke) due to dictionary property ordering.
   - Removed legacy static mesh loader (ScoLoadingService) and its associated file formats (.sco and .scb) to clean up the codebase.
+  - Home / Fixed PBE, LIVE and LOCAL card descriptions rendering lower than the rest of the grid because the background watermark inflated the tile layout.
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

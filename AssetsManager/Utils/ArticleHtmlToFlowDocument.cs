@@ -11,7 +11,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace AssetsManager.Views.Controls.News
+namespace AssetsManager.Utils
 {
     /// <summary>
     /// Converts the raw HTML article body (from Riot's CMS) into a native WPF FlowDocument.
