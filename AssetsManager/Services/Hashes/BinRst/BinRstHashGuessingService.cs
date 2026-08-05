@@ -35,6 +35,7 @@ namespace AssetsManager.Services.Hashes
         private const int MaximumTextChunkSize = 16 * 1024 * 1024;
         private const int NumericBudget = 5_000_000;
         private const int ContentBudget = 25_000_000;
+        private const int BigramBudget = 250_000;
         private static readonly Regex NumberRegex = new(@"[0-9]+", RegexOptions.Compiled);
         private readonly BinRstHashGuessingStore _store;
         private readonly HashGuessPersistenceService _persistence;
@@ -401,10 +402,20 @@ namespace AssetsManager.Services.Hashes
                         wordlist.FinalizeList();
 
                         CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
+                        CheckCandidates(GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "Structural Reduction Pass", preserveCasing: true);
+                        CheckCandidates(GenerateBigramCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.BigramVariant, "Structural Bigram Pass", preserveCasing: true);
+                        CheckCandidates(GenerateAttestedTailCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Structural Attested Tails Pass", preserveCasing: true);
+                        CheckCandidates(GenerateSwapCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.ReductionVariant, "Structural Word Swap Pass", preserveCasing: true);
                     }
 
-                    void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source)
+                    void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing = false)
                     {
+                        long probesAtStart = matcher.CheckedCandidates;
+                        int hitsAtStart = matcher.Matches.Count;
+                        int states = matcher.GetRemainingCount(InternalHashKind.BinFields)
+                            + matcher.GetRemainingCount(InternalHashKind.BinTypes)
+                            + matcher.GetRemainingCount(InternalHashKind.BinEntries)
+                            + matcher.GetRemainingCount(InternalHashKind.BinHashes);
                         foreach (string candidate in candidates)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -426,11 +437,11 @@ namespace AssetsManager.Services.Hashes
                                     }
                                     else
                                     {
-                                        matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source);
+                                        matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source, preserveCasing: preserveCasing);
                                     }
                                 }
                                 if (source != MetaSchemaClassSource)
-                                    matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source);
+                                    matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, strategy, source, preserveCasing: preserveCasing);
                             }
                             if (includeRst)
                                 matcher.Check(candidate, strategy, source);
@@ -440,6 +451,14 @@ namespace AssetsManager.Services.Hashes
                                     checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates));
                             if (matcher.Remaining == 0) break;
                         }
+                        long probes = matcher.CheckedCandidates - probesAtStart;
+                        int hits = matcher.Matches.Count - hitsAtStart;
+                        double noise = probes * (double)states / (double)uint.MaxValue;
+                        string report = $"{source}: {hits} hits; {noise:F2} expected chance matches ({probes} probes x {states} states / 2^32).";
+                        if (hits > 0 && noise >= hits * 0.5)
+                            _log.LogWarning(report);
+                        else
+                            _log.LogDebug(report);
                     }
                 }, cancellationToken);
 
@@ -810,13 +829,26 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private sealed class TokenWordlist
+        internal sealed class TokenWordlist
         {
             public List<string> AllTokens { get; } = new();
             public Dictionary<string, int> TokenCounts { get; } = new(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> Characters { get; } = new(StringComparer.OrdinalIgnoreCase);
             public List<string> PathTemplates { get; } = new();
             public List<string> FieldTemplates { get; } = new();
+            // Known non-path names fed to the list, source for the reduction pass.
+            public List<string> SourceNames { get; } = new();
+
+            // Attested casing per word: the spelling the known corpus uses most.
+            public Dictionary<string, string> PreferredSpellings { get; } = new(StringComparer.OrdinalIgnoreCase);
+            // Word pairs attested in known names, case-folded, sorted for determinism.
+            public List<(string A, string B)> Bigrams { get; } = new();
+            // Commonest final words of known names, for tail combination.
+            public List<string> Suffixes { get; } = new();
+
+            private readonly Dictionary<(string A, string B), int> _bigramCounts = new();
+            private readonly Dictionary<string, Dictionary<string, int>> _spellings = new(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, int> _suffixCounts = new(StringComparer.OrdinalIgnoreCase);
 
             public void AddName(string name)
             {
@@ -841,6 +873,7 @@ namespace AssetsManager.Services.Hashes
                 }
                 else
                 {
+                    SourceNames.Add(name);
                     bool hasDigit = false;
                     for (int i = 0; i < name.Length; i++)
                     {
@@ -850,6 +883,32 @@ namespace AssetsManager.Services.Hashes
                     {
                         string templated = NumberRegex.Replace(name, "{0}");
                         FieldTemplates.Add(templated);
+                    }
+
+                    // Attested casing, bigrams and tails come from the standard splitter.
+                    string[] words = WordSplitter.Split(name).ToArray();
+                    if (words.Length > 0)
+                    {
+                        string last = words[^1].ToLowerInvariant();
+                        _suffixCounts.TryGetValue(last, out int tailCount);
+                        _suffixCounts[last] = tailCount + 1;
+                    }
+                    for (int i = 0; i < words.Length; i++)
+                    {
+                        string lower = words[i].ToLowerInvariant();
+                        if (!_spellings.TryGetValue(lower, out Dictionary<string, int> spellings))
+                        {
+                            spellings = new Dictionary<string, int>(StringComparer.Ordinal);
+                            _spellings[lower] = spellings;
+                        }
+                        spellings.TryGetValue(words[i], out int spellingCount);
+                        spellings[words[i]] = spellingCount + 1;
+                        if (i > 0)
+                        {
+                            string prev = words[i - 1].ToLowerInvariant();
+                            _bigramCounts.TryGetValue((prev, lower), out int bigramCount);
+                            _bigramCounts[(prev, lower)] = bigramCount + 1;
+                        }
                     }
                 }
 
@@ -871,6 +930,31 @@ namespace AssetsManager.Services.Hashes
                 PathTemplates.AddRange(PathTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
                 FieldTemplates.Clear();
                 FieldTemplates.AddRange(FieldTemplates.Distinct(StringComparer.OrdinalIgnoreCase));
+
+                PreferredSpellings.Clear();
+                foreach (var pair in _spellings)
+                    PreferredSpellings[pair.Key] = pair.Value.OrderByDescending(spelling => spelling.Value)
+                        .ThenBy(spelling => spelling.Key, StringComparer.Ordinal).First().Key;
+
+                Bigrams.Clear();
+                Bigrams.AddRange(_bigramCounts.OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key.A, StringComparer.Ordinal)
+                    .ThenBy(pair => pair.Key.B, StringComparer.Ordinal)
+                    .Select(pair => pair.Key));
+
+                Suffixes.Clear();
+                Suffixes.AddRange(_suffixCounts.OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(12)
+                    .Select(pair => pair.Key));
+            }
+
+            // Attested spelling when the corpus knows one, else conventional upper-first casing.
+            public string Case(string token)
+            {
+                if (token.Length == 0) return token;
+                if (PreferredSpellings.TryGetValue(token, out string spelling)) return spelling;
+                return char.ToUpperInvariant(token[0]) + token[1..];
             }
         }
 
@@ -1001,6 +1085,142 @@ namespace AssetsManager.Services.Hashes
                         yield return comb2;
                         if (count >= budget) yield break;
                     }
+                }
+            }
+        }
+
+        // Reduction pass: every known name minus one inner word (never the last).
+        internal static IEnumerable<string> GenerateReductionCandidates(TokenWordlist wordlist)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string name in wordlist.SourceNames)
+            {
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                string[] words = WordSplitter.Split(name).ToArray();
+                if (words.Length < 2) continue;
+                for (int i = 0; i < words.Length - 1; i++)
+                {
+                    var builder = new StringBuilder();
+                    for (int j = 0; j < words.Length; j++)
+                    {
+                        if (j != i) builder.Append(words[j]);
+                    }
+                    string candidate = builder.ToString();
+                    if (candidate.Length < 3 || candidate.Length > 128) continue;
+                    if (seen.Add(candidate)) yield return candidate;
+                }
+            }
+        }
+
+        // Bigram pass: roots followed by word pairs attested in known names, depth 2..4.
+        internal static IEnumerable<string> GenerateBigramCandidates(
+            TokenWordlist wordlist,
+            int budget,
+            CancellationToken cancellationToken)
+        {
+            var successors = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string a, string b) in wordlist.Bigrams)
+            {
+                if (!successors.TryGetValue(a, out List<string> list))
+                {
+                    list = new List<string>();
+                    successors[a] = list;
+                }
+                list.Add(b);
+            }
+            if (successors.Count == 0) yield break;
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int count = 0;
+            foreach (string root in wordlist.AllTokens.Where(token => successors.ContainsKey(token)))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string word = wordlist.Case(root);
+                if (seen.Add(word))
+                {
+                    count++;
+                    yield return word;
+                    if (count >= budget) yield break;
+                }
+                var stack = new Stack<(string Word, int Depth, string Candidate)>();
+                foreach (string succ in successors[root])
+                    stack.Push((wordlist.Case(succ), 2, word + wordlist.Case(succ)));
+                while (stack.Count > 0 && count < budget)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    (string w, int depth, string candidate) = stack.Pop();
+                    if (candidate.Length <= 128 && seen.Add(candidate))
+                    {
+                        count++;
+                        yield return candidate;
+                    }
+                    if (depth >= 4) continue;
+                    if (!successors.TryGetValue(w.ToLowerInvariant(), out List<string> nexts)) continue;
+                    foreach (string succ in nexts)
+                        stack.Push((wordlist.Case(succ), depth + 1, candidate + wordlist.Case(succ)));
+                }
+            }
+        }
+
+        // Attested tails pass: top tokens combined with the commonest attested final words.
+        internal static IEnumerable<string> GenerateAttestedTailCandidates(
+            TokenWordlist wordlist,
+            int budget,
+            CancellationToken cancellationToken)
+        {
+            if (wordlist.Suffixes.Count == 0) yield break;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int count = 0;
+            foreach (string token in wordlist.AllTokens.Take(2000))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (string suffix in wordlist.Suffixes)
+                {
+                    string candidate = wordlist.Case(token) + wordlist.Case(suffix);
+                    if (candidate.Length < 3 || candidate.Length > 128) continue;
+                    if (seen.Add(candidate))
+                    {
+                        count++;
+                        yield return candidate;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+        }
+
+        // Swap pass: known names with one inner word replaced by a corpus word.
+        internal static IEnumerable<string> GenerateSwapCandidates(
+            TokenWordlist wordlist,
+            int budget,
+            CancellationToken cancellationToken)
+        {
+            var replacements = wordlist.AllTokens.Take(1500).ToList();
+            if (replacements.Count == 0) yield break;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int count = 0;
+            foreach (string name in wordlist.SourceNames)
+            {
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                string[] words = WordSplitter.Split(name).ToArray();
+                if (words.Length < 2) continue;
+                for (int i = 0; i < words.Length - 1; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    foreach (string replacement in replacements)
+                    {
+                        var builder = new StringBuilder();
+                        for (int j = 0; j < words.Length; j++)
+                            builder.Append(j == i ? wordlist.Case(replacement) : words[j]);
+                        string candidate = builder.ToString();
+                        if (candidate.Length < 3 || candidate.Length > 128) continue;
+                        if (seen.Add(candidate))
+                        {
+                            count++;
+                            yield return candidate;
+                            if (count >= budget) yield break;
+                        }
+                    }
+                    if (count >= budget) yield break;
                 }
             }
         }

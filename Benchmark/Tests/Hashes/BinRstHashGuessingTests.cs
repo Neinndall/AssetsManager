@@ -589,6 +589,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.Empty(matcher.Matches);
             Assert.Contains(truncated, targets[InternalHashKind.RstXxh3]);
         }
+
+        [Fact]
+        public void GamePathSkinVariantsResolveEntryAndHashTargets()
         {
             const string path = "data/characters/aatrox/skins/skin03/aatrox_skin03.skn";
             var targets = CreateTargets();
@@ -1146,6 +1149,126 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             Assert.Equal(string.Empty, File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries)));
             Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "internal.collisions.json")));
+        }
+
+        [Fact]
+        public void RewindUndoesAppendedWord()
+        {
+            uint state = Fnv1aIncremental.AppendWord(Fnv1aIncremental.Offset, "Champion");
+            state = Fnv1aIncremental.AppendWord(state, "Turret");
+            Assert.Equal(
+                Fnv1aIncremental.AppendWord(Fnv1aIncremental.Offset, "Champion"),
+                Fnv1aIncremental.Rewind(state, System.Text.Encoding.UTF8.GetBytes("Turret")));
+        }
+
+        [Fact]
+        public void SplitterRecoversAcronymRunsAndDropsHungarianPrefixes()
+        {
+            Assert.Equal(new[] { "AI", "Generic", "Common" }, WordSplitter.Split("AIGenericCommon"));
+            Assert.Equal(new[] { "Coefficient" }, WordSplitter.Split("mCoefficient"));
+            Assert.Equal(new[] { "MapSSAO", "Settings" }, WordSplitter.Split("MapSSAOSettings"));
+            Assert.Equal(new[] { "Spell", "Calculation" }, WordSplitter.Split("SpellCalculation"));
+            Assert.Equal(new[] { "Turret", "View", "Profile" }, WordSplitter.Split("TurretViewProfile"));
+            Assert.Equal("Ui", WordSplitter.FoldAcronyms("UI"));
+            Assert.Equal("Lol", WordSplitter.FoldAcronyms("LoL"));
+            Assert.True(WordSplitter.IsValidName("ChampionTurretView"));
+            Assert.False(WordSplitter.IsValidName("ChampionUITurret"));
+        }
+
+        [Fact]
+        public void ReductionPassRecoversNameMissingAnInteriorWord()
+        {
+            const string recovered = "CharacterSpeed";
+            uint hash = Fnv1a.HashLower(recovered);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuffData");
+
+            CheckCandidates(matcher, wordlist, GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "test reduction");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(recovered, match.Value);
+            Assert.Equal(InternalHashEvidence.MetaSchemaWordset, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void BigramPassRecoversAttestedSequenceName()
+        {
+            const string recovered = "SpellDamageBuffData";
+            uint hash = Fnv1a.HashLower(recovered);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuff", "DamageBuffData");
+
+            CheckCandidates(matcher, wordlist, GenerateBigramCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.BigramVariant, "test bigram");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(recovered, match.Value);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void SwapPassRecoversNameWithReplacedInteriorWord()
+        {
+            const string recovered = "CharacterDamageSpeed";
+            uint hash = Fnv1a.HashLower(recovered);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var wordlist = CreateWordlist("CharacterAttackSpeed", "SpellDamageBuff");
+
+            CheckCandidates(matcher, wordlist, GenerateSwapCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.ReductionVariant, "test swap");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(recovered, match.Value);
+            Assert.True(match.CanPromote);
+            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void StructuralPassesNeverHitUnrelatedTargets()
+        {
+            const string unrelated = "UnrelatedVfxParticleSystem";
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(Fnv1a.HashLower(unrelated));
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuffData");
+            wordlist.AddName(unrelated);
+
+            int before = matcher.Matches.Count;
+            CheckCandidates(matcher, wordlist, GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "test reduction");
+            CheckCandidates(matcher, wordlist, GenerateBigramCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.BigramVariant, "test bigram");
+            CheckCandidates(matcher, wordlist, GenerateSwapCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.ReductionVariant, "test swap");
+
+            Assert.Equal(before, matcher.Matches.Count);
+            Assert.Equal(1, targets[InternalHashKind.BinTypes].Count);
+        }
+
+        private static BinRstHashGuessingService.TokenWordlist CreateWordlist(params string[] names)
+        {
+            var wordlist = new BinRstHashGuessingService.TokenWordlist();
+            foreach (string name in names) wordlist.AddName(name);
+            wordlist.FinalizeList();
+            return wordlist;
+        }
+
+        private static void CheckCandidates(
+            InternalHashEvidenceMatcher matcher,
+            BinRstHashGuessingService.TokenWordlist wordlist,
+            IEnumerable<string> candidates,
+            InternalHashGuessStrategy strategy,
+            string source)
+        {
+            foreach (string candidate in candidates)
+            {
+                matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, strategy, source, preserveCasing: true);
+                if (matcher.Remaining == 0) break;
+            }
         }
 
         private static Dictionary<InternalHashKind, HashSet<ulong>> CreateTargets() => new()

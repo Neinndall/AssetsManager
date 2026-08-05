@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Hashes
                 Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinTypes));
             }
 
-            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath)
+            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath or InternalHashGuessStrategy.ReductionVariant or InternalHashGuessStrategy.BigramVariant)
             {
                 bool hasXxh3 = includeTruncatedRst && _targets[InternalHashKind.RstXxh3].Count > 0;
                 bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;
@@ -217,7 +217,8 @@ namespace AssetsManager.Services.Hashes
             string value,
             InternalHashGuessStrategy strategy,
             string source,
-            InternalHashEvidence evidence = InternalHashEvidence.MetaSchemaWordset)
+            InternalHashEvidence evidence = InternalHashEvidence.MetaSchemaWordset,
+            bool preserveCasing = false)
         {
             CheckedCandidates++;
             if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
@@ -233,9 +234,11 @@ namespace AssetsManager.Services.Hashes
                 DiscardedCandidates++;
                 return false;
             }
-            candidate = kind == InternalHashKind.BinTypes
-                ? UpperFirst(candidate)
-                : char.ToLowerInvariant(candidate[0]) + candidate[1..];
+            candidate = preserveCasing
+                ? candidate
+                : kind == InternalHashKind.BinTypes
+                    ? UpperFirst(candidate)
+                    : char.ToLowerInvariant(candidate[0]) + candidate[1..];
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
             {
