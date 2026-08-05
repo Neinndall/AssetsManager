@@ -849,6 +849,66 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void MetaSchemaParserCapturesHashToNameEntriesOnlyForActiveNamedItems()
+        {
+            const string json = """
+                {
+                  "latest": 42,
+                  "classes": {
+                    "0x11111111": {
+                      "revisions": [{ "from": 1 }],
+                      "properties": {}
+                    },
+                    "0x55555555": {
+                      "name": "KnownClass",
+                      "revisions": [{ "from": 1 }],
+                      "properties": {
+                        "0x33333333": { "name": "knownField", "revisions": [{ "from": 1 }] },
+                        "0x44444444": { "revisions": [{ "from": 1, "to": 2 }] }
+                      }
+                    },
+                    "0x66666666": {
+                      "revisions": [{ "from": 1, "to": 2 }],
+                      "properties": {}
+                    }
+                  }
+                }
+                """;
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+            MetaSchemaHashSnapshot snapshot = MetaSchemaHashSource.Parse(stream);
+
+            Assert.Equal("KnownClass", Assert.Contains(0x55555555u, snapshot.KnownTypeEntries));
+            Assert.False(snapshot.KnownTypeEntries.ContainsKey(0x11111111));
+            Assert.False(snapshot.KnownTypeEntries.ContainsKey(0x66666666));
+            Assert.Equal("knownField", Assert.Contains(0x33333333u, snapshot.KnownFieldEntries));
+            Assert.False(snapshot.KnownFieldEntries.ContainsKey(0x44444444));
+        }
+
+        [Fact]
+        public async Task StoreMergesMetaCatalogSupplementIntoKnownBinTypes()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string knownPath = Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt");
+            await File.WriteAllLinesAsync(knownPath, new[] { "02ec49d8 LocalOfficialName" });
+            string supplementPath = Path.Combine(bridge.Directories.HashesPath, "hashes.metaclasses.txt");
+            await File.WriteAllLinesAsync(supplementPath, new[]
+            {
+                "# meta-schema 42",
+                "02ec49d8 EventBusApBaseObject",
+                "d027765c EventBusObject"
+            });
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+
+            Dictionary<ulong, string> known = await store.LoadKnownAsync(InternalHashKind.BinTypes, CancellationToken.None);
+
+            Assert.Equal("LocalOfficialName", known[0x02ec49d8]);
+            Assert.Equal("EventBusObject", known[0xd027765c]);
+            Assert.Empty(await store.LoadKnownAsync(InternalHashKind.BinFields, CancellationToken.None));
+        }
+
+        [Fact]
         public async Task LegacyResearchIsQuarantinedInsteadOfPromoted()
         {
             using var bridge = new AssetsManagerTestBridge();

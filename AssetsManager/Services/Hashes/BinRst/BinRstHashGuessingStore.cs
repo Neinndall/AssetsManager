@@ -23,6 +23,13 @@ namespace AssetsManager.Services.Hashes
         public string GetVerifiedPath(InternalHashKind kind) =>
             Path.Combine(_directories.HashLabPath, "verified", GetKnownFileName(kind));
 
+        private static string GetMetaCatalogPath(InternalHashKind kind) => kind switch
+        {
+            InternalHashKind.BinTypes => "hashes.metaclasses.txt",
+            InternalHashKind.BinFields => "hashes.metafields.txt",
+            _ => string.Empty
+        };
+
         [Obsolete("Legacy overrides are quarantined and are no longer loaded. Use GetVerifiedPath.")]
         public string GetOverridePath(InternalHashKind kind) =>
             Path.Combine(_directories.HashLabPath, "overrides", GetKnownFileName(kind));
@@ -32,6 +39,9 @@ namespace AssetsManager.Services.Hashes
             var result = new Dictionary<ulong, string>();
             int width = IsRst(kind) ? 16 : 8;
             IEnumerable<string> paths = new[] { GetKnownPath(kind) };
+            string metaCatalog = GetMetaCatalogPath(kind);
+            if (metaCatalog.Length > 0)
+                paths = paths.Append(Path.Combine(_directories.HashesPath, metaCatalog));
             if (HasCurrentVerificationSchema())
                 paths = paths.Append(GetVerifiedPath(kind));
             foreach (string path in paths)

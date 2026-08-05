@@ -18,6 +18,10 @@ namespace AssetsManager.Services.Hashes
         public HashSet<ulong> UnknownFields { get; init; } = new();
         public IReadOnlyList<string> KnownTypeNames { get; init; } = Array.Empty<string>();
         public IReadOnlyList<string> KnownFieldNames { get; init; } = Array.Empty<string>();
+        public IReadOnlyDictionary<ulong, string> KnownTypeEntries { get; init; } =
+            new Dictionary<ulong, string>();
+        public IReadOnlyDictionary<ulong, string> KnownFieldEntries { get; init; } =
+            new Dictionary<ulong, string>();
         public IReadOnlyDictionary<ulong, IReadOnlyList<string>> TypeContexts { get; init; } =
             new Dictionary<ulong, IReadOnlyList<string>>();
     }
@@ -64,6 +68,7 @@ namespace AssetsManager.Services.Hashes
                     {
                         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
                     }
+                    await WriteCatalogSupplementsAsync(_cached, cancellationToken);
                     return _cached;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -73,6 +78,7 @@ namespace AssetsManager.Services.Hashes
                         await using Stream cachedFile = File.OpenRead(cachePath);
                         _cached = Parse(cachedFile);
                         _log.LogWarning($"Meta Schema download failed; cached version '{_cached.Version}' is being used: {ex.Message}");
+                        await WriteCatalogSupplementsAsync(_cached, cancellationToken);
                         return _cached;
                     }
                     _log.LogWarning($"Meta Schema is unavailable; runtime BIN inventory will still be used: {ex.Message}");
@@ -96,6 +102,8 @@ namespace AssetsManager.Services.Hashes
             var unknownFields = new HashSet<ulong>();
             var knownTypes = new HashSet<string>(StringComparer.Ordinal);
             var knownFields = new HashSet<string>(StringComparer.Ordinal);
+            var knownTypeEntries = new Dictionary<ulong, string>();
+            var knownFieldEntries = new Dictionary<ulong, string>();
             var typeContexts = new Dictionary<ulong, HashSet<string>>();
 
             if (root.TryGetProperty("classes", out JsonElement classes) &&
@@ -117,7 +125,10 @@ namespace AssetsManager.Services.Hashes
                     if (!IsActive(classValue)) continue;
                     bool hasClassHash = TryParseHash(classProperty.Name, out ulong currentClassHash);
                     if (TryReadName(classValue, out string className))
+                    {
                         knownTypes.Add(className);
+                        if (hasClassHash) knownTypeEntries.TryAdd(currentClassHash, className);
+                    }
                     else if (hasClassHash)
                         unknownTypes.Add(currentClassHash);
 
@@ -147,9 +158,13 @@ namespace AssetsManager.Services.Hashes
                     {
                         JsonElement fieldValue = fieldProperty.Value;
                         if (!IsActive(fieldValue)) continue;
+                        bool hasFieldHash = TryParseHash(fieldProperty.Name, out ulong fieldHash);
                         if (TryReadName(fieldValue, out string fieldName))
+                        {
                             knownFields.Add(fieldName);
-                        else if (TryParseHash(fieldProperty.Name, out ulong fieldHash))
+                            if (hasFieldHash) knownFieldEntries.TryAdd(fieldHash, fieldName);
+                        }
+                        else if (hasFieldHash)
                             unknownFields.Add(fieldHash);
 
                         string propertyName = TryReadName(fieldValue, out fieldName)
@@ -174,6 +189,8 @@ namespace AssetsManager.Services.Hashes
                 UnknownFields = unknownFields,
                 KnownTypeNames = knownTypes.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 KnownFieldNames = knownFields.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                KnownTypeEntries = knownTypeEntries,
+                KnownFieldEntries = knownFieldEntries,
                 TypeContexts = typeContexts.ToDictionary(
                     pair => pair.Key,
                     pair => (IReadOnlyList<string>)pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray())
@@ -187,6 +204,43 @@ namespace AssetsManager.Services.Hashes
                     typeContexts[hash] = contexts;
                 }
                 contexts.Add(context);
+            }
+        }
+
+        private async Task WriteCatalogSupplementsAsync(MetaSchemaHashSnapshot snapshot, CancellationToken cancellationToken)
+        {
+            await WriteSupplementAsync("hashes.metaclasses.txt", snapshot.Version, snapshot.KnownTypeEntries, cancellationToken);
+            await WriteSupplementAsync("hashes.metafields.txt", snapshot.Version, snapshot.KnownFieldEntries, cancellationToken);
+        }
+
+        private async Task WriteSupplementAsync(
+            string fileName,
+            string version,
+            IReadOnlyDictionary<ulong, string> entries,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                Directory.CreateDirectory(_directories.HashesPath);
+                string path = Path.Combine(_directories.HashesPath, fileName);
+                IEnumerable<string> lines = entries
+                    .OrderBy(pair => pair.Key)
+                    .Select(pair => $"{pair.Key:x8} {pair.Value}")
+                    .Prepend($"# meta-schema {version}");
+                string temporaryPath = path + ".tmp";
+                try
+                {
+                    await File.WriteAllLinesAsync(temporaryPath, lines, cancellationToken);
+                    File.Move(temporaryPath, path, true);
+                }
+                finally
+                {
+                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _log.LogWarning($"Failed to write meta catalog supplement '{fileName}': {ex.Message}");
             }
         }
 
