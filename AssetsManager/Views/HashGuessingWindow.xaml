@@ -35,7 +35,7 @@
                 <!-- Dynamic Titles Area (22px / 12px) -->
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                     <TextBlock Text="HASH GUESSING LAB" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                    <TextBlock Text="Resolve unknown WAD, BIN &amp; RST hashes using specialized guessing algorithms and merge verified matches." FontSize="12" Foreground="{StaticResource TextMuted}" Opacity="0.8"/>
+                    <TextBlock Text="Resolve unknown WAD, BIN &amp; RST hashes using specialized guessing algorithms and merge verified matches." FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8"/>
                 </StackPanel>
             </Grid>
         </Border>
