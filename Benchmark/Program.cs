@@ -12,6 +12,7 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
 using BenchmarkApp.Diagnostics.Viewer;
+using BenchmarkApp.Diagnostics.Hashes;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -48,6 +49,19 @@ namespace BenchmarkApp
             {
                 string targetPath = args.Length > 1 ? args[1] : null;
                 InspectSknDiagnostic.Run(targetPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-bin-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                LcuBinProbeDiagnostic.Run(rootPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-wad-content", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string filter = args.Length > 2 ? args[2] : null;
+                LcuWadContentProbe.Run(rootPath, filter);
                 return;
             }
 
