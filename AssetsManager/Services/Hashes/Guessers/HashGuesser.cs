@@ -198,7 +198,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             int? effectiveDigits = inferDigits
                 ? Math.Max(1, Math.Max(0, numberLimit - 1).ToString(CultureInfo.InvariantCulture).Length)
                 : digits;
-            string numberPattern = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}(?=[^/]*\\.[^/]+$)" : @"[0-9]+(?=[^/]*\.[^/]+$)";
+            string digitExpression = effectiveDigits.HasValue ? $"[0-9]{{{effectiveDigits.Value}}}" : "[0-9]+";
+            string numberPattern = digitExpression;
+            if (AnchorNumberMatchesToFileName) numberPattern += @"(?=[^/]*\.[^/]+$)";
             var formats = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in knownPaths)
             {
@@ -223,6 +225,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         protected virtual bool IncludeNumberPath(string path) => true;
+
+        protected virtual bool AnchorNumberMatchesToFileName => true;
 
         internal IEnumerable<HashGuessCandidate> GenerateExtensionCandidates(int candidateBudget = int.MaxValue)
         {

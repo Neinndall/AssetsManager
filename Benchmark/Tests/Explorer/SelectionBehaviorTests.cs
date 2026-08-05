@@ -92,10 +92,14 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
                 "Controls",
                 "Viewer",
                 "ViewerProjectExplorerControl.xaml"));
+            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "GridView.xaml"));
 
             Assert.Matches(
-                @"<ListBox[^>]*x:Name=""FilesListBox""[^>]*SelectionMode=""Extended""",
+                @"<ListBox[^>]*x:Name=""FilesListBox""[^>]*Style=""\{StaticResource ModernFileGridListBox\}""",
                 browser.ReplaceLineEndings(" "));
+            Assert.Matches(
+                @"<Style x:Key=""ModernFileGridListBox""[^>]*>.*?<Setter Property=""SelectionMode"" Value=""Extended""",
+                gridStyle.ReplaceLineEndings(" "));
         }
 
         [Theory]

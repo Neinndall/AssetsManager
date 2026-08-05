@@ -117,6 +117,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
 
+        protected override bool AnchorNumberMatchesToFileName => false;
+
         internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
         {
             foreach (HashGuessCandidate candidate in SubstituteNumbers(maximum))

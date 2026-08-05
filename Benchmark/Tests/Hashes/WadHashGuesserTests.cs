@@ -731,6 +731,20 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuNumberSubstitutionStaysAnchoredToFileNames()
+        {
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "plugins/rcp-fe-one/global/default/skin1/old-icon1.png"
+            }), null);
+
+            Assert.Contains(lcu.SubstituteNumbers(20), candidate =>
+                candidate.Path == "plugins/rcp-fe-one/global/default/skin1/old-icon2.png");
+            Assert.DoesNotContain(lcu.SubstituteNumbers(20), candidate =>
+                candidate.Path == "plugins/rcp-fe-one/global/default/skin2/old-icon1.png");
+        }
+
+        [Fact]
         public void LcuAdvancedPartiesAttackUsesReducedPngWordsForOneToTwoSubstitution()
         {
             var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
@@ -1088,9 +1102,12 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownPath }));
             var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash });
+            var candidates = game.SubstituteNumbers(maximum: 20).ToList();
+
+            Assert.Contains(candidates, candidate => candidate.Path == targetPath);
 
             int checkedCandidates = 0;
-            foreach (var candidate in game.SubstituteNumbers(maximum: 20))
+            foreach (var candidate in candidates)
             {
                 checkedCandidates++;
                 game.Check(engine, candidate.Path, candidate.Strategy);
