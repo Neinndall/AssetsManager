@@ -144,14 +144,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(candidate, HashGuessStrategy.PrefixVariant);
         }
 
-        internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken)
+        internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
             var formats = Corpus.GetOrCreate("basename-word-formats-1-1", values => BuildBasenameWordFormats(values, 1, 1));
             var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
-            return RunBasenameWordSubstitutionFormats(engine, formats, words, 1, cancellationToken, int.MaxValue, "GAME basename word substitution");
+            return RunBasenameWordSubstitutionFormats(engine, formats, words, 1, cancellationToken, candidateBudget, "GAME basename word substitution");
         }
 
-        internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken)
+        internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
             var formats = Corpus.GetOrCreate("word-addition-formats", values => BuildWordAdditionFormats(values.Where(path =>
                 !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
@@ -159,7 +159,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase))));
             var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
-            return RunWordAdditionFormats(engine, formats, words, cancellationToken, int.MaxValue);
+            return RunWordAdditionFormats(engine, formats, words, cancellationToken, candidateBudget);
         }
 
         internal IEnumerable<HashGuessCandidate> SubstituteCharacter() => GenerateCharacterSubstitutionCandidates(int.MaxValue);
@@ -412,11 +412,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken)
         {
             int checkedCandidates = 0;
-            var paths = KnownPaths;
 
-            checkedCandidates += CheckCandidates(engine, SubstituteSkinNumbers(), "GAME skin number combinations", cancellationToken);
+            checkedCandidates += CheckCandidates(engine, GenerateSkinNumberCandidates(5_000_000), "GAME skin number combinations", cancellationToken);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, SubstituteCharacter(), "GAME character substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += CheckCandidates(engine, GenerateCharacterSubstitutionCandidates(10_000_000), "GAME character substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken);
 
@@ -427,41 +426,46 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += SubstituteBasenameWords(engine, cancellationToken);
+                checkedCandidates += SubstituteBasenameWords(engine, cancellationToken, 10_000_000);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += AddBasenameWord(engine, cancellationToken);
+                checkedCandidates += AddBasenameWord(engine, cancellationToken, 10_000_000);
 
             if (engine.RemainingUnknownCount > 0)
             {
                 progress?.Report(engine.CreateProgress("Focused Attack: Bin paths", checkedCandidates));
-                var binPaths = Corpus.GetOrCreate("bin-paths", values => values.Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList());
-                checkedCandidates += RunFocusedWordlistSubstitution(engine, binPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(binPaths).Take(20000), cancellationToken);
+                var binPaths = Corpus.GetOrCreate("bin-paths", values => values
+                    .Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(path => path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                    .ThenBy(path => path, StringComparer.Ordinal)
+                    .ToList());
+                var binWords = Corpus.GetOrCreate("bin-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values
+                    .Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
+                checkedCandidates += RunFocusedWordlistSubstitution(engine, binPaths.Take(25000), binWords, cancellationToken, candidateBudget: 1_000_000);
 
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("Focused Attack: Data bin paths", checkedCandidates));
-                    var dataBins = Corpus.GetOrCreate("data-bin-paths", values => values.Where(path => path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)).ToList());
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, dataBins.Take(25000), HashGuessEngine.BuildBasenameWordlist(dataBins).Take(20000), cancellationToken);
-                }
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("Focused Attack: Characters DDS paths", checkedCandidates));
                     var ddsPaths = Corpus.GetOrCreate("character-dds-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList());
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, ddsPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(ddsPaths).Take(20000), cancellationToken);
+                    var ddsWords = Corpus.GetOrCreate("character-dds-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
+                    checkedCandidates += RunFocusedWordlistSubstitution(engine, ddsPaths.Take(25000), ddsWords, cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("Focused Attack: Characters TEX paths", checkedCandidates));
                     var texPaths = Corpus.GetOrCreate("character-tex-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList());
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, texPaths.Take(25000), HashGuessEngine.BuildBasenameWordlist(texPaths).Take(20000), cancellationToken);
+                    var texWords = Corpus.GetOrCreate("character-tex-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
+                    checkedCandidates += RunFocusedWordlistSubstitution(engine, texPaths.Take(25000), texWords, cancellationToken);
                 }
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("Focused Attack: Word insertions", checkedCandidates));
-                    var additionPaths = paths.Where(path => !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
-                        !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) && !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
-                        !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase));
-                    checkedCandidates += RunWordAdditionAttack(engine, additionPaths.Take(20000), HashGuessEngine.BuildBasenameWordlist(paths).Take(20000), cancellationToken);
+                    var additionPaths = Corpus.GetOrCreate("word-addition-paths", values => values.Where(path =>
+                        !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
+                        !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase)).ToList());
+                    var additionWords = Corpus.GetOrCreate("basename-wordlist-top20000", values => HashGuessEngine.BuildBasenameWordlist(values).Take(20000).ToList());
+                    checkedCandidates += RunWordAdditionAttack(engine, additionPaths.Take(20000), additionWords, cancellationToken);
                 }
             }
 
@@ -476,6 +480,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += SubstituteBasenames(
                     engine,
                     cancellationToken,
+                    candidateBudget: 10_000_000,
                     progress: count => progress?.Report(engine.CreateProgress("GAME Cartesian Cross", progressOffset + count)));
             }
             return checkedCandidates;
@@ -605,6 +610,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             return Task.Run(() =>
             {
+                const int maximumGroupLength = 8;
+                const int candidateBudget = 5_000_000;
                 var characters = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
                 var regex = new Regex(@"^assets/characters/([^/]+)/skins/skin(\d+)/", RegexOptions.IgnoreCase);
                 foreach (string path in KnownPaths)
@@ -620,16 +627,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                     skins.Add(int.Parse(match.Groups[2].Value));
                 }
                 int generated = 0;
-                foreach (var pair in characters)
+                foreach (var pair in characters.OrderBy(pair => pair.Value.Count))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var skins = pair.Value.Select(value => $"_skins_skin{value}").OrderBy(value => value).ToList();
-                    for (int length = 1; length <= skins.Count; length++)
+                    for (int length = 1; length <= Math.Min(skins.Count, maximumGroupLength); length++)
                     foreach (IEnumerable<string> combination in GetCombinations(skins, length))
                     {
                         Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
                         generated++;
-                        if (engine.RemainingUnknownCount == 0) return generated;
+                        if (generated >= candidateBudget || engine.RemainingUnknownCount == 0) return generated;
                     }
                 }
                 return generated;

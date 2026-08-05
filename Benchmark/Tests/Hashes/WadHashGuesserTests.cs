@@ -1196,5 +1196,67 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Equal(targetPath, engine.Matches[targetHash].Path);
             Assert.True(checkedCandidates <= 40);
         }
+
+        [Fact]
+        public void GameSkinNumberCandidatesRespectBudget()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "data/characters/annie/skins/skin1/annie_skin1.skn",
+                "data/characters/annie/skins/skin3/annie_skin3.dds"
+            }));
+
+            Assert.Equal(3, game.GenerateSkinNumberCandidates(3).Count());
+        }
+
+        [Fact]
+        public void GameCharacterSubstitutionCandidatesRespectBudget()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/hud/ahri_circle.dds",
+                "assets/characters/lux/hud/lux_square.dds"
+            }));
+
+            Assert.Equal(3, game.GenerateCharacterSubstitutionCandidates(3).Count());
+        }
+
+        [Fact]
+        public void GameWordAttacksRespectCandidateBudget()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "data/spells/ahri_test.bin",
+                "data/items/boot_1.bin"
+            }));
+            var neverMatching = new HashSet<ulong> { 1UL, 2UL, 3UL, 4UL };
+
+            var substitutionEngine = new HashGuessEngine(HashGuessDomain.Game, neverMatching.ToHashSet());
+            game.SubstituteBasenameWords(substitutionEngine, CancellationToken.None, candidateBudget: 3);
+            Assert.Equal(3, substitutionEngine.CheckedCandidates);
+
+            var additionEngine = new HashGuessEngine(HashGuessDomain.Game, neverMatching.ToHashSet());
+            game.AddBasenameWord(additionEngine, CancellationToken.None, candidateBudget: 3);
+            Assert.Equal(3, additionEngine.CheckedCandidates);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task GameSkinGroupsBinLocalCapsCombinationLength()
+        {
+            var corpus = new[] { "assets/characters/test/skins/skin0/a.dds" }
+                .Concat(Enumerable.Range(1, 9).Select(skin => $"assets/characters/test/skins/skin{skin}/a.dds"))
+                .ToArray();
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, corpus));
+            const string tooDeep = "data/test_skins_skin0_skins_skin1_skins_skin2_skins_skin3_skins_skin4_skins_skin5_skins_skin6_skins_skin7_skins_skin8.bin";
+            const string withinCap = "data/test_skins_skin0_skins_skin1_skins_skin2_skins_skin3_skins_skin4_skins_skin5_skins_skin6_skins_skin7.bin";
+
+            var deepEngine = CreateEngine(HashGuessDomain.Game, tooDeep);
+            await game.GuessSkinGroupsBin(deepEngine, CancellationToken.None);
+            Assert.Equal(1, deepEngine.RemainingUnknownCount);
+
+            var capEngine = CreateEngine(HashGuessDomain.Game, withinCap);
+            await game.GuessSkinGroupsBin(capEngine, CancellationToken.None);
+            AssertResolved(capEngine, withinCap);
+        }
     }
 }

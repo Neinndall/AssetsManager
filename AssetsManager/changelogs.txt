@@ -114,6 +114,10 @@ Improvements
   - Hash Guessing / GAME skin number substitution now emits only the real equal skin pairs (skins/skin12/..._skin12.skn) for single-token formats, resolving previously unreachable hashes while checking ~10x fewer candidates; mixed-token formats keep the full cross.
   - Hash Guessing / GAME chroma skin groups only run for champions attested in the known corpus (all champions are still processed when the corpus has none), and the character list is cached per hash-file revision.
   - Hash Guessing / GAME basename word and word-addition attacks now share a frequency-ranked wordlist (basename words first) and reuse prebuilt formats cached per hash-file revision, so productive words are tried first and formats are not rebuilt on every run.
+  - Hash Guessing / GAME Extended now caps the unbounded attacks (character substitution 10M, basename words 10M, word addition 10M, Cartesian cross 10M, skin numbers 5M) so patches with many unknowns no longer hang, while the frequency-ordered candidates keep the same hit order.
+  - Hash Guessing / GAME Extended now runs a single focused BIN word attack with data/ paths first (the previous data-bin attack was a subset of it) and caches the five focused wordlists per hash-file revision.
+  - Hash Guessing / GAME local skin groups now enumerate combinations by ascending length up to 8 with a 5M candidate budget (real corpus groups never exceed 8 tokens; TFT pet dragons with 20-50 skins stay reachable via the chroma attack), instead of the unbounded 2^n explosion.
+  - Hash Guessing / GAME word-attack formats are now ranked by corpus support (most common path patterns first) so budgets cut the rarest formats instead of the alphabetically last ones, yielding more hits per check.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.
   - LCU V1 Paths now avoids generating locale variants already discoverable from installed WADs.
   - Generated hash paths now use exact matching with shared batch processing and avoid repeated hash-file access.

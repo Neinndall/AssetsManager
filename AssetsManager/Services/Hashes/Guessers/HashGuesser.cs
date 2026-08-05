@@ -388,7 +388,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
             if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
-            var formats = new HashSet<(string Prefix, string Suffix)>();
+            var counts = new Dictionary<(string Prefix, string Suffix), int>();
             var regex = new Regex($@"([^/_.-]+)(?=((?:[-_][^/_.-]+){{{oldWordCount - 1}}})[^/]*\.[^/]+$)", RegexOptions.Compiled);
             foreach (string path in paths)
             {
@@ -396,11 +396,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                 foreach (Match match in regex.Matches(path))
                 {
                     int matchedLength = match.Groups[1].Length + match.Groups[2].Length;
-                    formats.Add((path[..match.Index], path[(match.Index + matchedLength)..]));
+                    var format = (path[..match.Index], path[(match.Index + matchedLength)..]);
+                    counts.TryGetValue(format, out int support);
+                    counts[format] = support + 1;
                 }
             }
-            return formats.OrderBy(value => value.Prefix, StringComparer.Ordinal)
-                .ThenBy(value => value.Suffix, StringComparer.Ordinal)
+            return counts.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key.Prefix, StringComparer.Ordinal)
+                .ThenBy(pair => pair.Key.Suffix, StringComparer.Ordinal)
+                .Select(pair => pair.Key)
                 .ToList();
         }
 
@@ -447,16 +451,21 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal static IReadOnlyList<string> BuildWordAdditionFormats(IEnumerable<string> paths)
         {
-            var formats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var regex = new Regex(@"([^/_.-]+)(?=[^/]*\.[^/]+$)", RegexOptions.Compiled);
             foreach (string path in paths)
             foreach (Match match in regex.Matches(path))
             foreach (string separator in new[] { "-", "_" })
             {
-                formats.Add(path[..match.Index] + "{0}" + separator + path[match.Index..]);
-                formats.Add(path[..(match.Index + match.Length)] + separator + "{0}" + path[(match.Index + match.Length)..]);
+                counts.TryGetValue(path[..match.Index] + "{0}" + separator + path[match.Index..], out int beforeSupport);
+                counts[path[..match.Index] + "{0}" + separator + path[match.Index..]] = beforeSupport + 1;
+                counts.TryGetValue(path[..(match.Index + match.Length)] + separator + "{0}" + path[(match.Index + match.Length)..], out int afterSupport);
+                counts[path[..(match.Index + match.Length)] + separator + "{0}" + path[(match.Index + match.Length)..]] = afterSupport + 1;
             }
-            return formats.OrderBy(format => format, StringComparer.Ordinal).ToList();
+            return counts.OrderByDescending(pair => pair.Value)
+                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key)
+                .ToList();
         }
 
         internal static int RunWordAdditionAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
