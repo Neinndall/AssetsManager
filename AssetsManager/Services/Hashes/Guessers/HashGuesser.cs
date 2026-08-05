@@ -331,19 +331,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             return CheckIter(engine, candidates, strategy, "XDBG hashes");
         }
 
-        internal int CheckBasenames(HashGuessEngine engine, IEnumerable<string> names, HashGuessStrategy strategy, string source, int candidateBudget = int.MaxValue)
-        {
-            int checkedCount = 0;
-            IReadOnlyList<string> directories = DirectoryList();
-            foreach (string name in names.Select(NormalizePath).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal))
-            foreach (string directory in directories)
-            {
-                engine.CheckCombined(directory, name, strategy, source, 0);
-                if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
-            }
-            return checkedCount;
-        }
-
         internal int SubstituteBasenames(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
@@ -456,25 +443,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken.ThrowIfCancellationRequested();
                 engine.CheckExact(string.Format(format, word), HashGuessStrategy.WordlistVariant, "Word Insertion");
                 if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
-            }
-            return checkedCount;
-        }
-
-        internal static int RunPrefixAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> prefixes, CancellationToken cancellationToken, int candidateBudget = 2_000_000)
-        {
-            int checkedCount = 0;
-            var prefixList = prefixes.ToList();
-            foreach (string path in paths)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                int separator = path.LastIndexOf('/');
-                string directory = separator >= 0 ? path[..(separator + 1)] : string.Empty;
-                string file = separator >= 0 ? path[(separator + 1)..] : path;
-                foreach (string prefix in prefixList)
-                {
-                    engine.CheckExact(directory + prefix + file, HashGuessStrategy.PrefixVariant, "Prefix variant");
-                    if (CountCandidate(ref checkedCount, candidateBudget) || engine.RemainingUnknownCount == 0) return checkedCount;
-                }
             }
             return checkedCount;
         }

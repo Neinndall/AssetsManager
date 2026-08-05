@@ -124,8 +124,6 @@ namespace AssetsManager.Views.Models.Hashes
 
     public sealed class InternalHashInventory
     {
-        public Dictionary<InternalHashKind, HashSet<ulong>> Unknowns { get; init; } = new();
-        public string PatchFingerprint { get; init; }
         public int ScannedBins { get; init; }
         public int ScannedStringTables { get; init; }
         public string MetaSchemaVersion { get; init; }
@@ -147,7 +145,6 @@ namespace AssetsManager.Views.Models.Hashes
 
     public sealed class InternalHashRunResult
     {
-        public int UnknownHashesAtStart { get; init; }
         public int ScannedFiles { get; init; }
         public IReadOnlyList<InternalHashGuessMatch> Matches { get; init; } = Array.Empty<InternalHashGuessMatch>();
     }
@@ -160,10 +157,7 @@ namespace AssetsManager.Views.Models.Hashes
         public int FoundMatches { get; init; }
         public int? RemainingUnknowns { get; init; }
         public long CheckedCandidates { get; init; }
-        public long DiscardedCandidates { get; init; }
-        public double CandidatesPerSecond { get; init; }
         public TimeSpan Elapsed { get; init; }
-        public long ManagedMemoryBytes { get; init; }
         public string CurrentStage { get; init; }
         public IReadOnlyList<InternalHashGuessMatch> NewMatches { get; init; } = Array.Empty<InternalHashGuessMatch>();
     }

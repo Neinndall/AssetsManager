@@ -382,7 +382,7 @@ namespace AssetsManager.Services.Hashes
                     int progressOffset = checkedCandidates;
                     checkedCandidates += _gameGuesser.CheckIter(
                         engine,
-                        _gameGuesser.CheckBasenamePrefixes(),
+                        _gameGuesser.CheckBasenamePrefixes(new[] { "tft_", "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }),
                         "GAME Basic: prefixes",
                         cancellationToken,
                         count => progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", progressOffset + count)),

@@ -348,16 +348,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal IEnumerable<HashGuessCandidate> GeneratePrefixAndShaderCandidates(int candidateBudget = int.MaxValue)
-        {
-            int generated = 0;
-            foreach (HashGuessCandidate candidate in CheckBasenamePrefixes(new[] { "tft_", "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }).Concat(GuessShaderVariants()))
-            {
-                yield return candidate;
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-            }
-        }
-
         internal IEnumerable<HashGuessCandidate> GuessShaderVariants()
         {
             var shaderPaths = new HashSet<string>(StringComparer.Ordinal);

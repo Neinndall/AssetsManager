@@ -177,14 +177,9 @@ namespace AssetsManager.Services.Hashes
             {
                 HashResolverService._hashFileAccessLock.Release();
             }
-            var unknowns = new Dictionary<InternalHashKind, HashSet<ulong>>();
-            foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
-                unknowns[kind] = await _store.LoadUnknownAsync(kind, cancellationToken);
             _log.LogSuccess($"Internal Hash Lab inventory completed: {scannedBins} BIN and {scannedRst} RST files parsed.");
             return new InternalHashInventory
             {
-                Unknowns = unknowns,
-                PatchFingerprint = fingerprint,
                 ScannedBins = scannedBins,
                 ScannedStringTables = scannedRst,
                 MetaSchemaVersion = metaSchema.Version,
@@ -491,7 +486,7 @@ namespace AssetsManager.Services.Hashes
             int verified = matches.Count(match => match.CanPromote);
             int candidates = matches.Count - verified;
             _log.LogSuccess($"Internal Hash Lab completed: {verified} verified values and {candidates} candidates from {initial} unknown hashes.");
-            return new InternalHashRunResult { UnknownHashesAtStart = initial, ScannedFiles = scanned, Matches = matches };
+            return new InternalHashRunResult { ScannedFiles = scanned, Matches = matches };
         }
 
         private async Task PersistCancelledMatchesAsync(InternalHashEvidenceMatcher matcher)
@@ -537,10 +532,7 @@ namespace AssetsManager.Services.Hashes
                 FoundMatches = matcher.Matches.Count,
                 RemainingUnknowns = matcher.Remaining,
                 CheckedCandidates = matcher.CheckedCandidates,
-                DiscardedCandidates = matcher.DiscardedCandidates,
-                CandidatesPerSecond = matcher.CheckedCandidates / Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001),
                 Elapsed = stopwatch.Elapsed,
-                ManagedMemoryBytes = GC.GetTotalMemory(false),
                 CurrentStage = stage,
                 NewMatches = matcher.TakePendingMatches()
             };

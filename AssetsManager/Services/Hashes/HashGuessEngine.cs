@@ -233,38 +233,5 @@ namespace AssetsManager.Services.Hashes
             return directories.OrderBy(path => path, StringComparer.Ordinal).ToList();
         }
 
-        public static IReadOnlyList<string> BuildRankedBasenames(IEnumerable<string> paths)
-        {
-            return paths.Select(System.IO.Path.GetFileName)
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .OrderByDescending(group => group.Count())
-                .ThenBy(group => group.Key, StringComparer.Ordinal)
-                .Select(group => group.Key)
-                .ToList();
-        }
-
-        public static IReadOnlyList<string> BuildRankedDirectoryList(IEnumerable<string> paths)
-        {
-            var scores = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (string path in paths)
-            {
-                int separator = path?.LastIndexOf('/') ?? -1;
-                while (separator >= 0)
-                {
-                    string directory = path[..separator];
-                    scores.TryGetValue(directory, out int score);
-                    scores[directory] = score + 1;
-                    if (separator == 0) break;
-                    separator = path.LastIndexOf('/', separator - 1);
-                }
-            }
-            scores.TryAdd(string.Empty, 0);
-            return scores.OrderByDescending(pair => pair.Value)
-                .ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => pair.Key)
-                .ToList();
-        }
-
     }
 }

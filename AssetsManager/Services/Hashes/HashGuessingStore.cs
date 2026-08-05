@@ -23,10 +23,6 @@ namespace AssetsManager.Services.Hashes
             _directoriesCreator.HashesPath,
             domain == HashGuessDomain.Game ? "hashes.game.txt" : "hashes.lcu.txt");
 
-        private string GetConfirmedResearchPath(HashGuessDomain domain) => Path.Combine(
-            _directoriesCreator.HashLabPath,
-            domain == HashGuessDomain.Game ? "confirmed.game.txt" : "confirmed.lcu.txt");
-
         public async Task SaveResearchMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
         {
             var incoming = matches?.ToList() ?? new List<HashGuessMatch>();
@@ -346,20 +342,6 @@ namespace AssetsManager.Services.Hashes
             {
                 await using (var target = File.Create(temporaryPath))
                     await JsonSerializer.SerializeAsync(target, records, cancellationToken: cancellationToken);
-                File.Move(temporaryPath, path, true);
-            }
-            finally
-            {
-                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-            }
-        }
-
-        private static async Task WriteHashViewAsync(string path, IEnumerable<HashUnknownRecord> records, CancellationToken cancellationToken)
-        {
-            string temporaryPath = path + ".tmp";
-            try
-            {
-                await File.WriteAllLinesAsync(temporaryPath, records.Select(record => $"{record.Hash:x16}"), cancellationToken);
                 File.Move(temporaryPath, path, true);
             }
             finally

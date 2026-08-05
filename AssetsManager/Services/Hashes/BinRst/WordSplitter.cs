@@ -24,7 +24,6 @@ namespace AssetsManager.Services.Hashes
             @"[A-Z]+(?![a-z])(?:[0-9]+[a-z0-9]*)?|[A-Z][a-z0-9]*|[a-z][a-z0-9]*|[0-9]+",
             RegexOptions.Compiled);
 
-        private static readonly Regex AcronymRunRegex = new(@"[A-Z]{2,}", RegexOptions.Compiled);
         private static readonly Regex PascalRegex = new(@"^[A-Z][A-Za-z0-9]*$", RegexOptions.Compiled);
         private static readonly Regex NotationRegex = new(@"^[a-z][A-Z][A-Za-z0-9]*$", RegexOptions.Compiled);
 

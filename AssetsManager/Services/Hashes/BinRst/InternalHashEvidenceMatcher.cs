@@ -29,7 +29,6 @@ namespace AssetsManager.Services.Hashes
         internal IReadOnlyCollection<InternalHashGuessMatch> Matches => _matches.Values;
         internal int Remaining => _targets.Sum(pair => Math.Max(0, pair.Value.Count - _matched[pair.Key].Count));
         internal long CheckedCandidates { get; private set; }
-        internal long DiscardedCandidates { get; private set; }
 
         internal int GetRemainingCount(InternalHashKind kind) =>
             _targets.TryGetValue(kind, out HashSet<ulong> values)
@@ -55,9 +54,7 @@ namespace AssetsManager.Services.Hashes
         {
             CheckedCandidates++;
             if (string.IsNullOrWhiteSpace(value) || value.Length < 3 || value.Length > 512)
-            {
-                DiscardedCandidates++;
-                return;
+            {                return;
             }
             string candidate = NormalizeCandidate(value);
             uint fnv = Fnv1a.HashLower(candidate);
@@ -106,17 +103,13 @@ namespace AssetsManager.Services.Hashes
         {
             CheckedCandidates++;
             if (string.IsNullOrWhiteSpace(value) || value.Length > 512)
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
 
             string candidate = NormalizeCandidate(value);
             uint computedHash = Fnv1a.HashLower(candidate);
             if (observedHash.HasValue && computedHash != observedHash.Value)
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
             if (!observedHash.HasValue)
             {
@@ -159,17 +152,13 @@ namespace AssetsManager.Services.Hashes
             if (kind is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64 ||
                 string.IsNullOrWhiteSpace(value) ||
                 value.Length > 512)
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
 
             string candidate = NormalizeCandidate(value);
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
             _matched[kind].Add(hash);
 
@@ -224,15 +213,11 @@ namespace AssetsManager.Services.Hashes
             if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
                 string.IsNullOrWhiteSpace(value) ||
                 value.Length > 128)
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
             string candidate = value.Trim();
             if (!IsIdentifier(candidate))
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
             candidate = preserveCasing
                 ? candidate
@@ -241,9 +226,7 @@ namespace AssetsManager.Services.Hashes
                     : char.ToLowerInvariant(candidate[0]) + candidate[1..];
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
-            {
-                DiscardedCandidates++;
-                return false;
+            {                return false;
             }
             _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, candidate);
