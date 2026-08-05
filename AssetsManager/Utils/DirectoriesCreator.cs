@@ -25,6 +25,7 @@ namespace AssetsManager.Utils
         public string ApiCacheRewardsPath { get; }
         public string NotificationsPath { get; }
         public string NotificationsHistoryPath { get; }
+        public string NewsSeenPath { get; }
 
         public DirectoriesCreator(string customAppFolderPath = null)
         {
@@ -63,6 +64,9 @@ namespace AssetsManager.Utils
             NotificationsPath = Path.Combine(appFolderPath, "notifications");
             NotificationsHistoryPath = Path.Combine(NotificationsPath, "notifications_history.json");
             CreateDirectory(NotificationsPath);
+
+            NewsSeenPath = Path.Combine(appFolderPath, "news_cache", "seen_news.json");
+            CreateDirectory(Path.Combine(appFolderPath, "news_cache"));
         }
 
         // Dynamic naming logic (Stateless & Safe)

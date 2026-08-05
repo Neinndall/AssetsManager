@@ -23,9 +23,9 @@ namespace AssetsManager.Views.Dialogs
             ViewModel?.MarkAllRead();
         }
 
-        private void ClearAll_Click(object sender, RoutedEventArgs e)
+        private void Clear_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.ClearAll();
+            ViewModel?.ClearSelectedCategory();
         }
 
         private void RemoveNotification_Click(object sender, RoutedEventArgs e)
@@ -76,6 +76,11 @@ namespace AssetsManager.Views.Dialogs
         private void FilterUpdates_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.SetCategoryFilter(NotificationCategory.Updates);
+        }
+
+        private void FilterNews_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.SetCategoryFilter(NotificationCategory.News);
         }
 
         protected override void OnClosed(EventArgs e)

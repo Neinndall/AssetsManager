@@ -14,6 +14,7 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Monitor;
+using AssetsManager.Services.News;
 using AssetsManager.Services.Updater;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Win;
@@ -22,6 +23,7 @@ using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.News;
 using AssetsManager.Views.Models.Wad;
 using LeagueToolkit.Core.Wad;
 
@@ -52,6 +54,7 @@ namespace AssetsManager.Views
         private readonly ReportGenerationService _reportGenerationService;
         private readonly TaskCancellationManager _taskCancellationManager;
         private readonly NotificationService _notificationService;
+        private readonly NewsService _newsService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private ComparatorWindow _comparatorWindow;
 
@@ -86,6 +89,7 @@ namespace AssetsManager.Views
             ReportGenerationService reportGenerationService,
             TaskCancellationManager taskCancellationManager,
             NotificationService notificationService,
+            NewsService newsService,
             ComparisonHistoryService comparisonHistoryService)
         {
             InitializeComponent();
@@ -109,6 +113,7 @@ namespace AssetsManager.Views
             _reportGenerationService = reportGenerationService;
             _taskCancellationManager = taskCancellationManager;
             _notificationService = notificationService;
+            _newsService = newsService;
             _comparisonHistoryService = comparisonHistoryService;
 
             // Peer-to-Peer Injection
@@ -213,7 +218,7 @@ namespace AssetsManager.Views
         }
 
         // --- End Taskbar Logic ---
-        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
@@ -235,10 +240,28 @@ namespace AssetsManager.Views
                 NotificationCategory.Watcher => "Watcher Notification",
                 NotificationCategory.Tracker => "Tracker Notification",
                 NotificationCategory.Updates => "App Update Notification",
+                NotificationCategory.News => "Riot News",
                 _ => "System Notification"
             };
 
-            ShowNotification(true, message, category, notificationTitle);
+            if (category == NotificationCategory.News)
+            {
+                _notificationService.AddNotification(
+                    notificationTitle,
+                    message,
+                    NotificationType.Info,
+                    onClick: () =>
+                    {
+                        _newsService.SetPendingArticle(newsItem);
+                        LoadNewsWindow();
+                    },
+                    category: category,
+                    actionText: "OPEN NEWS");
+            }
+            else
+            {
+                ShowNotification(true, message, category, notificationTitle);
+            }
         }
         
         private void OnExtractionCompleted()

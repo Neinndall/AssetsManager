@@ -28,6 +28,10 @@ New Features
   - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
   - Comparison Results now offer direct access to the output folder of any exported asset.
   - Added a News section with categorized Riot news feeds, search filtering, and full article reading.
+  - News / Added optional background news discovery with its own timer in Advanced settings, notifying through a dedicated NEWS category in the notification hub with click-through to the article.
+  - News / Feeds are now limited to the 10 most recent articles per category, reducing transfer and memory usage.
+  - News / The feed cache no longer auto-expires; lists are refreshed only on demand (Refresh button or notification click-through).
+  - Notifications / The hub's Clear button now removes only the notifications of the active category tab instead of everything.
 
 Improvements
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.

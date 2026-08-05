@@ -18,7 +18,8 @@ namespace AssetsManager.Views.Models.Notifications
         System,
         Watcher,
         Tracker,
-        Updates
+        Updates,
+        News
     }
 
     public class NotificationModel : INotifyPropertyChanged

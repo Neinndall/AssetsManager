@@ -9,8 +9,10 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
+using AssetsManager.Services.News;
 using AssetsManager.Info;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.News;
 
 namespace AssetsManager.Services.Core
 {
@@ -22,18 +24,21 @@ namespace AssetsManager.Services.Core
         private readonly LogService _logService;
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
+        private readonly NewsService _newsService;
         private Timer _updateTimer;
         private Timer _assetTrackerTimer;
         private Timer _pbeStatusTimer;
+        private Timer _newsTimer;
         private readonly BackgroundJobGate _generalUpdatesJob = new();
         private readonly BackgroundJobGate _assetTrackerJob = new();
         private readonly BackgroundJobGate _pbeStatusJob = new();
+        private readonly BackgroundJobGate _newsJob = new();
 
-        public event Action<string, string, NotificationCategory, string> UpdatesFound;
+        public event Action<string, string, NotificationCategory, string, NewsItemModel> UpdatesFound;
 
         public string AvailableVersion { get; private set; }
 
-        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService)
+        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NewsService newsService)
         {
             _appSettings = appSettings;
             _status = status;
@@ -41,6 +46,7 @@ namespace AssetsManager.Services.Core
             _logService = logService;
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
+            _newsService = newsService;
         }
 
         public void Start()
@@ -48,6 +54,7 @@ namespace AssetsManager.Services.Core
             _generalUpdatesJob.Start();
             _assetTrackerJob.Start();
             _pbeStatusJob.Start();
+            _newsJob.Start();
 
             // Start general updates timer
             if (_appSettings.BackgroundUpdates)
@@ -87,6 +94,24 @@ namespace AssetsManager.Services.Core
                 _pbeStatusTimer.Interval = _appSettings.PbeStatusFrequency * 60 * 1000;
                 _pbeStatusTimer.Enabled = true;
             }
+
+            // Start News timer
+            if (_appSettings.NewsUpdates && _appSettings.NewsUpdateFrequency > 0)
+            {
+                if (_newsTimer == null)
+                {
+                    _newsTimer = new Timer();
+                    _newsTimer.Elapsed += NewsTimer_Elapsed;
+                    _newsTimer.AutoReset = true;
+                }
+                _newsTimer.Interval = _appSettings.NewsUpdateFrequency * 60 * 1000;
+                _newsTimer.Enabled = true;
+            }
+        }
+
+        private async void NewsTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            await RunTimerJobAsync(CheckForNewsAsync, "News check");
         }
 
         private async void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -109,6 +134,7 @@ namespace AssetsManager.Services.Core
             _generalUpdatesJob.Stop();
             _assetTrackerJob.Stop();
             _pbeStatusJob.Stop();
+            _newsJob.Stop();
 
             if (_updateTimer != null)
             {
@@ -127,6 +153,12 @@ namespace AssetsManager.Services.Core
                 _pbeStatusTimer.Dispose();
                 _pbeStatusTimer = null;
                 _logService.LogDebug("PBE Status timer stopped.");
+            }
+            if (_newsTimer != null)
+            {
+                _newsTimer.Dispose();
+                _newsTimer = null;
+                _logService.LogDebug("News timer stopped.");
             }
         }
 
@@ -153,12 +185,12 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Tracker, "Asset Tracker Discovery");
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null);
                     }
                     else
                     {
                         string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Tracker, "Asset Tracker Discovery");
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null);
                     }
                 }
             });
@@ -176,9 +208,32 @@ namespace AssetsManager.Services.Core
             {
                 string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.System, "PBE Status Update");
+                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.System, "PBE Status Update", null);
             });
             if (!completed) _logService.LogDebug("PBE status check skipped because it is already running or monitoring stopped.");
+        }
+
+        /// <summary>
+        /// Checks for newly published Riot news articles.
+        /// This method is used by its dedicated background timer (_newsTimer).
+        /// It fires an 'UpdatesFound' event per new article.
+        /// </summary>
+        private async Task CheckForNewsAsync()
+        {
+            bool completed = await _newsJob.TryRunAsync(async cancellationToken =>
+            {
+                var newItems = await _newsService.CheckForNewNewsAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var item in newItems)
+                {
+                    string message = string.IsNullOrEmpty(item.CategoryTitle)
+                        ? item.Title
+                        : $"{item.Title} ({item.CategoryTitle})";
+                    UpdatesFound?.Invoke(message, null, NotificationCategory.News, "Riot News", item);
+                }
+            });
+            if (!completed) _logService.LogDebug("News check skipped because it is already running or monitoring stopped.");
         }
 
         /// <summary>
@@ -199,7 +254,7 @@ namespace AssetsManager.Services.Core
                     tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
                     {
                         if (silent && !cancellationToken.IsCancellationRequested)
-                            UpdatesFound?.Invoke("New hashes are available!", null, NotificationCategory.Updates, "Hash Update");
+                            UpdatesFound?.Invoke("New hashes are available!", null, NotificationCategory.Updates, "Hash Update", null);
                     }));
                 }
 
@@ -223,7 +278,7 @@ namespace AssetsManager.Services.Core
                     string message = ApplicationInfos.IsQA && latestVer <= currentVer
                         ? $"New stable version {newVersion} is available!"
                         : $"New version {newVersion} is available!";
-                    UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available");
+                    UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available", null);
                 }
 
                 async Task CheckMonitoredAssetsAsync()
@@ -235,7 +290,7 @@ namespace AssetsManager.Services.Core
                     string message = updatedNames.Count > 0
                         ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
                         : "Some monitored local assets have been updated!";
-                    UpdatesFound?.Invoke(message, null, NotificationCategory.Watcher, "Monitored Assets Updated");
+                    UpdatesFound?.Invoke(message, null, NotificationCategory.Watcher, "Monitored Assets Updated", null);
                 }
             });
             if (!completed) _logService.LogDebug("General update check skipped because it is already running or monitoring stopped.");

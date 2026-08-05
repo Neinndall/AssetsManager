@@ -37,13 +37,38 @@ namespace AssetsManager.Views
             Loaded += NewsWindow_Loaded;
         }
 
-        private void NewsWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void NewsWindow_Loaded(object sender, RoutedEventArgs e)
         {
             if (_isInitialized) return;
             _isInitialized = true;
 
+            var pendingArticle = _newsService.TakePendingArticle();
+            if (pendingArticle != null)
+            {
+                var category = MapNewsCategory(pendingArticle.CategoryId);
+                _viewModel.SelectedCategory = _viewModel.Categories.FirstOrDefault(c => c.Category == category) ?? _viewModel.Categories[0];
+                await LoadCategoryAsync(category, forceRefresh: true);
+                var article = _allItems.FirstOrDefault(item => item.ActionUrl == pendingArticle.ActionUrl);
+                if (article != null) OpenDetail(article);
+                return;
+            }
+
             _viewModel.SelectedCategory = _viewModel.Categories[0];
-            _ = LoadCategoryAsync(_viewModel.SelectedCategory.Category);
+            await LoadCategoryAsync(_viewModel.SelectedCategory.Category);
+        }
+
+        private static NewsCategory MapNewsCategory(string categoryId)
+        {
+            return categoryId?.ToLowerInvariant() switch
+            {
+                "dev" => NewsCategory.Dev,
+                "esports" => NewsCategory.Esports,
+                "game-updates" => NewsCategory.GameUpdates,
+                "lore" => NewsCategory.Lore,
+                "media" => NewsCategory.Media,
+                "patch_notes" => NewsCategory.PatchNotes,
+                _ => NewsCategory.AllNews
+            };
         }
 
         private async void CategoryComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

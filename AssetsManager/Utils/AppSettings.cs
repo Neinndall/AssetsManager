@@ -26,11 +26,13 @@ namespace AssetsManager.Utils
         public bool SaveWadComparisonHistory { get; set; }
         public bool BackgroundUpdates { get; set; }
         public bool CheckPbeStatus { get; set; }
+        public bool NewsUpdates { get; set; }
         public bool MinimizeToTrayOnClose { get; set; }
 
         public int UpdateCheckFrequency { get; set; }
         public int AssetTrackerFrequency { get; set; }
         public int PbeStatusFrequency { get; set; }
+        public int NewsUpdateFrequency { get; set; }
 
         public string LolPbeDirectory { get; set; }
         public string LolLiveDirectory { get; set; }
@@ -233,10 +235,12 @@ namespace AssetsManager.Utils
                 SaveWadComparisonHistory = false,
                 BackgroundUpdates = false,
                 CheckPbeStatus = false,
+                NewsUpdates = false,
                 MinimizeToTrayOnClose = false,
                 UpdateCheckFrequency = 10,
                 AssetTrackerFrequency = 60,
                 PbeStatusFrequency = 10,
+                NewsUpdateFrequency = 30,
                 LolPbeDirectory = null,
                 LolLiveDirectory = null,
                 DefaultExtractedSelectDirectory = null,
@@ -297,12 +301,14 @@ namespace AssetsManager.Utils
             SaveWadComparisonHistory = defaultSettings.SaveWadComparisonHistory;
             BackgroundUpdates = defaultSettings.BackgroundUpdates;
             CheckPbeStatus = defaultSettings.CheckPbeStatus;
+            NewsUpdates = defaultSettings.NewsUpdates;
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             PreferredClient = defaultSettings.PreferredClient;
             PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;
             PbeStatusFrequency = defaultSettings.PbeStatusFrequency;
+            NewsUpdateFrequency = defaultSettings.NewsUpdateFrequency;
             MonitoredAssets = defaultSettings.MonitoredAssets;
             DiffHistory = defaultSettings.DiffHistory;
             AssetTrackerTimer = defaultSettings.AssetTrackerTimer;

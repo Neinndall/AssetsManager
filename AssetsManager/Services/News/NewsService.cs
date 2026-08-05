@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.News;
 
 namespace AssetsManager.Services.News
@@ -15,36 +17,139 @@ namespace AssetsManager.Services.News
         private const string NewsApiBaseUrl = "https://soraclee.github.io/riotgames-news-api/data/lol/";
         private const string BrowserUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-        private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(15);
-
+        private const int MaxSeenEntries = 200;
+        private const int MaxItemsPerCategory = 10;
         private readonly HttpClient _httpClient;
         private readonly LogService _logService;
+        private readonly DirectoriesCreator _directoriesCreator;
         private readonly object _cacheSyncRoot = new();
+        private readonly object _pendingSyncRoot = new();
         private readonly Dictionary<NewsCategory, CacheEntry> _cache = new();
 
-        public NewsService(HttpClient httpClient, LogService logService)
+        private NewsItemModel _pendingArticle;
+
+        public NewsService(HttpClient httpClient, LogService logService, DirectoriesCreator directoriesCreator)
         {
             _httpClient = httpClient;
             _logService = logService;
+            _directoriesCreator = directoriesCreator;
         }
 
         public async Task<IReadOnlyList<NewsItemModel>> GetNewsAsync(NewsCategory category, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             lock (_cacheSyncRoot)
             {
-                if (!forceRefresh && _cache.TryGetValue(category, out var cached) && !cached.IsExpired)
+                if (!forceRefresh && _cache.TryGetValue(category, out var cached))
                 {
                     return cached.Items;
                 }
             }
 
             var items = await FetchAsync(category, cancellationToken);
+            var recentItems = items
+                .OrderByDescending(item => item.PublishedAt)
+                .Take(MaxItemsPerCategory)
+                .ToList();
 
             lock (_cacheSyncRoot)
             {
-                _cache[category] = new CacheEntry(items);
+                _cache[category] = new CacheEntry(recentItems);
             }
-            return items;
+            return recentItems;
+        }
+
+        /// <summary>
+        /// Background discovery of newly published Riot articles.
+        /// The first call establishes a baseline (no notifications); subsequent calls
+        /// return items whose ActionUrl was not seen before, limited to avoid spam.
+        /// File I/O runs outside any lock: the caller (UpdateCheckService job gate)
+        /// already serializes concurrent invocations.
+        /// </summary>
+        public async Task<IReadOnlyList<NewsItemModel>> CheckForNewNewsAsync(CancellationToken cancellationToken = default)
+        {
+            var items = await FetchAsync(NewsCategory.AllNews, cancellationToken);
+            if (items == null || items.Count == 0) return Array.Empty<NewsItemModel>();
+
+            var seen = await LoadSeenIdsAsync();
+            if (seen.Count == 0)
+            {
+                await PersistSeenIdsAsync(items.Select(item => item.ActionUrl).Where(url => !string.IsNullOrEmpty(url)));
+                _logService.LogDebug("News discovery baseline established.");
+                return Array.Empty<NewsItemModel>();
+            }
+
+            var newItems = items
+                .Where(item => !string.IsNullOrEmpty(item.ActionUrl) && !seen.Contains(item.ActionUrl))
+                .OrderByDescending(item => item.PublishedAt)
+                .Take(5)
+                .ToList();
+
+            if (newItems.Count > 0)
+            {
+                var merged = seen.Concat(newItems.Select(item => item.ActionUrl)).Distinct().TakeLast(MaxSeenEntries);
+                await PersistSeenIdsAsync(merged);
+                _logService.LogDebug($"News discovery found {newItems.Count} new article(s).");
+            }
+
+            return newItems;
+        }
+
+        public void SetPendingArticle(NewsItemModel article)
+        {
+            lock (_pendingSyncRoot)
+            {
+                _pendingArticle = article;
+            }
+        }
+
+        public NewsItemModel TakePendingArticle()
+        {
+            lock (_pendingSyncRoot)
+            {
+                var article = _pendingArticle;
+                _pendingArticle = null;
+                return article;
+            }
+        }
+
+        private async Task<HashSet<string>> LoadSeenIdsAsync()
+        {
+            try
+            {
+                if (!File.Exists(_directoriesCreator.NewsSeenPath)) return new HashSet<string>();
+
+                string json = await File.ReadAllTextAsync(_directoriesCreator.NewsSeenPath);
+                using var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("ids", out var ids) || ids.ValueKind != JsonValueKind.Array) return new HashSet<string>();
+
+                return new HashSet<string>(
+                    ids.EnumerateArray()
+                       .Where(e => e.ValueKind == JsonValueKind.String)
+                       .Select(e => e.GetString())
+                       .Where(id => !string.IsNullOrEmpty(id)),
+                    StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogWarning($"Failed to load seen news ids: {ex.Message}");
+                return new HashSet<string>();
+            }
+        }
+
+        private async Task PersistSeenIdsAsync(IEnumerable<string> ids)
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(_directoriesCreator.NewsSeenPath);
+                if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+
+                string json = JsonSerializer.Serialize(new { ids = ids.Where(id => !string.IsNullOrEmpty(id)).ToList() });
+                await File.WriteAllTextAsync(_directoriesCreator.NewsSeenPath, json);
+            }
+            catch (Exception ex)
+            {
+                _logService.LogWarning($"Failed to persist seen news ids: {ex.Message}");
+            }
         }
 
         private async Task<List<NewsItemModel>> FetchAsync(NewsCategory category, CancellationToken cancellationToken)
@@ -252,15 +357,11 @@ namespace AssetsManager.Services.News
         private sealed class CacheEntry
         {
             public IReadOnlyList<NewsItemModel> Items { get; }
-            private readonly DateTime _fetchedAtUtc;
 
             public CacheEntry(IReadOnlyList<NewsItemModel> items)
             {
                 Items = items;
-                _fetchedAtUtc = DateTime.UtcNow;
             }
-
-            public bool IsExpired => DateTime.UtcNow - _fetchedAtUtc > CacheLifetime;
         }
     }
 

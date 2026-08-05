@@ -130,11 +130,17 @@ namespace AssetsManager.Services.Core
             });
         }
 
-        public void ClearAll()
+        public void RemoveAllByCategory(NotificationCategory category)
         {
             RunOnUiThread(() =>
             {
-                _notifications.Clear();
+                for (int i = _notifications.Count - 1; i >= 0; i--)
+                {
+                    if (_notifications[i].Category == category)
+                    {
+                        _notifications.RemoveAt(i);
+                    }
+                }
                 CountsChanged?.Invoke();
                 SaveHistory();
             });

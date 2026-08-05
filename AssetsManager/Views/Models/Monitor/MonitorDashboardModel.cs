@@ -12,6 +12,7 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.News;
 using Material.Icons;
 
 namespace AssetsManager.Views.Models.Monitor
@@ -531,7 +532,7 @@ namespace AssetsManager.Views.Models.Monitor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title)
+        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title, NewsItemModel newsItem)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {

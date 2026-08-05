@@ -6,6 +6,7 @@ using AssetsManager.Services.Updater;
 using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Help;
 using AssetsManager.Views.Models.Notifications;
+using AssetsManager.Views.Models.News;
 
 namespace AssetsManager.Views.Help
 {
@@ -44,7 +45,7 @@ namespace AssetsManager.Views.Help
             _updateCheckService.UpdatesFound -= OnUpdatesFound;
         }
 
-        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem)
         {
             UpdateModelState();
         }

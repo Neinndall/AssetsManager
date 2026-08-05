@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Models.Notifications
                     OnPropertyChanged(nameof(IsWatcherSelected));
                     OnPropertyChanged(nameof(IsTrackerSelected));
                     OnPropertyChanged(nameof(IsUpdatesSelected));
+                    OnPropertyChanged(nameof(IsNewsSelected));
                     FilteredNotifications.Refresh();
                     NotifyFilteredStateChanged();
                 }
@@ -45,12 +46,14 @@ namespace AssetsManager.Views.Models.Notifications
         public bool IsWatcherSelected => _selectedCategory == NotificationCategory.Watcher;
         public bool IsTrackerSelected => _selectedCategory == NotificationCategory.Tracker;
         public bool IsUpdatesSelected => _selectedCategory == NotificationCategory.Updates;
+        public bool IsNewsSelected => _selectedCategory == NotificationCategory.News;
         public string SelectedCategoryTitle => _selectedCategory switch
         {
             NotificationCategory.System => "SYSTEM NOTIFICATIONS",
             NotificationCategory.Watcher => "WATCHER NOTIFICATIONS",
             NotificationCategory.Tracker => "TRACKER NOTIFICATIONS",
             NotificationCategory.Updates => "UPDATE NOTIFICATIONS",
+            NotificationCategory.News => "NEWS NOTIFICATIONS",
             _ => "ALL NOTIFICATIONS"
         };
         public int FilteredNotificationCount => FilteredNotifications.Cast<object>().Count();
@@ -89,12 +92,14 @@ namespace AssetsManager.Views.Models.Notifications
         public int UnreadWatcherCount => Notifications.Count(n => !n.IsRead && n.Category == NotificationCategory.Watcher);
         public int UnreadTrackerCount => Notifications.Count(n => !n.IsRead && n.Category == NotificationCategory.Tracker);
         public int UnreadUpdatesCount => Notifications.Count(n => !n.IsRead && n.Category == NotificationCategory.Updates);
+        public int UnreadNewsCount => Notifications.Count(n => !n.IsRead && n.Category == NotificationCategory.News);
         public int SelectedUnreadCount => _selectedCategory switch
         {
             NotificationCategory.System => UnreadSystemCount,
             NotificationCategory.Watcher => UnreadWatcherCount,
             NotificationCategory.Tracker => UnreadTrackerCount,
             NotificationCategory.Updates => UnreadUpdatesCount,
+            NotificationCategory.News => UnreadNewsCount,
             _ => UnreadCount
         };
         public bool HasSelectedUnread => SelectedUnreadCount > 0;
@@ -131,6 +136,7 @@ namespace AssetsManager.Views.Models.Notifications
             OnPropertyChanged(nameof(UnreadWatcherCount));
             OnPropertyChanged(nameof(UnreadTrackerCount));
             OnPropertyChanged(nameof(UnreadUpdatesCount));
+            OnPropertyChanged(nameof(UnreadNewsCount));
             FilteredNotifications.Refresh();
             NotifyFilteredStateChanged();
         }
@@ -141,7 +147,21 @@ namespace AssetsManager.Views.Models.Notifications
         }
 
         public void TogglePanel() => IsOpen = !IsOpen;
-        public void ClearAll() => _notificationService.ClearAll();
+
+        public void ClearSelectedCategory()
+        {
+            if (_selectedCategory == null)
+            {
+                foreach (var category in Enum.GetValues(typeof(NotificationCategory)).Cast<NotificationCategory>())
+                {
+                    _notificationService.RemoveAllByCategory(category);
+                }
+            }
+            else
+            {
+                _notificationService.RemoveAllByCategory(_selectedCategory.Value);
+            }
+        }
         public void MarkAllRead() => _notificationService.MarkAllAsRead();
         public void RemoveNotification(NotificationModel note) => _notificationService.RemoveNotification(note);
 

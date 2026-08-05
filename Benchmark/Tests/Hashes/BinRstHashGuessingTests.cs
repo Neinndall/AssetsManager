@@ -1153,7 +1153,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void SameFileDiscoverySavesIntoVerifiedCatalog()
+        public async Task SameFileDiscoverySavesIntoVerifiedCatalog()
         {
             const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
             uint hash = Fnv1a.HashLower(candidate);
@@ -1173,14 +1173,14 @@ namespace AssetsManager.BenchmarkTests.Hashes
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
             var store = new BinRstHashGuessingStore(bridge.Directories);
-            store.SaveMatchesAsync(matcher.Matches, CancellationToken.None).GetAwaiter().GetResult();
+            await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
 
             string verified = File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries));
             Assert.Contains($"{hash:x8} {candidate}", verified);
         }
 
         [Fact]
-        public void CollidingFileStringsNeverReachVerifiedCatalog()
+        public async Task CollidingFileStringsNeverReachVerifiedCatalog()
         {
             const string first = "yafhet0d6pup";
             const string second = "aye79o8723jl";
@@ -1206,7 +1206,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             using var bridge = new AssetsManagerTestBridge();
             bridge.Directories.CreateHashesDirectories();
             var store = new BinRstHashGuessingStore(bridge.Directories);
-            store.SaveMatchesAsync(matcher.Matches, CancellationToken.None).GetAwaiter().GetResult();
+            await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
 
             Assert.Equal(string.Empty, File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries)));
             Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "internal.collisions.json")));
@@ -1307,7 +1307,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
             CheckCandidates(matcher, wordlist, GenerateSwapCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.ReductionVariant, "test swap");
 
             Assert.Equal(before, matcher.Matches.Count);
-            Assert.Equal(1, targets[InternalHashKind.BinTypes].Count);
+            Assert.Single(targets[InternalHashKind.BinTypes]);
         }
 
         private static BinRstHashGuessingService.TokenWordlist CreateWordlist(params string[] names)
