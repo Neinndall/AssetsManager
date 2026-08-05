@@ -1056,6 +1056,84 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameSkinNumberEqualTokensGenerateRealPairs()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "data/characters/annie/skins/skin1/annie_skin1.skn",
+                "data/characters/annie/skins/skin3/annie_skin3.dds"
+            }));
+            const string expected = "data/characters/annie/skins/skin3/annie_skin3.skn";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            foreach (var candidate in game.SubstituteSkinNumbers())
+            {
+                game.Check(engine, candidate.Path, candidate.Strategy);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            AssertResolved(engine, expected);
+            Assert.DoesNotContain(game.SubstituteSkinNumbers(), candidate =>
+                candidate.Path == "data/characters/annie/skins/skin3/annie_skin1.skn");
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task GameChromaGroupsSkipCharactersUnknownToCorpus()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "lol-game-data.wad");
+            const string json = "{\"103000\":{\"id\":103000,\"loadScreenPath\":\"/lol-game-data/assets/assets/characters/ahri/skins/skin0/ahri_loadscreen.jpg\",\"chromas\":[{\"id\":103001}]},\"570000\":{\"id\":570000,\"loadScreenPath\":\"/lol-game-data/assets/assets/characters/teemo/skins/skin5/teemo_loadscreen.jpg\"}}";
+            var entries = new[]
+            {
+                new WadBakeEntry(
+                    RiotCatalogDefinitions.SkinsJsonPath,
+                    () => new MemoryStream(Encoding.UTF8.GetBytes(json)),
+                    WadChunkCompression.None)
+            };
+            WadBuilder.Bake(entries, wadPath, new WadBakeSettings());
+            const string expectedAhri = "data/ahri_skins_skin0_skins_skin1.bin";
+            const string unknownTeemo = "data/teemo_skins_skin5.bin";
+
+            try
+            {
+                var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/characters/ahri/hud/ahri_circle.dds" }));
+                var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+                {
+                    XxHash64Ext.Hash(expectedAhri),
+                    XxHash64Ext.Hash(unknownTeemo)
+                });
+                Assert.Equal(2, engine.RemainingUnknownCount);
+
+                await game.GuessSkinGroupsBinUsingChromas(engine, directory, CancellationToken.None);
+
+                Assert.Equal(1, engine.RemainingUnknownCount);
+                Assert.Contains(engine.Matches.Values, match => match.Path == expectedAhri);
+                Assert.DoesNotContain(engine.Matches.Values, match => match.Path == unknownTeemo);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public void GameBasenameWordSubstitutionKeepsRareWordCoverage()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/hud/ahri_circle.dds",
+                "assets/characters/lux/hud/lux_square.dds"
+            }));
+            const string expected = "assets/characters/ahri/hud/ahri_square.dds";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.SubstituteBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void HashFileLoadsUnknownExportsWithoutOwningPersistence()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));

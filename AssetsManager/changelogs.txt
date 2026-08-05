@@ -111,6 +111,9 @@ Improvements
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
   - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - Hash Guessing / GAME number substitution is path-wide again (map11 → map12 folders resolve), while LCU numeric guessing stays anchored to file names for the Basic suite cap.
+  - Hash Guessing / GAME skin number substitution now emits only the real equal skin pairs (skins/skin12/..._skin12.skn) for single-token formats, resolving previously unreachable hashes while checking ~10x fewer candidates; mixed-token formats keep the full cross.
+  - Hash Guessing / GAME chroma skin groups only run for champions attested in the known corpus (all champions are still processed when the corpus has none), and the character list is cached per hash-file revision.
+  - Hash Guessing / GAME basename word and word-addition attacks now share a frequency-ranked wordlist (basename words first) and reuse prebuilt formats cached per hash-file revision, so productive words are tried first and formats are not rebuilt on every run.
   - LCU V1 Paths now tests localized variants only when their default path is known, keeping the resolver responsive.
   - LCU V1 Paths now avoids generating locale variants already discoverable from installed WADs.
   - Generated hash paths now use exact matching with shared batch processing and avoid repeated hash-file access.

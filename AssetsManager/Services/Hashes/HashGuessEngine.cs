@@ -178,6 +178,29 @@ namespace AssetsManager.Services.Hashes
                 .ToList();
         }
 
+        public static IReadOnlyList<string> BuildFrequencyWordlist(IEnumerable<string> paths)
+        {
+            var basenameCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                if (string.IsNullOrEmpty(path)) continue;
+                List<string> pathTokens = TokenizePath(path);
+                if (pathTokens.Count == 0) continue;
+                for (int index = 0; index < pathTokens.Count - 1; index++)
+                    tokens.Add(pathTokens[index]);
+                foreach (string word in TokenizePath(System.IO.Path.GetFileNameWithoutExtension(path)))
+                {
+                    basenameCounts.TryGetValue(word, out int count);
+                    basenameCounts[word] = count + 1;
+                }
+            }
+            return tokens
+                .OrderByDescending(word => basenameCounts.TryGetValue(word, out int count) ? count : 0)
+                .ThenBy(word => word, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         private static List<string> TokenizePath(string path)
         {
             var list = new List<string>();

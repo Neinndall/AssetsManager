@@ -100,16 +100,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal IReadOnlyList<string> GetCharacters()
-        {
-            var characters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string path in KnownPaths)
-            {
-                Match match = Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)(?:/|$)", RegexOptions.IgnoreCase);
-                if (match.Success) characters.Add(match.Groups[1].Value);
-            }
-            return characters.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
-        }
+        internal IReadOnlyList<string> GetCharacters() =>
+            Corpus.GetOrCreate("characters", values => values
+                .Select(path => Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)(?:/|$)", RegexOptions.IgnoreCase))
+                .Where(match => match.Success)
+                .Select(match => match.Groups[1].Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList());
 
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", HashGuessEngine.BuildWordlist);
@@ -146,17 +144,22 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(candidate, HashGuessStrategy.PrefixVariant);
         }
 
-        internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken) =>
-            RunBasenameWordSubstitution(engine, KnownPaths, BuildWordlist(), 1, 1, cancellationToken, int.MaxValue, "GAME basename word substitution");
+        internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken)
+        {
+            var formats = Corpus.GetOrCreate("basename-word-formats-1-1", values => BuildBasenameWordFormats(values, 1, 1));
+            var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
+            return RunBasenameWordSubstitutionFormats(engine, formats, words, 1, cancellationToken, int.MaxValue, "GAME basename word substitution");
+        }
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken)
         {
-            IEnumerable<string> paths = KnownPaths.Where(path =>
+            var formats = Corpus.GetOrCreate("word-addition-formats", values => BuildWordAdditionFormats(values.Where(path =>
                 !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
-                !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase));
-            return RunWordAdditionAttack(engine, paths, BuildWordlist(), cancellationToken, int.MaxValue);
+                !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase))));
+            var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
+            return RunWordAdditionFormats(engine, formats, words, cancellationToken, int.MaxValue);
         }
 
         internal IEnumerable<HashGuessCandidate> SubstituteCharacter() => GenerateCharacterSubstitutionCandidates(int.MaxValue);
@@ -305,7 +308,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var directoryRegex = new Regex(@"/characters/([^/]+)/skins/(base|skin\d+)/", RegexOptions.IgnoreCase);
             var skinRegex = new Regex(@"(?:base|skin\d+)", RegexOptions.IgnoreCase);
-            var characters = new Dictionary<string, (HashSet<string> Skins, Dictionary<(string Format, int Count), (int Support, int DistinctSupport)> Formats)>(StringComparer.OrdinalIgnoreCase);
+            var characters = new Dictionary<string, (HashSet<string> Skins, Dictionary<(string Format, int Count), (int Support, int DistinctSupport, bool AllTokensEqual)> Formats)>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
                 Match directory = directoryRegex.Match(path);
@@ -313,21 +316,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string character = directory.Groups[1].Value;
                 if (!characters.TryGetValue(character, out var data))
                 {
-                    data = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new Dictionary<(string, int), (int, int)>());
+                    data = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new Dictionary<(string, int), (int, int, bool)>());
                     characters[character] = data;
                 }
                 data.Skins.Add(directory.Groups[2].Value.ToLowerInvariant());
                 MatchCollection matches = skinRegex.Matches(path);
                 var format = (skinRegex.Replace(path, "{skin}"), matches.Count);
-                data.Formats.TryGetValue(format, out var support);
-                bool distinct = matches.Select(match => match.Value).Distinct(StringComparer.OrdinalIgnoreCase).Count() == matches.Count;
-                data.Formats[format] = (support.Support + 1, support.DistinctSupport + (distinct ? 1 : 0));
+                if (!data.Formats.TryGetValue(format, out var support)) support = (0, 0, true);
+                string[] tokenValues = matches.Select(match => match.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                bool distinct = tokenValues.Length == matches.Count;
+                bool allTokensEqual = tokenValues.Length == 1;
+                data.Formats[format] = (support.Support + 1, support.DistinctSupport + (distinct ? 1 : 0), support.AllTokensEqual && allTokensEqual);
             }
             int generated = 0;
             var formats = characters.SelectMany(character => character.Value.Formats.Select(format => new
             {
                 Character = character.Key, character.Value.Skins, Format = format.Key.Format, Count = format.Key.Count,
-                Support = format.Value.Support, DistinctSupport = format.Value.DistinctSupport
+                Support = format.Value.Support, DistinctSupport = format.Value.DistinctSupport, AllTokensEqual = format.Value.AllTokensEqual
             })).OrderBy(value => value.DistinctSupport > 0 ? 0 : 1)
                 .ThenBy(value => value.Count == 2 ? 0 : value.Count == 1 ? 1 : value.Count)
                 .ThenByDescending(value => value.DistinctSupport).ThenByDescending(value => value.Support)
@@ -336,6 +341,15 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 List<string> skins = format.Skins.OrderBy(value => value, StringComparer.Ordinal).ToList();
                 if (format.Count > skins.Count) continue;
+                if (format.AllTokensEqual)
+                {
+                    foreach (string skin in skins)
+                    {
+                        yield return new HashGuessCandidate(format.Format.Replace("{skin}", skin, StringComparison.Ordinal), HashGuessStrategy.SkinNumberVariant);
+                        if (CountCandidate(ref generated, candidateBudget)) yield break;
+                    }
+                    continue;
+                }
                 foreach (IEnumerable<string> permutation in GetPermutations(skins, format.Count))
                 {
                     string candidate = format.Format;
@@ -513,6 +527,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                     string character = champion.Groups[1].Value.ToLowerInvariant();
                     groups.TryAdd(character, new List<List<int>>());
                     groups[character].Add(ids.OrderBy(id => id).ToList());
+                }
+                var knownCharacters = GetCharacters();
+                if (knownCharacters.Count > 0)
+                {
+                    var filtered = groups.Where(pair => knownCharacters.Contains(pair.Key))
+                        .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+                    if (filtered.Count > 0) groups = filtered;
                 }
                 int generated = 0;
                 foreach (var pair in groups)

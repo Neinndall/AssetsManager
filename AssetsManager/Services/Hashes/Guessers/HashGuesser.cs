@@ -384,6 +384,26 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal static int RunFocusedWordlistDoubleSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
             => RunBasenameWordSubstitution(engine, paths, words.Take(150), 2, 2, cancellationToken, candidateBudget, "Double Wordlist");
 
+        internal static IReadOnlyList<(string Prefix, string Suffix)> BuildBasenameWordFormats(IEnumerable<string> paths, int oldWordCount, int newWordCount)
+        {
+            if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
+            if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
+            var formats = new HashSet<(string Prefix, string Suffix)>();
+            var regex = new Regex($@"([^/_.-]+)(?=((?:[-_][^/_.-]+){{{oldWordCount - 1}}})[^/]*\.[^/]+$)", RegexOptions.Compiled);
+            foreach (string path in paths)
+            {
+                if (path.Contains('%')) continue;
+                foreach (Match match in regex.Matches(path))
+                {
+                    int matchedLength = match.Groups[1].Length + match.Groups[2].Length;
+                    formats.Add((path[..match.Index], path[(match.Index + matchedLength)..]));
+                }
+            }
+            return formats.OrderBy(value => value.Prefix, StringComparer.Ordinal)
+                .ThenBy(value => value.Suffix, StringComparer.Ordinal)
+                .ToList();
+        }
+
         internal static int RunBasenameWordSubstitution(
             HashGuessEngine engine,
             IEnumerable<string> paths,
@@ -395,25 +415,24 @@ namespace AssetsManager.Services.Hashes.Guessers
             string source = "Wordlist substitution",
             Action<int> progress = null)
         {
-            if (oldWordCount < 1) throw new ArgumentOutOfRangeException(nameof(oldWordCount));
-            if (newWordCount < 1) throw new ArgumentOutOfRangeException(nameof(newWordCount));
-            var pathsList = paths.ToList();
-            var wordsList = words.Where(word => !string.IsNullOrEmpty(word)).Distinct(StringComparer.Ordinal).ToList();
-            if (pathsList.Count == 0 || wordsList.Count == 0) return 0;
-            var formats = new HashSet<(string Prefix, string Suffix)>();
-            var regex = new Regex($@"([^/_.-]+)(?=((?:[-_][^/_.-]+){{{oldWordCount - 1}}})[^/]*\.[^/]+$)", RegexOptions.Compiled);
-            foreach (string path in pathsList)
-            {
-                if (path.Contains('%')) continue;
-                foreach (Match match in regex.Matches(path))
-                {
-                    int matchedLength = match.Groups[1].Length + match.Groups[2].Length;
-                    formats.Add((path[..match.Index], path[(match.Index + matchedLength)..]));
-                }
-            }
+            var formats = BuildBasenameWordFormats(paths, oldWordCount, newWordCount);
+            return RunBasenameWordSubstitutionFormats(engine, formats, words, newWordCount, cancellationToken, candidateBudget, source, progress);
+        }
 
+        internal static int RunBasenameWordSubstitutionFormats(
+            HashGuessEngine engine,
+            IReadOnlyList<(string Prefix, string Suffix)> formats,
+            IEnumerable<string> words,
+            int newWordCount,
+            CancellationToken cancellationToken,
+            int candidateBudget = 500_000,
+            string source = "Wordlist substitution",
+            Action<int> progress = null)
+        {
+            var wordsList = words.Where(word => !string.IsNullOrEmpty(word)).Distinct(StringComparer.Ordinal).ToList();
+            if (formats.Count == 0 || wordsList.Count == 0) return 0;
             int checkedCount = 0;
-            foreach ((string prefix, string suffix) in formats.OrderBy(value => value.Prefix, StringComparer.Ordinal).ThenBy(value => value.Suffix, StringComparer.Ordinal))
+            foreach ((string prefix, string suffix) in formats)
             foreach (string separator in newWordCount == 1 ? new[] { string.Empty } : new[] { "-", "_" })
             foreach (IReadOnlyList<string> combination in EnumerateWordCombinations(wordsList, newWordCount))
             {
@@ -426,20 +445,35 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        internal static int RunWordAdditionAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
+        internal static IReadOnlyList<string> BuildWordAdditionFormats(IEnumerable<string> paths)
         {
-            var pathsList = paths.ToList();
-            var wordsList = words.ToList();
-            if (pathsList.Count == 0 || wordsList.Count == 0) return 0;
             var formats = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var regex = new Regex(@"([^/_.-]+)(?=[^/]*\.[^/]+$)", RegexOptions.Compiled);
-            foreach (string path in pathsList)
+            foreach (string path in paths)
             foreach (Match match in regex.Matches(path))
             foreach (string separator in new[] { "-", "_" })
             {
                 formats.Add(path[..match.Index] + "{0}" + separator + path[match.Index..]);
                 formats.Add(path[..(match.Index + match.Length)] + separator + "{0}" + path[(match.Index + match.Length)..]);
             }
+            return formats.OrderBy(format => format, StringComparer.Ordinal).ToList();
+        }
+
+        internal static int RunWordAdditionAttack(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
+        {
+            var formats = BuildWordAdditionFormats(paths);
+            return RunWordAdditionFormats(engine, formats, words, cancellationToken, candidateBudget);
+        }
+
+        internal static int RunWordAdditionFormats(
+            HashGuessEngine engine,
+            IReadOnlyList<string> formats,
+            IEnumerable<string> words,
+            CancellationToken cancellationToken,
+            int candidateBudget = 500_000)
+        {
+            var wordsList = words.ToList();
+            if (formats.Count == 0 || wordsList.Count == 0) return 0;
             int checkedCount = 0;
             foreach (string format in formats)
             foreach (string word in wordsList)
