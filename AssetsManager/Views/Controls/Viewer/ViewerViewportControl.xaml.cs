@@ -22,6 +22,7 @@ using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Windows;
+using System.Windows.Threading;
 using OpenTK.Wpf;
 using System.Numerics;
 
@@ -91,7 +92,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Exception ex)
             {
-                LogService?.LogError(ex, "Failed to initialize Silk.NET OpenGL context.");
+                LogService.LogError(ex, "Failed to initialize Silk.NET OpenGL context.");
             }
         }
 
@@ -333,12 +334,16 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void OnViewportLoaded(object sender, RoutedEventArgs e)
+        private async void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
             _modelPlayers.Clear();
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
+
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+            if (_isCleanedUp) return;
 
             var settings = new GLWpfControlSettings
             {
