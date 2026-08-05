@@ -309,9 +309,21 @@ namespace AssetsManager.Services.Core
             tasks.Add(CheckForGeneralUpdatesAsync(silent));
 
             // Checkeo al arrancar de PbeStatus
-            if (_appSettings.CheckPbeStatus)
+            if (_appSettings.CheckPbeStatus && _appSettings.PbeStatusFrequency > 0)
             {
                 tasks.Add(CheckForPbeStatusAsync());
+            }
+
+            // Checkeo al arrancar del Asset Tracker (CDN)
+            if (_appSettings.AssetTrackerTimer && _appSettings.AssetTrackerFrequency > 0)
+            {
+                tasks.Add(CheckForAssetsAsync());
+            }
+
+            // Checkeo al arrancar de News
+            if (_appSettings.NewsUpdates && _appSettings.NewsUpdateFrequency > 0)
+            {
+                tasks.Add(CheckForNewsAsync());
             }
 
             await Task.WhenAll(tasks);
