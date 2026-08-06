@@ -41,6 +41,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Monitor / History: reduced the pagination page size of the Comparisons, Watcher and Differences tabs from 10 to 5 entries.
   - Monitor / Backups: replaced the NEWLY CREATED pill label with a minimal inline NEW tag (icon + text) for consistency with the Version Manager list.
   - Monitor / Version Manager: the manifest list now loads ordered by date descending (newest first), replacing the old alphabetical file-name order.
   - Monitor / Version Manager: standardized the download configuration card to match the Asset Tracker hero card (border geometry, icon boxes, title/description typography and optical text alignment).

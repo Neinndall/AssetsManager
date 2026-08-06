@@ -19,9 +19,9 @@ namespace AssetsManager.Views.Models.Monitor
 
         public HistoryModel()
         {
-            ComparisonsPaginator = new PaginationModel<HistoryEntry> { PageSize = 10 };
-            WatcherPaginator = new PaginationModel<HistoryEntry> { PageSize = 10 };
-            DifferencesPaginator = new PaginationModel<HistoryEntry> { PageSize = 10 };
+            ComparisonsPaginator = new PaginationModel<HistoryEntry> { PageSize = 5 };
+            WatcherPaginator = new PaginationModel<HistoryEntry> { PageSize = 5 };
+            DifferencesPaginator = new PaginationModel<HistoryEntry> { PageSize = 5 };
         }
 
         public IPaginationModel Paginator
