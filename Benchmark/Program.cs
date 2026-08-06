@@ -71,6 +71,27 @@ namespace BenchmarkApp
                 LcuStringSearchProbe.Run(rootPath, needles);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "shader-shareddata", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string hashesPath = args.Length > 2 ? args[2] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager", "hashes");
+                ShaderSharedDataProbe.Run(rootPath, hashesPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-bin-hash-scan", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                LcuBinaryHashScanProbe.Run(rootPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-bin-all-wads", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string hashesPath = args.Length > 2 ? args[2] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AssetsManager", "hashes");
+                bool allWads = args.Length > 3 && string.Equals(args[3], "--all", StringComparison.OrdinalIgnoreCase);
+                LcuBinAllWadsProbe.Run(rootPath, hashesPath, allWads);
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "lcu-methods", StringComparison.OrdinalIgnoreCase))
             {
                 string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
