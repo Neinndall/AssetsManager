@@ -55,6 +55,23 @@ namespace AssetsManager.BenchmarkTests.Monitor
             Assert.False(File.Exists(Path.Combine(destinationPath, ".assetsmanager-backup.json")));
         }
 
+        [Fact]
+        public void InstallationOutsideConfiguredRootsIsIdentifiedAsMain()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string liveMain = bridge.CreateDirectory("League of Legends");
+            string liveBackup = bridge.CreateDirectory("League of Legends_old_20260726_120000");
+            var settings = new AppSettings { LolPbeDirectory = bridge.CreateDirectory("League of Legends (PBE)") };
+            var manager = new BackupManager(bridge.Directories, bridge.LogService, settings, null);
+
+            var (liveIsPbe, liveIsMain) = manager.GetPathIdentification(liveMain);
+            var (backupIsPbe, backupIsMain) = manager.GetPathIdentification(liveBackup);
+
+            Assert.False(liveIsPbe);
+            Assert.True(liveIsMain);
+            Assert.False(backupIsMain);
+        }
+
         [Theory]
         [InlineData(PreferredClient.PBE, "pbe-main", "pbe-backup")]
         [InlineData(PreferredClient.LIVE, "live-main", "live-backup")]

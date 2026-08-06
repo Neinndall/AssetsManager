@@ -241,25 +241,21 @@ namespace AssetsManager.Services.Monitor
             string pbeRoot = _appSettings.LolPbeDirectory;
             string liveRoot = _appSettings.LolLiveDirectory;
 
-            // Prioritize based on user preference
-            bool isPbe;
-            bool isMain;
+            bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
+            bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
 
-            if (_appSettings.PreferredClient == PreferredClient.PBE)
+            bool isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
+
+            bool isMain = isPbeSub || isLiveSub;
+
+            // Fallback for installations outside any configured root (e.g. the LIVE
+            // client when only PBE is configured): any valid game installation that
+            // is not a "_old_" snapshot is the main client of its environment, so it
+            // must be identified as MAIN regardless of the preferred client.
+            if (!isMain)
             {
-                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
-                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
-
-                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
-                isMain = isPbeSub || isLiveSub;
-            }
-            else
-            {
-                bool isLiveSub = !string.IsNullOrEmpty(liveRoot) && PathUtils.IsSameOrSubPath(liveRoot, path);
-                bool isPbeSub = !string.IsNullOrEmpty(pbeRoot) && PathUtils.IsSameOrSubPath(pbeRoot, path);
-
-                isPbe = path.Contains("(PBE)", StringComparison.OrdinalIgnoreCase) || isPbeSub;
-                isMain = isLiveSub || isPbeSub;
+                string folderName = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                isMain = !folderName.Contains("_old_", StringComparison.OrdinalIgnoreCase);
             }
 
             return (isPbe, isMain);
