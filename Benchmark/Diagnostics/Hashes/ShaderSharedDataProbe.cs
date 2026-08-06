@@ -39,26 +39,38 @@ namespace BenchmarkApp.Diagnostics.Hashes
             Console.WriteLine($"Chunk key de '{BinPath}': 0x{keyForPath.Key:x16}");
 
             string gameDir = Path.Combine(pbeRoot, "Game");
-            string wadWithBin = null;
+            var wadsWithBin = new List<string>();
             foreach (string wadPath in Directory.EnumerateFiles(gameDir, "*.wad.client", SearchOption.AllDirectories))
             {
                 try
                 {
                     using var wad = new LeagueToolkit.Core.Wad.WadFile(wadPath);
                     if (wad.Chunks.ContainsKey(keyForPath.Key))
-                    {
-                        wadWithBin = wadPath;
-                        break;
-                    }
+                        wadsWithBin.Add(wadPath);
                 }
                 catch { }
             }
-            if (wadWithBin == null)
+            if (wadsWithBin.Count == 0)
             {
                 Console.WriteLine($"ERROR: chunk no encontrado en ningun WAD de Game");
                 return;
             }
-            Console.WriteLine($"Encontrado en: {Path.GetFileName(wadWithBin)}");
+            Console.WriteLine($"Encontrado en {wadsWithBin.Count} WADs:");
+            foreach (string w in wadsWithBin)
+            {
+                Console.WriteLine($"  - {w}");
+                try
+                {
+                    using var wad = new LeagueToolkit.Core.Wad.WadFile(w);
+                    var chunk = wad.Chunks[keyForPath.Key];
+                    using var data = wad.LoadChunkDecompressed(chunk);
+                    ArraySegment<byte> buffer = data.DangerousGetArray();
+                    Console.WriteLine($"      comprimido={chunk.CompressedSize} descomprimido={buffer.Count}");
+                }
+                catch { }
+            }
+            string wadWithBin = wadsWithBin.FirstOrDefault(w => w.Contains("Shaders.wad.client", StringComparison.OrdinalIgnoreCase)) ?? wadsWithBin[0];
+            Console.WriteLine($"Usando: {Path.GetFileName(wadWithBin)}");
 
             uint cbClass = Fnv1a.HashLower("X3DSharedConstantBufferDef");
             uint samplerClass = Fnv1a.HashLower("X3DSharedSamplerDef");
