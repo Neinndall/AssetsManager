@@ -12,6 +12,15 @@ namespace AssetsManager.Services.Hashes
 {
     internal static class BinContentEvidenceSource
     {
+        private static readonly Dictionary<string, string> SharedBufferLeaves = new()
+        {
+            ["CharacterPerDrawVertexCB"] = "CharacterPerDrawVS",
+            ["PostEffectPixelCB"] = "PostEffects",
+            ["FontVertexCB"] = "FontRendering",
+            ["VFXDynamicPerParticleInstanceCBVS"] = "VFXDynamicPerParticleVS",
+            ["VFXDynamicPerParticleInstanceCBPS"] = "VFXDynamicPerParticlePS"
+        };
+
         private static void VisitBinStrings(BinTree tree, Action<string> check)
         {
             foreach (string dependency in tree.Dependencies) check(dependency);
@@ -307,7 +316,9 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("TooltipFormat"))
                         MatchEntryPattern(entryHash, item, "mObjectName", value => $"UX/Tooltips/{value}");
                     else if (classHash == Fnv1a.HashLower("X3DSharedConstantBufferDef"))
-                        MatchEntryPattern(entryHash, item, "name", value => $"Shaders/SharedData/{value}");
+                        MatchSharedBufferDef(entryHash, item);
+                    else if (classHash == Fnv1a.HashLower("X3DSharedSamplerDef"))
+                        MatchSharedSamplerDef(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("ItemData"))
                         MatchEntryFromU32(entryHash, item, "itemID", value => $"Items/{value}");
                     else if (classHash == Fnv1a.HashLower("SummonerEmote"))
@@ -535,6 +546,27 @@ namespace AssetsManager.Services.Hashes
             void MatchEntryPattern(uint entryHash, BinTreeObject item, string field, Func<string, string> format)
             {
                 if (TryGetString(item.Properties, field, out string value)) MatchObservedEntry(entryHash, format(value));
+            }
+            void MatchSharedBufferDef(uint entryHash, BinTreeObject item)
+            {
+                if (!TryGetString(item.Properties, "name", out string name)) return;
+                if (SharedBufferLeaves.TryGetValue(name, out string leaf) &&
+                    MatchObservedEntry(entryHash, $"Shaders/SharedData/ConstantBuffers/{leaf}")) return;
+                if (MatchObservedEntry(entryHash, $"Shaders/SharedData/ConstantBuffers/{StripSharedBufferSuffix(name)}")) return;
+                if (MatchObservedEntry(entryHash, $"Shaders/SharedData/ConstantBuffers/{name}")) return;
+                MatchObservedEntry(entryHash, $"Shaders/SharedData/{name}");
+            }
+            void MatchSharedSamplerDef(uint entryHash, BinTreeObject item)
+            {
+                if (!TryGetString(item.Properties, "name", out string name)) return;
+                if (MatchObservedEntry(entryHash, $"Shaders/SharedData/SharedSamplers/{name}")) return;
+                MatchObservedEntry(entryHash, $"Shaders/SharedData/{name}");
+            }
+            static string StripSharedBufferSuffix(string name)
+            {
+                if (name.EndsWith("_BUFFER", StringComparison.Ordinal)) return name[..^"_BUFFER".Length];
+                if (name.EndsWith("CB", StringComparison.Ordinal) && name.Length > 2) return name[..^2];
+                return name;
             }
             void MatchEntryFromU32(uint entryHash, BinTreeObject item, string field, Func<uint, string> format)
             {
