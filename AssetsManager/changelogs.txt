@@ -40,6 +40,7 @@ New Features
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
 
 Improvements
+  - Monitor / Version Manager: standardized the download configuration card to match the Asset Tracker hero card (border geometry, icon boxes, title/description typography and optical text alignment).
   - Image Comparison / Wheel zoom now stays within the 25%-400% range and keeps the zoom slider in sync.
   - VFX Studio / Preserved transparent particle backgrounds across color ramps, billboards, trails, rays, and meshes.
   - VFX Studio / Audited real BIN-driven texture alpha, UV multiplier blending, emitter-space placement, and AttachedMesh fallback rendering.
