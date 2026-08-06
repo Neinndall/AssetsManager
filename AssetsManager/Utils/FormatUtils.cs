@@ -1,9 +1,15 @@
 using System;
+using System.Globalization;
 
 namespace AssetsManager.Utils
 {
     public static class FormatUtils
     {
+        public static DateTime ParseDate(string value, string format)
+        {
+            return DateTime.TryParseExact(value, format, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt : DateTime.MinValue;
+        }
+
         public static string FormatTimeRemaining(DateTime endTime)
         {
             var remaining = endTime.ToLocalTime() - DateTime.Now;

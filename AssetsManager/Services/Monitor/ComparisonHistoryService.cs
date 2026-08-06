@@ -264,7 +264,8 @@ namespace AssetsManager.Services.Monitor
                             if (folderName.StartsWith("comparison_") && folderName.Length >= 26)
                             {
                                 string dateStr = folderName.Substring(11, 15);
-                                if (DateTime.TryParseExact(dateStr, "ddMMyyyy_HHmmss", null, System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+                                var parsedDate = FormatUtils.ParseDate(dateStr, "ddMMyyyy_HHmmss");
+                                if (parsedDate != DateTime.MinValue)
                                 {
                                     timestamp = parsedDate;
                                 }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -105,7 +104,7 @@ namespace AssetsManager.Views.Models.Versions
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
                 var sortedFiles = allFiles
-                    .OrderByDescending(f => ParseDate(f.Date))
+                    .OrderByDescending(f => FormatUtils.ParseDate(f.Date, "dd/MM/yyyy HH:mm:ss"))
                     .ThenBy(f => f.FileName)
                     .ToList();
 
@@ -116,11 +115,6 @@ namespace AssetsManager.Views.Models.Versions
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions, preservePage);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions, preservePage);
             }
-        }
-
-        private static DateTime ParseDate(string date)
-        {
-            return DateTime.TryParseExact(date, "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt : DateTime.MinValue;
         }
 
         public void MarkNewFiles(ISet<string> knownFileNames)

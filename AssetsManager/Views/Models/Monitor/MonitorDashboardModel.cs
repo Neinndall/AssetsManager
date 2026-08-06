@@ -535,7 +535,8 @@ namespace AssetsManager.Views.Models.Monitor
         {
             if (string.IsNullOrEmpty(timeStr) || timeStr == "N/A") return "N/A";
 
-            if (DateTime.TryParseExact(timeStr, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime dt))
+            var dt = FormatUtils.ParseDate(timeStr, "yyyy-MM-dd HH:mm:ss");
+            if (dt != DateTime.MinValue)
             {
                 return dt.Date == DateTime.Today ? dt.ToString("HH:mm") : dt.ToString("yyyy-MM-dd HH:mm");
             }
