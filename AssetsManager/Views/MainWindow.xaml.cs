@@ -146,6 +146,7 @@ namespace AssetsManager.Views
             _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
+            _notificationService.NotificationsMarkedAsRead += OnNotificationMarkedAsRead;
 
             LoadHomeWindow();
 
@@ -218,6 +219,14 @@ namespace AssetsManager.Views
         }
 
         // --- End Taskbar Logic ---
+        private void OnNotificationMarkedAsRead(NotificationModel notification)
+        {
+            if (notification?.Category != NotificationCategory.News) return;
+            if (string.IsNullOrEmpty(notification.NewsArticleUrl)) return;
+
+            _ = _newsService.MarkAsSeenAsync(notification.NewsArticleUrl, notification.NewsPublishedAt ?? DateTime.MinValue);
+        }
+
         private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem)
         {
             if (!string.IsNullOrEmpty(latestVersion))
@@ -256,7 +265,9 @@ namespace AssetsManager.Views
                         LoadNewsWindow();
                     },
                     category: category,
-                    actionText: "OPEN NEWS");
+                    actionText: "OPEN NEWS",
+                    newsArticleUrl: newsItem?.ActionUrl,
+                    newsPublishedAt: newsItem?.PublishedAt);
             }
             else
             {

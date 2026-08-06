@@ -36,14 +36,24 @@
                         Visibility="Collapsed" Margin="0,0,0,28">
                     <Grid>
                         <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Image x:Name="BannerImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+                        <Border x:Name="BannerImage" CornerRadius="11" Visibility="Collapsed">
+                            <Border.Background>
+                                <ImageBrush Stretch="UniformToFill"/>
+                            </Border.Background>
+                        </Border>
                     </Grid>
                 </Border>
 
                 <!-- Title -->
                 <TextBlock x:Name="ArticleTitleText" TextWrapping="Wrap" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" LineHeight="34" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,10"/>
 
-                <!-- Meta row: category chip + date -->
+                <!-- Lead description (article subtitle) -->
+                <TextBlock x:Name="ArticleDescriptionText" TextWrapping="Wrap" FontSize="14" Foreground="{StaticResource TextSecondary}" LineHeight="21" LineStackingStrategy="BlockLineHeight" Margin="0,0,0,16" Visibility="Collapsed"/>
+
+                <!-- Subtle divider between the description and the meta row -->
+                <Border x:Name="ArticleDivider" Height="1" Background="{StaticResource BorderColor}" Opacity="0.35" Margin="0,0,0,12" Visibility="Collapsed"/>
+
+                <!-- Meta row: category chip + author + date -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <Border x:Name="ArticleCategoryChip" Padding="9,4" CornerRadius="6" BorderThickness="1" VerticalAlignment="Center" Visibility="Collapsed">
                         <Border.Background>
@@ -54,6 +64,7 @@
                         </Border.BorderBrush>
                         <TextBlock x:Name="ArticleCategoryText" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
                     </Border>
+                    <TextBlock x:Name="ArticleAuthorText" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Margin="10,0,0,0" Visibility="Collapsed"/>
                     <TextBlock x:Name="ArticleDateText" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
             </StackPanel>
@@ -88,12 +99,10 @@
                                           IsSelectionEnabled="True"
                                           Zoom="1"/>
 
-                <!-- Loading overlay -->
-                <StackPanel x:Name="LoadingOverlay" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0" Visibility="Collapsed">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <materialIcons:MaterialIcon Kind="Loading" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="LOADING ARTICLE..." FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                    </StackPanel>
+                <!-- Loading spinner (shown while the full article is fetched) -->
+                <StackPanel x:Name="LoadingOverlay" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Visibility="Collapsed">
+                    <materialIcons:MaterialIcon Kind="Loading" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" Style="{StaticResource SpinningIconStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock Text="LOADING ARTICLE..." FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
         </Grid>

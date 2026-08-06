@@ -21,4 +21,9 @@
       <HintPath>..\..\LeagueToolkit-4.1.0-beta.53\src\LeagueToolkit\BCnEncoder.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Diagnostics\News\patch_26_15_body.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

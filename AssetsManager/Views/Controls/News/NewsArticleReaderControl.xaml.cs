@@ -5,8 +5,10 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Extensions.DependencyInjection;
+using AssetsManager.Services.News;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.News;
 
@@ -58,9 +60,11 @@ namespace AssetsManager.Views.Controls.News
                 case nameof(NewsFeedModel.IsDetailVisible):
                     if (_model.IsDetailVisible) RefreshLayout();
                     break;
+                case nameof(NewsFeedModel.IsLoadingFullArticle):
                 case nameof(NewsFeedModel.FullArticleHtml):
                 case nameof(NewsFeedModel.FullArticleText):
                 case nameof(NewsFeedModel.FullArticleBanner):
+                case nameof(NewsFeedModel.FullArticleAuthors):
                 case nameof(NewsFeedModel.SelectedArticle):
                     RefreshLayout();
                     break;
@@ -80,12 +84,23 @@ namespace AssetsManager.Views.Controls.News
 
             UpdateHeader(article, isVideo);
 
+            // While the full article is being fetched, show a loading indicator instead
+            // of a half-rendered body, so content never pops in as a flash.
+            if (_model.IsLoadingFullArticle)
+            {
+                VideoPanel.Visibility = Visibility.Collapsed;
+                PlainTextPanel.Visibility = Visibility.Collapsed;
+                ArticleDocumentViewer.Visibility = Visibility.Collapsed;
+                LoadingOverlay.Visibility = Visibility.Visible;
+                return;
+            }
+            LoadingOverlay.Visibility = Visibility.Collapsed;
+
             if (isVideo)
             {
                 VideoPanel.Visibility = Visibility.Visible;
                 PlainTextPanel.Visibility = Visibility.Collapsed;
                 ArticleDocumentViewer.Visibility = Visibility.Collapsed;
-                LoadingOverlay.Visibility = Visibility.Collapsed;
                 UpdateVideoPanel(article);
                 return;
             }
@@ -103,6 +118,7 @@ namespace AssetsManager.Views.Controls.News
                     try
                     {
                         ArticleDocumentViewer.Document = ArticleHtmlToFlowDocument.Parse(html, _httpClient);
+                        FadeInContent(ArticleDocumentViewer);
                     }
                     catch (Exception)
                     {
@@ -115,9 +131,21 @@ namespace AssetsManager.Views.Controls.News
             {
                 ArticleDocumentViewer.Visibility = Visibility.Collapsed;
                 PlainTextPanel.Visibility = Visibility.Visible;
+                FadeInContent(PlainTextPanel);
             }
+        }
 
-            LoadingOverlay.Visibility = Visibility.Collapsed;
+        private static void FadeInContent(FrameworkElement element)
+        {
+            element.Opacity = 0;
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(280))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+                }
+            };
+            element.BeginAnimation(UIElement.OpacityProperty, fade);
         }
 
         private void UpdateHeader(NewsItemModel article, bool isVideo)
@@ -128,6 +156,18 @@ namespace AssetsManager.Views.Controls.News
 
             ArticleTitleText.Text = article?.Title ?? string.Empty;
             ArticleTitleText.Visibility = string.IsNullOrEmpty(ArticleTitleText.Text) ? Visibility.Collapsed : Visibility.Visible;
+
+            string description = article?.Description;
+            ArticleDescriptionText.Text = description ?? string.Empty;
+            ArticleDescriptionText.Visibility = string.IsNullOrEmpty(ArticleDescriptionText.Text) ? Visibility.Collapsed : Visibility.Visible;
+
+            var authors = _model?.FullArticleAuthors;
+            bool hasAuthor = authors != null && authors.Count > 0;
+            ArticleAuthorText.Text = hasAuthor ? string.Join(", ", authors) : string.Empty;
+            ArticleAuthorText.Visibility = hasAuthor ? Visibility.Visible : Visibility.Collapsed;
+
+            bool showDivider = ArticleDescriptionText.Visibility == Visibility.Visible || hasAuthor;
+            ArticleDivider.Visibility = showDivider ? Visibility.Visible : Visibility.Collapsed;
 
             bool hasCategory = !string.IsNullOrEmpty(article?.CategoryTitle);
             ArticleCategoryChip.Visibility = hasCategory ? Visibility.Visible : Visibility.Collapsed;
@@ -169,7 +209,7 @@ namespace AssetsManager.Views.Controls.News
             }
         }
 
-        private async void LoadImageAsync(Image image, string url)
+        private async void LoadImageAsync(Border border, string url)
         {
             try
             {
@@ -178,8 +218,7 @@ namespace AssetsManager.Views.Controls.News
                     try
                     {
                         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                        request.Headers.TryAddWithoutValidation("User-Agent",
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                        request.Headers.TryAddWithoutValidation("User-Agent", NewsService.BrowserUserAgent);
                         using var response = await _httpClient.SendAsync(request);
                         if (!response.IsSuccessStatusCode) return null;
                         return await response.Content.ReadAsByteArrayAsync();
@@ -201,8 +240,12 @@ namespace AssetsManager.Views.Controls.News
                     bitmap.EndInit();
                     bitmap.Freeze();
                 }
-                image.Source = bitmap;
-                image.Visibility = Visibility.Visible;
+                if (border.Background is ImageBrush brush)
+                {
+                    brush.ImageSource = bitmap;
+                    border.Visibility = Visibility.Visible;
+                    FadeInContent(border);
+                }
             }
             catch (Exception)
             {

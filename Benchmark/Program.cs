@@ -13,6 +13,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
 using BenchmarkApp.Diagnostics.Viewer;
 using BenchmarkApp.Diagnostics.Hashes;
+using BenchmarkApp.Diagnostics.News;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -49,6 +50,11 @@ namespace BenchmarkApp
             {
                 string targetPath = args.Length > 1 ? args[1] : null;
                 InspectSknDiagnostic.Run(targetPath);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "patch-notes-render", StringComparison.OrdinalIgnoreCase))
+            {
+                PatchNotesRenderDiagnostic.Run();
                 return;
             }
             if (args.Length > 0 && string.Equals(args[0], "lcu-bin-probe", StringComparison.OrdinalIgnoreCase))

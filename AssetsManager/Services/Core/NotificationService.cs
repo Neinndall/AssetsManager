@@ -22,6 +22,10 @@ namespace AssetsManager.Services.Core
         // Event for unread counters
         public event Action CountsChanged;
 
+        // Fired for each notification that is marked as read (either explicitly or
+        // by executing its action), letting consumers sync secondary state.
+        public event Action<NotificationModel> NotificationsMarkedAsRead;
+
         private readonly ObservableCollection<NotificationModel> _notifications;
 
         public NotificationService(DirectoriesCreator directoriesCreator, LogService logService)
@@ -42,12 +46,16 @@ namespace AssetsManager.Services.Core
             NotificationType type = NotificationType.Info,
             Action onClick = null,
             NotificationCategory category = NotificationCategory.System,
-            string actionText = null)
+            string actionText = null,
+            string newsArticleUrl = null,
+            DateTime? newsPublishedAt = null)
         {
             var notification = new NotificationModel(title, message, type, category)
             {
                 OnClickAction = onClick,
-                ActionText = actionText
+                ActionText = actionText,
+                NewsArticleUrl = newsArticleUrl,
+                NewsPublishedAt = newsPublishedAt
             };
 
             RunOnUiThread(() =>
@@ -101,6 +109,11 @@ namespace AssetsManager.Services.Core
                     note.IsRead = true;
                 }
 
+                foreach (var note in _notifications)
+                {
+                    NotificationsMarkedAsRead?.Invoke(note);
+                }
+
                 CountsChanged?.Invoke();
                 SaveHistory();
             });
@@ -115,6 +128,7 @@ namespace AssetsManager.Services.Core
                 if (!notification.IsRead)
                 {
                     notification.IsRead = true;
+                    NotificationsMarkedAsRead?.Invoke(notification);
                     CountsChanged?.Invoke();
                     SaveHistory();
                 }

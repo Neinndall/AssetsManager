@@ -17,9 +17,7 @@ namespace AssetsManager.Views.Models.News
         public string ActionUrl { get; private set; }
         public string ActionType { get; private set; }
         public List<string> Tags { get; private set; } = new();
-        public string ProductId { get; private set; }
 
-        public bool HasTags => Tags.Count > 0;
         public bool IsVideo => string.Equals(ActionType, "youtube_video", StringComparison.OrdinalIgnoreCase);
         public bool IsVideoLink => !string.IsNullOrEmpty(ActionUrl) &&
                                    (ActionUrl.Contains("youtube.com/", StringComparison.OrdinalIgnoreCase) ||
@@ -51,6 +49,15 @@ namespace AssetsManager.Views.Models.News
             }
             return Application.Current?.TryFindResource("AccentBrush") as Brush ?? Brushes.DodgerBlue;
         }
+
+        /// <summary>
+        /// Creates a minimal entry for the news seen-state cache (url + publish date).
+        /// </summary>
+        public static NewsItemModel FromSeenEntry(string url, DateTime publishedAt) => new()
+        {
+            ActionUrl = url,
+            PublishedAt = publishedAt
+        };
 
         public static NewsItemModel FromJson(JsonElement element)
         {
@@ -90,11 +97,6 @@ namespace AssetsManager.Views.Models.News
                     var tagName = ReadString(tag, "title");
                     if (!string.IsNullOrEmpty(tagName)) model.Tags.Add(tagName);
                 }
-            }
-
-            if (element.TryGetProperty("product", out var product))
-            {
-                model.ProductId = ReadString(product, "machineName");
             }
 
             return model;

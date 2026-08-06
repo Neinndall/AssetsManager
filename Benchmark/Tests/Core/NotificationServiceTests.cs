@@ -106,6 +106,74 @@ namespace AssetsManager.BenchmarkTests.Services.Core
             Assert.Null(model.FilteredNotifications.Filter);
         }
 
+        [Fact]
+        public void NewsArticleMetadataPersistsAcrossRestartForReadSync()
+        {
+            var service = CreateService();
+
+            service.AddNotification(
+                "Riot News",
+                "New dev update",
+                NotificationType.Info,
+                category: NotificationCategory.News,
+                newsArticleUrl: "https://www.leagueoflegends.com/en-us/news/dev/new-dev-update",
+                newsPublishedAt: new DateTime(2026, 8, 6, 12, 0, 0));
+
+            NotificationModel notification = Assert.Single(service.GetNotifications());
+            Assert.Equal(NotificationCategory.News, notification.Category);
+            Assert.Equal("https://www.leagueoflegends.com/en-us/news/dev/new-dev-update", notification.NewsArticleUrl);
+            Assert.Equal(new DateTime(2026, 8, 6, 12, 0, 0), notification.NewsPublishedAt);
+
+            var restoredService = CreateService();
+            NotificationModel restored = Assert.Single(restoredService.GetNotifications());
+            Assert.Equal(notification.NewsArticleUrl, restored.NewsArticleUrl);
+            Assert.Equal(notification.NewsPublishedAt, restored.NewsPublishedAt);
+        }
+
+        [Fact]
+        public void MarkingReadRaisesReadEventForEveryNewsNotification()
+        {
+            var service = CreateService();
+            int readEvents = 0;
+            service.NotificationsMarkedAsRead += _ => readEvents++;
+
+            service.AddNotification(
+                "Riot News",
+                "New dev update",
+                category: NotificationCategory.News,
+                newsArticleUrl: "https://www.leagueoflegends.com/en-us/news/dev/new-dev-update");
+            service.AddNotification(
+                "System",
+                "System message");
+
+            Assert.Equal(0, readEvents);
+
+            service.MarkAllAsRead();
+
+            Assert.Equal(2, readEvents);
+        }
+
+        [Fact]
+        public void ExecutingReadNewsNotificationRaisesReadEventOnce()
+        {
+            var service = CreateService();
+            int readEvents = 0;
+            service.NotificationsMarkedAsRead += _ => readEvents++;
+
+            service.AddNotification(
+                "Riot News",
+                "New dev update",
+                category: NotificationCategory.News,
+                newsArticleUrl: "https://www.leagueoflegends.com/en-us/news/dev/new-dev-update");
+
+            NotificationModel notification = Assert.Single(service.GetNotifications());
+            service.ExecuteNotificationAction(notification);
+            Assert.Equal(1, readEvents);
+
+            service.ExecuteNotificationAction(notification);
+            Assert.Equal(1, readEvents);
+        }
+
         private NotificationService CreateService()
         {
             return new NotificationService(_directories, _logService);

@@ -15,15 +15,16 @@ namespace AssetsManager.Services.News
     public class NewsService
     {
         private const string NewsApiBaseUrl = "https://soraclee.github.io/riotgames-news-api/data/lol/";
-        private const string BrowserUserAgent =
+        public const string BrowserUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-        private const int MaxSeenEntries = 200;
+        private const int MaxSeenEntries = 1000;
         private const int MaxItemsPerCategory = 10;
         private readonly HttpClient _httpClient;
         private readonly LogService _logService;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly object _cacheSyncRoot = new();
         private readonly object _pendingSyncRoot = new();
+        private readonly SemaphoreSlim _stateGate = new(1, 1);
         private readonly Dictionary<NewsCategory, CacheEntry> _cache = new();
 
         private NewsItemModel _pendingArticle;
@@ -61,37 +62,100 @@ namespace AssetsManager.Services.News
         /// <summary>
         /// Background discovery of newly published Riot articles.
         /// The first call establishes a baseline (no notifications); subsequent calls
-        /// return items whose ActionUrl was not seen before, limited to avoid spam.
-        /// File I/O runs outside any lock: the caller (UpdateCheckService job gate)
-        /// already serializes concurrent invocations.
+        /// return every item whose ActionUrl was not seen before AND that was published
+        /// after the newest article the user already saw, so nothing old is ever
+        /// re-notified while every genuinely new article is reported. The seen state
+        /// is kept in sync with the current feed after each run. File I/O is
+        /// serialized through <see cref="_stateGate"/> together with
+        /// <see cref="MarkAsSeenAsync"/>.
         /// </summary>
         public async Task<IReadOnlyList<NewsItemModel>> CheckForNewNewsAsync(CancellationToken cancellationToken = default)
         {
             var items = await FetchAsync(NewsCategory.AllNews, cancellationToken);
             if (items == null || items.Count == 0) return Array.Empty<NewsItemModel>();
 
-            var seen = await LoadSeenIdsAsync();
-            if (seen.Count == 0)
+            await _stateGate.WaitAsync(cancellationToken);
+            try
             {
-                await PersistSeenIdsAsync(items.Select(item => item.ActionUrl).Where(url => !string.IsNullOrEmpty(url)));
-                _logService.LogDebug("News discovery baseline established.");
-                return Array.Empty<NewsItemModel>();
+                var state = await LoadSeenStateAsync();
+                if (state.Urls.Count == 0)
+                {
+                    await PersistSeenStateAsync(items);
+                    _logService.LogDebug("News discovery baseline established.");
+                    return Array.Empty<NewsItemModel>();
+                }
+
+                // Reference date: the newest article the user already saw, either from
+                // the persisted state (new format with dates) or, for legacy url-only
+                // entries, from the feed items themselves. Anything published at or
+                // before this date is old and must never be notified again.
+                var newestSeenDate = state.NewestSeenDate;
+                foreach (var item in items)
+                {
+                    if (!string.IsNullOrEmpty(item.ActionUrl) &&
+                        state.Urls.Contains(item.ActionUrl) &&
+                        item.PublishedAt > newestSeenDate)
+                    {
+                        newestSeenDate = item.PublishedAt;
+                    }
+                }
+
+                var newItems = items
+                    .Where(item => !string.IsNullOrEmpty(item.ActionUrl) && !state.Urls.Contains(item.ActionUrl))
+                    .Where(item => item.PublishedAt > newestSeenDate)
+                    .OrderByDescending(item => item.PublishedAt)
+                    .ToList();
+
+                // Keep the seen set in sync with the current feed: everything still
+                // published is retained (with its publish date), plus previously seen
+                // entries, so nothing in the feed can ever be re-detected as new again.
+                var merged = items
+                    .Concat(state.Items)
+                    .Where(item => !string.IsNullOrEmpty(item.ActionUrl))
+                    .GroupBy(item => item.ActionUrl, StringComparer.Ordinal)
+                    .Select(group => group.OrderByDescending(item => item.PublishedAt).First())
+                    .OrderByDescending(item => item.PublishedAt)
+                    .Take(MaxSeenEntries);
+                await PersistSeenStateAsync(merged);
+
+                if (newItems.Count > 0)
+                {
+                    _logService.LogDebug($"News discovery found {newItems.Count} new article(s).");
+                }
+
+                return newItems;
             }
-
-            var newItems = items
-                .Where(item => !string.IsNullOrEmpty(item.ActionUrl) && !seen.Contains(item.ActionUrl))
-                .OrderByDescending(item => item.PublishedAt)
-                .Take(5)
-                .ToList();
-
-            if (newItems.Count > 0)
+            finally
             {
-                var merged = seen.Concat(newItems.Select(item => item.ActionUrl)).Distinct().TakeLast(MaxSeenEntries);
-                await PersistSeenIdsAsync(merged);
-                _logService.LogDebug($"News discovery found {newItems.Count} new article(s).");
+                _stateGate.Release();
             }
+        }
 
-            return newItems;
+        /// <summary>
+        /// Marks a single article as seen so it is never notified again, without
+        /// touching the rest of the seen state. Used when the user dismisses or
+        /// executes a news notification. Serialized with
+        /// <see cref="CheckForNewNewsAsync"/> through <see cref="_stateGate"/>.
+        /// </summary>
+        public async Task MarkAsSeenAsync(string url, DateTime publishedAt)
+        {
+            if (string.IsNullOrEmpty(url)) return;
+
+            await _stateGate.WaitAsync();
+            try
+            {
+                var state = await LoadSeenStateAsync();
+                if (state.Urls.Contains(url)) return;
+
+                var entry = NewsItemModel.FromSeenEntry(url, publishedAt);
+                state.Items.Add(entry);
+                state.Urls.Add(url);
+                await PersistSeenStateAsync(state.Items);
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
         }
 
         public void SetPendingArticle(NewsItemModel article)
@@ -112,44 +176,93 @@ namespace AssetsManager.Services.News
             }
         }
 
-        private async Task<HashSet<string>> LoadSeenIdsAsync()
+        private async Task<SeenState> LoadSeenStateAsync()
         {
             try
             {
-                if (!File.Exists(_directoriesCreator.NewsSeenPath)) return new HashSet<string>();
+                if (!File.Exists(_directoriesCreator.NewsSeenPath)) return new SeenState();
 
                 string json = await File.ReadAllTextAsync(_directoriesCreator.NewsSeenPath);
                 using var doc = JsonDocument.Parse(json);
-                if (!doc.RootElement.TryGetProperty("ids", out var ids) || ids.ValueKind != JsonValueKind.Array) return new HashSet<string>();
 
-                return new HashSet<string>(
-                    ids.EnumerateArray()
-                       .Where(e => e.ValueKind == JsonValueKind.String)
-                       .Select(e => e.GetString())
-                       .Where(id => !string.IsNullOrEmpty(id)),
-                    StringComparer.Ordinal);
+                var state = new SeenState();
+
+                if (doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+                {
+                    // Current format: entries with url + publish date.
+                    foreach (var entry in items.EnumerateArray())
+                    {
+                        if (!entry.TryGetProperty("url", out var urlElement) || urlElement.ValueKind != JsonValueKind.String) continue;
+                        string url = urlElement.GetString();
+                        if (string.IsNullOrEmpty(url)) continue;
+
+                        var model = NewsItemModel.FromSeenEntry(url,
+                            entry.TryGetProperty("publishedAt", out var dateElement) &&
+                            DateTimeOffset.TryParse(dateElement.GetString(), out var parsed)
+                                ? parsed.LocalDateTime
+                                : DateTime.MinValue);
+
+                        state.Items.Add(model);
+                        state.Urls.Add(url);
+                        if (model.PublishedAt > state.NewestSeenDate) state.NewestSeenDate = model.PublishedAt;
+                    }
+                }
+                else if (doc.RootElement.TryGetProperty("ids", out var ids) && ids.ValueKind == JsonValueKind.Array)
+                {
+                    // Legacy format (urls only): keep entries without dates; the first
+                    // persist run migrates the file to the new format.
+                    foreach (var entry in ids.EnumerateArray())
+                    {
+                        if (entry.ValueKind != JsonValueKind.String) continue;
+                        string url = entry.GetString();
+                        if (string.IsNullOrEmpty(url)) continue;
+
+                        state.Items.Add(NewsItemModel.FromSeenEntry(url, DateTime.MinValue));
+                        state.Urls.Add(url);
+                    }
+                }
+
+                return state;
             }
             catch (Exception ex)
             {
-                _logService.LogWarning($"Failed to load seen news ids: {ex.Message}");
-                return new HashSet<string>();
+                _logService.LogWarning($"Failed to load seen news state: {ex.Message}");
+                return new SeenState();
             }
         }
 
-        private async Task PersistSeenIdsAsync(IEnumerable<string> ids)
+        private async Task PersistSeenStateAsync(IEnumerable<NewsItemModel> items)
         {
             try
             {
                 string directory = Path.GetDirectoryName(_directoriesCreator.NewsSeenPath);
                 if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-                string json = JsonSerializer.Serialize(new { ids = ids.Where(id => !string.IsNullOrEmpty(id)).ToList() });
+                var payload = items
+                    .Where(item => !string.IsNullOrEmpty(item.ActionUrl))
+                    .OrderByDescending(item => item.PublishedAt)
+                    .Take(MaxSeenEntries)
+                    .Select(item => new
+                    {
+                        url = item.ActionUrl,
+                        publishedAt = item.PublishedAt.ToString("o")
+                    })
+                    .ToList();
+
+                string json = JsonSerializer.Serialize(new { items = payload });
                 await File.WriteAllTextAsync(_directoriesCreator.NewsSeenPath, json);
             }
             catch (Exception ex)
             {
-                _logService.LogWarning($"Failed to persist seen news ids: {ex.Message}");
+                _logService.LogWarning($"Failed to persist seen news state: {ex.Message}");
             }
+        }
+
+        private sealed class SeenState
+        {
+            public List<NewsItemModel> Items { get; } = new();
+            public HashSet<string> Urls { get; } = new(StringComparer.Ordinal);
+            public DateTime NewestSeenDate { get; set; }
         }
 
         private async Task<List<NewsItemModel>> FetchAsync(NewsCategory category, CancellationToken cancellationToken)
@@ -177,12 +290,6 @@ namespace AssetsManager.Services.News
                 throw;
             }
             return items;
-        }
-
-        public async Task<string> FetchArticleFullTextAsync(string articleUrl, CancellationToken cancellationToken = default)
-        {
-            var content = await FetchArticleFullContentAsync(articleUrl, cancellationToken);
-            return content?.Html ?? content?.PlainText ?? content?.Description;
         }
 
         public async Task<ArticleFullContent> FetchArticleFullContentAsync(string articleUrl, CancellationToken cancellationToken = default)
@@ -260,28 +367,12 @@ namespace AssetsManager.Services.News
                         {
                             content.BannerUrl = bannerUrl.GetString();
                         }
-                        if (blade.TryGetProperty("title", out var title)) content.Title = title.GetString();
-                        if (blade.TryGetProperty("description", out var description) &&
-                            description.TryGetProperty("body", out var descriptionBody))
+                        if (blade.TryGetProperty("authors", out var authors) && authors.ValueKind == JsonValueKind.Array)
                         {
-                            content.Description = descriptionBody.GetString();
-                        }
-                        if (blade.TryGetProperty("publishDate", out var publishDate) &&
-                            DateTime.TryParse(publishDate.GetString(), out var parsedDate))
-                        {
-                            content.PublishDate = parsedDate;
-                        }
-                        if (blade.TryGetProperty("category", out var category) &&
-                            category.TryGetProperty("title", out var categoryTitle))
-                        {
-                            content.CategoryTitle = categoryTitle.GetString();
-                        }
-                        if (blade.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array)
-                        {
-                            content.Tags = tags.EnumerateArray()
-                                .Where(t => t.TryGetProperty("title", out var tagTitle))
-                                .Select(t => t.GetProperty("title").GetString())
-                                .Where(t => !string.IsNullOrWhiteSpace(t))
+                            content.Authors = authors.EnumerateArray()
+                                .Where(a => a.TryGetProperty("name", out var authorName))
+                                .Select(a => a.GetProperty("name").GetString())
+                                .Where(a => !string.IsNullOrWhiteSpace(a))
                                 .ToList();
                         }
                         continue;
@@ -301,7 +392,7 @@ namespace AssetsManager.Services.News
                 }
 
                 if (bodies.Count > 0) content.Html = string.Join("\n", bodies);
-                return content.Html != null || content.BannerUrl != null || content.Title != null ? content : null;
+                return content.Html != null || content.BannerUrl != null ? content : null;
             }
             catch (JsonException)
             {
@@ -370,10 +461,6 @@ namespace AssetsManager.Services.News
         public string Html { get; set; }
         public string PlainText { get; set; }
         public string BannerUrl { get; set; }
-        public string Title { get; set; }
-        public string Description { get; set; }
-        public DateTime? PublishDate { get; set; }
-        public string CategoryTitle { get; set; }
-        public List<string> Tags { get; set; }
+        public List<string> Authors { get; set; }
     }
 }

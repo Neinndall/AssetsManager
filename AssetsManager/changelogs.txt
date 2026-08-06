@@ -249,6 +249,15 @@ Bug Fixes
   - Restored resolved audio event names in archived comparisons by preserving dependency decompression metadata and supporting legacy Zstd chunks.
   - Comparator / Smart Sync now mirrors the selected sub-directory (e.g. Plugins) into the base backup path, both on automatic pairing and when switching backups via Quick Select.
   - Comparator / Clearing the Target directory now resets the whole sync pair (Base included), so picking a backup afterwards pairs the roots instead of the previous sub-directory.
+  - News / Article banner images now fit inside the rounded header panel instead of overflowing its corners.
+  - News / Background discovery now notifies every article published after the newest one already seen, with no per-run cap: the seen-state reference date keeps old feed rotation from ever being re-notified, while all genuinely new articles are reported.
+  - News / The seen-state cache now stores publish dates alongside article URLs (auto-migrated from the legacy format) and keeps entries synchronized with the current feed so nothing still published can ever be re-notified.
+  - News / Marking a news notification as read (or opening it) now marks the article as seen, so it is never notified again even across app restarts; opening an article from the feed does the same.
+  - News / Notification hub cards now use a dedicated newspaper icon and show the article's publish time (relative) instead of the generic notification time.
+  - News / Feed toolbar refresh and sort buttons now share the app's standard transparent icon style (as used in LogView), grouped side by side with a divider, and the search box is taller (36px, matching the category picker) and more compact (190px).
+  - News / Article reader now shows the lead description, a subtle divider, and the article authors (from the article page) next to the publish date.
+  - News / Article loading now shows a skeleton card (banner, title and body lines with a soft pulse animation) plus the spinner, instead of a bare mini spinner.
+  - News / Feed toolbar now offers content type filtering (All / Articles / Videos) and a newest/oldest sort toggle, combining with the text search for filtered result counts and a dedicated no-results state.
   - Preserved PTCH data overrides in BIN previews and comparisons.
   - Fixed WAD path normalization and BIN name resolution across class, property, entry, and value domains.
   - Viewer maximize mode now spans the viewport across the full main-content width instead of leaving the hidden inspector column reserved.

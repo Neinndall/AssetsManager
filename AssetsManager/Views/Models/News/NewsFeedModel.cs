@@ -44,13 +44,6 @@ namespace AssetsManager.Views.Models.News
             set => SetProperty(ref _hasError, value);
         }
 
-        private string _statusText;
-        public string StatusText
-        {
-            get => _statusText;
-            set => SetProperty(ref _statusText, value);
-        }
-
         private string _errorMessage;
         public string ErrorMessage
         {
@@ -100,7 +93,28 @@ namespace AssetsManager.Views.Models.News
             set => SetProperty(ref _fullArticleBanner, value);
         }
 
+        private List<string> _fullArticleAuthors = new();
+        public List<string> FullArticleAuthors
+        {
+            get => _fullArticleAuthors;
+            set => SetProperty(ref _fullArticleAuthors, value ?? new List<string>());
+        }
+
         public int TotalCount => Items.Count;
+
+        private string _emptyStateTitle = "NO NEWS AVAILABLE";
+        public string EmptyStateTitle
+        {
+            get => _emptyStateTitle;
+            set => SetProperty(ref _emptyStateTitle, value);
+        }
+
+        private string _emptyStateHint = "Select a category or press refresh to load the latest articles.";
+        public string EmptyStateHint
+        {
+            get => _emptyStateHint;
+            set => SetProperty(ref _emptyStateHint, value);
+        }
 
         public void SetItems(IEnumerable<NewsItemModel> items)
         {

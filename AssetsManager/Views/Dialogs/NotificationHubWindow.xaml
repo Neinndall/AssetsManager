@@ -59,6 +59,10 @@
                                             <Setter Property="Kind" Value="CloseCircleOutline"/>
                                             <Setter Property="Foreground" Value="{StaticResource AccentRed}"/>
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding Category}" Value="News">
+                                            <Setter Property="Kind" Value="NewspaperVariantOutline"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </materialIcons:MaterialIcon.Style>
@@ -72,18 +76,48 @@
                                        Foreground="{StaticResource TextPrimary}"
                                        VerticalAlignment="Center"/>
                             
-                            <TextBlock Text="-" 
-                                       FontSize="11" 
-                                       Foreground="{StaticResource TextMuted}" 
-                                       Margin="6,0" 
+                            <TextBlock Text="-"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextMuted}"
+                                       Margin="6,0"
                                        Opacity="0.5"
                                        VerticalAlignment="Center"/>
 
-                            <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}" 
+                            <!-- Notification time (non-news notifications) -->
+                            <TextBlock Text="{Binding Timestamp, StringFormat='HH:mm'}"
                                        FontSize="10"
                                        FontWeight="SemiBold"
                                        Foreground="{StaticResource TextMuted}"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowArticleDate}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- Article publish time (news notifications) -->
+                            <TextBlock Text="{Binding ArticleTimestamp, Converter={StaticResource TimeAgoConverter}}"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowArticleDate}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                         
                         <!-- 3. Main Message (Below Header) -->

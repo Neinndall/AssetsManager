@@ -226,7 +226,8 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Category Label -->
                         <ColumnDefinition Width="Auto"/> <!-- ComboBox -->
-                        <ColumnDefinition Width="Auto"/> <!-- Refresh -->
+                        <ColumnDefinition Width="Auto"/> <!-- Refresh + Sort -->
+                        <ColumnDefinition Width="Auto"/> <!-- Type Filter -->
                         <ColumnDefinition Width="*"/>    <!-- Spacer -->
                         <ColumnDefinition Width="Auto"/> <!-- Search -->
                         <ColumnDefinition Width="Auto"/> <!-- Count Badge -->
@@ -252,13 +253,29 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
-                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="36" Height="36" Margin="8,0,0,0" Click="Refresh_Click" ToolTip="Refresh feed">
-                        <materialIcons:MaterialIcon x:Name="RefreshIcon" Kind="Refresh" Width="18" Height="18" Foreground="{StaticResource TextSecondary}"/>
-                    </Button>
+                    <!-- Refresh + Sort (Grouped) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Button x:Name="RefreshButton" Style="{StaticResource TransparentIconButton}" Width="34" Height="34" Margin="0,0,4,0" Click="Refresh_Click" ToolTip="Refresh feed">
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="17" Height="17"/>
+                        </Button>
+                        <Rectangle Width="1" Fill="{StaticResource BorderColor}" Margin="0,8" Opacity="0.6"/>
+                        <Button x:Name="SortButton" Style="{StaticResource TransparentIconButton}" Width="34" Height="34" Margin="4,0,0,0" Click="Sort_Click" ToolTip="Sort: newest first">
+                            <materialIcons:MaterialIcon x:Name="SortIcon" Kind="SortDescending" Width="17" Height="17"/>
+                        </Button>
+                    </StackPanel>
 
-                    <shared:SearchBoxControl Grid.Column="4" x:Name="SearchBox" Width="250" Margin="0,0,14,0" VerticalAlignment="Center" SearchTextChanged="SearchBox_SearchTextChanged" Tag="Search news..."/>
+                    <!-- Type Filter (Segmented) -->
+                    <Border Grid.Column="3" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="2" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Content="ALL" IsChecked="True" Tag="All" Checked="TypeFilter_Checked" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                            <RadioButton Content="ARTICLES" Tag="Articles" Checked="TypeFilter_Checked" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                            <RadioButton Content="VIDEOS" Tag="Videos" Checked="TypeFilter_Checked" Style="{StaticResource SegmentedRadioButtonStyle}"/>
+                        </StackPanel>
+                    </Border>
 
-                    <Border Grid.Column="5" Background="{StaticResource HoverColor}" CornerRadius="6" Padding="12,5" VerticalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <shared:SearchBoxControl Grid.Column="5" x:Name="SearchBox" Width="190" Height="36" Margin="0,0,14,0" VerticalAlignment="Center" SearchTextChanged="SearchBox_SearchTextChanged" Tag="Search news..."/>
+
+                    <Border Grid.Column="6" Background="{StaticResource HoverColor}" CornerRadius="6" Padding="12,5" VerticalAlignment="Center" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
                             <materialIcons:MaterialIcon Kind="NewspaperVariantOutline" Width="13" Height="13" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                             <TextBlock Text="{Binding TotalCount, StringFormat={}{0} RESULTS}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
@@ -319,8 +336,8 @@
                         </Style>
                     </StackPanel.Style>
                     <materialIcons:MaterialIcon Kind="NewspaperVariantOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.25" HorizontalAlignment="Center" Margin="0,0,0,14"/>
-                    <TextBlock Text="NO NEWS AVAILABLE" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="Select a category or press refresh to load the latest articles." FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Opacity="0.8"/>
+                    <TextBlock Text="{Binding EmptyStateTitle}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock Text="{Binding EmptyStateHint}" FontSize="11" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Opacity="0.8"/>
                 </StackPanel>
             </Grid>
         </Grid>

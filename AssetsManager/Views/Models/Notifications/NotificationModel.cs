@@ -38,6 +38,24 @@ namespace AssetsManager.Views.Models.Notifications
         public NotificationType Type { get; set; }
         public NotificationCategory Category { get; set; } = NotificationCategory.System;
         public DateTime Timestamp { get; set; }
+
+        /// <summary>
+        /// For NEWS notifications: the article URL this notification refers to, so
+        /// dismissing or opening it can mark the article as seen in the news seen-state
+        /// cache. Serialized so it survives app restarts (the click action itself is
+        /// not persisted).
+        /// </summary>
+        public string NewsArticleUrl { get; set; }
+
+        /// <summary>
+        /// Publish date of the news article referenced by <see cref="NewsArticleUrl"/>.
+        /// </summary>
+        public DateTime? NewsPublishedAt { get; set; }
+
+        public bool ShowArticleDate => Category == NotificationCategory.News && NewsPublishedAt.HasValue;
+
+        public DateTime ArticleTimestamp => ShowArticleDate ? NewsPublishedAt.Value : Timestamp;
+
         [JsonIgnore]
         public string ActionText { get; set; }
 

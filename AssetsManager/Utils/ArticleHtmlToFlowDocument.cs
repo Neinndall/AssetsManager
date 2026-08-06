@@ -23,14 +23,16 @@ namespace AssetsManager.Utils
         private static readonly Regex TokenRegex = new("<[^>]+>|[^<]+", RegexOptions.Singleline | RegexOptions.Compiled);
         private static readonly Regex AttrRegex = new("([a-zA-Z_:][-a-zA-Z0-9_:.]*)\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)|([a-zA-Z_:][-a-zA-Z0-9_:.]*)", RegexOptions.Compiled);
 
+        private static readonly Regex IconSizeRegex = new(@"-(\d+)x(\d+)\.", RegexOptions.Compiled);
+
         private static readonly HashSet<string> VoidTags = new(StringComparer.OrdinalIgnoreCase)
             { "br", "img", "hr", "input", "meta", "link", "source", "wbr" };
 
         private static readonly HashSet<string> SkipTags = new(StringComparer.OrdinalIgnoreCase)
-            { "script", "style", "iframe", "video", "svg", "button", "form", "nav", "header", "footer", "template" };
+            { "script", "style", "iframe", "video", "svg", "button", "form", "nav", "footer", "template" };
 
         private static readonly HashSet<string> BlockTags = new(StringComparer.OrdinalIgnoreCase)
-            { "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "div", "blockquote", "figure", "figcaption", "pre", "table", "tr", "td", "th", "ul", "ol", "hr" };
+            { "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "div", "header", "blockquote", "figure", "figcaption", "pre", "table", "tr", "td", "th", "ul", "ol", "hr" };
 
         private const string BaseUrl = "https://www.leagueoflegends.com";
         private const string NewsBaseUrl = "https://www.leagueoflegends.com/en-us/news/";
@@ -62,9 +64,9 @@ namespace AssetsManager.Utils
             {
                 PagePadding = new Thickness(0),
                 FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 14,
+                FontSize = 15,
                 Foreground = TextPrimary,
-                LineHeight = 24,
+                LineHeight = 26,
                 LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
                 TextAlignment = TextAlignment.Left
             };
@@ -212,31 +214,7 @@ namespace AssetsManager.Utils
                 case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
                 {
                     var paragraph = CreateParagraph();
-                    switch (tag)
-                    {
-                        case "h1":
-                            paragraph.FontSize = 24;
-                            paragraph.Margin = new Thickness(0, 24, 0, 12);
-                            break;
-                        case "h2":
-                            paragraph.FontSize = 19;
-                            paragraph.Margin = new Thickness(0, 20, 0, 10);
-                            break;
-                        case "h3":
-                            paragraph.FontSize = 16;
-                            paragraph.Margin = new Thickness(0, 18, 0, 8);
-                            break;
-                        case "h4":
-                            paragraph.FontSize = 14;
-                            paragraph.Margin = new Thickness(0, 16, 0, 8);
-                            break;
-                        default:
-                            paragraph.FontSize = 13.5;
-                            paragraph.Margin = new Thickness(0, 14, 0, 6);
-                            break;
-                    }
-                    paragraph.FontWeight = tag == "h4" || tag == "h5" || tag == "h6" ? FontWeights.SemiBold : FontWeights.Bold;
-                    paragraph.Foreground = White;
+                    ApplyHeadingStyle(paragraph, tag);
                     FillInlines(paragraph.Inlines, node, httpClient);
                     if (HasContent(paragraph.Inlines)) blocks.Add(paragraph);
                     break;
@@ -291,25 +269,17 @@ namespace AssetsManager.Utils
                 }
                 case "blockquote":
                 {
-                    var quoteTable = new Table { CellSpacing = 0, Margin = new Thickness(0, 12, 0, 14) };
-                    quoteTable.Columns.Add(new TableColumn { Width = new GridLength(3, GridUnitType.Pixel) });
-                    quoteTable.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
-
-                    var quoteGroup = new TableRowGroup();
-                    var quoteRow = new TableRow();
-                    var barCell = new TableCell(new Paragraph())
-                    {
-                        Background = Accent,
-                        Padding = new Thickness(0),
-                        BorderThickness = new Thickness(0)
-                    };
-                    barCell.Blocks.Clear();
-                    barCell.Blocks.Add(new Paragraph());
-                    var quoteContentCell = new TableCell
+                    // NOTE: a two-column Table with a fixed Pixel bar column and a Star column
+                    // does NOT honour the Pixel width in FlowDocument rendering — WPF splits the
+                    // width 50/50 and the accent bar expands to half the page. A Section with a
+                    // left border reproduces the quote look with a real 3px accent bar.
+                    var quoteSection = new Section
                     {
                         Background = QuoteBackground,
+                        BorderBrush = Accent,
+                        BorderThickness = new Thickness(3, 0, 0, 0),
                         Padding = new Thickness(16, 12, 16, 12),
-                        BorderThickness = new Thickness(0)
+                        Margin = new Thickness(0, 12, 0, 14)
                     };
 
                     foreach (var child in node.Children)
@@ -321,7 +291,7 @@ namespace AssetsManager.Utils
                             if (string.IsNullOrEmpty(text)) continue;
                             var textParagraph = CreateParagraph();
                             textParagraph.Inlines.Add(new Run(text));
-                            quoteContentCell.Blocks.Add(textParagraph);
+                            quoteSection.Blocks.Add(textParagraph);
                             continue;
                         }
                         if (string.Equals(child.Tag, "p", StringComparison.OrdinalIgnoreCase) ||
@@ -330,15 +300,11 @@ namespace AssetsManager.Utils
                         {
                             var innerParagraph = CreateParagraph();
                             FillInlines(innerParagraph.Inlines, child, httpClient);
-                            if (HasContent(innerParagraph.Inlines)) quoteContentCell.Blocks.Add(innerParagraph);
+                            if (HasContent(innerParagraph.Inlines)) quoteSection.Blocks.Add(innerParagraph);
                         }
                     }
 
-                    quoteRow.Cells.Add(barCell);
-                    quoteRow.Cells.Add(quoteContentCell);
-                    quoteGroup.Rows.Add(quoteRow);
-                    quoteTable.RowGroups.Add(quoteGroup);
-                    blocks.Add(quoteTable);
+                    blocks.Add(quoteSection);
                     break;
                 }
                 case "figure":
@@ -365,7 +331,7 @@ namespace AssetsManager.Utils
                         else if (childTag == "figcaption")
                         {
                             var caption = CreateParagraph();
-                            caption.FontSize = 12.5;
+                            caption.FontSize = 13;
                             caption.Foreground = TextSecondary;
                             caption.Margin = new Thickness(0, 6, 0, 16);
                             FillInlines(caption.Inlines, child, httpClient);
@@ -451,8 +417,18 @@ namespace AssetsManager.Utils
         {
             Paragraph pending = null;
 
-            foreach (var child in node.Children)
+            void Flush()
             {
+                if (pending != null && HasContent(pending.Inlines))
+                {
+                    blocks.Add(pending);
+                    pending = null;
+                }
+            }
+
+            for (int i = 0; i < node.Children.Count; i++)
+            {
+                var child = node.Children[i];
                 if (child.IsSkip) continue;
 
                 if (child.IsText)
@@ -465,22 +441,45 @@ namespace AssetsManager.Utils
                 }
 
                 string childTag = child.Tag.ToLowerInvariant();
+
+                // Champion/item icons are emitted as <p><a><img></a></p> right before the <h3>
+                // title. Merge them so the icon sits inline next to the title,
+                // matching the live site layout.
+                if (string.Equals(childTag, "p", StringComparison.OrdinalIgnoreCase) &&
+                    !HasTextContent(child) && TryGetIconNode(child, out var iconNode))
+                {
+                    int nextIndex = i + 1;
+                    while (nextIndex < node.Children.Count && node.Children[nextIndex].IsSkip) nextIndex++;
+                    if (nextIndex < node.Children.Count && IsHeadingTag(node.Children[nextIndex].Tag))
+                    {
+                        Flush();
+
+                        var heading = CreateParagraph();
+                        ApplyHeadingStyle(heading, node.Children[nextIndex].Tag.ToLowerInvariant());
+                        var icon = CreateAbilityIcon(iconNode, httpClient);
+                        if (icon != null)
+                        {
+                            heading.Inlines.Add(new InlineUIContainer(icon)
+                            {
+                                BaselineAlignment = BaselineAlignment.Center
+                            });
+                            heading.Inlines.Add(new Run(" "));
+                        }
+                        FillInlines(heading.Inlines, node.Children[nextIndex], httpClient);
+                        if (HasContent(heading.Inlines)) blocks.Add(heading);
+                        i = nextIndex;
+                        continue;
+                    }
+                }
+
                 if (BlockTags.Contains(childTag))
                 {
-                    if (pending != null && HasContent(pending.Inlines))
-                    {
-                        blocks.Add(pending);
-                        pending = null;
-                    }
+                    Flush();
                     EmitBlock(blocks, child, httpClient);
                 }
                 else if (string.Equals(childTag, "img", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (pending != null && HasContent(pending.Inlines))
-                    {
-                        blocks.Add(pending);
-                        pending = null;
-                    }
+                    Flush();
                     EmitImageBlock(blocks, child, httpClient);
                 }
                 else
@@ -490,10 +489,78 @@ namespace AssetsManager.Utils
                 }
             }
 
-            if (pending != null && HasContent(pending.Inlines))
+            Flush();
+        }
+
+        private static bool HasTextContent(Node node)
+        {
+            if (node.IsSkip) return false;
+            if (node.IsText) return !string.IsNullOrWhiteSpace(node.Text);
+            foreach (var child in node.Children)
             {
-                blocks.Add(pending);
+                if (HasTextContent(child)) return true;
             }
+            return false;
+        }
+
+        private static bool IsHeadingTag(string tag)
+        {
+            if (string.IsNullOrEmpty(tag)) return false;
+            string t = tag.ToLowerInvariant();
+            return t == "h1" || t == "h2" || t == "h3" || t == "h4" || t == "h5" || t == "h6";
+        }
+
+        private static bool TryGetIconNode(Node node, out Node iconNode)
+        {
+            iconNode = null;
+            if (node.IsText || node.IsSkip) return false;
+            if (string.Equals(node.Tag, "img", StringComparison.OrdinalIgnoreCase))
+            {
+                if (IsAbilityIconUrl(GetSrc(node)))
+                {
+                    iconNode = node;
+                    return true;
+                }
+                return false;
+            }
+            foreach (var child in node.Children)
+            {
+                if (TryGetIconNode(child, out var nested))
+                {
+                    iconNode = nested;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void ApplyHeadingStyle(Paragraph paragraph, string tag)
+        {
+            switch (tag)
+            {
+                case "h1":
+                    paragraph.FontSize = 25;
+                    paragraph.Margin = new Thickness(0, 24, 0, 12);
+                    break;
+                case "h2":
+                    paragraph.FontSize = 20;
+                    paragraph.Margin = new Thickness(0, 20, 0, 10);
+                    break;
+                case "h3":
+                    paragraph.FontSize = 17;
+                    paragraph.Margin = new Thickness(0, 18, 0, 8);
+                    break;
+                case "h4":
+                    paragraph.FontSize = 15;
+                    paragraph.Margin = new Thickness(0, 16, 0, 8);
+                    break;
+                default:
+                    paragraph.FontSize = 14.5;
+                    paragraph.Margin = new Thickness(0, 14, 0, 6);
+                    break;
+            }
+            paragraph.FontWeight = tag == "h4" || tag == "h5" || tag == "h6" ? FontWeights.SemiBold : FontWeights.Bold;
+            paragraph.Foreground = White;
         }
 
         private static bool ContainsImage(Node node)
@@ -618,7 +685,7 @@ namespace AssetsManager.Utils
                 if (cells.Count == 1 && string.Equals(cells[0].Tag, "th", StringComparison.OrdinalIgnoreCase) && !ContainsNestedTable(cells[0]))
                 {
                     var sectionParagraph = CreateParagraph();
-                    sectionParagraph.FontSize = 14.5;
+                    sectionParagraph.FontSize = 15.5;
                     sectionParagraph.FontWeight = FontWeights.Bold;
                     sectionParagraph.Foreground = White;
                     sectionParagraph.Margin = new Thickness(0, 18, 0, 8);
@@ -789,10 +856,31 @@ namespace AssetsManager.Utils
                         break;
                     }
                     case "img":
-                        inlines.Add(new LineBreak());
-                        inlines.Add(new InlineUIContainer(CreateImageBlock(child, httpClient)));
-                        inlines.Add(new LineBreak());
+                    {
+                        if (IsAbilityIconUrl(GetSrc(child)))
+                        {
+                            // Icons (champion/ability, <= 512px) go inline right before the
+                            // title text, vertically centered on the text line.
+                            var icon = CreateAbilityIcon(child, httpClient);
+                            if (icon != null)
+                            {
+                                inlines.Add(new InlineUIContainer(icon)
+                                {
+                                    BaselineAlignment = BaselineAlignment.Center
+                                });
+                            }
+                        }
+                        else
+                        {
+                            // Content images are block-level: keep them off the text line
+                            // so they don't overlap surrounding inlines.
+                            inlines.Add(new LineBreak());
+                            var element = CreateImageBlock(child, httpClient);
+                            if (element != null) inlines.Add(new InlineUIContainer(element));
+                            inlines.Add(new LineBreak());
+                        }
                         break;
+                    }
                     case "p":
                     case "h1": case "h2": case "h3": case "h4": case "h5": case "h6":
                     case "ul": case "ol": case "blockquote": case "figure": case "hr":
@@ -826,19 +914,85 @@ namespace AssetsManager.Utils
             foreach (var child in node.Children) CollectPlainText(child, inlines);
         }
 
+        private static string GetSrc(Node node)
+        {
+            return node.Attrs != null && node.Attrs.TryGetValue("src", out var rawSrc) ? rawSrc : null;
+        }
+
         private static void EmitImageBlock(ICollection<Block> blocks, Node node, HttpClient httpClient)
         {
-            var image = CreateImageBlock(node, httpClient);
-            if (image == null) return;
-            blocks.Add(new BlockUIContainer(image));
+            var element = CreateImageElement(node, httpClient);
+            if (element == null) return;
+            blocks.Add(new BlockUIContainer(element));
+        }
+
+        private static FrameworkElement CreateImageElement(Node node, HttpClient httpClient)
+        {
+            // Icons (champion/item/ability, <= 512px) render as small inline-friendly images;
+            // content images render as centered bordered blocks.
+            return IsAbilityIconUrl(GetSrc(node))
+                ? CreateAbilityIcon(node, httpClient)
+                : CreateImageBlock(node, httpClient);
+        }
+
+        private static bool IsAbilityIconUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return false;
+            if (url.IndexOf("ddragon.leagueoflegends.com", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                url.IndexOf("/img/", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (url.IndexOf("cmsassets.rgpub.io", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                var m = IconSizeRegex.Match(url);
+                if (m.Success)
+                {
+                    int w = int.Parse(m.Groups[1].Value);
+                    int h = int.Parse(m.Groups[2].Value);
+                    return Math.Max(w, h) <= 512;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsChampionIconUrl(string url)
+        {
+            return url.IndexOf("/img/champion/", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static (double, double) GetIconSize(string url)
+        {
+            if (IsChampionIconUrl(url)) return (40, 40);
+            if (url.IndexOf("/img/item/", StringComparison.OrdinalIgnoreCase) >= 0) return (48, 48);
+            if (url.IndexOf("cmsassets.rgpub.io", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                var m = IconSizeRegex.Match(url);
+                if (m.Success && int.Parse(m.Groups[1].Value) == 512) return (48, 48);
+            }
+            return (32, 32);
+        }
+
+        private static FrameworkElement CreateAbilityIcon(Node node, HttpClient httpClient)
+        {
+            string resolved = ResolveUrl(GetSrc(node));
+            if (resolved == null) return null;
+
+            (double w, double h) = GetIconSize(resolved);
+            var image = new Image
+            {
+                Width = w,
+                Height = h,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                SnapsToDevicePixels = true
+            };
+            LoadImageAsync(image, resolved, httpClient);
+            return image;
         }
 
         private static FrameworkElement CreateImageBlock(Node node, HttpClient httpClient)
         {
-            string src = node.Attrs != null && node.Attrs.TryGetValue("src", out var rawSrc) ? rawSrc : null;
-            if (string.IsNullOrEmpty(src)) return null;
-
-            string resolved = ResolveUrl(src);
+            string resolved = ResolveUrl(GetSrc(node));
             if (resolved == null) return null;
 
             var image = new Image
@@ -984,7 +1138,9 @@ namespace AssetsManager.Utils
 
         private static SolidColorBrush FromHex(string hex)
         {
-            return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            brush.Freeze();
+            return brush;
         }
     }
 }

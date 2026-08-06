@@ -15,12 +15,16 @@ namespace AssetsManager.Views
 {
     public partial class NewsWindow : UserControl
     {
+        private enum NewsTypeFilter { All, Articles, Videos }
+
         private readonly IServiceProvider _serviceProvider;
         private readonly NewsService _newsService;
         private readonly LogService _logService;
         private readonly NewsFeedModel _viewModel;
         private readonly List<NewsItemModel> _allItems = new();
         private NewsCategory _currentCategory;
+        private NewsTypeFilter _typeFilter = NewsTypeFilter.All;
+        private bool _sortOldestFirst;
         private bool _isInitialized;
 
         public NewsWindow(IServiceProvider serviceProvider)
@@ -92,8 +96,7 @@ namespace AssetsManager.Views
                 var items = await _newsService.GetNewsAsync(category, forceRefresh);
                 _allItems.Clear();
                 _allItems.AddRange(items);
-                _viewModel.SetItems(items);
-                _viewModel.StatusText = $"{items.Count} articles loaded.";
+                ApplyFilters();
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -119,18 +122,63 @@ namespace AssetsManager.Views
         private void SearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
         {
             if (!_isInitialized) return;
+            ApplyFilters();
+        }
 
-            string query = SearchBox.Text?.Trim();
-            if (string.IsNullOrEmpty(query))
+        private void TypeFilter_Checked(object sender, RoutedEventArgs e)
+        {
+            if (!_isInitialized || sender is not RadioButton radio) return;
+
+            _typeFilter = radio.Tag switch
             {
-                _viewModel.SetItems(_allItems);
-                return;
+                "Articles" => NewsTypeFilter.Articles,
+                "Videos" => NewsTypeFilter.Videos,
+                _ => NewsTypeFilter.All
+            };
+            ApplyFilters();
+        }
+
+        private void Sort_Click(object sender, RoutedEventArgs e)
+        {
+            _sortOldestFirst = !_sortOldestFirst;
+            SortIcon.Kind = _sortOldestFirst ? Material.Icons.MaterialIconKind.SortAscending : Material.Icons.MaterialIconKind.SortDescending;
+            SortButton.ToolTip = _sortOldestFirst ? "Sort: oldest first" : "Sort: newest first";
+            ApplyFilters();
+        }
+
+        private void ApplyFilters()
+        {
+            string query = SearchBox.Text?.Trim();
+            IEnumerable<NewsItemModel> filtered = _allItems;
+
+            if (!string.IsNullOrEmpty(query))
+            {
+                filtered = filtered.Where(item =>
+                    item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    (item.Description != null && item.Description.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                    (item.Tags != null && item.Tags.Any(tag => tag.Contains(query, StringComparison.OrdinalIgnoreCase))));
             }
 
-            var filtered = _allItems.Where(item =>
-                item.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (item.Description != null && item.Description.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
-                (item.Tags != null && item.Tags.Any(tag => tag.Contains(query, StringComparison.OrdinalIgnoreCase))));
+            switch (_typeFilter)
+            {
+                case NewsTypeFilter.Articles:
+                    filtered = filtered.Where(item => !item.IsVideo && !item.IsVideoLink);
+                    break;
+                case NewsTypeFilter.Videos:
+                    filtered = filtered.Where(item => item.IsVideo || item.IsVideoLink);
+                    break;
+            }
+
+            filtered = _sortOldestFirst
+                ? filtered.OrderBy(item => item.PublishedAt)
+                : filtered.OrderByDescending(item => item.PublishedAt);
+
+            bool hasConstraints = !string.IsNullOrEmpty(query) || _typeFilter != NewsTypeFilter.All;
+            _viewModel.EmptyStateTitle = hasConstraints ? "NO RESULTS FOUND" : "NO NEWS AVAILABLE";
+            _viewModel.EmptyStateHint = hasConstraints
+                ? "Try a different search term or clear the filters."
+                : "Select a category or press refresh to load the latest articles.";
+
             _viewModel.SetItems(filtered);
         }
 
@@ -167,9 +215,15 @@ namespace AssetsManager.Views
         {
             if (item == null) return;
 
+            if (!string.IsNullOrEmpty(item.ActionUrl))
+            {
+                _ = _newsService.MarkAsSeenAsync(item.ActionUrl, item.PublishedAt);
+            }
+
             _viewModel.SelectedArticle = item;
             _viewModel.FullArticleText = item.DescriptionDisplay;
             _viewModel.FullArticleBanner = null;
+            _viewModel.FullArticleAuthors = null;
             _viewModel.IsLoadingFullArticle = true;
             _viewModel.IsDetailVisible = true;
 
@@ -188,6 +242,7 @@ namespace AssetsManager.Views
                         _viewModel.FullArticleText = content.PlainText;
                     }
                     _viewModel.FullArticleBanner = content.BannerUrl;
+                    _viewModel.FullArticleAuthors = content.Authors;
                 }
                 else
                 {
@@ -209,6 +264,7 @@ namespace AssetsManager.Views
             _viewModel.FullArticleText = null;
             _viewModel.FullArticleHtml = null;
             _viewModel.FullArticleBanner = null;
+            _viewModel.FullArticleAuthors = null;
             _viewModel.IsLoadingFullArticle = false;
         }
     }
