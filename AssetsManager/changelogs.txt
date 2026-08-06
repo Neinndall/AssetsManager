@@ -247,6 +247,8 @@ Bug Fixes
   - Restored the original height and rounded proportions of the Comparison Results search and filter toolbar.
   - Preserved Comparator selections and path fields when navigating between main views.
   - Restored resolved audio event names in archived comparisons by preserving dependency decompression metadata and supporting legacy Zstd chunks.
+  - Comparator / Smart Sync now mirrors the selected sub-directory (e.g. Plugins) into the base backup path, both on automatic pairing and when switching backups via Quick Select.
+  - Comparator / Clearing the Target directory now resets the whole sync pair (Base included), so picking a backup afterwards pairs the roots instead of the previous sub-directory.
   - Preserved PTCH data overrides in BIN previews and comparisons.
   - Fixed WAD path normalization and BIN name resolution across class, property, entry, and value domains.
   - Viewer maximize mode now spans the viewport across the full main-content width instead of leaving the hidden inspector column reserved.

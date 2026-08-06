@@ -102,7 +102,8 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (ViewModel == null) return;
 
-            var match = ViewModel.AvailableBackups.FirstOrDefault(b => string.Equals(b.Path, path, StringComparison.OrdinalIgnoreCase));
+            var match = ViewModel.AvailableBackups.FirstOrDefault(b =>
+                string.Equals(ViewModel.ApplySyncSuffix(b.Path), path, StringComparison.OrdinalIgnoreCase));
             if (isBase)
             {
                 if (match != null) ViewModel.SelectedBaseBackup = match;
@@ -113,6 +114,36 @@ namespace AssetsManager.Views.Controls.Comparator
                 if (match != null) ViewModel.SelectedTargetBackup = match;
                 else ViewModel.NewDirectoryPath = path;
             }
+        }
+
+        private string GetRelativeSubDirectory(string path)
+        {
+            if (string.IsNullOrEmpty(path) || BackupManager == null) return null;
+            string root = BackupManager.GetGameRoot(path);
+            if (string.IsNullOrEmpty(root) || string.Equals(root, path, StringComparison.OrdinalIgnoreCase)) return null;
+            string relative = System.IO.Path.GetRelativePath(root, path);
+            if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal)) return null;
+            return relative;
+        }
+
+        private async Task SyncDirectoryBaseAsync(string targetPath)
+        {
+            if (ViewModel == null || !ViewModel.IsDirectoryMode || !string.IsNullOrEmpty(ViewModel.OldDirectoryPath)) return;
+
+            var (isPbe, _) = BackupManager.GetPathIdentification(targetPath);
+            var suggestedBackup = ViewModel.AvailableBackups
+                .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
+                .OrderByDescending(b => b.CreationDate)
+                .FirstOrDefault();
+
+            if (suggestedBackup == null) return;
+
+            ViewModel.SelectedBaseBackup = suggestedBackup;
+            await ViewModel.UpdateMetadataFromPathAsync(
+                true,
+                ViewModel.ApplySyncSuffix(suggestedBackup.Path),
+                VersionService,
+                BackupManager);
         }
 
         private async Task InitializeDefaultPathsAsync(
@@ -142,22 +173,13 @@ namespace AssetsManager.Views.Controls.Comparator
             if (!string.IsNullOrEmpty(defaultPath))
             {
                 SetPathWithSync(false, defaultPath);
+                ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(defaultPath);
                 await ViewModel.UpdateMetadataFromPathAsync(false, defaultPath, VersionService, BackupManager);
 
                 // --- DIRECTORY AUTO-SYNC ---
                 if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
                 {
-                    var (isPbe, _) = BackupManager.GetPathIdentification(defaultPath);
-                    var suggestedBackup = ViewModel.AvailableBackups
-                        .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
-                        .OrderByDescending(b => b.CreationDate)
-                        .FirstOrDefault();
-
-                    if (suggestedBackup != null)
-                    {
-                        ViewModel.SelectedBaseBackup = suggestedBackup;
-                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                    }
+                    await SyncDirectoryBaseAsync(defaultPath);
                 }
             }
         }
@@ -193,7 +215,10 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(true, backup.Path, VersionService, BackupManager);
+                string effectivePath = ViewModel.IsDirectoryMode
+                    ? ViewModel.ApplySyncSuffix(backup.Path)
+                    : backup.Path;
+                await ViewModel.UpdateMetadataFromPathAsync(true, effectivePath, VersionService, BackupManager);
                 if (ViewModel.IsFileMode)
                 {
                     await SyncWadFilePathsAsync(backup.Path);
@@ -205,21 +230,15 @@ namespace AssetsManager.Views.Controls.Comparator
         {
             if (sender is ComboBox comboBox && comboBox.SelectedItem is BackupModel backup)
             {
-                await ViewModel.UpdateMetadataFromPathAsync(false, backup.Path, VersionService, BackupManager);
+                string effectivePath = ViewModel.IsDirectoryMode
+                    ? ViewModel.ApplySyncSuffix(backup.Path)
+                    : backup.Path;
+                await ViewModel.UpdateMetadataFromPathAsync(false, effectivePath, VersionService, BackupManager);
 
                 // --- DIRECTORY AUTO-SYNC ---
                 if (ViewModel.IsDirectoryMode && string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
                 {
-                    var suggestedBackup = ViewModel.AvailableBackups
-                        .Where(b => !b.IsMainClient && b.IsPbe == backup.IsPbe)
-                        .OrderByDescending(b => b.CreationDate)
-                        .FirstOrDefault();
-
-                    if (suggestedBackup != null)
-                    {
-                        ViewModel.SelectedBaseBackup = suggestedBackup;
-                        await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                    }
+                    await SyncDirectoryBaseAsync(effectivePath);
                 }
             }
         }
@@ -247,22 +266,13 @@ namespace AssetsManager.Views.Controls.Comparator
                 {
                     string newPath = folderBrowserDialog.FileName;
                     SetPathWithSync(false, newPath);
+                    ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
                     await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
 
                     // --- DIRECTORY AUTO-SYNC ---
                     if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
                     {
-                        var (isPbe, _) = BackupManager.GetPathIdentification(newPath);
-                        var suggestedBackup = ViewModel.AvailableBackups
-                            .Where(b => !b.IsMainClient && b.IsPbe == isPbe)
-                            .OrderByDescending(b => b.CreationDate)
-                            .FirstOrDefault();
-
-                        if (suggestedBackup != null)
-                        {
-                            ViewModel.SelectedBaseBackup = suggestedBackup;
-                            await ViewModel.UpdateMetadataFromPathAsync(true, suggestedBackup.Path, VersionService, BackupManager);
-                        }
+                        await SyncDirectoryBaseAsync(newPath);
                     }
                 }
             }
