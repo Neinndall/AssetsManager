@@ -223,10 +223,11 @@
                                                 </Border>
 
                                                 <!-- NEW Badge -->
-                                                <Border Background="{StaticResource AccentPurple}" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center"
                                                         Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                    <TextBlock Text="NEWLY CREATED" FontSize="8" FontWeight="Black" Foreground="White" VerticalAlignment="Center"/>
-                                                </Border>
+                                                    <materialIcons:MaterialIcon Kind="Tag" Width="10" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="NEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                                </StackPanel>
                                             </StackPanel>
 
                                             <!-- Metadata Row (Unified HUD Pattern) -->

@@ -256,6 +256,10 @@
                                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                                     <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsNew, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <materialIcons:MaterialIcon Kind="Tag" Width="10" Foreground="{StaticResource AccentBrush}" Margin="8,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="NEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
                                             <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -318,6 +322,10 @@
                                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                                     <materialIcons:MaterialIcon Kind="CalendarClock" Width="10" Foreground="{StaticResource TextMuted}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding Date, StringFormat='Published: {0}'}" FontSize="10" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                                                    <StackPanel Orientation="Horizontal" Visibility="{Binding IsNew, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <materialIcons:MaterialIcon Kind="Tag" Width="10" Foreground="{StaticResource AccentBrush}" Margin="8,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="NEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
                                             <materialIcons:MaterialIcon x:Name="CheckIcon" Grid.Column="2" Kind="CheckCircle" Foreground="{StaticResource AccentGreen}" Width="20" Height="20" Margin="0,0,6,0" Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}"/>

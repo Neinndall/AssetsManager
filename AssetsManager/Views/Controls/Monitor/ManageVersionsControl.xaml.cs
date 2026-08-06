@@ -47,10 +47,15 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             if (VersionService != null && LogService != null)
             {
+                var knownFileNames = _viewModel != null
+                    ? new HashSet<string>(_viewModel.AllLeagueClientVersions.Concat(_viewModel.AllLoLGameClientVersions).Select(f => f.FileName))
+                    : new HashSet<string>();
+
                 await VersionService.FetchAllVersionsAsync();
                 if (_viewModel != null)
                 {
                     await _viewModel.LoadVersionFilesAsync(preservePage: true);
+                    _viewModel.MarkNewFiles(knownFileNames);
                 }
             }
             else

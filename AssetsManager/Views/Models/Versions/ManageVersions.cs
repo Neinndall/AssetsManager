@@ -123,6 +123,15 @@ namespace AssetsManager.Views.Models.Versions
             return DateTime.TryParseExact(date, "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt : DateTime.MinValue;
         }
 
+        public void MarkNewFiles(ISet<string> knownFileNames)
+        {
+            var allFiles = AllLeagueClientVersions.Concat(AllLoLGameClientVersions);
+            foreach (var file in allFiles)
+            {
+                file.IsNew = !knownFileNames.Contains(file.FileName);
+            }
+        }
+
         public async Task LoadTargetInstallationsAsync(BackupManager backupManager, AppSettings appSettings)
         {
             var previousSelectedPath = SelectedTargetInstallation?.Path;

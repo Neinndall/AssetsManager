@@ -38,8 +38,10 @@ New Features
   - Image Comparison / Timeline Mode: export the frame sequence as an animated GIF with a configurable hold time per state (2s-5s; the total stays an exact multiple of it - 2x per cycle Forward, (cycles+2)x Round trip - while the short 0.5s wipe/fade is folded into the state boundaries), FPS (12/24/30) and size (1024px, 2048px or original resolution), with Floyd-Steinberg dithering for smoother gradients, following the selected sequence and cycles.
   - Image Comparison / Timeline Mode: OLD/NEW badges identify which image belongs to each side of the transition, both on the viewport and baked into the exported GIF.
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
+  - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Monitor / Backups: replaced the NEWLY CREATED pill label with a minimal inline NEW tag (icon + text) for consistency with the Version Manager list.
   - Monitor / Version Manager: the manifest list now loads ordered by date descending (newest first), replacing the old alphabetical file-name order.
   - Monitor / Version Manager: standardized the download configuration card to match the Asset Tracker hero card (border geometry, icon boxes, title/description typography and optical text alignment).
   - Image Comparison / Wheel zoom now stays within the 25%-400% range and keeps the zoom slider in sync.
