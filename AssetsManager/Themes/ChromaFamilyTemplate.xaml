@@ -15,7 +15,7 @@
                     BorderBrush="{StaticResource BorderColor}"
                     BorderThickness="1">
                 <Grid>
-                    <Border CornerRadius="8">
+                    <Border CornerRadius="9">
                         <Border.Background>
                             <ImageBrush ImageSource="{Binding PreviewImage}"
                                         Stretch="UniformToFill"/>

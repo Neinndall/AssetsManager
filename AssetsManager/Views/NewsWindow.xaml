@@ -23,7 +23,7 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- 0. THUMBNAIL -->
-                    <Border Grid.Column="0" Height="99" CornerRadius="10" Background="{StaticResource SidebarBackground}" VerticalAlignment="Top">
+                    <Border Grid.Column="0" Height="99" CornerRadius="10" Background="{StaticResource SidebarBackground}" VerticalAlignment="Top" ClipToBounds="True">
                         <Grid>
                             <materialIcons:MaterialIcon Kind="ImageOutline" Width="40" Height="40" Foreground="{StaticResource TextMuted}" Opacity="0.12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             <Border CornerRadius="10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
