@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -301,6 +302,7 @@ namespace AssetsManager.Views.Models.Monitor
 
             _monitorService.CategoryCheckCompleted += OnCategoryCheckCompleted;
             _monitorService.CategoryCheckStarted += OnCategoryCheckStarted;
+            _appSettings.ConfigurationSaved += OnConfigurationSaved;
             _pbeStatusService.StatusChecked += OnPbeStatusChecked;
             _statusService.HashSyncStarted += OnHashSyncStarted;
             _statusService.HashSyncCompleted += OnHashSyncCompleted;
@@ -484,23 +486,17 @@ namespace AssetsManager.Views.Models.Monitor
             if (!_monitorService.AssetCategories.Any()) _monitorService.LoadAssetCategories();
 
             AssetTrackerCategoriesCount = _monitorService.AssetCategories.Count;
-            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(category =>
-                category.Entries.Values.Count(entry => entry.State == TrackedAssetState.Available));
+            AssetTrackerTotalFound = _monitorService.AssetCategories.Sum(category => CountFoundAssets(category));
 
             var lastActiveCategory = _monitorService.AssetCategories
-                .Where(category => category.Entries.Values.Any(entry => entry.State == TrackedAssetState.Available))
-                .OrderByDescending(category => category.Entries.Values
-                    .Where(entry => entry.State == TrackedAssetState.Available)
-                    .Max(entry => entry.AssetId))
+                .Where(category => CountFoundAssets(category) > 0)
+                .OrderByDescending(category => MaxFoundAssetId(category))
                 .FirstOrDefault();
 
             if (lastActiveCategory != null)
             {
                 LastDiscoveredCategory = lastActiveCategory.Name;
-                LastDiscoveredAssetId = lastActiveCategory.Entries.Values
-                    .Where(entry => entry.State == TrackedAssetState.Available)
-                    .Max(entry => entry.AssetId)
-                    .ToString();
+                LastDiscoveredAssetId = MaxFoundAssetId(lastActiveCategory).ToString();
             }
             else
             {
@@ -513,6 +509,26 @@ namespace AssetsManager.Views.Models.Monitor
                 AssetTrackerStatus = "Idle";
             }
             UpdateDataStatus();
+        }
+
+        private static int CountFoundAssets(AssetCategory category)
+        {
+            var removed = new HashSet<long>(category.UserRemovedUrls);
+            return category.Entries.Values.Count(entry =>
+                entry.State == TrackedAssetState.Available && !removed.Contains(entry.AssetId));
+        }
+
+        private static long MaxFoundAssetId(AssetCategory category)
+        {
+            var removed = new HashSet<long>(category.UserRemovedUrls);
+            return category.Entries.Values
+                .Where(entry => entry.State == TrackedAssetState.Available && !removed.Contains(entry.AssetId))
+                .Max(entry => entry.AssetId);
+        }
+
+        private void OnConfigurationSaved(object sender, EventArgs e)
+        {
+            Application.Current.Dispatcher.InvokeAsync(RefreshAssetTrackerData);
         }
 
         private string FormatLastCheckTime(string timeStr)
@@ -618,6 +634,7 @@ namespace AssetsManager.Views.Models.Monitor
                 }
                 _monitorService.CategoryCheckCompleted -= OnCategoryCheckCompleted;
                 _monitorService.CategoryCheckStarted -= OnCategoryCheckStarted;
+                _appSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
 
             if (_pbeStatusService != null)
