@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -103,14 +104,23 @@ namespace AssetsManager.Views.Models.Versions
             if (_versionService != null)
             {
                 var allFiles = await _versionService.GetVersionFilesAsync();
+                var sortedFiles = allFiles
+                    .OrderByDescending(f => ParseDate(f.Date))
+                    .ThenBy(f => f.FileName)
+                    .ToList();
 
-                AllLeagueClientVersions = allFiles.Where(f => f.Category == "league-client").ToList();
+                AllLeagueClientVersions = sortedFiles.Where(f => f.Category == "league-client").ToList();
                 var gameClientCategories = new[] { "lol-game-client" };
-                AllLoLGameClientVersions = allFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
+                AllLoLGameClientVersions = sortedFiles.Where(f => gameClientCategories.Contains(f.Category)).ToList();
 
                 LeagueClientPaginator.SetFullList(AllLeagueClientVersions, preservePage);
                 LoLGameClientPaginator.SetFullList(AllLoLGameClientVersions, preservePage);
             }
+        }
+
+        private static DateTime ParseDate(string date)
+        {
+            return DateTime.TryParseExact(date, "dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt : DateTime.MinValue;
         }
 
         public async Task LoadTargetInstallationsAsync(BackupManager backupManager, AppSettings appSettings)
