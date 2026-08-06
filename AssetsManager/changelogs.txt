@@ -212,6 +212,7 @@ Changes
 
 Bug Fixes
   - Monitor / Asset Tracker: the FOUND counter on the CDN Discovery dashboard card now excludes user-removed assets and refreshes immediately after deleting found assets (REMOVE or Clean Found), instead of keeping the stale total until the window was reopened.
+  - Viewer / Fixed the Models list layout that was regressed by the file-grid style refactor: model cards now span the full sidebar width in a vertical list with smooth pixel scrolling (restored ModernListBox base style) instead of floating as horizontal wrapped tiles.
   - Comparator / Historical comparison results now re-resolve their hashes when reopened, so assets that were unnamed at comparison time show their real game paths once the hash catalogs are available.
   - Notifications / Fixed notification category classification so Watcher updates, Comparator/PBE status discoveries, and App/Hash updates appear under their respective tabs instead of defaulting to System.
   - Comparator / Fixed export mode labels in results tab to accurately reflect configured protocol settings (Original vs Smart).

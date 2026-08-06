@@ -188,7 +188,7 @@
                                      ItemsSource="{Binding FilteredModels}"
                                      SelectionMode="Extended"
                                      SelectionChanged="ModelsListBox_SelectionChanged"
-                                     Style="{StaticResource ModernFileGridListBox}"
+                                     Style="{StaticResource ModernListBox}"
                                      ItemContainerStyle="{StaticResource ModernSelectableCardItemStyle}"
                                      MinHeight="120" MaxHeight="240"
                                      Visibility="{Binding HasLoadedModels, Converter={StaticResource BooleanToVisibilityConverter}}">

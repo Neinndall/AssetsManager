@@ -100,6 +100,15 @@
         </Setter>
     </Style>
 
+    <!-- Estilo base para ListBox de paneles (lista vertical, scroll por píxel) -->
+    <Style x:Key="ModernListBox" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="ScrollViewer.CanContentScroll" Value="False"/>
+    </Style>
+
     <!-- ESTILO MAESTRO PARA TARJETAS SELECCIONABLES (Usado en Models, Animations e Image Merger) -->
     <Style x:Key="ModernSelectableCardItemStyle" TargetType="ListBoxItem">
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
