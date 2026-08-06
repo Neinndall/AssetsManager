@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.News;
 using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Views.Helpers;
 
@@ -10,12 +11,20 @@ namespace AssetsManager.Views.Dialogs
 {
     public partial class NotificationHubWindow : HudWindow
     {
+        private readonly NotificationService _notificationService;
+        private readonly NewsService _newsService;
+
         public NotificationHubModel ViewModel => DataContext as NotificationHubModel;
 
-        public NotificationHubWindow(NotificationService notificationService)
+        public NotificationHubWindow(NotificationService notificationService, NewsService newsService)
         {
+            _notificationService = notificationService;
+            _newsService = newsService;
+
             InitializeComponent();
             this.DataContext = new NotificationHubModel(notificationService);
+
+            _notificationService.NotificationsMarkedAsRead += OnNotificationMarkedAsRead;
         }
 
         private void MarkAllRead_Click(object sender, RoutedEventArgs e)
@@ -85,8 +94,17 @@ namespace AssetsManager.Views.Dialogs
 
         protected override void OnClosed(EventArgs e)
         {
+            _notificationService.NotificationsMarkedAsRead -= OnNotificationMarkedAsRead;
             base.OnClosed(e);
             ViewModel?.Dispose();
+        }
+
+        private void OnNotificationMarkedAsRead(NotificationModel notification)
+        {
+            if (notification?.Category != NotificationCategory.News) return;
+            if (string.IsNullOrEmpty(notification.NewsArticleUrl)) return;
+
+            _ = _newsService.MarkAsSeenAsync(notification.NewsArticleUrl, notification.NewsPublishedAt ?? DateTime.MinValue);
         }
     }
 }
