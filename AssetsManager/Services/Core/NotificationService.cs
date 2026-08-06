@@ -22,8 +22,9 @@ namespace AssetsManager.Services.Core
         // Event for unread counters
         public event Action CountsChanged;
 
-        // Fired for each notification that is marked as read (either explicitly or
-        // by executing its action), letting consumers sync secondary state.
+        // Fired for each notification that is marked as read (either explicitly, by
+        // executing its action, or by dismissing it), letting consumers sync secondary
+        // state such as the news seen-state cache.
         public event Action<NotificationModel> NotificationsMarkedAsRead;
 
         private readonly ObservableCollection<NotificationModel> _notifications;
@@ -106,11 +107,8 @@ namespace AssetsManager.Services.Core
             {
                 foreach (var note in _notifications)
                 {
+                    if (note.IsRead) continue;
                     note.IsRead = true;
-                }
-
-                foreach (var note in _notifications)
-                {
                     NotificationsMarkedAsRead?.Invoke(note);
                 }
 
@@ -150,10 +148,23 @@ namespace AssetsManager.Services.Core
             {
                 for (int i = _notifications.Count - 1; i >= 0; i--)
                 {
-                    if (_notifications[i].Category == category)
+                    var note = _notifications[i];
+                    if (note.Category != category) continue;
+
+                    // Clearing counts as having read/dismissed every notification:
+                    // mark them read and, for news, as seen so the articles are
+                    // never notified again.
+                    if (!note.IsRead)
                     {
-                        _notifications.RemoveAt(i);
+                        note.IsRead = true;
+                        if (category == NotificationCategory.News &&
+                            !string.IsNullOrEmpty(note.NewsArticleUrl))
+                        {
+                            NotificationsMarkedAsRead?.Invoke(note);
+                        }
                     }
+
+                    _notifications.RemoveAt(i);
                 }
                 CountsChanged?.Invoke();
                 SaveHistory();
@@ -166,6 +177,18 @@ namespace AssetsManager.Services.Core
 
             RunOnUiThread(() =>
             {
+                // Dismissing a notification counts as having read it: mark it read
+                // and, for news, as seen so the article is never notified again.
+                if (!notification.IsRead)
+                {
+                    notification.IsRead = true;
+                    if (notification.Category == NotificationCategory.News &&
+                        !string.IsNullOrEmpty(notification.NewsArticleUrl))
+                    {
+                        NotificationsMarkedAsRead?.Invoke(notification);
+                    }
+                }
+
                 _notifications.Remove(notification);
                 CountsChanged?.Invoke();
                 SaveHistory();

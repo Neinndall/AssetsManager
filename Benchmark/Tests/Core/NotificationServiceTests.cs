@@ -174,6 +174,66 @@ namespace AssetsManager.BenchmarkTests.Services.Core
             Assert.Equal(1, readEvents);
         }
 
+        [Fact]
+        public void DismissingNewsNotificationRaisesReadEventOnceAndRemovesIt()
+        {
+            var service = CreateService();
+            int readEvents = 0;
+            service.NotificationsMarkedAsRead += _ => readEvents++;
+
+            service.AddNotification(
+                "Riot News",
+                "New dev update",
+                category: NotificationCategory.News,
+                newsArticleUrl: "https://www.leagueoflegends.com/en-us/news/dev/new-dev-update");
+
+            NotificationModel notification = Assert.Single(service.GetNotifications());
+            service.RemoveNotification(notification);
+            Assert.Equal(1, readEvents);
+            Assert.True(notification.IsRead);
+            Assert.Empty(service.GetNotifications());
+        }
+
+        [Fact]
+        public void DismissingNonNewsNotificationDoesNotRaiseReadEvent()
+        {
+            var service = CreateService();
+            int readEvents = 0;
+            service.NotificationsMarkedAsRead += _ => readEvents++;
+
+            service.AddNotification("System", "System message");
+
+            NotificationModel notification = Assert.Single(service.GetNotifications());
+            service.RemoveNotification(notification);
+            Assert.Equal(0, readEvents);
+            Assert.Empty(service.GetNotifications());
+        }
+
+        [Fact]
+        public void ClearingNewsCategoryRaisesReadEventForEachNewsArticle()
+        {
+            var service = CreateService();
+            int readEvents = 0;
+            service.NotificationsMarkedAsRead += _ => readEvents++;
+
+            service.AddNotification(
+                "Riot News",
+                "New dev update",
+                category: NotificationCategory.News,
+                newsArticleUrl: "https://www.leagueoflegends.com/en-us/news/dev/new-dev-update");
+            service.AddNotification(
+                "Riot News",
+                "New patch notes",
+                category: NotificationCategory.News);
+            service.AddNotification("System", "System message");
+
+            service.RemoveAllByCategory(NotificationCategory.News);
+
+            Assert.Equal(1, readEvents);
+            NotificationModel remaining = Assert.Single(service.GetNotifications());
+            Assert.Equal(NotificationCategory.System, remaining.Category);
+        }
+
         private NotificationService CreateService()
         {
             return new NotificationService(_directories, _logService);
