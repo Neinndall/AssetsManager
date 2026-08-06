@@ -36,7 +36,7 @@
                         Visibility="Collapsed" Margin="0,0,0,28">
                     <Grid>
                         <materialIcons:MaterialIcon Kind="ImageOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}" Opacity="0.12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Border x:Name="BannerImage" CornerRadius="11" Visibility="Collapsed">
+                        <Border x:Name="BannerImage" CornerRadius="12" Visibility="Collapsed">
                             <Border.Background>
                                 <ImageBrush Stretch="UniformToFill"/>
                             </Border.Background>
