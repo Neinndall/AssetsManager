@@ -1,81 +1,52 @@
 name: "🐛 Bug Report"
-description: "Report a bug or unexpected behavior in the application."
+description: "Report a bug or unexpected behavior."
 title: "[BUG] "
-labels: 
+labels:
   - "bug"
   - "triage"
 body:
   - type: markdown
     attributes:
       value: |
-        > [!IMPORTANT]  
-        > Thanks for taking the time to fill out this bug report!
-        > Please provide the information below to help us investigate.
+        > [!IMPORTANT]
+        > Thanks for reporting! Only the description and version are required.
 
   - type: textarea
-    id: description
+    id: bug
     attributes:
-      label: "📝 Bug Description"
-      description: "Clearly describe the problem. What were you doing? What happened, and what did you expect to happen?"
-      placeholder: "A clear and concise description of the bug, including expected vs actual behavior."
+      label: "What happened?"
+      description: "What did you do and what went wrong? Optionally note what you expected instead."
+      placeholder: "e.g. 'Bulk-exporting .bin files crashes the app. Expected: a ZIP with the selected files.'"
     validations:
       required: true
-      
+
   - type: textarea
-    id: steps-to-reproduce
+    id: reproduce
     attributes:
-      label: "🛠️ Steps to Reproduce (Optional)"
-      description: "List the exact steps to reproduce the behavior if applicable."
+      label: "Reproduce (optional)"
+      description: "Steps, or a screenshot/video/link."
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. See error
+        1. Open...
+        2. Click...
+        3. See error.
+        (or drag a screenshot here)
     validations:
       required: false
-      
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: "📸 Screenshots or Videos (Optional)"
-      description: "Attach screenshots or a short video showing the problem."
-      placeholder: "Drag and drop images or videos here, or paste links."
-    validations:
-      required: false
-      
+
   - type: input
     id: version
     attributes:
-      label: "AssetsManager Version"
-      description: "e.g., v4.1.0.3 (found in the Help -> About window)"
-      placeholder: "v4.x.y.z"
+      label: "Version & OS"
+      description: "e.g., app version (Help -> About) and OS."
+      placeholder: "v4.1.0.3 · Windows 11 x64"
     validations:
       required: true
-      
-  - type: input
-    id: environment
-    attributes:
-      label: "Operating System & Environment (Optional)"
-      description: "e.g., Windows 11 x64, Update (or Clean Installation)"
-      placeholder: "Windows 11 x64"
-    validations:
-      required: false
-      
+
   - type: textarea
-    id: log-files
+    id: logs
     attributes:
-      label: "📄 Log Files (Optional)"
-      description: |
-        Please provide relevant log entries if available. You can find log files in the `logs` folder:
-        - `application.log`: General application logs.
-        - `application_errors.log`: Critical errors.
+      label: "Logs (optional)"
+      description: "Relevant lines from the `logs` folder (e.g., `application_errors.log`)."
       render: shell
-    validations:
-      required: false
-      
-  - type: textarea
-    id: additional-context
-    attributes:
-      label: "💡 Additional Context (Optional)"
-      description: "Any other information or specific configurations."
     validations:
       required: false

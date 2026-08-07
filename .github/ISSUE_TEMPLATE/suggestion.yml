@@ -1,5 +1,5 @@
-name: "💡 Requests a Suggestion"
-description: "Got an idea for a new feature or an improvement? We'd love to hear it!"
+name: "💡 Suggestion"
+description: "Suggest a new feature or an improvement."
 title: "[SUGGESTION] "
 labels: ["enhancement", "status/triage"]
 body:
@@ -7,31 +7,22 @@ body:
     attributes:
       value: |
         > [!NOTE]
-        > Thanks for taking the time to suggest an improvement! Please describe your proposal below.
+        > One idea per request. Keep it short and concrete.
 
   - type: textarea
-    id: proposal
+    id: idea
     attributes:
-      label: "💡 Describe your Suggestion"
-      description: "What would you like to add or improve? Please explain how you envision it working."
-      placeholder: "e.g., 'Add a right-click context menu option to export images directly from the previewer...'"
+      label: "Your idea"
+      description: "What to add or improve, and why it's useful."
+      placeholder: "e.g. 'Add a bulk-export option from the context menu to share selected files in one step.'"
     validations:
       required: true
 
   - type: textarea
-    id: why-needed
+    id: extra
     attributes:
-      label: "🎯 Why is this needed / Use Case"
-      description: "Explain the problem or limitation this solves. Why is this feature valuable?"
-      placeholder: "e.g., 'Currently, exporting images requires navigating through multiple folders and confirmation dialogues, which is very tedious when exporting in bulk...'"
-    validations:
-      required: true
-
-  - type: textarea
-    id: other-context
-    attributes:
-      label: "🔍 Additional Context (Optional)"
-      description: "Add any other context, mockups, screenshots, or links."
+      label: "Extra context (optional)"
+      description: "Links, mockups, screenshots, or use cases."
       placeholder: "You can drag and drop images or paste links here."
     validations:
       required: false
