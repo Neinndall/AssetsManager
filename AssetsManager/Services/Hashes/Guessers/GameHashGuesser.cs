@@ -761,7 +761,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 foreach (Match match in ShaderIncludeRegex.Matches(text))
                 {
                     if (!IsAscii(match.Groups[1].Value)) continue;
-                    yield return new HashGuessCandidate(NormalizePath(Path.Combine(directory, match.Groups[1].Value)), HashGuessStrategy.ShaderInclude);
+                    yield return new HashGuessCandidate(
+                        NormalizePath(PathUtils.NormalizeVirtualPath($"{directory}/{match.Groups[1].Value}")),
+                        HashGuessStrategy.ShaderInclude);
                 }
                 yield break;
             }
@@ -891,16 +893,15 @@ namespace AssetsManager.Services.Hashes.Guessers
             var paths = new HashSet<string>(StringComparer.Ordinal);
             foreach ((int offset, int length) in FindGeneralPathRanges(data))
             {
-                string path = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
+                string path = PathUtils.NormalizeGrepPath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
                 if (path.Length > 0) paths.Add(path);
-
                 if (offset < 2) continue;
                 int encodedLength = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
                 if (encodedLength == 0 && offset >= 4)
                     encodedLength = ByteAt(data, offset - 4) | (ByteAt(data, offset - 3) << 8) |
                                     (ByteAt(data, offset - 2) << 16) | (ByteAt(data, offset - 1) << 24);
                 if (encodedLength <= 0 || encodedLength >= length || offset + encodedLength > data.Count) continue;
-                string shortened = NormalizePath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, encodedLength));
+                string shortened = PathUtils.NormalizeGrepPath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, encodedLength));
                 if (shortened.Length > 0) paths.Add(shortened);
             }
 
@@ -1016,6 +1017,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(prefix + ".preload", HashGuessStrategy.LuaVariant);
                 yield break;
             }
+
             yield return new HashGuessCandidate(path, strategy);
         }
 

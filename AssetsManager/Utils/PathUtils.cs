@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -295,6 +296,36 @@ namespace AssetsManager.Utils
             if (string.IsNullOrWhiteSpace(path)) return string.Empty;
             // Repeated separators are significant in Riot's historical GAME hashes.
             return path.Trim().Replace('\\', '/').ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Normalizes a grep-extracted path the same way CDTB does: lowercases and
+        /// converts "DATA_SOON/..." (the legacy Riot folder name) back to "data/...".
+        /// </summary>
+        public static string NormalizeGrepPath(string path) =>
+            NormalizePath(path).Replace("data_soon/", "data/", StringComparison.Ordinal);
+
+        /// <summary>
+        /// Resolves "." / ".." segments and collapses duplicate slashes like Python's
+        /// os.path.normpath, without touching the file system (paths are virtual).
+        /// </summary>
+        public static string NormalizeVirtualPath(string path)
+        {
+            var segments = new Stack<string>();
+            foreach (string segment in path.Split('/'))
+            {
+                if (segment.Length == 0 || segment == ".") continue;
+                if (segment == "..")
+                {
+                    if (segments.Count > 0 && !string.Equals(segments.Peek(), "..", StringComparison.Ordinal))
+                        segments.Pop();
+                    else
+                        segments.Push("..");
+                    continue;
+                }
+                segments.Push(segment);
+            }
+            return string.Join('/', segments.Reverse());
         }
 
         /// <summary>
