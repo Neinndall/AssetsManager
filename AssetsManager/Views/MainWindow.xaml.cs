@@ -213,7 +213,9 @@ namespace AssetsManager.Views
                 TrayIcon.Visibility = Visibility.Visible;
                 Hide();
                 // Show a balloon tip when minimized to tray
-                TrayIcon.ShowBalloonTip("AssetsManager", "The application has been minimized to the tray.", BalloonIcon.Info);
+                string message = "The application has been minimized to the tray.";
+                string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, NotificationCategory.System, "System");
+                TrayIcon.ShowBalloonTip(toastTitle, message, BalloonIcon.Info);
             }
         }
 
@@ -225,24 +227,20 @@ namespace AssetsManager.Views
                 _latestAppVersionAvailable = latestVersion;
             }
 
+            // Resolve adaptive title for toast balloon notification
+            string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, category, title, newsItem);
+
             // Show System Tray Balloon Notification if window is not visible
             if (Visibility != Visibility.Visible)
             {
                 Dispatcher.InvokeAsync(() =>
                 {
-                    TrayIcon.ShowBalloonTip("AssetsManager", message, BalloonIcon.Info);
+                    TrayIcon.ShowBalloonTip(toastTitle, message, BalloonIcon.Info);
                 });
             }
 
             // Always update internal notification system
-            string notificationTitle = !string.IsNullOrEmpty(title) ? title : category switch
-            {
-                NotificationCategory.Watcher => "Watcher Notification",
-                NotificationCategory.Tracker => "Tracker Notification",
-                NotificationCategory.Updates => "App Update Notification",
-                NotificationCategory.News => "Riot News",
-                _ => "System Notification"
-            };
+            string notificationTitle = !string.IsNullOrEmpty(title) ? title : toastTitle;
 
             if (category == NotificationCategory.News)
             {

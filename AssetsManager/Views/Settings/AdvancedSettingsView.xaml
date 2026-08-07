@@ -150,8 +150,8 @@
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Run in background on close" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Minimize to system tray on close to maintain monitoring" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Minimize to System Tray" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Hide window to system tray when minimizing to maintain background monitoring" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
                     <CheckBox Grid.Column="1" IsChecked="{Binding Settings.MinimizeToTrayOnClose, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>

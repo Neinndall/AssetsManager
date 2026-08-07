@@ -981,6 +981,8 @@ Improvements
   - Text Comparison / Interface Feedback
     * Synchronized Icon Feedback: filter icons now dynamically change color (Gray when disabled, Brand-specific when active) to provide clear and immediate visual feedback of the active filtering state.
     * Enhanced Word-Level Diff Visibility: increased the highlight opacity to 1.0, ensuring that granular changes within lines stand out with maximum clarity.
+  - Notifications / Adaptive Toast Headers
+    * Implemented adaptive titles for system tray toast notifications based on event context (PBE Maintenance, Asset Tracker, App Updates, Riot News).
 
 Changes
   - Explorer / Interface Refinement
