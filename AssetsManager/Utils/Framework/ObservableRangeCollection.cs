@@ -48,19 +48,31 @@ namespace AssetsManager.Utils.Framework
 
             // ListCollectionView (TreeView/ListView) does not support range Add operations.
             // Detect binding and fallback to Reset to prevent NotSupportedException.
-            var view = CollectionViewSource.GetDefaultView(this);
-            if (view is ListCollectionView)
+            // CRITICAL: Never invoke CollectionViewSource.GetDefaultView on a background thread.
+            // Doing so creates and caches a ListCollectionView bound to the background thread context,
+            // which causes a NotSupportedException when WPF later accesses or disposes the collection on the Dispatcher thread.
+            bool isUiThread = System.Windows.Application.Current == null || System.Windows.Application.Current.Dispatcher.CheckAccess();
+
+            if (isUiThread)
+            {
+                var view = CollectionViewSource.GetDefaultView(this);
+                if (view is ListCollectionView)
+                {
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                    return;
+                }
+
+                const int BatchSize = 500;
+                for (int i = 0; i < list.Count; i += BatchSize)
+                {
+                    int count = Math.Min(BatchSize, list.Count - i);
+                    var batch = list.GetRange(i, count);
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, batch, startIndex + i));
+                }
+            }
+            else
             {
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-                return;
-            }
-
-            const int BatchSize = 500;
-            for (int i = 0; i < list.Count; i += BatchSize)
-            {
-                int count = Math.Min(BatchSize, list.Count - i);
-                var batch = list.GetRange(i, count);
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, batch, startIndex + i));
             }
         }
 

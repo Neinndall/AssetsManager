@@ -376,7 +376,8 @@ namespace AssetsManager.Views.Models.Explorer
             // Limpiar hijos recursivamente
             if (_children != null)
             {
-                foreach (var child in _children)
+                var childrenCopy = _children.ToList();
+                foreach (var child in childrenCopy)
                 {
                     child.Dispose();
                 }
