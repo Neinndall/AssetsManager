@@ -152,29 +152,27 @@ namespace AssetsManager.Utils
 
                 if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
                 {
-                    Texture tex = maxWidth.HasValue && maxHeight.HasValue
+                    Texture texture = maxWidth.HasValue && maxHeight.HasValue
                         ? Texture.LoadTex(textureStream, maxWidth.Value, maxHeight.Value)
                         : Texture.LoadTex(textureStream);
-                    if (tex.Mips.Length > 0)
-                        return ConvertToBgra32BitmapSource(tex);
+                    if (texture.Mips.Length > 0)
+                        return ConvertTextureMipToBitmapSource(texture);
                     return null;
                 }
                 else if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
                 {
-                    Texture tex = Texture.LoadDds(textureStream);
-                    if (tex.Mips.Length > 0)
+                    Texture texture = Texture.LoadDds(textureStream);
+                    if (texture.Mips.Length > 0)
                     {
-                        using Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
-                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
+                        using Image<Rgba32> image = texture.Mips[0].ToImage();
+                        return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
                     }
                     return null;
                 }
                 else if (extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
                 {
-                    using (Image<Rgba32> imageSharp = Image.Load<Rgba32>(textureStream))
-                    {
-                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
-                    }
+                    using Image<Rgba32> image = Image.Load<Rgba32>(textureStream);
+                    return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
                 }
                 else
                 {
@@ -202,58 +200,44 @@ namespace AssetsManager.Utils
             }
         }
 
-        private static BitmapSource ConvertToBgra32BitmapSource(Texture texture)
+        private static BitmapSource ConvertTextureMipToBitmapSource(Texture texture)
         {
             var mip = texture.Mips[0];
             if (!mip.TryGetMemory(out Memory<ColorRgba32> colorMemory))
                 throw new InvalidOperationException("Texture mip memory must be contiguous.");
 
-            byte[] pixels = MemoryMarshal.AsBytes(colorMemory.Span).ToArray();
-            for (int i = 0; i < pixels.Length; i += 4)
-                (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
-
-            int stride = checked(mip.Width * 4);
-            BitmapSource result = BitmapSource.Create(
-                mip.Width, mip.Height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
-            result.Freeze();
-            return result;
+            return CreateBgra32BitmapSource(
+                MemoryMarshal.AsBytes(colorMemory.Span).ToArray(),
+                mip.Width,
+                mip.Height);
         }
 
-        private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight)
+        private static BitmapSource ConvertImageToBitmapSource(Image<Rgba32> image, int? maxWidth, int? maxHeight)
         {
-            if ((maxWidth.HasValue && imageSharp.Width > maxWidth.Value) ||
-                (maxHeight.HasValue && imageSharp.Height > maxHeight.Value))
+            if ((maxWidth.HasValue && image.Width > maxWidth.Value) ||
+                (maxHeight.HasValue && image.Height > maxHeight.Value))
             {
-                int resizeWidth = maxWidth ?? imageSharp.Width;
-                int resizeHeight = maxHeight ?? imageSharp.Height;
-                imageSharp.Mutate(x => x.Resize(new ResizeOptions
+                image.Mutate(x => x.Resize(new ResizeOptions
                 {
-                    Size = new Size(resizeWidth, resizeHeight),
+                    Size = new Size(maxWidth ?? image.Width, maxHeight ?? image.Height),
                     Mode = ResizeMode.Max
                 }));
             }
 
-            int bufferSize = checked(imageSharp.Width * imageSharp.Height * 4);
-            byte[] pixelBuffer = new byte[bufferSize];
-            imageSharp.CopyPixelDataTo(pixelBuffer);
+            byte[] pixels = new byte[checked(image.Width * image.Height * 4)];
+            image.CopyPixelDataTo(pixels);
+            return CreateBgra32BitmapSource(pixels, image.Width, image.Height);
+        }
 
-            for (int i = 0; i < pixelBuffer.Length; i += 4)
-            {
-                (pixelBuffer[i], pixelBuffer[i + 2]) = (pixelBuffer[i + 2], pixelBuffer[i]);
-            }
+        private static BitmapSource CreateBgra32BitmapSource(byte[] pixels, int width, int height)
+        {
+            for (int i = 0; i < pixels.Length; i += 4)
+                (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
 
-            int stride = imageSharp.Width * 4;
-            var bitmapSource = BitmapSource.Create(
-                imageSharp.Width,
-                imageSharp.Height,
-                96, 96,
-                PixelFormats.Bgra32,
-                null,
-                pixelBuffer,
-                stride);
-
-            bitmapSource.Freeze();
-            return bitmapSource;
+            BitmapSource bitmap = BitmapSource.Create(
+                width, height, 96, 96, PixelFormats.Bgra32, null, pixels, checked(width * 4));
+            bitmap.Freeze();
+            return bitmap;
         }
 
         public static BitmapSource LoadTexture(Stream textureStream, string extension)
@@ -271,7 +255,7 @@ namespace AssetsManager.Utils
                 extension.Equals(".webp", StringComparison.OrdinalIgnoreCase))
             {
                 using Image<Rgba32> image = Image.Load<Rgba32>(fileStream);
-                return ConvertToBgra32BitmapSource(image, maxWidth, maxHeight);
+                return ConvertImageToBitmapSource(image, maxWidth, maxHeight);
             }
 
             return LoadTexture(fileStream, extension, maxWidth, maxHeight);
