@@ -80,6 +80,8 @@ namespace AssetsManager.Services.Hashes
                 ? await _metaSchema.GetSnapshotAsync(cancellationToken)
                 : new MetaSchemaHashSnapshot();
 
+            var stopwatch = Stopwatch.StartNew();
+
             await Task.Run(() =>
             {
                 for (int index = 0; index < wads.Length; index++)
@@ -157,7 +159,8 @@ namespace AssetsManager.Services.Hashes
                         ProcessedWads = index + 1,
                         TotalWads = wads.Length,
                         ProcessedFiles = scannedBins + scannedRst,
-                        CurrentStage = includeBin ? "Building BIN inventory" : "Building RST inventory"
+                        CurrentStage = includeBin ? "Building BIN inventory" : "Building RST inventory",
+                        Elapsed = stopwatch.Elapsed
                     });
                 }
             }, cancellationToken);

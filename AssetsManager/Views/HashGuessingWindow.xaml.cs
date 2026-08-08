@@ -201,10 +201,38 @@ namespace AssetsManager.Views
             _viewModel.ProgressValue = 0;
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = mode != HashGuessMode.GrepGame && mode != HashGuessMode.GrepLcu;
-            _viewModel.StatusText = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
+            
+            string currentStage = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
+            long totalChecked = 0;
+            int totalWads = 0;
+            int foundMatches = 0;
+
             _viewModel.Matches.Clear();
             var displayedMatchHashes = new System.Collections.Generic.HashSet<ulong>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            void UpdateStatus()
+            {
+                string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                _viewModel.StatusText = totalWads > 0
+                    ? $"{currentStage} · {totalChecked:N0} checked · {foundMatches:N0} found · Time: {timeText}"
+                    : $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
+            }
+
+            UpdateStatus();
+
+            var timer = new DispatcherTimer(DispatcherPriority.Normal)
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            timer.Tick += (s, e) =>
+            {
+                if (_viewModel.IsRunning && stopwatch.IsRunning)
+                {
+                    UpdateStatus();
+                }
+            };
+            timer.Start();
 
             try
             {
@@ -222,11 +250,11 @@ namespace AssetsManager.Views
                         long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
-                    long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
-                    string timeText = FormatElapsedTime(value.Elapsed);
-                    _viewModel.StatusText = value.TotalWads > 0
-                        ? $"{value.CurrentWad} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · Time: {timeText}"
-                        : $"{value.CurrentWad} · {value.FoundMatches:N0} found · Time: {timeText}";
+                    currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
+                    totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
+                    totalWads = value.TotalWads;
+                    foundMatches = value.FoundMatches;
+                    UpdateStatus();
                 });
                 IProgress<HashGuessMatch> matchProgress =
                     (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu || mode == HashGuessMode.LcuV1Paths)
@@ -251,6 +279,7 @@ namespace AssetsManager.Views
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
                 stopwatch.Stop();
+                timer.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
                 _viewModel.ProgressValue = 100;
@@ -268,12 +297,16 @@ namespace AssetsManager.Views
             }
             catch (OperationCanceledException)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _viewModel.StatusText = "Hash guessing cancelled.";
             }
             catch (InvalidOperationException ex)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogWarning(ex.Message);
@@ -282,6 +315,8 @@ namespace AssetsManager.Views
             }
             catch (System.IO.DirectoryNotFoundException ex)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogWarning(ex.Message);
@@ -290,6 +325,8 @@ namespace AssetsManager.Views
             }
             catch (Exception ex)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogError(ex, "Hash guessing failed.");
@@ -298,6 +335,7 @@ namespace AssetsManager.Views
             }
             finally
             {
+                timer.Stop();
                 if (ReferenceEquals(_cancellationTokenSource, runCancellation))
                     _cancellationTokenSource = null;
                 runCancellation.Dispose();
@@ -326,10 +364,38 @@ namespace AssetsManager.Views
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
             string internalDomain = includeBin ? "BIN" : "RST";
-            _viewModel.StatusText = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
+            
+            string currentStage = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
+            long totalChecked = 0;
+            int totalWads = 0;
+            int foundMatches = 0;
+
             _viewModel.Matches.Clear();
             var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash, string Value)>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            void UpdateStatus()
+            {
+                string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                _viewModel.StatusText = totalWads > 0
+                    ? $"{currentStage} · {totalChecked:N0} checked · {foundMatches:N0} found · Time: {timeText}"
+                    : $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
+            }
+
+            UpdateStatus();
+
+            var timer = new DispatcherTimer(DispatcherPriority.Normal)
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            timer.Tick += (s, e) =>
+            {
+                if (_viewModel.IsRunning && stopwatch.IsRunning)
+                {
+                    UpdateStatus();
+                }
+            };
+            timer.Start();
 
             try
             {
@@ -363,17 +429,18 @@ namespace AssetsManager.Views
                         long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
-                    long totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
-                    string timeText = FormatElapsedTime(value.Elapsed);
-                    _viewModel.StatusText = value.TotalWads > 0
-                        ? $"{value.CurrentStage} · {totalChecked:N0} checked · {value.FoundMatches:N0} found · Time: {timeText}"
-                        : $"{value.CurrentStage} · {value.FoundMatches:N0} found · Time: {timeText}";
+                    currentStage = string.IsNullOrEmpty(value.CurrentStage) ? currentStage : value.CurrentStage;
+                    totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
+                    totalWads = value.TotalWads;
+                    foundMatches = value.FoundMatches;
+                    UpdateStatus();
                 });
 
                 if (action == InternalHashAction.Inventory)
                 {
                     var inventory = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
                     stopwatch.Stop();
+                    timer.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
@@ -389,6 +456,7 @@ namespace AssetsManager.Views
                         _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
                     };
                     stopwatch.Stop();
+                    timer.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.Matches.AddRange(result.Matches
                         .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
@@ -401,16 +469,21 @@ namespace AssetsManager.Views
             }
             catch (OperationCanceledException)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _viewModel.StatusText = "Internal hash guessing cancelled.";
             }
             catch (Exception ex)
             {
+                stopwatch.Stop();
+                timer.Stop();
                 _logService.LogError(ex, "Internal hash guessing failed.");
                 _viewModel.StatusText = "Internal hash guessing failed. Check application_errors.log.";
                 _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             finally
             {
+                timer.Stop();
                 if (ReferenceEquals(_cancellationTokenSource, runCancellation)) _cancellationTokenSource = null;
                 runCancellation.Dispose();
                 _viewModel.IsProgressIndeterminate = false;
