@@ -249,6 +249,9 @@ namespace AssetsManager.Views.Helpers
 
             var delta = e.Delta > 0 ? 1 : -1;
             var lookDir = camera.LookDirection;
+            double currentDistance = lookDir.Length;
+            if (!double.IsFinite(currentDistance) || currentDistance <= 0.001) return;
+
             lookDir.Normalize();
 
             double speedMultiplier = 1.0;
@@ -270,16 +273,26 @@ namespace AssetsManager.Views.Helpers
                 _isTransitioning = true;
             }
 
-            // Calculate the zoom shift vector
-            var shift = lookDir * delta * ZoomSensitivity * speedMultiplier;
+            // Calculate dynamic zoom step based on distance so zooming is smooth at both macro (map) and micro (street) scales.
+            double step = Math.Max(10.0, currentDistance * 0.15) * speedMultiplier;
+            var shift = lookDir * delta * step;
 
-            // Ensure we don't zoom past the target point (which would invert the camera)
-            if (Vector3D.DotProduct(camera.LookDirection - shift, lookDir) > 0.1)
+            if (delta > 0) // Zooming IN
             {
-                // Increment the target position
+                if (currentDistance - step < 5.0)
+                {
+                    // Move position and shift target point forward so user can zoom continuously into streets without hitting a wall
+                    _targetPosition += lookDir * step;
+                }
+                else
+                {
+                    _targetPosition += shift;
+                    _targetLookDirection -= shift;
+                }
+            }
+            else // Zooming OUT
+            {
                 _targetPosition += shift;
-                
-                // To keep the orbit target stationary while zooming, subtract the shift from LookDirection
                 _targetLookDirection -= shift;
             }
         }

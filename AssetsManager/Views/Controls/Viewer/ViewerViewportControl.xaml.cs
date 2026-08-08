@@ -1022,10 +1022,10 @@ namespace AssetsManager.Views.Controls.Viewer
             float cameraDistance = lookDirection.Length();
             if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
             {
-                return 10f;
+                return 1f;
             }
 
-            return Math.Clamp(cameraDistance * 0.01f, 10f, 500f);
+            return Math.Clamp(cameraDistance * 0.01f, 1f, 500f);
         }
 
         internal static float CalculateProjectionFarPlane(Vector3 lookDirection)
@@ -1033,10 +1033,10 @@ namespace AssetsManager.Views.Controls.Viewer
             float cameraDistance = lookDirection.Length();
             if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
             {
-                return 10000f;
+                return 100000f;
             }
 
-            return Math.Max(10000f, cameraDistance * 4f);
+            return Math.Max(100000f, cameraDistance * 4f);
         }
 
         private void SetCameraView_Click(object sender, RoutedEventArgs e)

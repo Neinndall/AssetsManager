@@ -44,6 +44,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Fixed background map clipping on large environments and enabled continuous close-up zoom into terrain streets.
   - Standardized identity header position, padding, and corner radius across Hash Guessing Lab and WAD Comparator.
   - Hash Guessing Lab / Added continuous UI timer ticker and offloaded summary count loading to background threads to prevent UI freezes.
   - Monitor / History: reduced the pagination page size of the Comparisons, Watcher and Differences tabs from 10 to 5 entries.
