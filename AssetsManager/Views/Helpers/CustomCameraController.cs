@@ -274,7 +274,8 @@ namespace AssetsManager.Views.Helpers
             }
 
             // Calculate dynamic zoom step based on distance so zooming is smooth at both macro (map) and micro (street) scales.
-            double step = Math.Max(10.0, currentDistance * 0.15) * speedMultiplier;
+            double baseStep = Math.Clamp(currentDistance * 0.08, 15.0, 120.0);
+            double step = baseStep * speedMultiplier;
             var shift = lookDir * delta * step;
 
             if (delta > 0) // Zooming IN
