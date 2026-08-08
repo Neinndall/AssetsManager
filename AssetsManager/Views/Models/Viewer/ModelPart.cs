@@ -59,6 +59,7 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsTextureTiled { get; set; } = true;
         public bool IsDoubleSided { get; set; } = true;
         public bool IsDecal { get; set; }
+        public MapLightmapBinding Lightmap { get; set; }
 
         public Dictionary<string, BitmapSource> AllTextures
         {
@@ -128,8 +129,13 @@ namespace AssetsManager.Views.Models.Viewer
 
             AvailableTextureNames?.Clear();
             SourceVertexIndices = null;
+            Lightmap = null;
 
             PropertyChanged = null;
         }
     }
+
+    public sealed record MapLightmapBinding(
+        string TextureKey,
+        float[] UvCoordinates);
 }

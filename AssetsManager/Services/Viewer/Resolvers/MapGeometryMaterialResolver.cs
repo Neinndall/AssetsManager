@@ -6,7 +6,7 @@ using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Viewer.MapGeometry
+namespace AssetsManager.Services.Viewer.Resolvers
 {
     internal sealed class MapGeometryMaterialResolver
     {

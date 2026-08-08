@@ -1,13 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Resolvers;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Tests.Viewer.Models
+namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
 {
     public class SknMaterialTextureResolverTests
     {

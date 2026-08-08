@@ -12,18 +12,18 @@ using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Models
+namespace AssetsManager.Services.Viewer.Loading
 {
-    public class ChromaScannerService
+    public class ChromaLoadingService
     {
         private readonly LogService _logService;
 
-        public ChromaScannerService(LogService logService)
+        public ChromaLoadingService(LogService logService)
         {
             _logService = logService;
         }
 
-        public async Task<List<ChromaFamilyModel>> ScanSkinsAsync(string rootPath)
+        public async Task<List<ChromaFamilyModel>> LoadFamiliesAsync(string rootPath)
         {
             return await Task.Run(() =>
             {

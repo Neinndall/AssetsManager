@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Viewer;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -14,7 +14,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public ChromaSelectionModel ViewModel => _viewModel;
 
-        public ChromaScannerService ScannerService { get; set; }
+        public ChromaLoadingService LoadingService { get; set; }
 
         public ViewerPanelControl ParentPanel { get; set; }
 
@@ -28,13 +28,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public async Task InitializeAsync(string skinsPath)
         {
-            if (ScannerService == null) return;
+            if (LoadingService == null) return;
 
             _viewModel.SetScanningState(System.IO.Path.GetFileName(skinsPath));
 
             try
             {
-                var families = await ScannerService.ScanSkinsAsync(skinsPath);
+                var families = await LoadingService.LoadFamiliesAsync(skinsPath);
                 _viewModel.SetFamilies(families);
 
                 if (families.Count == 0)

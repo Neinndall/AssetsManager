@@ -29,7 +29,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
                 })
             {
                 AllTextures = textures,
-                SourceVertexIndices = new[] { 0, 1, 2 }
+                SourceVertexIndices = new[] { 0, 1, 2 },
+                Lightmap = new MapLightmapBinding("lightmap", new float[6])
             };
             var scene = new SceneModel();
             scene.Parts.Add(part);
@@ -39,6 +40,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Null(scene.RootVisual);
             Assert.Null(scene.SkinnedMesh);
             Assert.Null(scene.Skeleton);
+            Assert.Null(scene.MapLightingProfile);
             Assert.Empty(scene.Parts);
             Assert.Empty(scene.Animations);
             Assert.Empty(textures);
@@ -46,6 +48,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.Null(part.Geometry);
             Assert.Null(part.AllTextures);
             Assert.Null(part.SourceVertexIndices);
+            Assert.Null(part.Lightmap);
         }
 
         [Fact]

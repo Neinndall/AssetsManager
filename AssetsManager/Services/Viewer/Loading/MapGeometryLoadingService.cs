@@ -12,11 +12,13 @@ using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Composition;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 
-namespace AssetsManager.Services.Viewer.MapGeometry
+namespace AssetsManager.Services.Viewer.Loading
 {
     public class MapGeometryLoadingService
     {
@@ -128,6 +130,7 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                 StringComparer.OrdinalIgnoreCase);
             var mappingBuilders = new Dictionary<string, MapGeometryUvWorldMappingBuilder>(
                 StringComparer.OrdinalIgnoreCase);
+            MapLightingProfile lightingProfile = MapGeometryLightingResolver.Resolve(materialsBin);
 
             foreach (var mesh in mapGeometry.Meshes)
             {
@@ -135,6 +138,9 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                 var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                 var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
                 bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
+                MapGeometryLightmapData lightmap = MapGeometryLightingResolver.ResolveLightmap(mesh);
+                if (lightmap != null)
+                    allTexturePaths.Add(lightmap.TexturePath);
 
                 foreach (var submesh in mesh.Submeshes)
                 {
@@ -183,6 +189,10 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                         }
                     }
 
+                    float[] subLightmapCoordinates = lightmap?.SliceCoordinates(
+                        submesh.MinVertex,
+                        submesh.VertexCount);
+
                     bool isTerrainBlend = MapGeometryLayeredTextureComposer.IsTerrainBlend(material);
                     if (isTerrainBlend)
                     {
@@ -227,7 +237,9 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                         primarySampler?.AddressU == 0 || primarySampler?.AddressV == 0,
                         material?.TintColor,
                         mesh.DisableBackfaceCulling,
-                        mesh.RenderFlags.HasFlag(EnvironmentAssetMeshRenderFlags.IsDecal)));
+                        mesh.RenderFlags.HasFlag(EnvironmentAssetMeshRenderFlags.IsDecal),
+                        lightmap?.TexturePath,
+                        subLightmapCoordinates));
                 }
             }
 
@@ -250,7 +262,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                 unresolvedMaterials,
                 materialsWithoutVisuals,
                 textures.MissingTexturePaths,
-                layeredMaterials);
+                layeredMaterials,
+                lightingProfile);
         }
 
         private MapGeometryTextureLoadResult LoadTextures(
@@ -349,7 +362,11 @@ namespace AssetsManager.Services.Viewer.MapGeometry
         {
             var availableTextureNames = new ObservableRangeCollection<string>(result.LoadedTextures.Keys);
             var parts = new List<ModelPart>(result.Submeshes.Count);
-            var sceneModel = new SceneModel { Name = modelName };
+            var sceneModel = new SceneModel
+            {
+                Name = modelName,
+                MapLightingProfile = result.LightingProfile
+            };
 
             foreach (MapGeometrySubmeshData data in result.Submeshes)
             {
@@ -388,7 +405,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                     SelectedTextureName = textureKey,
                     IsTextureTiled = data.IsTextureTiled,
                     IsDoubleSided = data.IsDoubleSided,
-                    IsDecal = data.IsDecal
+                    IsDecal = data.IsDecal,
+                    Lightmap = CreateLightmapBinding(data, result)
                 };
 
                 TextureUtils.UpdateMaterial(modelPart);
@@ -406,11 +424,31 @@ namespace AssetsManager.Services.Viewer.MapGeometry
             if (result.LayeredTextureKeys.TryGetValue(data.MaterialName, out string layeredKey))
                 return layeredKey;
 
-            string normalizedPath = PathUtils.ToVirtualPath(data.TexturePath);
+            return ResolveTextureKey(data.TexturePath, result);
+        }
+
+        private static string ResolveTextureKey(
+            string texturePath,
+            MapGeometryProcessingResult result)
+        {
+            string normalizedPath = PathUtils.ToVirtualPath(texturePath);
             return !string.IsNullOrEmpty(normalizedPath) &&
                    result.TextureKeys.TryGetValue(normalizedPath, out string textureKey)
                 ? textureKey
                 : null;
+        }
+
+        private static MapLightmapBinding CreateLightmapBinding(
+            MapGeometrySubmeshData data,
+            MapGeometryProcessingResult result)
+        {
+            if (data.LightmapUvCoordinates == null || data.LightmapUvCoordinates.Length == 0)
+                return null;
+
+            string textureKey = ResolveTextureKey(data.LightmapTexturePath, result);
+            return string.IsNullOrEmpty(textureKey)
+                ? null
+                : new MapLightmapBinding(textureKey, data.LightmapUvCoordinates);
         }
 
         private static Color ToMediaColor(System.Numerics.Vector4? value)
@@ -559,7 +597,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
             HashSet<string> UnresolvedMaterials,
             HashSet<string> MaterialsWithoutVisuals,
             HashSet<string> MissingTexturePaths,
-            HashSet<string> LayeredMaterials);
+            HashSet<string> LayeredMaterials,
+            MapLightingProfile LightingProfile);
 
         private sealed record MapGeometryTextureLoadResult(
             Dictionary<string, BitmapSource> LoadedTextures,
@@ -577,7 +616,9 @@ namespace AssetsManager.Services.Viewer.MapGeometry
             bool IsTextureTiled,
             System.Numerics.Vector4? TintColor,
             bool IsDoubleSided,
-            bool IsDecal);
+            bool IsDecal,
+            string LightmapTexturePath,
+            float[] LightmapUvCoordinates);
 
     }
 }

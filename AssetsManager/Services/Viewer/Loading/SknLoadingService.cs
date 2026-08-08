@@ -17,10 +17,11 @@ using System.Collections.Generic;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 
 
-namespace AssetsManager.Services.Viewer.Models
+namespace AssetsManager.Services.Viewer.Loading
 {
     public class SknLoadingService
     {

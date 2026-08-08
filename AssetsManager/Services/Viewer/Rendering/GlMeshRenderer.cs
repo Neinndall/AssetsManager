@@ -18,6 +18,8 @@ namespace AssetsManager.Services.Viewer.Rendering
     /// </summary>
     public sealed class GlMeshRenderer : IDisposable
     {
+        private const float DefaultLightmapEmissionScale = 0.1f;
+
         private sealed class GlPartBuffers
         {
             public uint Vao;
@@ -28,6 +30,11 @@ namespace AssetsManager.Services.Viewer.Rendering
             public bool TextureResolved;
             public string LoadedTextureKey;
             public BitmapSource LoadedBitmap;
+            public uint LightmapTexture;
+            public bool LightmapTextureResolved;
+            public string LoadedLightmapTextureKey;
+            public BitmapSource LoadedLightmapBitmap;
+            public uint LightmapVbo;
             public Point3DCollection UploadedPositions;
             public GlMeshVertexData VertexData;
         }
@@ -48,6 +55,9 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLightDir2;
         private int _uLightColor2;
         private int _uAmbient;
+        private int _uLightmap;
+        private int _uHasLightmap;
+        private int _uLightMapColorScale;
         private bool _ready;
 
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
@@ -57,6 +67,8 @@ namespace AssetsManager.Services.Viewer.Rendering
         private readonly ConditionalWeakTable<ModelPart, GlPartBuffers> _partBuffers = new();
         private readonly HashSet<GlPartBuffers> _livePartBuffers = new();
         private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
+            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<BitmapSource, SharedTexture> _sharedLightmapTextures =
             new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<ModelPart> _pendingReleases = new();
         private uint _whiteTex;
@@ -79,6 +91,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLightDir2 = gl.GetUniformLocation(_program, "uLightDir2");
             _uLightColor2 = gl.GetUniformLocation(_program, "uLightColor2");
             _uAmbient = gl.GetUniformLocation(_program, "uAmbient");
+            _uLightmap = gl.GetUniformLocation(_program, "uLightmap");
+            _uHasLightmap = gl.GetUniformLocation(_program, "uHasLightmap");
+            _uLightMapColorScale = gl.GetUniformLocation(_program, "uLightMapColorScale");
 
             // Generate fallback 1x1 white texture
             _whiteTex = gl.GenTexture();
@@ -92,9 +107,28 @@ namespace AssetsManager.Services.Viewer.Rendering
             _ready = true;
         }
 
-        public void Render(SceneModel model, Matrix4x4 viewProj, Vector3 lightDir, Vector3 lightColor, Vector3 lightDir2, Vector3 lightColor2, Vector3 ambientColor)
+        public void Render(
+            SceneModel model,
+            Matrix4x4 viewProj,
+            Vector3 lightDir,
+            Vector3 lightColor,
+            Vector3 lightDir2,
+            Vector3 lightColor2,
+            Vector3 ambientColor)
         {
             if (!_ready || model == null || !model.IsVisible) return;
+
+            MapLightingProfile mapLighting = model.MapLightingProfile;
+            float lightMapColorScale = DefaultLightmapEmissionScale;
+            if (mapLighting != null)
+            {
+                lightDir = mapLighting.SunDirection;
+                lightColor = mapLighting.SunColor;
+                lightDir2 = Vector3.UnitY;
+                lightColor2 = Vector3.Zero;
+                ambientColor = mapLighting.AmbientColor;
+                lightMapColorScale *= mapLighting.LightMapColorScale;
+            }
 
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
@@ -108,12 +142,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                               Matrix4x4.CreateTranslation((float)model.PositionX, (float)model.PositionY, (float)model.PositionZ);
 
             _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
-            _gl.Uniform3(_uLightDir, Vector3.Normalize(lightDir));
+            _gl.Uniform3(_uLightDir, NormalizeOrDefault(lightDir));
             _gl.Uniform3(_uLightColor, lightColor);
-            _gl.Uniform3(_uLightDir2, Vector3.Normalize(lightDir2));
+            _gl.Uniform3(_uLightDir2, NormalizeOrDefault(lightDir2));
             _gl.Uniform3(_uLightColor2, lightColor2);
             _gl.Uniform3(_uAmbient, ambientColor);
             _gl.Uniform1(_uTex, 0);
+            _gl.Uniform1(_uLightmap, 1);
+            _gl.Uniform1(_uLightMapColorScale, lightMapColorScale);
 
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
@@ -124,8 +160,14 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.Disable(EnableCap.PolygonOffsetFill);
             _gl.BindVertexArray(0);
+            _gl.ActiveTexture(TextureUnit.Texture1);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _gl.ActiveTexture(TextureUnit.Texture0);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
+
+        private static Vector3 NormalizeOrDefault(Vector3 value) =>
+            value.LengthSquared() > 1e-6f ? Vector3.Normalize(value) : Vector3.UnitY;
 
         private void RenderParts(SceneModel model, bool renderDecals)
         {
@@ -152,6 +194,12 @@ namespace AssetsManager.Services.Viewer.Rendering
                 uint tex = buffers.Texture != 0 ? buffers.Texture : _whiteTex;
                 _gl.BindTexture(TextureTarget.Texture2D, tex);
 
+                bool hasLightmap = buffers.LightmapTexture != 0 && buffers.LightmapVbo != 0;
+                _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);
+                _gl.ActiveTexture(TextureUnit.Texture1);
+                _gl.BindTexture(TextureTarget.Texture2D, hasLightmap ? buffers.LightmapTexture : 0);
+                _gl.ActiveTexture(TextureUnit.Texture0);
+
                 if (_drawElements != null)
                 {
                     _drawElements((uint)PrimitiveType.Triangles, buffers.IndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
@@ -169,6 +217,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             EnsureTexture(part, buffers);
+            EnsureLightmapTexture(part, buffers);
 
             // Build VAO/VBO/EBO if not already created
             if (buffers.Vao == 0 && part.Geometry?.Geometry is MeshGeometry3D mesh)
@@ -245,7 +294,38 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
 
+            EnsureLightmapVertexBuffer(part, buffers);
+
             return buffers;
+        }
+
+        private void EnsureLightmapVertexBuffer(ModelPart part, GlPartBuffers buffers)
+        {
+            float[] coordinates = part.Lightmap?.UvCoordinates;
+            if (buffers.Vao == 0 || buffers.LightmapVbo != 0 ||
+                coordinates == null ||
+                coordinates.Length != buffers.VertexData.VertexCount * 2)
+            {
+                return;
+            }
+
+            buffers.LightmapVbo = _gl.GenBuffer();
+            _gl.BindVertexArray(buffers.Vao);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffers.LightmapVbo);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<float>(coordinates),
+                BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(3);
+            _gl.VertexAttribPointer(
+                3,
+                2,
+                VertexAttribPointerType.Float,
+                false,
+                2 * sizeof(float),
+                IntPtr.Zero);
+            _gl.BindVertexArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
         private void EnsureTexture(ModelPart part, GlPartBuffers buffers)
@@ -257,7 +337,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
-            ReleaseTexture(buffers);
+            ReleaseBaseTexture(buffers);
             buffers.TextureResolved = true;
             buffers.LoadedTextureKey = selectedTexture;
             buffers.LoadedBitmap = bitmap;
@@ -273,21 +353,69 @@ namespace AssetsManager.Services.Viewer.Rendering
             buffers.Texture = sharedTexture.Id;
         }
 
-        private void ReleaseTexture(GlPartBuffers buffers)
+        private void EnsureLightmapTexture(ModelPart part, GlPartBuffers buffers)
         {
-            if (buffers.LoadedBitmap != null &&
-                _sharedTextures.TryGetValue(buffers.LoadedBitmap, out SharedTexture sharedTexture))
+            string selectedTexture = part.Lightmap?.TextureKey;
+            if (buffers.LightmapTextureResolved && buffers.LoadedLightmapTextureKey == selectedTexture)
+                return;
+
+            ReleaseLightmapTexture(buffers);
+            buffers.LightmapTextureResolved = true;
+            buffers.LoadedLightmapTextureKey = selectedTexture;
+
+            BitmapSource bitmap = TextureUtils.ResolveTexture(part.AllTextures, selectedTexture);
+            buffers.LoadedLightmapBitmap = bitmap;
+            if (bitmap == null) return;
+
+            if (!_sharedLightmapTextures.TryGetValue(bitmap, out SharedTexture sharedTexture))
             {
-                sharedTexture.ReferenceCount--;
-                if (sharedTexture.ReferenceCount == 0)
+                sharedTexture = new SharedTexture
                 {
-                    _gl.DeleteTexture(sharedTexture.Id);
-                    _sharedTextures.Remove(buffers.LoadedBitmap);
-                }
+                    Id = UploadTexture(
+                        bitmap,
+                        premultiplyAlpha: false,
+                        wrapMode: TextureWrapMode.ClampToEdge)
+                };
+                _sharedLightmapTextures.Add(bitmap, sharedTexture);
             }
 
+            sharedTexture.ReferenceCount++;
+            buffers.LightmapTexture = sharedTexture.Id;
+        }
+
+        private void ReleaseTexture(GlPartBuffers buffers)
+        {
+            ReleaseBaseTexture(buffers);
+            ReleaseLightmapTexture(buffers);
+        }
+
+        private void ReleaseBaseTexture(GlPartBuffers buffers)
+        {
+            ReleaseSharedTexture(_sharedTextures, buffers.LoadedBitmap);
             buffers.Texture = 0;
             buffers.LoadedBitmap = null;
+        }
+
+        private void ReleaseLightmapTexture(GlPartBuffers buffers)
+        {
+            ReleaseSharedTexture(_sharedLightmapTextures, buffers.LoadedLightmapBitmap);
+            buffers.LightmapTexture = 0;
+            buffers.LoadedLightmapBitmap = null;
+        }
+
+        private void ReleaseSharedTexture(
+            Dictionary<BitmapSource, SharedTexture> textures,
+            BitmapSource bitmap)
+        {
+            if (bitmap == null || !textures.TryGetValue(bitmap, out SharedTexture sharedTexture))
+                return;
+
+            sharedTexture.ReferenceCount--;
+            if (sharedTexture.ReferenceCount == 0)
+            {
+                _gl.DeleteTexture(sharedTexture.Id);
+                textures.Remove(bitmap);
+            }
         }
 
         public void QueueRelease(SceneModel model)
@@ -317,12 +445,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (buffers.Vao != 0) _gl.DeleteVertexArray(buffers.Vao);
             if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
             if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
+            if (buffers.LightmapVbo != 0) _gl.DeleteBuffer(buffers.LightmapVbo);
 
             _livePartBuffers.Remove(buffers);
             _partBuffers.Remove(part);
         }
 
-        private uint UploadTexture(BitmapSource bitmap)
+        private uint UploadTexture(
+            BitmapSource bitmap,
+            bool premultiplyAlpha = true,
+            TextureWrapMode wrapMode = TextureWrapMode.Repeat)
         {
             if (bitmap.Format != System.Windows.Media.PixelFormats.Bgra32)
             {
@@ -338,7 +470,8 @@ namespace AssetsManager.Services.Viewer.Rendering
             int stride = width * 4;
             byte[] pixels = new byte[height * stride];
             bitmap.CopyPixels(pixels, stride, 0);
-            PremultiplyBgra(pixels);
+            if (premultiplyAlpha)
+                PremultiplyBgra(pixels);
 
             uint tex = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, tex);
@@ -347,8 +480,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.Repeat);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.Repeat);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)wrapMode);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)wrapMode);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
 
             return tex;
@@ -375,11 +508,18 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
             _sharedTextures.Clear();
 
+            foreach (SharedTexture texture in _sharedLightmapTextures.Values)
+            {
+                _gl.DeleteTexture(texture.Id);
+            }
+            _sharedLightmapTextures.Clear();
+
             foreach (GlPartBuffers buffers in _livePartBuffers)
             {
                 if (buffers.Vao != 0) _gl.DeleteVertexArray(buffers.Vao);
                 if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
                 if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
+                if (buffers.LightmapVbo != 0) _gl.DeleteBuffer(buffers.LightmapVbo);
             }
             _livePartBuffers.Clear();
             _pendingReleases.Clear();
@@ -394,21 +534,28 @@ namespace AssetsManager.Services.Viewer.Rendering
 					layout(location=0) in vec3 aPos;
 					layout(location=1) in vec3 aNormal;
 					layout(location=2) in vec2 aUv;
+					layout(location=3) in vec2 aLightmapUv;
 					uniform mat4 uViewProj;
 					uniform mat4 uWorld;
 					out vec3 vNormal;
 					out vec2 vUv;
+					out vec2 vLightmapUv;
 					void main(){
 							vec4 worldPos = uWorld * vec4(aPos, 1.0);
 							gl_Position = uViewProj * worldPos;
 							vNormal = normalize(mat3(uWorld) * aNormal);
 							vUv = aUv;
+							vLightmapUv = aLightmapUv;
 				}";
 
         private const string MeshFrag = @"
 					in vec3 vNormal;
 					in vec2 vUv;
+					in vec2 vLightmapUv;
 					uniform sampler2D uTex;
+					uniform sampler2D uLightmap;
+					uniform int uHasLightmap;
+					uniform float uLightMapColorScale;
 					uniform vec3 uLightDir;
 					uniform vec3 uLightColor;
 					uniform vec3 uLightDir2;
@@ -429,7 +576,13 @@ namespace AssetsManager.Services.Viewer.Rendering
 							vec3 diffuse2 = diff2 * uLightColor2;
 							
 							vec3 finalLight = clamp(uAmbient + diffuse1 + diffuse2, 0.0, 1.0);
-							fragColor = vec4(texColor.rgb * finalLight, texColor.a);
+							vec3 finalColor = texColor.rgb * finalLight;
+							if (uHasLightmap != 0)
+							{
+								vec2 lightmapUv = vLightmapUv;
+								finalColor += texture(uLightmap, lightmapUv).rgb * uLightMapColorScale;
+							}
+							fragColor = vec4(finalColor, texColor.a);
 				}";
     }
 }

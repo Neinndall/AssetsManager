@@ -20,8 +20,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
-using AssetsManager.Services.Viewer.MapGeometry;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
 using AssetsManager.Services.Formatting;
@@ -169,10 +168,10 @@ namespace AssetsManager
       services.AddSingleton<WadPackagingService>();
       services.AddSingleton<ReportGenerationService>();
 
-      // Models Services
+      // Viewer Loading Services
       services.AddSingleton<SknLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
-      services.AddSingleton<ChromaScannerService>();
+      services.AddSingleton<ChromaLoadingService>();
 
       // Audio Services
       services.AddSingleton<AudioBankService>();

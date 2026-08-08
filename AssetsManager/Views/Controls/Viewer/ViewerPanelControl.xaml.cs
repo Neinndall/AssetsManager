@@ -11,8 +11,7 @@ using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using LeagueToolkit.Core.Animation;
 using AssetsManager.Views.Models.Viewer;
-using AssetsManager.Services.Viewer.MapGeometry;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Audio;
@@ -37,7 +36,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public SknLoadingService SknLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
-        public ChromaScannerService ChromaScannerService { get; set; }
+        public ChromaLoadingService ChromaLoadingService { get; set; }
         public LogService LogService { get; set; }
         public CustomMessageBoxService CustomMessageBoxService { get; set; }
         public TaskCancellationManager TaskCancellationManager { get; set; }

@@ -3,8 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer.MapGeometry;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
@@ -30,7 +29,7 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             SknLoadingService sknLoadingService,
             MapGeometryLoadingService mapGeometryLoadingService,
-            ChromaScannerService chromaScannerService,
+            ChromaLoadingService chromaLoadingService,
             CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
@@ -47,14 +46,14 @@ namespace AssetsManager.Views
  
             PanelControl.SknLoadingService = sknLoadingService;
             PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
-            PanelControl.ChromaScannerService = chromaScannerService;
+            PanelControl.ChromaLoadingService = chromaLoadingService;
             PanelControl.LogService = _logService;
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
             PanelControl.ProjectExplorer = ProjectExplorer;
  
-            ChromaSelectionOverlay.ScannerService = chromaScannerService;
+            ChromaSelectionOverlay.LoadingService = chromaLoadingService;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;

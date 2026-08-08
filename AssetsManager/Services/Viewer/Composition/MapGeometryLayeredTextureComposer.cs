@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
+using AssetsManager.Services.Viewer.Resolvers;
 
-namespace AssetsManager.Services.Viewer.MapGeometry
+namespace AssetsManager.Services.Viewer.Composition
 {
     internal static class MapGeometryLayeredTextureComposer
     {

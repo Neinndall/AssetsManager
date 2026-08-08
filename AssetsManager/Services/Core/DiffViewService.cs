@@ -17,7 +17,7 @@ using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Services.Audio;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Dialogs.Controls;
 using AssetsManager.Views.Models.Audio;
 

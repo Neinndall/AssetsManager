@@ -2,17 +2,17 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
-using AssetsManager.Services.Viewer.Models;
+using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Views.Models.Viewer;
 using Serilog;
 using Xunit;
 
-namespace AssetsManager.BenchmarkTests.Tests.Viewer.Models
+namespace AssetsManager.BenchmarkTests.Tests.Viewer.Loading
 {
-    public sealed class ChromaScannerServiceTests
+    public sealed class ChromaLoadingServiceTests
     {
         [Fact]
-        public async Task ScanSkinsAsync_GroupsChromasUnderNearestPrimarySkin()
+        public async Task LoadFamiliesAsync_GroupsChromasUnderNearestPrimarySkin()
         {
             string root = Path.Combine(
                 Path.GetTempPath(),
@@ -27,9 +27,9 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Models
                 CreateSkin(root, "skin04", hasModel: false);
 
                 using var logger = new LoggerConfiguration().CreateLogger();
-                var scanner = new ChromaScannerService(new LogService(logger));
+                var loader = new ChromaLoadingService(new LogService(logger));
 
-                var families = await scanner.ScanSkinsAsync(root);
+                var families = await loader.LoadFamiliesAsync(root);
 
                 Assert.Collection(
                     families,

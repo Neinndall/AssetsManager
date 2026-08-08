@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Map Environment now applies map-authored sun, ambient lighting, and baked lightmaps to static geometry.
   - Chroma Library now groups variants by their source skin with family selection and a persistent selected count.
   - Viewer models can now be selected directly in the viewport and moved along XYZ axes with a transform gizmo, including CTRL toggles and SHIFT ranges.
   - Viewer can now auto-arrange selected models from left to right around the scene center using their model-list order.
