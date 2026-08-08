@@ -273,36 +273,31 @@ namespace AssetsManager.Views.Helpers
                 _isTransitioning = true;
             }
 
-            // Calculate dynamic zoom step based on distance so zooming is smooth at both macro (map) and micro (street) scales.
-            double baseStep = Math.Clamp(currentDistance * 0.08, 15.0, 120.0);
+            // Calculate dynamic zoom step based on distance so zooming is smooth at both macro (map) and micro (street/model) scales.
+            double baseStep = Math.Clamp(currentDistance * 0.08, 5.0, 120.0);
             double step = baseStep * speedMultiplier;
             var shift = lookDir * delta * step;
 
             if (delta > 0) // Zooming IN
             {
-                Point3D nextPos;
-                Vector3D nextLook = _targetLookDirection;
-
-                if (currentDistance - step < 5.0)
+                // Enforce a minimum distance to the orbit target point (20 units)
+                // This prevents passing through the target, camera "surfing" along the floor, or looking at the model from underneath.
+                const double minDistance = 20.0;
+                if (currentDistance - step < minDistance)
                 {
-                    // Move position and shift target point forward so user can zoom continuously into streets without hitting a wall
-                    nextPos = _targetPosition + lookDir * step;
+                    double allowedStep = currentDistance - minDistance;
+                    if (allowedStep > 0)
+                    {
+                        var allowedShift = lookDir * allowedStep;
+                        _targetPosition += allowedShift;
+                        _targetLookDirection -= allowedShift;
+                    }
                 }
                 else
                 {
-                    nextPos = _targetPosition + shift;
-                    nextLook = _targetLookDirection - shift;
+                    _targetPosition += shift;
+                    _targetLookDirection -= shift;
                 }
-
-                // Minimum height clamp: prevent camera from penetrating underneath the map ground plane
-                const double minGroundY = 10.0;
-                if (nextPos.Y < minGroundY)
-                {
-                    nextPos.Y = minGroundY;
-                }
-
-                _targetPosition = nextPos;
-                _targetLookDirection = nextLook;
             }
             else // Zooming OUT
             {
