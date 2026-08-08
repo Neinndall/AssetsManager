@@ -58,6 +58,7 @@ namespace AssetsManager.Views.Models.Viewer
         public int[] SourceVertexIndices { get; set; }
         public bool IsTextureTiled { get; set; } = true;
         public bool IsDoubleSided { get; set; } = true;
+        public bool IsDecal { get; set; }
 
         public Dictionary<string, BitmapSource> AllTextures
         {

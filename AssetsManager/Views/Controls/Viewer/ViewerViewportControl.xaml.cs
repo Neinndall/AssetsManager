@@ -165,7 +165,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
-                10f,
+                CalculateProjectionNearPlane(lookDir),
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
@@ -1016,6 +1016,17 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         public void SnapCamera() => ResetCamera(false);
+
+        internal static float CalculateProjectionNearPlane(Vector3 lookDirection)
+        {
+            float cameraDistance = lookDirection.Length();
+            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
+            {
+                return 10f;
+            }
+
+            return Math.Clamp(cameraDistance * 0.01f, 10f, 500f);
+        }
 
         internal static float CalculateProjectionFarPlane(Vector3 lookDirection)
         {

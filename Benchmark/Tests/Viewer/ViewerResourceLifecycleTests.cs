@@ -65,12 +65,15 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
-        public void ProjectionFarPlaneExpandsForMapScaleCameraDistances()
+        public void ProjectionPlanesPreserveDepthPrecisionAtMapScale()
         {
-            float farPlane = ViewerViewportControl.CalculateProjectionFarPlane(
-                new Vector3(0f, -18000f, -15000f));
+            var lookDirection = new Vector3(0f, -18000f, -15000f);
+            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(lookDirection);
+            float farPlane = ViewerViewportControl.CalculateProjectionFarPlane(lookDirection);
 
+            Assert.InRange(nearPlane, 200f, 250f);
             Assert.True(farPlane > 90000f);
+            Assert.True(farPlane / nearPlane < 500f);
         }
 
         [Theory]

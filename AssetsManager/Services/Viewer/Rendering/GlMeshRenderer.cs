@@ -119,9 +119,29 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
 
+            RenderParts(model, renderDecals: false);
+            RenderParts(model, renderDecals: true);
+
+            _gl.Disable(EnableCap.PolygonOffsetFill);
+            _gl.BindVertexArray(0);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+        }
+
+        private void RenderParts(SceneModel model, bool renderDecals)
+        {
+            if (renderDecals)
+            {
+                _gl.Enable(EnableCap.PolygonOffsetFill);
+                _gl.PolygonOffset(-1f, -1f);
+            }
+            else
+            {
+                _gl.Disable(EnableCap.PolygonOffsetFill);
+            }
+
             foreach (var part in model.Parts)
             {
-                if (!part.IsVisible) continue;
+                if (!part.IsVisible || part.IsDecal != renderDecals) continue;
 
                 var buffers = EnsureBuffers(part);
                 if (buffers.Vao == 0) continue;
@@ -137,9 +157,6 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _drawElements((uint)PrimitiveType.Triangles, buffers.IndexCount, (uint)DrawElementsType.UnsignedInt, IntPtr.Zero);
                 }
             }
-
-            _gl.BindVertexArray(0);
-            _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
 
         private GlPartBuffers EnsureBuffers(ModelPart part)

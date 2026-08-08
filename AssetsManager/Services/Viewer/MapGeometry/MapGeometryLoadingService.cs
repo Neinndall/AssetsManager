@@ -226,7 +226,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                         primaryTexturePath,
                         primarySampler?.AddressU == 0 || primarySampler?.AddressV == 0,
                         material?.TintColor,
-                        mesh.DisableBackfaceCulling));
+                        mesh.DisableBackfaceCulling,
+                        mesh.RenderFlags.HasFlag(EnvironmentAssetMeshRenderFlags.IsDecal)));
                 }
             }
 
@@ -386,7 +387,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
                     AvailableTextureNames = availableTextureNames,
                     SelectedTextureName = textureKey,
                     IsTextureTiled = data.IsTextureTiled,
-                    IsDoubleSided = data.IsDoubleSided
+                    IsDoubleSided = data.IsDoubleSided,
+                    IsDecal = data.IsDecal
                 };
 
                 TextureUtils.UpdateMaterial(modelPart);
@@ -574,7 +576,8 @@ namespace AssetsManager.Services.Viewer.MapGeometry
             string TexturePath,
             bool IsTextureTiled,
             System.Numerics.Vector4? TintColor,
-            bool IsDoubleSided);
+            bool IsDoubleSided,
+            bool IsDecal);
 
     }
 }
