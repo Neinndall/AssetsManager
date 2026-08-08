@@ -988,9 +988,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public async Task OpenMapGeometry()
         {
-            var openMapGeoDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("MapGeometry Files", "*.mapgeo") }, Title = "Select a mapgeo file" };
+            var openMapGeoDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "MapGeometry Files (*.mapgeo)|*.mapgeo|All Files (*.*)|*.*",
+                Title = "Select a mapgeo file"
+            };
 
-            if (openMapGeoDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openMapGeoDialog.ShowDialog() == true)
             {
                 string mapGeoPath = openMapGeoDialog.FileName;
                 string materialsBinPath = Path.ChangeExtension(mapGeoPath, ".materials.bin");

@@ -70,30 +70,33 @@ namespace AssetsManager.Services.Viewer.Loading
             string gameDataPath,
             CancellationToken cancellationToken)
         {
-            try
+            return await Task.Run(async () =>
             {
-                using (var stream = File.OpenRead(filePath))
-                using (var mapGeometry = new EnvironmentAsset(stream))
+                try
                 {
-                    string modelName = Path.GetFileNameWithoutExtension(filePath);
+                    using (var stream = File.OpenRead(filePath))
+                    using (var mapGeometry = new EnvironmentAsset(stream))
+                    {
+                        string modelName = Path.GetFileNameWithoutExtension(filePath);
 
-                    return await CreateSceneModel(
-                        mapGeometry,
-                        modelName,
-                        materialsBin,
-                        gameDataPath,
-                        cancellationToken);
+                        return await CreateSceneModel(
+                            mapGeometry,
+                            modelName,
+                            materialsBin,
+                            gameDataPath,
+                            cancellationToken);
+                    }
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load map geometry");
-                return null;
-            }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "Failed to load map geometry");
+                    return null;
+                }
+            }, cancellationToken);
         }
 
         private async Task<SceneModel> CreateSceneModel(
