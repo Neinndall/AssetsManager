@@ -40,6 +40,7 @@ namespace AssetsManager.Views
             _logService = logService;
             DataContext = _viewModel;
             Unloaded += OnUnloaded;
+            Loaded += (s, e) => UpdateUnknownCountAsync();
         }
 
         private async void UpdateUnknownCountAsync()
