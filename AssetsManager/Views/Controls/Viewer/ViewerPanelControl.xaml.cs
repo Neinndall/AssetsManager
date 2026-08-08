@@ -688,17 +688,16 @@ namespace AssetsManager.Views.Controls.Viewer
                 : System.Threading.CancellationToken.None;
 
             SceneModel newModel = null;
-            string extension = Path.GetExtension(modelPath).ToLowerInvariant();
 
             try
             {
                 if (string.IsNullOrEmpty(texturePath))
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath), cancellationToken);
+                    newModel = await SknLoadingService.LoadModel(modelPath, cancellationToken);
                 }
                 else
                 {
-                    newModel = await Task.Run(() => SknLoadingService.LoadModel(modelPath, texturePath), cancellationToken);
+                    newModel = await SknLoadingService.LoadModel(modelPath, texturePath, cancellationToken);
                 }
             }
             catch (System.OperationCanceledException)
@@ -709,23 +708,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (cancellationToken.IsCancellationRequested)
             {
-                newModel = null;
+                SafeDisposeModel(newModel);
+                return;
             }
 
             if (newModel != null)
             {
-                if (extension == ".skn")
-                {
-                    string sklFilePath = Path.ChangeExtension(modelPath, ".skl");
-                    if (File.Exists(sklFilePath))
-                    {
-                        using (var stream = File.OpenRead(sklFilePath))
-                        {
-                            newModel.Skeleton = new RigResource(stream);
-                        }
-                    }
-                }
-
                 if (isInitialLoad)
                 {
                     Viewport?.SetupScene(false);
@@ -874,7 +862,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (cancellationToken.IsCancellationRequested)
             {
-                newModel = null;
+                SafeDisposeModel(newModel);
+                return;
             }
 
             if (newModel != null)

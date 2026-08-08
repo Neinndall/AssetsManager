@@ -101,11 +101,17 @@ namespace AssetsManager.Services.Viewer.Loading
             string gameDataPath,
             CancellationToken cancellationToken)
         {
-            MapGeometryProcessingResult processingResult = await Task.Run(
-                () => ProcessMapGeometry(mapGeometry, materialsBin, gameDataPath, cancellationToken),
+            MapGeometryProcessingResult processingResult = ProcessMapGeometry(
+                mapGeometry,
+                materialsBin,
+                gameDataPath,
                 cancellationToken);
-            SceneModel sceneModel = CreateSceneFromProcessedMap(modelName, processingResult);
             LogMaterialDiagnostics(processingResult, materialsBin != null);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            SceneModel sceneModel = await Application.Current.Dispatcher.InvokeAsync(
+                () => CreateSceneFromProcessedMap(modelName, processingResult));
+
             _logService.LogDebug("--- Finished displaying model ---");
             return sceneModel;
         }
@@ -298,7 +304,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         continue;
                     }
 
-                    if (loadedTexture.CanFreeze) loadedTexture.Freeze();
                     loadedTextures[textureKeys[texturePath]] = loadedTexture;
                     texturesByPath[texturePath] = loadedTexture;
                 }

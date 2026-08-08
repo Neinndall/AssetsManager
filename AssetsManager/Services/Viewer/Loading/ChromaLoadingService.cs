@@ -115,7 +115,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         Colors.Transparent,
                         Path.GetFileNameWithoutExtension(primaryTexture));
 
-                bitmap.Freeze();
                 return new PreviewData(
                     bitmap,
                     ExtractDominantColor(bitmap),

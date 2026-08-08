@@ -1,11 +1,13 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Renderer;
@@ -34,58 +36,66 @@ namespace AssetsManager.Services.Viewer.Loading
         }
 
         // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
-        public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath)
+        public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath, CancellationToken cancellationToken = default)
         {
-            try
+            return await Task.Run(async () =>
             {
-                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
-                if (string.IsNullOrEmpty(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
+                try
                 {
-                    _logService.LogError("Invalid texture directory provided for chroma model.");
+                    SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                    if (string.IsNullOrEmpty(textureDirectoryPath) || !Directory.Exists(textureDirectoryPath))
+                    {
+                        _logService.LogError("Invalid texture directory provided for chroma model.");
+                        skinnedMesh.Dispose();
+                        return null;
+                    }
+
+                    var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath, cancellationToken);
+                    var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, false);
+
+                    _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
+                    return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logService.LogError(ex, "Failed to load model with custom textures");
                     return null;
                 }
-
-                var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath);
-                var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, false);
-
-                _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath);
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load model with custom textures");
-                return null;
-            }
+            }, cancellationToken);
         }
 
         // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
-        public async Task<SceneModel> LoadModel(string filePath)
+        public async Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
         {
-            try
+            return await Task.Run(async () =>
             {
-                SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
-                string modelDirectory = ResolveTextureDirectory(filePath);
-
-                if (string.IsNullOrEmpty(modelDirectory))
+                try
                 {
-                    _logService.LogError("Could not determine the model directory.");
+                    SkinnedMesh skinnedMesh = SkinnedMesh.ReadFromSimpleSkin(filePath);
+                    string modelDirectory = ResolveTextureDirectory(filePath);
+
+                    if (string.IsNullOrEmpty(modelDirectory))
+                    {
+                        _logService.LogError("Could not determine the model directory.");
+                        skinnedMesh.Dispose();
+                        return null;
+                    }
+
+                    var loadedTextures = LoadTexturesFromDirectory(modelDirectory, cancellationToken);
+                    var materialTextures = LoadMaterialTextures(filePath, loadedTextures, true);
+
+                    _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
+                    return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logService.LogError(ex, "Failed to load model");
                     return null;
                 }
-
-                var loadedTextures = LoadTexturesFromDirectory(modelDirectory);
-                var materialTextures = LoadMaterialTextures(filePath, loadedTextures, true);
-
-                _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath);
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load model");
-                return null;
-            }
+            }, cancellationToken);
         }
 
-        private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath)
+        private Dictionary<string, BitmapSource> LoadTexturesFromDirectory(string directoryPath, CancellationToken cancellationToken)
         {
             var loadedTextures = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
             var textureFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
@@ -96,6 +106,7 @@ namespace AssetsManager.Services.Viewer.Loading
 
             foreach (string texPath in textureFiles)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 LoadTextureFile(texPath, loadedTextures);
             }
             return loadedTextures;
@@ -153,92 +164,98 @@ namespace AssetsManager.Services.Viewer.Loading
             Dictionary<string, BitmapSource> loadedTextures,
             string modelName,
             SknMaterialTextureResolution materialTextures,
-            string filePath = "")
+            string filePath,
+            CancellationToken cancellationToken)
         {
             var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
             string defaultTextureKey = materialTextures?.DefaultTextureKey ??
                 SknMaterialTextureResolver.FindUnambiguousFallback(loadedTextures.Keys);
 
-            // Move geometry processing to background thread
-            var dataList = await Task.Run(() =>
+            var dataList = new List<SubmeshData>();
+            var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
+            var positions = vertexAccessor.AsVector3Array().ToArray();
+            var texCoordAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
+            var texCoords = texCoordAccessor.AsVector2Array().ToArray();
+            var indices = skinnedMesh.Indices;
+
+            foreach (var rangeObj in skinnedMesh.Ranges)
             {
-                var list = new List<SubmeshData>();
-                var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
-                var positions = vertexAccessor.AsVector3Array().ToArray();
-                var texCoordAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
-                var texCoords = texCoordAccessor.AsVector2Array().ToArray();
-                var indices = skinnedMesh.Indices;
+                cancellationToken.ThrowIfCancellationRequested();
+                string materialName = rangeObj.Material.TrimEnd('\0');
 
-                foreach (var rangeObj in skinnedMesh.Ranges)
+                var subIndices = indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
+                var vertexMap = new Dictionary<int, int>();
+                var subPositions = new List<Point3D>();
+                var subTexCoords = new List<System.Windows.Point>();
+                var sourceVertexIndices = new List<int>();
+                var triangleIndices = new int[rangeObj.IndexCount];
+
+                // Riot SKNs may store submesh indices globally or relative to the range's first vertex.
+                bool usesGlobalIndices = true;
+                bool usesLocalIndices = rangeObj.StartVertex > 0;
+                for (int i = 0; i < rangeObj.IndexCount; i++)
                 {
-                    string materialName = rangeObj.Material.TrimEnd('\0');
-
-                    var subIndices = indices.Slice(rangeObj.StartIndex, rangeObj.IndexCount);
-                    var vertexMap = new Dictionary<int, int>();
-                    var subPositions = new List<Point3D>();
-                    var subTexCoords = new List<System.Windows.Point>();
-                    var sourceVertexIndices = new List<int>();
-                    var triangleIndices = new int[rangeObj.IndexCount];
-
-                    // Riot SKNs may store submesh indices globally or relative to the range's first vertex.
-                    bool usesGlobalIndices = true;
-                    bool usesLocalIndices = rangeObj.StartVertex > 0;
-                    for (int i = 0; i < rangeObj.IndexCount; i++)
-                    {
-                        int index = (int)subIndices[i];
-                        usesGlobalIndices &= index >= rangeObj.StartVertex &&
-                                             index < rangeObj.StartVertex + rangeObj.VertexCount;
-                        usesLocalIndices &= index >= 0 && index < rangeObj.VertexCount;
-                    }
-
-                    if (!usesGlobalIndices && !usesLocalIndices)
-                    {
-                        throw new InvalidDataException(
-                            $"Submesh '{materialName}' contains indices outside its declared vertex range.");
-                    }
-
-                    int vertexOffset = usesLocalIndices && !usesGlobalIndices
-                        ? rangeObj.StartVertex
-                        : 0;
-
-                    for (int i = 0; i < rangeObj.IndexCount; i++)
-                    {
-                        int sourceIndex = (int)subIndices[i] + vertexOffset;
-                        if (!vertexMap.TryGetValue(sourceIndex, out int localIndex))
-                        {
-                            var p = positions[sourceIndex];
-                            var uv = texCoords[sourceIndex];
-
-                            localIndex = subPositions.Count;
-                            vertexMap[sourceIndex] = localIndex;
-                            subPositions.Add(new Point3D(p.X, p.Y, p.Z));
-                            subTexCoords.Add(new System.Windows.Point(uv.X, uv.Y));
-                            sourceVertexIndices.Add(sourceIndex);
-                        }
-
-                        triangleIndices[i] = localIndex;
-                    }
-
-                    string initialMatchingKey = ResolveMaterialTexture(
-                        materialName,
-                        defaultTextureKey,
-                        materialTextures?.Overrides,
-                        loadedTextures);
-
-                    list.Add(new SubmeshData(
-                        materialName,
-                        subPositions.ToArray(),
-                        triangleIndices,
-                        subTexCoords.ToArray(),
-                        sourceVertexIndices.ToArray(),
-                        initialMatchingKey));
+                    int index = (int)subIndices[i];
+                    usesGlobalIndices &= index >= rangeObj.StartVertex &&
+                                         index < rangeObj.StartVertex + rangeObj.VertexCount;
+                    usesLocalIndices &= index >= 0 && index < rangeObj.VertexCount;
                 }
-                return list;
-            });
+
+                if (!usesGlobalIndices && !usesLocalIndices)
+                {
+                    throw new InvalidDataException(
+                        $"Submesh '{materialName}' contains indices outside its declared vertex range.");
+                }
+
+                int vertexOffset = usesLocalIndices && !usesGlobalIndices
+                    ? rangeObj.StartVertex
+                    : 0;
+
+                for (int i = 0; i < rangeObj.IndexCount; i++)
+                {
+                    int sourceIndex = (int)subIndices[i] + vertexOffset;
+                    if (!vertexMap.TryGetValue(sourceIndex, out int localIndex))
+                    {
+                        var p = positions[sourceIndex];
+                        var uv = texCoords[sourceIndex];
+
+                        localIndex = subPositions.Count;
+                        vertexMap[sourceIndex] = localIndex;
+                        subPositions.Add(new Point3D(p.X, p.Y, p.Z));
+                        subTexCoords.Add(new System.Windows.Point(uv.X, uv.Y));
+                        sourceVertexIndices.Add(sourceIndex);
+                    }
+
+                    triangleIndices[i] = localIndex;
+                }
+
+                string initialMatchingKey = ResolveMaterialTexture(
+                    materialName,
+                    defaultTextureKey,
+                    materialTextures?.Overrides,
+                    loadedTextures);
+
+                dataList.Add(new SubmeshData(
+                    materialName,
+                    subPositions.ToArray(),
+                    triangleIndices,
+                    subTexCoords.ToArray(),
+                    sourceVertexIndices.ToArray(),
+                    initialMatchingKey));
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            RigResource skeleton = null;
+            string skeletonPath = Path.ChangeExtension(filePath, ".skl");
+            if (File.Exists(skeletonPath))
+            {
+                using var stream = File.OpenRead(skeletonPath);
+                skeleton = new RigResource(stream);
+            }
 
             return await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh, FilePath = filePath };
+                var sceneModel = new SceneModel { Name = modelName, SkinnedMesh = skinnedMesh, FilePath = filePath, Skeleton = skeleton };
                 _logService.LogDebug("--- Displaying Model ---");
                 var parts = new List<ModelPart>();
 
