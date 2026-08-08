@@ -219,6 +219,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Map Environment street zoom now prevents the camera from crossing the ground, including high-speed zoom, while preserving its direction during floor sliding.
   - Viewer / Model, Chroma, and Map Environment loading now stays responsive without cross-thread scene crashes.
   - Viewer / Transparent map textures no longer develop bright borders in generated mipmaps.
   - Viewer / Map textures no longer flicker when viewing large environments from a distance.

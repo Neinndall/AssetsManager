@@ -439,6 +439,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetupScene(bool isMapGeometry)
         {
+            if (_cameraController != null)
+            {
+                _cameraController.IsMapGroundCollisionEnabled = isMapGeometry;
+            }
+
             if (isMapGeometry)
             {
                 _viewModel.IsGridVisible = false;

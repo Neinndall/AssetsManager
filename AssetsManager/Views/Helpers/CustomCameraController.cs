@@ -22,8 +22,10 @@ namespace AssetsManager.Views.Helpers
         private bool _isTransitioning;
         private const double SmoothFactor = 0.15; 
         private const double TransitionThreshold = 0.05;
+        private const double MapGroundHeight = 10.0;
 
         public double ZoomSensitivity { get; set; } = 80.0;
+        public bool IsMapGroundCollisionEnabled { get; set; }
 
         public CustomCameraController(Viewport3D viewport, FrameworkElement inputSurface = null)
         {
@@ -294,18 +296,13 @@ namespace AssetsManager.Views.Helpers
                     nextLook = _targetLookDirection - shift;
                 }
 
-                // 1. Minimum floor height: prevent camera from sinking below ground (Y < 10.0)
-                const double minGroundY = 10.0;
-                if (nextPos.Y < minGroundY)
+                bool hitMapGround = IsMapGroundCollisionEnabled && nextPos.Y <= MapGroundHeight;
+                if (hitMapGround)
                 {
-                    nextPos.Y = minGroundY;
-                }
-
-                // 2. Preserve downward viewing angle near ground so camera surfs forward looking at the street ahead,
-                // without pitching up to show the underside of models.
-                if (nextPos.Y <= minGroundY + 5.0 && nextLook.Y > -10.0)
-                {
-                    nextLook.Y = -10.0;
+                    // Keep the previous view direction when the zoom step reaches the floor.
+                    // This turns an oversized (Shift) step into a smooth floor slide instead of a bounce.
+                    nextPos.Y = MapGroundHeight;
+                    nextLook = _targetLookDirection;
                 }
 
                 _targetPosition = nextPos;
