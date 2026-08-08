@@ -1280,6 +1280,7 @@ namespace AssetsManager.Views.Controls.Viewer
             string defaultFileName = $"{modelName}_{timestamp}.png";
             var saveFileDialog = new SaveFileDialog
             {
+                FileName = defaultFileName,
                 Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*",
                 Title = "Save Viewport Snapshot",
                 DefaultExt = "png"
