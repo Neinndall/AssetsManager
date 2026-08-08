@@ -134,8 +134,4 @@ namespace AssetsManager.Views.Models.Viewer
             PropertyChanged = null;
         }
     }
-
-    public sealed record MapLightmapBinding(
-        string TextureKey,
-        float[] UvCoordinates);
 }

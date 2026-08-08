@@ -7,4 +7,8 @@ namespace AssetsManager.Views.Models.Viewer
         Vector3 SunColor,
         Vector3 AmbientColor,
         float LightMapColorScale);
+
+    public sealed record MapLightmapBinding(
+        string TextureKey,
+        float[] UvCoordinates);
 }
