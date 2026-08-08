@@ -211,6 +211,7 @@ Improvements
 
 Changes
   - Image Comparison / Removed the Mathematical Difference Map mode as it became obsolete; the image loading progression now reflects the real remaining steps (acquire 25% - decode 60% - ready 100%).
+  - Monitor / Backups: Styled the NEW session snapshot indicator as a HUD technical badge with a 1px border and sparkles icon.
 
 Bug Fixes
   - Explorer / Fixed an issue where navigating away from Local Files in the sidebar could cause an application crash.

@@ -222,12 +222,14 @@
                                                     </TextBlock>
                                                 </Border>
 
-                                                <!-- NEW Badge -->
-                                                <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center"
+                                                <!-- NEW Badge (HUD Technical Badge) -->
+                                                <Border Background="#1A00D2C4" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center"
                                                         Visibility="{Binding IsCurrentSessionBackup, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                    <materialIcons:MaterialIcon Kind="Tag" Width="10" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="NEW" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
-                                                </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="Sparkles" Width="10" Height="10" Foreground="{StaticResource AccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
                                             </StackPanel>
 
                                             <!-- Metadata Row (Unified HUD Pattern) -->
