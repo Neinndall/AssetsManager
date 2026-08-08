@@ -36,7 +36,7 @@ namespace AssetsManager.Services.Viewer.Loading
             string gameDataPath,
             CancellationToken cancellationToken = default)
         {
-            return await LoadMapGeometryInternal(filePath, null, gameDataPath, cancellationToken);
+            return await LoadMapGeometry(filePath, null, gameDataPath, cancellationToken);
         }
 
         public async Task<SceneModel> LoadMapGeometry(
@@ -45,33 +45,28 @@ namespace AssetsManager.Services.Viewer.Loading
             string gameDataPath,
             CancellationToken cancellationToken = default)
         {
-            try
-            {
-                using (var stream = File.OpenRead(materialsPath))
-                {
-                    var materialsBin = new BinTree(stream);
-                    return await LoadMapGeometryInternal(filePath, materialsBin, gameDataPath, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Failed to load materials.bin");
-                return await LoadMapGeometryInternal(filePath, null, gameDataPath, cancellationToken);
-            }
-        }
-
-        private async Task<SceneModel> LoadMapGeometryInternal(
-            string filePath,
-            BinTree materialsBin,
-            string gameDataPath,
-            CancellationToken cancellationToken)
-        {
             return await Task.Run(async () =>
             {
+                BinTree materialsBin = null;
+                if (!string.IsNullOrEmpty(materialsPath) && File.Exists(materialsPath))
+                {
+                    try
+                    {
+                        using (var stream = File.OpenRead(materialsPath))
+                        {
+                            materialsBin = new BinTree(stream);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to load materials.bin");
+                    }
+                }
+
                 try
                 {
                     using (var stream = File.OpenRead(filePath))
