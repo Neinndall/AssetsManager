@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Views.Models.Comparator;
 using AssetsManager.Services.Comparator;
 using AssetsManager.Services.Core;
@@ -246,34 +246,30 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectOldLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            using (var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() })
+            var folderBrowserDialog = new OpenFolderDialog { Title = "Select old directory", InitialDirectory = GetPreferredInitialDirectory() };
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    string oldPath = folderBrowserDialog.FileName;
-                    SetPathWithSync(true, oldPath);
-                    await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
-                }
+                string oldPath = folderBrowserDialog.FolderName;
+                SetPathWithSync(true, oldPath);
+                await ViewModel.UpdateMetadataFromPathAsync(true, oldPath, VersionService, BackupManager);
             }
         }
 
         private async void btnSelectNewLolPbeDirectory_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            using (var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() })
+            var folderBrowserDialog = new OpenFolderDialog { Title = "Select new directory", InitialDirectory = GetPreferredInitialDirectory() };
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    string newPath = folderBrowserDialog.FileName;
-                    SetPathWithSync(false, newPath);
-                    ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
-                    await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
+                string newPath = folderBrowserDialog.FolderName;
+                SetPathWithSync(false, newPath);
+                ViewModel.DirectorySyncSuffix = GetRelativeSubDirectory(newPath);
+                await ViewModel.UpdateMetadataFromPathAsync(false, newPath, VersionService, BackupManager);
 
-                    // --- DIRECTORY AUTO-SYNC ---
-                    if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
-                    {
-                        await SyncDirectoryBaseAsync(newPath);
-                    }
+                // --- DIRECTORY AUTO-SYNC ---
+                if (string.IsNullOrEmpty(ViewModel.OldDirectoryPath))
+                {
+                    await SyncDirectoryBaseAsync(newPath);
                 }
             }
         }
@@ -281,8 +277,8 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectOldWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            var openFileDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") }, Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select old wad file", InitialDirectory = GetPreferredInitialDirectory() };
+            if (openFileDialog.ShowDialog() == true)
             {
                 ViewModel.OldWadFilePath = openFileDialog.FileName;
                 await ViewModel.UpdateMetadataFromPathAsync(true, ViewModel.OldWadFilePath, VersionService, BackupManager);
@@ -292,9 +288,9 @@ namespace AssetsManager.Views.Controls.Comparator
         private async void btnSelectNewWadFile_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel == null) return;
-            var openFileDialog = new CommonOpenFileDialog { Filters = { new CommonFileDialogFilter("WAD files", "*.wad;*.wad.client"), new CommonFileDialogFilter("All files", "*.*") }, Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
+            var openFileDialog = new OpenFileDialog { Filter = "WAD files (*.wad;*.wad.client)|*.wad;*.wad.client|All files (*.*)|*.*", Title = "Select new wad file", InitialDirectory = GetPreferredInitialDirectory() };
             
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 string newPath = openFileDialog.FileName;
                 ViewModel.NewWadFilePath = newPath;

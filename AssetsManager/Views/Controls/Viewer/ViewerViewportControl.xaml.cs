@@ -20,7 +20,7 @@ using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Views.Helpers;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Threading;
 using OpenTK.Wpf;
@@ -1273,20 +1273,16 @@ namespace AssetsManager.Views.Controls.Viewer
             string modelName = _activeSceneModel?.Name ?? "Model";
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string defaultFileName = $"{modelName}_{timestamp}.png";
-
-            var saveFileDialog = new CommonSaveFileDialog
+            var saveFileDialog = new SaveFileDialog
             {
-                Filters = { new CommonFileDialogFilter("PNG Image", "*.png") },
-                Title = "Save 4K Snapshot",
-                DefaultExtension = ".png",
-                DefaultFileName = defaultFileName
+                Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*",
+                Title = "Save Viewport Snapshot",
+                DefaultExt = "png"
             };
 
-            if (saveFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (saveFileDialog.ShowDialog() == true)
             {
-                string filePath = Path.GetExtension(saveFileDialog.FileName).Equals(".png", StringComparison.OrdinalIgnoreCase)
-                    ? saveFileDialog.FileName
-                    : Path.ChangeExtension(saveFileDialog.FileName, ".png");
+                string filePath = saveFileDialog.FileName;
                 (int width, int height) = OpenGlSnapshotService.CalculateUhdSize(
                     OpenTkControl.FrameBufferWidth,
                     OpenTkControl.FrameBufferHeight);

@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
-using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;

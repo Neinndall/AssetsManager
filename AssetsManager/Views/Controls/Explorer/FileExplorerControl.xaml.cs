@@ -13,7 +13,7 @@ using System.Windows.Threading;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Utils;
 using AssetsManager.Services.Core;
@@ -423,14 +423,14 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public async void HandleLoadResults()
         {
-            var openFileDialog = new CommonOpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
                 Title = "Select a comparison result file",
-                Filters = { new CommonFileDialogFilter("WAD Comparison JSON", "wadcomparison.json"), new CommonFileDialogFilter("All files", "*.*") },
+                Filter = "WAD Comparison JSON (*.wadcomparison.json)|*.wadcomparison.json|All files (*.*)|*.*",
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 _currentRootPath = null; // Important: Clear root when loading result
 
@@ -602,10 +602,10 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
                 {
-                    destinationPath = dialog.FileName;
+                    destinationPath = dialog.FolderName;
                 }
             }
 
@@ -686,10 +686,10 @@ namespace AssetsManager.Views.Controls.Explorer
             }
             else
             {
-                var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select destination folder" };
-                if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+                var dialog = new OpenFolderDialog { Title = "Select destination folder" };
+                if (dialog.ShowDialog() == true)
                 {
-                    destinationPath = dialog.FileName;
+                    destinationPath = dialog.FolderName;
                 }
             }
 
@@ -929,11 +929,11 @@ namespace AssetsManager.Views.Controls.Explorer
 
         private async void SelectLolDirButton_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select a league of legends directory" };
+            var dialog = new OpenFolderDialog { Title = "Select a league of legends directory" };
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog() == true)
             {
-                string selectedDirectory = dialog.FileName;
+                string selectedDirectory = dialog.FolderName;
                 if (Directory.Exists(selectedDirectory))
                 {
                     await BuildWadTreeAsync(selectedDirectory);

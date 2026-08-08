@@ -11,7 +11,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
-using Microsoft.WindowsAPICodePack.Dialogs; // Added for CommonSaveFileDialog
+using Microsoft.Win32;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Core;
@@ -349,16 +349,16 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async Task HandleExportRequestAsync(string defaultFileName, System.Collections.IEnumerable items, DataTemplate template, int columns)
         {
-            var dialog = new CommonSaveFileDialog
+            var dialog = new SaveFileDialog
             {
                 Title = $"Save {defaultFileName.Replace("_", " ")} data",
-                DefaultFileName = defaultFileName,
+                FileName = defaultFileName,
                 InitialDirectory = DirectoriesCreator.AssetsDownloadedPath,
-                DefaultExtension = ".png"
+                DefaultExt = "png",
+                Filter = "PNG Image (*.png)|*.png|All Files (*.*)|*.*"
             };
-            dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", "*.png"));
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog() == true)
             {
                 try
                 {

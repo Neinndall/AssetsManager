@@ -17,7 +17,7 @@ using AssetsManager.Services.Viewer.Vfx;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 
 namespace AssetsManager.Views.Dialogs
 {
@@ -197,16 +197,15 @@ namespace AssetsManager.Views.Dialogs
 
         private void BrowseRoot_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new CommonOpenFileDialog
+            var dialog = new OpenFolderDialog
             {
-                IsFolderPicker = true,
                 Title = "Select asset directory root"
             };
 
-            if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (dialog.ShowDialog() == true)
             {
-                _model.RootPath = dialog.FileName;
-                ScanRootDirectory(dialog.FileName);
+                _model.RootPath = dialog.FolderName;
+                ScanRootDirectory(dialog.FolderName);
             }
         }
 

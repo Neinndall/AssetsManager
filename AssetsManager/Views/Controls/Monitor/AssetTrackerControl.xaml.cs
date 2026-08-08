@@ -7,7 +7,6 @@ using System.Windows.Controls;
 using System.Windows;
 using System.Threading;
 using Microsoft.Win32;
-using Microsoft.WindowsAPICodePack.Dialogs;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
@@ -138,15 +137,14 @@ namespace AssetsManager.Views.Controls.Monitor
                 return;
             }
 
-            using (var folderBrowserDialog = new CommonOpenFileDialog
+            var folderBrowserDialog = new OpenFolderDialog
             {
-                IsFolderPicker = true,
                 Title = $"Select folder to save the assets"
-            })
+            };
+
+            if (folderBrowserDialog.ShowDialog() == true)
             {
-                if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
-                {
-                    string destinationPath = folderBrowserDialog.FileName;
+                string destinationPath = folderBrowserDialog.FolderName;
                     int downloadedCount = 0;
                     try
                     {
@@ -171,7 +169,6 @@ namespace AssetsManager.Views.Controls.Monitor
                         ViewModel.IsBusy = false;
                     }
                 }
-            }
         }
 
         private void LoadMoreButton_Click(object sender, RoutedEventArgs e)

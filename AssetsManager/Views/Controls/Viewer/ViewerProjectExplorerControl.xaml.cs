@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Helpers;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using Material.Icons;
 
 namespace AssetsManager.Views.Controls.Viewer
@@ -462,10 +462,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ChangeFolder_Click(object sender, RoutedEventArgs e)
         {
-            var folderBrowser = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select extracted WAD root folder" };
-            if (folderBrowser.ShowDialog() == CommonFileDialogResult.Ok)
+            var folderBrowser = new OpenFolderDialog { Title = "Select extracted WAD root folder" };
+            if (folderBrowser.ShowDialog() == true)
             {
-                LoadProjectFolder(folderBrowser.FileName);
+                LoadProjectFolder(folderBrowser.FolderName);
             }
         }
     }

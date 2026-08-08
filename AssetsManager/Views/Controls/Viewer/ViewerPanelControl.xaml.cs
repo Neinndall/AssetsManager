@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using AssetsManager.Utils.Framework;
@@ -773,14 +773,14 @@ namespace AssetsManager.Views.Controls.Viewer
                 return;
             }
 
-            var openFileDialog = new CommonOpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("Animation files", "*.anm"), new CommonFileDialogFilter("All files", "*.*") },
+                Filter = "Animation files (*.anm)|*.anm|All files (*.*)|*.*",
                 Title = "Select animation files",
                 Multiselect = true
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 foreach (string fileName in openFileDialog.FileNames)
                 {
@@ -962,13 +962,13 @@ namespace AssetsManager.Views.Controls.Viewer
         // DIALOG METHODS (moved from ViewerWindow for passive orchestrator pattern)
         public async Task OpenSknModel()
         {
-            var openFileDialog = new CommonOpenFileDialog
+            var openFileDialog = new OpenFileDialog
             {
-                Filters = { new CommonFileDialogFilter("3D Model Files", "*.skn;*.skl;*.sco;*.scb"), new CommonFileDialogFilter("All Files", "*.*") },
+                Filter = "3D Model Files (*.skn;*.skl;*.sco;*.scb)|*.skn;*.skl;*.sco;*.scb|All Files (*.*)|*.*",
                 Title = "Select a model file"
             };
 
-            if (openFileDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            if (openFileDialog.ShowDialog() == true)
             {
                 var extension = Path.GetExtension(openFileDialog.FileName).ToLower();
                 if (extension == ".skl") LoadSkeleton(openFileDialog.FileName);
@@ -978,17 +978,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void OpenChromaFolder()
         {
-            var folderBrowserDialog = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select the skins folder" };
-
-            if (folderBrowserDialog.ShowDialog() == CommonFileDialogResult.Ok)
+            var folderBrowserDialog = new OpenFolderDialog
             {
-                HandleChromaGalleryRequest(folderBrowserDialog.FileName);
+                Title = "Select the skins folder"
+            };
+
+            if (folderBrowserDialog.ShowDialog() == true)
+            {
+                HandleChromaGalleryRequest(folderBrowserDialog.FolderName);
             }
         }
 
         public async Task OpenMapGeometry()
         {
-            var openMapGeoDialog = new Microsoft.Win32.OpenFileDialog
+            var openMapGeoDialog = new OpenFileDialog
             {
                 Filter = "MapGeometry Files (*.mapgeo)|*.mapgeo|All Files (*.*)|*.*",
                 Title = "Select a mapgeo file"

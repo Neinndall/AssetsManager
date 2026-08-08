@@ -1,7 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.Win32;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Utils;
@@ -99,10 +99,10 @@ namespace AssetsManager.Views
 
         private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
         {
-            var folderBrowser = new CommonOpenFileDialog { IsFolderPicker = true, Title = "Select extracted WAD root folder" };
-            if (folderBrowser.ShowDialog() == CommonFileDialogResult.Ok)
+            var folderBrowser = new OpenFolderDialog { Title = "Select extracted WAD root folder" };
+            if (folderBrowser.ShowDialog() == true)
             {
-                ProjectExplorer.LoadProjectFolder(folderBrowser.FileName);
+                ProjectExplorer.LoadProjectFolder(folderBrowser.FolderName);
                 _viewModel.IsProjectExplorerVisible = true;
                 PanelControl.ViewModel.ShowMainContent();
             }
