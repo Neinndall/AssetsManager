@@ -280,24 +280,36 @@ namespace AssetsManager.Views.Helpers
 
             if (delta > 0) // Zooming IN
             {
-                // Enforce a minimum distance to the orbit target point (20 units)
-                // This prevents passing through the target, camera "surfing" along the floor, or looking at the model from underneath.
-                const double minDistance = 20.0;
-                if (currentDistance - step < minDistance)
+                Point3D nextPos;
+                Vector3D nextLook = _targetLookDirection;
+
+                if (currentDistance - step < 5.0)
                 {
-                    double allowedStep = currentDistance - minDistance;
-                    if (allowedStep > 0)
-                    {
-                        var allowedShift = lookDir * allowedStep;
-                        _targetPosition += allowedShift;
-                        _targetLookDirection -= allowedShift;
-                    }
+                    // Continuous street surfing: move position and target point forward along lookDir
+                    nextPos = _targetPosition + lookDir * step;
                 }
                 else
                 {
-                    _targetPosition += shift;
-                    _targetLookDirection -= shift;
+                    nextPos = _targetPosition + shift;
+                    nextLook = _targetLookDirection - shift;
                 }
+
+                // 1. Minimum floor height: prevent camera from sinking below ground (Y < 10.0)
+                const double minGroundY = 10.0;
+                if (nextPos.Y < minGroundY)
+                {
+                    nextPos.Y = minGroundY;
+                }
+
+                // 2. Preserve downward viewing angle near ground so camera surfs forward looking at the street ahead,
+                // without pitching up to show the underside of models.
+                if (nextPos.Y <= minGroundY + 5.0 && nextLook.Y > -10.0)
+                {
+                    nextLook.Y = -10.0;
+                }
+
+                _targetPosition = nextPos;
+                _targetLookDirection = nextLook;
             }
             else // Zooming OUT
             {
