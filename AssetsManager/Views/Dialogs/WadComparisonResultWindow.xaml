@@ -26,9 +26,9 @@
         <!-- 1. NAVIGATION SIDEBAR -->
         <Border Grid.Column="0" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0" Width="64">
             <StackPanel Margin="0,20">
-                <!-- Advanced (Technical Tree) -->
+                <!-- Hierarchy (Technical Tree) -->
                 <RadioButton Style="{StaticResource ModernSidebarNavigationStyle}" 
-                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}, Mode=TwoWay}"
+                             IsChecked="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Hierarchy}, Mode=TwoWay}"
                              ToolTip="Hierarchy"
                              GroupName="ExplorerNavigation">
                     <Grid Width="64">
@@ -159,8 +159,8 @@
                 <controls:WadResultsControl x:Name="ResultsControl"
                                             Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Results}}"/>
                 
-                <!-- Advanced View (Hierarchy + Details) -->
-                <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Advanced}}">
+                <!-- Hierarchy View (Hierarchy Tree + Details) -->
+                <Grid Visibility="{Binding ActiveView, Converter={StaticResource EqualityConverter}, ConverterParameter={x:Static viewModels:ComparisonViewMode.Hierarchy}}">
                     <Grid Margin="24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="45*" MinWidth="300"/>

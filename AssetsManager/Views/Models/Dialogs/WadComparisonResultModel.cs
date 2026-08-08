@@ -12,7 +12,7 @@ namespace AssetsManager.Views.Models.Dialogs
     public enum ComparisonViewMode
     {
         Overview,
-        Advanced,
+        Hierarchy,
         Results
     }
 
@@ -38,7 +38,7 @@ namespace AssetsManager.Views.Models.Dialogs
         private string _countRenamed = "0";
         private string _filterText = string.Empty;
         private int _totalDiffsCount = -1;
-        private ComparisonViewMode _activeView = ComparisonViewMode.Advanced;
+        private ComparisonViewMode _activeView = ComparisonViewMode.Hierarchy;
 
         private SerializableChunkDiff _selectedItem;
         private List<SerializableChunkDiff> _selectedNodes = new();
