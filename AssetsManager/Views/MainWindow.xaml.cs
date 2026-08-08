@@ -57,6 +57,9 @@ namespace AssetsManager.Views
         private readonly NewsService _newsService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private ComparatorWindow _comparatorWindow;
+        private HashGuessingWindow _hashGuessingWindow;
+        private MonitorWindow _monitorWindow;
+        private NewsWindow _newsWindow;
 
         private string _latestAppVersionAvailable;
         
@@ -480,9 +483,21 @@ namespace AssetsManager.Views
             MainContentArea.Content = _comparatorWindow;
         }
         private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
-        private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
-        private void LoadHashGuessingWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<HashGuessingWindow>();
-        private void LoadNewsWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<NewsWindow>();
+        private void LoadMonitorWindow()
+        {
+            _monitorWindow ??= _serviceProvider.GetRequiredService<MonitorWindow>();
+            MainContentArea.Content = _monitorWindow;
+        }
+        private void LoadHashGuessingWindow()
+        {
+            _hashGuessingWindow ??= _serviceProvider.GetRequiredService<HashGuessingWindow>();
+            MainContentArea.Content = _hashGuessingWindow;
+        }
+        private void LoadNewsWindow()
+        {
+            _newsWindow ??= _serviceProvider.GetRequiredService<NewsWindow>();
+            MainContentArea.Content = _newsWindow;
+        }
 
         private void btnHelp_Click(object sender, RoutedEventArgs e)
         {

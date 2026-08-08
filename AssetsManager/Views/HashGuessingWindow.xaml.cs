@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -39,33 +40,39 @@ namespace AssetsManager.Views
             _logService = logService;
             DataContext = _viewModel;
             Unloaded += OnUnloaded;
-            UpdateUnknownCountAsync();
         }
 
         private async void UpdateUnknownCountAsync()
         {
             if (DomainSelector == null || TxtUnknownCount == null || TxtUnknownBreakdown == null) return;
+            int selectedIndex = DomainSelector.SelectedIndex;
             try
             {
-                if (DomainSelector.SelectedIndex < 2)
+                if (selectedIndex < 2)
                 {
-                    var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-                    var summary = await _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None);
-                    TxtUnknownCount.Text = $"{summary.Total:N0} unresolved";
-                    TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0} · Historical: {summary.Historical:N0}";
+                    var domain = selectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
+                    var summary = await Task.Run(() => _hashGuessingService.GetUnknownSummaryAsync(domain, CancellationToken.None));
+                    if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
+                    {
+                        TxtUnknownCount.Text = $"{summary.Total:N0} unresolved";
+                        TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0} · Historical: {summary.Historical:N0}";
+                    }
                 }
                 else
                 {
-                    var summary = await _binRstHashGuessingService.GetSummaryAsync(CancellationToken.None);
-                    if (DomainSelector.SelectedIndex == 2)
+                    var summary = await Task.Run(() => _binRstHashGuessingService.GetSummaryAsync(CancellationToken.None));
+                    if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
-                        TxtUnknownCount.Text = $"{summary.BinTotal:N0} BIN unresolved";
-                        TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
-                    }
-                    else
-                    {
-                        TxtUnknownCount.Text = $"{summary.RstTotal:N0} RST unresolved";
-                        TxtUnknownBreakdown.Text = $"XXH3: {summary.RstXxh3:N0} · XXH64: {summary.RstXxh64:N0}";
+                        if (selectedIndex == 2)
+                        {
+                            TxtUnknownCount.Text = $"{summary.BinTotal:N0} BIN unresolved";
+                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
+                        }
+                        else
+                        {
+                            TxtUnknownCount.Text = $"{summary.RstTotal:N0} RST unresolved";
+                            TxtUnknownBreakdown.Text = $"XXH3: {summary.RstXxh3:N0} · XXH64: {summary.RstXxh64:N0}";
+                        }
                     }
                 }
             }

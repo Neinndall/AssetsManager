@@ -44,7 +44,7 @@ New Features
 
 Improvements
   - Standardized identity header position, padding, and corner radius across Hash Guessing Lab and WAD Comparator.
-  - Hash Guessing Lab / Added continuous UI timer ticker and fixed inventory progress reporting so execution time updates smoothly without freezing.
+  - Hash Guessing Lab / Added continuous UI timer ticker, offloaded summary count loading to background threads, and cached view instances to eliminate navigation hitches.
   - Monitor / History: reduced the pagination page size of the Comparisons, Watcher and Differences tabs from 10 to 5 entries.
   - Monitor / Backups: replaced the NEWLY CREATED pill label with a minimal inline NEW tag (icon + text) for consistency with the Version Manager list.
   - Monitor / Version Manager: the manifest list now loads ordered by date descending (newest first), replacing the old alphabetical file-name order.
