@@ -280,16 +280,29 @@ namespace AssetsManager.Views.Helpers
 
             if (delta > 0) // Zooming IN
             {
+                Point3D nextPos;
+                Vector3D nextLook = _targetLookDirection;
+
                 if (currentDistance - step < 5.0)
                 {
                     // Move position and shift target point forward so user can zoom continuously into streets without hitting a wall
-                    _targetPosition += lookDir * step;
+                    nextPos = _targetPosition + lookDir * step;
                 }
                 else
                 {
-                    _targetPosition += shift;
-                    _targetLookDirection -= shift;
+                    nextPos = _targetPosition + shift;
+                    nextLook = _targetLookDirection - shift;
                 }
+
+                // Minimum height clamp: prevent camera from penetrating underneath the map ground plane
+                const double minGroundY = 10.0;
+                if (nextPos.Y < minGroundY)
+                {
+                    nextPos.Y = minGroundY;
+                }
+
+                _targetPosition = nextPos;
+                _targetLookDirection = nextLook;
             }
             else // Zooming OUT
             {
