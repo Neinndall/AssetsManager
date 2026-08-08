@@ -76,6 +76,26 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.True(farPlane / nearPlane < 500f);
         }
 
+        [Fact]
+        public void TexturePremultiplicationRemovesInvisibleRgbFromGeneratedMipmaps()
+        {
+            byte[] pixels =
+            {
+                255, 255, 255, 0,
+                100, 50, 200, 128,
+                10, 20, 30, 255
+            };
+
+            GlMeshRenderer.PremultiplyBgra(pixels);
+
+            Assert.Equal(new byte[]
+            {
+                0, 0, 0, 0,
+                50, 25, 100, 128,
+                10, 20, 30, 255
+            }, pixels);
+        }
+
         [Theory]
         [InlineData("Front", 0, 0, 25, 0, 0, -25, 0, 1, 0)]
         [InlineData("Back", 0, 0, -25, 0, 0, 25, 0, 1, 0)]

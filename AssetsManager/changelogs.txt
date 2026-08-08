@@ -217,6 +217,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Transparent map textures no longer develop bright borders in generated mipmaps.
   - Viewer / Map textures no longer flicker when viewing large environments from a distance.
   - Explorer / Fixed an issue where navigating away from Local Files in the sidebar could cause an application crash.
   - Monitor / Asset Tracker: the FOUND counter on the CDN Discovery dashboard card now excludes user-removed assets and refreshes immediately after deleting found assets (REMOVE or Clean Found), instead of keeping the stale total until the window was reopened.

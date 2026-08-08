@@ -338,6 +338,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             int stride = width * 4;
             byte[] pixels = new byte[height * stride];
             bitmap.CopyPixels(pixels, stride, 0);
+            PremultiplyBgra(pixels);
 
             uint tex = _gl.GenTexture();
             _gl.BindTexture(TextureTarget.Texture2D, tex);
@@ -351,6 +352,17 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, 0);
 
             return tex;
+        }
+
+        internal static void PremultiplyBgra(Span<byte> pixels)
+        {
+            for (int i = 0; i + 3 < pixels.Length; i += 4)
+            {
+                int alpha = pixels[i + 3];
+                pixels[i] = (byte)((pixels[i] * alpha + 127) / 255);
+                pixels[i + 1] = (byte)((pixels[i + 1] * alpha + 127) / 255);
+                pixels[i + 2] = (byte)((pixels[i + 2] * alpha + 127) / 255);
+            }
         }
 
         public void Dispose()
@@ -406,6 +418,7 @@ namespace AssetsManager.Services.Viewer.Rendering
 					void main(){
 							vec4 texColor = texture(uTex, vUv);
 							if (texColor.a < 0.1) discard;
+							texColor.rgb /= max(texColor.a, 0.0039215686);
 							
 							// Light 1 (Key Light)
 							float diff1 = max(dot(vNormal, uLightDir), 0.0);
