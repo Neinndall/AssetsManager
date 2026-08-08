@@ -12,7 +12,7 @@
         </Grid.RowDefinitions>
 
         <!-- DYNAMIC IDENTITY HEADER (SettingsCard Style) -->
-        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,20,32,0" Padding="24,18">
+        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,24,32,0" Padding="24,20">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Hero Icon -->

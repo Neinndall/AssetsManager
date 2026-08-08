@@ -14,49 +14,38 @@
             <RowDefinition Height="*"/>    <!-- Content Area -->
         </Grid.RowDefinitions>
 
-        <!-- 1. FLOATING COMMAND CENTER HEADER (Comparator Style) -->
-        <Border Grid.Row="0" 
-                Margin="32,24,32,16" 
-                Background="{StaticResource CardBackground}" 
-                CornerRadius="16" 
-                BorderBrush="{StaticResource BorderColor}" 
-                BorderThickness="1">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="30" ShadowDepth="2" Opacity="0.2" Color="Black"/>
-            </Border.Effect>
-            
-            <Border Padding="24,20">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/> <!-- Icon -->
-                        <ColumnDefinition Width="Auto"/> <!-- Separator -->
-                        <ColumnDefinition Width="*"/>    <!-- Titles -->
-                        <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
-                    </Grid.ColumnDefinitions>
+        <!-- 1. DYNAMIC IDENTITY HEADER (SettingsCard Style) -->
+        <Border Grid.Row="0" Style="{StaticResource SettingsCard}" Margin="32,24,32,0" Padding="24,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Icon -->
+                    <ColumnDefinition Width="Auto"/> <!-- Separator -->
+                    <ColumnDefinition Width="*"/>    <!-- Titles -->
+                    <ColumnDefinition Width="Auto"/> <!-- Status Badge -->
+                </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
-                        <materialIcons:MaterialIcon Kind="Compare" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <materialIcons:MaterialIcon.Effect>
-                                <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.3"/>
-                            </materialIcons:MaterialIcon.Effect>
-                        </materialIcons:MaterialIcon>
-                    </Border>
+                <Border Grid.Column="0" Background="{StaticResource HoverColor}" CornerRadius="10" Width="48" Height="48" Margin="0,0,0,0">
+                    <materialIcons:MaterialIcon Kind="Compare" Width="26" Height="26" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <materialIcons:MaterialIcon.Effect>
+                            <DropShadowEffect Color="#FF5C85FF" BlurRadius="12" ShadowDepth="0" Opacity="0.4"/>
+                        </materialIcons:MaterialIcon.Effect>
+                    </materialIcons:MaterialIcon>
+                </Border>
 
-                    <!-- Technical Vertical Separator -->
-                    <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,10" VerticalAlignment="Stretch" Opacity="0.6"/>
+                <!-- Technical Vertical Separator -->
+                <Rectangle Grid.Column="1" Width="1" Fill="{StaticResource BorderColor}" Margin="20,8" VerticalAlignment="Stretch" Opacity="0.5"/>
 
-                    <!-- Titles -->
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                        <TextBlock Text="WAD COMPARATOR" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
-                        <TextBlock Text="Compare game distributions, identify file differences and extract assets" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
+                <!-- Titles -->
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Text="WAD COMPARATOR" FontWeight="SemiBold" FontSize="22" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,2"/>
+                    <TextBlock Text="Compare game distributions, identify file differences and extract assets" FontSize="12" Foreground="{StaticResource TextSecondary}" Opacity="0.8"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- 2. CONTENT AREA -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Grid Margin="32,0,32,32">
+            <Grid Margin="32,16,32,32">
                 <comparator:WadComparisonControl x:Name="WadComparisonControl" HorizontalAlignment="Stretch"/>
             </Grid>
         </ScrollViewer>
