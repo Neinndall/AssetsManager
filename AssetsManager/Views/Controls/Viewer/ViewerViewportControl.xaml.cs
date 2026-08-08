@@ -34,6 +34,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private GlMeshRenderer _meshRenderer;
         private VfxRenderSession _vfxRenderer;
         private GridRenderer _gridRenderer;
+        private VfxSystemModel _selectedVfxSystem;
 
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -81,14 +82,9 @@ namespace AssetsManager.Views.Controls.Viewer
             try
             {
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
-                _meshRenderer = new GlMeshRenderer();
-                _meshRenderer.Initialize(_gl);
-
-                _vfxRenderer = new VfxRenderSession(LogService);
-                _vfxRenderer.Initialize(_gl);
-
-                _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
+                EnsureSceneRenderers();
+                EnsureVfxRenderer();
+                _vfxRenderer?.SetVfxSystem(_selectedVfxSystem);
             }
             catch (Exception ex)
             {
@@ -234,6 +230,32 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer.Update((float)Math.Clamp(frameDelta.TotalSeconds, 0, 0.25));
                 _vfxRenderer.Render(viewProj, view);
             }
+        }
+
+        private void EnsureSceneRenderers(bool required = false)
+        {
+            if (_gl == null || (!required && _loadedModels.Count == 0)) return;
+
+            if (_meshRenderer == null)
+            {
+                _meshRenderer = new GlMeshRenderer();
+                _meshRenderer.Initialize(_gl);
+            }
+
+            if (_gridRenderer == null && _viewModel.IsGridVisible)
+            {
+                _gridRenderer = new GridRenderer();
+                _gridRenderer.Initialize(_gl, GlShaderCompiler.UsesEmbeddedProfile(_gl), 1000f);
+            }
+        }
+
+        private void EnsureVfxRenderer()
+        {
+            if (_vfxRenderer != null || _gl == null || _selectedVfxSystem == null) return;
+            EnsureSceneRenderers(required: true);
+            var renderer = new VfxRenderSession(LogService);
+            renderer.Initialize(_gl);
+            _vfxRenderer = renderer;
         }
 
         private CustomCameraController _cameraController;
@@ -527,6 +549,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 _vfxRenderer?.Dispose();
                 _vfxRenderer = null;
+                _selectedVfxSystem = null;
+
+                _gl?.Dispose();
+                _gl = null;
+                OpenTkControl.Dispose();
 
             }
             catch (Exception ex)
@@ -701,6 +728,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public void AddModel(SceneModel model)
         {
             _loadedModels.Add(model);
+            EnsureSceneRenderers();
             if (model.IsVisible)
             {
                 if (!Viewport.Children.Contains(model.RootVisual))
@@ -815,8 +843,9 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SelectVfxSystem(VfxSystemModel vfxSystem)
         {
-            if (_vfxRenderer == null) return;
-            _vfxRenderer.SetVfxSystem(vfxSystem);
+            _selectedVfxSystem = vfxSystem;
+            EnsureVfxRenderer();
+            _vfxRenderer?.SetVfxSystem(vfxSystem);
         }
 
         public void PlayVfx() => _vfxRenderer?.Play();
