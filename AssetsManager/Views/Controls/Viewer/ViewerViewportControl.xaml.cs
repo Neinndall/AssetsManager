@@ -94,7 +94,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OpenTkControl_Render(TimeSpan delta)
         {
-            if (_gl == null || _meshRenderer == null) return;
+            if (_gl == null) return;
             int framebufferWidth = OpenTkControl.FrameBufferWidth;
             int framebufferHeight = OpenTkControl.FrameBufferHeight;
             if (framebufferWidth <= 0 || framebufferHeight <= 0) return;
@@ -129,7 +129,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
         {
-            _meshRenderer.ProcessPendingReleases();
+            _meshRenderer?.ProcessPendingReleases();
             _gl.Viewport(0, 0, (uint)framebufferWidth, (uint)framebufferHeight);
 
             // Clear color based on transparent background setting
