@@ -72,5 +72,55 @@ namespace AssetsManager.BenchmarkTests.Tests.Utils
             Assert.Equal(TileMode.Tile, tiled.TileMode);
             Assert.Equal(TileMode.None, clamped.TileMode);
         }
+
+        [Fact]
+        public void LoadViewerTexture_SelectsExistingTexMipWithoutResizing()
+        {
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(0x00584554u);
+                writer.Write((ushort)2);
+                writer.Write((ushort)2);
+                writer.Write((byte)0);
+                writer.Write((byte)20);
+                writer.Write((byte)0);
+                writer.Write((byte)1);
+                writer.Write(new byte[] { 30, 20, 10, 40 });
+                writer.Write(new byte[16]);
+            }
+
+            stream.Position = 0;
+            BitmapSource bitmap = TextureUtils.LoadViewerTexture(stream, ".tex", 1, 1);
+            var pixels = new byte[4];
+            bitmap.CopyPixels(pixels, 4, 0);
+
+            Assert.Equal(1, bitmap.PixelWidth);
+            Assert.Equal(1, bitmap.PixelHeight);
+            Assert.Equal(new byte[] { 30, 20, 10, 40 }, pixels);
+        }
+
+        [Fact]
+        public void LoadViewerTexture_PreservesTexWithoutMipmapsWhenItExceedsCap()
+        {
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(0x00584554u);
+                writer.Write((ushort)2);
+                writer.Write((ushort)2);
+                writer.Write((byte)0);
+                writer.Write((byte)20);
+                writer.Write((byte)0);
+                writer.Write((byte)0);
+                writer.Write(new byte[16]);
+            }
+
+            stream.Position = 0;
+            BitmapSource bitmap = TextureUtils.LoadViewerTexture(stream, ".tex", 1, 1);
+
+            Assert.Equal(2, bitmap.PixelWidth);
+            Assert.Equal(2, bitmap.PixelHeight);
+        }
     }
 }

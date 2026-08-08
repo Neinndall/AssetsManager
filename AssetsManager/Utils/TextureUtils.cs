@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
+using BCnEncoder.Shared;
 using LeagueToolkit.Core.Renderer;
 using LeagueToolkit.Toolkit;
 using SixLabors.ImageSharp;
@@ -148,15 +150,22 @@ namespace AssetsManager.Utils
             {
                 if (textureStream == null) { return null; }
 
-                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                if (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase))
                 {
-                    Texture tex = Texture.Load(textureStream);
+                    Texture tex = maxWidth.HasValue && maxHeight.HasValue
+                        ? Texture.LoadTex(textureStream, maxWidth.Value, maxHeight.Value)
+                        : Texture.LoadTex(textureStream);
+                    if (tex.Mips.Length > 0)
+                        return ConvertToBgra32BitmapSource(tex);
+                    return null;
+                }
+                else if (extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    Texture tex = Texture.LoadDds(textureStream);
                     if (tex.Mips.Length > 0)
                     {
-                        using (Image<Rgba32> imageSharp = tex.Mips[0].ToImage())
-                        {
-                            return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
-                        }
+                        using Image<Rgba32> imageSharp = tex.Mips[0].ToImage();
+                        return ConvertToBgra32BitmapSource(imageSharp, maxWidth, maxHeight);
                     }
                     return null;
                 }
@@ -191,6 +200,23 @@ namespace AssetsManager.Utils
                 logService?.LogError(ex, $"Failed to decode viewer texture: {source ?? extension ?? "unknown source"}");
                 return null;
             }
+        }
+
+        private static BitmapSource ConvertToBgra32BitmapSource(Texture texture)
+        {
+            var mip = texture.Mips[0];
+            if (!mip.TryGetMemory(out Memory<ColorRgba32> colorMemory))
+                throw new InvalidOperationException("Texture mip memory must be contiguous.");
+
+            byte[] pixels = MemoryMarshal.AsBytes(colorMemory.Span).ToArray();
+            for (int i = 0; i < pixels.Length; i += 4)
+                (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
+
+            int stride = checked(mip.Width * 4);
+            BitmapSource result = BitmapSource.Create(
+                mip.Width, mip.Height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+            result.Freeze();
+            return result;
         }
 
         private static BitmapSource ConvertToBgra32BitmapSource(Image<Rgba32> imageSharp, int? maxWidth, int? maxHeight)

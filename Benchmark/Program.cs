@@ -52,6 +52,14 @@ namespace BenchmarkApp
                 InspectSknDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "mapgeo-memory", StringComparison.OrdinalIgnoreCase))
+            {
+                string mapGeoPath = args.Length > 1 ? args[1] : null;
+                string materialsPath = args.Length > 2 ? args[2] : null;
+                string gameDataPath = args.Length > 3 ? args[3] : null;
+                MapGeometryMemoryDiagnostic.Run(mapGeoPath, materialsPath, gameDataPath);
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "patch-notes-render", StringComparison.OrdinalIgnoreCase))
             {
                 PatchNotesRenderDiagnostic.Run();

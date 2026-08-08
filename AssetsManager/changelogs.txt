@@ -44,6 +44,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Map Environment now reuses mesh metadata, decodes only the required TEX mip and releases temporary renderer memory, reducing usage across repeated large-map loads.
   - Viewer / Fixed background map clipping on large environments and enabled continuous close-up zoom into terrain streets.
   - Standardized identity header position, padding, and corner radius across Hash Guessing Lab and WAD Comparator.
   - Hash Guessing Lab / Added continuous UI timer ticker and offloaded summary count loading to background threads to prevent UI freezes.
@@ -214,6 +215,7 @@ Improvements
   - Core / PBE maintenance, Automated CDN tracking and background news checks now also run once at application startup, gated by their own Advanced settings and frequencies, so enabled features report updates even when the app is closed before the next timer tick.
 
 Changes
+  - Benchmark / Added a MapGeo memory diagnostic that reports WPF geometry, texture, managed and renderer CPU-copy estimates by loading phase.
   - Image Comparison / Removed the Mathematical Difference Map mode as it became obsolete; the image loading progression now reflects the real remaining steps (acquire 25% - decode 60% - ready 100%).
   - Monitor / Backups: Styled the NEW session snapshot indicator as a HUD technical badge with a 1px border and sparkles icon.
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.

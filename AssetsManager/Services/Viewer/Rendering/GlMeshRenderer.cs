@@ -36,6 +36,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             public BitmapSource LoadedLightmapBitmap;
             public uint LightmapVbo;
             public Point3DCollection UploadedPositions;
+            public int VertexCount;
             public GlMeshVertexData VertexData;
         }
 
@@ -228,8 +229,11 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (positions != null && indices != null)
                 {
                     int vertexCount = positions.Count;
-                    buffers.VertexData = new GlMeshVertexData(vertexCount);
-                    buffers.VertexData.Update(mesh, updateTextureCoordinates: true);
+                    var vertexData = new GlMeshVertexData(vertexCount);
+                    vertexData.Update(mesh, updateTextureCoordinates: true);
+                    bool retainsVertexData = part.SourceVertexIndices != null;
+                    buffers.VertexCount = vertexCount;
+                    buffers.VertexData = retainsVertexData ? vertexData : null;
                     buffers.UploadedPositions = positions;
 
                     uint[] indicesArray = new uint[indices.Count];
@@ -247,8 +251,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffers.Vbo);
                     _gl.BufferData(
                         BufferTargetARB.ArrayBuffer,
-                        new ReadOnlySpan<float>(buffers.VertexData.Data),
-                        BufferUsageARB.DynamicDraw);
+                        new ReadOnlySpan<float>(vertexData.Data),
+                        retainsVertexData ? BufferUsageARB.DynamicDraw : BufferUsageARB.StaticDraw);
 
                     _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, buffers.Ebo);
                     _gl.BufferData(BufferTargetARB.ElementArrayBuffer, new ReadOnlySpan<uint>(indicesArray), BufferUsageARB.StaticDraw);
@@ -269,6 +273,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 }
             }
             else if (buffers.Vao != 0 &&
+                     buffers.VertexData != null &&
                      part.Geometry?.Geometry is MeshGeometry3D meshAnim &&
                      !ReferenceEquals(buffers.UploadedPositions, meshAnim.Positions))
             {
@@ -304,7 +309,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             float[] coordinates = part.Lightmap?.UvCoordinates;
             if (buffers.Vao == 0 || buffers.LightmapVbo != 0 ||
                 coordinates == null ||
-                coordinates.Length != buffers.VertexData.VertexCount * 2)
+                coordinates.Length != buffers.VertexCount * 2)
             {
                 return;
             }

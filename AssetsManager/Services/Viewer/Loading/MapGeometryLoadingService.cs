@@ -22,7 +22,7 @@ namespace AssetsManager.Services.Viewer.Loading
 {
     public class MapGeometryLoadingService
     {
-        private const int MapTextureMaxSize = 2048;
+        private const int MapTextureMaxSize = 1024;
 
         private readonly LogService _logService;
 
@@ -364,6 +364,7 @@ namespace AssetsManager.Services.Viewer.Loading
             MapGeometryProcessingResult result)
         {
             var availableTextureNames = new ObservableRangeCollection<string>(result.LoadedTextures.Keys);
+            var meshNames = new Dictionary<string, string>(StringComparer.Ordinal);
             var parts = new List<ModelPart>(result.Submeshes.Count);
             var sceneModel = new SceneModel
             {
@@ -373,6 +374,12 @@ namespace AssetsManager.Services.Viewer.Loading
 
             foreach (MapGeometrySubmeshData data in result.Submeshes)
             {
+                if (!meshNames.TryGetValue(data.MaterialName, out string meshName))
+                {
+                    meshName = PathUtils.SimplifyMeshName(data.MaterialName);
+                    meshNames[data.MaterialName] = meshName;
+                }
+
                 var positions = new Point3DCollection(data.Positions);
                 var indices = new Int32Collection(data.TriangleIndices);
                 var textureCoordinates = new PointCollection(data.TextureCoordinates);
@@ -400,7 +407,7 @@ namespace AssetsManager.Services.Viewer.Loading
                 };
 
                 var modelPart = new ModelPart(
-                    PathUtils.SimplifyMeshName(data.MaterialName),
+                    meshName,
                     geometryModel)
                 {
                     AllTextures = result.LoadedTextures,
