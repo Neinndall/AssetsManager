@@ -5,7 +5,6 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetsManager.Utils.Framework;
-using Material.Icons;
 
 namespace AssetsManager.Views.Models.Viewer
 {
@@ -16,9 +15,6 @@ namespace AssetsManager.Views.Models.Viewer
     public class ViewerPanelModel : INotifyPropertyChanged
     {
         private bool _isMapMode;
-        private string _loadButtonText = "Model";
-        private string _loadButtonTooltip = "Load Model";
-        private MaterialIconKind _loadButtonIcon = MaterialIconKind.CubeOutline;
 
         // --- UI State Properties (v3.2.2.0) ---
         private bool _isChromaGalleryVisible = false;
@@ -139,28 +135,9 @@ namespace AssetsManager.Views.Models.Viewer
                 if (_isMapMode != value)
                 {
                     _isMapMode = value;
-                    UpdateModeData();
                     OnPropertyChanged();
                 }
             }
-        }
-
-        public string LoadButtonText
-        {
-            get => _loadButtonText;
-            private set { _loadButtonText = value; OnPropertyChanged(); }
-        }
-
-        public string LoadButtonTooltip
-        {
-            get => _loadButtonTooltip;
-            private set { _loadButtonTooltip = value; OnPropertyChanged(); }
-        }
-
-        public MaterialIconKind LoadButtonIcon
-        {
-            get => _loadButtonIcon;
-            private set { _loadButtonIcon = value; OnPropertyChanged(); }
         }
 
         // --- Navigation State (Control Deck v3.3) ---
@@ -320,22 +297,6 @@ namespace AssetsManager.Views.Models.Viewer
             IsCameraSectionExpanded = expanded;
             IsLightingSectionExpanded = expanded;
             IsRenderSectionExpanded = expanded;
-        }
-
-        private void UpdateModeData()
-        {
-            if (_isMapMode)
-            {
-                LoadButtonText = "Map";
-                LoadButtonTooltip = "Load MapGeometry";
-                LoadButtonIcon = MaterialIconKind.Map;
-            }
-            else
-            {
-                LoadButtonText = "Model";
-                LoadButtonTooltip = "Load Model";
-                LoadButtonIcon = MaterialIconKind.CubeOutline;
-            }
         }
 
         /// <summary>
