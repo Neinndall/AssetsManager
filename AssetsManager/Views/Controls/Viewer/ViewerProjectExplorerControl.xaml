@@ -153,12 +153,10 @@
                             </Border>
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                    <Setter TargetName="ItemBorder" Property="Background" Value="#15FFFFFF"/>
-                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                                    <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                                     <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource HoverColor}"/>
-                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="Transparent"/>
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
