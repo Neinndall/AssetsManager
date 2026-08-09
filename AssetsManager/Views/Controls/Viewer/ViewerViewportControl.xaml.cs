@@ -158,10 +158,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)framebufferWidth / framebufferHeight;
+            float? mapGroundClearance = _cameraController?.IsMapGroundCollisionEnabled == true
+                ? (float)(camera.Position.Y - CustomCameraController.MapGroundHeight)
+                : null;
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
-                CalculateProjectionNearPlane(lookDir),
+                CalculateProjectionNearPlane(lookDir, mapGroundClearance),
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
@@ -1051,15 +1054,22 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SnapCamera() => ResetCamera(false);
 
-        internal static float CalculateProjectionNearPlane(Vector3 lookDirection)
+        internal static float CalculateProjectionNearPlane(
+            Vector3 lookDirection,
+            float? mapGroundClearance = null)
         {
             float cameraDistance = lookDirection.Length();
-            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
+            float nearPlane = !float.IsFinite(cameraDistance) || cameraDistance <= 0f
+                ? 1f
+                : Math.Clamp(cameraDistance * 0.01f, 0.1f, 500f);
+
+            if (mapGroundClearance.HasValue)
             {
-                return 1f;
+                float clearanceNearPlane = Math.Max(mapGroundClearance.Value * 0.1f, 0.1f);
+                nearPlane = Math.Min(nearPlane, clearanceNearPlane);
             }
 
-            return Math.Clamp(cameraDistance * 0.01f, 1f, 500f);
+            return nearPlane;
         }
 
         internal static float CalculateProjectionFarPlane(Vector3 lookDirection)

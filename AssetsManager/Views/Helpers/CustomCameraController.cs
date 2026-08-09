@@ -22,7 +22,8 @@ namespace AssetsManager.Views.Helpers
         private bool _isTransitioning;
         private const double SmoothFactor = 0.15; 
         private const double TransitionThreshold = 0.05;
-        private const double MapGroundHeight = 10.0;
+        internal const double MapGroundHeight = 10.0;
+        internal const double MapSurfaceClearance = 50.0;
 
         public double ZoomSensitivity { get; set; } = 80.0;
         public bool IsMapGroundCollisionEnabled { get; set; }
@@ -94,7 +95,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
 
-            _targetPosition = position;
+            _targetPosition = ConstrainMapPosition(position);
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
             _isTransitioning = true;
@@ -104,6 +105,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
 
+            position = ConstrainMapPosition(position);
             _targetPosition = position;
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
@@ -130,7 +132,7 @@ namespace AssetsManager.Views.Helpers
 
             // Interpolate Position
             var currentPos = camera.Position;
-            var newPos = currentPos + (_targetPosition - currentPos) * SmoothFactor;
+            var newPos = ConstrainMapPosition(currentPos + (_targetPosition - currentPos) * SmoothFactor);
             camera.Position = newPos;
 
             // Interpolate LookDirection
@@ -284,6 +286,7 @@ namespace AssetsManager.Views.Helpers
             {
                 Point3D nextPos;
                 Vector3D nextLook = _targetLookDirection;
+                double navigationSurfaceY = (_targetPosition + _targetLookDirection).Y;
 
                 if (currentDistance - step < 5.0)
                 {
@@ -296,21 +299,23 @@ namespace AssetsManager.Views.Helpers
                     nextLook = _targetLookDirection - shift;
                 }
 
-                bool hitMapGround = IsMapGroundCollisionEnabled && nextPos.Y <= MapGroundHeight;
-                if (hitMapGround)
+                Point3D constrainedPosition = ConstrainMapPosition(
+                    nextPos,
+                    IsMapGroundCollisionEnabled,
+                    navigationSurfaceY);
+                if (constrainedPosition.Y != nextPos.Y)
                 {
-                    // Keep the previous view direction when the zoom step reaches the floor.
-                    // This turns an oversized (Shift) step into a smooth floor slide instead of a bounce.
-                    nextPos.Y = MapGroundHeight;
+                    // Preserve the horizontal heading and surface target while sliding across the map.
                     nextLook = _targetLookDirection;
+                    nextLook.Y = navigationSurfaceY - constrainedPosition.Y;
                 }
 
-                _targetPosition = nextPos;
+                _targetPosition = constrainedPosition;
                 _targetLookDirection = nextLook;
             }
             else // Zooming OUT
             {
-                _targetPosition += shift;
+                _targetPosition = ConstrainMapPosition(_targetPosition + shift);
                 _targetLookDirection -= shift;
             }
         }
@@ -328,7 +333,10 @@ namespace AssetsManager.Views.Helpers
             transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(Vector3D.CrossProduct(up, -camera.LookDirection), -delta.Y)));
 
 
-            var newPosition = transform.Transform(camera.Position - target) + target;
+            var newPosition = ConstrainMapPosition(
+                transform.Transform(camera.Position - target) + target,
+                IsMapGroundCollisionEnabled,
+                target.Y);
             var newLookDirection = target - newPosition;
             var newUpDirection = transform.Transform(up);
 
@@ -356,8 +364,30 @@ namespace AssetsManager.Views.Helpers
             double sensitivity = distance * 0.0012;
 
             var translation = rightDir * (-delta.X * sensitivity) + orthoUp * (delta.Y * sensitivity);
+            if (IsMapGroundCollisionEnabled)
+                translation.Y = 0;
 
-            camera.Position += translation;
+            camera.Position = ConstrainMapPosition(camera.Position + translation);
         }
+
+        internal static Point3D ConstrainMapPosition(
+            Point3D position,
+            bool collisionEnabled,
+            double? navigationSurfaceY = null)
+        {
+            if (collisionEnabled)
+            {
+                double minimumHeight = navigationSurfaceY.HasValue
+                    ? Math.Max(MapGroundHeight, navigationSurfaceY.Value + MapSurfaceClearance)
+                    : MapGroundHeight;
+                if (position.Y < minimumHeight)
+                    position.Y = minimumHeight;
+            }
+
+            return position;
+        }
+
+        private Point3D ConstrainMapPosition(Point3D position) =>
+            ConstrainMapPosition(position, IsMapGroundCollisionEnabled);
     }
 }

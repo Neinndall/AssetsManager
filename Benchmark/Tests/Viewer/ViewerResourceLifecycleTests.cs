@@ -6,6 +6,7 @@ using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -77,6 +78,45 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
             Assert.InRange(nearPlane, 200f, 250f);
             Assert.True(farPlane > 90000f);
             Assert.True(farPlane / nearPlane < 500f);
+        }
+
+        [Fact]
+        public void ProjectionNearPlaneAllowsCloseMapSurfaceViewing()
+        {
+            var lookDirection = new Vector3(0f, -18000f, -15000f);
+
+            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
+                lookDirection,
+                mapGroundClearance: 0f);
+
+            Assert.Equal(0.1f, nearPlane);
+        }
+
+        [Fact]
+        public void MapCameraCollisionPreservesHorizontalMovementAboveGround()
+        {
+            var requestedPosition = new Point3D(120, -50, -340);
+
+            Point3D constrained = CustomCameraController.ConstrainMapPosition(
+                requestedPosition,
+                collisionEnabled: true);
+
+            Assert.Equal(120, constrained.X);
+            Assert.Equal(CustomCameraController.MapGroundHeight, constrained.Y);
+            Assert.Equal(-340, constrained.Z);
+        }
+
+        [Fact]
+        public void MapCameraCollisionKeepsClearanceAboveNavigationSurface()
+        {
+            var requestedPosition = new Point3D(120, 80, -340);
+
+            Point3D constrained = CustomCameraController.ConstrainMapPosition(
+                requestedPosition,
+                collisionEnabled: true,
+                navigationSurfaceY: 100);
+
+            Assert.Equal(150, constrained.Y);
         }
 
         [Fact]

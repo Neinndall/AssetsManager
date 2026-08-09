@@ -223,6 +223,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Map camera movement no longer crosses the ground, and close terrain views no longer disappear behind projection clipping.
   - Viewer now keeps its standard dark background before any model or map is loaded.
   - Viewer / Map Environment street zoom now prevents the camera from crossing the ground, including high-speed zoom, while preserving its direction during floor sliding.
   - Viewer / Model, Chroma, and Map Environment loading now stays responsive without cross-thread scene crashes.
