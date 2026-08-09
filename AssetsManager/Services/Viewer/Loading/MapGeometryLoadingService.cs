@@ -31,6 +31,9 @@ namespace AssetsManager.Services.Viewer.Loading
             _logService = logService;
         }
 
+        internal static bool IsDefaultVisibility(EnvironmentVisibility visibility) =>
+            visibility == EnvironmentVisibility.AllLayers;
+
         public async Task<SceneModel> LoadMapGeometry(
             string filePath,
             string gameDataPath,
@@ -139,6 +142,11 @@ namespace AssetsManager.Services.Viewer.Loading
             foreach (var mesh in mapGeometry.Meshes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // Conditional variants require a runtime layer selection and must not overlap the base scene.
+                if (!IsDefaultVisibility(mesh.VisibilityFlags))
+                    continue;
+
                 var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                 var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
                 bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
