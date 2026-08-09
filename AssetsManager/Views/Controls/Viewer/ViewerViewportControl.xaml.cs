@@ -48,9 +48,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public Viewport3D Viewport3D => _dummyViewport;
         public Viewport3D Viewport => Viewport3D;
 
-        private readonly AmbientLight GlobalAmbientLight = new AmbientLight();
-        private readonly DirectionalLight StudioLight = new DirectionalLight();
-        private readonly DirectionalLight FillLight = new DirectionalLight();
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
         public ViewerPanelControl Panel { get; set; }
@@ -171,13 +168,13 @@ namespace AssetsManager.Views.Controls.Viewer
             float phi = (float)(_viewModel.LightRotation * (Math.PI / 180.0));
             float theta = (float)(_viewModel.LightHeight * (Math.PI / 180.0));
 
-            // Key Light (StudioLight)
+            // Key light direction
             float x = MathF.Cos(theta) * MathF.Sin(phi);
             float y = MathF.Sin(theta);
             float z = MathF.Cos(theta) * MathF.Cos(phi);
             var lightDir1 = new Vector3(-x, -y, -z);
 
-            // Fill Light (FillLight - opposite)
+            // Fill light direction
             var lightDir2 = new Vector3(x, y, -z);
 
             float ambientVal = (float)(_viewModel.AmbientIntensity / 100.0);
@@ -338,11 +335,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     break;
                 case nameof(ViewerViewportModel.IsAutoRotateActive):
                     HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
-                    break;
-                case nameof(ViewerViewportModel.AmbientIntensity):
-                case nameof(ViewerViewportModel.LightRotation):
-                case nameof(ViewerViewportModel.LightHeight):
-                    UpdateStudioLighting();
                     break;
                 case nameof(ViewerViewportModel.FieldOfView):
                     UpdateFieldOfView();
@@ -690,11 +682,6 @@ namespace AssetsManager.Views.Controls.Viewer
         public void ResetScene()
         {
             StopAnimation();
-
-            // RESET LIGHTING TO 'NORMAL' MODE (Como antes)
-            if (GlobalAmbientLight != null) GlobalAmbientLight.Color = Colors.White;
-            if (StudioLight != null) StudioLight.Color = Colors.Black;
-            if (FillLight != null) FillLight.Color = Colors.Black;
 
             foreach (var model in _loadedModels)
             {
@@ -1180,39 +1167,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 camera.FieldOfView = _viewModel.FieldOfView;
             }
-        }
-
-        private void UpdateStudioLighting()
-        {
-            if (GlobalAmbientLight == null || StudioLight == null || FillLight == null) return;
-
-            // 1. Set Ambient Color
-            byte ambVal = (byte)(255 * (_viewModel.AmbientIntensity / 100.0));
-            GlobalAmbientLight.Color = Color.FromRgb(ambVal, ambVal, ambVal);
-
-            // 2. Set Studio Lights Intensity (Inverse of Ambient)
-            double studioFactor = 1.0 - (_viewModel.AmbientIntensity / 100.0);
-
-            if (studioFactor <= 0)
-            {
-                StudioLight.Color = Colors.Black;
-                FillLight.Color = Colors.Black;
-            }
-            else
-            {
-                byte keyVal = (byte)(255 * studioFactor);
-                byte fillVal = (byte)(64 * studioFactor);
-                StudioLight.Color = Color.FromRgb(keyVal, keyVal, keyVal);
-                FillLight.Color = Color.FromRgb(fillVal, fillVal, fillVal);
-            }
-
-            // 3. Update Studio Light Direction
-            double phiRad = _viewModel.LightRotation * Math.PI / 180.0;
-            double thetaRad = _viewModel.LightHeight * Math.PI / 180.0;
-            double x = Math.Cos(thetaRad) * Math.Sin(phiRad);
-            double y = Math.Sin(thetaRad);
-            double z = Math.Cos(thetaRad) * Math.Cos(phiRad);
-            StudioLight.Direction = new Vector3D(-x, -y, -z);
         }
 
         public void SetSkyboxVisibility(bool isVisible)

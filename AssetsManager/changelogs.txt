@@ -47,6 +47,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Removed the unused WPF lighting objects from the OpenGL viewport; Studio Lighting now has one effective lighting path through the OpenGL renderer.
   - Viewer / Model material effects now classify each BIN-linked submesh conservatively and no longer approximate complex masked vertex deformation as a simple wave.
   - Viewer / Model effects now keep BIN-authored Bloom from overwhelming masked body details.
   - Viewer / Map Environment now selects each map's base visibility layer to prevent overlapping terrain variants.
