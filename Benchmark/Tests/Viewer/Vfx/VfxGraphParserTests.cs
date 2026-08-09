@@ -1,7 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;

@@ -6,8 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using AssetsManager.Services.Viewer.Vfx;
-
 namespace AssetsManager.Views.Models.Viewer
 {
     /// <summary>

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
     /// <summary>
     /// Immutable file index shared by every effect in an extracted WAD tree.

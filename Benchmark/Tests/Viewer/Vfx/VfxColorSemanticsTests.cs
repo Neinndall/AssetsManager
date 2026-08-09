@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 

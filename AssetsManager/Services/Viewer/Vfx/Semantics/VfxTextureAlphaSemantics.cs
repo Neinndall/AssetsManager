@@ -3,7 +3,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Semantics
 {
     /// <summary>Resolves legacy League texture alpha semantics without changing authored mesh opacity.</summary>
     internal static class VfxTextureAlphaSemantics

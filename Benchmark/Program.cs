@@ -519,7 +519,7 @@ namespace BenchmarkApp
 
             using var logger = new LoggerConfiguration().CreateLogger();
             var logService = new AssetsManager.Services.Core.LogService(logger);
-            var service = new AssetsManager.Services.Viewer.Vfx.VfxLoadingService();
+            var service = new AssetsManager.Services.Viewer.Vfx.Loading.VfxLoadingService();
 
             string binPath = Path.GetFullPath(args[0]);
             string rootPath = Path.GetFullPath(args[1]);
@@ -530,7 +530,7 @@ namespace BenchmarkApp
 
             var bundle = service.Load(binPath, logService);
             Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {bundle.Systems.Count}");
-            var meshResolver = new AssetsManager.Services.Viewer.Vfx.VfxResourceResolver();
+            var meshResolver = new AssetsManager.Services.Viewer.Vfx.Resources.VfxResourceResolver();
 
             string systemFilter = args.Length > 2 ? args[2] : null;
             var selectedSystems = string.IsNullOrWhiteSpace(systemFilter)

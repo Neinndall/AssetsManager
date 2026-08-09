@@ -11,7 +11,7 @@ using LeagueToolkit.Hashing;
 using System.Numerics;
 using AssetsManager.Services.Core;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
     /// <summary>Resolves and decodes resources referenced by an effect graph.</summary>
     internal sealed class VfxResourceResolver

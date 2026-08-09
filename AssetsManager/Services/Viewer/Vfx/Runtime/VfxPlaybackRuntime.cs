@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     /// <summary>
     /// Maintains deterministic, graphics-independent playback state for one placed effect graph.

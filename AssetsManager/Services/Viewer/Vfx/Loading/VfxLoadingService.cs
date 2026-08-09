@@ -7,9 +7,13 @@ using System.Windows.Media.Imaging;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Viewer.Vfx.Parsing;
+using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Loading
 {
     /// <summary>
     /// Loads a model's complete effect catalog and prepares every referenced emitter resource.

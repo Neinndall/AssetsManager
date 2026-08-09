@@ -1,6 +1,6 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 

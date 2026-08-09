@@ -4,7 +4,7 @@ using System.Linq;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     public static class VfxDurationCalculator
     {

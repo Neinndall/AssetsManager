@@ -4,7 +4,7 @@ using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Hashing;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Runtime
 {
     /// <summary>Executes one complete VFX graph, including particle-authored child systems.</summary>
     public sealed class VfxPlaybackGraphRuntime

@@ -15,7 +15,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Animation;
 using AssetsManager.Services.Viewer.Interaction;
 using AssetsManager.Services.Viewer.Rendering;
-using AssetsManager.Services.Viewer.Vfx;
+using AssetsManager.Services.Viewer.Vfx.Session;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;

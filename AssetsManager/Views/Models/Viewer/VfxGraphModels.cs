@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using AssetsManager.Services.Viewer.Vfx;
-
 namespace AssetsManager.Views.Models.Viewer
 {
     public enum VfxPrimitiveKind

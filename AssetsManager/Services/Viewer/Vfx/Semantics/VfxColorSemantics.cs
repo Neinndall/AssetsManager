@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
 
-namespace AssetsManager.Services.Viewer.Vfx
+namespace AssetsManager.Services.Viewer.Vfx.Semantics
 {
     /// <summary>Normalizes and composes authored BIN colors before they reach the renderer.</summary>
     internal static class VfxColorSemantics
