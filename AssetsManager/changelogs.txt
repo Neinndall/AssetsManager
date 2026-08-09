@@ -44,7 +44,6 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
-  - Viewer / Map Environment now avoids overlapping conditional map layers that caused terrain flickering.
   - Viewer actions remain responsive during startup and graphics resources are fully released when leaving the view.
   - Viewer / 4K snapshots now suggest a model-based filename automatically.
   - Viewer / Map Environment now reuses mesh metadata, decodes only the required TEX mip and releases temporary renderer memory, reducing usage across repeated large-map loads.
