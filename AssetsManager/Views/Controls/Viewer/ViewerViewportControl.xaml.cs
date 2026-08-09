@@ -159,13 +159,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)framebufferWidth / framebufferHeight;
-            float? mapNearPlaneLimit = _isMapGeometry
-                ? 2.5f
-                : null;
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
-                CalculateProjectionNearPlane(lookDir, mapNearPlaneLimit),
+                CalculateProjectionNearPlane(lookDir, _isMapGeometry),
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
@@ -1054,17 +1051,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal static float CalculateProjectionNearPlane(
             Vector3 lookDirection,
-            float? maximumNearPlane = null)
+            bool isMapGeometry = false)
         {
             float cameraDistance = lookDirection.Length();
-            float nearPlane = !float.IsFinite(cameraDistance) || cameraDistance <= 0f
-                ? 1f
+            if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
+                return isMapGeometry ? 0.1f : 1f;
+
+            return isMapGeometry
+                ? Math.Clamp(cameraDistance * 0.001f, 0.1f, 2.5f)
                 : Math.Clamp(cameraDistance * 0.01f, 0.1f, 500f);
-
-            if (maximumNearPlane.HasValue)
-                nearPlane = Math.Min(nearPlane, Math.Max(maximumNearPlane.Value, 0.1f));
-
-            return nearPlane;
         }
 
         internal static float CalculateProjectionFarPlane(Vector3 lookDirection)

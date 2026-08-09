@@ -83,13 +83,13 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         [Fact]
         public void ProjectionNearPlaneAllowsCloseMapSurfaceViewing()
         {
-            var lookDirection = new Vector3(0f, -18000f, -15000f);
+            var lookDirection = new Vector3(0f, -100f, 0f);
 
             float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
                 lookDirection,
-                maximumNearPlane: 2.5f);
+                isMapGeometry: true);
 
-            Assert.Equal(2.5f, nearPlane);
+            Assert.Equal(0.1f, nearPlane);
         }
 
         [Fact]
