@@ -18,7 +18,6 @@
                 <RowDefinition Height="Auto"/> <!-- Hero Card -->
                 <RowDefinition Height="*"/>    <!-- Content -->
                 <RowDefinition Height="Auto"/> <!-- Animation Player (sticky above dock) -->
-                <RowDefinition Height="Auto"/> <!-- Bottom Actions -->
             </Grid.RowDefinitions>
 
             <!-- ============================================ -->
@@ -710,7 +709,7 @@
                                             <StackPanel HorizontalAlignment="Center">
                                                 <materialIcons:MaterialIcon Kind="AnimationPlay" Width="22" Height="22" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.5"/>
                                                 <TextBlock Text="No animations loaded" FontSize="11" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Margin="0,6,0,0"/>
-                                                <TextBlock Text="Use the 'Anims' button below" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.7" Margin="0,2,0,0"/>
+                                                <TextBlock Text="Load .anm files from Project Browser" FontSize="9" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Center" Opacity="0.7" Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </Border>
 
@@ -1061,30 +1060,11 @@
                     </Grid>
                 </StackPanel>
             </Border>
-
-
-
-            <!-- ============================================ -->
-            <!-- BOTTOM DOCK (Quick Actions)                 -->
-            <!-- ============================================ -->
-            <Border Grid.Row="3" Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0" Padding="14,12" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                <Grid>
-                    <!-- Collapsed buttons to preserve code-behind bindings without breaking layout -->
-                    <Button x:Name="LoadModelButton" Visibility="Collapsed" Click="LoadModelButton_Click"/>
-                    <Button x:Name="LoadChromaModelButton" Visibility="Collapsed" Click="LoadChromaModelButton_Click"/>
-                    
-                    <!-- LoadAnimationButton takes full width when NOT in map mode -->
-                    <Button x:Name="LoadAnimationButton" Click="LoadAnimationButton_Click" Style="{StaticResource SecondaryButton}" Height="40" Padding="0" Visibility="{Binding IsMapMode, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <materialIcons:MaterialIcon Kind="AnimationPlay" Width="15" Height="15" Foreground="{StaticResource AccentGreen}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Load Animation" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
-            
             <!-- Hidden controls needed for legacy logic -->
-            <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/><Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
+            <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/>
+            <Button x:Name="LoadModelButton" Visibility="Collapsed" Click="LoadModelButton_Click"/>
+            <Button x:Name="LoadChromaModelButton" Visibility="Collapsed" Click="LoadChromaModelButton_Click"/>
+            <Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
         </Grid>
     </Border>
 </UserControl>

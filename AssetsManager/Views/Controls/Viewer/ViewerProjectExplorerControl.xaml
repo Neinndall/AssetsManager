@@ -108,7 +108,19 @@
                 <ListBox Grid.Column="2"
                          x:Name="FilesListBox"
                          Margin="4"
-                         Style="{StaticResource ModernFileGridListBox}">
+                         Style="{StaticResource ModernFileGridListBox}"
+                         PreviewMouseRightButtonDown="FilesListBox_PreviewMouseRightButtonDown">
+                    <ListBox.ContextMenu>
+                        <ContextMenu Opened="FilesContextMenu_Opened">
+                            <MenuItem x:Name="LoadAnimationsMenuItem"
+                                      Header="Load Animations"
+                                      Click="LoadAnimationsMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <materialIcons:MaterialIcon Kind="AnimationPlay"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="{x:Type local:ProjectExplorerNode}">
                             <Border x:Name="ItemBorder" CornerRadius="8" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" Padding="4" Width="95" Height="95" Cursor="Hand">

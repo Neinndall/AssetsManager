@@ -100,6 +100,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Explorer
             Assert.Matches(
                 @"<Style x:Key=""ModernFileGridListBox""[^>]*>.*?<Setter Property=""SelectionMode"" Value=""Extended""",
                 gridStyle.ReplaceLineEndings(" "));
+            Assert.Contains("Header=\"Load Animations\"", browser);
+            Assert.Contains("PreviewMouseRightButtonDown=\"FilesListBox_PreviewMouseRightButtonDown\"", browser);
         }
 
         [Theory]

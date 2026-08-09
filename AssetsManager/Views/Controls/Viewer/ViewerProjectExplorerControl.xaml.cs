@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Helpers;
@@ -63,6 +64,7 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class ViewerProjectExplorerControl : UserControl
     {
         public event EventHandler<string> ModelSelected;
+        public event EventHandler<IReadOnlyList<string>> AnimationsSelected;
         public event EventHandler CloseRequested;
 
         private string _currentRootFolder;
@@ -454,6 +456,35 @@ namespace AssetsManager.Views.Controls.Viewer
 
             NavigateToFolder(node);
         }
+
+        private void FilesListBox_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var item = ItemsControl.ContainerFromElement(FilesListBox, e.OriginalSource as DependencyObject) as ListBoxItem;
+            if (item != null && !item.IsSelected)
+            {
+                FilesListBox.SelectedItems.Clear();
+                item.IsSelected = true;
+            }
+        }
+
+        private void FilesContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            LoadAnimationsMenuItem.IsEnabled = GetSelectedAnimationPaths().Count > 0;
+        }
+
+        private void LoadAnimationsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var paths = GetSelectedAnimationPaths();
+            if (paths.Count > 0)
+                AnimationsSelected?.Invoke(this, paths);
+        }
+
+        private IReadOnlyList<string> GetSelectedAnimationPaths() => FilesListBox.SelectedItems
+            .OfType<ProjectExplorerNode>()
+            .Where(node => node.IsFile && string.Equals(Path.GetExtension(node.FullPath), ".anm", StringComparison.OrdinalIgnoreCase))
+            .Select(node => node.FullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
 
         private void CloseExplorer_Click(object sender, RoutedEventArgs e)
         {

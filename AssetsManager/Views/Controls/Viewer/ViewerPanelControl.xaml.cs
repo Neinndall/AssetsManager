@@ -471,10 +471,6 @@ namespace AssetsManager.Views.Controls.Viewer
             LoadChromaModelButton.IsEnabled = true;
 
             ViewModel.IsMapMode = (_currentMode == ViewerType.MapGeometry);
-            if (!ViewModel.IsMapMode)
-            {
-                LoadAnimationButton.IsEnabled = true;
-            }
 
             UpdateHeroStats();
         }
@@ -744,79 +740,57 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
-                LoadAnimationButton.IsEnabled = true;
             }
         }
 
-        private void LoadAnimationButton_Click(object sender, RoutedEventArgs e)
+        private bool EnsureAnimationTarget()
         {
             if (_viewModel.SelectedModel == null && _viewModel.LoadedModels.Count == 1)
-            {
                 ModelsListBox.SelectedIndex = 0;
-            }
 
             if (_viewModel.SelectedModel == null)
             {
                 CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
-                return;
-            }
-
-            var openFileDialog = new OpenFileDialog
-            {
-                Filter = "Animation files (*.anm)|*.anm|All files (*.*)|*.*",
-                Title = "Select animation files",
-                Multiselect = true
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                foreach (string fileName in openFileDialog.FileNames)
-                {
-                    LoadAnimation(fileName);
-                }
-            }
-        }
-
-        private void LoadAnimation(string filePath)
-        {
-            if (_viewModel.SelectedModel == null)
-            {
-                CustomMessageBoxService.ShowWarning("No Model Selected", "Please select a model from the 'Models' tab first.", Window.GetWindow(this));
-                return;
+                return false;
             }
 
             if (_viewModel.SelectedModel.Skeleton == null)
             {
                 CustomMessageBoxService.ShowWarning("Missing Skeleton", "Please load a skeleton (.skl) file first.", Window.GetWindow(this));
-                return;
+                return false;
             }
+
+            return true;
+        }
+
+        private void LoadAnimation(string filePath)
+        {
+            var animationName = Path.GetFileNameWithoutExtension(filePath);
+            if (_viewModel.AnimationModels.Any(animation => animation.Name == animationName))
+                return;
+
             using (var stream = File.OpenRead(filePath))
             {
                 var animationAsset = AnimationAsset.Load(stream);
-                var animationName = Path.GetFileNameWithoutExtension(filePath);
+                var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
+                var animationModel = new AnimationModel(animationData);
 
-                if (!_viewModel.AnimationModels.Any(a => a.Name == animationName))
+                if (_viewModel.IsAnimationSyncEnabled)
                 {
-                    var animationData = new AnimationData { AnimationAsset = animationAsset, Name = animationName };
-                    var animationModel = new AnimationModel(animationData);
-
-                    if (_viewModel.IsAnimationSyncEnabled)
+                    foreach (var model in _viewModel.LoadedModels)
                     {
-                        foreach (var model in _viewModel.LoadedModels)
+                        if (!model.Animations.Any(animation => animation.Name == animationName))
                         {
-                            if (!model.Animations.Any(a => a.Name == animationName))
-                            {
-                                model.Animations.Add(animationData);
-                            }
+                            model.Animations.Add(animationData);
                         }
                     }
-                    else
-                    {
-                        _viewModel.SelectedModel.Animations.Add(animationData);
-                    }
-
-                    _viewModel.AnimationModels.Add(animationModel);
                 }
+                else
+                {
+                    _viewModel.SelectedModel.Animations.Add(animationData);
+                }
+
+                _viewModel.AnimationModels.Add(animationModel);
             }
         }
 
@@ -1142,16 +1116,30 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         public void LoadAnimationDirectly(string filePath)
+            => LoadAnimationsDirectly(new[] { filePath });
+
+        public void LoadAnimationsDirectly(IEnumerable<string> filePaths)
         {
-            try
+            if (!EnsureAnimationTarget()) return;
+
+            int failureCount = 0;
+            foreach (string filePath in filePaths
+                         .Where(path => string.Equals(Path.GetExtension(path), ".anm", StringComparison.OrdinalIgnoreCase))
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                LoadAnimation(filePath);
+                try
+                {
+                    LoadAnimation(filePath);
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    LogService.LogError(ex, $"Failed to load animation: {filePath}");
+                }
             }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"Failed to load animation: {filePath}");
-                CustomMessageBoxService.ShowError("Load Error", $"Failed to load animation file: {ex.Message}", Window.GetWindow(this));
-            }
+
+            if (failureCount > 0)
+                CustomMessageBoxService.ShowError("Load Error", $"Failed to load {failureCount} animation file(s). See the log for details.", Window.GetWindow(this));
         }
     }
 }

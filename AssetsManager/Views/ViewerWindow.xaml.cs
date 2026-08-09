@@ -51,7 +51,6 @@ namespace AssetsManager.Views
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
-            PanelControl.ProjectExplorer = ProjectExplorer;
  
             ChromaSelectionOverlay.LoadingService = chromaLoadingService;
 
@@ -67,6 +66,7 @@ namespace AssetsManager.Views
 
             // Project Explorer event wiring
             ProjectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
+            ProjectExplorer.AnimationsSelected += (_, paths) => PanelControl.LoadAnimationsDirectly(paths);
             ProjectExplorer.CloseRequested += (s, e) => _viewModel.IsProjectExplorerVisible = false;
 
             _viewModel.PropertyChanged += (s, e) =>
