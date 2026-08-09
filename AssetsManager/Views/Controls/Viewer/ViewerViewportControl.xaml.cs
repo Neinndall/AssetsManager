@@ -35,6 +35,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxRenderSession _vfxRenderer;
         private GridRenderer _gridRenderer;
         private VfxSystemModel _selectedVfxSystem;
+        private bool _isMapGeometry;
 
         private readonly ViewerViewportModel _viewModel;
         public ViewerViewportModel ViewModel => _viewModel;
@@ -158,13 +159,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             float fovRadians = (float)(camera.FieldOfView * (Math.PI / 180.0));
             float aspect = (float)framebufferWidth / framebufferHeight;
-            float? mapGroundClearance = _cameraController?.IsMapGroundCollisionEnabled == true
-                ? (float)(camera.Position.Y - CustomCameraController.MapGroundHeight)
+            float? mapNearPlaneLimit = _isMapGeometry
+                ? 2.5f
                 : null;
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(
                 fovRadians,
                 aspect,
-                CalculateProjectionNearPlane(lookDir, mapGroundClearance),
+                CalculateProjectionNearPlane(lookDir, mapNearPlaneLimit),
                 CalculateProjectionFarPlane(lookDir));
             var viewProj = view * proj;
             _modelInteractionController?.Update(viewProj);
@@ -464,10 +465,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetupScene(bool isMapGeometry)
         {
-            if (_cameraController != null)
-            {
-                _cameraController.IsMapGroundCollisionEnabled = isMapGeometry;
-            }
+            _isMapGeometry = isMapGeometry;
 
             if (isMapGeometry)
             {
@@ -1056,18 +1054,15 @@ namespace AssetsManager.Views.Controls.Viewer
 
         internal static float CalculateProjectionNearPlane(
             Vector3 lookDirection,
-            float? mapGroundClearance = null)
+            float? maximumNearPlane = null)
         {
             float cameraDistance = lookDirection.Length();
             float nearPlane = !float.IsFinite(cameraDistance) || cameraDistance <= 0f
                 ? 1f
                 : Math.Clamp(cameraDistance * 0.01f, 0.1f, 500f);
 
-            if (mapGroundClearance.HasValue)
-            {
-                float clearanceNearPlane = Math.Max(mapGroundClearance.Value * 0.1f, 0.1f);
-                nearPlane = Math.Min(nearPlane, clearanceNearPlane);
-            }
+            if (maximumNearPlane.HasValue)
+                nearPlane = Math.Min(nearPlane, Math.Max(maximumNearPlane.Value, 0.1f));
 
             return nearPlane;
         }

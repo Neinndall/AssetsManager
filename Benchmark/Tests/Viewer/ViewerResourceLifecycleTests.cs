@@ -87,36 +87,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
 
             float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
                 lookDirection,
-                mapGroundClearance: 0f);
+                maximumNearPlane: 2.5f);
 
-            Assert.Equal(0.1f, nearPlane);
-        }
-
-        [Fact]
-        public void MapCameraCollisionPreservesHorizontalMovementAboveGround()
-        {
-            var requestedPosition = new Point3D(120, -50, -340);
-
-            Point3D constrained = CustomCameraController.ConstrainMapPosition(
-                requestedPosition,
-                collisionEnabled: true);
-
-            Assert.Equal(120, constrained.X);
-            Assert.Equal(CustomCameraController.MapGroundHeight, constrained.Y);
-            Assert.Equal(-340, constrained.Z);
-        }
-
-        [Fact]
-        public void MapCameraCollisionKeepsClearanceAboveNavigationSurface()
-        {
-            var requestedPosition = new Point3D(120, 80, -340);
-
-            Point3D constrained = CustomCameraController.ConstrainMapPosition(
-                requestedPosition,
-                collisionEnabled: true,
-                navigationSurfaceY: 100);
-
-            Assert.Equal(150, constrained.Y);
+            Assert.Equal(2.5f, nearPlane);
         }
 
         [Fact]
