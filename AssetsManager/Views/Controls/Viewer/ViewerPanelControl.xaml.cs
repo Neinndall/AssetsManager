@@ -31,9 +31,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
 
-        private enum ViewerType { Skn, MapGeometry }
-        private ViewerType _currentMode;
-
         public SknLoadingService SknLoadingService { get; set; }
         public MapGeometryLoadingService MapGeometryLoadingService { get; set; }
         public ChromaLoadingService ChromaLoadingService { get; set; }
@@ -467,8 +464,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ModelsSearchBox != null) ModelsSearchBox.Text = string.Empty;
             if (AnimationsSearchBox != null) AnimationsSearchBox.Text = string.Empty;
 
-            ViewModel.IsMapMode = (_currentMode == ViewerType.MapGeometry);
-
             UpdateHeroStats();
         }
 
@@ -575,8 +570,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _viewModel.SelectedAnimation = null;
         }
 
-        private void TextureThumbnail_Click(object sender, RoutedEventArgs e) { /* removed: see textures ComboBox */ }
-
         /// <summary>
         /// Orchestrates the opening of the Chroma Gallery.
         /// </summary>
@@ -654,7 +647,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public async Task ProcessModelLoading(string modelPath, string texturePath, bool isInitialLoad)
         {
-            _currentMode = ViewerType.Skn;
             ViewModel.IsMapMode = false;
 
             // Start a new cancellable operation. If another load is already in flight
@@ -774,15 +766,8 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void PlayButton_Click(object sender, RoutedEventArgs e)
-        {
-            // Legacy handler kept for compatibility; playback now lives in the
-            // Mini Player (PlayPauseButton_Click / StopButton_Click).
-        }
-
         public async Task LoadMapGeometry(string filePath, string materialsPath, string gameDataPath)
         {
-            _currentMode = ViewerType.MapGeometry;
             ViewModel.IsMapMode = true;
 
             var cancellationToken = TaskCancellationManager != null

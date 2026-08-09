@@ -222,7 +222,7 @@
                                                 </materialIcons:MaterialIcon>
                                             </ToggleButton>
                                             
-                                            <Button Grid.Column="2" x:Name="DeleteModelButton" Click="DeleteModelButton_Click" Tag="{Binding}" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Model">
+                                            <Button Grid.Column="2" Click="DeleteModelButton_Click" Tag="{Binding}" Style="{StaticResource TransparentIconButton}" Width="28" Height="28" ToolTip="Remove Model">
                                                 <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" Foreground="{StaticResource AccentRed}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Button>
                                         </Grid>
@@ -941,7 +941,7 @@
 
                         <StackPanel Margin="0,4,0,0"
                                     Visibility="{Binding IsChecked, ElementName=SectionRender, Converter={StaticResource BooleanToVisibilityConverter}}">
-                            <Button x:Name="SnapshotButton" Click="SnapshotButton_Click" Style="{StaticResource PrimaryButton}" Height="40">
+                            <Button Click="SnapshotButton_Click" Style="{StaticResource PrimaryButton}" Height="40">
                                 <StackPanel Orientation="Horizontal">
                                     <materialIcons:MaterialIcon Kind="Camera" Width="15" Height="15" Margin="0,0,8,0"/>
                                     <TextBlock Text="Take 4K Snapshot" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -1004,7 +1004,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <Button x:Name="PlayPauseButton" Grid.Column="0" Click="PlayPauseButton_Click"
+                        <Button Grid.Column="0" Click="PlayPauseButton_Click"
                                 Width="32" Height="32" Margin="0,0,6,0"
                                 Background="{StaticResource AccentBrush}" BorderThickness="0" Cursor="Hand"
                                 ToolTip="Play / Pause" VerticalAlignment="Center">
