@@ -467,9 +467,6 @@ namespace AssetsManager.Views.Controls.Viewer
             if (ModelsSearchBox != null) ModelsSearchBox.Text = string.Empty;
             if (AnimationsSearchBox != null) AnimationsSearchBox.Text = string.Empty;
 
-            LoadModelButton.IsEnabled = true;
-            LoadChromaModelButton.IsEnabled = true;
-
             ViewModel.IsMapMode = (_currentMode == ViewerType.MapGeometry);
 
             UpdateHeroStats();
@@ -579,23 +576,6 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private void TextureThumbnail_Click(object sender, RoutedEventArgs e) { /* removed: see textures ComboBox */ }
-
-        private async void LoadModelButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMode == ViewerType.Skn)
-            {
-                await OpenSknModel();
-            }
-            else
-            {
-                await OpenMapGeometry();
-            }
-        }
-
-        private void LoadChromaModelButton_Click(object sender, RoutedEventArgs e)
-        {
-            OpenChromaFolder();
-        }
 
         /// <summary>
         /// Orchestrates the opening of the Chroma Gallery.
@@ -858,7 +838,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 ModelsListBox.SelectedItem = newModel;
 
                 Viewport?.SnapCamera();
-                LoadModelButton.IsEnabled = false;
             }
         }
 

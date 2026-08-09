@@ -1060,11 +1060,6 @@
                     </Grid>
                 </StackPanel>
             </Border>
-            <!-- Hidden controls needed for legacy logic -->
-            <TextBlock x:Name="LoadModelTextHidden" Visibility="Collapsed"/>
-            <Button x:Name="LoadModelButton" Visibility="Collapsed" Click="LoadModelButton_Click"/>
-            <Button x:Name="LoadChromaModelButton" Visibility="Collapsed" Click="LoadChromaModelButton_Click"/>
-            <Button x:Name="PlayButtonHidden" Visibility="Collapsed"/>
         </Grid>
     </Border>
 </UserControl>
