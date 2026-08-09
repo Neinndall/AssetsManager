@@ -31,6 +31,33 @@ namespace AssetsManager.Services.Viewer.Loading
             _logService = logService;
         }
 
+        internal static EnvironmentVisibility? ResolveBaseVisibility(
+            IEnumerable<EnvironmentVisibility> visibilities)
+        {
+            EnvironmentVisibility usedLayers = EnvironmentVisibility.NoLayer;
+            foreach (EnvironmentVisibility visibility in visibilities)
+            {
+                if (visibility is not (EnvironmentVisibility.NoLayer or EnvironmentVisibility.AllLayers))
+                    usedLayers |= visibility;
+            }
+
+            for (int bit = 0; bit < 8; bit++)
+            {
+                var layer = (EnvironmentVisibility)(1 << bit);
+                if ((usedLayers & layer) != 0)
+                    return layer;
+            }
+
+            return null;
+        }
+
+        internal static bool IsVisible(
+            EnvironmentVisibility visibility,
+            EnvironmentVisibility? baseVisibility) =>
+            baseVisibility == null ||
+            visibility is EnvironmentVisibility.NoLayer or EnvironmentVisibility.AllLayers ||
+            (visibility & baseVisibility.Value) != 0;
+
         public async Task<SceneModel> LoadMapGeometry(
             string filePath,
             string gameDataPath,
@@ -132,15 +159,37 @@ namespace AssetsManager.Services.Viewer.Loading
             var layeredMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var materialDefinitions = new Dictionary<string, MapGeometryMaterialDefinition>(
                 StringComparer.OrdinalIgnoreCase);
+            var materialPlans = new Dictionary<string, MapGeometryMaterialPlan>(
+                StringComparer.OrdinalIgnoreCase);
             var mappingBuilders = new Dictionary<string, MapGeometryUvWorldMappingBuilder>(
                 StringComparer.OrdinalIgnoreCase);
             MapLightingProfile lightingProfile = MapGeometryLightingResolver.Resolve(materialsBin);
+            EnvironmentVisibility? baseVisibility = ResolveBaseVisibility(
+                mapGeometry.Meshes.Select(mesh => mesh.VisibilityFlags));
+            HashSet<MapGeometryPlacement> baseVariantPlacements = baseVisibility == null
+                ? null
+                : mapGeometry.Meshes
+                    .Where(mesh =>
+                        mesh.VisibilityFlags is not (EnvironmentVisibility.NoLayer or EnvironmentVisibility.AllLayers) &&
+                        (mesh.VisibilityFlags & baseVisibility.Value) != 0)
+                    .Select(GetPlacement)
+                    .ToHashSet();
 
             foreach (var mesh in mapGeometry.Meshes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (!IsVisible(mesh.VisibilityFlags, baseVisibility) ||
+                    mesh.VisibilityFlags == EnvironmentVisibility.AllLayers &&
+                    baseVariantPlacements?.Contains(GetPlacement(mesh)) == true)
+                    continue;
+
                 var positions = mesh.VerticesView.GetAccessor(VertexElement.POSITION.Name).AsVector3Array();
                 var texCoordAccessor = mesh.VerticesView.GetAccessor(VertexElement.TEXCOORD_0.Name);
+                bool hasVertexColors = mesh.VerticesView.TryGetAccessor(
+                    VertexElement.PRIMARY_COLOR.Name,
+                    out VertexElementAccessor colorAccessor) &&
+                    colorAccessor.Element.Format is
+                        ElementFormat.BGRA_Packed8888 or ElementFormat.RGBA_Packed8888;
                 bool isPacked1616 = texCoordAccessor.Element.Format == ElementFormat.XY_Packed1616;
                 MapGeometryLightmapData lightmap = MapGeometryLightingResolver.ResolveLightmap(mesh);
                 if (lightmap != null)
@@ -149,15 +198,25 @@ namespace AssetsManager.Services.Viewer.Loading
                 foreach (var submesh in mesh.Submeshes)
                 {
                     string materialName = submesh.Material.TrimEnd('\0');
-                    MapGeometryMaterialDefinition material = null;
-                    if (materialsBin != null && !materialResolver.TryResolve(materialName, out material))
+                    if (!materialPlans.TryGetValue(materialName, out MapGeometryMaterialPlan materialPlan))
                     {
-                        unresolvedMaterials.Add(materialName);
+                        if (materialsBin != null && materialResolver.TryResolve(
+                            materialName,
+                            out MapGeometryMaterialDefinition definition))
+                        {
+                            materialDefinitions[materialName] = definition;
+                            materialPlan = MapGeometryMaterialResolver.CreateRenderPlan(definition);
+                        }
+                        else
+                        {
+                            unresolvedMaterials.Add(materialName);
+                            materialPlan = MapGeometryMaterialPlan.Unsupported;
+                        }
+
+                        materialPlans[materialName] = materialPlan;
                     }
-                    else if (material != null)
-                    {
-                        materialDefinitions[materialName] = material;
-                    }
+
+                    materialDefinitions.TryGetValue(materialName, out MapGeometryMaterialDefinition material);
 
                     var subPositions = new Point3D[submesh.VertexCount];
                     for (int i = 0; i < submesh.VertexCount; i++)
@@ -196,8 +255,11 @@ namespace AssetsManager.Services.Viewer.Loading
                     float[] subLightmapCoordinates = lightmap?.SliceCoordinates(
                         submesh.MinVertex,
                         submesh.VertexCount);
+                    byte[] subVertexColors = hasVertexColors
+                        ? SliceVertexColors(colorAccessor, submesh.MinVertex, submesh.VertexCount)
+                        : null;
 
-                    bool isTerrainBlend = MapGeometryLayeredTextureComposer.IsTerrainBlend(material);
+                    bool isTerrainBlend = materialPlan.Kind == MapGeometryMaterialKind.TerrainBlend;
                     if (isTerrainBlend)
                     {
                         layeredMaterials.Add(materialName);
@@ -218,17 +280,19 @@ namespace AssetsManager.Services.Viewer.Loading
                         }
                     }
 
-                    MapGeometryTextureSampler primarySampler = material?.PrimarySampler;
+                    MapGeometryTextureSampler primarySampler = materialPlan.PrimarySampler;
                     string primaryTexturePath = primarySampler?.TexturePath;
-                    if (material != null)
+                    if (isTerrainBlend)
                     {
                         foreach (MapGeometryTextureSampler sampler in material.Samplers)
-                        {
                             allTexturePaths.Add(PathUtils.ToVirtualPath(sampler.TexturePath));
-                        }
                     }
+                    else if (primarySampler != null)
+                        allTexturePaths.Add(PathUtils.ToVirtualPath(primarySampler.TexturePath));
 
-                    if (string.IsNullOrWhiteSpace(primaryTexturePath) && material?.TintColor == null)
+                    bool hasBakedDiffuse = materialPlan.Kind == MapGeometryMaterialKind.BakedDiffuse && lightmap != null;
+                    if (materialPlan.Kind == MapGeometryMaterialKind.Unsupported ||
+                        materialPlan.Kind == MapGeometryMaterialKind.BakedDiffuse && !hasBakedDiffuse)
                         materialsWithoutVisuals.Add(materialName);
 
                     dataList.Add(new MapGeometrySubmeshData(
@@ -239,7 +303,12 @@ namespace AssetsManager.Services.Viewer.Loading
                         mesh.Transform,
                         primaryTexturePath,
                         primarySampler?.AddressU == 0 || primarySampler?.AddressV == 0,
-                        material?.TintColor,
+                        materialPlan.Kind == MapGeometryMaterialKind.SolidColor
+                            ? material.TintColor
+                            : null,
+                        materialPlan.AlphaCutoff,
+                        hasBakedDiffuse,
+                        subVertexColors,
                         mesh.DisableBackfaceCulling,
                         mesh.RenderFlags.HasFlag(EnvironmentAssetMeshRenderFlags.IsDecal),
                         lightmap?.TexturePath,
@@ -416,6 +485,10 @@ namespace AssetsManager.Services.Viewer.Loading
                     IsTextureTiled = data.IsTextureTiled,
                     IsDoubleSided = data.IsDoubleSided,
                     IsDecal = data.IsDecal,
+                    ColorTint = data.TintColor ?? System.Numerics.Vector4.One,
+                    AlphaCutoff = data.AlphaCutoff,
+                    UsesBakedDiffuse = data.UsesBakedDiffuse,
+                    VertexColors = data.VertexColors,
                     Lightmap = CreateLightmapBinding(data, result)
                 };
 
@@ -471,6 +544,25 @@ namespace AssetsManager.Services.Viewer.Loading
 
             System.Numerics.Vector4 color = value.Value;
             return Color.FromArgb(ToByte(color.W), ToByte(color.X), ToByte(color.Y), ToByte(color.Z));
+        }
+
+        private static byte[] SliceVertexColors(
+            VertexElementAccessor accessor,
+            int start,
+            int count)
+        {
+            bool isBgra = accessor.Element.Format == ElementFormat.BGRA_Packed8888;
+            var colors = new byte[count * 4];
+            for (int i = 0; i < count; i++)
+            {
+                ReadOnlySpan<byte> source = accessor.DecodeAt(start + i);
+                int offset = i * 4;
+                colors[offset] = source[isBgra ? 2 : 0];
+                colors[offset + 1] = source[1];
+                colors[offset + 2] = source[isBgra ? 0 : 2];
+                colors[offset + 3] = source[3];
+            }
+            return colors;
         }
 
         private static Transform3D ToMediaTransform(System.Numerics.Matrix4x4 value)
@@ -625,10 +717,21 @@ namespace AssetsManager.Services.Viewer.Loading
             string TexturePath,
             bool IsTextureTiled,
             System.Numerics.Vector4? TintColor,
+            float AlphaCutoff,
+            bool UsesBakedDiffuse,
+            byte[] VertexColors,
             bool IsDoubleSided,
             bool IsDecal,
             string LightmapTexturePath,
             float[] LightmapUvCoordinates);
+
+        private static MapGeometryPlacement GetPlacement(EnvironmentAssetMesh mesh) =>
+            new(mesh.BoundingBox.Min, mesh.BoundingBox.Max, mesh.Transform);
+
+        private readonly record struct MapGeometryPlacement(
+            System.Numerics.Vector3 Min,
+            System.Numerics.Vector3 Max,
+            System.Numerics.Matrix4x4 Transform);
 
     }
 }

@@ -209,6 +209,7 @@ namespace BenchmarkApp.Diagnostics.Viewer
             long indexCount = 0;
             long textureCoordinateCount = 0;
             long lightmapCoordinateCount = 0;
+            long vertexColorBytes = 0;
             long dynamicVertexCount = 0;
             long estimatedTextureBytes = 0;
             long estimatedLightmapTextureBytes = 0;
@@ -265,6 +266,8 @@ namespace BenchmarkApp.Diagnostics.Viewer
                     }
                 }
 
+                vertexColorBytes += part.VertexColors?.LongLength ?? 0;
+
                 if (part.AllTextures == null)
                     continue;
 
@@ -285,7 +288,8 @@ namespace BenchmarkApp.Diagnostics.Viewer
                 vertexCount * 24L +
                 indexCount * sizeof(int) +
                 textureCoordinateCount * 16L +
-                lightmapCoordinateCount * sizeof(float);
+                lightmapCoordinateCount * sizeof(float) +
+                vertexColorBytes;
             long estimatedRendererUploadStagingBytes =
                 vertexCount * 8L * sizeof(float) +
                 vertexCount * 3L * sizeof(float) +
@@ -305,6 +309,7 @@ namespace BenchmarkApp.Diagnostics.Viewer
             Console.WriteLine($"  Indices: {indexCount:N0}");
             Console.WriteLine($"  Lightmapped parts: {lightmappedPartCount:N0}");
             Console.WriteLine($"  Lightmap UV floats: {lightmapCoordinateCount:N0} ({ToMb(lightmapCoordinateCount * sizeof(float)):N1} MB)");
+            Console.WriteLine($"  Vertex colors: {ToMb(vertexColorBytes):N1} MB");
             Console.WriteLine($"  Unique lightmap textures: {lightmapTextures.Count:N0} ({ToMb(estimatedLightmapTextureBytes):N1} MB pixels)");
             Console.WriteLine($"  Lightmap texture keys: {lightmapKeys.Count:N0}");
             Console.WriteLine($"  Unique BitmapSource textures: {textures.Count:N0}");

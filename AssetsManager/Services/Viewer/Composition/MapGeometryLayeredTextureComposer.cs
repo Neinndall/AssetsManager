@@ -12,21 +12,13 @@ namespace AssetsManager.Services.Viewer.Composition
 {
     internal static class MapGeometryLayeredTextureComposer
     {
-        public static bool IsTerrainBlend(MapGeometryMaterialDefinition material) =>
-            material != null &&
-            TryGetSampler(material, "Mask_Texture", out _) &&
-            TryGetSampler(material, "Bottom_Texture", out _) &&
-            TryGetSampler(material, "Middle_Texture", out _) &&
-            TryGetSampler(material, "Top_Texture", out _) &&
-            TryGetSampler(material, "Extras_Texture", out _);
-
         public static BitmapSource Compose(
             MapGeometryMaterialDefinition material,
             MapGeometryUvWorldMapping mapping,
             IReadOnlyDictionary<string, BitmapSource> texturesByPath,
             CancellationToken cancellationToken)
         {
-            if (!IsTerrainBlend(material) || !mapping.IsValid)
+            if (material == null || !mapping.IsValid)
                 return null;
 
             if (!TryGetTexture(material, "Mask_Texture", texturesByPath, out BitmapSource maskSource) ||

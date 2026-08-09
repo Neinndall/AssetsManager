@@ -35,6 +35,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             public string LoadedLightmapTextureKey;
             public BitmapSource LoadedLightmapBitmap;
             public uint LightmapVbo;
+            public uint ColorVbo;
             public Point3DCollection UploadedPositions;
             public int VertexCount;
             public GlMeshVertexData VertexData;
@@ -59,6 +60,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uLightmap;
         private int _uHasLightmap;
         private int _uLightMapColorScale;
+        private int _uColorTint;
+        private int _uAlphaCutoff;
+        private int _uUsesBakedDiffuse;
+        private int _uHasVertexColor;
         private bool _ready;
 
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
@@ -95,6 +100,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uLightmap = gl.GetUniformLocation(_program, "uLightmap");
             _uHasLightmap = gl.GetUniformLocation(_program, "uHasLightmap");
             _uLightMapColorScale = gl.GetUniformLocation(_program, "uLightMapColorScale");
+            _uColorTint = gl.GetUniformLocation(_program, "uColorTint");
+            _uAlphaCutoff = gl.GetUniformLocation(_program, "uAlphaCutoff");
+            _uUsesBakedDiffuse = gl.GetUniformLocation(_program, "uUsesBakedDiffuse");
+            _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
 
             // Generate fallback 1x1 white texture
             _whiteTex = gl.GenTexture();
@@ -156,10 +165,18 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
 
-            RenderParts(model, renderDecals: false);
-            RenderParts(model, renderDecals: true);
+            RenderParts(model, renderDecals: false, alphaBlended: false);
+            RenderParts(model, renderDecals: true, alphaBlended: false);
+
+            _gl.Enable(EnableCap.Blend);
+            _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            _gl.DepthMask(false);
+            RenderParts(model, renderDecals: false, alphaBlended: true);
+            RenderParts(model, renderDecals: true, alphaBlended: true);
 
             _gl.Disable(EnableCap.PolygonOffsetFill);
+            _gl.Disable(EnableCap.Blend);
+            _gl.DepthMask(true);
             _gl.BindVertexArray(0);
             _gl.ActiveTexture(TextureUnit.Texture1);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
@@ -170,7 +187,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private static Vector3 NormalizeOrDefault(Vector3 value) =>
             value.LengthSquared() > 1e-6f ? Vector3.Normalize(value) : Vector3.UnitY;
 
-        private void RenderParts(SceneModel model, bool renderDecals)
+        private void RenderParts(SceneModel model, bool renderDecals, bool alphaBlended)
         {
             if (renderDecals)
             {
@@ -184,7 +201,10 @@ namespace AssetsManager.Services.Viewer.Rendering
 
             foreach (var part in model.Parts)
             {
-                if (!part.IsVisible || part.IsDecal != renderDecals) continue;
+                if (!part.IsVisible ||
+                    part.IsDecal != renderDecals ||
+                    part.IsAlphaBlended != alphaBlended)
+                    continue;
 
                 var buffers = EnsureBuffers(part);
                 if (buffers.Vao == 0) continue;
@@ -194,6 +214,15 @@ namespace AssetsManager.Services.Viewer.Rendering
 
                 uint tex = buffers.Texture != 0 ? buffers.Texture : _whiteTex;
                 _gl.BindTexture(TextureTarget.Texture2D, tex);
+                _gl.Uniform4(
+                    _uColorTint,
+                    part.ColorTint.X,
+                    part.ColorTint.Y,
+                    part.ColorTint.Z,
+                    part.ColorTint.W);
+                _gl.Uniform1(_uAlphaCutoff, part.AlphaCutoff);
+                _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
+                _gl.Uniform1(_uHasVertexColor, buffers.ColorVbo != 0 ? 1 : 0);
 
                 bool hasLightmap = buffers.LightmapTexture != 0 && buffers.LightmapVbo != 0;
                 _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);
@@ -300,8 +329,26 @@ namespace AssetsManager.Services.Viewer.Rendering
             }
 
             EnsureLightmapVertexBuffer(part, buffers);
+            EnsureVertexColorBuffer(part, buffers);
 
             return buffers;
+        }
+
+        private void EnsureVertexColorBuffer(ModelPart part, GlPartBuffers buffers)
+        {
+            byte[] colors = part.VertexColors;
+            if (buffers.Vao == 0 || buffers.ColorVbo != 0 ||
+                colors == null || colors.Length != buffers.VertexCount * 4)
+                return;
+
+            buffers.ColorVbo = _gl.GenBuffer();
+            _gl.BindVertexArray(buffers.Vao);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, buffers.ColorVbo);
+            _gl.BufferData(BufferTargetARB.ArrayBuffer, new ReadOnlySpan<byte>(colors), BufferUsageARB.StaticDraw);
+            _gl.EnableVertexAttribArray(4);
+            _gl.VertexAttribPointer(4, 4, VertexAttribPointerType.UnsignedByte, true, 4, IntPtr.Zero);
+            _gl.BindVertexArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
         private void EnsureLightmapVertexBuffer(ModelPart part, GlPartBuffers buffers)
@@ -451,6 +498,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
             if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
             if (buffers.LightmapVbo != 0) _gl.DeleteBuffer(buffers.LightmapVbo);
+            if (buffers.ColorVbo != 0) _gl.DeleteBuffer(buffers.ColorVbo);
 
             _livePartBuffers.Remove(buffers);
             _partBuffers.Remove(part);
@@ -525,6 +573,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 if (buffers.Vbo != 0) _gl.DeleteBuffer(buffers.Vbo);
                 if (buffers.Ebo != 0) _gl.DeleteBuffer(buffers.Ebo);
                 if (buffers.LightmapVbo != 0) _gl.DeleteBuffer(buffers.LightmapVbo);
+                if (buffers.ColorVbo != 0) _gl.DeleteBuffer(buffers.ColorVbo);
             }
             _livePartBuffers.Clear();
             _pendingReleases.Clear();
@@ -540,27 +589,35 @@ namespace AssetsManager.Services.Viewer.Rendering
 					layout(location=1) in vec3 aNormal;
 					layout(location=2) in vec2 aUv;
 					layout(location=3) in vec2 aLightmapUv;
+					layout(location=4) in vec4 aColor;
 					uniform mat4 uViewProj;
 					uniform mat4 uWorld;
+					uniform int uHasVertexColor;
 					out vec3 vNormal;
 					out vec2 vUv;
 					out vec2 vLightmapUv;
+					out vec4 vColor;
 					void main(){
 							vec4 worldPos = uWorld * vec4(aPos, 1.0);
 							gl_Position = uViewProj * worldPos;
 							vNormal = normalize(mat3(uWorld) * aNormal);
 							vUv = aUv;
 							vLightmapUv = aLightmapUv;
+							vColor = uHasVertexColor != 0 ? aColor : vec4(1.0);
 				}";
 
         private const string MeshFrag = @"
 					in vec3 vNormal;
 					in vec2 vUv;
 					in vec2 vLightmapUv;
+					in vec4 vColor;
 					uniform sampler2D uTex;
 					uniform sampler2D uLightmap;
 					uniform int uHasLightmap;
 					uniform float uLightMapColorScale;
+					uniform vec4 uColorTint;
+					uniform float uAlphaCutoff;
+					uniform int uUsesBakedDiffuse;
 					uniform vec3 uLightDir;
 					uniform vec3 uLightColor;
 					uniform vec3 uLightDir2;
@@ -569,8 +626,9 @@ namespace AssetsManager.Services.Viewer.Rendering
 					out vec4 fragColor;
 					void main(){
 							vec4 texColor = texture(uTex, vUv);
-							if (texColor.a < 0.1) discard;
+							if (texColor.a * vColor.a * uColorTint.a < uAlphaCutoff) discard;
 							texColor.rgb /= max(texColor.a, 0.0039215686);
+							texColor *= vColor * uColorTint;
 							
 							// Light 1 (Key Light)
 							float diff1 = max(dot(vNormal, uLightDir), 0.0);
@@ -581,11 +639,16 @@ namespace AssetsManager.Services.Viewer.Rendering
 							vec3 diffuse2 = diff2 * uLightColor2;
 							
 							vec3 finalLight = clamp(uAmbient + diffuse1 + diffuse2, 0.0, 1.0);
-							vec3 finalColor = texColor.rgb * finalLight;
-							if (uHasLightmap != 0)
+							vec3 finalColor;
+							if (uUsesBakedDiffuse != 0 && uHasLightmap != 0)
 							{
-								vec2 lightmapUv = vLightmapUv;
-								finalColor += texture(uLightmap, lightmapUv).rgb * uLightMapColorScale;
+								finalColor = texture(uLightmap, vLightmapUv).rgb * vColor.rgb;
+							}
+							else
+							{
+								finalColor = texColor.rgb * finalLight;
+								if (uHasLightmap != 0)
+									finalColor += texture(uLightmap, vLightmapUv).rgb * uLightMapColorScale;
 							}
 							fragColor = vec4(finalColor, texColor.a);
 				}";

@@ -44,6 +44,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Map Environment now selects each map's base visibility layer to prevent overlapping terrain variants.
+  - Viewer / Map Environment now renders baked terrain, FlowMap water and vertex-colored foliage correctly.
   - Viewer actions remain responsive during startup and graphics resources are fully released when leaving the view.
   - Viewer / 4K snapshots now suggest a model-based filename automatically.
   - Viewer / Map Environment now reuses mesh metadata, decodes only the required TEX mip and releases temporary renderer memory, reducing usage across repeated large-map loads.

@@ -25,7 +25,6 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Composition
             var material = new MapGeometryMaterialDefinition(
                 "Terrain",
                 samplers,
-                samplers[1],
                 null,
                 new Dictionary<string, Vector4>(),
                 0);
@@ -78,7 +77,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Composition
         }
 
         private static MapGeometryTextureSampler Sampler(string name, string path) =>
-            new(name, string.Empty, path, 0, 0, 0, 0);
+            new(name, string.Empty, path, 0, 0);
 
         private static BitmapSource Bitmap(int width, int height, params byte[] rgb)
         {

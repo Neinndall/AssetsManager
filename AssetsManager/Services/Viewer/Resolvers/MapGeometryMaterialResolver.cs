@@ -17,14 +17,28 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint TexturePathHash = Fnv1a.HashLower("texturePath");
         private static readonly uint AddressUHash = Fnv1a.HashLower("addressU");
         private static readonly uint AddressVHash = Fnv1a.HashLower("addressV");
-        private static readonly uint FilterMinHash = Fnv1a.HashLower("filterMin");
-        private static readonly uint FilterMagHash = Fnv1a.HashLower("filterMag");
         private static readonly uint ParamValuesHash = Fnv1a.HashLower("paramValues");
         private static readonly uint NameHash = Fnv1a.HashLower("name");
         private static readonly uint ValueHash = Fnv1a.HashLower("value");
         private static readonly uint TechniquesHash = Fnv1a.HashLower("techniques");
         private static readonly uint PassesHash = Fnv1a.HashLower("passes");
         private static readonly uint ShaderHash = Fnv1a.HashLower("shader");
+        private static readonly string[] AlphaCutoffParameterNames =
+        {
+            "AlphaTestValue",
+            "Opacity_Clip",
+            "Overlay_TEST"
+        };
+        private static readonly HashSet<uint> AlphaTestShaders = new()
+        {
+            Fnv1a.HashLower("Shaders/Environment/DefaultEnv_Flat_AlphaTest"),
+            Fnv1a.HashLower("Shaders/Environment/DefaultEnv_Flat_AlphaTest_DoubleSided"),
+            Fnv1a.HashLower("Shaders/Environment/SRX_Brush"),
+            Fnv1a.HashLower("Shaders/StaticMesh/DefaultEnv_Flat_AlphaTest"),
+            Fnv1a.HashLower("Shaders/StaticMesh/DefaultEnv_Flat_AlphaTest_DoubleSided"),
+            Fnv1a.HashLower("Shaders/StaticMesh/SRX_Brush"),
+            Fnv1a.HashLower("Shaders/StaticMesh/AlphaTest_ENV")
+        };
 
         private static readonly string[] TintParameterNames =
         {
@@ -59,24 +73,81 @@ namespace AssetsManager.Services.Viewer.Resolvers
             definition = new MapGeometryMaterialDefinition(
                 materialName,
                 samplers,
-                SelectPrimarySampler(samplers),
                 ReadTintColor(parameters),
                 parameters,
                 ReadShaderHash(materialObject));
             return true;
         }
 
-        internal static MapGeometryTextureSampler SelectPrimarySampler(
+        internal static MapGeometryMaterialPlan CreateRenderPlan(MapGeometryMaterialDefinition material)
+        {
+            if (material == null)
+                return MapGeometryMaterialPlan.Unsupported;
+
+            if (HasSampler(material, "BAKED_DIFFUSE_TEXTURE"))
+                return new(MapGeometryMaterialKind.BakedDiffuse, null, ResolveAlphaCutoff(material));
+
+            MapGeometryTextureSampler primarySampler = SelectPrimarySampler(material.Samplers);
+            MapGeometryMaterialKind kind = HasTerrainSamplers(material)
+                ? MapGeometryMaterialKind.TerrainBlend
+                : HasSampler(material, "Flow_Map") && primarySampler != null
+                    ? MapGeometryMaterialKind.FlowMap
+                    : primarySampler != null
+                        ? MapGeometryMaterialKind.Diffuse
+                        : material.TintColor != null
+                            ? MapGeometryMaterialKind.SolidColor
+                            : MapGeometryMaterialKind.Unsupported;
+            return new(kind, primarySampler, ResolveAlphaCutoff(material));
+        }
+
+        private static MapGeometryTextureSampler SelectPrimarySampler(
             IReadOnlyList<MapGeometryTextureSampler> samplers)
         {
-            MapGeometryTextureSampler selected = samplers?
-                .Where(x => !string.IsNullOrWhiteSpace(x.TexturePath))
-                .OrderBy(x => GetSamplerPriority(x.TextureName, x.SamplerName))
-                .FirstOrDefault();
-            return selected != null && GetSamplerPriority(selected.TextureName, selected.SamplerName) < 1000
+            MapGeometryTextureSampler selected = null;
+            int candidateCount = 0;
+            int selectedPriority = 1000;
+            foreach (MapGeometryTextureSampler sampler in samplers)
+            {
+                if (string.IsNullOrWhiteSpace(sampler.TexturePath))
+                    continue;
+
+                candidateCount++;
+                int priority = GetSamplerPriority(sampler.TextureName, sampler.SamplerName);
+                if (priority >= selectedPriority)
+                    continue;
+
+                selected = sampler;
+                selectedPriority = priority;
+            }
+
+            return selectedPriority < 100 || selectedPriority == 100 && candidateCount == 1
                 ? selected
                 : null;
         }
+
+        private static float ResolveAlphaCutoff(MapGeometryMaterialDefinition material)
+        {
+            if (material == null)
+                return 0.1f;
+
+            foreach (string name in AlphaCutoffParameterNames)
+                if (material.Parameters.TryGetValue(name, out Vector4 value))
+                    return Math.Clamp(value.X, 0f, 1f);
+
+            return AlphaTestShaders.Contains(material.ShaderHash) ? 0.3f : 0.1f;
+        }
+
+        private static bool HasTerrainSamplers(MapGeometryMaterialDefinition material) =>
+            HasSampler(material, "Mask_Texture") &&
+            HasSampler(material, "Bottom_Texture") &&
+            HasSampler(material, "Middle_Texture") &&
+            HasSampler(material, "Top_Texture") &&
+            HasSampler(material, "Extras_Texture");
+
+        private static bool HasSampler(MapGeometryMaterialDefinition material, string name) =>
+            material.Samplers.Any(sampler =>
+                name.Equals(sampler.TextureName, StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(sampler.SamplerName, StringComparison.OrdinalIgnoreCase));
 
         private static List<MapGeometryTextureSampler> ReadSamplers(BinTreeObject materialObject)
         {
@@ -98,9 +169,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     ReadString(sampler, SamplerNameHash),
                     texturePath,
                     ReadUInt32(sampler, AddressUHash),
-                    ReadUInt32(sampler, AddressVHash),
-                    ReadUInt32(sampler, FilterMinHash),
-                    ReadUInt32(sampler, FilterMagHash)));
+                    ReadUInt32(sampler, AddressVHash)));
             }
 
             return result;
@@ -162,8 +231,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         private static int GetSamplerPriority(string textureName, string samplerName)
         {
-            string identity = string.IsNullOrWhiteSpace(textureName) ? samplerName ?? string.Empty : textureName;
-            string normalized = identity.Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
+            string normalized = NormalizeSamplerName(textureName, samplerName);
 
             return normalized switch
             {
@@ -181,6 +249,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 _ when IsAuxiliarySampler(normalized) => 1000,
                 _ => 100
             };
+        }
+
+        private static string NormalizeSamplerName(string textureName, string samplerName)
+        {
+            string identity = string.IsNullOrWhiteSpace(textureName) ? samplerName ?? string.Empty : textureName;
+            return identity.Replace("_", string.Empty, StringComparison.Ordinal).ToLowerInvariant();
         }
 
         private static bool IsAuxiliarySampler(string identity) =>
@@ -207,17 +281,33 @@ namespace AssetsManager.Services.Viewer.Resolvers
     internal sealed record MapGeometryMaterialDefinition(
         string Name,
         IReadOnlyList<MapGeometryTextureSampler> Samplers,
-        MapGeometryTextureSampler PrimarySampler,
         Vector4? TintColor,
         IReadOnlyDictionary<string, Vector4> Parameters,
         uint ShaderHash);
+
+    internal enum MapGeometryMaterialKind
+    {
+        Unsupported,
+        Diffuse,
+        TerrainBlend,
+        FlowMap,
+        BakedDiffuse,
+        SolidColor
+    }
+
+    internal sealed record MapGeometryMaterialPlan(
+        MapGeometryMaterialKind Kind,
+        MapGeometryTextureSampler PrimarySampler,
+        float AlphaCutoff)
+    {
+        public static readonly MapGeometryMaterialPlan Unsupported =
+            new(MapGeometryMaterialKind.Unsupported, null, 0.1f);
+    }
 
     internal sealed record MapGeometryTextureSampler(
         string TextureName,
         string SamplerName,
         string TexturePath,
         uint AddressU,
-        uint AddressV,
-        uint FilterMin,
-        uint FilterMag);
+        uint AddressV);
 }

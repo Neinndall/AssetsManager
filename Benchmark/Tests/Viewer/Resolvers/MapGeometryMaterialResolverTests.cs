@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Resolvers;
@@ -24,7 +25,9 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             bool resolved = resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition);
 
             Assert.True(resolved);
-            Assert.Equal("ASSETS/Maps/Jade/diffuse.tex", definition.PrimarySampler.TexturePath);
+            MapGeometryMaterialPlan plan = MapGeometryMaterialResolver.CreateRenderPlan(definition);
+            Assert.Equal(MapGeometryMaterialKind.Diffuse, plan.Kind);
+            Assert.Equal("ASSETS/Maps/Jade/diffuse.tex", plan.PrimarySampler.TexturePath);
         }
 
         [Fact]
@@ -35,12 +38,16 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 materialPath,
                 CreateSampler("Mask_Texture", "ASSETS/Maps/Jade/mask.tex"),
                 CreateSampler("Bottom_Texture", "ASSETS/Maps/Jade/dirt.tex"),
-                CreateSampler("Top_Texture", "ASSETS/Maps/Jade/grass.tex"));
+                CreateSampler("Middle_Texture", "ASSETS/Maps/Jade/rock.tex"),
+                CreateSampler("Top_Texture", "ASSETS/Maps/Jade/grass.tex"),
+                CreateSampler("Extras_Texture", "ASSETS/Maps/Jade/details.tex"));
             var resolver = new MapGeometryMaterialResolver(new BinTree(new[] { material }, Array.Empty<string>()));
 
             Assert.True(resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition));
-            Assert.Equal("Bottom_Texture", definition.PrimarySampler.TextureName);
-            Assert.Equal(3, definition.Samplers.Count);
+            MapGeometryMaterialPlan plan = MapGeometryMaterialResolver.CreateRenderPlan(definition);
+            Assert.Equal(MapGeometryMaterialKind.TerrainBlend, plan.Kind);
+            Assert.Equal("Bottom_Texture", plan.PrimarySampler.TextureName);
+            Assert.Equal(5, definition.Samplers.Count);
         }
 
         [Fact]
@@ -68,7 +75,9 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
 
             Assert.True(resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition));
             Assert.Equal(tint, definition.TintColor);
-            Assert.Null(definition.PrimarySampler);
+            Assert.Equal(
+                MapGeometryMaterialKind.SolidColor,
+                MapGeometryMaterialResolver.CreateRenderPlan(definition).Kind);
         }
 
         [Fact]
@@ -81,8 +90,45 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             var resolver = new MapGeometryMaterialResolver(new BinTree(new[] { material }, Array.Empty<string>()));
 
             Assert.True(resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition));
-            Assert.Null(definition.PrimarySampler);
+            Assert.Equal(
+                MapGeometryMaterialKind.Unsupported,
+                MapGeometryMaterialResolver.CreateRenderPlan(definition).Kind);
             Assert.Single(definition.Samplers);
+        }
+
+        [Theory]
+        [InlineData("Flow_Map|Flowing_Normal_Map|Diffuse_Texture", (int)MapGeometryMaterialKind.FlowMap, "diffuse_texture.tex")]
+        [InlineData("BAKED_DIFFUSE_TEXTURE", (int)MapGeometryMaterialKind.BakedDiffuse, null)]
+        [InlineData("Custom_Texture", (int)MapGeometryMaterialKind.Diffuse, "custom_texture.tex")]
+        [InlineData("First_Texture|Second_Texture", (int)MapGeometryMaterialKind.Unsupported, null)]
+        public void CreateRenderPlan_ClassifiesSamplerRoles(
+            string samplerNames,
+            int expectedKind,
+            string expectedTexture)
+        {
+            var material = new MapGeometryMaterialDefinition(
+                "Material",
+                samplerNames.Split('|').Select(name => Sampler(name, $"{name.ToLowerInvariant()}.tex")).ToArray(),
+                null,
+                new Dictionary<string, Vector4>(),
+                0);
+            MapGeometryMaterialPlan plan = MapGeometryMaterialResolver.CreateRenderPlan(material);
+
+            Assert.Equal((MapGeometryMaterialKind)expectedKind, plan.Kind);
+            Assert.Equal(expectedTexture, plan.PrimarySampler?.TexturePath);
+        }
+
+        [Fact]
+        public void CreateRenderPlan_UsesShaderAlphaTestCutoff()
+        {
+            var material = new MapGeometryMaterialDefinition(
+                "Brush",
+                new[] { Sampler("Diffuse_Texture", "brush.tex") },
+                null,
+                new Dictionary<string, Vector4>(),
+                Fnv1a.HashLower("Shaders/Environment/SRX_Brush"));
+
+            Assert.Equal(0.3f, MapGeometryMaterialResolver.CreateRenderPlan(material).AlphaCutoff);
         }
 
         [Fact]
@@ -123,5 +169,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                     new BinTreeU32(Fnv1a.HashLower("addressU"), 0),
                     new BinTreeU32(Fnv1a.HashLower("addressV"), 0)
                 });
+
+        private static MapGeometryTextureSampler Sampler(string name, string path) =>
+            new(name, string.Empty, path, 0, 0);
     }
 }
