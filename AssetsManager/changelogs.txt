@@ -6,6 +6,8 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
+  - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Project Browser can load multiple selected animation files from its context menu.
   - Viewer / Map Environment now applies map-authored sun, ambient lighting, and baked lightmaps to static geometry.
   - Chroma Library now groups variants by their source skin with family selection and a persistent selected count.
@@ -45,6 +47,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Model material effects now classify each BIN-linked submesh conservatively and no longer approximate complex masked vertex deformation as a simple wave.
+  - Viewer / Model effects now keep BIN-authored Bloom from overwhelming masked body details.
   - Viewer / Map Environment now selects each map's base visibility layer to prevent overlapping terrain variants.
   - Viewer / Map Environment now renders baked terrain, FlowMap water and vertex-colored foliage correctly.
   - Viewer actions remain responsive during startup and graphics resources are fully released when leaving the view.
@@ -86,6 +90,7 @@ Improvements
   - Viewer services and tests are now organized by animation, models, map geometry, rendering, and VFX domains.
   - Viewer Browser now uses the compact shared breadcrumb navigation.
   - Viewer model rendering now reuses animated mesh buffers and shared textures while releasing GPU resources as models are removed.
+  - Viewer models now apply supported BIN-authored scrolling and flow effects to the correct submeshes.
   - BIN Hash Lab now preserves observed casing and requires runtime evidence before promoting Meta Schema candidates.
   - BIN Hash Lab now discovers owner-matched entry names without class-specific whitelists.
   - BIN Hash Lab now preserves unpaired semantic matches as research and extracts embedded function names without partial block results.
@@ -228,6 +233,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Fixed shared model materials leaking scoped texture effects into unrelated submeshes.
   - Viewer / Close map views no longer disappear behind projection clipping.
   - Viewer now keeps its standard dark background before any model or map is loaded.
   - Viewer / Model, Chroma, and Map Environment loading now stays responsive without cross-thread scene crashes.

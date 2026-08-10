@@ -25,6 +25,20 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal bool TextureResolved;
             internal string LoadedTextureKey;
             internal BitmapSource LoadedBitmap;
+            internal uint EffectTexture;
+            internal uint EffectMaskTexture;
+            internal bool EffectTexturesResolved;
+            internal string LoadedEffectTextureKey;
+            internal string LoadedEffectMaskTextureKey;
+            internal BitmapSource LoadedEffectBitmap;
+            internal BitmapSource LoadedEffectMaskBitmap;
+            internal uint EmissionTexture;
+            internal uint EmissionMaskTexture;
+            internal bool EmissionTexturesResolved;
+            internal string LoadedEmissionTextureKey;
+            internal string LoadedEmissionMaskTextureKey;
+            internal BitmapSource LoadedEmissionBitmap;
+            internal BitmapSource LoadedEmissionMaskBitmap;
             internal uint LightmapTexture;
             internal bool LightmapTextureResolved;
             internal string LoadedLightmapTextureKey;
@@ -69,6 +83,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
 
             EnsureBaseTexture(part, resources);
+            EnsureEffectTextures(part, resources);
+            EnsureEmissionTextures(part, resources);
             EnsureLightmapTexture(part, resources);
             resources = EnsureMeshBuffers(part, resources);
             EnsureLightmapVertexBuffer(part, resources);
@@ -267,7 +283,92 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 () => UploadTexture(
                     resources.LoadedLightmapBitmap,
                     premultiplyAlpha: false,
-                    wrapMode: TextureWrapMode.ClampToEdge));
+                wrapMode: TextureWrapMode.ClampToEdge));
+        }
+
+        private void EnsureEffectTextures(ModelPart part, PartResources resources)
+        {
+            ModelMaterialEffectDefinition effect =
+                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            string effectTextureKey = effect.Kind == ModelMaterialEffectKind.None
+                ? null
+                : effect.TextureName;
+            string effectMaskTextureKey = effect.Kind == ModelMaterialEffectKind.None
+                ? null
+                : effect.MaskTextureName;
+
+            if (resources.EffectTexturesResolved &&
+                resources.LoadedEffectTextureKey == effectTextureKey &&
+                resources.LoadedEffectMaskTextureKey == effectMaskTextureKey)
+            {
+                return;
+            }
+
+            ReleaseEffectTextures(resources);
+            resources.EffectTexturesResolved = true;
+            resources.LoadedEffectTextureKey = effectTextureKey;
+            resources.LoadedEffectMaskTextureKey = effectMaskTextureKey;
+            resources.LoadedEffectBitmap = TextureUtils.ResolveTexture(part.AllTextures, effectTextureKey);
+            resources.LoadedEffectMaskBitmap = TextureUtils.ResolveTexture(part.AllTextures, effectMaskTextureKey);
+
+            if (resources.LoadedEffectBitmap != null)
+            {
+                resources.EffectTexture = AcquireTexture(
+                    _sharedTextures,
+                    resources.LoadedEffectBitmap,
+                    () => UploadTexture(resources.LoadedEffectBitmap));
+            }
+
+            if (resources.LoadedEffectMaskBitmap != null)
+            {
+                resources.EffectMaskTexture = AcquireTexture(
+                    _sharedTextures,
+                    resources.LoadedEffectMaskBitmap,
+                    () => UploadTexture(resources.LoadedEffectMaskBitmap));
+            }
+        }
+
+        private void EnsureEmissionTextures(ModelPart part, PartResources resources)
+        {
+            ModelMaterialEffectDefinition effect =
+                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            bool hasEmission = (effect.Kind & ModelMaterialEffectKind.Emission) != 0;
+            string emissionTextureKey = hasEmission ? effect.EmissionTextureName : null;
+            string emissionMaskTextureKey = hasEmission ? effect.EmissionMaskTextureName : null;
+
+            if (resources.EmissionTexturesResolved &&
+                resources.LoadedEmissionTextureKey == emissionTextureKey &&
+                resources.LoadedEmissionMaskTextureKey == emissionMaskTextureKey)
+            {
+                return;
+            }
+
+            ReleaseEmissionTextures(resources);
+            resources.EmissionTexturesResolved = true;
+            resources.LoadedEmissionTextureKey = emissionTextureKey;
+            resources.LoadedEmissionMaskTextureKey = emissionMaskTextureKey;
+            resources.LoadedEmissionBitmap = TextureUtils.ResolveTexture(
+                part.AllTextures,
+                emissionTextureKey);
+            resources.LoadedEmissionMaskBitmap = TextureUtils.ResolveTexture(
+                part.AllTextures,
+                emissionMaskTextureKey);
+
+            if (resources.LoadedEmissionBitmap != null)
+            {
+                resources.EmissionTexture = AcquireTexture(
+                    _sharedTextures,
+                    resources.LoadedEmissionBitmap,
+                    () => UploadTexture(resources.LoadedEmissionBitmap));
+            }
+
+            if (resources.LoadedEmissionMaskBitmap != null)
+            {
+                resources.EmissionMaskTexture = AcquireTexture(
+                    _sharedTextures,
+                    resources.LoadedEmissionMaskBitmap,
+                    () => UploadTexture(resources.LoadedEmissionMaskBitmap));
+            }
         }
 
         private static uint AcquireTexture(
@@ -290,6 +391,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (!_partResources.TryGetValue(part, out PartResources resources)) return;
 
             ReleaseBaseTexture(resources);
+            ReleaseEffectTextures(resources);
+            ReleaseEmissionTextures(resources);
             ReleaseLightmapTexture(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);
@@ -317,6 +420,26 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             ReleaseSharedTexture(_sharedLightmapTextures, resources.LoadedLightmapBitmap);
             resources.LightmapTexture = 0;
             resources.LoadedLightmapBitmap = null;
+        }
+
+        private void ReleaseEffectTextures(PartResources resources)
+        {
+            ReleaseSharedTexture(_sharedTextures, resources.LoadedEffectBitmap);
+            ReleaseSharedTexture(_sharedTextures, resources.LoadedEffectMaskBitmap);
+            resources.EffectTexture = 0;
+            resources.EffectMaskTexture = 0;
+            resources.LoadedEffectBitmap = null;
+            resources.LoadedEffectMaskBitmap = null;
+        }
+
+        private void ReleaseEmissionTextures(PartResources resources)
+        {
+            ReleaseSharedTexture(_sharedTextures, resources.LoadedEmissionBitmap);
+            ReleaseSharedTexture(_sharedTextures, resources.LoadedEmissionMaskBitmap);
+            resources.EmissionTexture = 0;
+            resources.EmissionMaskTexture = 0;
+            resources.LoadedEmissionBitmap = null;
+            resources.LoadedEmissionMaskBitmap = null;
         }
 
         private void ReleaseSharedTexture(

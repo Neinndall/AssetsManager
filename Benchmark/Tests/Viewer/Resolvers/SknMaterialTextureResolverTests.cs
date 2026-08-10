@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Resolvers;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -162,6 +164,474 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 new[] { "belveth_skin29_mask_tx_cm", "belveth_skin29_tx_cm" });
 
             Assert.Equal("belveth_skin29_tx_cm", resolution.Overrides["creaturebody"]);
+        }
+
+        [Fact]
+        public void Resolve_ScopesAdditiveScrollToItsSubmesh()
+        {
+            const string materialPath = "Characters/Aurora/Skins/Base/Materials/Aurora";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_TX_CM.tex",
+                CreateOverride(
+                    "Base",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_TX_CM.tex"),
+                        CreateSampler("AdditiveScrollTex", "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_Tile01.tex"),
+                        CreateSampler("AdditiveScroll_Mask", "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex")
+                    },
+                    CreateParameter("AdditiveTexTile", new Vector4(3f, 2f, 0f, 0f)),
+                    CreateParameter("AdditiveTexScrollSpeed_R", new Vector4(-0.1f, 0.1f, 0f, 0f)),
+                    CreateParameter("AdditiveScroll_ColorTint_R", new Vector4(0.18f, 0.67f, 1f, 0f)),
+                    CreateParameter("AdditiveStrength_R", Vector4.One)),
+                materialOverride2: CreateOverride(
+                    "Hat",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "aurora_base_tx_cm",
+                    "aurora_base_mat_tile01",
+                    "aurora_base_mat_hatmask"
+                });
+
+            Assert.False(resolution.Effects.ContainsKey("base"));
+            ModelMaterialEffectDefinition effect = resolution.Effects["hat"];
+            Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
+            Assert.Equal("aurora_base_mat_tile01", effect.TextureName);
+            Assert.Equal("aurora_base_mat_hatmask", effect.MaskTextureName);
+            Assert.Equal(new Vector2(-0.1f, 0.1f), effect.ScrollSpeed);
+            Assert.Equal(new Vector2(3f, 2f), effect.Tiling);
+            Assert.Equal(new Vector4(0.18f, 0.67f, 1f, 0f), effect.Color);
+            Assert.Contains(
+                "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex",
+                SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_CombinesFresnelAndBloomWithMaterialMask()
+        {
+            const string materialPath = "Characters/Brand/Skins/Skin53/Materials/Hair";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Brand/Skins/Skin53/Brand_Skin53_TX_CM.tex",
+                CreateOverride(
+                    "Hair",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Brand/Skins/Skin53/Brand_Skin53_Hair_TX_CM.tex"),
+                        CreateSampler("Mask", "ASSETS/Characters/Brand/Skins/Skin53/Brand_Skin53_HairAlpha_TX_CM.tex")
+                    },
+                    CreateParameter("Fresnel_Color_Intensity", new Vector4(0.8f, 0f, 0f, 0f)),
+                    CreateParameter("FresnelPower", new Vector4(3f, 0f, 0f, 0f)),
+                    CreateParameter("Fresnel_Noise_Tiling_Speed", new Vector4(1f, 3f, 0.2f, -0.1f)),
+                    CreateParameter("Anim_Wave_Speed", new Vector4(0.8f, 0f, 0f, 0f)),
+                    CreateParameter("Anim_Wave_Dir", new Vector4(50f, 40f, 30f, 0f)),
+                    CreateParameter("Anim_Wave_Frequency", new Vector4(0.7f, 0f, 0f, 0f)),
+                    CreateParameter("Anim_Wave_Dir_Intensity", new Vector4(0.15f, 0f, 0f, 0f)),
+                    CreateParameter("BloomColor", new Vector4(1f, 0.2f, 0.05f, 1f)),
+                    CreateParameter("BloomColorIntensity", new Vector4(0.6f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "brand_skin53_tx_cm",
+                    "brand_skin53_hair_tx_cm",
+                    "brand_skin53_hairalpha_tx_cm"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["hair"];
+            Assert.Equal(
+                ModelMaterialEffectKind.Fresnel |
+                ModelMaterialEffectKind.Bloom |
+                ModelMaterialEffectKind.FresnelNoise |
+                ModelMaterialEffectKind.AnimatedWave,
+                effect.Kind);
+            Assert.Equal("brand_skin53_hairalpha_tx_cm", effect.MaskTextureName);
+            Assert.Equal(3f, effect.FresnelPower);
+            Assert.Equal(0.8f, effect.FresnelStrength);
+            Assert.Equal(new Vector4(1f, 0.2f, 0.05f, 1f), effect.BloomColor);
+            Assert.Equal(0.6f, effect.BloomIntensity);
+            Assert.Equal(new Vector3(50f, 40f, 30f), effect.WaveDirection);
+            Assert.Equal(0.8f, effect.WaveSpeed);
+            Assert.Equal(0.7f, effect.WaveFrequency);
+            Assert.Equal(0.15f, effect.WaveIntensity);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.FresnelNoiseSpeed);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotInventBloomForGradientDissolveMaterial()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Base/Materials/Wings";
+            const string diffusePath = "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_Wings_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Wings",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Mask_Texture", "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_R_wing_mask.tex"),
+                        CreateSampler("Gradient_Texture", "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_R_mat_gradient.tex")
+                    },
+                    CreateParameter("Mask_Intensity", new Vector4(0.94f, 0f, 0f, 0f)),
+                    CreateParameter("Bloom_Intensity", new Vector4(5f, 0f, 0f, 0f)),
+                    CreateParameter("Dissolve_Bias", new Vector4(0.785f, 0f, 0f, 0f)),
+                    CreateParameter("Dissolve_SmoothStep", new Vector4(0f, 0.5f, 0f, 0f)),
+                    CreateParameter("Gradient_Sharpness", new Vector4(2f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "aatrox_base_wings_tx_cm",
+                    "aatrox_base_r_wing_mask",
+                    "aatrox_base_r_mat_gradient"
+                });
+
+            Assert.DoesNotContain("wings", resolution.Effects);
+        }
+
+        [Fact]
+        public void Resolve_RecognizesRealScrollSamplerAliases()
+        {
+            const string materialPath = "Characters/Lux/Skins/Skin58/Materials/Body";
+            const string diffusePath = "ASSETS/Characters/Lux/Skins/Skin58/Lux_Skin58_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Scroll_Tex", "ASSETS/Characters/Lux/Skins/Skin58/Lux_Scroll.tex"),
+                        CreateSampler("Scroll_Tex_Mask", "ASSETS/Characters/Lux/Skins/Skin58/Lux_Scroll_Mask.tex")
+                    },
+                    CreateParameter("ScrollSpeed_R", new Vector4(0.2f, -0.1f, 0f, 0f)),
+                    CreateParameter("ScrollStrength_R", new Vector4(0.75f, 0f, 0f, 0f)),
+                    CreateParameter("ScrollTexTile", new Vector4(2f, 3f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "lux_skin58_tx_cm",
+                    "lux_scroll",
+                    "lux_scroll_mask"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
+            Assert.Equal("lux_scroll", effect.TextureName);
+            Assert.Equal("lux_scroll_mask", effect.MaskTextureName);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.ScrollSpeed);
+            Assert.Equal(new Vector2(2f, 3f), effect.Tiling);
+        }
+
+        [Fact]
+        public void Resolve_RecognizesRealDissolveSamplerAliases()
+        {
+            const string materialPath = "Characters/MissFortune/Skins/Skin48/Materials/Body";
+            const string diffusePath = "ASSETS/Characters/MissFortune/Skins/Skin48/MissFortune_Skin48_TX_CM.tex";
+            const string dissolvePath = "ASSETS/Characters/MissFortune/Skins/Skin48/Dissolve_Texture.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Dissolve_Texture", dissolvePath)
+                    },
+                    CreateParameter("DissolveBias", new Vector4(0.35f, 0f, 0f, 0f)),
+                    CreateParameter("DissolveWidth", new Vector4(0.2f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "missfortune_skin48_tx_cm", "dissolve_texture" });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
+            Assert.Equal("dissolve_texture", effect.TextureName);
+            Assert.Equal(0.35f, effect.DissolveThreshold);
+            Assert.Equal(0.2f, effect.DissolveSoftness);
+            Assert.Contains(dissolvePath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_RecognizesRedChannelEmissionTexture()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Skin37/Materials/Sword";
+            const string diffusePath = "ASSETS/Characters/Aatrox/Skins/Skin37/Aatrox_Skin37_Sword_TX_CM.tex";
+            const string emissionPath = "ASSETS/Characters/Aatrox/Skins/Skin37/Aatrox_Skin37_Sword_Distortion.tex";
+            const string maskPath = "ASSETS/Characters/Aatrox/Skins/Skin37/Aatrox_Skin37_Sword_EmissionMask.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Sword",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("EmissionR_DistortionG_Texture", emissionPath),
+                        CreateSampler("EmissionMask", maskPath)
+                    },
+                    CreateParameter("EmissionR_Strength", new Vector4(1.25f, 0f, 0f, 0f)),
+                    CreateParameter("EmissionColor", new Vector4(1f, 0.63f, 0f, 1f)),
+                    CreateParameter("VFX_ScrollTex_R_UV_Tile", new Vector4(15f, 3f, 0f, 0f)),
+                    CreateParameter("VFX_ScrollTex_R_UV_Scroll_Speed", new Vector4(0f, -2f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "aatrox_skin37_sword_tx_cm",
+                    "aatrox_skin37_sword_distortion",
+                    "aatrox_skin37_sword_emissionmask"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["sword"];
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Emission) != 0);
+            Assert.False((effect.Kind & ModelMaterialEffectKind.Bloom) != 0);
+            Assert.Equal("aatrox_skin37_sword_distortion", effect.EmissionTextureName);
+            Assert.Equal("aatrox_skin37_sword_emissionmask", effect.EmissionMaskTextureName);
+            Assert.Equal(0, effect.EmissionChannel);
+            Assert.Equal(new Vector2(15f, 3f), effect.EmissionTiling);
+            Assert.Equal(new Vector2(0f, -2f), effect.EmissionScrollSpeed);
+            Assert.Equal(1.25f, effect.EmissionStrength);
+            Assert.Equal(new Vector4(1f, 0.63f, 0f, 1f), effect.EmissionColor);
+            Assert.Contains(emissionPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+            Assert.Contains(maskPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_IgnoresNeutralEmissionTexture()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Skin37/Materials/Sword";
+            const string diffusePath = "ASSETS/Characters/Aatrox/Skins/Skin37/Aatrox_Skin37_Sword_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Sword",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("EmissionR_DistortionG_Texture", "ASSETS/Shared/Materials/black.tex")
+                    },
+                    CreateParameter("EmissionR_Strength", Vector4.One),
+                    CreateParameter("EmissionColor", Vector4.One)));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "aatrox_skin37_sword_tx_cm" });
+
+            Assert.DoesNotContain("sword", resolution.Effects);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotApproximateComplexVertexDeformationAsSimpleWave()
+        {
+            const string materialPath = "Characters/MissFortune/Skins/Skin69/Materials/Gun25Gold";
+            const string texturePath = "ASSETS/Characters/MissFortune/Skins/Skin69/Gun25_Gold_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                texturePath,
+                CreateOverride(
+                    "C_Gun25",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", texturePath),
+                        CreateSampler("DeformNoise", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("DeformMask", "ASSETS/Shared/Materials/black.tex")
+                    },
+                    CreateParameter("Anim_Wave_Speed", new Vector4(0.3f, 0f, 0f, 0f)),
+                    CreateParameter("Anim_Wave_Dir", new Vector4(5f, 5f, 0.5f, 0f)),
+                    CreateParameter("Anim_Wave_Frequency", Vector4.One),
+                    CreateParameter("Anim_Wave_Dir_Intensity", Vector4.One),
+                    CreateParameter("VertexDeformFeatureStrength", Vector4.One),
+                    CreateParameter("DeformIntensity", new Vector4(6f, 0f, 0f, 0f)),
+                    CreateParameter("DeformProtection", new Vector4(2f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "gun25_gold_tx_cm" });
+
+            Assert.Equal("gun25_gold_tx_cm", resolution.Overrides["cgun25"]);
+            Assert.DoesNotContain("cgun25", resolution.Effects);
+        }
+
+        [Fact]
+        public void Resolve_ResolvesMaskTextureRedForBelvethBloom()
+        {
+            const string materialPath = "Characters/Belveth/Skins/Skin29/Materials/Ult";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_ULT_TX_CM.tex",
+                CreateOverride(
+                    "Ult",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_ULT_TX_CM.tex"),
+                        CreateSampler("Mask_Texture_red", "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_Ult_BloomMask_TX_CM.tex")
+                    },
+                    CreateParameter("Bloom_Color", new Vector4(0.89f, 0.95f, 0.56f, 1f)),
+                    CreateParameter("Bloom_Intensity", new Vector4(5f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "belveth_skin29_ult_tx_cm",
+                    "belveth_skin29_ult_bloommask_tx_cm"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["ult"];
+            Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
+            Assert.Equal("belveth_skin29_ult_bloommask_tx_cm", effect.MaskTextureName);
+            Assert.Equal(5f, effect.BloomIntensity);
+            Assert.Contains(
+                "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_Ult_BloomMask_TX_CM.tex",
+                SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_UsesTransitionTextureForSimpleDissolve()
+        {
+            const string materialPath = "Characters/Belveth/Skins/Skin29/Materials/Transition";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex",
+                CreateOverride(
+                    "Armor",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex"),
+                        CreateSampler("Transition_PatternTexture", "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Transition_Noise.tex"),
+                        CreateSampler("Transition_State2", "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Transition_State.tex")
+                    },
+                    CreateParameter("Dissolve", new Vector4(0.35f, 0f, 0f, 0f)),
+                    CreateParameter("DissolveSoftness", new Vector4(0.08f, 0f, 0f, 0f)),
+                    CreateParameter("Transition_Speed", new Vector4(0.1f, -0.2f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "belveth_skin29_tx_cm",
+                    "belveth_transition_noise",
+                    "belveth_transition_state"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["armor"];
+            Assert.Equal(ModelMaterialEffectKind.Dissolve, effect.Kind);
+            Assert.Equal("belveth_transition_noise", effect.TextureName);
+            Assert.Equal("belveth_transition_state", effect.MaskTextureName);
+            Assert.Equal(new Vector2(0.1f, -0.2f), effect.ScrollSpeed);
+            Assert.Equal(0.35f, effect.DissolveThreshold);
+            Assert.Equal(0.08f, effect.DissolveSoftness);
+            Assert.Contains(
+                "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Transition_Noise.tex",
+                SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Theory]
+        [InlineData("FlowMap")]
+        [InlineData("Flow_Map")]
+        [InlineData("Flowmap")]
+        public void Resolve_RecognizesFlowMapSamplerAlias(string samplerName)
+        {
+            const string materialPath = "Characters/Brand/Skins/Skin53/Materials/Hair";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Brand/Skins/Skin53/Brand_Skin53_TX_CM.tex",
+                CreateOverride(
+                    "Hair",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Brand/Skins/Skin53/Brand_Skin53_Hair_TX_CM.tex"),
+                        CreateSampler(samplerName, "ASSETS/Characters/Brand/Skins/Skin53/CloudFM_TX_CM.tex")
+                    },
+                    CreateParameter("FlowSpeed", new Vector4(0.2f, -0.1f, 0f, 0f)),
+                    CreateParameter("FlowmapIntensity", new Vector4(0.15f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "brand_skin53_tx_cm", "brand_skin53_hair_tx_cm", "cloudfm_tx_cm" });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["hair"];
+            Assert.Equal(ModelMaterialEffectKind.FlowMap, effect.Kind);
+            Assert.Equal("cloudfm_tx_cm", effect.TextureName);
+            Assert.Equal(new Vector2(0.2f, -0.1f), effect.ScrollSpeed);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotApproximateCompositeOnsenMaterial()
+        {
+            const string materialPath = "Characters/Locke/Skins/Base/Materials/Onsen";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Locke/Skins/Base/Locke_Base_Main_TX_CM.tex",
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", "ASSETS/Characters/Locke/Skins/Base/Locke_Base_Main_TX_CM.tex"),
+                        CreateSampler("NoiseDisturb", "ASSETS/Characters/Locke/Skins/Base/Locke_Coat_Mask.tex"),
+                        CreateSampler("FlowmapTex", "ASSETS/Shared/Materials/flowmap.tex"),
+                        CreateSampler("WaterShape", "ASSETS/Characters/Locke/Skins/Base/WaterShape.tex"),
+                        CreateSampler("Transition_State2", "ASSETS/Characters/Locke/Skins/Base/Locke_State.tex"),
+                        CreateSampler("AdditiveScrollTex", "ASSETS/Characters/Locke/Skins/Base/Locke_AdditionalScrollCombo.tex")
+                    },
+                    CreateParameter("FlowSpeed", new Vector4(-0.2f, 0f, 0f, 0f)),
+                    CreateParameter("Fresnel", Vector4.One),
+                    CreateParameter("Bloom", new Vector4(0.5f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "locke_base_main_tx_cm", "flowmap", "locke_additionalscrollcombo" });
+
+            Assert.Empty(resolution.Effects);
+        }
+
+        [Fact]
+        public void IsReferencedSampler_RejectsSuffixedBlackTexture()
+        {
+            Assert.False(SknMaterialTextureResolver.IsReferencedSampler(
+                new SknMaterialSampler(
+                    "Mask",
+                    "ASSETS/Characters/Brand/Skins/Skin53/black.SKINS_Brand_Skin53.tex")));
         }
 
         [Fact]
@@ -363,11 +833,49 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             }
         }
 
+        [Fact]
+        public void TryResolveReferencedTexturePath_FindsSharedMaterialTexture()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-shared-reference-{Guid.NewGuid():N}");
+            string sknPath = Path.Combine(
+                root,
+                "assets",
+                "characters",
+                "aurora",
+                "skins",
+                "skin0",
+                "aurora_base.skn");
+            string texturePath = Path.Combine(root, "assets", "shared", "materials", "flowmap.tex");
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(sknPath)!);
+                Directory.CreateDirectory(Path.GetDirectoryName(texturePath)!);
+                File.WriteAllBytes(sknPath, Array.Empty<byte>());
+                File.WriteAllBytes(texturePath, Array.Empty<byte>());
+
+                Assert.Equal(
+                    texturePath,
+                    SknMaterialTextureResolver.TryResolveTexturePath(
+                        sknPath,
+                        "ASSETS/Shared/Materials/flowmap.tex"),
+                    ignoreCase: true);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
         private static BinTree CreateSkinTree(
             string defaultTexturePath,
             BinTreeEmbedded materialOverride = null,
             BinTreeObject material = null,
-            string simpleSkinPath = null)
+            string simpleSkinPath = null,
+            BinTreeEmbedded materialOverride2 = null)
         {
             var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
             {
@@ -377,13 +885,16 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             {
                 meshPropertyList.Add(new BinTreeString(Fnv1a.HashLower("simpleSkin"), simpleSkinPath));
             }
-            if (materialOverride != null)
+            BinTreeEmbedded[] materialOverrides = new[] { materialOverride, materialOverride2 }
+                .Where(overrideValue => overrideValue != null)
+                .ToArray();
+            if (materialOverrides.Length > 0)
             {
                 meshPropertyList.Add(
                     new BinTreeUnorderedContainer(
                         Fnv1a.HashLower("materialOverride"),
                         BinPropertyType.Embedded,
-                        new[] { materialOverride }));
+                        materialOverrides));
             }
 
             var meshProperties = new BinTreeStruct(
@@ -418,7 +929,36 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                     new BinTreeUnorderedContainer(
                         Fnv1a.HashLower("samplerValues"),
                         BinPropertyType.Embedded,
-                        samplers)
+                         samplers)
+                });
+
+        private static BinTreeObject CreateMaterialWithParameters(
+            string path,
+            BinTreeEmbedded[] samplers,
+            params BinTreeEmbedded[] parameters) =>
+            new(
+                path,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        samplers),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("paramValues"),
+                        BinPropertyType.Embedded,
+                        parameters)
+                });
+
+        private static BinTreeEmbedded CreateParameter(string name, Vector4 value) =>
+            new(
+                0,
+                Fnv1a.HashLower("StaticMaterialShaderParamDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), name),
+                    new BinTreeVector4(Fnv1a.HashLower("value"), value)
                 });
 
         private static BinTreeEmbedded CreateSampler(string textureName, string texturePath) =>

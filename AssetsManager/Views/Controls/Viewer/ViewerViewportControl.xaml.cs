@@ -197,13 +197,13 @@ namespace AssetsManager.Views.Controls.Viewer
             // 4. Render loaded models
             foreach (var model in _loadedModels)
             {
-                _meshRenderer.Render(model, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render ground if visible
             if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
             {
-                _meshRenderer.Render(_groundModel, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(_groundModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render 3D Ground Grid if visible
@@ -215,7 +215,7 @@ namespace AssetsManager.Views.Controls.Viewer
             // Render skybox if visible
             if (_skyModel != null && _viewModel.ShowSkybox)
             {
-                _meshRenderer.Render(_skyModel, viewProj, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
+                _meshRenderer.Render(_skyModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render active VFX particles

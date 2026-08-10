@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Viewer;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -12,15 +14,29 @@ namespace AssetsManager.Services.Viewer.Resolvers
 {
     internal sealed record SknMaterialTextureResolution(
         string DefaultTextureKey,
-        IReadOnlyDictionary<string, string> Overrides);
+        IReadOnlyDictionary<string, string> Overrides,
+        IReadOnlyDictionary<string, ModelMaterialEffectDefinition> Effects);
+
+    internal sealed record SknMaterialSampler(
+        string TextureName,
+        string TexturePath);
+
+    internal sealed record SknMaterialDefinition(
+        IReadOnlyList<SknMaterialSampler> Samplers,
+        IReadOnlyDictionary<string, Vector4> Parameters);
 
     internal sealed record SknMaterialTextureMetadata(
         string DefaultTexturePath,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths)
+        IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths,
+        IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
         internal IEnumerable<string> ReferencedTexturePaths =>
             OverrideTexturePaths.Values
-                .Select(paths => paths.FirstOrDefault())
+                .SelectMany(paths => paths)
+                .Concat(OverrideMaterials.Values
+                    .SelectMany(material => material.Samplers
+                        .Where(SknMaterialTextureResolver.IsReferencedSampler)
+                        .Select(sampler => sampler.TexturePath)))
                 .Prepend(DefaultTexturePath)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
@@ -39,6 +55,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint SamplerValues = Fnv1a.HashLower("samplerValues");
         private static readonly uint TextureName = Fnv1a.HashLower("textureName");
         private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
+        private static readonly uint ParamValues = Fnv1a.HashLower("paramValues");
+        private static readonly uint ParameterName = Fnv1a.HashLower("name");
+        private static readonly uint ParameterValue = Fnv1a.HashLower("value");
 
         internal static SknMaterialTextureResolution Resolve(
             BinTree binTree,
@@ -47,8 +66,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static SknMaterialTextureMetadata ReadMetadata(BinTree binTree)
         {
-            var materialTexturePaths = BuildMaterialTexturePathMap(binTree);
+            var materialDefinitions = BuildMaterialDefinitionMap(binTree);
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             string defaultTexturePath = null;
 
             foreach (BinTreeObject obj in binTree.Objects.Values)
@@ -80,6 +100,12 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         continue;
                     }
 
+                    string normalizedSubmesh = NormalizeMaterialKey(submeshName);
+                    if (string.IsNullOrEmpty(normalizedSubmesh))
+                    {
+                        continue;
+                    }
+
                     var candidates = new List<string>(2);
                     if (TryGetString(entry, Texture, out string directTexturePath))
                     {
@@ -88,20 +114,31 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
                     if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
                         linkProperty is BinTreeObjectLink materialLink &&
-                        materialTexturePaths.TryGetValue(materialLink.Value, out string materialTexturePath))
+                        materialDefinitions.TryGetValue(materialLink.Value, out SknMaterialDefinition materialDefinition))
                     {
-                        candidates.Add(materialTexturePath);
+                        string materialTexturePath = SelectColorTexturePath(materialDefinition.Samplers);
+                        if (!string.IsNullOrWhiteSpace(materialTexturePath))
+                        {
+                            candidates.Add(materialTexturePath);
+                        }
+
+                        if (materialDefinition.Samplers.Count > 0)
+                        {
+                            overrideMaterials[normalizedSubmesh] = materialDefinition;
+                        }
                     }
 
-                    string normalizedSubmesh = NormalizeMaterialKey(submeshName);
-                    if (!string.IsNullOrEmpty(normalizedSubmesh) && candidates.Count > 0)
+                    if (candidates.Count > 0)
                     {
                         overrideTexturePaths[normalizedSubmesh] = candidates;
                     }
                 }
             }
 
-            return new SknMaterialTextureMetadata(defaultTexturePath, overrideTexturePaths);
+            return new SknMaterialTextureMetadata(
+                defaultTexturePath,
+                overrideTexturePaths,
+                overrideMaterials);
         }
 
         internal static SknMaterialTextureResolution Resolve(
@@ -110,6 +147,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         {
             var textureKeys = availableTextureKeys?.ToList() ?? new List<string>();
             var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var effects = new Dictionary<string, ModelMaterialEffectDefinition>(StringComparer.OrdinalIgnoreCase);
             foreach ((string submesh, IReadOnlyList<string> texturePaths) in metadata.OverrideTexturePaths)
             {
                 string textureKey = texturePaths
@@ -121,9 +159,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
+            foreach ((string submesh, SknMaterialDefinition material) in metadata.OverrideMaterials)
+            {
+                ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                    material,
+                    submesh,
+                    textureKeys,
+                    metadata.OverrideTexturePaths.Keys);
+                if (effect.Kind != ModelMaterialEffectKind.None)
+                {
+                    effects[submesh] = effect;
+                }
+            }
+
             return new SknMaterialTextureResolution(
                 MatchTextureKey(metadata.DefaultTexturePath, textureKeys),
-                overrides);
+                overrides,
+                effects);
         }
 
         internal static string TryResolveBinPath(string sknPath)
@@ -177,18 +229,41 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             string assetPath = assetTexturePath.Replace('\\', '/').TrimStart('/');
-            string prefix = $"assets/characters/{characterRoot.Name}/";
-            if (!assetPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            string assetsRoot = characterRoot.Parent?.Parent?.FullName;
+            string relativePath = null;
+            string candidateRoot = null;
+            string characterPrefix = $"assets/characters/{characterRoot.Name}/";
+            if (assetPath.StartsWith(characterPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                relativePath = assetPath[characterPrefix.Length..];
+                candidateRoot = characterRoot.FullName;
+            }
+            else if (assetPath.StartsWith("assets/shared/", StringComparison.OrdinalIgnoreCase) &&
+                     assetsRoot != null &&
+                     characterRoot.Parent?.Parent?.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                relativePath = assetPath["assets/".Length..];
+                candidateRoot = assetsRoot;
+            }
+            else if (assetPath.StartsWith("assets/characters/shared/", StringComparison.OrdinalIgnoreCase) &&
+                     assetsRoot != null &&
+                     characterRoot.Parent?.Parent?.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                relativePath = assetPath["assets/".Length..];
+                candidateRoot = assetsRoot;
+            }
+
+            if (relativePath == null || candidateRoot == null)
             {
                 return null;
             }
 
             string candidate = Path.GetFullPath(Path.Combine(
-                characterRoot.FullName,
-                assetPath[prefix.Length..].Replace('/', Path.DirectorySeparatorChar)));
+                candidateRoot,
+                relativePath.Replace('/', Path.DirectorySeparatorChar)));
             string extension = Path.GetExtension(candidate);
             string rootedPrefix =
-                characterRoot.FullName.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             return candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
                    (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) ||
                     extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
@@ -301,45 +376,135 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
         }
 
-        private static Dictionary<uint, string> BuildMaterialTexturePathMap(BinTree binTree)
+        private static Dictionary<uint, SknMaterialDefinition> BuildMaterialDefinitionMap(BinTree binTree)
         {
-            var result = new Dictionary<uint, string>();
+            var result = new Dictionary<uint, SknMaterialDefinition>();
             foreach ((uint pathHash, BinTreeObject obj) in binTree.Objects)
             {
-                if (obj.ClassHash != StaticMaterialClass ||
-                    !obj.Properties.TryGetValue(SamplerValues, out BinTreeProperty samplerProperty) ||
-                    samplerProperty is not BinTreeContainer samplers)
+                if (obj.ClassHash != StaticMaterialClass)
                 {
                     continue;
                 }
 
-                string bestTexturePath = null;
-                int bestRank = 0;
-                foreach (BinTreeProperty element in samplers.Elements)
+                List<SknMaterialSampler> samplers = ReadSamplers(obj);
+                Dictionary<string, Vector4> parameters = ReadParameters(obj);
+                if (samplers.Count > 0 || parameters.Count > 0)
                 {
-                    if (element is not BinTreeStruct sampler ||
-                        !TryGetString(sampler, TextureName, out string slotName) ||
-                        !TryGetString(sampler, TexturePath, out string texturePath))
-                    {
-                        continue;
-                    }
-
-                    int rank = RankColorSampler(slotName);
-                    if (rank > bestRank)
-                    {
-                        bestRank = rank;
-                        bestTexturePath = texturePath;
-                    }
-                }
-
-                if (bestTexturePath != null)
-                {
-                    result[pathHash] = bestTexturePath;
+                    result[pathHash] = new SknMaterialDefinition(samplers, parameters);
                 }
             }
 
             return result;
         }
+
+        private static List<SknMaterialSampler> ReadSamplers(BinTreeObject materialObject)
+        {
+            var result = new List<SknMaterialSampler>();
+            if (!materialObject.Properties.TryGetValue(SamplerValues, out BinTreeProperty property) ||
+                property is not BinTreeContainer samplers)
+            {
+                return result;
+            }
+
+            foreach (BinTreeProperty element in samplers.Elements)
+            {
+                if (element is BinTreeStruct sampler &&
+                    TryGetString(sampler, TextureName, out string textureName) &&
+                    TryGetString(sampler, TexturePath, out string texturePath))
+                {
+                    result.Add(new SknMaterialSampler(textureName, texturePath));
+                }
+            }
+
+            return result;
+        }
+
+        private static Dictionary<string, Vector4> ReadParameters(BinTreeObject materialObject)
+        {
+            var result = new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase);
+            if (!materialObject.Properties.TryGetValue(ParamValues, out BinTreeProperty property) ||
+                property is not BinTreeContainer parameters)
+            {
+                return result;
+            }
+
+            foreach (BinTreeProperty element in parameters.Elements)
+            {
+                if (element is not BinTreeStruct parameter ||
+                    !TryGetString(parameter, ParameterName, out string name) ||
+                    !parameter.Properties.TryGetValue(ParameterValue, out BinTreeProperty value) ||
+                    value is not BinTreeVector4 vector)
+                {
+                    continue;
+                }
+
+                result[name] = vector.Value;
+            }
+
+            return result;
+        }
+
+        private static string SelectColorTexturePath(IReadOnlyList<SknMaterialSampler> samplers) =>
+            (samplers ?? Array.Empty<SknMaterialSampler>())
+                .Where(sampler => RankColorSampler(sampler.TextureName) > 0)
+                .OrderByDescending(sampler => RankColorSampler(sampler.TextureName))
+                .Select(sampler => sampler.TexturePath)
+                .FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+
+        internal static bool IsReferencedSampler(SknMaterialSampler sampler) =>
+            sampler != null &&
+            !string.IsNullOrWhiteSpace(sampler.TexturePath) &&
+            !IsNeutralTexturePath(sampler.TexturePath) &&
+            (RankColorSampler(sampler.TextureName) > 0 ||
+             IsEffectSampler(sampler.TextureName));
+
+        private static bool IsEffectSampler(string textureName)
+        {
+            string normalized = NormalizeToken(textureName);
+            return normalized is "additivescrolltex" or
+                "additivescrollmask" or
+                "scrolltex" or
+                "scrolltexmask" or
+                "scrolltexture" or
+                "scrolltexturemask" or
+                "scrollmask" or
+                "mask" or
+                "masktexturered" or
+                "masktexturegreen" or
+                "masktextureblue" or
+                "masktexture" or
+                "masktex" or
+                "fresnelmask" or
+                "bloommask" or
+                "patternmask" or
+                "emissionmask" or
+                "emissivemask" or
+                "flowmaptex" or
+                "flowmap" or
+                "flowmapmask" or
+                "flowtexture" or
+                "flowmaptexture" or
+                "flowmask" or
+                "noisedisturb" or
+                "noisetexture" or
+                "transitionpatterntexture" or
+                "transitionstate2" or
+                "dissolvetex" or
+                "dissolvetexture" or
+                "dissolvegradienttexture" or
+                "dissolvetexture2" or
+                "bloommasktexture" or
+                "outlinebloommask" or
+                "bloomtexture" or
+                "emissiontexture" or
+                "emissionrtexture" or
+                "emissivetexture" or
+                "emissionrdistortiongtexture";
+        }
+
+        internal static bool IsNeutralTexturePath(string texturePath) =>
+            NormalizeToken(PathUtils.TruncateAtDot(
+                Path.GetFileNameWithoutExtension(texturePath ?? string.Empty))) == "black";
 
         private static int RankColorSampler(string slotName)
         {
@@ -381,7 +546,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return false;
         }
 
-        private static string MatchTextureKey(string texturePath, IReadOnlyList<string> availableKeys)
+        internal static string MatchTextureKey(string texturePath, IReadOnlyList<string> availableKeys)
         {
             if (string.IsNullOrWhiteSpace(texturePath))
             {
@@ -415,7 +580,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                    normalized.Contains("loading");
         }
 
-        private static string NormalizeToken(string value) =>
+        internal static string NormalizeToken(string value) =>
             Regex.Replace(value?.ToLowerInvariant() ?? string.Empty, @"[^a-z0-9]", string.Empty);
 
         private static string NormalizeAssetPath(string value) =>

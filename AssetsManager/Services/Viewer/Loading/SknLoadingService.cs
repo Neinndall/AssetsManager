@@ -51,7 +51,10 @@ namespace AssetsManager.Services.Viewer.Loading
                     }
 
                     var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath, cancellationToken);
-                    var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, false);
+                    // Chroma folders contain the replacement color maps, while the exact skin BIN
+                    // may reference shared/parent-skin effect maps. Load those dependencies as well;
+                    // the dictionary keeps the chroma files authoritative when names collide.
+                    var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, true);
 
                     _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
                     return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath, cancellationToken);
@@ -234,6 +237,12 @@ namespace AssetsManager.Services.Viewer.Loading
                     defaultTextureKey,
                     materialTextures?.Overrides,
                     loadedTextures);
+                string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
+                ModelMaterialEffectDefinition materialEffect =
+                    materialTextures?.Effects != null &&
+                    materialTextures.Effects.TryGetValue(normalizedMaterialName, out ModelMaterialEffectDefinition effect)
+                        ? effect
+                        : ModelMaterialEffectDefinition.None;
 
                 dataList.Add(new SubmeshData(
                     materialName,
@@ -241,7 +250,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     triangleIndices,
                     subTexCoords.ToArray(),
                     sourceVertexIndices.ToArray(),
-                    initialMatchingKey));
+                    initialMatchingKey,
+                    materialEffect));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -285,7 +295,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         SourceVertexIndices = data.SourceVertexIndices,
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
-                        SelectedTextureName = data.TexturePath
+                        SelectedTextureName = data.TexturePath,
+                        MaterialEffect = data.MaterialEffect
                     };
 
                     TextureUtils.UpdateMaterial(modelPart);
@@ -362,7 +373,8 @@ namespace AssetsManager.Services.Viewer.Loading
                     SknMaterialTextureResolver.Resolve(metadata, loadedTextures.Keys);
                 _logService.LogDebug(
                     $"Loaded skin texture metadata from '{Path.GetFileName(skinBinPath)}': " +
-                    $"default='{resolution.DefaultTextureKey ?? "none"}', overrides={resolution.Overrides.Count}.");
+                    $"default='{resolution.DefaultTextureKey ?? "none"}', " +
+                    $"overrides={resolution.Overrides.Count}, effects={resolution.Effects.Count}.");
                 return resolution;
             }
             catch (Exception ex)
@@ -378,7 +390,8 @@ namespace AssetsManager.Services.Viewer.Loading
             int[] TriangleIndices,
             System.Windows.Point[] TextureCoordinates,
             int[] SourceVertexIndices,
-            string TexturePath);
+            string TexturePath,
+            ModelMaterialEffectDefinition MaterialEffect);
 
     }
 }

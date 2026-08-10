@@ -52,6 +52,35 @@ namespace BenchmarkApp
                 InspectSknDiagnostic.Run(targetPath);
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "champion-bin-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                ChampionSkinBinDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "champion-bin-structure-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                string rootPath = args.Length > 1 ? args[1] : PbeDirectory;
+                string hashesPath = args.Length > 2
+                    ? args[2]
+                    : Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AssetsManager",
+                        "hashes");
+                string filter = args.Length > 3 &&
+                                 !string.IsNullOrWhiteSpace(args[3]) &&
+                                 !string.Equals(args[3], "-", StringComparison.Ordinal) &&
+                                 !string.Equals(args[3], "*", StringComparison.Ordinal)
+                    ? args[3]
+                    : null;
+                int maxBins = args.Length > 4 && int.TryParse(args[4], out int parsedMax) ? parsedMax : 12;
+                ChampionSkinBinStructureDiagnostic.Run(rootPath, hashesPath, filter, Math.Max(1, maxBins));
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "champion-texture-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                ChampionTextureDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "mapgeo-memory", StringComparison.OrdinalIgnoreCase))
             {
                 string mapGeoPath = args.Length > 1 ? args[1] : null;

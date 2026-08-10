@@ -65,6 +65,7 @@ namespace AssetsManager.Views.Models.Viewer
         internal bool UsesBakedDiffuse { get; set; }
         internal byte[] VertexColors { get; set; }
         public MapLightmapBinding Lightmap { get; set; }
+        public ModelMaterialEffectDefinition MaterialEffect { get; set; } = ModelMaterialEffectDefinition.None;
 
         public Dictionary<string, BitmapSource> AllTextures
         {
@@ -136,6 +137,7 @@ namespace AssetsManager.Views.Models.Viewer
             SourceVertexIndices = null;
             VertexColors = null;
             Lightmap = null;
+            MaterialEffect = ModelMaterialEffectDefinition.None;
 
             PropertyChanged = null;
         }

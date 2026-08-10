@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
@@ -21,6 +22,39 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uViewProj;
         private int _uWorld;
         private int _uTex;
+        private int _uEffectTex;
+        private int _uEffectMask;
+        private int _uEmissionTex;
+        private int _uEmissionMask;
+        private int _uEffectKind;
+        private int _uHasEffectTex;
+        private int _uHasEmissionTex;
+        private int _uHasEmissionMask;
+        private int _uEffectTime;
+        private int _uEffectScrollSpeed;
+        private int _uEffectTiling;
+        private int _uEffectColor;
+        private int _uEffectStrength;
+        private int _uFlowIntensity;
+        private int _uCameraPosition;
+        private int _uFresnelColor;
+        private int _uFresnelPower;
+        private int _uFresnelStrength;
+        private int _uDissolveThreshold;
+        private int _uDissolveSoftness;
+        private int _uBloomColor;
+        private int _uBloomIntensity;
+        private int _uEmissionScrollSpeed;
+        private int _uEmissionTiling;
+        private int _uEmissionColor;
+        private int _uEmissionStrength;
+        private int _uEmissionChannel;
+        private int _uWaveDirection;
+        private int _uWaveSpeed;
+        private int _uWaveFrequency;
+        private int _uWaveIntensity;
+        private int _uFresnelNoiseTiling;
+        private int _uFresnelNoiseSpeed;
         private int _uLightDir;
         private int _uLightColor;
         private int _uLightDir2;
@@ -34,6 +68,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uUsesBakedDiffuse;
         private int _uHasVertexColor;
         private bool _ready;
+        private long _startTimestamp;
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
@@ -43,6 +78,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         public void Initialize(GL gl)
         {
             _gl = gl;
+            _startTimestamp = Stopwatch.GetTimestamp();
             IntPtr proc = gl.Context.GetProcAddress("glDrawElements");
             if (proc != IntPtr.Zero)
             {
@@ -63,6 +99,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         public void Render(
             SceneModel model,
             Matrix4x4 viewProj,
+            Vector3 cameraPosition,
             Vector3 lightDir,
             Vector3 lightColor,
             Vector3 lightDir2,
@@ -91,8 +128,16 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uLightDir2, NormalizeOrDefault(lightDir2));
             _gl.Uniform3(_uLightColor2, lightColor2);
             _gl.Uniform3(_uAmbient, ambientColor);
+            _gl.Uniform3(_uCameraPosition, cameraPosition);
             _gl.Uniform1(_uTex, 0);
             _gl.Uniform1(_uLightmap, 1);
+            _gl.Uniform1(_uEffectTex, 2);
+            _gl.Uniform1(_uEffectMask, 3);
+            _gl.Uniform1(_uEmissionTex, 4);
+            _gl.Uniform1(_uEmissionMask, 5);
+            _gl.Uniform1(
+                _uEffectTime,
+                (float)((Stopwatch.GetTimestamp() - _startTimestamp) / (double)Stopwatch.Frequency));
             _gl.Uniform1(_uLightMapColorScale, lightmapScale);
 
             _gl.Enable(EnableCap.DepthTest);
@@ -119,6 +164,39 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uWorld = gl.GetUniformLocation(_program, "uWorld");
             _uTex = gl.GetUniformLocation(_program, "uTex");
+            _uEffectTex = gl.GetUniformLocation(_program, "uEffectTex");
+            _uEffectMask = gl.GetUniformLocation(_program, "uEffectMask");
+            _uEmissionTex = gl.GetUniformLocation(_program, "uEmissionTex");
+            _uEmissionMask = gl.GetUniformLocation(_program, "uEmissionMask");
+            _uEffectKind = gl.GetUniformLocation(_program, "uEffectKind");
+            _uHasEffectTex = gl.GetUniformLocation(_program, "uHasEffectTex");
+            _uHasEmissionTex = gl.GetUniformLocation(_program, "uHasEmissionTex");
+            _uHasEmissionMask = gl.GetUniformLocation(_program, "uHasEmissionMask");
+            _uEffectTime = gl.GetUniformLocation(_program, "uEffectTime");
+            _uEffectScrollSpeed = gl.GetUniformLocation(_program, "uEffectScrollSpeed");
+            _uEffectTiling = gl.GetUniformLocation(_program, "uEffectTiling");
+            _uEffectColor = gl.GetUniformLocation(_program, "uEffectColor");
+            _uEffectStrength = gl.GetUniformLocation(_program, "uEffectStrength");
+            _uFlowIntensity = gl.GetUniformLocation(_program, "uFlowIntensity");
+            _uCameraPosition = gl.GetUniformLocation(_program, "uCameraPosition");
+            _uFresnelColor = gl.GetUniformLocation(_program, "uFresnelColor");
+            _uFresnelPower = gl.GetUniformLocation(_program, "uFresnelPower");
+            _uFresnelStrength = gl.GetUniformLocation(_program, "uFresnelStrength");
+            _uDissolveThreshold = gl.GetUniformLocation(_program, "uDissolveThreshold");
+            _uDissolveSoftness = gl.GetUniformLocation(_program, "uDissolveSoftness");
+            _uBloomColor = gl.GetUniformLocation(_program, "uBloomColor");
+            _uBloomIntensity = gl.GetUniformLocation(_program, "uBloomIntensity");
+            _uEmissionScrollSpeed = gl.GetUniformLocation(_program, "uEmissionScrollSpeed");
+            _uEmissionTiling = gl.GetUniformLocation(_program, "uEmissionTiling");
+            _uEmissionColor = gl.GetUniformLocation(_program, "uEmissionColor");
+            _uEmissionStrength = gl.GetUniformLocation(_program, "uEmissionStrength");
+            _uEmissionChannel = gl.GetUniformLocation(_program, "uEmissionChannel");
+            _uWaveDirection = gl.GetUniformLocation(_program, "uWaveDirection");
+            _uWaveSpeed = gl.GetUniformLocation(_program, "uWaveSpeed");
+            _uWaveFrequency = gl.GetUniformLocation(_program, "uWaveFrequency");
+            _uWaveIntensity = gl.GetUniformLocation(_program, "uWaveIntensity");
+            _uFresnelNoiseTiling = gl.GetUniformLocation(_program, "uFresnelNoiseTiling");
+            _uFresnelNoiseSpeed = gl.GetUniformLocation(_program, "uFresnelNoiseSpeed");
             _uLightDir = gl.GetUniformLocation(_program, "uLightDir");
             _uLightColor = gl.GetUniformLocation(_program, "uLightColor");
             _uLightDir2 = gl.GetUniformLocation(_program, "uLightDir2");
@@ -167,12 +245,58 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
 
+                ModelMaterialEffectDefinition effect =
+                    part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+                _gl.Uniform1(_uEffectKind, (int)effect.Kind);
+                _gl.Uniform1(_uHasEffectTex, resources.EffectTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_uHasEmissionTex, resources.EmissionTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_uHasEmissionMask, resources.EmissionMaskTexture != 0 ? 1 : 0);
+                _gl.Uniform2(_uEffectScrollSpeed, effect.ScrollSpeed.X, effect.ScrollSpeed.Y);
+                _gl.Uniform2(_uEffectTiling, effect.Tiling.X, effect.Tiling.Y);
+                _gl.Uniform4(_uEffectColor, effect.Color.X, effect.Color.Y, effect.Color.Z, effect.Color.W);
+                _gl.Uniform1(_uEffectStrength, effect.Strength);
+                _gl.Uniform1(_uFlowIntensity, effect.FlowIntensity);
+                _gl.Uniform4(_uFresnelColor, effect.FresnelColor.X, effect.FresnelColor.Y, effect.FresnelColor.Z, effect.FresnelColor.W);
+                _gl.Uniform1(_uFresnelPower, effect.FresnelPower);
+                _gl.Uniform1(_uFresnelStrength, effect.FresnelStrength);
+                _gl.Uniform1(_uDissolveThreshold, effect.DissolveThreshold);
+                _gl.Uniform1(_uDissolveSoftness, effect.DissolveSoftness);
+                _gl.Uniform4(_uBloomColor, effect.BloomColor.X, effect.BloomColor.Y, effect.BloomColor.Z, effect.BloomColor.W);
+                _gl.Uniform1(_uBloomIntensity, effect.BloomIntensity);
+                _gl.Uniform2(_uEmissionScrollSpeed, effect.EmissionScrollSpeed.X, effect.EmissionScrollSpeed.Y);
+                _gl.Uniform2(_uEmissionTiling, effect.EmissionTiling.X, effect.EmissionTiling.Y);
+                _gl.Uniform4(_uEmissionColor, effect.EmissionColor.X, effect.EmissionColor.Y, effect.EmissionColor.Z, effect.EmissionColor.W);
+                _gl.Uniform1(_uEmissionStrength, effect.EmissionStrength);
+                _gl.Uniform1(_uEmissionChannel, effect.EmissionChannel);
+                _gl.Uniform3(_uWaveDirection, effect.WaveDirection);
+                _gl.Uniform1(_uWaveSpeed, effect.WaveSpeed);
+                _gl.Uniform1(_uWaveFrequency, effect.WaveFrequency);
+                _gl.Uniform1(_uWaveIntensity, effect.WaveIntensity);
+                _gl.Uniform2(_uFresnelNoiseTiling, effect.FresnelNoiseTiling.X, effect.FresnelNoiseTiling.Y);
+                _gl.Uniform2(_uFresnelNoiseSpeed, effect.FresnelNoiseSpeed.X, effect.FresnelNoiseSpeed.Y);
+
                 bool hasLightmap = resources.LightmapTexture != 0 && resources.LightmapVbo != 0;
                 _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);
                 _gl.ActiveTexture(TextureUnit.Texture1);
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
                     hasLightmap ? resources.LightmapTexture : 0);
+                _gl.ActiveTexture(TextureUnit.Texture2);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    resources.EffectTexture);
+                _gl.ActiveTexture(TextureUnit.Texture3);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    resources.EffectMaskTexture != 0 ? resources.EffectMaskTexture : _resources.WhiteTexture);
+                _gl.ActiveTexture(TextureUnit.Texture4);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    resources.EmissionTexture);
+                _gl.ActiveTexture(TextureUnit.Texture5);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    resources.EmissionMaskTexture != 0 ? resources.EmissionMaskTexture : _resources.WhiteTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
 
                 _drawElements?.Invoke(
@@ -185,6 +309,14 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
+            _gl.ActiveTexture(TextureUnit.Texture5);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _gl.ActiveTexture(TextureUnit.Texture4);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _gl.ActiveTexture(TextureUnit.Texture3);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
+            _gl.ActiveTexture(TextureUnit.Texture2);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture1);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture0);
