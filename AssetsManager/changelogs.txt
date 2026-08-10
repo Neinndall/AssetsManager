@@ -51,6 +51,8 @@ Improvements
   - Viewer / Removed the unused WPF lighting objects from the OpenGL viewport; Studio Lighting now has one effective lighting path through the OpenGL renderer.
   - Viewer / Model material effects now classify each BIN-linked submesh conservatively and no longer approximate complex masked vertex deformation as a simple wave.
   - Viewer / Model effects now keep BIN-authored Bloom from overwhelming masked body details.
+  - Viewer / Model effects now require an explicit emission signal before applying generic Bloom, preventing gradient/dissolve materials such as Aatrox skin0 from being washed out.
+  - Viewer / Model material resolution now recognizes real Scroll/Dissolve/Flow sampler aliases and loads their BIN-referenced dependencies for chroma texture directories.
   - Viewer / Map Environment now selects each map's base visibility layer to prevent overlapping terrain variants.
   - Viewer / Map Environment now renders baked terrain, FlowMap water and vertex-colored foliage correctly.
   - Viewer actions remain responsive during startup and graphics resources are fully released when leaving the view.

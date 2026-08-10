@@ -15,7 +15,30 @@ namespace AssetsManager.Services.Viewer.Resolvers
     internal sealed record SknMaterialTextureResolution(
         string DefaultTextureKey,
         IReadOnlyDictionary<string, string> Overrides,
-        IReadOnlyDictionary<string, ModelMaterialEffectDefinition> Effects);
+        IReadOnlyDictionary<string, ModelMaterialEffectDefinition> Effects,
+        IReadOnlySet<string> MaterialOverrideKeys,
+        ModelMaterialEffectDefinition DefaultEffect)
+    {
+        internal ModelMaterialEffectDefinition ResolveEffect(string normalizedSubmeshName)
+        {
+            if (string.IsNullOrEmpty(normalizedSubmeshName))
+            {
+                return DefaultEffect;
+            }
+
+            if (Effects != null && Effects.TryGetValue(normalizedSubmeshName, out ModelMaterialEffectDefinition effect))
+            {
+                return effect;
+            }
+
+            if (MaterialOverrideKeys != null && !MaterialOverrideKeys.Contains(normalizedSubmeshName))
+            {
+                return DefaultEffect;
+            }
+
+            return ModelMaterialEffectDefinition.None;
+        }
+    }
 
     internal sealed record SknMaterialSampler(
         string TextureName,
@@ -27,6 +50,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
     internal sealed record SknMaterialTextureMetadata(
         string DefaultTexturePath,
+        SknMaterialDefinition DefaultMaterial,
         IReadOnlyDictionary<string, IReadOnlyList<string>> OverrideTexturePaths,
         IReadOnlyDictionary<string, SknMaterialDefinition> OverrideMaterials)
     {
@@ -37,6 +61,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     .SelectMany(material => material.Samplers
                         .Where(SknMaterialTextureResolver.IsReferencedSampler)
                         .Select(sampler => sampler.TexturePath)))
+                .Concat((DefaultMaterial?.Samplers ?? Array.Empty<SknMaterialSampler>())
+                    .Where(SknMaterialTextureResolver.IsReferencedSampler)
+                    .Select(sampler => sampler.TexturePath))
                 .Prepend(DefaultTexturePath)
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
@@ -70,6 +97,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             string defaultTexturePath = null;
+            SknMaterialDefinition defaultMaterial = null;
 
             foreach (BinTreeObject obj in binTree.Objects.Values)
             {
@@ -84,6 +112,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     TryGetString(meshProperties, Texture, out string texturePath))
                 {
                     defaultTexturePath = texturePath;
+                }
+
+                if (defaultMaterial == null &&
+                    meshProperties.Properties.TryGetValue(Material, out BinTreeProperty materialProperty) &&
+                    materialProperty is BinTreeObjectLink defaultMaterialLink &&
+                    materialDefinitions.TryGetValue(defaultMaterialLink.Value, out SknMaterialDefinition linkedMaterial))
+                {
+                    defaultMaterial = linkedMaterial;
                 }
 
                 if (!meshProperties.Properties.TryGetValue(MaterialOverride, out BinTreeProperty overrideProperty) ||
@@ -137,6 +173,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             return new SknMaterialTextureMetadata(
                 defaultTexturePath,
+                defaultMaterial,
                 overrideTexturePaths,
                 overrideMaterials);
         }
@@ -172,10 +209,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
             }
 
+            ModelMaterialEffectDefinition defaultEffect = metadata.DefaultMaterial == null
+                ? ModelMaterialEffectDefinition.None
+                : SknMaterialEffectResolver.Resolve(
+                    metadata.DefaultMaterial,
+                    string.Empty,
+                    textureKeys,
+                    metadata.OverrideTexturePaths.Keys);
+
             return new SknMaterialTextureResolution(
+                MatchTextureKey(
+                    SelectColorTexturePath(metadata.DefaultMaterial?.Samplers),
+                    textureKeys) ??
                 MatchTextureKey(metadata.DefaultTexturePath, textureKeys),
                 overrides,
-                effects);
+                effects,
+                metadata.OverrideMaterials.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+                defaultEffect);
         }
 
         internal static string TryResolveBinPath(string sknPath)

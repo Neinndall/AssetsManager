@@ -239,10 +239,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     loadedTextures);
                 string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
                 ModelMaterialEffectDefinition materialEffect =
-                    materialTextures?.Effects != null &&
-                    materialTextures.Effects.TryGetValue(normalizedMaterialName, out ModelMaterialEffectDefinition effect)
-                        ? effect
-                        : ModelMaterialEffectDefinition.None;
+                    materialTextures?.ResolveEffect(normalizedMaterialName) ?? ModelMaterialEffectDefinition.None;
 
                 dataList.Add(new SubmeshData(
                     materialName,

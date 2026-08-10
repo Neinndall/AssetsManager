@@ -73,6 +73,76 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_UsesLinkedSkinMaterialAsDefaultBeforeLegacyTexture()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Skin33/Materials/Default_Head";
+            const string legacyTexturePath =
+                "ASSETS/Characters/Aatrox/Skins/Skin33/Aatrox_Skin33_Sword_VFX_TX_CM.tex";
+            const string materialTexturePath =
+                "ASSETS/Characters/Aatrox/Skins/Skin33/Aatrox_Skin33_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                legacyTexturePath,
+                material: CreateMaterial(
+                    materialPath,
+                    CreateSampler("Diffuse_Texture", materialTexturePath)),
+                defaultMaterialPath: materialPath);
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "aatrox_skin33_sword_vfx_tx_cm", "aatrox_skin33_tx_cm" });
+
+            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultTextureKey);
+            Assert.Contains(
+                materialTexturePath,
+                SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_HandlesMultiSubmeshModelWithDefaultMaterialAndOverrides()
+        {
+            const string defaultMaterialPath = "Characters/Aatrox/Skins/Skin33/Materials/Base_Body";
+            const string swordMaterialPath = "Characters/Aatrox/Skins/Skin33/Materials/Sword";
+            const string bodyTexturePath = "ASSETS/Characters/Aatrox/Skins/Skin33/Aatrox_Skin33_TX_CM.tex";
+            const string swordTexturePath = "ASSETS/Characters/Aatrox/Skins/Skin33/Aatrox_Skin33_Sword_TX_CM.tex";
+            const string legacyTexturePath = "ASSETS/Characters/Aatrox/Skins/Skin33/Aatrox_Skin33_VFX_TX_CM.tex";
+
+            BinTreeEmbedded swordOverride = CreateOverride(
+                "Sword",
+                new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(swordMaterialPath)));
+
+            BinTree tree = CreateSkinTree(
+                legacyTexturePath,
+                swordOverride,
+                CreateMaterial(
+                    defaultMaterialPath,
+                    CreateSampler("Diffuse_Texture", bodyTexturePath)),
+                defaultMaterialPath: defaultMaterialPath,
+                materialOverride2: null);
+
+            // Add the sword material object to the bin tree
+            BinTreeObject swordMaterialObj = CreateMaterial(
+                swordMaterialPath,
+                CreateSampler("Diffuse_Texture", swordTexturePath));
+            tree.Objects[Fnv1a.HashLower(swordMaterialPath)] = swordMaterialObj;
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "aatrox_skin33_tx_cm", "aatrox_skin33_sword_tx_cm", "aatrox_skin33_vfx_tx_cm" });
+
+            // Submesh 0 (Body/Default) falls back to DefaultTextureKey
+            Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultTextureKey);
+
+            // Submesh 1 (Sword) resolves via MaterialOverride
+            Assert.True(resolution.Overrides.ContainsKey("sword"));
+            Assert.Equal("aatrox_skin33_sword_tx_cm", resolution.Overrides["sword"]);
+
+            // Verified metadata contains both referenced texture paths
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
+            Assert.Contains(bodyTexturePath, metadata.ReferencedTexturePaths);
+            Assert.Contains(swordTexturePath, metadata.ReferencedTexturePaths);
+        }
+
+        [Fact]
         public void Resolve_FallsBackToLinkedMaterialWhenDirectTextureIsUnavailable()
         {
             const string materialPath = "Characters/Belveth/Skins/Skin29/Materials/Head";
@@ -875,7 +945,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             BinTreeEmbedded materialOverride = null,
             BinTreeObject material = null,
             string simpleSkinPath = null,
-            BinTreeEmbedded materialOverride2 = null)
+            BinTreeEmbedded materialOverride2 = null,
+            string defaultMaterialPath = null)
         {
             var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
             {
@@ -884,6 +955,12 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             if (!string.IsNullOrWhiteSpace(simpleSkinPath))
             {
                 meshPropertyList.Add(new BinTreeString(Fnv1a.HashLower("simpleSkin"), simpleSkinPath));
+            }
+            if (!string.IsNullOrWhiteSpace(defaultMaterialPath))
+            {
+                meshPropertyList.Add(new BinTreeObjectLink(
+                    Fnv1a.HashLower("material"),
+                    Fnv1a.HashLower(defaultMaterialPath)));
             }
             BinTreeEmbedded[] materialOverrides = new[] { materialOverride, materialOverride2 }
                 .Where(overrideValue => overrideValue != null)
