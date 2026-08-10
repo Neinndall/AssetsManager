@@ -372,7 +372,7 @@ namespace AssetsManager.Views
             _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
             string internalDomain = includeBin ? "BIN" : "RST";
             
-            string currentStage = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory..." : "Preparing internal hash scan...";
+            string currentStage = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory" : "Preparing internal hash scan";
             long totalChecked = 0;
             int totalWads = 0;
             int foundMatches = 0;

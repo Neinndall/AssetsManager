@@ -68,7 +68,6 @@ namespace AssetsManager.Services.Hashes
                     {
                         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
                     }
-                    await WriteCatalogSupplementsAsync(_cached, cancellationToken);
                     return _cached;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -78,7 +77,6 @@ namespace AssetsManager.Services.Hashes
                         await using Stream cachedFile = File.OpenRead(cachePath);
                         _cached = Parse(cachedFile);
                         _log.LogWarning($"Meta Schema download failed; cached version '{_cached.Version}' is being used: {ex.Message}");
-                        await WriteCatalogSupplementsAsync(_cached, cancellationToken);
                         return _cached;
                     }
                     _log.LogWarning($"Meta Schema is unavailable; runtime BIN inventory will still be used: {ex.Message}");
@@ -204,43 +202,6 @@ namespace AssetsManager.Services.Hashes
                     typeContexts[hash] = contexts;
                 }
                 contexts.Add(context);
-            }
-        }
-
-        private async Task WriteCatalogSupplementsAsync(MetaSchemaHashSnapshot snapshot, CancellationToken cancellationToken)
-        {
-            await WriteSupplementAsync("hashes.metaclasses.txt", snapshot.Version, snapshot.KnownTypeEntries, cancellationToken);
-            await WriteSupplementAsync("hashes.metafields.txt", snapshot.Version, snapshot.KnownFieldEntries, cancellationToken);
-        }
-
-        private async Task WriteSupplementAsync(
-            string fileName,
-            string version,
-            IReadOnlyDictionary<ulong, string> entries,
-            CancellationToken cancellationToken)
-        {
-            try
-            {
-                Directory.CreateDirectory(_directories.HashesPath);
-                string path = Path.Combine(_directories.HashesPath, fileName);
-                IEnumerable<string> lines = entries
-                    .OrderBy(pair => pair.Key)
-                    .Select(pair => $"{pair.Key:x8} {pair.Value}")
-                    .Prepend($"# meta-schema {version}");
-                string temporaryPath = path + ".tmp";
-                try
-                {
-                    await File.WriteAllLinesAsync(temporaryPath, lines, cancellationToken);
-                    File.Move(temporaryPath, path, true);
-                }
-                finally
-                {
-                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _log.LogWarning($"Failed to write meta catalog supplement '{fileName}': {ex.Message}");
             }
         }
 

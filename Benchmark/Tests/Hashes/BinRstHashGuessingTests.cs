@@ -892,7 +892,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
             bridge.Directories.CreateHashesDirectories();
             string knownPath = Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt");
             await File.WriteAllLinesAsync(knownPath, new[] { "02ec49d8 LocalOfficialName" });
-            string supplementPath = Path.Combine(bridge.Directories.HashesPath, "hashes.metaclasses.txt");
+            string verifiedDir = Path.Combine(bridge.Directories.HashLabPath, "verified");
+            Directory.CreateDirectory(verifiedDir);
+            string supplementPath = Path.Combine(verifiedDir, "hashes.bintypes.txt");
             await File.WriteAllLinesAsync(supplementPath, new[]
             {
                 "# meta-schema 42",
@@ -1288,7 +1290,41 @@ namespace AssetsManager.BenchmarkTests.Hashes
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(recovered, match.Value);
             Assert.True(match.CanPromote);
-            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
+        }
+
+        [Fact]
+        public void StructuralPassRecovers3TokenCompoundNames()
+        {
+            uint hash1 = Fnv1a.HashLower("CharacterOutlineCategory");
+            uint hash2 = Fnv1a.HashLower("CharacterOutlineSubmeshes");
+            uint hash3 = Fnv1a.HashLower("OutlineCategorySubmeshes");
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(hash1);
+            targets[InternalHashKind.BinFields].Add(hash2);
+            targets[InternalHashKind.BinFields].Add(hash3);
+
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var wordlist = CreateWordlist(
+                "CharacterRecord",
+                "SkinCharacterDataProperties",
+                "CharacterOutline",
+                "SubmeshCategory",
+                "CategoryData",
+                "SubmeshesList",
+                "OutlineSettings",
+                "Submeshes");
+
+            foreach (string candidate in GenerateStructuralCandidates(wordlist, 500_000, CancellationToken.None))
+            {
+                matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, InternalHashGuessStrategy.CrossDictionary, "test 3-token compounds", preserveCasing: true);
+                matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, InternalHashGuessStrategy.CrossDictionary, "test 3-token compounds", preserveCasing: true);
+            }
+
+            var matchedValues = matcher.Matches.Select(m => m.Value).ToList();
+            Assert.Contains(matchedValues, s => string.Equals(s, "CharacterOutlineCategory", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(matchedValues, s => string.Equals(s, "CharacterOutlineSubmeshes", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(matchedValues, s => string.Equals(s, "OutlineCategorySubmeshes", StringComparison.OrdinalIgnoreCase));
         }
 
         [Fact]

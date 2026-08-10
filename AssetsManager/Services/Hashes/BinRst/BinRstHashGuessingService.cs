@@ -203,7 +203,7 @@ namespace AssetsManager.Services.Hashes
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
-            progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
+            progress?.Report(CreateProgress(matcher, stopwatch, "Loading game hashes dictionary", 0));
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             int scanned = 0;
@@ -217,6 +217,7 @@ namespace AssetsManager.Services.Hashes
             {
                 await Task.Run(() =>
                 {
+                    progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN context files", 0, 0, wads.Length));
                     for (int index = 0; index < wads.Length && matcher.Remaining > 0 && !ContentBudgetExceeded(); index++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -286,7 +287,8 @@ namespace AssetsManager.Services.Hashes
                         {
                             _log.LogError(ex, $"Internal Hash Lab could not scan WAD '{wadPath}'.");
                         }
-                        progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN and text content", scanned, index + 1, wads.Length));
+                        string stageText = includeBin ? "Scanning BIN context files" : "Scanning RST text content";
+                        progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, wads.Length));
                     }
                 }, cancellationToken);
 
@@ -296,7 +298,13 @@ namespace AssetsManager.Services.Hashes
                     .Where(file =>
                     {
                         string ext = Path.GetExtension(file).ToLowerInvariant();
-                        return ext is ".exe" or ".dll" or ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin" or ".css" or ".js" or ".html" or ".log" or ".info";
+                        string fileName = Path.GetFileName(file).ToLowerInvariant();
+                        if (ext == ".dll") return false;
+                        if (ext == ".exe")
+                        {
+                            return fileName is "league of legends.exe" or "leagueclient.exe" or "leagueclientux.exe" or "riotclientservices.exe";
+                        }
+                        return ext is ".json" or ".yaml" or ".yml" or ".xml" or ".cfg" or ".ini" or ".txt" or ".csv" or ".stringtable" or ".material" or ".troybin" or ".preload" or ".luabin64" or ".luabin" or ".css" or ".js" or ".html" or ".log" or ".info";
                     })
                     .ToList();
 
@@ -358,7 +366,7 @@ namespace AssetsManager.Services.Hashes
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
             int initial = matcher.Remaining;
-            progress?.Report(CreateProgress(matcher, stopwatch, "Session inventory ready", 0));
+            progress?.Report(CreateProgress(matcher, stopwatch, "Loading catalogs", 0));
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
                 binKnown.AddRange((await _store.LoadKnownAsync(kind, cancellationToken)).Values);
@@ -374,6 +382,7 @@ namespace AssetsManager.Services.Hashes
             {
                 await Task.Run(() =>
                 {
+            progress?.Report(CreateProgress(matcher, stopwatch, "Synthesizing structural candidates", 0));
                     if (includeRst)
                     {
                         CheckCandidates(binKnown, InternalHashGuessStrategy.CrossDictionary, "BIN dictionary keys");
@@ -382,8 +391,8 @@ namespace AssetsManager.Services.Hashes
                     }
                     if (includeBin)
                     {
-                        CheckCandidates(metaSchema.KnownTypeNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaClassSource);
-                        CheckCandidates(metaSchema.KnownFieldNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaPropertySource);
+                        CheckCandidates(metaSchema.KnownTypeNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaClassSource, preserveCasing: true);
+                        CheckCandidates(metaSchema.KnownFieldNames, InternalHashGuessStrategy.CrossDictionary, MetaSchemaPropertySource, preserveCasing: true);
                     }
                     CheckCandidates(Common3DBones, InternalHashGuessStrategy.CrossDictionary, "Common 3D Skeleton Bones");
 
@@ -399,7 +408,7 @@ namespace AssetsManager.Services.Hashes
                         foreach (string val in metaSchema.KnownFieldNames) wordlist.AddName(val);
                         wordlist.FinalizeList();
 
-                        CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation");
+                        CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Advanced Structural Generation", preserveCasing: true);
                         CheckCandidates(GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "Structural Reduction Pass", preserveCasing: true);
                         CheckCandidates(GenerateBigramCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.BigramVariant, "Structural Bigram Pass", preserveCasing: true);
                         CheckCandidates(GenerateAttestedTailCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Structural Attested Tails Pass", preserveCasing: true);
@@ -953,7 +962,7 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private static IEnumerable<string> GenerateStructuralCandidates(
+        internal static IEnumerable<string> GenerateStructuralCandidates(
             TokenWordlist wordlist,
             int budget,
             CancellationToken cancellationToken)
@@ -1025,7 +1034,61 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            // 4. Dynamic Prefix & Suffix addition (Derived 100% from known hash tokens)
+            // 4. Token combinations (2-word combinations)
+            var combTokens = topTokens.Take(300).ToList();
+            for (int i = 0; i < combTokens.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (int j = 0; j < combTokens.Count; j++)
+                {
+                    if (i == j) continue;
+
+                    string comb1 = UpperFirst(combTokens[i]) + UpperFirst(combTokens[j]);
+                    if (Emit(comb1))
+                    {
+                        yield return comb1;
+                        if (count >= budget) yield break;
+                    }
+
+                    string comb2 = combTokens[i] + "_" + combTokens[j];
+                    if (Emit(comb2))
+                    {
+                        yield return comb2;
+                        if (count >= budget) yield break;
+                    }
+                }
+            }
+
+            // 5. 3-word token combinations (e.g. CharacterOutlineCategory, CharacterOutlineSubmeshes, OutlineCategorySubmeshes)
+            var trigramTokens = topTokens.Take(100).ToList();
+            for (int i = 0; i < trigramTokens.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                for (int j = 0; j < trigramTokens.Count; j++)
+                {
+                    if (i == j) continue;
+                    string prefix2 = UpperFirst(trigramTokens[i]) + UpperFirst(trigramTokens[j]);
+                    for (int k = 0; k < trigramTokens.Count; k++)
+                    {
+                        if (k == i || k == j) continue;
+                        string word3 = UpperFirst(trigramTokens[k]);
+                        string comb3 = prefix2 + word3;
+                        if (Emit(comb3))
+                        {
+                            yield return comb3;
+                            if (count >= budget) yield break;
+                        }
+                        string comb3Plural = prefix2 + Pluralize(word3);
+                        if (!string.Equals(comb3Plural, comb3, StringComparison.Ordinal) && Emit(comb3Plural))
+                        {
+                            yield return comb3Plural;
+                            if (count >= budget) yield break;
+                        }
+                    }
+                }
+            }
+
+            // 6. Dynamic Prefix & Suffix addition (Derived 100% from known hash tokens)
             string[] prefixes = { "m_", "m", "is", "has", "get", "set" };
             var dynamicSuffixes = wordlist.AllTokens.Take(300).ToList();
 
@@ -1053,31 +1116,6 @@ namespace AssetsManager.Services.Hashes
                     if (Emit(candidateUnderscore))
                     {
                         yield return candidateUnderscore;
-                        if (count >= budget) yield break;
-                    }
-                }
-            }
-
-            // 5. Token combinations (2-word combinations)
-            var combTokens = topTokens.Take(300).ToList();
-            for (int i = 0; i < combTokens.Count; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (int j = 0; j < combTokens.Count; j++)
-                {
-                    if (i == j) continue;
-
-                    string comb1 = UpperFirst(combTokens[i]) + UpperFirst(combTokens[j]);
-                    if (Emit(comb1))
-                    {
-                        yield return comb1;
-                        if (count >= budget) yield break;
-                    }
-
-                    string comb2 = combTokens[i] + "_" + combTokens[j];
-                    if (Emit(comb2))
-                    {
-                        yield return comb2;
                         if (count >= budget) yield break;
                     }
                 }

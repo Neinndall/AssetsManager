@@ -23,13 +23,6 @@ namespace AssetsManager.Services.Hashes
         public string GetVerifiedPath(InternalHashKind kind) =>
             Path.Combine(_directories.HashLabPath, "verified", GetKnownFileName(kind));
 
-        private static string GetMetaCatalogPath(InternalHashKind kind) => kind switch
-        {
-            InternalHashKind.BinTypes => "hashes.metaclasses.txt",
-            InternalHashKind.BinFields => "hashes.metafields.txt",
-            _ => string.Empty
-        };
-
         [Obsolete("Legacy overrides are quarantined and are no longer loaded. Use GetVerifiedPath.")]
         public string GetOverridePath(InternalHashKind kind) =>
             Path.Combine(_directories.HashLabPath, "overrides", GetKnownFileName(kind));
@@ -38,12 +31,7 @@ namespace AssetsManager.Services.Hashes
         {
             var result = new Dictionary<ulong, string>();
             int width = IsRst(kind) ? 16 : 8;
-            IEnumerable<string> paths = new[] { GetKnownPath(kind) };
-            string metaCatalog = GetMetaCatalogPath(kind);
-            if (metaCatalog.Length > 0)
-                paths = paths.Append(Path.Combine(_directories.HashesPath, metaCatalog));
-            if (HasCurrentVerificationSchema())
-                paths = paths.Append(GetVerifiedPath(kind));
+            IEnumerable<string> paths = new[] { GetKnownPath(kind), GetVerifiedPath(kind) };
             foreach (string path in paths)
             {
                 if (!File.Exists(path)) continue;
@@ -242,11 +230,24 @@ namespace AssetsManager.Services.Hashes
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
             {
                 int width = IsRst(kind) ? 16 : 8;
-                IEnumerable<string> lines = verified
-                    .Where(match => match.Kind == kind)
-                    .OrderBy(match => match.Value, StringComparer.Ordinal)
-                    .Select(match => $"{match.Hash.ToString(width == 16 ? "x16" : "x8")} {match.Value}");
-                await WriteTextAtomicallyAsync(GetVerifiedPath(kind), lines, cancellationToken);
+                string path = GetVerifiedPath(kind);
+                var mergedMap = new Dictionary<ulong, string>();
+                if (File.Exists(path))
+                {
+                    using var reader = new StreamReader(path);
+                    while (await reader.ReadLineAsync(cancellationToken) is string line)
+                    {
+                        if (line.Length > width && line[width] == ' ' && ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h))
+                            mergedMap[h] = line[(width + 1)..].Trim();
+                    }
+                }
+                foreach (var match in verified.Where(match => match.Kind == kind))
+                    mergedMap[match.Hash] = match.Value;
+
+                IEnumerable<string> lines = mergedMap
+                    .OrderBy(pair => pair.Value, StringComparer.Ordinal)
+                    .Select(pair => $"{pair.Key.ToString(width == 16 ? "x16" : "x8")} {pair.Value}");
+                await WriteTextAtomicallyAsync(path, lines, cancellationToken);
             }
 
             await WriteTextAtomicallyAsync(
