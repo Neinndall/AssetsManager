@@ -47,6 +47,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Project Browser now features a unified context menu on both the tree view and file grid to easily close individual projects or clear the workspace.
   - Viewer / Adjusted default studio lighting to provide realistic 3D shading and highlights when loading models.
   - Viewer / Project Browser file tiles now use the same HoverColor for hover and selection without an extra border overlay.
   - Viewer / Removed the unused WPF lighting objects from the OpenGL viewport; Studio Lighting now has one effective lighting path through the OpenGL renderer.

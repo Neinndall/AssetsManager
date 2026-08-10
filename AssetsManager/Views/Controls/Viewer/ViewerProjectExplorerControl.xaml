@@ -75,6 +75,20 @@
                               x:Name="FoldersTreeView"
                               Style="{StaticResource ModernTreeView}"
                               SelectedItemChanged="FoldersTreeView_SelectedItemChanged">
+                        <TreeView.ContextMenu>
+                            <ContextMenu Opened="FoldersContextMenu_Opened">
+                                <MenuItem Header="Close Project" Click="CloseSelectedProject_Click">
+                                    <MenuItem.Icon>
+                                        <materialIcons:MaterialIcon Kind="FolderRemoveOutline"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Close All Projects" Click="CloseAllProjects_Click">
+                                    <MenuItem.Icon>
+                                        <materialIcons:MaterialIcon Kind="DeleteOutline"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </TreeView.ContextMenu>
                         <TreeView.Resources>
                             <HierarchicalDataTemplate DataType="{x:Type local:ProjectExplorerNode}" ItemsSource="{Binding Children}">
                                 <StackPanel Orientation="Horizontal" Margin="2,1">

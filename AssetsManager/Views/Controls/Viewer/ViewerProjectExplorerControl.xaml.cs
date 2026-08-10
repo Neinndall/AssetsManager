@@ -467,11 +467,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void FilesContextMenu_Opened(object sender, RoutedEventArgs e)
-        {
-            LoadAnimationsMenuItem.IsEnabled = GetSelectedAnimationPaths().Count > 0;
-        }
-
         private void LoadAnimationsMenuItem_Click(object sender, RoutedEventArgs e)
         {
             var paths = GetSelectedAnimationPaths();
@@ -498,6 +493,89 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LoadProjectFolder(folderBrowser.FolderName);
             }
+        }
+
+        private void CloseSelectedProject_Click(object sender, RoutedEventArgs e) => CloseProjectFolder();
+
+        private void CloseAllProjects_Click(object sender, RoutedEventArgs e) => ClearWorkspace();
+
+        private void FilesContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            LoadAnimationsMenuItem.IsEnabled = GetSelectedAnimationPaths().Count > 0;
+        }
+
+        private void FoldersContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            if (sender is ContextMenu menu)
+            {
+                bool hasProjects = _folderOnlyNodes.Count > 0;
+                foreach (var item in menu.Items.OfType<MenuItem>())
+                {
+                    item.IsEnabled = hasProjects;
+                }
+            }
+        }
+
+        public void CloseProjectFolder(string pathOrName = null)
+        {
+            if (_folderOnlyNodes.Count == 0) return;
+
+            ProjectExplorerNode targetRoot = null;
+            if (!string.IsNullOrEmpty(pathOrName))
+            {
+                targetRoot = _allNodes.FirstOrDefault(n =>
+                    string.Equals(n.FullPath, pathOrName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(n.Name, pathOrName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            targetRoot ??= FindRootNodeFor(FoldersTreeView.SelectedItem as ProjectExplorerNode)
+                       ?? FindRootNodeFor(_currentFolderNode)
+                       ?? _allNodes.LastOrDefault();
+
+            if (targetRoot == null) return;
+
+            _allNodes.Remove(targetRoot);
+            var folderOnlyTarget = _folderOnlyNodes.FirstOrDefault(n =>
+                string.Equals(n.FullPath, targetRoot.FullPath, StringComparison.OrdinalIgnoreCase));
+            if (folderOnlyTarget != null)
+            {
+                _folderOnlyNodes.Remove(folderOnlyTarget);
+            }
+
+            if (_allNodes.Count > 0)
+            {
+                var nextRoot = _allNodes.Last();
+                _currentRootFolder = nextRoot.FullPath;
+                NavigateToFolder(nextRoot);
+            }
+            else
+            {
+                ClearWorkspace();
+            }
+        }
+
+        public void ClearWorkspace()
+        {
+            _allNodes.Clear();
+            _folderOnlyNodes.Clear();
+            _currentRootFolder = null;
+            _currentFolderNode = null;
+            FilesListBox.ItemsSource = null;
+            Breadcrumbs.Clear();
+            SearchBox.Text = string.Empty;
+        }
+
+        private ProjectExplorerNode FindRootNodeFor(ProjectExplorerNode node)
+        {
+            if (node == null) return null;
+            var current = node;
+            while (current != null)
+            {
+                var parent = FindParentNode(current);
+                if (parent == null) return current;
+                current = parent;
+            }
+            return null;
         }
     }
 }
