@@ -46,7 +46,27 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
     internal sealed record SknMaterialDefinition(
         IReadOnlyList<SknMaterialSampler> Samplers,
-        IReadOnlyDictionary<string, Vector4> Parameters);
+        IReadOnlyDictionary<string, Vector4> Parameters)
+    {
+        private Dictionary<string, SknMaterialSampler> _normalizedSamplers;
+
+        internal SknMaterialSampler FindSampler(string normalizedToken)
+        {
+            if (_normalizedSamplers == null)
+            {
+                var map = new Dictionary<string, SknMaterialSampler>(StringComparer.Ordinal);
+                foreach (var sampler in Samplers)
+                {
+                    string key = SknMaterialTextureResolver.NormalizeToken(sampler.TextureName);
+                    map.TryAdd(key, sampler);
+                }
+
+                _normalizedSamplers = map;
+            }
+
+            return _normalizedSamplers.TryGetValue(normalizedToken, out SknMaterialSampler matchedSampler) ? matchedSampler : null;
+        }
+    }
 
     internal sealed record SknMaterialTextureMetadata(
         string DefaultTexturePath,

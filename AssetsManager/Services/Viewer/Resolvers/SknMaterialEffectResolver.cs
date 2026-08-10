@@ -17,7 +17,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyList<string> textureKeys,
             IEnumerable<string> submeshes)
         {
-            if (IsCompositeOnsenMaterial(material.Samplers))
+            if (IsCompositeOnsenMaterial(material))
             {
                 return ModelMaterialEffectDefinition.None;
             }
@@ -40,13 +40,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IEnumerable<string> submeshes)
         {
             string additiveTexture = FindSamplerKey(
-                material.Samplers,
+                material,
                 textureKeys,
                 "AdditiveScrollTex",
                 "Scroll_Tex",
                 "Scroll_Texture");
             string additiveMask = FindSamplerKey(
-                material.Samplers,
+                material,
                 textureKeys,
                 "AdditiveScroll_Mask",
                 "Scroll_Tex_Mask",
@@ -101,7 +101,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             string flowTexture = FindSamplerKey(
-                material.Samplers,
+                material,
                 textureKeys,
                 "FlowmapTex",
                 "FlowMap",
@@ -116,7 +116,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ModelMaterialEffectKind.FlowMap,
                 flowTexture,
                 FindSamplerKey(
-                    material.Samplers,
+                    material,
                     textureKeys,
                     "Mask",
                     "Mask_Texture_red",
@@ -152,7 +152,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             string texture = FindSamplerKey(
-                material.Samplers,
+                material,
                 textureKeys,
                 "Transition_PatternTexture",
                 "NoiseDisturb",
@@ -180,7 +180,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 ModelMaterialEffectKind.Dissolve,
                 texture,
                 FindSamplerKey(
-                    material.Samplers,
+                    material,
                     textureKeys,
                     "Transition_State2",
                     "DissolveMask",
@@ -230,7 +230,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             effect = effect with
             {
                 Kind = effect.Kind | ModelMaterialEffectKind.Fresnel,
-                MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material.Samplers, textureKeys),
+                MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material, textureKeys),
                 FresnelColor = ReadVector4(
                     material.Parameters,
                     Vector4.One,
@@ -265,7 +265,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyList<string> textureKeys)
         {
             string emissionTexture = FindSamplerKey(
-                material.Samplers,
+                material,
                 textureKeys,
                 "EmissionR_DistortionG_Texture",
                 "EmissionR_Texture",
@@ -284,7 +284,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     Kind = effect.Kind | ModelMaterialEffectKind.Emission,
                     EmissionTextureName = emissionTexture,
                     EmissionMaskTextureName = FindSamplerKey(
-                        material.Samplers,
+                        material,
                         textureKeys,
                         "EmissionMask",
                         "EmissiveMask",
@@ -361,7 +361,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 : effect with
                 {
                     Kind = effect.Kind | ModelMaterialEffectKind.Bloom,
-                    MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material.Samplers, textureKeys),
+                    MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material, textureKeys),
                     BloomColor = ReadVector4(
                         material.Parameters,
                         Vector4.One,
@@ -459,14 +459,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "VertexDeformIntensity",
                 "DeformIntensity",
                 "DeformProtection") ||
-            HasSampler(material.Samplers, "DeformNoise") ||
-            HasSampler(material.Samplers, "DeformMask");
+            HasSampler(material, "DeformNoise") ||
+            HasSampler(material, "DeformMask");
 
         private static string FindMaterialMask(
-            IReadOnlyList<SknMaterialSampler> samplers,
+            SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys) =>
             FindSamplerKey(
-                samplers,
+                material,
                 textureKeys,
                 "Mask",
                 "Mask_Texture_red",
@@ -510,40 +510,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return scopedSubmesh == null || scopedSubmesh.Equals(submesh, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsCompositeOnsenMaterial(IReadOnlyList<SknMaterialSampler> samplers) =>
-            HasSampler(samplers, "NoiseDisturb") &&
-            HasSampler(samplers, "FlowmapTex") &&
-            HasSampler(samplers, "WaterShape") &&
-            HasSampler(samplers, "Transition_State2");
+        private static bool IsCompositeOnsenMaterial(SknMaterialDefinition material) =>
+            HasSampler(material, "NoiseDisturb") &&
+            HasSampler(material, "FlowmapTex") &&
+            HasSampler(material, "WaterShape") &&
+            HasSampler(material, "Transition_State2");
 
         private static bool HasSampler(
-            IReadOnlyList<SknMaterialSampler> samplers,
+            SknMaterialDefinition material,
             string samplerName)
         {
             string expected = SknMaterialTextureResolver.NormalizeToken(samplerName);
-            return samplers.Any(sampler =>
-                SknMaterialTextureResolver.NormalizeToken(sampler.TextureName) == expected);
+            return material.FindSampler(expected) != null;
         }
 
         private static string FindSamplerKey(
-            IReadOnlyList<SknMaterialSampler> samplers,
+            SknMaterialDefinition material,
             IReadOnlyList<string> textureKeys,
             params string[] samplerNames)
         {
-            // Sampler names are normalized by case and separators, so aliases here
-            // must represent distinct normalized tokens rather than spelling variants.
             foreach (string samplerName in samplerNames)
             {
                 string expected = SknMaterialTextureResolver.NormalizeToken(samplerName);
-                SknMaterialSampler sampler = samplers.FirstOrDefault(candidate =>
-                    SknMaterialTextureResolver.NormalizeToken(candidate.TextureName) == expected &&
-                    !SknMaterialTextureResolver.IsNeutralTexturePath(candidate.TexturePath));
-                string textureKey = sampler == null
-                    ? null
-                    : SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
-                if (textureKey != null)
+                SknMaterialSampler sampler = material.FindSampler(expected);
+                if (sampler != null && !SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath))
                 {
-                    return textureKey;
+                    string textureKey = SknMaterialTextureResolver.MatchTextureKey(sampler.TexturePath, textureKeys);
+                    if (textureKey != null)
+                    {
+                        return textureKey;
+                    }
                 }
             }
 
