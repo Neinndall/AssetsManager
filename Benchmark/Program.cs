@@ -76,6 +76,11 @@ namespace BenchmarkApp
                 ChampionSkinBinStructureDiagnostic.Run(rootPath, hashesPath, filter, Math.Max(1, maxBins));
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "submesh-texture-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                SubmeshTextureAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "champion-texture-audit", StringComparison.OrdinalIgnoreCase))
             {
                 ChampionTextureDiagnostic.Run(args.Skip(1).ToArray());

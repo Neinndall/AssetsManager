@@ -16,9 +16,9 @@ namespace AssetsManager.Views.Models.Viewer
         private bool _isToolbarVisible = false;
 
         // --- Studio Lighting Properties ---
-        private double _ambientIntensity = 100;
-        private double _lightRotation = 0; // Phi
-        private double _lightHeight = 0;   // Theta
+        private double _ambientIntensity = 75;
+        private double _lightRotation = 45; // Phi
+        private double _lightHeight = 35;   // Theta
         private double _fieldOfView = 45;
         private bool _isGroundVisible = false;
         private bool _isGridVisible = true;
@@ -151,9 +151,9 @@ namespace AssetsManager.Views.Models.Viewer
 
         public void ResetStudioSettings()
         {
-            AmbientIntensity = 100;
-            LightRotation = 0;
-            LightHeight = 0;
+            AmbientIntensity = 75;
+            LightRotation = 45;
+            LightHeight = 35;
             FieldOfView = 45;
             IsGroundVisible = false;
             IsGridVisible = true;
