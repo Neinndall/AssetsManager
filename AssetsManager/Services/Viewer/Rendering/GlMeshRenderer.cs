@@ -248,32 +248,35 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ModelMaterialEffectDefinition effect =
                     part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
                 _gl.Uniform1(_uEffectKind, (int)effect.Kind);
-                _gl.Uniform1(_uHasEffectTex, resources.EffectTexture != 0 ? 1 : 0);
-                _gl.Uniform1(_uHasEmissionTex, resources.EmissionTexture != 0 ? 1 : 0);
-                _gl.Uniform1(_uHasEmissionMask, resources.EmissionMaskTexture != 0 ? 1 : 0);
-                _gl.Uniform2(_uEffectScrollSpeed, effect.ScrollSpeed.X, effect.ScrollSpeed.Y);
-                _gl.Uniform2(_uEffectTiling, effect.Tiling.X, effect.Tiling.Y);
-                _gl.Uniform4(_uEffectColor, effect.Color.X, effect.Color.Y, effect.Color.Z, effect.Color.W);
-                _gl.Uniform1(_uEffectStrength, effect.Strength);
-                _gl.Uniform1(_uFlowIntensity, effect.FlowIntensity);
-                _gl.Uniform4(_uFresnelColor, effect.FresnelColor.X, effect.FresnelColor.Y, effect.FresnelColor.Z, effect.FresnelColor.W);
-                _gl.Uniform1(_uFresnelPower, effect.FresnelPower);
-                _gl.Uniform1(_uFresnelStrength, effect.FresnelStrength);
-                _gl.Uniform1(_uDissolveThreshold, effect.DissolveThreshold);
-                _gl.Uniform1(_uDissolveSoftness, effect.DissolveSoftness);
-                _gl.Uniform4(_uBloomColor, effect.BloomColor.X, effect.BloomColor.Y, effect.BloomColor.Z, effect.BloomColor.W);
-                _gl.Uniform1(_uBloomIntensity, effect.BloomIntensity);
-                _gl.Uniform2(_uEmissionScrollSpeed, effect.EmissionScrollSpeed.X, effect.EmissionScrollSpeed.Y);
-                _gl.Uniform2(_uEmissionTiling, effect.EmissionTiling.X, effect.EmissionTiling.Y);
-                _gl.Uniform4(_uEmissionColor, effect.EmissionColor.X, effect.EmissionColor.Y, effect.EmissionColor.Z, effect.EmissionColor.W);
-                _gl.Uniform1(_uEmissionStrength, effect.EmissionStrength);
-                _gl.Uniform1(_uEmissionChannel, effect.EmissionChannel);
-                _gl.Uniform3(_uWaveDirection, effect.WaveDirection);
-                _gl.Uniform1(_uWaveSpeed, effect.WaveSpeed);
-                _gl.Uniform1(_uWaveFrequency, effect.WaveFrequency);
-                _gl.Uniform1(_uWaveIntensity, effect.WaveIntensity);
-                _gl.Uniform2(_uFresnelNoiseTiling, effect.FresnelNoiseTiling.X, effect.FresnelNoiseTiling.Y);
-                _gl.Uniform2(_uFresnelNoiseSpeed, effect.FresnelNoiseSpeed.X, effect.FresnelNoiseSpeed.Y);
+                if (effect.Kind != ModelMaterialEffectKind.None)
+                {
+                    _gl.Uniform1(_uHasEffectTex, resources.EffectTexture != 0 ? 1 : 0);
+                    _gl.Uniform1(_uHasEmissionTex, resources.EmissionTexture != 0 ? 1 : 0);
+                    _gl.Uniform1(_uHasEmissionMask, resources.EmissionMaskTexture != 0 ? 1 : 0);
+                    _gl.Uniform2(_uEffectScrollSpeed, effect.ScrollSpeed.X, effect.ScrollSpeed.Y);
+                    _gl.Uniform2(_uEffectTiling, effect.Tiling.X, effect.Tiling.Y);
+                    _gl.Uniform4(_uEffectColor, effect.Color.X, effect.Color.Y, effect.Color.Z, effect.Color.W);
+                    _gl.Uniform1(_uEffectStrength, effect.Strength);
+                    _gl.Uniform1(_uFlowIntensity, effect.FlowIntensity);
+                    _gl.Uniform4(_uFresnelColor, effect.FresnelColor.X, effect.FresnelColor.Y, effect.FresnelColor.Z, effect.FresnelColor.W);
+                    _gl.Uniform1(_uFresnelPower, effect.FresnelPower);
+                    _gl.Uniform1(_uFresnelStrength, effect.FresnelStrength);
+                    _gl.Uniform1(_uDissolveThreshold, effect.DissolveThreshold);
+                    _gl.Uniform1(_uDissolveSoftness, effect.DissolveSoftness);
+                    _gl.Uniform4(_uBloomColor, effect.BloomColor.X, effect.BloomColor.Y, effect.BloomColor.Z, effect.BloomColor.W);
+                    _gl.Uniform1(_uBloomIntensity, effect.BloomIntensity);
+                    _gl.Uniform2(_uEmissionScrollSpeed, effect.EmissionScrollSpeed.X, effect.EmissionScrollSpeed.Y);
+                    _gl.Uniform2(_uEmissionTiling, effect.EmissionTiling.X, effect.EmissionTiling.Y);
+                    _gl.Uniform4(_uEmissionColor, effect.EmissionColor.X, effect.EmissionColor.Y, effect.EmissionColor.Z, effect.EmissionColor.W);
+                    _gl.Uniform1(_uEmissionStrength, effect.EmissionStrength);
+                    _gl.Uniform1(_uEmissionChannel, effect.EmissionChannel);
+                    _gl.Uniform3(_uWaveDirection, effect.WaveDirection);
+                    _gl.Uniform1(_uWaveSpeed, effect.WaveSpeed);
+                    _gl.Uniform1(_uWaveFrequency, effect.WaveFrequency);
+                    _gl.Uniform1(_uWaveIntensity, effect.WaveIntensity);
+                    _gl.Uniform2(_uFresnelNoiseTiling, effect.FresnelNoiseTiling.X, effect.FresnelNoiseTiling.Y);
+                    _gl.Uniform2(_uFresnelNoiseSpeed, effect.FresnelNoiseSpeed.X, effect.FresnelNoiseSpeed.Y);
+                }
 
                 bool hasLightmap = resources.LightmapTexture != 0 && resources.LightmapVbo != 0;
                 _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);

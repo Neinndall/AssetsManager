@@ -299,44 +299,35 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             string assetPath = assetTexturePath.Replace('\\', '/').TrimStart('/');
-            string assetsRoot = characterRoot.Parent?.Parent?.FullName;
-            string relativePath = null;
-            string candidateRoot = null;
             string characterPrefix = $"assets/characters/{characterRoot.Name}/";
+
+            string candidateRoot = null;
+            string relativePath = null;
+
             if (assetPath.StartsWith(characterPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                relativePath = assetPath[characterPrefix.Length..];
                 candidateRoot = characterRoot.FullName;
+                relativePath = assetPath[characterPrefix.Length..];
             }
-            else if (assetPath.StartsWith("assets/shared/", StringComparison.OrdinalIgnoreCase) &&
-                     assetsRoot != null &&
-                     characterRoot.Parent?.Parent?.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) == true)
+            else if (assetPath.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) &&
+                     characterRoot.Parent?.Parent is DirectoryInfo assetsRoot &&
+                     assetsRoot.Name.Equals("assets", StringComparison.OrdinalIgnoreCase))
             {
+                candidateRoot = assetsRoot.FullName;
                 relativePath = assetPath["assets/".Length..];
-                candidateRoot = assetsRoot;
-            }
-            else if (assetPath.StartsWith("assets/characters/shared/", StringComparison.OrdinalIgnoreCase) &&
-                     assetsRoot != null &&
-                     characterRoot.Parent?.Parent?.Name.Equals("assets", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                relativePath = assetPath["assets/".Length..];
-                candidateRoot = assetsRoot;
             }
 
-            if (relativePath == null || candidateRoot == null)
+            if (candidateRoot == null || relativePath == null)
             {
                 return null;
             }
 
-            string candidate = Path.GetFullPath(Path.Combine(
-                candidateRoot,
-                relativePath.Replace('/', Path.DirectorySeparatorChar)));
+            string candidate = Path.GetFullPath(Path.Combine(candidateRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
             string extension = Path.GetExtension(candidate);
-            string rootedPrefix =
-                Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string rootedPrefix = Path.GetFullPath(candidateRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
             return candidate.StartsWith(rootedPrefix, StringComparison.OrdinalIgnoreCase) &&
-                   (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) ||
-                    extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
+                   (extension.Equals(".tex", StringComparison.OrdinalIgnoreCase) || extension.Equals(".dds", StringComparison.OrdinalIgnoreCase)) &&
                    File.Exists(candidate)
                 ? candidate
                 : null;
