@@ -542,7 +542,7 @@
                           SizeChanged="ResultsListView_SizeChanged">
                     <ListView.View>
                         <GridView AllowsColumnReorder="False">
-                            <GridViewColumn Header="Hash" Width="140">
+                            <GridViewColumn Header="Hash" Width="120">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
@@ -555,7 +555,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Domain" Width="80">
+                            <GridViewColumn Header="Domain" Width="130">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
@@ -568,7 +568,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Resolved value" Width="340">
+                            <GridViewColumn Header="Resolved value" Width="320">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
@@ -581,7 +581,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Strategy" Width="135">
+                            <GridViewColumn Header="Strategy" Width="170">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
