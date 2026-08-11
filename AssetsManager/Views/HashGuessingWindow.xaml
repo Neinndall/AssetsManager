@@ -537,16 +537,18 @@
                 <ListView x:Name="ResultsListView"
                           Grid.Row="4"
                           ItemsSource="{Binding Matches}"
-                          Style="{StaticResource HashResultsListView}"
+                          Style="{StaticResource ModernTableListView}"
+                          ItemContainerStyle="{StaticResource HashGuessingResultsListViewItem}"
                           Loaded="ResultsListView_Loaded"
                           SizeChanged="ResultsListView_SizeChanged">
                     <ListView.View>
                         <GridView AllowsColumnReorder="False">
                             <GridViewColumn Header="Hash" Width="120">
                                 <GridViewColumn.HeaderContainerStyle>
-                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="0,7"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
@@ -557,9 +559,10 @@
                             </GridViewColumn>
                             <GridViewColumn Header="Domain" Width="130">
                                 <GridViewColumn.HeaderContainerStyle>
-                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="0,7"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
@@ -570,9 +573,10 @@
                             </GridViewColumn>
                             <GridViewColumn Header="Resolved value" Width="320">
                                 <GridViewColumn.HeaderContainerStyle>
-                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="0,7"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
@@ -583,9 +587,10 @@
                             </GridViewColumn>
                             <GridViewColumn Header="Strategy" Width="170">
                                 <GridViewColumn.HeaderContainerStyle>
-                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="0,7"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>
@@ -598,9 +603,10 @@
                             </GridViewColumn>
                             <GridViewColumn Header="Source WAD" Width="240">
                                 <GridViewColumn.HeaderContainerStyle>
-                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource HashResultsColumnHeader}">
+                                    <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                        <Setter Property="Padding" Value="0,7"/>
                                     </Style>
                                 </GridViewColumn.HeaderContainerStyle>
                                 <GridViewColumn.CellTemplate>

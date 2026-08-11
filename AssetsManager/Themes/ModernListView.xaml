@@ -5,7 +5,7 @@
         <ResourceDictionary Source="/Themes/Colors.xaml"/>
     </ResourceDictionary.MergedDictionaries>
 
-    <!-- Estilo para las filas -->
+    <!-- Estilo para las filas generales -->
     <Style x:Key="ModernListViewItem" TargetType="ListViewItem">
         <Setter Property="ClipToBounds" Value="True"/>
         <Setter Property="Background" Value="Transparent"/>
@@ -48,12 +48,13 @@
         </Setter>
     </Style>
 
+    <!-- Estilo exclusivo para las filas de Hash Lab -->
     <Style x:Key="HashGuessingResultsListViewItem" TargetType="ListViewItem">
         <Setter Property="ClipToBounds" Value="True"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0,0,0,1"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
-        <Setter Property="Padding" Value="16,1"/>
+        <Setter Property="Padding" Value="0,1"/>
         <Setter Property="MinHeight" Value="28"/>
         <Setter Property="Margin" Value="0"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -153,10 +154,7 @@
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="Padding" Value="0"/>
-        <Setter Property="ItemContainerStyle" Value="{StaticResource HashGuessingResultsListViewItem}"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource ModernListViewItem}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListView">
@@ -174,8 +172,5 @@
         </Setter>
     </Style>
 
-    <!-- Aliases para Hash Lab y compatibilidad -->
-    <Style x:Key="HashResultsListView" TargetType="ListView" BasedOn="{StaticResource ModernTableListView}"/>
-    <Style x:Key="HashResultsColumnHeader" TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}"/>
 
 </ResourceDictionary>
