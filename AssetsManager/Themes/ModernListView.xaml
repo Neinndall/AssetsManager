@@ -154,6 +154,8 @@
         <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
+				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource ModernListViewItem}"/>
         <Setter Property="Template">
             <Setter.Value>
