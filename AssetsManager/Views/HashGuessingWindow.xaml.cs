@@ -212,6 +212,7 @@ namespace AssetsManager.Views
             long totalChecked = 0;
             int totalWads = 0;
             int foundMatches = 0;
+            int sessionTargets = 0;
 
             _viewModel.Matches.Clear();
             var displayedMatchHashes = new System.Collections.Generic.HashSet<ulong>();
@@ -223,6 +224,21 @@ namespace AssetsManager.Views
                 _viewModel.StatusText = totalWads > 0
                     ? $"{currentStage} · {totalChecked:N0} checked · {foundMatches:N0} found · Time: {timeText}"
                     : $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
+            }
+
+            void UpdateLiveProgress(int? remaining = null, int? matches = null)
+            {
+                if (matches.HasValue)
+                    foundMatches = Math.Max(foundMatches, matches.Value);
+                if (remaining.HasValue)
+                    sessionTargets = Math.Max(sessionTargets, remaining.Value + foundMatches);
+
+                if (sessionTargets > 0)
+                {
+                    int unresolved = Math.Max(0, sessionTargets - foundMatches);
+                    ShowLiveUnknownCount(unresolved, foundMatches);
+                }
+                UpdateStatus();
             }
 
             UpdateStatus();
@@ -244,7 +260,7 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
-                    ShowLiveUnknownCount(value.RemainingUnknowns, value.FoundMatches);
+                    UpdateLiveProgress(value.RemainingUnknowns, value.FoundMatches);
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
                     if (value.TotalWads > 0)
                     {
@@ -259,13 +275,15 @@ namespace AssetsManager.Views
                     currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
-                    foundMatches = value.FoundMatches;
                     UpdateStatus();
                 });
                 IProgress<HashGuessMatch> matchProgress = new Progress<HashGuessMatch>(match =>
                 {
                     if (displayedMatchHashes.Add(match.Hash))
+                    {
                         _viewModel.Matches.Add(match);
+                        UpdateLiveProgress(matches: displayedMatchHashes.Count);
+                    }
                 });
                 var result = mode switch
                 {
@@ -284,6 +302,7 @@ namespace AssetsManager.Views
                 timer.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
+                UpdateLiveProgress(result.UnknownHashesAtStart - result.Matches.Count, result.Matches.Count);
                 _viewModel.ProgressValue = 100;
                 _viewModel.ProgressText = "100%";
                 _viewModel.IsProgressIndeterminate = false;
