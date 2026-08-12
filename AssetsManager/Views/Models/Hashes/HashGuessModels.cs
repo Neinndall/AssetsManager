@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace AssetsManager.Views.Models.Hashes
 {
     public enum HashGuessDomain { Game, Lcu }
-    public enum HashGuessStrategy { EmbeddedPathGrep, BinLengthPath, BinEntry, PreloadReference, ShaderInclude, ShaderVariant, AtlasReference, LcuEmbeddedPath, CharacterTemplate, CharacterSubstitution, SkinNumberVariant, SuffixVariant, ChromaGroupVariant, CrossDomainAsset, CrossDomainGame, PrefixVariant, PluginVariant, LcuPattern, ExtensionVariant, LanguageVariant, NumberVariant, LuaVariant, ImageExtensionVariant, WordlistVariant, LcuRelativeBasename, LuaManifest }
+    public enum HashGuessStrategy { EmbeddedPathGrep, BinLengthPath, BinEntry, PreloadReference, ShaderInclude, ShaderVariant, AtlasReference, LcuEmbeddedPath, CharacterTemplate, CharacterSubstitution, SkinNumberVariant, SuffixVariant, ChromaGroupVariant, CrossDomainAsset, CrossDomainGame, PrefixVariant, PluginVariant, LcuPattern, ExtensionVariant, LanguageVariant, NumberVariant, LuaVariant, ImageExtensionVariant, WordlistVariant, LcuRelativeBasename, LuaManifest, AnimationBinLink }
 
     public sealed class HashGuessMatch
     {

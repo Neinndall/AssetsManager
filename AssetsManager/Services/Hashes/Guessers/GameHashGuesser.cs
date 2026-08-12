@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 
@@ -57,6 +59,16 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly byte[][] WadBinPrefixesM = ToAsciiPrefixes("Maps/");
         private static readonly byte[][] WadBinPrefixesP = ToAsciiPrefixes("Patching/");
         private static readonly byte[][] WadBinPrefixesS = ToAsciiPrefixes("Shaders/");
+        private static readonly Regex AnimationBinPathRegex = new(
+            @"^data/characters/(?<character>[^/]+)/animations/(?<skin>[^/]+)\.bin$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex KnownAnimationPathRegex = new(
+            @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex AnimationSkinTokenRegex = new("skin\\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly uint AnimationFilePathNameHash = Fnv1a.HashLower("mAnimationFilePath");
+        private static readonly uint ClipDataMapNameHash = Fnv1a.HashLower("mClipDataMap");
+        private static readonly uint AnimationResourceDataNameHash = Fnv1a.HashLower("mAnimationResourceData");
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
         {
             "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm", "anm", "skl", "skn",
@@ -678,8 +690,186 @@ namespace AssetsManager.Services.Hashes.Guessers
             return words.ToList();
         }
 
-        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
+        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash)
+        {
             CheckChunk(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+            if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                GrepAnimationBinLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+        }
+
+        internal IReadOnlyList<string> GenerateAnimationContextCandidates(string character, string skin)
+        {
+            if (string.IsNullOrWhiteSpace(character) || string.IsNullOrWhiteSpace(skin)) return Array.Empty<string>();
+            return GetAnimationCandidateIndex(character, skin).Values.ToList();
+        }
+
+        private void GrepAnimationBinLinks(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash)
+        {
+            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
+            if (!context.Success || data.Array is null || data.Count == 0) return;
+
+            var targetHashes = new HashSet<ulong>();
+            try
+            {
+                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
+                var tree = new BinTree(stream);
+                foreach (ulong targetHash in EnumerateAnimationFileLinks(tree))
+                    if (targetHash != 0 && engine.UnknownHashes.Contains(targetHash)) targetHashes.Add(targetHash);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logService?.LogDebug($"GAME animation BIN link scan skipped '{sourcePath}': {exception.Message}");
+                return;
+            }
+
+            if (targetHashes.Count == 0) return;
+            IReadOnlyDictionary<ulong, string> candidates = GetAnimationCandidateIndex(
+                context.Groups["character"].Value,
+                context.Groups["skin"].Value);
+            CheckIter(
+                engine,
+                GetMatchingAnimationPaths(targetHashes, candidates),
+                HashGuessStrategy.AnimationBinLink,
+                sourceWadPath,
+                sourceChunkHash);
+        }
+
+        private static IEnumerable<string> GetMatchingAnimationPaths(
+            IEnumerable<ulong> targetHashes,
+            IReadOnlyDictionary<ulong, string> candidates)
+        {
+            foreach (ulong targetHash in targetHashes)
+                if (candidates.TryGetValue(targetHash, out string path))
+                    yield return path;
+        }
+
+        private IReadOnlyDictionary<ulong, string> GetAnimationCandidateIndex(string character, string skin)
+        {
+            string normalizedCharacter = character.ToLowerInvariant();
+            string normalizedSkin = skin.ToLowerInvariant();
+            HashCorpusIndex corpus = Corpus;
+            return corpus.GetOrCreate(
+                $"animation-candidates/{normalizedCharacter}/{normalizedSkin}",
+                paths => BuildAnimationCandidateIndex(paths, normalizedCharacter, normalizedSkin));
+        }
+
+        private static IReadOnlyDictionary<ulong, string> BuildAnimationCandidateIndex(
+            IReadOnlyList<string> knownPaths,
+            string character,
+            string skin)
+        {
+            var paths = new HashSet<string>(StringComparer.Ordinal);
+            var animationNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var characterAnimationNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in knownPaths)
+            {
+                if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
+                string name = GetBasename(path);
+                if (name.Length == 0) continue;
+
+                animationNames.Add(name);
+                Match knownContext = KnownAnimationPathRegex.Match(path);
+                if (knownContext.Success && knownContext.Groups["character"].Value.Equals(character, StringComparison.OrdinalIgnoreCase))
+                    characterAnimationNames.Add(name);
+            }
+
+            HashSet<string> reusablePrefixes = GetReusableAnimationPrefixes(characterAnimationNames);
+            foreach (string name in animationNames)
+            {
+                AddAnimationNameVariants(paths, character, skin, name);
+
+                string convertedName = AnimationSkinTokenRegex.Replace(name, skin);
+                if (!convertedName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    AddAnimationNameVariants(paths, character, skin, convertedName);
+            }
+
+            foreach (string name in characterAnimationNames)
+            {
+                foreach (string prefix in reusablePrefixes)
+                {
+                    AddAnimationNameVariants(paths, character, skin, prefix + "_" + name);
+                    string convertedName = AnimationSkinTokenRegex.Replace(name, skin);
+                    if (!convertedName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        AddAnimationNameVariants(paths, character, skin, prefix + "_" + convertedName);
+                }
+            }
+
+            var result = new Dictionary<ulong, string>();
+            foreach (string path in paths.OrderBy(value => value, StringComparer.Ordinal))
+                result.TryAdd(XxHash64Ext.Hash(PathUtils.NormalizePath(path)), path);
+            return result;
+        }
+
+        private static HashSet<string> GetReusableAnimationPrefixes(IEnumerable<string> names)
+        {
+            var knownNames = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var prefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string name in knownNames)
+            {
+                for (int separator = name.IndexOf('_'); separator > 0; separator = name.IndexOf('_', separator + 1))
+                {
+                    string prefix = name[..separator];
+                    string remainder = name[(separator + 1)..];
+                    if (prefix.Length > 0 && prefix.Length <= 12 && prefix.All(char.IsLetterOrDigit) && remainder.Length > 0 && knownNames.Contains(remainder))
+                        prefixes.Add(prefix);
+                }
+            }
+            return prefixes;
+        }
+
+        private static void AddAnimationNameVariants(ISet<string> paths, string character, string skin, string name)
+        {
+            string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
+            if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) return;
+            stem = stem.ToLowerInvariant();
+
+            Add(stem + ".anm");
+            Add(character + "_" + stem + ".anm");
+            Add(character + "_" + skin + "_" + stem + ".anm");
+            Add(skin + "_" + stem + ".anm");
+
+            void Add(string fileName) => paths.Add($"assets/characters/{character}/skins/{skin}/animations/{fileName}");
+        }
+
+        private static string GetBasename(string path)
+        {
+            int separator = path.LastIndexOf('/');
+            return separator >= 0 ? path[(separator + 1)..] : path;
+        }
+
+        private static IEnumerable<ulong> EnumerateAnimationFileLinks(BinTree tree)
+        {
+            foreach (BinTreeObject item in tree.Objects.Values)
+                if (item.Properties.TryGetValue(ClipDataMapNameHash, out BinTreeProperty property) &&
+                    property is BinTreeMap map)
+                    foreach (ulong target in EnumerateAnimationFileLinks(map))
+                        yield return target;
+
+            foreach (BinTreeDataOverride item in tree.DataOverrides)
+                if (item.Property is BinTreeMap map && item.Property.NameHash == ClipDataMapNameHash)
+                    foreach (ulong target in EnumerateAnimationFileLinks(map))
+                        yield return target;
+        }
+
+        private static IEnumerable<ulong> EnumerateAnimationFileLinks(BinTreeMap map)
+        {
+            foreach (var pair in map)
+            {
+                if (pair.Value is not BinTreeStruct clip ||
+                    !clip.Properties.TryGetValue(AnimationResourceDataNameHash, out BinTreeProperty resource) ||
+                    resource is not BinTreeStruct animationResource ||
+                    !animationResource.Properties.TryGetValue(AnimationFilePathNameHash, out BinTreeProperty path) ||
+                    path is not BinTreeWadChunkLink link)
+                    continue;
+
+                yield return link.Value;
+            }
+        }
 
         internal int GrepFile(
             HashGuessEngine engine,

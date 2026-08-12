@@ -9,6 +9,8 @@ using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
+using LeagueToolkit.Core.Meta;
+using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Wad;
 using LeagueToolkit.Hashing;
 using Xunit;
@@ -216,6 +218,89 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             guesser.GrepWad(engine, data, "data/test.bin", "test.wad.client", 3);
 
             AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameAnimationBinLinksResolveContextualAnmPath()
+        {
+            const string expected = "assets/characters/seraphine/skins/skin69/animations/joke_start.anm";
+            ulong targetHash = XxHash64Ext.Hash(expected);
+            var animationResource = new BinTreeStruct(
+                Fnv1a.HashLower("mAnimationResourceData"),
+                Fnv1a.HashLower("AnimationResourceData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), targetHash)
+                });
+            var clip = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AtomicClipData"),
+                new BinTreeProperty[] { animationResource });
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, Fnv1a.HashLower("JokeStart")),
+                        clip)
+                });
+            var tree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(0x12345678, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map })
+                },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/seraphine/skins/skin10/animations/joke_start.anm"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                0x1234UL);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(HashGuessStrategy.AnimationBinLink, match.Strategy);
+            Assert.Equal("Seraphine.wad.client", match.SourceWadPath);
+            Assert.Equal(0x1234UL, match.SourceChunkHash);
+        }
+
+        [Fact]
+        public void GameAnimationCandidatesCarryCharacterSkinNumberVariants()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/seraphine/skins/skin10/animations/seraphine_skin10_spell1.anm"
+            }));
+
+            Assert.Contains(
+                game.GenerateAnimationContextCandidates("seraphine", "skin69"),
+                path => path == "assets/characters/seraphine/skins/skin69/animations/seraphine_skin69_spell1.anm");
+        }
+
+        [Fact]
+        public void GameAnimationCandidatesDeriveReusableCharacterPrefixes()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/seraphine/skins/skin10/animations/spell1_to_idle.anm",
+                "assets/characters/seraphine/skins/skin10/animations/p_spell1_to_run.anm",
+                "assets/characters/seraphine/skins/skin10/animations/spell1_to_run.anm"
+            }));
+
+            Assert.Contains(
+                game.GenerateAnimationContextCandidates("seraphine", "skin69"),
+                path => path == "assets/characters/seraphine/skins/skin69/animations/p_spell1_to_idle.anm");
         }
 
         [Fact]

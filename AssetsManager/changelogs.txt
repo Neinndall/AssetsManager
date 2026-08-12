@@ -22,6 +22,7 @@ New Features
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
+  - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
