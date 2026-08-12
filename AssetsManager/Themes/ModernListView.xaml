@@ -151,13 +151,13 @@
 
     <!-- Estilo global moderno para tablas ListView con GridView -->
     <Style x:Key="ModernTableListView" TargetType="ListView">
-        <Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
+				<Setter Property="Background" Value="{StaticResource SidebarBackground}"/>
+				<Setter Property="BorderBrush" Value="Transparent"/>
+				<Setter Property="BorderThickness" Value="0"/>
 				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
-        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-        <Setter Property="ItemContainerStyle" Value="{StaticResource ModernListViewItem}"/>
-        <Setter Property="Template">
+				<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+				<Setter Property="ItemContainerStyle" Value="{StaticResource ModernListViewItem}"/>
+				<Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListView">
                     <Border BorderBrush="{TemplateBinding BorderBrush}"
