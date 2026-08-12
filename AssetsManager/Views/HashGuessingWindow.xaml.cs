@@ -263,23 +263,20 @@ namespace AssetsManager.Views
                     foundMatches = value.FoundMatches;
                     UpdateStatus();
                 });
-                IProgress<HashGuessMatch> matchProgress =
-                    (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu || mode == HashGuessMode.LcuV1Paths)
-                    ? new Progress<HashGuessMatch>(match =>
-                    {
-                        if (displayedMatchHashes.Add(match.Hash))
-                            _viewModel.Matches.Add(match);
-                    })
-                    : null;
+                IProgress<HashGuessMatch> matchProgress = new Progress<HashGuessMatch>(match =>
+                {
+                    if (displayedMatchHashes.Add(match.Hash))
+                        _viewModel.Matches.Add(match);
+                });
                 var result = mode switch
                 {
-                    HashGuessMode.RunCanonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, runCancellation.Token),
-                    HashGuessMode.RunLocales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, runCancellation.Token),
-                    HashGuessMode.RunNumbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, runCancellation.Token),
-                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token),
-                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token),
-                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token),
-                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token),
+                    HashGuessMode.RunCanonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
+                    HashGuessMode.RunLocales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
+                    HashGuessMode.RunNumbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
+                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
