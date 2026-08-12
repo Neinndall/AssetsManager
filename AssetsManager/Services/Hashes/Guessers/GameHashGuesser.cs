@@ -379,7 +379,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal IEnumerable<HashGuessCandidate> GuessShaderVariants()
         {
             var shaderPaths = new HashSet<string>(StringComparer.Ordinal);
-            var regex = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|\.))", RegexOptions.IgnoreCase);
+            var regex = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase);
             foreach (string path in KnownPaths)
             {
                 Match match = regex.Match(path);

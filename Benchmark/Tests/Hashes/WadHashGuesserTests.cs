@@ -895,7 +895,8 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             {
                 "characters/ahri",
                 "assets/ui/icon.png",
-                "assets/shaders/test.ps.dx11"
+                "assets/shaders/test.ps.dx11",
+                "assets/shaders/test.ps-dx11"
             }));
 
             Assert.Contains("ahri", game.GetCharacters());
