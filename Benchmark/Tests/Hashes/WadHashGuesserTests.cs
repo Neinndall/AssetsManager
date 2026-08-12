@@ -95,6 +95,44 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Same(game.KnownPaths, game.KnownPaths);
             Assert.Same(game.DirectoryList(), game.DirectoryList());
             Assert.Same(game.BuildWordlist(), game.BuildWordlist());
+            Assert.Same(game.BuildSwordlist(), game.BuildSwordlist());
+        }
+
+        [Fact]
+        public void SwordlistUsesBasenamesFromPathsContainingBin()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.bin",
+                "assets/characters/lux/lux.bin.meta",
+                "assets/characters/zed/zed.dds"
+            }));
+
+            IReadOnlyList<string> swordlist = game.BuildSwordlist();
+
+            Assert.Contains("ahri", swordlist);
+            Assert.Contains("lux", swordlist);
+            Assert.DoesNotContain("zed", swordlist);
+        }
+
+        [Fact]
+        public void GeneralWordlistMatchesPythonTokenAndNumericFiltering()
+        {
+            IReadOnlyList<string> words = HashGuessEngine.BuildWordlist(new[]
+            {
+                "assets/123/scene.json",
+                "assets/maps/1234",
+                "assets/foo_42-bar.data"
+            });
+
+            Assert.Contains("assets", words);
+            Assert.Contains("foo", words);
+            Assert.Contains("42", words);
+            Assert.Contains("bar", words);
+            Assert.DoesNotContain("123", words);
+            Assert.DoesNotContain("1234", words);
+            Assert.DoesNotContain("json", words);
+            Assert.DoesNotContain("data", words);
         }
 
         [Fact]
@@ -182,6 +220,129 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 1);
 
             AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuLootTranslationGrepAddsHextechImagePaths()
+        {
+            const string expected = "plugins/rcp-be-lol-game-data/global/default/v1/hextech-images/item.png";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("{\"item\":{}}"),
+                "plugins/rcp-fe-lol-loot/global/default/trans.json",
+                "loot.wad",
+                2);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuPluginDescriptionGrepAddsCommonPluginPaths()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/init.js";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("{\"pluginDependencies\":[],\"name\":\"rcp-fe-test\"}"),
+                "plugins/rcp-fe-test/global/default/description.json",
+                "test.wad",
+                3);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuChampionSummaryGrepAddsChampionAndSplashMetadata()
+        {
+            const string champion = "plugins/rcp-be-lol-game-data/global/default/v1/champions/123.json";
+            const string splash = "plugins/rcp-be-lol-game-data/global/default/v1/champion-splashes/123/metadata.json";
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                new[] { champion, splash }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("[{\"id\":123}]"),
+                "plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json",
+                "game.wad",
+                4);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(
+                new[] { champion, splash }.OrderBy(path => path),
+                engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
+        }
+
+        [Fact]
+        public void LcuRecommendedItemsGrepAddsGameDataPaths()
+        {
+            const string expected = "plugins/rcp-be-lol-game-data/global/default/data/items/1001.json";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("{\"recommendedItemDefaults\":[\"/data/items/1001.json\"]}"),
+                "plugins/rcp-be-lol-game-data/global/default/v1/items.json",
+                "game.wad",
+                5);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void LcuGrepCoversFrontendDataAndGameDataAssetReferences()
+        {
+            const string frontend = "plugins/rcp-fe-test/global/default/init.js";
+            const string data = "plugins/rcp-be-lol-game-data/global/default/data/items/1001.json";
+            const string asset = "plugins/rcp-be-lol-game-data/global/default/data/characters/ahri/ahri.json";
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                new[] { frontend, data, asset }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("fe/test/init.js /DATA/items/1001.json lol-game-data/assets/data/characters/ahri/ahri.json"),
+                "init.js",
+                "game.wad",
+                6);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(
+                new[] { asset, data, frontend },
+                engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
+        }
+
+        [Fact]
+        public void LcuGrepCoversTemplateFileNameAndSourceMapBasenames()
+        {
+            const string directory = "plugins/rcp-fe-test/global/default";
+            const string template = directory + "/abc/template.html";
+            const string fileName = directory + "/icon.png";
+            const string sourceMap = directory + "/map.js";
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                new[] { template, fileName, sourceMap }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            var guesser = new LcuHashGuesser(new[] { directory + "/existing.json" }, null);
+
+            guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("<template id=\"app-template-abc\"></template> \"icon.png\" sourceMappingURL=map.js.map"),
+                directory + "/init.js",
+                "test.wad",
+                7);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(
+                new[] { fileName, sourceMap, template }.OrderBy(path => path),
+                engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
         }
 
         [Fact]
@@ -273,6 +434,72 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Equal(HashGuessStrategy.AnimationBinLink, match.Strategy);
             Assert.Equal("Seraphine.wad.client", match.SourceWadPath);
             Assert.Equal(0x1234UL, match.SourceChunkHash);
+        }
+
+        [Fact]
+        public void GameAnimationBinLinksUseClipNameHashesAndNumericVariants()
+        {
+            const string happy = "assets/characters/seraphine/skins/skin69/animations/joke_happy.anm";
+            const string sad = "assets/characters/seraphine/skins/skin69/animations/joke_sad.anm";
+            const string passive = "assets/characters/seraphine/skins/skin69/animations/passive_attack_-180.anm";
+            var entries = new[]
+            {
+                CreateClip("joke_happy", happy),
+                CreateClip("joke_sad", sad),
+                CreateClip("passive_attack_left", passive)
+            };
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                entries);
+            var tree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(0x12345678, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map })
+                },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/seraphine/skins/skin10/animations/joke_start.anm",
+                "assets/characters/seraphine/skins/skin10/animations/passive_attack_-90.anm",
+                "assets/shared/happy/file.bin",
+                "assets/shared/sad/file.bin"
+            }));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new[] { happy, sad, passive }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                0x5678UL);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.Equal(new[] { happy, sad, passive }, engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
+            Assert.All(engine.Matches.Values, match => Assert.Equal(HashGuessStrategy.AnimationBinLink, match.Strategy));
+
+            static KeyValuePair<BinTreeProperty, BinTreeProperty> CreateClip(string name, string path)
+            {
+                var resource = new BinTreeStruct(
+                    Fnv1a.HashLower("mAnimationResourceData"),
+                    Fnv1a.HashLower("AnimationResourceData"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(path))
+                    });
+                var clip = new BinTreeStruct(
+                    0,
+                    Fnv1a.HashLower("AtomicClipData"),
+                    new BinTreeProperty[] { resource });
+                return new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                    new BinTreeHash(0, Fnv1a.HashLower(name)),
+                    clip);
+            }
         }
 
         [Fact]
@@ -452,7 +679,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void SpecializedGuessersOwnCanonicalAndCrossDomainStrategies()
+        public void SpecializedGuessersOwnCharacterAndCrossDomainStrategies()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
@@ -463,12 +690,25 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 "plugins/rcp-be-lol-game-data/global/default/assets/characters/ahri/hud/ahri_square.png"
             }), null);
 
-            Assert.Contains(game.GenerateCanonicalCandidates(lcu), candidate =>
-                candidate.Path == "data/characters/ahri/skins/base/ahri.skn");
-            Assert.Contains(lcu.GuessFromGameHashes(game), candidate =>
-                candidate.Path == "plugins/rcp-be-lol-game-data/global/default/assets/characters/ahri/hud/ahri_square.png");
-            Assert.Contains(game.GuessFromLcuHashes(lcu), candidate =>
-                candidate.Path == "assets/characters/ahri/hud/ahri_square.dds");
+            const string expectedCharacter = "data/characters/ahri/skins/base/ahri.skn";
+            var characterEngine = CreateEngine(HashGuessDomain.Game, expectedCharacter);
+            int checkedCharacters = game.GuessCharacterFiles(characterEngine, CancellationToken.None);
+            AssertResolved(characterEngine, expectedCharacter);
+            Assert.True(checkedCharacters > 0);
+
+            const string expectedCharacterTexture = "assets/characters/ahri/hud/ahri_square.dds";
+            var textureEngine = CreateEngine(HashGuessDomain.Game, expectedCharacterTexture);
+            game.GuessCharacterFiles(textureEngine, CancellationToken.None);
+            AssertResolved(textureEngine, expectedCharacterTexture);
+            const string expectedCrossDomain = "plugins/rcp-be-lol-game-data/global/default/assets/characters/ahri/hud/ahri_square.png";
+            var crossDomainEngine = CreateEngine(HashGuessDomain.Lcu, expectedCrossDomain);
+            int checkedCrossDomain = lcu.GuessFromGameHashes(crossDomainEngine, game, CancellationToken.None);
+            AssertResolved(crossDomainEngine, expectedCrossDomain);
+            Assert.True(checkedCrossDomain > 0);
+            var gameCrossDomainEngine = CreateEngine(HashGuessDomain.Game, expectedCharacterTexture);
+            int checkedGameCrossDomain = game.GuessFromLcuHashes(gameCrossDomainEngine, lcu, CancellationToken.None);
+            AssertResolved(gameCrossDomainEngine, expectedCharacterTexture);
+            Assert.True(checkedGameCrossDomain > 0);
         }
 
         [Fact]
@@ -487,17 +727,34 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 "plugins/rcp-be-lol-game-data/global/default/assets/client/already.dds"
             }), null);
 
-            var lcuCandidates = lcu.GuessFromGameHashes(game).Select(candidate => candidate.Path).ToHashSet();
-            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.png", lcuCandidates);
-            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/assets/game/source.jpg", lcuCandidates);
-            Assert.Contains("plugins/rcp-be-lol-game-data/global/default/data/game/config.json", lcuCandidates);
-            Assert.DoesNotContain("plugins/rcp-be-lol-game-data/global/default/assets/game/source.dds", lcuCandidates);
-            Assert.DoesNotContain("plugins/rcp-be-lol-game-data/global/default/assets/game/already.png", lcuCandidates);
+            const string sourcePng = "plugins/rcp-be-lol-game-data/global/default/assets/game/source.png";
+            const string sourceJpg = "plugins/rcp-be-lol-game-data/global/default/assets/game/source.jpg";
+            const string config = "plugins/rcp-be-lol-game-data/global/default/data/game/config.json";
+            const string webp = "plugins/rcp-be-lol-game-data/global/default/assets/game/source.webp";
+            var lcuEngine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                new[] { sourcePng, sourceJpg, config, webp }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            int lcuCheckedCandidates = lcu.GuessFromGameHashes(lcuEngine, game, CancellationToken.None);
+            Assert.Equal(1, lcuEngine.RemainingUnknownCount);
+            Assert.Contains(lcuEngine.Matches.Values, match => match.Path == sourcePng);
+            Assert.Contains(lcuEngine.Matches.Values, match => match.Path == sourceJpg);
+            Assert.Contains(lcuEngine.Matches.Values, match => match.Path == config);
+            Assert.DoesNotContain(lcuEngine.Matches.Values, match => match.Path == webp);
+            Assert.Equal(3, lcuCheckedCandidates);
 
-            var gameCandidates = game.GuessFromLcuHashes(lcu).Select(candidate => candidate.Path).ToHashSet();
-            Assert.Contains("assets/client/icon.dds", gameCandidates);
-            Assert.Contains("assets/client/icon.tex", gameCandidates);
-            Assert.Contains("data/client/config.json", gameCandidates);
+            string[] expectedGameCandidates = { "assets/client/icon.dds", "data/client/config.json" };
+            var gameEngine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                expectedGameCandidates
+                    .Append("assets/client/already.dds")
+                    .Select(path => XxHash64Ext.Hash(path))
+                    .ToHashSet());
+            int gameCheckedCandidates = game.GuessFromLcuHashes(gameEngine, lcu, CancellationToken.None);
+            Assert.Equal(1, gameEngine.RemainingUnknownCount);
+            Assert.Equal(2, gameCheckedCandidates);
+            Assert.All(expectedGameCandidates, expected =>
+                Assert.Contains(gameEngine.Matches.Values, match => match.Path == expected));
+            Assert.DoesNotContain(gameEngine.Matches.Values, match => match.Path == "assets/client/already.dds");
         }
 
         [Theory]
@@ -524,9 +781,9 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             }), null);
             var engine = CreateEngine(HashGuessDomain.Game, "assets/unrelated.bin");
 
-            int checkedCandidates = game.RunCrossDomainAttacks(engine, lcu, CancellationToken.None);
+            int checkedCandidates = game.GuessFromLcuHashes(engine, lcu, CancellationToken.None);
 
-            Assert.Equal(3, checkedCandidates);
+            Assert.Equal(1, checkedCandidates);
         }
 
         [Fact]
@@ -539,7 +796,10 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             }));
 
             Assert.Contains(game.SubstituteNumbers(3), candidate => candidate.Path == "assets/test/icon2.dds");
-            Assert.Contains(game.GenerateExtensionCandidates(), candidate => candidate.Path == "assets/test/icon1.png");
+            var extensionEngine = CreateEngine(HashGuessDomain.Game, "assets/test/icon1.png");
+            int checkedExtensions = game.SubstituteExtensions(extensionEngine, CancellationToken.None);
+            AssertResolved(extensionEngine, "assets/test/icon1.png");
+            Assert.True(checkedExtensions > 0);
         }
 
         [Fact]
@@ -575,8 +835,9 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             string expected)
         {
             var engine = CreateEngine(HashGuessDomain.Game, expected);
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownPath }));
 
-            HashGuesser.RunBasenameWordSubstitution(
+            game.SubstituteBasenameWordsCore(
                 engine,
                 new[] { knownPath },
                 new[] { "red", "blue", "new" },
@@ -625,7 +886,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             }
 
             var insertionEngine = CreateEngine(HashGuessDomain.Game, inserted);
-            HashGuesser.RunWordAdditionAttack(
+            game.AddBasenameWordCore(
                 insertionEngine,
                 new[] { "assets/ui/icon.png" },
                 new[] { "new" },
@@ -674,6 +935,21 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.DoesNotContain(fixedWidth, candidate => candidate.Path == "assets/test/icon002.dds");
             Assert.Contains(unpadded, candidate => candidate.Path == "assets/test/icon2.dds");
             Assert.DoesNotContain(unpadded, candidate => candidate.Path == "assets/test/icon02.dds");
+        }
+
+        [Fact]
+        public void GameSubstituteNumbersChecksFileNameVariantsThroughCommonCore()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/test/icon12.dds"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, "assets/test/icon2.dds");
+
+            int checkedCandidates = game.SubstituteNumbers(engine, CancellationToken.None);
+
+            AssertResolved(engine, "assets/test/icon2.dds");
+            Assert.True(checkedCandidates > 0);
         }
 
         [Fact]
@@ -731,14 +1007,27 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 "plugins/rcp-fe-two/global/default/assets/other.png"
             }), null);
 
-            Assert.Contains(lcu.SubstitutePlugin(), candidate =>
-                candidate.Path == "plugins/rcp-fe-two/global/en_us/assets/icon.png");
-            Assert.Contains(lcu.SubstituteRegionLang(), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/pbe/default/assets/icon.png");
-            Assert.Contains(lcu.SubstituteRegionLang(), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/global/default/assets/icon.png");
-            Assert.Contains(lcu.GuessPatterns(), candidate =>
-                candidate.Path == "plugins/rcp-fe-lol-perks/global/default/images/construct/8000/environment.jpg");
+            const string expectedPlugin = "plugins/rcp-fe-two/global/en_us/assets/icon.png";
+            var pluginEngine = CreateEngine(HashGuessDomain.Lcu, expectedPlugin);
+            int checkedPlugins = lcu.SubstitutePlugin(pluginEngine, CancellationToken.None);
+            AssertResolved(pluginEngine, expectedPlugin);
+            Assert.True(checkedPlugins > 0);
+            const string expectedPbe = "plugins/rcp-fe-one/pbe/default/assets/icon.png";
+            var pbeEngine = CreateEngine(HashGuessDomain.Lcu, expectedPbe);
+            int checkedPbe = lcu.SubstituteRegionLang(pbeEngine, CancellationToken.None);
+            AssertResolved(pbeEngine, expectedPbe);
+            Assert.True(checkedPbe > 0);
+
+            const string expectedGlobal = "plugins/rcp-fe-one/global/default/assets/icon.png";
+            var globalEngine = CreateEngine(HashGuessDomain.Lcu, expectedGlobal);
+            int checkedGlobal = lcu.SubstituteRegionLang(globalEngine, CancellationToken.None);
+            AssertResolved(globalEngine, expectedGlobal);
+            Assert.True(checkedGlobal > 0);
+            const string expectedPattern = "plugins/rcp-fe-lol-perks/global/default/images/construct/8000/environment.jpg";
+            var patternEngine = CreateEngine(HashGuessDomain.Lcu, expectedPattern);
+            int checkedPatterns = lcu.GuessPatterns(patternEngine, CancellationToken.None);
+            AssertResolved(patternEngine, expectedPattern);
+            Assert.True(checkedPatterns > 0);
         }
 
         [Fact]
@@ -750,9 +1039,13 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 "plugins/rcp-fe-test/global/default/asset.two"
             }), null);
 
-            var candidates = lcu.GenerateLcuExtensionCandidates().Select(candidate => candidate.Path).ToHashSet();
+            const string expected = "root/source.two";
+            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
 
-            Assert.Contains("root/source.two", candidates);
+            int checkedCandidates = lcu.SubstituteExtensions(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
         }
 
         [Fact]
@@ -760,9 +1053,15 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/ui/icon.png" }));
 
-            var candidates = game.CheckBasenamePrefixes(new[] { "2x_", "2x_" }).Select(candidate => candidate.Path).ToList();
+            const string expected = "assets/ui/2x_icon.png";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            int checkedCandidates = game.CheckBasenamePrefixes(
+                engine,
+                CancellationToken.None,
+                new[] { "2x_", "2x_" });
 
-            Assert.Equal("assets/ui/2x_icon.png", Assert.Single(candidates));
+            AssertResolved(engine, expected);
+            Assert.Equal(1, checkedCandidates);
         }
 
         [Fact]
@@ -784,6 +1083,86 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuSpecializedWordlistsUseExpectedBasenameFilters()
+        {
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "plugins/rcp-fe-lol-home/global/default/menu/main.json",
+                "plugins/rcp-fe-lol-home/global/default/menu/home.svg",
+                "plugins/rcp-fe-lol-static-assets/global/default/navigation/play.svg",
+                "plugins/rcp-fe-lol-static-assets/global/default/navigation/play.png",
+                "plugins/rcp-fe-lol-other/global/default/images/logo.svg",
+                "plugins/rcp-fe-lol-other/global/default/images/logo.jpg",
+                "plugins/rcp-be-other/global/default/menu/other.json"
+            }), null);
+
+            IReadOnlyList<string> swordlist = lcu.BuildSwordlist();
+            IReadOnlyList<string> sswordlist = lcu.BuildSswordlist();
+            IReadOnlyList<string> pngJpgSwordlist = lcu.BuildPngJpgSwordlist();
+
+            Assert.Contains("main", swordlist);
+            Assert.DoesNotContain("home", swordlist);
+            Assert.DoesNotContain("play", swordlist);
+            Assert.DoesNotContain("other", swordlist);
+
+            Assert.Contains("home", sswordlist);
+            Assert.Contains("play", sswordlist);
+            Assert.Contains("logo", sswordlist);
+            Assert.DoesNotContain("main", sswordlist);
+
+            Assert.Contains("play", pngJpgSwordlist);
+            Assert.Contains("logo", pngJpgSwordlist);
+            Assert.DoesNotContain("main", pngJpgSwordlist);
+
+            Assert.Same(swordlist, lcu.BuildSwordlist());
+            Assert.Same(sswordlist, lcu.BuildSswordlist());
+            Assert.Same(pngJpgSwordlist, lcu.BuildPngJpgSwordlist());
+        }
+
+        [Fact]
+        public void LcuCustomRunsAllRcpFeLolSvgBasenameWordVariants()
+        {
+            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
+            {
+                "plugins/rcp-fe-lol-home/global/default/navigation/old-icon.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-alpha.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/old-icon.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-alpha.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/old-icon.png",
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-alpha.png",
+                "plugins/rcp-fe-lol-other/global/default/navigation/old-icon.jpg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-alpha.jpg",
+                "plugins/rcp-fe-other/global/default/navigation/old-icon.svg",
+                "plugins/rcp-fe-other/global/default/navigation/new-alpha.svg"
+            }), null);
+            string[] expectedPaths =
+            {
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new-icon.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new-icon.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon.png",
+                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new-icon.png",
+                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new.png",
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon.jpg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new-icon.jpg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new.jpg"
+            };
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                expectedPaths.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            int checkedCandidates = lcu.RunCustomAttacks(engine, null, CancellationToken.None);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(expectedPaths, expected =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == expected));
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
         public void LcuExplicitCdtbMethodsUseFullWordlistAndExactNumbers()
         {
             var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
@@ -802,12 +1181,21 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 words: new[] { "new" });
 
             AssertResolved(substitutionEngine, substituted);
-            Assert.Contains(lcu.SubstituteNumbers(3), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/global/default/navigation/old-icon2.png");
-            Assert.DoesNotContain(lcu.SubstituteNumbers(3), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/global/default/navigation/old-icon002.png");
-            Assert.Contains(lcu.SubstitutePlugin(), candidate =>
-                candidate.Path == "plugins/rcp-fe-two/global/default/navigation/old-icon1.png");
+            const string expectedNumber = "plugins/rcp-fe-one/global/default/navigation/old-icon2.png";
+            var numberEngine = CreateEngine(HashGuessDomain.Lcu, expectedNumber);
+            int checkedNumbers = lcu.SubstituteNumbers(numberEngine, CancellationToken.None, maximum: 3);
+            AssertResolved(numberEngine, expectedNumber);
+            Assert.True(checkedNumbers > 0);
+
+            const string paddedNumber = "plugins/rcp-fe-one/global/default/navigation/old-icon002.png";
+            var paddedNumberEngine = CreateEngine(HashGuessDomain.Lcu, paddedNumber);
+            lcu.SubstituteNumbers(paddedNumberEngine, CancellationToken.None, maximum: 3);
+            Assert.Equal(1, paddedNumberEngine.RemainingUnknownCount);
+            const string expectedPlugin = "plugins/rcp-fe-two/global/default/navigation/old-icon1.png";
+            var pluginEngine = CreateEngine(HashGuessDomain.Lcu, expectedPlugin);
+            int checkedPlugins = lcu.SubstitutePlugin(pluginEngine, CancellationToken.None);
+            AssertResolved(pluginEngine, expectedPlugin);
+            Assert.True(checkedPlugins > 0);
 
             const string inserted = "plugins/rcp-fe-one/global/default/navigation/navigation-old-icon1.png";
             var insertionEngine = CreateEngine(HashGuessDomain.Lcu, inserted);
@@ -823,26 +1211,16 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
                 "plugins/rcp-fe-one/global/default/skin1/old-icon1.png"
             }), null);
 
-            Assert.Contains(lcu.SubstituteNumbers(20), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/global/default/skin1/old-icon2.png");
-            Assert.DoesNotContain(lcu.SubstituteNumbers(20), candidate =>
-                candidate.Path == "plugins/rcp-fe-one/global/default/skin2/old-icon1.png");
-        }
+            const string expectedFileName = "plugins/rcp-fe-one/global/default/skin1/old-icon2.png";
+            var fileNameEngine = CreateEngine(HashGuessDomain.Lcu, expectedFileName);
+            int checkedNumbers = lcu.SubstituteNumbers(fileNameEngine, CancellationToken.None, maximum: 20);
+            AssertResolved(fileNameEngine, expectedFileName);
+            Assert.True(checkedNumbers > 0);
 
-        [Fact]
-        public void LcuAdvancedPartiesAttackUsesReducedPngWordsForOneToTwoSubstitution()
-        {
-            var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
-            {
-                "plugins/rcp-fe-lol-parties/global/default/assets/old-icon.png",
-                "plugins/rcp-fe-lol-static-assets/global/default/images/new-alpha.png"
-            }), null);
-            const string expected = "plugins/rcp-fe-lol-parties/global/default/assets/new-alpha-icon.png";
-            var engine = CreateEngine(HashGuessDomain.Lcu, expected);
-
-            lcu.SubstitutePartiesBasenameWordPairs(engine, CancellationToken.None);
-
-            AssertResolved(engine, expected);
+            const string expectedDirectory = "plugins/rcp-fe-one/global/default/skin2/old-icon1.png";
+            var directoryEngine = CreateEngine(HashGuessDomain.Lcu, expectedDirectory);
+            lcu.SubstituteNumbers(directoryEngine, CancellationToken.None, maximum: 20);
+            Assert.Equal(1, directoryEngine.RemainingUnknownCount);
         }
 
         [Fact]
@@ -901,12 +1279,71 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 
             Assert.Contains("ahri", game.GetCharacters());
             Assert.Contains("shaders", game.BuildWordlist());
-            Assert.Contains(game.CheckBasenamePrefixes(), candidate => candidate.Path == "assets/ui/2x_icon.png");
-            Assert.Contains(game.GuessCharacterFiles(new[] { "lux" }), candidate =>
-                candidate.Path == "data/characters/lux/skins/base/lux.skn");
-            Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps.metal_19900");
-            Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps-dx11");
-            Assert.Contains(game.GuessShaderVariants(), candidate => candidate.Path == "assets/shaders/test.ps-metal_19900");
+            var prefixEngine = CreateEngine(HashGuessDomain.Game, "assets/ui/2x_icon.png");
+            game.CheckBasenamePrefixes(prefixEngine, CancellationToken.None);
+            AssertResolved(prefixEngine, "assets/ui/2x_icon.png");
+
+            var characterEngine = CreateEngine(HashGuessDomain.Game, "data/characters/lux/skins/base/lux.skn");
+            game.GuessCharacterFiles(characterEngine, CancellationToken.None, new[] { "lux" });
+            AssertResolved(characterEngine, "data/characters/lux/skins/base/lux.skn");
+
+            string[] shaderTargets =
+            {
+                "assets/shaders/test.ps.metal_19900",
+                "assets/shaders/test.ps-dx11",
+                "assets/shaders/test.ps-metal_19900"
+            };
+            var shaderEngine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                shaderTargets.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+            game.GuessShaderVariants(shaderEngine, CancellationToken.None);
+            Assert.Equal(0, shaderEngine.RemainingUnknownCount);
+            Assert.All(shaderTargets, expected =>
+                Assert.Contains(shaderEngine.Matches.Values, match => match.Path == expected));
+        }
+
+        [Fact]
+        public void GameCharacterTemplatesMatchCdtbCoverage()
+        {
+            var game = new GameHashGuesser();
+            string[] targets =
+            {
+                "data/characters/lux/skins/root.bin",
+                "data/characters/lux/skins/skin0.bin",
+                "data/characters/lux/skins/skin199.bin",
+                "data/characters/lux/animations/skin0.bin",
+                "data/characters/lux/animations/skin199.bin"
+            };
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                targets.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            int checkedCandidates = game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "lux" });
+
+            Assert.True(checkedCandidates > 0);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(targets, expected =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == expected));
+        }
+
+        [Fact]
+        public void GamePetCharacterTemplatesMatchCdtbCoverage()
+        {
+            var game = new GameHashGuesser();
+            string[] targets =
+            {
+                "data/characters/pet_tft/tiers/tier0.bin",
+                "data/characters/pet_tft/tiers/tier9.bin"
+            };
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                targets.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "pet_tft" });
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(targets, expected =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == expected));
         }
 
         [Theory]
@@ -1090,6 +1527,21 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameSuffixSubstitutionKeepsDistinctKnownSuffixes()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/test/icon.en_us.dds",
+                "assets/test/icon.fr_fr.dds"
+            }));
+
+            var candidates = game.SubstituteSuffixes().Select(candidate => candidate.Path).ToHashSet(StringComparer.Ordinal);
+
+            Assert.Contains("assets/test/icon.en_us.dds", candidates);
+            Assert.Contains("assets/test/icon.fr_fr.dds", candidates);
+        }
+
+        [Fact]
         public async System.Threading.Tasks.Task GameSkinNumberLanguageAndLocalGroupMethodsMatchCdtb()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
@@ -1099,9 +1551,11 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             }));
 
             Assert.Contains(game.SubstituteSkinNumbers(), candidate =>
-                candidate.Path == "assets/characters/ahri/skins/skin2/foo_skin1.en_us.dds");
-            Assert.Contains(game.SubstituteLang(), candidate =>
-                candidate.Path == "assets/characters/ahri/skins/skin1/foo_skin2.fr_fr.dds");
+                candidate.Path == "assets/characters/ahri/skins/skin1/foo_skin2.en_us.dds");
+            const string expectedLocale = "assets/characters/ahri/skins/skin1/foo_skin2.fr_fr.dds";
+            var languageEngine = CreateEngine(HashGuessDomain.Game, expectedLocale);
+            game.SubstituteLang(languageEngine, CancellationToken.None);
+            AssertResolved(languageEngine, expectedLocale);
 
             const string expectedGroup = "data/ahri_skins_skin0_skins_skin1.bin";
             var engine = CreateEngine(HashGuessDomain.Game, expectedGroup);
@@ -1142,25 +1596,26 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void GameSkinNumberEqualTokensGenerateRealPairs()
+        public void GameSkinNumberSubstitutionUsesCombinationsInsteadOfPermutations()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "data/characters/annie/skins/skin1/annie_skin1.skn",
-                "data/characters/annie/skins/skin3/annie_skin3.dds"
+                "data/characters/annie/skins/skin2/annie_skin2.skn",
+                "data/characters/annie/skins/skin3/annie_skin3.skn"
             }));
-            const string expected = "data/characters/annie/skins/skin3/annie_skin3.skn";
-            var engine = CreateEngine(HashGuessDomain.Game, expected);
 
-            foreach (var candidate in game.SubstituteSkinNumbers())
-            {
-                game.Check(engine, candidate.Path, candidate.Strategy);
-                if (engine.RemainingUnknownCount == 0) break;
-            }
+            var candidates = game.SubstituteSkinNumbers()
+                .Select(candidate => candidate.Path)
+                .Where(path => path.EndsWith(".skn", StringComparison.Ordinal))
+                .ToList();
 
-            AssertResolved(engine, expected);
-            Assert.DoesNotContain(game.SubstituteSkinNumbers(), candidate =>
-                candidate.Path == "data/characters/annie/skins/skin3/annie_skin1.skn");
+            Assert.Equal(3, candidates.Count);
+            Assert.Equal(candidates.Count, candidates.Distinct(StringComparer.Ordinal).Count());
+            Assert.Contains("data/characters/annie/skins/skin1/annie_skin2.skn", candidates);
+            Assert.Contains("data/characters/annie/skins/skin1/annie_skin3.skn", candidates);
+            Assert.Contains("data/characters/annie/skins/skin2/annie_skin3.skn", candidates);
+            Assert.DoesNotContain("data/characters/annie/skins/skin3/annie_skin1.skn", candidates);
         }
 
         [Fact]
@@ -1220,6 +1675,133 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameCustomBinWordlistAttackUsesBinPathsAndBasenames()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.bin",
+                "assets/characters/lux/lux.bin",
+                "assets/characters/ahri/ahri.dds"
+            }));
+            const string expected = "assets/characters/ahri/lux.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteBinBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomDataBinWordlistAttackUsesOnlyDataBinPaths()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "data/characters/ahri/ahri.bin",
+                "data/characters/lux/lux.bin",
+                "assets/characters/ahri/ahri.bin",
+                "data/characters/ahri/ahri.dds"
+            }));
+            const string expected = "data/characters/ahri/lux.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteDataBinBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomCharacterDdsWordlistAttackUsesOnlyCharacterDdsPaths()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.dds",
+                "assets/characters/lux/lux.dds",
+                "assets/characters/ahri/ahri.bin",
+                "assets/maps/ahri/ahri.dds"
+            }));
+            const string expected = "assets/characters/ahri/lux.dds";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteCharacterDdsBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomCharacterTexWordlistAttackUsesOnlyCharacterTexPaths()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.tex",
+                "assets/characters/lux/lux.tex",
+                "assets/characters/ahri/ahri.dds",
+                "assets/maps/ahri/ahri.tex"
+            }));
+            const string expected = "assets/characters/ahri/lux.tex";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteCharacterTexBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomWordAdditionUsesDeterministicGameLists()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.bin",
+                "assets/characters/lux/lux.bin"
+            }));
+            const string expected = "assets/characters/ahri/ahri_lux.bin";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.AddCustomBasenameWord(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomSwordlistSubstitutionUsesTheSpecializedBinWords()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.dds",
+                "assets/characters/lux/lux.bin",
+                "assets/characters/zed/zed.bin"
+            }));
+            const string expected = "assets/characters/ahri/lux.dds";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteSwordlistBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
+        public void GameCustomWordlistSubstitutionUsesTheGeneralGameWords()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/ahri.dds",
+                "assets/characters/lux/lux.dds"
+            }));
+            const string expected = "assets/characters/ahri/lux.dds";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.SubstituteWordlistBasenameWords(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+            Assert.True(checkedCandidates > 0);
+        }
+
+        [Fact]
         public void HashFileLoadsUnknownExportsWithoutOwningPersistence()
         {
             string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -1258,29 +1840,15 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void FolderNumberSubstitutionResolvesDirectoryHashes()
+        public void GameNumberSubstitutionOnlyChangesNumbersInFileNames()
         {
             string knownPath = "assets/maps/map11/scene.dds";
             string targetPath = "assets/maps/map12/scene.dds";
-            ulong targetHash = XxHash64Ext.Hash(targetPath);
 
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownPath }));
-            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong> { targetHash });
             var candidates = game.SubstituteNumbers(maximum: 20).ToList();
 
-            Assert.Contains(candidates, candidate => candidate.Path == targetPath);
-
-            int checkedCandidates = 0;
-            foreach (var candidate in candidates)
-            {
-                checkedCandidates++;
-                game.Check(engine, candidate.Path, candidate.Strategy);
-                if (engine.RemainingUnknownCount == 0) break;
-            }
-
-            Assert.Equal(0, engine.RemainingUnknownCount);
-            Assert.Equal(targetPath, engine.Matches[targetHash].Path);
-            Assert.True(checkedCandidates <= 40);
+            Assert.DoesNotContain(candidates, candidate => candidate.Path == targetPath);
         }
 
         [Fact]
@@ -1289,7 +1857,8 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "data/characters/annie/skins/skin1/annie_skin1.skn",
-                "data/characters/annie/skins/skin3/annie_skin3.dds"
+                "data/characters/annie/skins/skin2/annie_skin2.skn",
+                "data/characters/annie/skins/skin3/annie_skin3.skn"
             }));
 
             Assert.Equal(3, game.GenerateSkinNumberCandidates(3).Count());
@@ -1327,7 +1896,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public async System.Threading.Tasks.Task GameSkinGroupsBinLocalCapsCombinationLength()
+        public async System.Threading.Tasks.Task GameSkinGroupsBinLocalGeneratesGroupsBeyondEightSkins()
         {
             var corpus = new[] { "assets/characters/test/skins/skin0/a.dds" }
                 .Concat(Enumerable.Range(1, 9).Select(skin => $"assets/characters/test/skins/skin{skin}/a.dds"))
@@ -1338,7 +1907,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 
             var deepEngine = CreateEngine(HashGuessDomain.Game, tooDeep);
             await game.GuessSkinGroupsBin(deepEngine, CancellationToken.None);
-            Assert.Equal(1, deepEngine.RemainingUnknownCount);
+            AssertResolved(deepEngine, tooDeep);
 
             var capEngine = CreateEngine(HashGuessDomain.Game, withinCap);
             await game.GuessSkinGroupsBin(capEngine, CancellationToken.None);

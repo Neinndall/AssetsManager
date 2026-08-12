@@ -24,6 +24,10 @@ New Features
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
   - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
   - Hash Guessing Lab / GAME shader variant guessing now recognizes hyphenated shader targets such as `.ps-dx11` and `.vs-metal`.
+  - Hash Guessing Lab / Added the GAME Custom Guess button with a focused BIN-basename wordlist attack using deterministic 30,000-entry build lists.
+  - Hash Guessing Lab / GAME Custom now also targets deterministic basename substitutions from `data/*.bin` paths.
+  - Hash Guessing Lab / GAME Custom now also targets deterministic basename substitutions from character `.dds` paths.
+  - Hash Guessing Lab / GAME Custom now includes character `.tex` substitutions and deterministic basename word addition.
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
@@ -49,6 +53,11 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab / GAME Canonical now follows CDTB character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
+  - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
+  - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
+  - Hash Guessing Lab / GAME Extended now runs only skin groups, chroma groups, suffixes, skin numbers, character substitution and the GetCharacters corpus helper; custom attacks are reserved for a separate button.
+  - Hash Guessing Lab / GAME WAD animation links now use BIN clip-name hashes plus corpus-derived numeric and word variants for unresolved `.anm` paths.
   - Viewer / Project Browser now features a unified context menu on both the tree view and file grid to easily close individual projects or clear the workspace.
   - Viewer / Adjusted default studio lighting to provide realistic 3D shading and highlights when loading models.
   - Viewer / Project Browser file tiles now use the same HoverColor for hover and selection without an extra border overlay.
@@ -152,7 +161,7 @@ Improvements
   - Shared GAME and LCU basename substitution now reports live candidate counts and speed during exhaustive searches.
   - LCU Basic Suite now caps basename and basename-word substitution at 10M candidates each, and numeric variant guessing only varies digits inside file names (matching CDTB), keeping the suite fast while preserving full-coverage attacks for the Advanced suite.
   - Hash Guessing / GAME number substitution is path-wide again (map11 → map12 folders resolve), while LCU numeric guessing stays anchored to file names for the Basic suite cap.
-  - Hash Guessing / GAME skin number substitution now emits only the real equal skin pairs (skins/skin12/..._skin12.skn) for single-token formats, resolving previously unreachable hashes while checking ~10x fewer candidates; mixed-token formats keep the full cross.
+  - Hash Guessing / GAME skin number substitution now follows CDTB combinations instead of permutations, avoiding the larger permutation cross while preserving mixed skin-token candidates.
   - Hash Guessing / GAME chroma skin groups only run for champions attested in the known corpus (all champions are still processed when the corpus has none), and the character list is cached per hash-file revision.
   - Hash Guessing / GAME basename word and word-addition attacks now share a frequency-ranked wordlist (basename words first) and reuse prebuilt formats cached per hash-file revision, so productive words are tried first and formats are not rebuilt on every run.
   - Hash Guessing / GAME Extended now caps the unbounded attacks (character substitution 10M, basename words 10M, word addition 10M, Cartesian cross 10M, skin numbers 5M) so patches with many unknowns no longer hang, while the frequency-ordered candidates keep the same hit order.

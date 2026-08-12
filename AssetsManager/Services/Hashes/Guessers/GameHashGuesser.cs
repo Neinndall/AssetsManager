@@ -22,8 +22,8 @@ namespace AssetsManager.Services.Hashes.Guessers
     {
         private static readonly Regex PreloadNameRegex = new("Name=\\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex ShaderIncludeRegex = new("#include \\\"([^\\\"]+)\\\"", RegexOptions.Compiled);
-        private static readonly Regex LocaleRegex = new(@"(?<![a-z])(?:ar_ae|ar_eg|cs_cz|de_de|el_gr|en_au|en_gb|en_ph|en_pl|en_sg|en_us|es_ar|es_es|es_mx|fr_fr|hu_hu|id_id|it_it|ja_jp|ko_kr|ms_my|pl_pl|pt_br|ro_ro|ru_ru|th_th|tr_tr|vi_vn|vn_vn|zh_cn|zh_my|zh_tw)(?![a-z])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
+        private static readonly Regex LocaleRegex = new($"({string.Join("|", Locales)})", RegexOptions.Compiled);
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private static readonly string[] LuaExtensions = { "luabin64", "preload" };
@@ -66,6 +66,17 @@ namespace AssetsManager.Services.Hashes.Guessers
             @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex AnimationSkinTokenRegex = new("skin\\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private const int AnimationNumberLimit = 10_000;
+        private const int CustomBinSampleSize = 30_000;
+        private const int CustomCharacterDdsSampleSize = 25_000;
+        private const int CustomCharacterTexSampleSize = 20_000;
+        private const int CustomWordAdditionSampleSize = 20_000;
+        private const int CustomFocusedPathSampleSize = 20_000;
+        private const int CustomSwordlistCandidateBudget = 10_000_000;
+        private const int CustomWordlistCandidateBudget = 10_000_000;
+        private const int SkinGroupCandidateBudget = 5_000_000;
+        private const int CharacterSubstitutionCandidateBudget = 10_000_000;
+        private const int SkinNumberSubstitutionCandidateBudget = 10_000_000;
         private static readonly uint AnimationFilePathNameHash = Fnv1a.HashLower("mAnimationFilePath");
         private static readonly uint ClipDataMapNameHash = Fnv1a.HashLower("mClipDataMap");
         private static readonly uint AnimationResourceDataNameHash = Fnv1a.HashLower("mAnimationResourceData");
@@ -74,6 +85,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             "dds", "jpg", "png", "tga", "ttf", "otf", "ogg", "webm", "anm", "skl", "skn",
             "scb", "sco", "troybin", "bnk", "wpk", "tex"
         };
+        private readonly record struct AnimationFileLink(uint NameHash, ulong PathHash);
 
         private readonly LogService _logService;
 
@@ -88,30 +100,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal override bool ShouldSkip(string extension) => SkippedExtensions.Contains(extension);
 
-        internal override IEnumerable<HashGuessCandidate> GenerateCanonicalCandidates(HashGuesser otherDomain, int candidateBudget = int.MaxValue)
-        {
-            int generated = 0;
-            foreach (HashGuessCandidate candidate in GuessCharacterFiles())
-            {
-                yield return candidate;
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-            }
-        }
-
-        internal override IEnumerable<HashGuessCandidate> GenerateLanguageCandidates(int candidateBudget = int.MaxValue)
-        {
-            int generated = 0;
-            var formats = KnownPaths.Where(path => LocaleRegex.IsMatch(path))
-                .Select(path => LocaleRegex.Replace(path, "{locale}"))
-                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal);
-            foreach (string format in formats)
-            foreach (string locale in Locales)
-            {
-                yield return new HashGuessCandidate(format.Replace("{locale}", locale, StringComparison.Ordinal), HashGuessStrategy.LanguageVariant);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-            }
-        }
-
         internal IReadOnlyList<string> GetCharacters() =>
             Corpus.GetOrCreate("characters", values => values
                 .Select(path => Regex.Match(path, @"^(?:assets/|data/)?characters/([^/.]+)(?:/|$)", RegexOptions.IgnoreCase))
@@ -124,10 +112,34 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", HashGuessEngine.BuildWordlist);
 
-        internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
+        internal IReadOnlyList<string> BuildSwordlist() =>
+            Corpus.GetOrCreate(
+                "swordlist",
+                values => HashGuessEngine.BuildWordlist(
+                    values
+                        .Where(path => path.Contains(".bin", StringComparison.Ordinal))
+                        .Select(GetBasename)));
+
+        internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 200, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
 
-        protected override bool AnchorNumberMatchesToFileName => false;
+        internal int SubstituteNumbers(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int maximum = 200,
+            int? digits = null,
+            Action<int> progress = null) =>
+            base.SubstituteNumbersCore(
+                engine,
+                KnownPaths,
+                maximum,
+                digits,
+                inferDigits: false,
+                cancellationToken: cancellationToken,
+                source: "Generated numeric variant",
+                progress: progress);
+
+        protected override bool AnchorNumberMatchesToFileName => true;
 
         internal IEnumerable<HashGuessCandidate> SubstituteBasicNumbers(int maximum = 100)
         {
@@ -139,8 +151,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return candidate;
         }
 
-        internal IEnumerable<HashGuessCandidate> CheckBasenamePrefixes(IEnumerable<string> prefixes = null)
+        internal int CheckBasenamePrefixes(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            IEnumerable<string> prefixes = null,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
             string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }).ToArray();
             var candidates = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in KnownPaths)
@@ -152,54 +173,395 @@ namespace AssetsManager.Services.Hashes.Guessers
                     candidates.Add(directory + prefix + basename);
             }
 
-            foreach (string candidate in candidates.OrderBy(path => path, StringComparer.Ordinal))
-                yield return new HashGuessCandidate(candidate, HashGuessStrategy.PrefixVariant);
+            IEnumerable<HashGuessCandidate> orderedCandidates = candidates
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(path => new HashGuessCandidate(path, HashGuessStrategy.PrefixVariant));
+            if (candidateBudget != int.MaxValue) orderedCandidates = orderedCandidates.Take(candidateBudget);
+            int checkedCount = CheckIter(
+                engine,
+                orderedCandidates,
+                "GAME basename prefixes",
+                cancellationToken,
+                progress);
+            return checkedCount;
         }
 
         internal int SubstituteBasenameWords(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
-            var formats = Corpus.GetOrCreate("basename-word-formats-1-1", values => BuildBasenameWordFormats(values, 1, 1));
             var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
-            return RunBasenameWordSubstitutionFormats(engine, formats, words, 1, cancellationToken, candidateBudget, "GAME basename word substitution");
+            return SubstituteBasenameWordsCore(
+                engine,
+                KnownPaths,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget,
+                "GAME basename word substitution");
+        }
+
+        internal int SubstituteBinBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> binPaths = Corpus.GetOrCreate(
+                "custom-bin-paths",
+                paths => paths.Where(path => path.EndsWith(".bin", StringComparison.Ordinal)).ToList());
+            IReadOnlyList<string> binNames = Corpus.GetOrCreate(
+                "custom-bin-names",
+                _ => binPaths.Select(GetBasename).ToList());
+            IReadOnlyList<string> binWordlist = Corpus.GetOrCreate(
+                "custom-bin-wordlist",
+                _ => HashGuessEngine.BuildWordlist(binNames));
+
+            IReadOnlyList<string> seedBins = binPaths.Take(CustomBinSampleSize).ToList();
+            IReadOnlyList<string> words = binWordlist.Take(CustomBinSampleSize).ToList();
+            return SubstituteBasenameWordsCore(
+                engine,
+                seedBins,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: int.MaxValue,
+                source: "GAME Custom: BIN basename wordlist",
+                progress);
+        }
+
+        internal int SubstituteDataBinBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> dataPaths = Corpus.GetOrCreate(
+                "custom-data-bin-paths",
+                paths => paths
+                    .Where(path => path.StartsWith("data/", StringComparison.Ordinal)
+                        && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+            IReadOnlyList<string> dataNames = Corpus.GetOrCreate(
+                "custom-data-bin-names",
+                _ => dataPaths.Select(GetBasename).ToList());
+            IReadOnlyList<string> dataWordlist = Corpus.GetOrCreate(
+                "custom-data-bin-wordlist",
+                _ => HashGuessEngine.BuildWordlist(dataNames));
+
+            IReadOnlyList<string> seedDataBins = dataPaths.Take(CustomBinSampleSize).ToList();
+            IReadOnlyList<string> words = dataWordlist.Take(CustomBinSampleSize).ToList();
+            return SubstituteBasenameWordsCore(
+                engine,
+                seedDataBins,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: int.MaxValue,
+                source: "GAME Custom: data BIN basename wordlist",
+                progress);
+        }
+
+        internal int SubstituteCharacterDdsBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> characterDdsPaths = Corpus.GetOrCreate(
+                "custom-character-dds-paths",
+                paths => paths
+                    .Where(path => path.StartsWith("assets/characters/", StringComparison.Ordinal)
+                        && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+            IReadOnlyList<string> characterDdsNames = Corpus.GetOrCreate(
+                "custom-character-dds-names",
+                _ => characterDdsPaths.Select(GetBasename).ToList());
+            IReadOnlyList<string> characterDdsWordlist = Corpus.GetOrCreate(
+                "custom-character-dds-wordlist",
+                _ => HashGuessEngine.BuildWordlist(characterDdsNames));
+
+            IReadOnlyList<string> seedDdsPaths = characterDdsPaths.Take(CustomCharacterDdsSampleSize).ToList();
+            IReadOnlyList<string> words = characterDdsWordlist.Take(CustomCharacterDdsSampleSize).ToList();
+            return SubstituteBasenameWordsCore(
+                engine,
+                seedDdsPaths,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: int.MaxValue,
+                source: "GAME Custom: character DDS basename wordlist",
+                progress);
+        }
+
+        internal int SubstituteCharacterTexBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> characterTexPaths = Corpus.GetOrCreate(
+                "custom-character-tex-paths",
+                paths => paths
+                    .Where(path => path.StartsWith("assets/characters/", StringComparison.Ordinal)
+                        && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                    .ToList());
+            IReadOnlyList<string> characterTexNames = Corpus.GetOrCreate(
+                "custom-character-tex-names",
+                _ => characterTexPaths.Select(GetBasename).ToList());
+            IReadOnlyList<string> characterTexWordlist = Corpus.GetOrCreate(
+                "custom-character-tex-wordlist",
+                _ => HashGuessEngine.BuildWordlist(characterTexNames));
+
+            IReadOnlyList<string> seedTexPaths = characterTexPaths.Take(CustomCharacterTexSampleSize).ToList();
+            IReadOnlyList<string> words = characterTexWordlist.Take(CustomCharacterTexSampleSize).ToList();
+            return SubstituteBasenameWordsCore(
+                engine,
+                seedTexPaths,
+                words,
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: int.MaxValue,
+                source: "GAME Custom: character TEX basename wordlist",
+                progress);
+        }
+
+        internal int AddCustomBasenameWord(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> paths = Corpus.GetOrCreate(
+                "custom-word-addition-paths",
+                values => values.Take(CustomWordAdditionSampleSize).ToList());
+            IReadOnlyList<string> words = Corpus.GetOrCreate(
+                "custom-word-addition-wordlist",
+                _ => BuildWordlist().Take(CustomWordAdditionSampleSize).ToList());
+
+            int checkedCount = AddBasenameWordCore(
+                engine,
+                paths,
+                words,
+                cancellationToken,
+                candidateBudget: int.MaxValue);
+            progress?.Invoke(checkedCount);
+            return checkedCount;
+        }
+
+        internal int SubstituteSwordlistBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> paths = Corpus.GetOrCreate(
+                "custom-focused-wordlist-paths",
+                values => values.Take(CustomFocusedPathSampleSize).ToList());
+            return SubstituteBasenameWordsCore(
+                engine,
+                paths,
+                BuildSwordlist(),
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: CustomSwordlistCandidateBudget,
+                source: "GAME Custom: SwordList basename substitution",
+                progress);
+        }
+
+        internal int SubstituteWordlistBasenameWords(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            IReadOnlyList<string> paths = Corpus.GetOrCreate(
+                "custom-focused-wordlist-paths",
+                values => values.Take(CustomFocusedPathSampleSize).ToList());
+            return SubstituteBasenameWordsCore(
+                engine,
+                paths,
+                BuildWordlist(),
+                oldWordCount: 1,
+                newWordCount: 1,
+                cancellationToken,
+                candidateBudget: CustomWordlistCandidateBudget,
+                source: "GAME Custom: WordList basename substitution",
+                progress);
+        }
+
+        internal int RunCustomAttacks(
+            HashGuessEngine engine,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            int checkedCandidates = 0;
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress("GAME Custom: BIN basename wordlist", checkedCandidates));
+            int progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteBinBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: BIN basename wordlist", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: data BIN basename wordlist", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteDataBinBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: data BIN basename wordlist", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: character DDS basename wordlist", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteCharacterDdsBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: character DDS basename wordlist", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: character TEX basename wordlist", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteCharacterTexBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: character TEX basename wordlist", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: SwordList basename substitution", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteSwordlistBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: SwordList basename substitution", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: WordList basename substitution", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += SubstituteWordlistBasenameWords(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: WordList basename substitution", progressOffset + count)));
+
+            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+
+            progress?.Report(engine.CreateProgress(
+                "GAME Custom: basename word addition", checkedCandidates));
+            progressOffset = checkedCandidates;
+            checkedCandidates += AddCustomBasenameWord(
+                engine,
+                cancellationToken,
+                count => progress?.Report(engine.CreateProgress(
+                    "GAME Custom: basename word addition", progressOffset + count)));
+            return checkedCandidates;
         }
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
-            var formats = Corpus.GetOrCreate("word-addition-formats", values => BuildWordAdditionFormats(values.Where(path =>
+            var paths = Corpus.GetOrCreate("word-addition-paths", values => values.Where(path =>
                 !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) &&
                 !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
-                !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase))));
+                !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase)).ToList());
             var words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
-            return RunWordAdditionFormats(engine, formats, words, cancellationToken, candidateBudget);
+            return AddBasenameWordCore(
+                engine,
+                paths,
+                words,
+                cancellationToken,
+                candidateBudget,
+                source: "GAME basename word addition");
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteCharacter() => GenerateCharacterSubstitutionCandidates(int.MaxValue);
-        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers() => GenerateSkinNumberCandidates(int.MaxValue);
+        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = int.MaxValue) => GenerateCharacterSubstitutionCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = int.MaxValue) => GenerateSkinNumberCandidates(candidateBudget);
         internal IEnumerable<HashGuessCandidate> SubstituteSuffixes() => GenerateSuffixCandidates(int.MaxValue);
-        internal IEnumerable<HashGuessCandidate> SubstituteLang() => GenerateLanguageCandidates(int.MaxValue);
-
-        internal IEnumerable<HashGuessCandidate> GenerateCrossDomainCandidates(HashGuesser lcuGuesser, int candidateBudget = int.MaxValue)
+        internal int SubstituteLang(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            string source = "Generated locale variant",
+            Action<int> progress = null)
         {
-            int generated = 0;
+            ArgumentNullException.ThrowIfNull(engine);
+            IReadOnlyList<string> formats = KnownPaths
+                .Where(path => LocaleRegex.IsMatch(path))
+                .Select(path => LocaleRegex.Replace(path, "{locale}"))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList();
+
+            int checkedCount = 0;
+            foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                checkedCount += CheckIter(
+                    engine,
+                    Locales.Select(locale => new HashGuessCandidate(
+                        format.Replace("{locale}", locale, StringComparison.Ordinal),
+                        HashGuessStrategy.LanguageVariant)),
+                    source,
+                    cancellationToken);
+                progress?.Invoke(checkedCount);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            return checkedCount;
+        }
+
+        internal int GuessFromLcuHashes(
+            HashGuessEngine engine,
+            HashGuesser lcuGuesser,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            ArgumentNullException.ThrowIfNull(lcuGuesser);
+            if (lcuGuesser.Domain != HashGuessDomain.Lcu)
+                throw new ArgumentException("GAME cross-domain guessing requires an LCU guesser.", nameof(lcuGuesser));
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            const string source = "GAME from LCU hashes";
+            var regex = new Regex(
+                @"^plugins/rcp-be-lol-game-data/global/default/((?:assets|data)/.*)\.(png|jpg|json)$",
+                RegexOptions.Compiled);
+            int checkedCount = 0;
             foreach (string lcuPath in lcuGuesser.KnownPaths)
             {
-                Match match = Regex.Match(lcuPath, @"^plugins/rcp-be-lol-game-data/global/default/((?:assets|data)/.*)\.(png|jpg|dds|json)$", RegexOptions.IgnoreCase);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                Match match = regex.Match(lcuPath);
                 if (!match.Success) continue;
                 string path = match.Groups[1].Value;
-                string extension = match.Groups[2].Value.ToLowerInvariant();
-                yield return new HashGuessCandidate(path + "." + extension, HashGuessStrategy.CrossDomainGame);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-                if (extension is "json" or "dds") continue;
-                yield return new HashGuessCandidate(path + ".dds", HashGuessStrategy.CrossDomainGame);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-                yield return new HashGuessCandidate(path + ".tex", HashGuessStrategy.CrossDomainGame);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-            }
-        }
+                string extension = match.Groups[2].Value;
+                string candidatePath = extension is "png" or "jpg"
+                    ? $"{path}.dds"
+                    : $"{path}.{extension}";
 
-        internal IEnumerable<HashGuessCandidate> GuessFromLcuHashes(HashGuesser lcuGuesser) =>
-            GenerateCrossDomainCandidates(lcuGuesser, int.MaxValue);
+                Check(engine, candidatePath, HashGuessStrategy.CrossDomainGame, source);
+                checkedCount++;
+                progress?.Invoke(checkedCount);
+            }
+
+            return checkedCount;
+        }
 
         internal IEnumerable<HashGuessCandidate> GuessFromBinEntryBasenames(IEnumerable<string> binEntryPaths)
         {
@@ -221,11 +583,38 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return new HashGuessCandidate(basename + extension, HashGuessStrategy.CrossDomainGame);
         }
 
-        internal IEnumerable<HashGuessCandidate> GuessCharacterFiles(IEnumerable<string> characters = null)
+        internal int GuessCharacterFiles(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            IEnumerable<string> characters = null,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
-            foreach (string character in (characters ?? GetCharacters()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.Ordinal))
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            IReadOnlyList<string> characterList = (characters ?? GetCharacters())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToList();
+            int checkedCount = 0;
+
+            int CheckCharacterPaths(IEnumerable<string> paths)
             {
-                foreach (string path in new[]
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) return 0;
+                IEnumerable<HashGuessCandidate> candidatesToCheck = paths.Select(
+                    path => new HashGuessCandidate(path, HashGuessStrategy.CharacterTemplate));
+                if (remaining != int.MaxValue) candidatesToCheck = candidatesToCheck.Take(remaining);
+                int checkedPaths = CheckIter(engine, candidatesToCheck, "GAME character files", cancellationToken);
+                progress?.Invoke(checkedCount + checkedPaths);
+                return checkedPaths;
+            }
+
+            foreach (string character in ProgressIterator(characterList, value => value, cancellationToken))
+            {
+                checkedCount += CheckCharacterPaths(new[]
                 {
                     $"data/characters/{character}/skins/root.bin",
                     $"data/characters/{character}/skins/base/{character}.skl",
@@ -239,26 +628,24 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"assets/characters/{character}/hud/{character}_circle.dds",
                     $"assets/characters/{character}/hud/{character}_square.dds",
                     $"characters/{character}"
-                })
-                    yield return new HashGuessCandidate(path, HashGuessStrategy.CharacterTemplate);
+                });
 
                 int skinLimit = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 200;
-                for (int skin = 0; skin < skinLimit; skin++)
-                {
-                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}.bin", HashGuessStrategy.CharacterTemplate);
-                    yield return new HashGuessCandidate($"data/characters/{character}/animations/skin{skin}.bin", HashGuessStrategy.CharacterTemplate);
-                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skn", HashGuessStrategy.CharacterTemplate);
-                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.skl", HashGuessStrategy.CharacterTemplate);
-                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}.anm", HashGuessStrategy.CharacterTemplate);
-                    yield return new HashGuessCandidate($"data/characters/{character}/skins/skin{skin}/{character}_skin{skin}_tx_cm.dds", HashGuessStrategy.CharacterTemplate);
-                }
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"data/characters/{character}/skins/skin{skin}.bin"));
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"data/characters/{character}/animations/skin{skin}.bin"));
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
-                    for (int tier = 0; tier < 10; tier++)
-                    {
-                        yield return new HashGuessCandidate($"data/characters/{character}/tiers/tier{tier}.bin", HashGuessStrategy.CharacterTemplate);
-                        yield return new HashGuessCandidate($"assets/characters/{character}/hud/{character}_tier{tier}.png", HashGuessStrategy.CharacterTemplate);
-                    }
+                    checkedCount += CheckCharacterPaths(
+                        Enumerable.Range(0, 10).Select(tier =>
+                            $"data/characters/{character}/tiers/tier{tier}.bin"));
+
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
+
+            return checkedCount;
         }
 
         internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget)
@@ -289,7 +676,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IEnumerable<HashGuessCandidate> GenerateSuffixCandidates(int candidateBudget)
         {
-            var suffixCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { [string.Empty] = int.MaxValue };
+            var suffixCounts = new Dictionary<string, int>(StringComparer.Ordinal) { [string.Empty] = int.MaxValue };
             var formatCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             var regex = new Regex(@"^(.*?)(\.[^.]+)?(\.[^.]+)$");
             foreach (string path in KnownPaths)
@@ -320,7 +707,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var directoryRegex = new Regex(@"/characters/([^/]+)/skins/(base|skin\d+)/", RegexOptions.IgnoreCase);
             var skinRegex = new Regex(@"(?:base|skin\d+)", RegexOptions.IgnoreCase);
-            var characters = new Dictionary<string, (HashSet<string> Skins, Dictionary<(string Format, int Count), (int Support, int DistinctSupport, bool AllTokensEqual)> Formats)>(StringComparer.OrdinalIgnoreCase);
+            var characters = new Dictionary<string, (HashSet<string> Skins, HashSet<(string Format, int Count)> Formats)>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
                 Match directory = directoryRegex.Match(path);
@@ -328,44 +715,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string character = directory.Groups[1].Value;
                 if (!characters.TryGetValue(character, out var data))
                 {
-                    data = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new Dictionary<(string, int), (int, int, bool)>());
+                    data = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), new HashSet<(string Format, int Count)>());
                     characters[character] = data;
                 }
                 data.Skins.Add(directory.Groups[2].Value.ToLowerInvariant());
                 MatchCollection matches = skinRegex.Matches(path);
-                var format = (skinRegex.Replace(path, "{skin}"), matches.Count);
-                if (!data.Formats.TryGetValue(format, out var support)) support = (0, 0, true);
-                string[] tokenValues = matches.Select(match => match.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                bool distinct = tokenValues.Length == matches.Count;
-                bool allTokensEqual = tokenValues.Length == 1;
-                data.Formats[format] = (support.Support + 1, support.DistinctSupport + (distinct ? 1 : 0), support.AllTokensEqual && allTokensEqual);
+                data.Formats.Add((skinRegex.Replace(path, "{skin}"), matches.Count));
             }
             int generated = 0;
-            var formats = characters.SelectMany(character => character.Value.Formats.Select(format => new
+            foreach (var character in characters.OrderBy(value => value.Key, StringComparer.Ordinal))
+            foreach ((string format, int count) in character.Value.Formats
+                .OrderBy(value => value.Format, StringComparer.Ordinal)
+                .ThenBy(value => value.Count))
             {
-                Character = character.Key, character.Value.Skins, Format = format.Key.Format, Count = format.Key.Count,
-                Support = format.Value.Support, DistinctSupport = format.Value.DistinctSupport, AllTokensEqual = format.Value.AllTokensEqual
-            })).OrderBy(value => value.DistinctSupport > 0 ? 0 : 1)
-                .ThenBy(value => value.Count == 2 ? 0 : value.Count == 1 ? 1 : value.Count)
-                .ThenByDescending(value => value.DistinctSupport).ThenByDescending(value => value.Support)
-                .ThenBy(value => value.Character, StringComparer.Ordinal).ThenBy(value => value.Format, StringComparer.Ordinal);
-            foreach (var format in formats)
-            {
-                List<string> skins = format.Skins.OrderBy(value => value, StringComparer.Ordinal).ToList();
-                if (format.Count > skins.Count) continue;
-                if (format.AllTokensEqual)
+                List<string> skins = character.Value.Skins.OrderBy(value => value, StringComparer.Ordinal).ToList();
+                if (count > skins.Count) continue;
+                foreach (IEnumerable<string> combination in GetCombinations(skins, count))
                 {
-                    foreach (string skin in skins)
-                    {
-                        yield return new HashGuessCandidate(format.Format.Replace("{skin}", skin, StringComparison.Ordinal), HashGuessStrategy.SkinNumberVariant);
-                        if (CountCandidate(ref generated, candidateBudget)) yield break;
-                    }
-                    continue;
-                }
-                foreach (IEnumerable<string> permutation in GetPermutations(skins, format.Count))
-                {
-                    string candidate = format.Format;
-                    foreach (string skin in permutation)
+                    string candidate = format;
+                    foreach (string skin in combination)
                     {
                         int marker = candidate.IndexOf("{skin}", StringComparison.Ordinal);
                         candidate = candidate[..marker] + skin + candidate[(marker + 6)..];
@@ -376,8 +744,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal IEnumerable<HashGuessCandidate> GuessShaderVariants()
+        internal int GuessShaderVariants(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
             var shaderPaths = new HashSet<string>(StringComparer.Ordinal);
             var regex = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase);
             foreach (string path in KnownPaths)
@@ -385,17 +761,37 @@ namespace AssetsManager.Services.Hashes.Guessers
                 Match match = regex.Match(path);
                 if (match.Success) shaderPaths.Add(match.Value);
             }
-            foreach (string path in shaderPaths.OrderBy(value => value, StringComparer.Ordinal))
-            foreach (string variant in ShaderVariants)
-            {
-                yield return new HashGuessCandidate(path + variant, HashGuessStrategy.ShaderVariant);
-                for (int number = 0; number < 20000; number += 100)
-                    yield return new HashGuessCandidate($"{path}{variant}_{number}", HashGuessStrategy.ShaderVariant);
-            }
-        }
 
-        internal int RunCrossDomainAttacks(HashGuessEngine engine, HashGuesser lcuGuesser, CancellationToken cancellationToken)
-            => CheckCandidates(engine, GuessFromLcuHashes(lcuGuesser), "LCU to GAME", cancellationToken);
+            int checkedCount = 0;
+            foreach (string path in ProgressIterator(
+                         shaderPaths.OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                         value => value,
+                         cancellationToken))
+            {
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+
+                IEnumerable<HashGuessCandidate> variants = ShaderVariants.Select(variant =>
+                    new HashGuessCandidate(path + variant, HashGuessStrategy.ShaderVariant));
+                if (remaining != int.MaxValue) variants = variants.Take(remaining);
+                int checkedVariants = CheckIter(engine, variants, "GAME shader variants", cancellationToken);
+                checkedCount += checkedVariants;
+                progress?.Invoke(checkedCount);
+
+                remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+                IEnumerable<HashGuessCandidate> numberedVariants =
+                    ShaderVariants.SelectMany(variant => Enumerable.Range(0, 20000 / 100).Select(index =>
+                        new HashGuessCandidate(
+                            $"{path}{variant}_{index * 100}",
+                            HashGuessStrategy.ShaderVariant)));
+                if (remaining != int.MaxValue) numberedVariants = numberedVariants.Take(remaining);
+                checkedCount += CheckIter(engine, numberedVariants, "GAME shader variants", cancellationToken);
+                progress?.Invoke(checkedCount);
+            }
+
+            return checkedCount;
+        }
 
         internal int RunEsportsBannersAttack(HashGuessEngine engine, string rootDirectory, CancellationToken cancellationToken)
         {
@@ -413,88 +809,41 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (string word in ExtractWordsFromDirectoryJsons(rootDirectory, cancellationToken))
                 if (!words.Contains(word, StringComparer.OrdinalIgnoreCase)) words.Add(word);
             return RunFocusedWordlistSubstitution(engine, paths, words, cancellationToken) +
-                   RunWordAdditionAttack(engine, paths, words, cancellationToken);
+                   AddBasenameWordCore(engine, paths, words, cancellationToken);
         }
 
         internal async Task<int> RunExtendedAttacksAsync(
             HashGuessEngine engine,
             string rootDirectory,
-            IEnumerable<string> binEntryPaths,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken)
         {
             int checkedCandidates = 0;
 
-            checkedCandidates += CheckCandidates(engine, GenerateSkinNumberCandidates(5_000_000), "GAME skin number combinations", cancellationToken);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, GenerateCharacterSubstitutionCandidates(10_000_000), "GAME character substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken);
-
+                checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken);
             if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("BIN entries to GAME", checkedCandidates));
-                checkedCandidates += CheckCandidates(engine, GuessFromBinEntryBasenames(binEntryPaths), "BIN entries to GAME", cancellationToken, progress, checkedCandidates);
-            }
-
+                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += SubstituteBasenameWords(engine, cancellationToken, 10_000_000);
-            if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += AddBasenameWord(engine, cancellationToken, 10_000_000);
-
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("Focused Attack: Bin paths", checkedCandidates));
-                var binPaths = Corpus.GetOrCreate("bin-paths", values => values
-                    .Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                    .OrderBy(path => path.StartsWith("data/", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                    .ThenBy(path => path, StringComparer.Ordinal)
-                    .ToList());
-                var binWords = Corpus.GetOrCreate("bin-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values
-                    .Where(path => path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
-                checkedCandidates += RunFocusedWordlistSubstitution(engine, binPaths.Take(25000), binWords, cancellationToken, candidateBudget: 1_000_000);
-
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("Focused Attack: Characters DDS paths", checkedCandidates));
-                    var ddsPaths = Corpus.GetOrCreate("character-dds-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase)).ToList());
-                    var ddsWords = Corpus.GetOrCreate("character-dds-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, ddsPaths.Take(25000), ddsWords, cancellationToken);
-                }
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("Focused Attack: Characters TEX paths", checkedCandidates));
-                    var texPaths = Corpus.GetOrCreate("character-tex-paths", values => values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)).ToList());
-                    var texWords = Corpus.GetOrCreate("character-tex-wordlist", values => HashGuessEngine.BuildBasenameWordlist(values.Where(path => path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))).Take(20000).ToList());
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, texPaths.Take(25000), texWords, cancellationToken);
-                }
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("Focused Attack: Word insertions", checkedCandidates));
-                    var additionPaths = Corpus.GetOrCreate("word-addition-paths", values => values.Where(path =>
-                        !path.Contains("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
-                        !path.Contains("vo/", StringComparison.OrdinalIgnoreCase) &&
-                        !path.Contains("sfx/", StringComparison.OrdinalIgnoreCase) &&
-                        !path.Contains("skins_skin", StringComparison.OrdinalIgnoreCase)).ToList());
-                    var additionWords = Corpus.GetOrCreate("basename-wordlist-top20000", values => HashGuessEngine.BuildBasenameWordlist(values).Take(20000).ToList());
-                    checkedCandidates += RunWordAdditionAttack(engine, additionPaths.Take(20000), additionWords, cancellationToken);
-                }
-            }
-
-            checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken);
-            checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken);
-            checkedCandidates += RunEsportsBannersAttack(engine, rootDirectory, cancellationToken);
-
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("GAME Cartesian Cross", checkedCandidates));
-                int progressOffset = checkedCandidates;
-                checkedCandidates += SubstituteBasenames(
+                checkedCandidates += CheckCandidates(
                     engine,
+                    SubstituteSkinNumbers(SkinNumberSubstitutionCandidateBudget),
+                    "GAME skin number combinations",
                     cancellationToken,
-                    candidateBudget: 10_000_000,
-                    progress: count => progress?.Report(engine.CreateProgress("GAME Cartesian Cross", progressOffset + count)));
-            }
+                    progress,
+                    checkedCandidates);
+            if (engine.RemainingUnknownCount > 0)
+                checkedCandidates += CheckCandidates(
+                    engine,
+                    SubstituteCharacter(CharacterSubstitutionCandidateBudget),
+                    "GAME character substitution",
+                    cancellationToken,
+                    progress,
+                    checkedCandidates);
+
+            GetCharacters();
             return checkedCandidates;
         }
 
@@ -564,6 +913,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     foreach (IEnumerable<List<string>> combination in GetCombinations(tokens, length))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        if (generated >= SkinGroupCandidateBudget) return generated;
                         string suffix = string.Concat(combination.SelectMany(value => value).OrderBy(value => value, StringComparer.Ordinal));
                         Check(engine, "data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
                         generated++;
@@ -622,8 +972,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             return Task.Run(() =>
             {
-                const int maximumGroupLength = 8;
-                const int candidateBudget = 5_000_000;
                 var characters = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
                 var regex = new Regex(@"^assets/characters/([^/]+)/skins/skin(\d+)/", RegexOptions.IgnoreCase);
                 foreach (string path in KnownPaths)
@@ -643,12 +991,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var skins = pair.Value.Select(value => $"_skins_skin{value}").OrderBy(value => value).ToList();
-                    for (int length = 1; length <= Math.Min(skins.Count, maximumGroupLength); length++)
+                    for (int length = 1; length <= skins.Count; length++)
                     foreach (IEnumerable<string> combination in GetCombinations(skins, length))
                     {
+                        if (generated >= SkinGroupCandidateBudget) return generated;
                         Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
                         generated++;
-                        if (generated >= candidateBudget || engine.RemainingUnknownCount == 0) return generated;
+                        if (engine.RemainingUnknownCount == 0) return generated;
                     }
                 }
                 return generated;
@@ -692,9 +1041,152 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash)
         {
-            CheckChunk(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
-            if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                GrepAnimationBinLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+            if (data.Count == 0) return;
+
+            void CheckGame(string path, HashGuessStrategy strategy = HashGuessStrategy.BinLengthPath)
+            {
+                if (!string.IsNullOrEmpty(path))
+                    Check(engine, path, strategy, sourceWadPath, sourceChunkHash);
+            }
+
+            void CheckGameIter(IEnumerable<string> paths, HashGuessStrategy strategy = HashGuessStrategy.BinLengthPath) =>
+                CheckIter(engine, paths, strategy, sourceWadPath, sourceChunkHash);
+
+            void CheckGameCandidates(IEnumerable<HashGuessCandidate> candidates) =>
+                CheckIter(engine, candidates, sourceWadPath, CancellationToken.None, sourceChunkHash: sourceChunkHash);
+
+            if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
+            {
+                CheckGameCandidates(ExtractLuaManifestCandidates(data));
+                return;
+            }
+
+            string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
+            if (extension is "bin" or "inibin")
+            {
+                foreach (int offset in FindBinPathOffsets(data))
+                {
+                    if (offset < 2) continue;
+                    int length = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
+                    if (length <= 0 || offset + length > data.Count) continue;
+                    if (!TryDecodeAscii(data, offset, length, out string path)) continue;
+                    path = NormalizePath(path);
+
+                    if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckGame(path);
+                        CheckGame($"assets/{path}");
+                        CheckGame($"data/{path}");
+                    }
+                    else if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string prefix = path[..^4];
+                        CheckGame(path);
+                        CheckGame(prefix + ".luabin", HashGuessStrategy.LuaVariant);
+                        CheckGame(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
+                        CheckGame(prefix + ".preload", HashGuessStrategy.LuaVariant);
+                    }
+                    else if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckGameIter(
+                            ShaderExtensions.Select(extensionName =>
+                                $"assets/shaders/generated/{path}{extensionName}"));
+                        CheckGameIter(
+                            ShaderExtensions.SelectMany(extensionName =>
+                                ShaderVariants.Select(variant =>
+                                    $"assets/shaders/generated/{path}{extensionName}{variant}")));
+                    }
+                    else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckGame($"data/{path}.mapgeo");
+                        CheckGame($"data/{path}.materials.bin");
+                    }
+                    else if (path.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
+                             path.StartsWith("patching/", StringComparison.OrdinalIgnoreCase) ||
+                             path.StartsWith("loadouts/", StringComparison.OrdinalIgnoreCase) ||
+                             path.StartsWith("maps/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckGame(path);
+                        int separator = path.LastIndexOf('/');
+                        if (separator > 0)
+                        {
+                            string parent = path[..separator];
+                            CheckGame(parent);
+                            int parentSeparator = parent.LastIndexOf('/');
+                            if (parentSeparator > 0) CheckGame(parent[..parentSeparator]);
+                        }
+                    }
+                    else
+                    {
+                        CheckGame(path);
+                        if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                            CheckGame(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
+                    }
+                }
+
+                if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                    GrepAnimationBinLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+                return;
+            }
+
+            if (extension == "preload")
+            {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
+                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                foreach (Match match in PreloadNameRegex.Matches(text))
+                {
+                    if (!IsAscii(match.Groups[1].Value)) continue;
+                    string path = NormalizePath(match.Groups[1].Value);
+                    if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string prefix = path[..^4];
+                        CheckGame(path, HashGuessStrategy.PreloadReference);
+                        CheckGame(prefix + ".luabin", HashGuessStrategy.LuaVariant);
+                        CheckGame(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
+                    }
+                    else if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckGame($"data/shared/particles/{path[..^5]}.troybin", HashGuessStrategy.PreloadReference);
+                    }
+                    else if (!string.IsNullOrEmpty(directory))
+                    {
+                        CheckGame(directory + "/" + path + ".preload", HashGuessStrategy.PreloadReference);
+                    }
+                }
+                return;
+            }
+
+            if (extension is "hls" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0")
+            {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
+                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                if (string.IsNullOrEmpty(directory)) return;
+                foreach (Match match in ShaderIncludeRegex.Matches(text))
+                {
+                    if (!IsAscii(match.Groups[1].Value)) continue;
+                    CheckGame(
+                        NormalizePath(PathUtils.NormalizeVirtualPath($"{directory}/{match.Groups[1].Value}")),
+                        HashGuessStrategy.ShaderInclude);
+                }
+                return;
+            }
+
+            if (extension == "atlas")
+            {
+                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
+                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
+                if (string.IsNullOrEmpty(directory)) return;
+                foreach (string line in text.Split('\n'))
+                {
+                    if (!IsAscii(line)) continue;
+                    CheckGame(
+                        NormalizePath(Path.Combine(directory, line.Trim())),
+                        HashGuessStrategy.AtlasReference);
+                }
+                return;
+            }
+
+            CheckGameCandidates(GrepFileCandidates(data));
         }
 
         internal IReadOnlyList<string> GenerateAnimationContextCandidates(string character, string skin)
@@ -713,13 +1205,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
             if (!context.Success || data.Array is null || data.Count == 0) return;
 
-            var targetHashes = new HashSet<ulong>();
+            var links = new HashSet<AnimationFileLink>();
             try
             {
                 using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
                 var tree = new BinTree(stream);
-                foreach (ulong targetHash in EnumerateAnimationFileLinks(tree))
-                    if (targetHash != 0 && engine.UnknownHashes.Contains(targetHash)) targetHashes.Add(targetHash);
+                foreach (AnimationFileLink link in EnumerateAnimationFileLinks(tree))
+                    if (link.PathHash != 0 && engine.UnknownHashes.Contains(link.PathHash)) links.Add(link);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -727,23 +1219,35 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return;
             }
 
-            if (targetHashes.Count == 0) return;
+            if (links.Count == 0) return;
             IReadOnlyDictionary<ulong, string> candidates = GetAnimationCandidateIndex(
                 context.Groups["character"].Value,
                 context.Groups["skin"].Value);
             CheckIter(
                 engine,
-                GetMatchingAnimationPaths(targetHashes, candidates),
+                GetMatchingAnimationPaths(links.Select(link => link.PathHash), candidates),
                 HashGuessStrategy.AnimationBinLink,
                 sourceWadPath,
                 sourceChunkHash);
+
+            if (engine.RemainingUnknownCount > 0)
+                CheckIter(
+                    engine,
+                    EnumerateAnimationFallbackPaths(
+                        context.Groups["character"].Value,
+                        context.Groups["skin"].Value,
+                        links,
+                        engine.UnknownHashes),
+                    HashGuessStrategy.AnimationBinLink,
+                    sourceWadPath,
+                    sourceChunkHash);
         }
 
         private static IEnumerable<string> GetMatchingAnimationPaths(
             IEnumerable<ulong> targetHashes,
             IReadOnlyDictionary<ulong, string> candidates)
         {
-            foreach (ulong targetHash in targetHashes)
+            foreach (ulong targetHash in targetHashes.Distinct())
                 if (candidates.TryGetValue(targetHash, out string path))
                     yield return path;
         }
@@ -805,6 +1309,99 @@ namespace AssetsManager.Services.Hashes.Guessers
             return result;
         }
 
+        private IEnumerable<string> EnumerateAnimationFallbackPaths(
+            string character,
+            string skin,
+            IEnumerable<AnimationFileLink> links,
+            IReadOnlyCollection<ulong> unknownHashes)
+        {
+            var remaining = links
+                .Where(link => link.PathHash != 0 && unknownHashes.Contains(link.PathHash))
+                .Select(link => link.PathHash)
+                .ToHashSet();
+            if (remaining.Count == 0) yield break;
+
+            IReadOnlyList<string> contextualNames = GetAnimationNames(character, contextual: true);
+            IReadOnlyList<string> sourceNames = contextualNames.Count > 0
+                ? contextualNames
+                : GetAnimationNames(character, contextual: false);
+            foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
+                         sourceNames.Where(name => name.Any(char.IsDigit)).Select(name => $"animations/{name}"),
+                         AnimationNumberLimit,
+                         int.MaxValue,
+                         digits: null,
+                         inferDigits: false,
+                         includeCommonPadding: false))
+            {
+                foreach (string path in EnumerateUnresolvedAnimationVariants(GetBasename(candidate.Path), character, skin, remaining))
+                    yield return path;
+                if (remaining.Count == 0) yield break;
+            }
+
+            HashSet<uint> nameHashes = links
+                .Where(link => remaining.Contains(link.PathHash) && link.NameHash != 0)
+                .Select(link => link.NameHash)
+                .ToHashSet();
+            if (nameHashes.Count == 0) yield break;
+
+            IReadOnlyList<string> allNames = GetAnimationNames(character, contextual: false);
+            var formats = Corpus.GetOrCreate(
+                "animation-word-formats",
+                _ => BuildBasenameWordFormats(allNames.Select(name => $"animations/{name}"), 1, 1));
+            IReadOnlyList<string> words = Corpus.GetOrCreate("frequency-wordlist", HashGuessEngine.BuildFrequencyWordlist);
+            var generatedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach ((string prefix, string suffix) in formats)
+            foreach (string word in words)
+            {
+                string generated = GetBasename(prefix + word + suffix);
+                string stem = generated.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)
+                    ? generated[..^4]
+                    : generated;
+                if (!nameHashes.Contains(Fnv1a.HashLower(stem)) || !generatedNames.Add(generated)) continue;
+
+                foreach (string path in EnumerateUnresolvedAnimationVariants(generated, character, skin, remaining))
+                    yield return path;
+                if (remaining.Count == 0) yield break;
+            }
+        }
+
+        private IReadOnlyList<string> GetAnimationNames(string character, bool contextual)
+        {
+            string key = contextual ? $"animation-names/{character.ToLowerInvariant()}" : "animation-names/all";
+            return Corpus.GetOrCreate(
+                key,
+                paths => BuildAnimationNames(paths, contextual ? character : null));
+        }
+
+        private static IReadOnlyList<string> BuildAnimationNames(IReadOnlyList<string> knownPaths, string character)
+        {
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in knownPaths)
+            {
+                Match context = KnownAnimationPathRegex.Match(PathUtils.NormalizePath(path));
+                if (!context.Success || (character != null && !context.Groups["character"].Value.Equals(character, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                string name = GetBasename(path);
+                if (name.Length > 0) names.Add(name);
+            }
+
+            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static IEnumerable<string> EnumerateUnresolvedAnimationVariants(
+            string name,
+            string character,
+            string skin,
+            ISet<ulong> remaining)
+        {
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, name))
+            {
+                if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
+                    yield return path;
+            }
+        }
+
         private static HashSet<string> GetReusableAnimationPrefixes(IEnumerable<string> names)
         {
             var knownNames = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -824,16 +1421,20 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private static void AddAnimationNameVariants(ISet<string> paths, string character, string skin, string name)
         {
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, name))
+                paths.Add(path);
+        }
+
+        private static IEnumerable<string> EnumerateAnimationNameVariants(string character, string skin, string name)
+        {
             string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
-            if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) return;
+            if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
             stem = stem.ToLowerInvariant();
 
-            Add(stem + ".anm");
-            Add(character + "_" + stem + ".anm");
-            Add(character + "_" + skin + "_" + stem + ".anm");
-            Add(skin + "_" + stem + ".anm");
-
-            void Add(string fileName) => paths.Add($"assets/characters/{character}/skins/{skin}/animations/{fileName}");
+            yield return $"assets/characters/{character}/skins/{skin}/animations/{stem}.anm";
+            yield return $"assets/characters/{character}/skins/{skin}/animations/{character}_{stem}.anm";
+            yield return $"assets/characters/{character}/skins/{skin}/animations/{character}_{skin}_{stem}.anm";
+            yield return $"assets/characters/{character}/skins/{skin}/animations/{skin}_{stem}.anm";
         }
 
         private static string GetBasename(string path)
@@ -842,21 +1443,21 @@ namespace AssetsManager.Services.Hashes.Guessers
             return separator >= 0 ? path[(separator + 1)..] : path;
         }
 
-        private static IEnumerable<ulong> EnumerateAnimationFileLinks(BinTree tree)
+        private static IEnumerable<AnimationFileLink> EnumerateAnimationFileLinks(BinTree tree)
         {
             foreach (BinTreeObject item in tree.Objects.Values)
                 if (item.Properties.TryGetValue(ClipDataMapNameHash, out BinTreeProperty property) &&
                     property is BinTreeMap map)
-                    foreach (ulong target in EnumerateAnimationFileLinks(map))
+                    foreach (AnimationFileLink target in EnumerateAnimationFileLinks(map))
                         yield return target;
 
             foreach (BinTreeDataOverride item in tree.DataOverrides)
                 if (item.Property is BinTreeMap map && item.Property.NameHash == ClipDataMapNameHash)
-                    foreach (ulong target in EnumerateAnimationFileLinks(map))
+                    foreach (AnimationFileLink target in EnumerateAnimationFileLinks(map))
                         yield return target;
         }
 
-        private static IEnumerable<ulong> EnumerateAnimationFileLinks(BinTreeMap map)
+        private static IEnumerable<AnimationFileLink> EnumerateAnimationFileLinks(BinTreeMap map)
         {
             foreach (var pair in map)
             {
@@ -867,7 +1468,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                     path is not BinTreeWadChunkLink link)
                     continue;
 
-                yield return link.Value;
+                yield return new AnimationFileLink(
+                    pair.Key is BinTreeHash hash ? hash.Value : 0,
+                    link.Value);
             }
         }
 
@@ -887,94 +1490,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (engine.RemainingUnknownCount == 0) break;
             }
             return checkedCandidates;
-        }
-
-        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath)
-        {
-            if (data.Count == 0) yield break;
-
-            if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
-            {
-                foreach (HashGuessCandidate candidate in ExtractLuaManifestCandidates(data))
-                    yield return candidate;
-                yield break;
-            }
-
-            string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (extension is "bin" or "inibin")
-            {
-                foreach (int offset in FindBinPathOffsets(data))
-                {
-                    if (offset < 2) continue;
-                    int length = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
-                    if (length <= 0 || offset + length > data.Count) continue;
-                    if (!TryDecodeAscii(data, offset, length, out string decodedPath)) continue;
-                    string path = NormalizePath(decodedPath);
-                    foreach (HashGuessCandidate candidate in ExpandBinPath(path, HashGuessStrategy.BinLengthPath))
-                        yield return candidate;
-                }
-                yield break;
-            }
-
-            if (extension == "preload")
-            {
-                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
-                foreach (Match match in PreloadNameRegex.Matches(text))
-                {
-                    if (!IsAscii(match.Groups[1].Value)) continue;
-                    string path = NormalizePath(match.Groups[1].Value);
-                    if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string prefix = path[..^4];
-                        yield return new HashGuessCandidate(path, HashGuessStrategy.PreloadReference);
-                        yield return new HashGuessCandidate(prefix + ".luabin", HashGuessStrategy.LuaVariant);
-                        yield return new HashGuessCandidate(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
-                    }
-                    else if (path.EndsWith(".troy", StringComparison.OrdinalIgnoreCase))
-                    {
-                        yield return new HashGuessCandidate($"data/shared/particles/{path[..^5]}.troybin", HashGuessStrategy.PreloadReference);
-                    }
-                    else if (!string.IsNullOrEmpty(directory))
-                    {
-                        yield return new HashGuessCandidate(directory + "/" + path + ".preload", HashGuessStrategy.PreloadReference);
-                    }
-                }
-                yield break;
-            }
-
-            if (extension is "hls" or "ps_2_0" or "ps_3_0" or "vs_2_0" or "vs_3_0")
-            {
-                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
-                if (string.IsNullOrEmpty(directory)) yield break;
-                foreach (Match match in ShaderIncludeRegex.Matches(text))
-                {
-                    if (!IsAscii(match.Groups[1].Value)) continue;
-                    yield return new HashGuessCandidate(
-                        NormalizePath(PathUtils.NormalizeVirtualPath($"{directory}/{match.Groups[1].Value}")),
-                        HashGuessStrategy.ShaderInclude);
-                }
-                yield break;
-            }
-
-            if (extension == "atlas")
-            {
-                string text = Encoding.Latin1.GetString(data.Array, data.Offset, data.Count);
-                string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/') ?? string.Empty;
-                if (string.IsNullOrEmpty(directory)) yield break;
-                foreach (string line in text.Split('\n'))
-                {
-                    if (!IsAscii(line)) continue;
-                    string candidate = NormalizePath(Path.Combine(directory, line.Trim()));
-                    if (candidate.Length > 0)
-                        yield return new HashGuessCandidate(candidate, HashGuessStrategy.AtlasReference);
-                }
-                yield break;
-            }
-
-            foreach (HashGuessCandidate candidate in GrepFileCandidates(data))
-                yield return candidate;
         }
 
         private static IEnumerable<HashGuessCandidate> ExtractLuaManifestCandidates(ArraySegment<byte> data)
@@ -1132,69 +1647,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 >= (byte)'A' and <= (byte)'Z' or
                 >= (byte)'a' and <= (byte)'z' or
                 (byte)'_' or (byte)'.' or (byte)' ' or (byte)'/' or (byte)'-';
-
-        private static IEnumerable<HashGuessCandidate> ExpandBinPath(string path, HashGuessStrategy strategy)
-        {
-            if (path.Length == 0) yield break;
-
-            if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return new HashGuessCandidate(path, strategy);
-                yield return new HashGuessCandidate($"assets/{path}", strategy);
-                yield return new HashGuessCandidate($"data/{path}", strategy);
-                yield break;
-            }
-
-            if (path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            {
-                string prefix = path[..^4];
-                yield return new HashGuessCandidate(path, strategy);
-                yield return new HashGuessCandidate(prefix + ".luabin", HashGuessStrategy.LuaVariant);
-                yield return new HashGuessCandidate(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
-                yield return new HashGuessCandidate(prefix + ".preload", HashGuessStrategy.LuaVariant);
-                yield break;
-            }
-
-            if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase))
-            {
-                foreach (string extension in ShaderExtensions)
-                {
-                    yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}", strategy);
-                    foreach (string variant in ShaderVariants)
-                        yield return new HashGuessCandidate($"assets/shaders/generated/{path}{extension}{variant}", strategy);
-                }
-                yield break;
-            }
-
-            if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return new HashGuessCandidate($"data/{path}.mapgeo", strategy);
-                yield return new HashGuessCandidate($"data/{path}.materials.bin", strategy);
-                yield break;
-            }
-
-            if (path.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("patching/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("loadouts/", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("maps/", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return new HashGuessCandidate(path, strategy);
-                int separator = path.LastIndexOf('/');
-                if (separator > 0)
-                {
-                    string parent = path[..separator];
-                    yield return new HashGuessCandidate(parent, strategy);
-                    int parentSeparator = parent.LastIndexOf('/');
-                    if (parentSeparator > 0)
-                        yield return new HashGuessCandidate(parent[..parentSeparator], strategy);
-                }
-                yield break;
-            }
-
-            yield return new HashGuessCandidate(path, strategy);
-            if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                yield return new HashGuessCandidate(path[..^4] + ".dds", HashGuessStrategy.ImageExtensionVariant);
-        }
 
         private static IEnumerable<HashGuessCandidate> ExpandGrepFilePath(string path, HashGuessStrategy strategy)
         {

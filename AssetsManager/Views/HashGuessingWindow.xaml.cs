@@ -168,13 +168,12 @@ namespace AssetsManager.Views
 
         private async void RunGrepGame_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepGame);
         private async void RunGrepLcu_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepLcu);
-        private async void RunCanonical_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.RunCanonical);
-        private async void RunLocales_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.RunLocales);
-        private async void RunNumbers_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.RunNumbers);
         private async void RunGameBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameBasic);
         private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
+        private async void RunGameCustom_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameCustom);
         private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
-        private async void RunLcuAdvanced_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuAdvanced);
+        private async void RunLcuExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuExtended);
+        private async void RunLcuCustom_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuCustom);
         private async void RunLcuV1Paths_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuV1Paths);
         private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
         private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
@@ -193,8 +192,8 @@ namespace AssetsManager.Views
             if (_viewModel.IsRunning) return;
 
             var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
-            if (mode == HashGuessMode.GrepGame) domain = HashGuessDomain.Game;
-            else if (mode == HashGuessMode.GrepLcu) domain = HashGuessDomain.Lcu;
+            if (mode is HashGuessMode.GrepGame or HashGuessMode.GameCustom) domain = HashGuessDomain.Game;
+            else if (mode is HashGuessMode.GrepLcu or HashGuessMode.LcuCustom) domain = HashGuessDomain.Lcu;
 
             string rootPath = _appSettings.LolPbeDirectory?.Trim();
             if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
@@ -270,13 +269,12 @@ namespace AssetsManager.Views
                 });
                 var result = mode switch
                 {
-                    HashGuessMode.RunCanonical => await _hashGuessingService.RunCanonicalGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
-                    HashGuessMode.RunLocales => await _hashGuessingService.RunLanguageGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
-                    HashGuessMode.RunNumbers => await _hashGuessingService.RunNumberGuessingAsync(domain, rootPath, progress, runCancellation.Token, matchProgress: matchProgress),
                     HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuAdvanced => await _hashGuessingService.RunLcuAdvancedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
@@ -503,7 +501,7 @@ namespace AssetsManager.Views
             return elapsed.ToString(@"mm\:ss\.f", System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        private enum HashGuessMode { GrepGame, GrepLcu, RunCanonical, RunLocales, RunNumbers, GameBasic, GameExtended, LcuBasic, LcuAdvanced, LcuV1Paths }
+        private enum HashGuessMode { GrepGame, GrepLcu, GameBasic, GameExtended, GameCustom, LcuBasic, LcuExtended, LcuCustom, LcuV1Paths }
         private enum InternalHashAction { Inventory, Content, Structural }
     }
 }

@@ -234,55 +234,6 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private async Task<HashGuessRunResult> RunBasicSuiteAsync(
-            HashGuessDomain domain,
-            HashUnknownInventory inventory,
-            CancellationToken cancellationToken,
-            params Func<ISet<ulong>, Task<HashGuessRunResult>>[] phases)
-        {
-            var sessionResolved = new HashSet<ulong>();
-            var results = new List<HashGuessRunResult>();
-            try
-            {
-                foreach (var phase in phases)
-                    results.Add(await phase(sessionResolved));
-
-                var matches = results.SelectMany(result => result.Matches)
-                    .GroupBy(match => match.Hash)
-                    .Select(group => group.First())
-                    .OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                await PersistGuessingRunAsync(
-                    domain,
-                    matches,
-                    CreateSessionPending(inventory.All, sessionResolved),
-                    CreateSessionPending(inventory.Current, sessionResolved),
-                    inventory.PatchFingerprint,
-                    cancellationToken);
-                return new HashGuessRunResult
-                {
-                    Domain = domain,
-                    UnknownHashesAtStart = results.FirstOrDefault()?.UnknownHashesAtStart ?? 0,
-                    ScannedChunks = results.Sum(result => result.ScannedChunks),
-                    Matches = matches
-                };
-            }
-            catch (OperationCanceledException)
-            {
-                var matches = results.SelectMany(result => result.Matches).ToList();
-                await PersistGuessingRunAsync(
-                    domain,
-                    matches,
-                    CreateSessionPending(inventory.All, sessionResolved),
-                    CreateSessionPending(inventory.Current, sessionResolved),
-                    inventory.PatchFingerprint,
-                    CancellationToken.None);
-                if (matches.Count > 0)
-                    await SaveMatchesAsync(matches, CancellationToken.None);
-                throw;
-            }
-        }
-
         private HashGuesser CreateWadGuesser(HashGuessDomain domain)
         {
             return domain switch
@@ -290,61 +241,6 @@ namespace AssetsManager.Services.Hashes
                 HashGuessDomain.Game => _gameGuesser,
                 HashGuessDomain.Lcu => _lcuGuesser,
                 _ => throw new ArgumentOutOfRangeException(nameof(domain), domain, "Unsupported WAD hash domain.")
-            };
-        }
-
-        public async Task<HashGuessRunResult> RunCanonicalGuessingAsync(
-            HashGuessDomain domain,
-            string rootDirectory,
-            IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken,
-            ISet<ulong> sessionResolved = null,
-            HashUnknownInventory preparedInventory = null,
-            IProgress<HashGuessMatch> matchProgress = null)
-        {
-            await _hashResolverService.LoadAllHashesAsync();
-            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
-                throw new DirectoryNotFoundException("The selected game directory does not exist.");
-
-            HashGuesser otherGuesser = CreateWadGuesser(domain == HashGuessDomain.Game ? HashGuessDomain.Lcu : HashGuessDomain.Game);
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
-            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
-            int unknownAtStart = unknownHashes.Count;
-            HashGuessEngine engine = null;
-            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
-            {
-                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
-                engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
-                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
-
-                IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
-                    ? _lcuGuesser.GuessFromGameHashes(otherGuesser)
-                    : _gameGuesser.GenerateCanonicalCandidates(otherGuesser);
-                int checkedCandidates = guesser.CheckIter(
-                    engine,
-                    candidates,
-                    "Generated canonical pattern",
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress("Generating canonical paths", count)),
-                    1000);
-
-                var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (resultMatches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, domain, inventory, sessionResolved);
-
-            var resultMatches = runResult.Item1;
-            int checkedCandidates = runResult.Item2;
-            var remainingUnknowns = runResult.Item3;
-            if (preparedInventory == null || sessionResolved == null)
-                await PersistGuessingRunAsync(domain, resultMatches, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
-            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
-            _logService.LogSuccess($"Hash Lab {domain} canonical guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
-            return new HashGuessRunResult
-            {
-                Domain = domain,
-                UnknownHashesAtStart = unknownAtStart,
-                ScannedChunks = checkedCandidates,
-                Matches = resultMatches
             };
         }
 
@@ -356,19 +252,15 @@ namespace AssetsManager.Services.Hashes
         {
             await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
-            return await RunBasicSuiteAsync(
-                HashGuessDomain.Game,
-                inventory,
+            return await RunGameBasicMethodsGuessingAsync(
+                progress,
                 cancellationToken,
-                session => RunCanonicalGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunLanguageGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunNumberGuessingAsync(HashGuessDomain.Game, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunGameCrossDomainGuessingAsync(rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunGameBasicSupplementalGuessingAsync(rootDirectory, progress, cancellationToken, session, inventory, matchProgress));
+                null,
+                inventory,
+                matchProgress);
         }
 
-        private async Task<HashGuessRunResult> RunGameBasicSupplementalGuessingAsync(
-            string rootDirectory,
+        private async Task<HashGuessRunResult> RunGameBasicMethodsGuessingAsync(
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
             ISet<ulong> sessionResolved,
@@ -386,49 +278,105 @@ namespace AssetsManager.Services.Hashes
 
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
+                    progress?.Report(engine.CreateProgress("GAME Basic: GAME hash cross-domain", checkedCandidates));
                     int progressOffset = checkedCandidates;
-                    checkedCandidates += _gameGuesser.CheckIter(
+                    checkedCandidates += _gameGuesser.GuessFromLcuHashes(
                         engine,
-                        _gameGuesser.CheckBasenamePrefixes(new[] { "tft_", "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }),
-                        "GAME Basic: prefixes",
+                        _lcuGuesser,
                         cancellationToken,
-                        count => progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", progressOffset + count)),
-                        5000);
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: GAME hash cross-domain", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: character files", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.GuessCharacterFiles(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: character files", progressOffset + count)));
                 }
 
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
                     int progressOffset = checkedCandidates;
-                    checkedCandidates += _gameGuesser.CheckIter(
+                    checkedCandidates += _gameGuesser.GuessShaderVariants(
                         engine,
-                        _gameGuesser.GuessShaderVariants(),
-                        "GAME Basic: shader variants",
                         cancellationToken,
-                        count => progress?.Report(engine.CreateProgress("GAME Basic: shader variants", progressOffset + count)),
-                        5000);
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: shader variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: locale variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.SubstituteLang(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: locale variants", progressOffset + count)));
                 }
 
                 if (engine.RemainingUnknownCount > 0)
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", checkedCandidates));
                     int progressOffset = checkedCandidates;
-                    checkedCandidates += _gameGuesser.CheckIter(
+                    checkedCandidates += _gameGuesser.SubstituteExtensions(
                         engine,
-                        _gameGuesser.GenerateExtensionCandidates(int.MaxValue),
-                        "GAME Basic: extension substitution",
                         cancellationToken,
-                        count => progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", progressOffset + count)),
-                        5000);
+                        candidateBudget: int.MaxValue,
+                        source: "GAME Basic: extension substitution",
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: extension substitution", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.CheckBasenamePrefixes(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: basename prefixes", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: numeric variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.SubstituteNumbers(
+                        engine,
+                        cancellationToken,
+                        maximum: 200,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: numeric variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: padded numeric variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.SubstituteNumbers(
+                        engine,
+                        cancellationToken,
+                        maximum: 200,
+                        digits: 2,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("GAME Basic: padded numeric variants", progressOffset + count)));
                 }
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (matches, checkedCandidates);
+                return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken), () => engine, HashGuessDomain.Game, inventory, sessionResolved);
 
             var matches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
+            var remainingUnknowns = runResult.Item3;
+            await PersistGuessingRunAsync(
+                HashGuessDomain.Game,
+                matches,
+                remainingUnknowns,
+                inventory.Current,
+                inventory.PatchFingerprint,
+                cancellationToken);
             sessionResolved?.UnionWith(matches.Select(match => match.Hash));
             return new HashGuessRunResult
             {
@@ -447,17 +395,150 @@ namespace AssetsManager.Services.Hashes
         {
             await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
-            return await RunBasicSuiteAsync(
-                HashGuessDomain.Lcu,
-                inventory,
+            return await RunLcuBasicMethodsGuessingAsync(
+                progress,
                 cancellationToken,
-                session => RunCanonicalGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunLanguageGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunNumberGuessingAsync(HashGuessDomain.Lcu, rootDirectory, progress, cancellationToken, session, inventory, matchProgress),
-                session => RunLcuSupplementalGuessingAsync(rootDirectory, progress, cancellationToken, session, inventory, matchProgress));
+                inventory,
+                matchProgress);
         }
 
-        public async Task<HashGuessRunResult> RunLcuAdvancedGuessingAsync(
+        private async Task<HashGuessRunResult> RunLcuBasicMethodsGuessingAsync(
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            HashUnknownInventory inventory,
+            IProgress<HashGuessMatch> matchProgress)
+        {
+            var unknown = inventory.All;
+            int initial = unknown.Count;
+            HashGuessEngine engine = null;
+            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
+            {
+                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
+                engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
+                int checkedCandidates = 0;
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: extension variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteExtensions(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: int.MaxValue,
+                        source: "LCU Basic: extension substitution",
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: extension variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: patterns", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.GuessPatterns(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: int.MaxValue,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: patterns", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: GAME hash cross-domain", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.GuessFromGameHashes(
+                        engine,
+                        _gameGuesser,
+                        cancellationToken,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: GAME hash cross-domain", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: plugin variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstitutePlugin(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: int.MaxValue,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: plugin variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: numeric variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteNumbers(
+                        engine,
+                        cancellationToken,
+                        maximum: 10_000,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: numeric variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: region and locale variants", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteRegionLang(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: region and locale variants", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteBasenames(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: 10_000_000,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: basename substitution", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.SubstituteBasenameWords(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: 10_000_000,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: basename word substitution", progressOffset + count)));
+                }
+
+                var matches = engine.Matches.Values
+                    .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return (matches, checkedCandidates, engine.UnknownHashes);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+
+            var matches = runResult.Item1;
+            int checkedCandidates = runResult.Item2;
+            var remainingUnknowns = runResult.Item3;
+            await PersistGuessingRunAsync(
+                HashGuessDomain.Lcu,
+                matches,
+                remainingUnknowns,
+                inventory.Current,
+                inventory.PatchFingerprint,
+                cancellationToken);
+            return new HashGuessRunResult
+            {
+                Domain = HashGuessDomain.Lcu,
+                UnknownHashesAtStart = initial,
+                ScannedChunks = checkedCandidates,
+                Matches = matches
+            };
+        }
+
+        public async Task<HashGuessRunResult> RunLcuExtendedGuessingAsync(
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
@@ -471,7 +552,13 @@ namespace AssetsManager.Services.Hashes
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
-                int checkedCandidates = _lcuGuesser.RunAdvancedAttacks(engine, progress, cancellationToken);
+                progress?.Report(engine.CreateProgress("LCU Extended: basename word addition", 0));
+                int checkedCandidates = _lcuGuesser.AddBasenameWord(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(
+                        engine.CreateProgress("LCU Extended: basename word addition", count)));
+                progress?.Report(engine.CreateProgress("LCU Extended: basename word addition", checkedCandidates));
 
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
@@ -482,6 +569,46 @@ namespace AssetsManager.Services.Hashes
             var remainingUnknowns = runResult.Item3;
             await PersistGuessingRunAsync(HashGuessDomain.Lcu, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
+        }
+
+        public async Task<HashGuessRunResult> RunLcuCustomGuessingAsync(
+            string rootDirectory,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            IProgress<HashGuessMatch> matchProgress = null)
+        {
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var unknown = inventory.All;
+            int initial = unknown.Count;
+            HashGuessEngine engine = null;
+            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
+            {
+                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
+                engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
+                int checkedCandidates = _lcuGuesser.RunCustomAttacks(engine, progress, cancellationToken);
+                var matches = engine.Matches.Values
+                    .OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return (matches, checkedCandidates, engine.UnknownHashes);
+            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory);
+
+            var matches = runResult.Item1;
+            int checkedCandidates = runResult.Item2;
+            var remainingUnknowns = runResult.Item3;
+            await PersistGuessingRunAsync(
+                HashGuessDomain.Lcu,
+                matches,
+                remainingUnknowns,
+                inventory.Current,
+                inventory.PatchFingerprint,
+                cancellationToken);
+            return new HashGuessRunResult
+            {
+                Domain = HashGuessDomain.Lcu,
+                UnknownHashesAtStart = initial,
+                ScannedChunks = checkedCandidates,
+                Matches = matches
+            };
         }
 
         public async Task<HashGuessRunResult> RunLcuV1PathGuessingAsync(
@@ -511,75 +638,6 @@ namespace AssetsManager.Services.Hashes
             return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
-        private async Task<HashGuessRunResult> RunLcuSupplementalGuessingAsync(
-            string rootDirectory,
-            IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken,
-            ISet<ulong> sessionResolved,
-            HashUnknownInventory inventory,
-            IProgress<HashGuessMatch> matchProgress)
-        {
-            var unknown = CreateSessionPending(inventory.All, sessionResolved);
-            int initial = unknown.Count;
-            HashGuessEngine engine = null;
-            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
-            {
-                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
-                engine = new HashGuessEngine(HashGuessDomain.Lcu, unknown, reportMatch);
-                int checkedCandidates = 0;
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", checkedCandidates));
-                    int progressOffset = checkedCandidates;
-                    checkedCandidates += _lcuGuesser.SubstituteBasenames(
-                        engine,
-                        cancellationToken,
-                        candidateBudget: 10_000_000,
-                        progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename substitution", progressOffset + count)));
-                }
-                if (engine.RemainingUnknownCount > 0)
-                {
-                    progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", checkedCandidates));
-                    int progressOffset = checkedCandidates;
-                    checkedCandidates += _lcuGuesser.SubstituteBasenameWords(
-                        engine,
-                        cancellationToken,
-                        candidateBudget: 10_000_000,
-                        progress: count => progress?.Report(engine.CreateProgress("LCU Basic: basename word substitution", progressOffset + count)));
-                }
-
-                var phases = new (string Name, IEnumerable<HashGuessCandidate> Candidates)[]
-                {
-                    ("plugin variants", _lcuGuesser.SubstitutePlugin()),
-                    ("extension variants", _lcuGuesser.GenerateLcuExtensionCandidates(int.MaxValue)),
-                    ("LCU patterns", _lcuGuesser.GuessPatterns())
-                };
-
-                foreach (var phase in phases)
-                {
-                    progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", checkedCandidates));
-                    int progressOffset = checkedCandidates;
-                    checkedCandidates += _lcuGuesser.CheckIter(
-                        engine,
-                        phase.Candidates,
-                        "LCU Basic",
-                        cancellationToken,
-                        count => progress?.Report(engine.CreateProgress($"LCU Basic: {phase.Name}", progressOffset + count)),
-                        5000);
-
-                    if (engine.RemainingUnknownCount == 0) break;
-                }
-
-                var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (matches, checkedCandidates);
-            }, cancellationToken), () => engine, HashGuessDomain.Lcu, inventory, sessionResolved);
-
-            var matches = runResult.Item1;
-            int checkedCandidates = runResult.Item2;
-            sessionResolved?.UnionWith(matches.Select(match => match.Hash));
-            return new HashGuessRunResult { Domain = HashGuessDomain.Lcu, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
-        }
-
         public async Task<HashGuessRunResult> RunGameExtendedGuessingAsync(
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
@@ -595,7 +653,7 @@ namespace AssetsManager.Services.Hashes
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Game, unknown, reportMatch);
                 int checkedCandidates = await _gameGuesser.RunExtendedAttacksAsync(
-                    engine, rootDirectory, _binEntriesHashFile.LoadPaths(), progress, cancellationToken);
+                    engine, rootDirectory, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
                 return (matches, checkedCandidates, engine.UnknownHashes);
             }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
@@ -607,141 +665,30 @@ namespace AssetsManager.Services.Hashes
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
-        private async Task<HashGuessRunResult> RunGameCrossDomainGuessingAsync(
+        public async Task<HashGuessRunResult> RunGameCustomGuessingAsync(
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
-            ISet<ulong> sessionResolved,
-            HashUnknownInventory inventory,
-            IProgress<HashGuessMatch> matchProgress)
+            IProgress<HashGuessMatch> matchProgress = null)
         {
-            var unknown = CreateSessionPending(inventory.All, sessionResolved);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
             {
                 Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
                 engine = new HashGuessEngine(HashGuessDomain.Game, unknown, reportMatch);
-                int candidates = _gameGuesser.RunCrossDomainAttacks(engine, _lcuGuesser, cancellationToken);
-
+                int checkedCandidates = _gameGuesser.RunCustomAttacks(engine, progress, cancellationToken);
                 var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (matches, candidates);
-            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory, sessionResolved);
+                return (matches, checkedCandidates, engine.UnknownHashes);
+            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
 
             var matches = runResult.Item1;
-            int candidates = runResult.Item2;
-            sessionResolved?.UnionWith(matches.Select(match => match.Hash));
-            return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = candidates, Matches = matches };
-        }
-
-        public async Task<HashGuessRunResult> RunLanguageGuessingAsync(
-            HashGuessDomain domain,
-            string rootDirectory,
-            IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken,
-            ISet<ulong> sessionResolved = null,
-            HashUnknownInventory preparedInventory = null,
-            IProgress<HashGuessMatch> matchProgress = null)
-        {
-            await _hashResolverService.LoadAllHashesAsync();
-            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
-                throw new DirectoryNotFoundException("The selected game directory does not exist.");
-
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
-            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
-            int unknownAtStart = unknownHashes.Count;
-            HashGuessEngine engine = null;
-            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
-            {
-                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
-                engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
-                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
-
-                IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
-                    ? _lcuGuesser.SubstituteRegionLang()
-                    : _gameGuesser.SubstituteLang();
-                int checkedCandidates = guesser.CheckIter(
-                    engine,
-                    candidates,
-                    "Generated locale or region variant",
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress("Generating locale and region variants", count)),
-                    5000);
-
-                var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (resultMatches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, domain, inventory, sessionResolved);
-
-            var resultMatches = runResult.Item1;
             int checkedCandidates = runResult.Item2;
             var remainingUnknowns = runResult.Item3;
-            if (preparedInventory == null || sessionResolved == null)
-                await PersistGuessingRunAsync(domain, resultMatches, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
-            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
-            _logService.LogSuccess($"Hash Lab {domain} language guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
-            return new HashGuessRunResult
-            {
-                Domain = domain,
-                UnknownHashesAtStart = unknownAtStart,
-                ScannedChunks = checkedCandidates,
-                Matches = resultMatches
-            };
-        }
-
-        public async Task<HashGuessRunResult> RunNumberGuessingAsync(
-            HashGuessDomain domain,
-            string rootDirectory,
-            IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken,
-            ISet<ulong> sessionResolved = null,
-            HashUnknownInventory preparedInventory = null,
-            IProgress<HashGuessMatch> matchProgress = null)
-        {
-            await _hashResolverService.LoadAllHashesAsync();
-            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
-                throw new DirectoryNotFoundException("The selected game directory does not exist.");
-
-            var inventory = preparedInventory ?? await LoadPersistedInventoryAsync(domain, rootDirectory, cancellationToken, sessionResolved as IReadOnlySet<ulong>);
-            var unknownHashes = CreateSessionPending(inventory.All, sessionResolved);
-            int unknownAtStart = unknownHashes.Count;
-            int numberLimit = domain == HashGuessDomain.Game ? 100 : 10_000;
-            const int candidateBudget = int.MaxValue;
-            HashGuessEngine engine = null;
-            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
-            {
-                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
-                engine = new HashGuessEngine(domain, unknownHashes, reportMatch);
-                HashGuesser guesser = domain == HashGuessDomain.Lcu ? _lcuGuesser : _gameGuesser;
-
-                IEnumerable<HashGuessCandidate> candidates = domain == HashGuessDomain.Lcu
-                    ? _lcuGuesser.SubstituteNumbers(numberLimit)
-                    : _gameGuesser.SubstituteBasicNumbers(numberLimit);
-                int checkedCandidates = guesser.CheckIter(
-                    engine,
-                    candidates,
-                    "Generated numeric variant",
-                    cancellationToken,
-                    count => progress?.Report(engine.CreateProgress($"Generating numeric variants ({count:N0}/{candidateBudget:N0})", count)),
-                    5000);
-
-                var resultMatches = engine.Matches.Values.OrderBy(match => match.Path, StringComparer.OrdinalIgnoreCase).ToList();
-                return (resultMatches, checkedCandidates, engine.UnknownHashes);
-            }, cancellationToken), () => engine, domain, inventory, sessionResolved);
-
-            var resultMatches = runResult.Item1;
-            int checkedCandidates = runResult.Item2;
-            var remainingUnknowns = runResult.Item3;
-            if (preparedInventory == null || sessionResolved == null)
-                await PersistGuessingRunAsync(domain, resultMatches, remainingUnknowns, CreateSessionPending(inventory.Current, sessionResolved), inventory.PatchFingerprint, cancellationToken);
-            sessionResolved?.UnionWith(resultMatches.Select(match => match.Hash));
-            _logService.LogSuccess($"Hash Lab {domain} number guessing completed: {resultMatches.Count} paths resolved from {unknownAtStart} unknown hashes.");
-            return new HashGuessRunResult
-            {
-                Domain = domain,
-                UnknownHashesAtStart = unknownAtStart,
-                ScannedChunks = checkedCandidates,
-                Matches = resultMatches
-            };
+            await PersistGuessingRunAsync(HashGuessDomain.Game, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
         private async Task<HashUnknownInventory> LoadPersistedInventoryAsync(

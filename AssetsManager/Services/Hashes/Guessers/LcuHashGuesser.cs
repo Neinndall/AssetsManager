@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex TemplateRegex = new("<template id=\\\"[^\\\"]*-template-([^\\\"]+)\\\"", RegexOptions.Compiled);
         private static readonly Regex SourceMapRegex = new("sourceMappingURL=(.*?\\.js)\\.map", RegexOptions.Compiled);
         private static readonly Regex SplashNameRegex = new(@"-splash-([^.]+)", RegexOptions.Compiled);
+        private static readonly Regex RegionLangRegex = new(@"^plugins/([^/]+)/[^/]+/[^/]+/", RegexOptions.Compiled);
         private static readonly Regex NumberExcludedPathRegex = new(@"(?:^(?:plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champion-|plugins/rcp-be-lol-game-data/global/default/(?:data|assets)/characters/|plugins/rcp-be-lol-game-data/global/default/data/items/icons2d/\d+_|plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champions/-1\.json)|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex WordlistExcludedPathRegex = new(@"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
@@ -59,112 +60,219 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", _ => HashGuessEngine.BuildWordlist(WordlistPaths));
 
-        internal override IEnumerable<HashGuessCandidate> GenerateCanonicalCandidates(HashGuesser otherDomain, int candidateBudget = int.MaxValue)
-        {
-            const string basePath = "plugins/rcp-be-lol-game-data/global/default/";
-            int generated = 0;
-            foreach (string path in otherDomain.KnownPaths)
-            {
-                if (path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                {
-                    string prefix = path[..^4];
-                    foreach (string extension in new[] { ".png", ".jpg", ".webp" })
-                    {
-                        yield return new HashGuessCandidate(basePath + prefix + extension, HashGuessStrategy.CrossDomainAsset);
-                        if (CountCandidate(ref generated, candidateBudget)) yield break;
-                    }
-                }
-                else if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                {
-                    yield return new HashGuessCandidate(basePath + path, HashGuessStrategy.CrossDomainAsset);
-                    if (CountCandidate(ref generated, candidateBudget)) yield break;
-                }
-            }
-        }
+        internal IReadOnlyList<string> BuildSwordlist() =>
+            Corpus.GetOrCreate(
+                "swordlist",
+                paths => HashGuessEngine.BuildWordlist(
+                    paths
+                        .Where(path => path.Contains("-fe-lol-", StringComparison.Ordinal)
+                            && path.Contains(".json", StringComparison.Ordinal))
+                        .Select(Path.GetFileName)));
 
-        internal override IEnumerable<HashGuessCandidate> GenerateLanguageCandidates(int candidateBudget = int.MaxValue)
-        {
-            var formats = new HashSet<string>(StringComparer.Ordinal);
-            foreach (string path in KnownPaths)
-            {
-                Match match = Regex.Match(path, @"^plugins/([^/]+)/[^/]+/[^/]+/(.*)$", RegexOptions.IgnoreCase);
-                if (match.Success) formats.Add($"plugins/{match.Groups[1].Value}/{{region}}/{{locale}}/{match.Groups[2].Value}");
-            }
-            int generated = 0;
-            foreach (string format in formats.OrderBy(path => path, StringComparer.Ordinal))
-            foreach (string region in Regions)
-            foreach (string locale in Locales.Append("default"))
-            {
-                yield return new HashGuessCandidate(
-                    format.Replace("{region}", region, StringComparison.Ordinal).Replace("{locale}", locale, StringComparison.Ordinal),
-                    HashGuessStrategy.LanguageVariant);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
-            }
-        }
+        internal IReadOnlyList<string> BuildSswordlist() =>
+            Corpus.GetOrCreate(
+                "sswordlist",
+                paths => HashGuessEngine.BuildWordlist(
+                    paths
+                        .Where(IsRcpFeLolSvgPath)
+                        .Select(Path.GetFileName)));
+
+        internal IReadOnlyList<string> BuildPngJpgSwordlist() =>
+            Corpus.GetOrCreate(
+                "swordlist-png-jpg",
+                paths => HashGuessEngine.BuildWordlist(
+                    paths
+                        .Where(IsRcpFeLolPngJpgPath)
+                        .Select(Path.GetFileName)));
+
+        private static bool IsRcpFeLolSvgPath(string path) =>
+            path.Contains("-fe-lol-", StringComparison.Ordinal)
+            && path.Contains(".svg", StringComparison.Ordinal);
+
+        private static bool IsRcpFeLolPngJpgPath(string path) =>
+            path.Contains("-fe-lol-", StringComparison.Ordinal)
+            && (path.Contains(".png", StringComparison.Ordinal)
+                || path.Contains(".jpg", StringComparison.Ordinal));
 
         protected override bool IncludeNumberPath(string path) => !NumberExcludedPathRegex.IsMatch(path);
 
-        internal IEnumerable<HashGuessCandidate> GeneratePluginCandidates(int candidateBudget = int.MaxValue)
+        internal int SubstitutePlugin(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
-            var paths = KnownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
-            var plugins = paths.Select(path => path.Split('/')[1]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            var formats = paths.Select(path => Regex.Replace(path, @"^plugins/[^/]+/", "plugins/{plugin}/", RegexOptions.IgnoreCase))
-                .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal);
-            int generated = 0;
-            foreach (string format in formats)
-            foreach (string plugin in plugins)
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            IReadOnlyList<string> allPaths = KnownPaths
+                .Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            IReadOnlyList<string> plugins = allPaths
+                .Select(path => path.Split('/')[1])
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(plugin => plugin, StringComparer.Ordinal)
+                .ToList();
+            IReadOnlyList<string> formats = allPaths
+                .Select(path => Regex.Replace(path, @"^plugins/([^/]+)/", "plugins/{plugin}/", RegexOptions.IgnoreCase))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList();
+
+            const string source = "LCU plugin substitution";
+            int checkedCount = 0;
+            foreach (string format in ProgressIterator(formats, value => value, cancellationToken))
             {
-                yield return new HashGuessCandidate(format.Replace("{plugin}", plugin, StringComparison.Ordinal), HashGuessStrategy.PluginVariant);
-                if (CountCandidate(ref generated, candidateBudget)) yield break;
+                cancellationToken.ThrowIfCancellationRequested();
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+
+                IEnumerable<HashGuessCandidate> candidates = plugins.Select(plugin =>
+                    new HashGuessCandidate(
+                        format.Replace("{plugin}", plugin, StringComparison.Ordinal),
+                        HashGuessStrategy.PluginVariant));
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
+                progress?.Invoke(checkedCount);
             }
+
+            return checkedCount;
         }
 
-        internal IEnumerable<HashGuessCandidate> GenerateLcuExtensionCandidates(int candidateBudget = int.MaxValue) =>
-            GenerateExtensionCandidates(KnownPaths, candidateBudget);
-
-        internal IEnumerable<HashGuessCandidate> GeneratePatternCandidates()
+        internal int GuessPatterns(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
         {
-            var paths = KnownPaths.Where(path => path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase)).ToList();
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            const string source = "LCU patterns";
+            int checkedCount = 0;
+
+            void CheckPatternIter(IEnumerable<string> paths)
+            {
+                if (engine.RemainingUnknownCount == 0) return;
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0) return;
+
+                IEnumerable<HashGuessCandidate> candidates = paths.Select(
+                    path => new HashGuessCandidate(path, HashGuessStrategy.LcuPattern));
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
+                progress?.Invoke(checkedCount);
+            }
+
             var perkPrimary = Enumerable.Range(80, 6).Select(value => value * 100).ToList();
             foreach (int primary in perkPrimary)
             {
-                var secondary = Enumerable.Range(primary, 100).ToList();
-                foreach (int style in perkPrimary.Prepend(0))
-                foreach (int perk in secondary.Prepend(0))
-                    yield return new HashGuessCandidate($"plugins/rcp-fe-lol-perks/global/default/images/inventory-card/{primary}/p{primary}_s{style}_k{perk}.jpg", HashGuessStrategy.LcuPattern);
-                yield return new HashGuessCandidate($"plugins/rcp-fe-lol-perks/global/default/images/construct/{primary}/environment.jpg", HashGuessStrategy.LcuPattern);
-                yield return new HashGuessCandidate($"plugins/rcp-fe-lol-perks/global/default/images/construct/{primary}/construct.png", HashGuessStrategy.LcuPattern);
-                foreach (int perk in secondary)
-                    yield return new HashGuessCandidate($"plugins/rcp-fe-lol-perks/global/default/images/construct/{primary}/keystones/{perk}.png", HashGuessStrategy.LcuPattern);
-                foreach (int style in perkPrimary)
-                    yield return new HashGuessCandidate($"plugins/rcp-fe-lol-perks/global/default/images/construct/{primary}/second/{style}.png", HashGuessStrategy.LcuPattern);
+                var perkSecondary = Enumerable.Range(primary, 100).ToList();
+                CheckPatternIter(
+                    perkPrimary.Prepend(0).SelectMany(style =>
+                        perkSecondary.Prepend(0).Select(perk =>
+                            $"plugins/rcp-fe-lol-perks/global/default/images/inventory-card/{primary}/p{primary}_s{style}_k{perk}.jpg")));
+
+                CheckPatternIter(
+                    new[] { "environment.jpg", "construct.png" }
+                        .Concat(perkSecondary.Select(perk => $"keystones/{perk}.png"))
+                        .Concat(perkPrimary.Select(style => $"second/{style}.png"))
+                        .Select(path => $"plugins/rcp-fe-lol-perks/global/default/images/construct/{primary}/{path}"));
+
+                if (engine.RemainingUnknownCount == 0 || checkedCount >= candidateBudget) return checkedCount;
             }
 
-            foreach (string action in new[] { "filter", "unfilter", "whitelist" })
-            for (int index = 0; index < 5; index++)
+            IEnumerable<string> sanitizerPaths = Enumerable.Range(0, 5).SelectMany(index =>
+                new[] { "filter", "unfilter", "whitelist" }.SelectMany(action =>
+                    new[] { $"{index}.{action}.csv" }
+                        .Concat(Locales.Select(locale =>
+                        {
+                            string[] parts = locale.Split('_');
+                            return $"{index}.{action}.language.{parts[0]}.csv";
+                        }))
+                        .Concat(Locales.Select(locale =>
+                        {
+                            string[] parts = locale.Split('_');
+                            return $"{index}.{action}.country.{parts[1]}.csv";
+                        }))
+                        .Concat(Regions
+                            .Where(region => !region.Equals("global", StringComparison.OrdinalIgnoreCase))
+                            .Select(region => $"{index}.{action}.region.{region}.csv"))
+                        .Concat(Locales.Select(locale => $"{index}.{action}.locale.{locale}.csv"))));
+
+            IEnumerable<string> sanitizerNames = new[]
             {
-                yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{index}.{action}.csv", HashGuessStrategy.LcuPattern);
-                foreach (string locale in Locales)
-                {
-                    string[] parts = locale.Split('_');
-                    yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{index}.{action}.language.{parts[0]}.csv", HashGuessStrategy.LcuPattern);
-                    yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{index}.{action}.country.{parts[1]}.csv", HashGuessStrategy.LcuPattern);
-                    yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{index}.{action}.locale.{locale}.csv", HashGuessStrategy.LcuPattern);
-                }
-                foreach (string region in Regions)
-                    yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{index}.{action}.region.{region}.csv", HashGuessStrategy.LcuPattern);
-            }
-            foreach (string name in new[] { "allowedchars", "breakingchars", "projectedchars", "projectedchars1337", "punctuationchars", "variantaliases" })
-            foreach (string locale in Locales)
+                "allowedchars", "breakingchars", "projectedchars", "projectedchars1337",
+                "punctuationchars", "variantaliases"
+            }.SelectMany(name =>
+                Locales.Select(locale => $"{name}.locale.{locale}.txt")
+                    .Concat(Locales.Select(locale => $"{name}.language.{locale.Split('_')[0]}.txt")));
+
+            CheckPatternIter(
+                sanitizerPaths
+                    .Concat(sanitizerNames)
+                    .Select(path => $"plugins/rcp-be-sanitizer/global/default/{path}"));
+
+            if (engine.RemainingUnknownCount == 0 || checkedCount >= candidateBudget) return checkedCount;
+
+            foreach (string path in KnownPaths.Where(path =>
+                         path.StartsWith("plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/", StringComparison.OrdinalIgnoreCase) &&
+                         path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
             {
-                yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{name}.locale.{locale}.txt", HashGuessStrategy.LcuPattern);
-                yield return new HashGuessCandidate($"plugins/rcp-be-sanitizer/global/default/{name}.language.{locale.Split('_')[0]}.txt", HashGuessStrategy.LcuPattern);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+                Check(engine, path[..^4] + "_splash.png", HashGuessStrategy.LcuPattern, source);
+                checkedCount++;
+                progress?.Invoke(checkedCount);
             }
-            foreach (string path in paths.Where(path => path.StartsWith("plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
-                yield return new HashGuessCandidate(path[..^4] + "_splash.png", HashGuessStrategy.LcuPattern);
+
+            return checkedCount;
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteRegionLang() => GenerateLanguageCandidates(int.MaxValue);
+        internal int SubstituteRegionLang(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            IReadOnlyList<string> known = KnownPaths.ToList();
+            IReadOnlyList<string> languages = Locales.Append("default").ToList();
+            var regionLanguages = Regions
+                .SelectMany(region => languages, (region, language) => (Region: region, Language: language))
+                .ToList();
+
+            const string source = "Generated region or locale variant";
+            int checkedCount = 0;
+            foreach (var regionLanguage in ProgressIterator(
+                         regionLanguages,
+                         value => $"{value.Region}/{value.Language}",
+                         cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
+                if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+
+                string replacement = $"plugins/$1/{regionLanguage.Region}/{regionLanguage.Language}/";
+                IEnumerable<HashGuessCandidate> candidates = known.Select(path =>
+                    new HashGuessCandidate(
+                        RegionLangRegex.Replace(path, replacement),
+                        HashGuessStrategy.LanguageVariant));
+                if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
+
+                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
+                progress?.Invoke(checkedCount);
+            }
+
+            return checkedCount;
+        }
 
         internal int SubstituteBasenameWords(
             HashGuessEngine engine,
@@ -178,48 +286,216 @@ namespace AssetsManager.Services.Hashes.Guessers
             Action<int> progress = null)
         {
             IEnumerable<string> paths = KnownPaths;
-            if (!string.IsNullOrWhiteSpace(plugin))
-                paths = paths.Where(path => path.StartsWith($"plugins/{plugin}/", StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrWhiteSpace(fileExtension))
-                paths = paths.Where(path => path.EndsWith(fileExtension, StringComparison.OrdinalIgnoreCase));
-            return RunBasenameWordSubstitution(
+            if (!string.IsNullOrEmpty(plugin))
+            {
+                string pluginPrefix = plugin.EndsWith("*", StringComparison.Ordinal)
+                    ? $"plugins/{plugin[..^1]}"
+                    : $"plugins/{plugin}/";
+                paths = paths.Where(path => path.StartsWith(pluginPrefix, StringComparison.Ordinal));
+            }
+            if (!string.IsNullOrEmpty(fileExtension))
+                paths = paths.Where(path => path.EndsWith(fileExtension, StringComparison.Ordinal));
+            return SubstituteBasenameWordsCore(
                 engine, paths, words ?? BuildWordlist(), oldWordCount, newWordCount,
                 cancellationToken, candidateBudget, "LCU basename word substitution", progress);
         }
 
-        internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken) =>
-            RunWordAdditionAttack(engine, KnownPaths, BuildWordlist(), cancellationToken, int.MaxValue);
-
-        internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 10_000, int? digits = null, bool inferDigits = false) =>
-            GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
-
-        internal IEnumerable<HashGuessCandidate> SubstitutePlugin() => GeneratePluginCandidates(int.MaxValue);
-
-        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash) =>
-            CheckChunk(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
-
-        internal IEnumerable<HashGuessCandidate> GuessFromGameHashes(HashGuesser gameGuesser) =>
-            GenerateCanonicalCandidates(gameGuesser, int.MaxValue);
-
-        internal IEnumerable<HashGuessCandidate> GuessPatterns() => GeneratePatternCandidates();
-
-        internal int SubstitutePartiesBasenameWordPairs(HashGuessEngine engine, CancellationToken cancellationToken)
+        internal int RunCustomAttacks(
+            HashGuessEngine engine,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken)
         {
-            var partyImages = Corpus.GetOrCreate("party-images", paths => paths.Where(path =>
-                    path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) &&
-                    path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList());
-            var imageWords = Corpus.GetOrCreate("splash-image-words", paths =>
-                HashGuessEngine.BuildBasenameWordlist(paths.Where(path =>
-                    path.Contains("-fe-lol-s", StringComparison.OrdinalIgnoreCase) &&
-                    path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))));
+            ArgumentNullException.ThrowIfNull(engine);
 
-            return RunBasenameWordSubstitution(
-                engine, partyImages, imageWords, 1, 2, cancellationToken, int.MaxValue,
-                "LCU parties PNG word-pair substitution");
+            IReadOnlyList<string> words = BuildSswordlist();
+            int checkedCandidates = 0;
+            var variants = new[]
+            {
+                (OldWordCount: 1, NewWordCount: 1),
+                (OldWordCount: 1, NewWordCount: 2),
+                (OldWordCount: 2, NewWordCount: 2)
+            };
+
+            int RunVariants(
+                IReadOnlyList<string> variantWords,
+                IEnumerable<string> extensions,
+                string label)
+            {
+                int variantCheckedCandidates = 0;
+                foreach (string extension in extensions)
+                foreach ((int oldWordCount, int newWordCount) in variants)
+                {
+                    if (engine.RemainingUnknownCount == 0) return variantCheckedCandidates;
+
+                    string stage = $"LCU Custom: rcp-fe-lol-* {label} basename {oldWordCount}->{newWordCount}";
+                    progress?.Report(engine.CreateProgress(stage, checkedCandidates + variantCheckedCandidates));
+                    int progressOffset = checkedCandidates + variantCheckedCandidates;
+                    int count = SubstituteBasenameWords(
+                        engine,
+                        cancellationToken,
+                        plugin: "rcp-fe-lol-*",
+                        fileExtension: extension,
+                        words: variantWords,
+                        oldWordCount: oldWordCount,
+                        newWordCount: newWordCount,
+                        candidateBudget: int.MaxValue,
+                        progress: current => progress?.Report(
+                            engine.CreateProgress(stage, progressOffset + current)));
+                    variantCheckedCandidates += count;
+                }
+
+                return variantCheckedCandidates;
+            }
+
+            checkedCandidates += RunVariants(words, new[] { "svg" }, "SVG");
+            if (engine.RemainingUnknownCount > 0)
+                checkedCandidates += RunVariants(BuildPngJpgSwordlist(), new[] { "png", "jpg" }, "PNG/JPG");
+
+            return checkedCandidates;
+        }
+
+        internal int AddBasenameWord(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null) =>
+            AddBasenameWordCore(
+                engine,
+                KnownPaths,
+                BuildWordlist(),
+                cancellationToken,
+                candidateBudget: int.MaxValue,
+                source: "LCU basename word addition",
+                progress: progress);
+
+        internal int SubstituteNumbers(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int maximum = 10_000,
+            int? digits = null,
+            Action<int> progress = null) =>
+            base.SubstituteNumbersCore(
+                engine,
+                KnownPaths.Where(path => !NumberExcludedPathRegex.IsMatch(path)),
+                maximum,
+                digits,
+                inferDigits: false,
+                cancellationToken: cancellationToken,
+                source: "Generated numeric variant",
+                progress: progress);
+
+        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash)
+        {
+            if (data.Count == 0 || !TryDecodeWadText(data, out string text)) return;
+            void CheckLcuCandidates(IEnumerable<HashGuessCandidate> candidates) =>
+                CheckIter(engine, candidates, sourceWadPath, CancellationToken.None, sourceChunkHash: sourceChunkHash);
+
+            if (Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                var structuredCandidates = new List<HashGuessCandidate>();
+                bool stopAfterStructuredJson = ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
+                CheckLcuCandidates(structuredCandidates);
+                if (stopAfterStructuredJson) return;
+            }
+
+            CheckLcuCandidates(
+                PluginPathRegex.Matches(text).Cast<Match>().Select(match =>
+                    new HashGuessCandidate(NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath)));
+            CheckLcuCandidates(
+                FrontendPathRegex.Matches(text).Cast<Match>().Select(match =>
+                    new HashGuessCandidate(
+                        $"plugins/rcp-fe-{match.Groups[1].Value}/global/default/{match.Groups[2].Value}".ToLowerInvariant(),
+                        HashGuessStrategy.LcuEmbeddedPath)));
+            CheckLcuCandidates(
+                DataPathRegex.Matches(text).Cast<Match>().Select(match =>
+                    new HashGuessCandidate(
+                        $"plugins/rcp-be-lol-game-data/global/default/data/{match.Groups[1].Value}".ToLowerInvariant(),
+                        HashGuessStrategy.LcuEmbeddedPath)));
+            CheckLcuCandidates(
+                AssetPathRegex.Matches(text).Cast<Match>().Select(match =>
+                    new HashGuessCandidate(
+                        $"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(),
+                        HashGuessStrategy.LcuEmbeddedPath)));
+
+            foreach (Match match in CssUrlRegex.Matches(text))
+            {
+                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
+                if (contextualPath.Length > 0)
+                    CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
+            }
+            foreach (Match match in HtmlAssetRegex.Matches(text))
+            {
+                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
+                if (contextualPath.Length > 0)
+                    CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
+            }
+
+            var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Match match in RelativePathRegex.Matches(text))
+            {
+                string relativePath = match.Groups[1].Value;
+                relativePaths.Add(relativePath);
+                string contextualPath = ResolveRelativePath(sourcePath, relativePath);
+                if (contextualPath.Length > 0)
+                    CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
+            }
+            foreach (Match match in FileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+            foreach (Match match in TemplateRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value + "/template.html");
+            foreach (Match match in SourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+
+            CheckLcuCandidates(
+                relativePaths.Select(path => new HashGuessCandidate(NormalizePath(path), HashGuessStrategy.LcuRelativeBasename)));
+        }
+
+        internal int GuessFromGameHashes(
+            HashGuessEngine engine,
+            HashGuesser gameGuesser,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            ArgumentNullException.ThrowIfNull(gameGuesser);
+            if (gameGuesser.Domain != HashGuessDomain.Game)
+                throw new ArgumentException("Cross-domain LCU guessing requires a GAME guesser.", nameof(gameGuesser));
+            if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
+            if (candidateBudget == 0) return 0;
+
+            const string basePath = "plugins/rcp-be-lol-game-data/global/default";
+            const string source = "LCU from GAME hashes";
+            int checkedCount = 0;
+
+            bool CheckGamePath(string path)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return false;
+                Check(engine, path, HashGuessStrategy.CrossDomainAsset, source);
+                checkedCount++;
+                progress?.Invoke(checkedCount);
+                return true;
+            }
+
+            foreach (string path in gameGuesser.KnownPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                if (path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    string prefix = path[..^4];
+                    if (!CheckGamePath($"{basePath}/{prefix}.png")) break;
+                    if (!CheckGamePath($"{basePath}/{prefix}.jpg")) break;
+                }
+                else if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!CheckGamePath($"{basePath}/{path}")) break;
+                }
+            }
+
+            return checkedCount;
         }
 
         // Dedicated, opt-in coverage for the v1 check_iter patterns used by CDTB tooling.
-        // It deliberately stays out of Basic and Advanced because its wordlist cross-product is expensive.
+        // It deliberately stays out of Basic and Extended because its wordlist cross-product is expensive.
         internal int RunV1PathPatterns(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
@@ -267,25 +543,28 @@ namespace AssetsManager.Services.Hashes.Guessers
             bool CheckDefaultThenLocales(string fileName, string phase)
             {
                 string defaultPath = $"{v1Prefix}default/v1/{fileName}";
-                cancellationToken.ThrowIfCancellationRequested();
-                bool resolvedDefault = Check(engine, defaultPath, HashGuessStrategy.LcuPattern, source);
-                bool hasDefaultEvidence = resolvedDefault ||
-                    knownHashes.ContainsKey(XxHash64Ext.Hash(PathUtils.NormalizePath(defaultPath)));
-                if (checkedCandidates != int.MaxValue) checkedCandidates++;
+                checkedCandidates += CheckIter(
+                    engine,
+                    new[] { new HashGuessCandidate(defaultPath, HashGuessStrategy.LcuPattern) },
+                    source,
+                    cancellationToken);
                 Report(phase);
                 if (engine.RemainingUnknownCount == 0) return false;
 
                 // A localized path is only attempted after its default counterpart is known or resolved.
                 // This preserves the useful locale expansion without multiplying every word pair by all locales.
+                ulong defaultHash = XxHash64Ext.Hash(PathUtils.NormalizePath(defaultPath));
+                bool hasDefaultEvidence = engine.Matches.ContainsKey(defaultHash) || knownHashes.ContainsKey(defaultHash);
                 if (!hasDefaultEvidence) return true;
-                foreach (string locale in localeList)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    Check(engine, $"{v1Prefix}{locale}/v1/{fileName}", HashGuessStrategy.LcuPattern, source);
-                    if (checkedCandidates != int.MaxValue) checkedCandidates++;
-                    Report(phase);
-                    if (engine.RemainingUnknownCount == 0) return false;
-                }
+
+                checkedCandidates += CheckIter(
+                    engine,
+                    localeList.Select(locale => new HashGuessCandidate(
+                        $"{v1Prefix}{locale}/v1/{fileName}",
+                        HashGuessStrategy.LcuPattern)),
+                    source,
+                    cancellationToken);
+                Report(phase);
                 return true;
             }
 
@@ -327,67 +606,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        private static bool IsFrontendJsonPath(string path) =>
-            path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase) &&
-            path.Contains("-fe-lol-", StringComparison.OrdinalIgnoreCase) &&
-            path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
-
-        private static IReadOnlyList<string> BuildFrontendJsonWordlist(IEnumerable<string> paths) =>
-            HashGuessEngine.BuildBasenameWordlist(paths.Where(IsFrontendJsonPath)).Take(2_000).ToList();
-
-        internal int RunAdvancedAttacks(HashGuessEngine engine, IProgress<HashGuessProgress> progress, CancellationToken cancellationToken)
-        {
-            var paths = KnownPaths;
-            int checkedCandidates = 0;
-
-            if (engine.RemainingUnknownCount > 0)
-            {
-                var frontendJsonPaths = Corpus.GetOrCreate("frontend-json-paths", values => values.Where(IsFrontendJsonPath).ToList());
-                var frontendJsonWords = Corpus.GetOrCreate("frontend-json-words", _ => BuildFrontendJsonWordlist(frontendJsonPaths));
-                if (frontendJsonPaths.Count > 0 && frontendJsonWords.Count > 0)
-                {
-                    progress?.Report(engine.CreateProgress("LCU Advanced: frontend JSON", checkedCandidates));
-                    checkedCandidates += RunFocusedWordlistSubstitution(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
-                    if (engine.RemainingUnknownCount > 0)
-                        checkedCandidates += RunWordAdditionAttack(engine, frontendJsonPaths, frontendJsonWords, cancellationToken);
-                }
-            }
-            if (engine.RemainingUnknownCount > 0)
-            {
-                checkedCandidates += AddBasenameWord(engine, cancellationToken);
-            }
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("LCU Advanced: parties PNG word pairs", checkedCandidates));
-                checkedCandidates += SubstitutePartiesBasenameWordPairs(engine, cancellationToken);
-            }
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-
-            progress?.Report(engine.CreateProgress("Focused Attack: LCU static-assets", checkedCandidates));
-            var staticAssets = Corpus.GetOrCreate("static-svg-paths", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-static-assets/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList());
-            var staticWords = Corpus.GetOrCreate("static-svg-words", _ => HashGuessEngine.BuildBasenameWordlist(staticAssets).Take(5000).ToList());
-            checkedCandidates += RunFocusedWordlistSubstitution(engine, staticAssets, staticWords, cancellationToken);
-            if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, staticAssets, staticWords, cancellationToken);
-
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("Focused Attack: LCU navigation", checkedCandidates));
-                var navigation = Corpus.GetOrCreate("navigation-svg-paths", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-navigation/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList());
-                checkedCandidates += RunFocusedWordlistSubstitution(engine, navigation, staticWords, cancellationToken);
-                if (engine.RemainingUnknownCount > 0)
-                    checkedCandidates += RunFocusedWordlistDoubleSubstitution(engine, navigation, staticWords, cancellationToken);
-            }
-            if (engine.RemainingUnknownCount > 0)
-            {
-                progress?.Report(engine.CreateProgress("Focused Attack: LCU parties", checkedCandidates));
-                var parties = Corpus.GetOrCreate("party-images", values => values.Where(path => path.StartsWith("plugins/rcp-fe-lol-parties/", StringComparison.OrdinalIgnoreCase) && path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)).ToList());
-                var partyWords = Corpus.GetOrCreate("party-image-words", _ => HashGuessEngine.BuildBasenameWordlist(parties).Take(5000).ToList());
-                checkedCandidates += RunFocusedWordlistSubstitution(engine, parties, partyWords, cancellationToken);
-            }
-            return checkedCandidates;
-        }
-
         protected override void CheckCandidate(
             HashGuessEngine engine,
             HashGuessCandidate candidate,
@@ -422,66 +640,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
                 return _knownDirectories;
             }
-        }
-
-        protected override IEnumerable<HashGuessCandidate> ExtractCandidates(ArraySegment<byte> data, string sourcePath)
-        {
-            if (data.Count == 0) yield break;
-
-            if (!TryDecodeWadText(data, out string text))
-                yield break;
-            if (Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
-            {
-                var structuredCandidates = new List<HashGuessCandidate>();
-                bool stopAfterStructuredJson = ExtractStructuredJsonCandidates(data, sourcePath, structuredCandidates);
-                foreach (HashGuessCandidate candidate in structuredCandidates)
-                    yield return candidate;
-                if (stopAfterStructuredJson) yield break;
-            }
-
-            foreach (Match match in PluginPathRegex.Matches(text))
-                yield return new HashGuessCandidate(NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath);
-            foreach (Match match in FrontendPathRegex.Matches(text))
-                yield return new HashGuessCandidate(
-                    $"plugins/rcp-fe-{match.Groups[1].Value}/global/default/{match.Groups[2].Value}".ToLowerInvariant(),
-                    HashGuessStrategy.LcuEmbeddedPath);
-            foreach (Match match in DataPathRegex.Matches(text))
-                yield return new HashGuessCandidate(
-                    $"plugins/rcp-be-lol-game-data/global/default/data/{match.Groups[1].Value}".ToLowerInvariant(),
-                    HashGuessStrategy.LcuEmbeddedPath);
-            foreach (Match match in AssetPathRegex.Matches(text))
-                yield return new HashGuessCandidate(
-                    $"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(),
-                    HashGuessStrategy.LcuEmbeddedPath);
-
-            foreach (Match match in CssUrlRegex.Matches(text))
-            {
-                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
-                if (contextualPath.Length > 0)
-                    yield return new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath);
-            }
-            foreach (Match match in HtmlAssetRegex.Matches(text))
-            {
-                string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
-                if (contextualPath.Length > 0)
-                    yield return new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath);
-            }
-
-            var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match match in RelativePathRegex.Matches(text))
-            {
-                string relativePath = match.Groups[1].Value;
-                relativePaths.Add(relativePath);
-                string contextualPath = ResolveRelativePath(sourcePath, relativePath);
-                if (contextualPath.Length > 0)
-                    yield return new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath);
-            }
-            foreach (Match match in FileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
-            foreach (Match match in TemplateRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value + "/template.html");
-            foreach (Match match in SourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
-
-            foreach (string relativePath in relativePaths)
-                yield return new HashGuessCandidate(NormalizePath(relativePath), HashGuessStrategy.LcuRelativeBasename);
         }
 
         private bool ExtractStructuredJsonCandidates(

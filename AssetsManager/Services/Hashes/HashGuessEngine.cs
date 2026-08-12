@@ -37,13 +37,8 @@ namespace AssetsManager.Services.Hashes
 
         public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {
-            return CheckExact(candidate, strategy, source, sourceChunkHash);
-        }
-
-        internal bool CheckExact(string path, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
-        {
             CheckedCandidates++;
-            string normalizedPath = PathUtils.NormalizePath(path);
+            string normalizedPath = PathUtils.NormalizePath(candidate);
             if (normalizedPath.Length == 0)
             {
                 DiscardedCandidates++;
@@ -148,15 +143,32 @@ namespace AssetsManager.Services.Hashes
 
         public static IReadOnlyList<string> BuildWordlist(IEnumerable<string> paths)
         {
+            ArgumentNullException.ThrowIfNull(paths);
+
             var words = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in paths)
             {
-                List<string> tokens = TokenizePath(path);
-                for (int index = 0; index < tokens.Count - 1; index++)
-                    words.Add(tokens[index]);
+                if (string.IsNullOrEmpty(path)) continue;
+
+                string normalized = path.Replace('/', '-').Replace('_', '-').Replace('.', '-');
+                string[] tokens = normalized.Split('-');
+                for (int index = 0; index < tokens.Length - 1; index++)
+                {
+                    string word = tokens[index];
+                    if (word.Length == 0 || IsLargeNumericWord(word)) continue;
+                    words.Add(word);
+                }
             }
 
             return words.OrderBy(word => word, StringComparer.Ordinal).ToList();
+        }
+
+        private static bool IsLargeNumericWord(string word)
+        {
+            if (word.Length < 3) return false;
+            foreach (char character in word)
+                if (character < '0' || character > '9') return false;
+            return true;
         }
 
         public static IReadOnlyList<string> BuildBasenameWordlist(IEnumerable<string> paths, int minimumLength = 1, int maximumLength = 48)

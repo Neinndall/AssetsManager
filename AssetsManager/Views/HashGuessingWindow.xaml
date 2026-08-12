@@ -163,7 +163,7 @@
                                 <materialIcons:MaterialIcon Grid.Column="0" Kind="ShieldOutline" Width="24" Height="24" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="GAME Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Canonical &amp; short ranges" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Standard paths &amp; short ranges" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
@@ -183,50 +183,21 @@
                             </Grid>
                         </Button>
 
-                        <!-- Canonical -->
-                        <Button Click="RunCanonical_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                        <!-- GAME Custom -->
+                        <Button Click="RunGameCustom_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
                             <Grid HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Standard path templates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Custom Guess" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Focused build-list attacks" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
 
-                        <!-- Locales -->
-                        <Button Click="RunLocales_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                            <Grid HorizontalAlignment="Stretch">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Region &amp; language tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <!-- Numbers -->
-                        <Button Click="RunNumbers_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                            <Grid HorizontalAlignment="Stretch">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Numeric" Width="24" Height="24" Foreground="{StaticResource AccentGreen}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Numeric Ranges" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Iterate numeric indexes" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
                     </UniformGrid>
                 </StackPanel>
 
@@ -269,13 +240,13 @@
                                 <materialIcons:MaterialIcon Grid.Column="0" Kind="FileCabinet" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="LCU Basic Suite" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Canonical &amp; plugin structure" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="Cross-domain &amp; plugin structure" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
 
-                        <!-- LCU Advanced -->
-                        <Button Click="RunLcuAdvanced_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                        <!-- LCU Extended -->
+                        <Button Click="RunLcuExtended_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
                             <Grid HorizontalAlignment="Stretch">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -283,8 +254,23 @@
                                 </Grid.ColumnDefinitions>
                                 <materialIcons:MaterialIcon Grid.Column="0" Kind="LightningBolt" Width="24" Height="24" Foreground="{StaticResource AccentRed}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="LCU Advanced" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="SVGs, PNGs &amp; TFTs" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="LCU Extended" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Basename word insertion" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
+                        <!-- LCU Custom -->
+                        <Button Click="RunLcuCustom_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="FlaskOutline" Width="24" Height="24" Foreground="{StaticResource AccentTeal}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="LCU Custom" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Focused SVG wordlist variants" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </Grid>
                         </Button>
@@ -304,35 +290,6 @@
                             </Grid>
                         </Button>
 
-                        <!-- Canonical -->
-                        <Button Click="RunCanonical_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                            <Grid HorizontalAlignment="Stretch">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Kind="HexagonOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Canonical Patterns" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Standard path templates" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <!-- Locales -->
-                        <Button Click="RunLocales_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
-                            <Grid HorizontalAlignment="Stretch">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <materialIcons:MaterialIcon Grid.Column="0" Kind="Translate" Width="24" Height="24" Foreground="{StaticResource AccentPurple}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Locale Variants" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
-                                    <TextBlock Text="Region &amp; language tags" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </Grid>
-                        </Button>
                     </UniformGrid>
                 </StackPanel>
 

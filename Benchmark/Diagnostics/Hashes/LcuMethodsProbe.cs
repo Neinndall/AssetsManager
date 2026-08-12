@@ -46,28 +46,28 @@ namespace BenchmarkApp.Diagnostics.Hashes
             RunPhase("GREP (Wad Path Grep principal)", () => RunGrepPhase(lcuGuesser, engine, pbeRoot, hashesPath), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
-            RunPhase("Canonical (cross-domain GAME->LCU)", () =>
-                CheckIter(lcuGuesser, engine, GenerateCanonical(lcuGuesser, gameGuesser), "Canonical"), engine);
+            RunPhase("GAME hash cross-domain", () =>
+                GuessFromGameHashes(lcuGuesser, engine, gameGuesser), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Language variants", () =>
-                CheckIter(lcuGuesser, engine, GenerateLanguage(lcuGuesser), "Language"), engine);
+                SubstituteRegionLang(lcuGuesser, engine, int.MaxValue), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Number variants", () =>
-                CheckIter(lcuGuesser, engine, GenerateNumbers(lcuGuesser), "Numbers"), engine);
+                SubstituteNumbers(lcuGuesser, engine, 10_000), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Plugin variants", () =>
-                CheckIter(lcuGuesser, engine, GeneratePlugins(lcuGuesser), "Plugins"), engine);
+                SubstitutePlugin(lcuGuesser, engine, int.MaxValue), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Extension variants", () =>
-                CheckIter(lcuGuesser, engine, GenerateExtensions(lcuGuesser), "Extensions"), engine);
+                SubstituteExtensions(lcuGuesser, engine, int.MaxValue), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Patterns", () =>
-                CheckIter(lcuGuesser, engine, GeneratePatterns(lcuGuesser), "Patterns"), engine);
+                GuessPatterns(lcuGuesser, engine, int.MaxValue), engine);
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("Basename substitution (budget 10M)", () =>
@@ -96,10 +96,6 @@ namespace BenchmarkApp.Diagnostics.Hashes
 
             RunPhase("GENERAL AddBasenameWord (time-boxed 120s, todas las rutas)", () =>
                 RunGeneralWordAddition(lcuGuesser, engine, 10_000_000), engine, timeoutCancelled: "timeout");
-            if (engine.RemainingUnknownCount == 0) return;
-
-            RunPhase("Advanced attacks (time-boxed 120s)", () =>
-                RunAdvanced(lcuGuesser, engine, TimeSpan.FromSeconds(120)), engine, timeoutCancelled: "timeout");
             if (engine.RemainingUnknownCount == 0) return;
 
             RunPhase("V1 path patterns (time-boxed 120s)", () =>
@@ -253,18 +249,14 @@ namespace BenchmarkApp.Diagnostics.Hashes
             return ctor.Invoke(args);
         }
 
-        private static object GenerateCanonical(object lcuGuesser, object gameGuesser) =>
-            Invoke(lcuGuesser, "GenerateCanonicalCandidates", gameGuesser, int.MaxValue);
+        private static int SubstituteRegionLang(object lcuGuesser, HashGuessEngine engine, int budget) =>
+            (int)Invoke(lcuGuesser, "SubstituteRegionLang", engine, CancellationToken.None, budget, null);
 
-        private static object GenerateLanguage(object lcuGuesser) => Invoke(lcuGuesser, "GenerateLanguageCandidates", int.MaxValue);
+        private static int SubstituteNumbers(object lcuGuesser, HashGuessEngine engine, int maximum) =>
+            (int)Invoke(lcuGuesser, "SubstituteNumbers", engine, CancellationToken.None, maximum, null, null);
 
-        private static object GenerateNumbers(object lcuGuesser) => Invoke(lcuGuesser, "SubstituteNumbers", 10_000, null, false);
-
-        private static object GeneratePlugins(object lcuGuesser) => Invoke(lcuGuesser, "SubstitutePlugin");
-
-        private static object GenerateExtensions(object lcuGuesser) => Invoke(lcuGuesser, "GenerateLcuExtensionCandidates", int.MaxValue);
-
-        private static object GeneratePatterns(object lcuGuesser) => Invoke(lcuGuesser, "GuessPatterns");
+        private static int SubstitutePlugin(object lcuGuesser, HashGuessEngine engine, int budget) =>
+            (int)Invoke(lcuGuesser, "SubstitutePlugin", engine, CancellationToken.None, budget, null);
 
         private static int CheckIter(object guesser, HashGuessEngine engine, object candidates, string source)
         {
@@ -301,6 +293,15 @@ namespace BenchmarkApp.Diagnostics.Hashes
         private static int SubstituteBasenameWords(object lcuGuesser, HashGuessEngine engine, int budget) =>
             (int)Invoke(lcuGuesser, "SubstituteBasenameWords", engine, CancellationToken.None, null, null, null, 1, 1, budget, null);
 
+        private static int SubstituteExtensions(object lcuGuesser, HashGuessEngine engine, int budget) =>
+            (int)Invoke(lcuGuesser, "SubstituteExtensions", engine, CancellationToken.None, budget, null, null);
+
+        private static int GuessPatterns(object lcuGuesser, HashGuessEngine engine, int budget) =>
+            (int)Invoke(lcuGuesser, "GuessPatterns", engine, CancellationToken.None, budget, null);
+
+        private static int GuessFromGameHashes(object lcuGuesser, HashGuessEngine engine, object gameGuesser) =>
+            (int)Invoke(lcuGuesser, "GuessFromGameHashes", engine, gameGuesser, CancellationToken.None, int.MaxValue, null);
+
         private static IReadOnlyList<string> GetGameDataPaths(object lcuGuesser)
         {
             IReadOnlyList<string> paths = GetKnownPaths(lcuGuesser);
@@ -315,11 +316,11 @@ namespace BenchmarkApp.Diagnostics.Hashes
             int checkedCount = 0;
             if (!doubleMode)
             {
-                checkedCount += RunStatic("RunFocusedWordlistSubstitution", engine, paths, words.Take(wordCap), budget);
+                checkedCount += RunInstance(lcuGuesser, "RunFocusedWordlistSubstitution", engine, paths, words.Take(wordCap), budget);
             }
             else
             {
-                checkedCount += RunStatic("RunFocusedWordlistDoubleSubstitution", engine, paths, words.Take(doubleCap), budget);
+                checkedCount += RunInstance(lcuGuesser, "RunFocusedWordlistDoubleSubstitution", engine, paths, words.Take(doubleCap), budget);
             }
             return checkedCount;
         }
@@ -328,14 +329,14 @@ namespace BenchmarkApp.Diagnostics.Hashes
         {
             var paths = GetGameDataPaths(lcuGuesser);
             var words = HashGuessEngine.BuildBasenameWordlist(paths).Take(wordCap).ToList();
-            return RunStatic("RunBasenameWordSubstitution", engine, paths, words, budget, oldWordCount: 1, newWordCount: 2);
+            return RunInstance(lcuGuesser, "SubstituteBasenameWordsCore", engine, paths, words, budget, oldWordCount: 1, newWordCount: 2);
         }
 
         private static int RunGameDataAddition(object lcuGuesser, HashGuessEngine engine, int wordCap, int budget)
         {
             var paths = GetGameDataPaths(lcuGuesser);
             var words = HashGuessEngine.BuildBasenameWordlist(paths).Take(wordCap).ToList();
-            return RunStatic("RunWordAdditionAttack", engine, paths, words, budget);
+            return RunInstance(lcuGuesser, "AddBasenameWordCore", engine, paths, words, budget);
         }
 
         private static int RunGeneralWordAddition(object lcuGuesser, HashGuessEngine engine, int budget)
@@ -364,9 +365,9 @@ namespace BenchmarkApp.Diagnostics.Hashes
                 .GetType("AssetsManager.Services.Hashes.Guessers.HashGuesser", throwOnError: true)
                 .GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
             object[] args;
-            if (methodName == "RunFocusedWordlistSubstitution" || methodName == "RunFocusedWordlistDoubleSubstitution" || methodName == "RunWordAdditionAttack")
+            if (methodName == "AddBasenameWordCore")
             {
-                args = new object[] { engine, paths, words, CancellationToken.None, budget };
+                args = new object[] { engine, paths, words, CancellationToken.None, budget, "Focused game-data word addition", null };
             }
             else
             {
@@ -375,17 +376,22 @@ namespace BenchmarkApp.Diagnostics.Hashes
             return (int)method.Invoke(null, args);
         }
 
-        private static int RunAdvanced(object lcuGuesser, HashGuessEngine engine, TimeSpan timeout)
+        private static int RunInstance(object guesser, string methodName, HashGuessEngine engine, IReadOnlyList<string> paths, IEnumerable<string> words, int budget, int oldWordCount = 1, int newWordCount = 1)
         {
-            using var cts = new CancellationTokenSource(timeout);
-            try
+            MethodInfo method = typeof(HashGuessEngine).Assembly
+                .GetType("AssetsManager.Services.Hashes.Guessers.HashGuesser", throwOnError: true)
+                .GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            object[] args;
+            if (methodName == "RunFocusedWordlistSubstitution" || methodName == "RunFocusedWordlistDoubleSubstitution")
             {
-                return (int)Invoke(lcuGuesser, "RunAdvancedAttacks", engine, null, cts.Token);
+                args = new object[] { engine, paths, words, CancellationToken.None, budget };
             }
-            catch (TargetInvocationException exception) when (exception.InnerException is OperationCanceledException)
+            else
             {
-                return -1;
+                args = new object[] { engine, paths, words, oldWordCount, newWordCount, CancellationToken.None, budget, "Focused game-data PNG pairs", null };
             }
+
+            return (int)method.Invoke(guesser, args);
         }
 
         private static int RunV1(object lcuGuesser, HashGuessEngine engine, TimeSpan timeout)
