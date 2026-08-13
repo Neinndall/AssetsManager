@@ -69,6 +69,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex AnimationSkinTokenRegex = new("skin\\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex DottedBinPathRegex = new(
+            @"^(?<prefix>.+)\.[0-9a-f]{8}\.bin$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private const int AnimationNumberLimit = 10_000;
         private const int CustomBinSampleSize = 30_000;
         private const int CustomCharacterDdsSampleSize = 25_000;
@@ -1223,6 +1226,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
 
+                GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
                     GrepAnimationBinLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
                 return;
@@ -1286,6 +1290,79 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             CheckGameCandidates(GrepFileCandidates(data));
+        }
+
+        private void GuessDottedBinPaths(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourceWadPath,
+            ulong sourceChunkHash)
+        {
+            IReadOnlyList<string> prefixes = Corpus.GetOrCreate(
+                "dotted-bin-prefixes",
+                paths => paths
+                    .Select(path => DottedBinPathRegex.Match(PathUtils.NormalizePath(path)))
+                    .Where(match => match.Success)
+                    .Select(match => match.Groups["prefix"].Value)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(prefix => prefix, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+            if (prefixes.Count == 0 || data.Array is null || data.Count < 16) return;
+
+            try
+            {
+                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
+                using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: true);
+                string magic = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                if (magic == "PTCH")
+                {
+                    if (reader.ReadUInt32() != 1) return;
+                    reader.ReadUInt32();
+                    magic = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                }
+                if (magic != "PROP") return;
+
+                uint version = reader.ReadUInt32();
+                if (version is not (1 or 2 or 3)) return;
+                if (version >= 2)
+                {
+                    uint dependencyCount = reader.ReadUInt32();
+                    if (dependencyCount > data.Count / sizeof(ushort)) return;
+                    for (uint index = 0; index < dependencyCount; index++)
+                    {
+                        ushort length = reader.ReadUInt16();
+                        if (length > stream.Length - stream.Position) return;
+                        stream.Position += length;
+                    }
+                }
+
+                uint objectCount = reader.ReadUInt32();
+                if (objectCount > data.Count / 10 || (long)objectCount * sizeof(uint) > stream.Length - stream.Position)
+                    return;
+                stream.Position += (long)objectCount * sizeof(uint);
+
+                for (uint index = 0; index < objectCount; index++)
+                {
+                    long objectOffset = stream.Position;
+                    uint objectSize = reader.ReadUInt32();
+                    uint objectPathHash = reader.ReadUInt32();
+                    long nextObjectOffset = objectOffset + sizeof(uint) + objectSize;
+                    if (objectSize < 6 || nextObjectOffset < stream.Position || nextObjectOffset > stream.Length)
+                        return;
+                    foreach (string prefix in prefixes)
+                        Check(
+                            engine,
+                            $"{prefix}.{objectPathHash:x8}.bin",
+                            HashGuessStrategy.BinEntry,
+                            sourceWadPath,
+                            sourceChunkHash);
+                    stream.Position = nextObjectOffset;
+                }
+            }
+            catch (Exception exception) when (exception is EndOfStreamException or IOException or ArgumentException)
+            {
+                _logService?.LogDebug($"GAME dotted BIN object scan skipped malformed data: {exception.Message}");
+            }
         }
 
         private void GrepAnimationBinLinks(

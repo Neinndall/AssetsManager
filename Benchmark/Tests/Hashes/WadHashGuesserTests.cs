@@ -382,6 +382,42 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameBinGrepResolvesDottedBinsFromObjectPaths()
+        {
+            const string expected = "loadouts/tftdamageskins.79a3aef6.bin";
+            var tree = new BinTree(
+                new[]
+                {
+                    new BinTreeObject(
+                        0x11111111,
+                        Fnv1a.HashLower("TftDamageSkinCeremony"),
+                        new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("effectKey"), "test") }),
+                    new BinTreeObject(0x79a3aef6, Fnv1a.HashLower("VfxSystemDefinitionData"), Array.Empty<BinTreeProperty>())
+                },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "loadouts/tftdamageskins.00000000.bin"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "ac3005bb6bb022eb.bin",
+                "Global.wad.client",
+                0xac3005bb6bb022eb);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
+            Assert.Equal("Global.wad.client", match.SourceWadPath);
+            Assert.Equal(0xac3005bb6bb022ebUL, match.SourceChunkHash);
+        }
+
+        [Fact]
         public void GameAnimationBinLinksResolveContextualAnmPath()
         {
             const string expected = "assets/characters/seraphine/skins/skin69/animations/joke_start.anm";

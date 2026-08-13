@@ -53,6 +53,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab / GAME WAD grep now discovers generated dotted BIN paths from their embedded object identifiers.
   - Hash Guessing Lab / GAME Canonical now follows CDTB character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
   - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
   - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
