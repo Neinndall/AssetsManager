@@ -26,6 +26,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex LocaleRegex = new($"({string.Join("|", Locales)})", RegexOptions.Compiled);
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
+        private static readonly Regex ShaderPathRegex = new(
+            @".*\.[pv]s(?:_[23]_0|(?=$|[.-]))",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly string[] LuaExtensions = { "luabin64", "preload" };
         private static readonly string[] LuaCharacterPrefixes = { "", "spells/", "scripts/", "npcscripts", "npcscripts/" };
         private static readonly string[] LuaCommonPaths =
@@ -749,19 +752,20 @@ namespace AssetsManager.Services.Hashes.Guessers
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             int candidateBudget = int.MaxValue,
-            Action<int> progress = null)
+            Action<int> progress = null,
+            string rootDirectory = null)
         {
             ArgumentNullException.ThrowIfNull(engine);
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            var shaderPaths = new HashSet<string>(StringComparer.Ordinal);
-            var regex = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase);
+            var shaderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string path in KnownPaths)
             {
-                Match match = regex.Match(path);
+                Match match = ShaderPathRegex.Match(path);
                 if (match.Success) shaderPaths.Add(match.Value);
             }
+            AddExecutableShaderReferences(shaderPaths, rootDirectory, cancellationToken);
 
             int checkedCount = 0;
             foreach (string path in ProgressIterator(
@@ -792,6 +796,96 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             return checkedCount;
+        }
+
+        private void AddExecutableShaderReferences(
+            ISet<string> shaderPaths,
+            string rootDirectory,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(rootDirectory)) return;
+            string gameDirectory = Directory.Exists(Path.Combine(rootDirectory, "Game"))
+                ? Path.Combine(rootDirectory, "Game")
+                : rootDirectory;
+            string executablePath = Path.Combine(gameDirectory, "League of Legends.exe");
+            if (!File.Exists(executablePath)) return;
+
+            try
+            {
+                using var stream = new FileStream(
+                    executablePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    bufferSize: 64 * 1024,
+                    FileOptions.SequentialScan);
+                var token = new StringBuilder();
+                var buffer = new byte[64 * 1024];
+                bool tokenOverflowed = false;
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    for (int index = 0; index < read; index++)
+                    {
+                        byte value = buffer[index];
+                        if (IsShaderPathByte(value))
+                        {
+                            if (!tokenOverflowed)
+                            {
+                                token.Append((char)value);
+                                if (token.Length > 512)
+                                {
+                                    token.Clear();
+                                    tokenOverflowed = true;
+                                }
+                            }
+                            continue;
+                        }
+
+                        if (!tokenOverflowed) AddReference(token);
+                        token.Clear();
+                        tokenOverflowed = false;
+                    }
+                }
+                if (!tokenOverflowed) AddReference(token);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logService?.LogDebug($"GAME shader executable scan skipped '{executablePath}': {exception.Message}");
+            }
+
+            void AddReference(StringBuilder value)
+            {
+                if (!IsShaderReference(value)) return;
+                string path = NormalizePath(value.ToString());
+                if (!path.Contains('/') || GetBasename(path).Length <= 4) return;
+                shaderPaths.Add(path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase)
+                    ? path
+                    : $"assets/shaders/hlsl/{path}");
+            }
+        }
+
+        private static bool IsShaderPathByte(byte value) =>
+            value is >= (byte)'0' and <= (byte)'9' or
+                >= (byte)'A' and <= (byte)'Z' or
+                >= (byte)'a' and <= (byte)'z' or
+                (byte)'_' or (byte)'.' or (byte)'/' or (byte)'-';
+
+        private static bool IsShaderReference(StringBuilder value)
+        {
+            foreach (string extension in ShaderExtensions)
+                if (EndsWith(value, extension)) return true;
+            return false;
+        }
+
+        private static bool EndsWith(StringBuilder value, string suffix)
+        {
+            if (value.Length < suffix.Length) return false;
+            int offset = value.Length - suffix.Length;
+            for (int index = 0; index < suffix.Length; index++)
+                if (char.ToLowerInvariant(value[offset + index]) != suffix[index]) return false;
+            return true;
         }
 
         internal int RunEsportsBannersAttack(HashGuessEngine engine, string rootDirectory, CancellationToken cancellationToken)
@@ -1096,6 +1190,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                             ShaderExtensions.SelectMany(extensionName =>
                                 ShaderVariants.Select(variant =>
                                     $"assets/shaders/generated/{path}{extensionName}{variant}")));
+                        CheckGameIter(
+                            ShaderExtensions.SelectMany(extensionName =>
+                                ShaderVariants.Select(variant =>
+                                    $"assets/shaders/generated/{path}{extensionName}{variant}_0")));
                     }
                     else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
                     {

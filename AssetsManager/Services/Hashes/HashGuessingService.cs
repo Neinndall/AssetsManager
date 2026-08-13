@@ -253,6 +253,7 @@ namespace AssetsManager.Services.Hashes
             await _hashResolverService.LoadAllHashesAsync();
             var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
             return await RunGameBasicMethodsGuessingAsync(
+                rootDirectory,
                 progress,
                 cancellationToken,
                 null,
@@ -261,6 +262,7 @@ namespace AssetsManager.Services.Hashes
         }
 
         private async Task<HashGuessRunResult> RunGameBasicMethodsGuessingAsync(
+            string rootDirectory,
             IProgress<HashGuessProgress> progress,
             CancellationToken cancellationToken,
             ISet<ulong> sessionResolved,
@@ -304,7 +306,8 @@ namespace AssetsManager.Services.Hashes
                     checkedCandidates += _gameGuesser.GuessShaderVariants(
                         engine,
                         cancellationToken,
-                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: shader variants", progressOffset + count)));
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: shader variants", progressOffset + count)),
+                        rootDirectory: rootDirectory);
                 }
 
                 if (engine.RemainingUnknownCount > 0)

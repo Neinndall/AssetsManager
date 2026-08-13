@@ -23,7 +23,7 @@ New Features
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
   - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
-  - Hash Guessing Lab / GAME shader variant guessing now recognizes hyphenated shader targets such as `.ps-dx11` and `.vs-metal`.
+  - Hash Guessing Lab / GAME shader guessing now discovers executable-referenced HLSL families and immediate `_0` variants for generated platform targets.
   - Hash Guessing Lab / Added the GAME Custom Guess button with a focused BIN-basename wordlist attack using deterministic 30,000-entry build lists.
   - Hash Guessing Lab / GAME Custom now also targets deterministic basename substitutions from `data/*.bin` paths.
   - Hash Guessing Lab / GAME Custom now also targets deterministic basename substitutions from character `.dds` paths.

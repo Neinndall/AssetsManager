@@ -1381,6 +1381,56 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameShaderVariantsDiscoverUnseededHlslFamiliesFromExecutableReferences()
+        {
+            string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-shaders-{Guid.NewGuid():N}");
+            string gameDirectory = Path.Combine(root, "Game");
+            Directory.CreateDirectory(gameDirectory);
+            try
+            {
+                File.WriteAllBytes(
+                    Path.Combine(gameDirectory, "League of Legends.exe"),
+                    Encoding.ASCII.GetBytes("ignored\0UI/LineGraph.ps\0UI/LineGraph.vs\0s.ps\0"));
+                string[] expected =
+                {
+                    "assets/shaders/hlsl/ui/linegraph.ps-dx11",
+                    "assets/shaders/hlsl/ui/linegraph.ps-dx11_0",
+                    "assets/shaders/hlsl/ui/linegraph.ps-metal",
+                    "assets/shaders/hlsl/ui/linegraph.ps-metal_0",
+                    "assets/shaders/hlsl/ui/linegraph.ps.dx11",
+                    "assets/shaders/hlsl/ui/linegraph.ps.dx11_0",
+                    "assets/shaders/hlsl/ui/linegraph.ps.glsl",
+                    "assets/shaders/hlsl/ui/linegraph.ps.glsl_0",
+                    "assets/shaders/hlsl/ui/linegraph.ps.metal",
+                    "assets/shaders/hlsl/ui/linegraph.ps.metal_0",
+                    "assets/shaders/hlsl/ui/linegraph.vs-dx11",
+                    "assets/shaders/hlsl/ui/linegraph.vs-dx11_0",
+                    "assets/shaders/hlsl/ui/linegraph.vs-metal",
+                    "assets/shaders/hlsl/ui/linegraph.vs-metal_0",
+                    "assets/shaders/hlsl/ui/linegraph.vs.dx11",
+                    "assets/shaders/hlsl/ui/linegraph.vs.dx11_0",
+                    "assets/shaders/hlsl/ui/linegraph.vs.glsl",
+                    "assets/shaders/hlsl/ui/linegraph.vs.glsl_0",
+                    "assets/shaders/hlsl/ui/linegraph.vs.metal",
+                    "assets/shaders/hlsl/ui/linegraph.vs.metal_0"
+                };
+                var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+                var engine = new HashGuessEngine(
+                    HashGuessDomain.Game,
+                    expected.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+                game.GuessShaderVariants(engine, CancellationToken.None, rootDirectory: root);
+
+                Assert.Equal(0, engine.RemainingUnknownCount);
+                Assert.All(expected, path => Assert.Contains(engine.Matches.Values, match => match.Path == path));
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void GameCharacterTemplatesMatchCdtbCoverage()
         {
             var game = new GameHashGuesser();
@@ -1426,7 +1476,9 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
 
         [Theory]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11")]
+        [InlineData("assets/shaders/generated/shaders/test.ps_2_0-dx11_0")]
         [InlineData("assets/shaders/generated/shaders/test.ps_2_0-metal")]
+        [InlineData("assets/shaders/generated/shaders/test.ps_2_0-metal_0")]
         public void WadGrepCoversHyphenatedShaderVariants(string expected)
         {
             var game = new GameHashGuesser();
