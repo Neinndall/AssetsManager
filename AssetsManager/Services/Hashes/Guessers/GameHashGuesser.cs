@@ -83,6 +83,11 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int SkinGroupCandidateBudget = 5_000_000;
         private const int CharacterSubstitutionCandidateBudget = 10_000_000;
         private const int SkinNumberSubstitutionCandidateBudget = 10_000_000;
+        private const int EsportsBannerSingleCandidateBudget = 2_000_000;
+        private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
+        private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
+        private const int EsportsBannerInsertionCandidateBudget = 750_000;
+        private const int EsportsBannerDoubleWordLimit = 96;
         private static readonly uint AnimationFilePathNameHash = Fnv1a.HashLower("mAnimationFilePath");
         private static readonly uint ClipDataMapNameHash = Fnv1a.HashLower("mClipDataMap");
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
@@ -891,23 +896,39 @@ namespace AssetsManager.Services.Hashes.Guessers
             return true;
         }
 
-        internal int RunEsportsBannersAttack(HashGuessEngine engine, string rootDirectory, CancellationToken cancellationToken)
+        internal int GuessEsportsBanners(
+            HashGuessEngine engine,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken)
         {
-            var paths = KnownPaths.Where(path => path.StartsWith("assets/esports/", StringComparison.OrdinalIgnoreCase)).ToList();
-            if (paths.Count == 0) return 0;
-            var words = HashGuessEngine.BuildWordlist(paths).ToList();
-            foreach (string keyword in new[]
-            {
-                "halloflegends", "air", "pg", "action", "lrn", "faker", "es", "spirit", "blossom",
-                "uzi", "gll", "kaktus", "kotsovolos", "kb", "trophy", "league", "legends", "greek",
-                "masters", "visa", "al", "2024", "arabian", "2025", "2026", "five", "elite", "series",
-                "arcane", "lolesports", "omen", "moviestar", "audi", "kitkat", "emea"
-            })
-                if (!words.Contains(keyword, StringComparer.OrdinalIgnoreCase)) words.Add(keyword);
-            foreach (string word in ExtractWordsFromDirectoryJsons(rootDirectory, cancellationToken))
-                if (!words.Contains(word, StringComparer.OrdinalIgnoreCase)) words.Add(word);
-            return RunFocusedWordlistSubstitution(engine, paths, words, cancellationToken) +
-                   AddBasenameWordCore(engine, paths, words, cancellationToken);
+            const string bannerPathPrefix = "assets/esports/sponsoredbanners/";
+            IReadOnlyList<string> paths = Corpus.GetOrCreate(
+                "esports-banner-paths",
+                values => values
+                    .Where(path => path.StartsWith(bannerPathPrefix, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+            IReadOnlyList<string> wordlist = Corpus.GetOrCreate(
+                "esports-banner-wordlist",
+                _ => HashGuessingHelper.BuildScopedWordlist(paths));
+
+            return HashGuessingHelper.RunScopedBasenameAttack(
+                this,
+                Corpus,
+                engine,
+                paths,
+                wordlist,
+                "esports-banner",
+                "GAME Banner",
+                HashGuessStrategy.BannerVariant,
+                new HashGuessAttackLimits(
+                    EsportsBannerSingleCandidateBudget,
+                    EsportsBannerCompoundCandidateBudget,
+                    EsportsBannerDoubleCandidateBudget,
+                    EsportsBannerInsertionCandidateBudget,
+                    EsportsBannerDoubleWordLimit),
+                progress,
+                cancellationToken);
         }
 
         internal async Task<int> RunExtendedAttacksAsync(
@@ -1228,7 +1249,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                    GrepAnimationBinLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
                 return;
             }
 
@@ -1365,7 +1386,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private void GrepAnimationBinLinks(
+        private void GuessAnimationBinPaths(
             HashGuessEngine engine,
             ArraySegment<byte> data,
             string sourcePath,
@@ -1610,14 +1631,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var roots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
                 .Concat(tree.DataOverrides.Select(ovr => ovr.Property));
-            return roots
-                .SelectMany(root => FindProperties(root, ClipDataMapNameHash))
-                .OfType<BinTreeMap>()
-                .SelectMany(EnumerateAnimationFileLinks);
-        }
-
-        private static IEnumerable<AnimationFileLink> EnumerateAnimationFileLinks(BinTreeMap map)
-        {
+            foreach (BinTreeMap map in roots
+                         .SelectMany(root => FindProperties(root, ClipDataMapNameHash))
+                         .OfType<BinTreeMap>())
             foreach (var pair in map)
             {
                 uint nameHash = pair.Key is BinTreeHash hash ? hash.Value : 0;

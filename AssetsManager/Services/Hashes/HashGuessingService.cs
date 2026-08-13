@@ -668,6 +668,32 @@ namespace AssetsManager.Services.Hashes
             return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
         }
 
+        public async Task<HashGuessRunResult> RunGameBannerGuessingAsync(
+            string rootDirectory,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken,
+            IProgress<HashGuessMatch> matchProgress = null)
+        {
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var unknown = inventory.All;
+            int initial = unknown.Count;
+            HashGuessEngine engine = null;
+            var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
+            {
+                Action<HashGuessMatch> reportMatch = matchProgress is null ? null : matchProgress.Report;
+                engine = new HashGuessEngine(HashGuessDomain.Game, unknown, reportMatch);
+                int checkedCandidates = _gameGuesser.GuessEsportsBanners(engine, progress, cancellationToken);
+                var matches = engine.Matches.Values.OrderBy(value => value.Path, StringComparer.OrdinalIgnoreCase).ToList();
+                return (matches, checkedCandidates, engine.UnknownHashes);
+            }, cancellationToken), () => engine, HashGuessDomain.Game, inventory);
+
+            var matches = runResult.Item1;
+            int checkedCandidates = runResult.Item2;
+            var remainingUnknowns = runResult.Item3;
+            await PersistGuessingRunAsync(HashGuessDomain.Game, matches, remainingUnknowns, inventory.Current, inventory.PatchFingerprint, cancellationToken);
+            return new HashGuessRunResult { Domain = HashGuessDomain.Game, UnknownHashesAtStart = initial, ScannedChunks = checkedCandidates, Matches = matches };
+        }
+
         public async Task<HashGuessRunResult> RunGameCustomGuessingAsync(
             string rootDirectory,
             IProgress<HashGuessProgress> progress,

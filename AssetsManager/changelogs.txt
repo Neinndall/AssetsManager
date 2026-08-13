@@ -22,6 +22,7 @@ New Features
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
+  - Hash Guessing Lab / Added a dedicated Banner Guess action for esports sponsored banner hashes.
   - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
   - Hash Guessing Lab / GAME shader guessing now discovers executable-referenced HLSL families and immediate `_0` variants for generated platform targets.
   - Hash Guessing Lab / Added the GAME Custom Guess button with a focused BIN-basename wordlist attack using deterministic 30,000-entry build lists.
@@ -58,6 +59,7 @@ Improvements
   - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
   - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
   - Hash Guessing Lab / GAME Extended now runs only skin groups, chroma groups, suffixes, skin numbers, character substitution and the GetCharacters corpus helper; custom attacks are reserved for a separate button.
+  - Hash Guessing Lab / Banner Guess now uses catalog-attested sports words and bounded compound variants for faster discovery.
   - Hash Guessing Lab / GAME WAD animation links now resolve BIN clip hashes through targeted `.anm` candidates with lower scan time and memory use.
   - Viewer / Project Browser now features a unified context menu on both the tree view and file grid to easily close individual projects or clear the workspace.
   - Viewer / Adjusted default studio lighting to provide realistic 3D shading and highlights when loading models.

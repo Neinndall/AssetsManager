@@ -963,6 +963,32 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void BannerGuessUsesAttestedCompoundVocabulary()
+        {
+            const string expected = "assets/esports/sponsoredbanners/secret/lpl_li-ning.tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/esports/sponsoredbanners/secret/lpl_2024.tex",
+                "assets/esports/sponsoredbanners/secret/lpl_li_ning.tex",
+                "assets/esports/sponsoredbanners/secret/lec_blue.tex",
+                "assets/characters/outsider/outsider_special.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            int checkedCandidates = game.GuessEsportsBanners(engine, null, CancellationToken.None);
+
+            Assert.True(checkedCandidates > 0);
+            IReadOnlyList<string> bannerWordlist = HashGuessingHelper.BuildScopedWordlist(
+                game.KnownPaths.Where(path => path.StartsWith(
+                    "assets/esports/sponsoredbanners/",
+                    StringComparison.OrdinalIgnoreCase)));
+            Assert.Contains("lpl", bannerWordlist);
+            Assert.DoesNotContain("outsider", bannerWordlist);
+            AssertResolved(engine, expected);
+            Assert.Equal(HashGuessStrategy.BannerVariant, Assert.Single(engine.Matches).Value.Strategy);
+        }
+
+        [Fact]
         public void CommonCheckHelpersAndWordAdditionPreserveCdtbCoverage()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/known.bin" }));

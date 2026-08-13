@@ -490,7 +490,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             int candidateBudget = int.MaxValue,
             string source = "Wordlist substitution",
-            Action<int> progress = null)
+            Action<int> progress = null,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant)
         {
             ArgumentNullException.ThrowIfNull(engine);
             ArgumentNullException.ThrowIfNull(paths);
@@ -515,7 +516,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 IEnumerable<string> candidates = EnumerateBasenameWordCandidates(format, wordsList, newWordCount, cancellationToken);
                 if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
 
-                checkedCount += CheckIter(engine, candidates, HashGuessStrategy.WordlistVariant, source);
+                checkedCount += CheckIter(engine, candidates, strategy, source);
                 progress?.Invoke(checkedCount);
                 if (engine.RemainingUnknownCount == 0) return checkedCount;
             }
@@ -544,7 +545,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken,
             int candidateBudget = int.MaxValue,
             string source = "Word insertion",
-            Action<int> progress = null)
+            Action<int> progress = null,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant)
         {
             ArgumentNullException.ThrowIfNull(engine);
             ArgumentNullException.ThrowIfNull(paths);
@@ -565,7 +567,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 IEnumerable<HashGuessCandidate> candidates = wordsList.Select(word =>
                     new HashGuessCandidate(
                         format.Replace("{0}", word, StringComparison.Ordinal),
-                        HashGuessStrategy.WordlistVariant));
+                        strategy));
                 if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
 
                 checkedCount += CheckIter(engine, candidates, source, cancellationToken);

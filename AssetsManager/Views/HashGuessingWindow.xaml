@@ -183,6 +183,21 @@
                             </Grid>
                         </Button>
 
+                        <!-- Banner Guess -->
+                        <Button Click="RunBannerGuess_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
+                            <Grid HorizontalAlignment="Stretch">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <materialIcons:MaterialIcon Grid.Column="0" Kind="TrophyOutline" Width="24" Height="24" Foreground="{StaticResource AccentOrange}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="Banner Guess" FontSize="12.5" FontWeight="Bold" Foreground="{StaticResource TextPrimary}"/>
+                                    <TextBlock Text="Esports sponsored banners" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
+
                         <!-- GAME Custom -->
                         <Button Click="RunGameCustom_Click" Margin="4" Padding="12" Style="{StaticResource SelectionCardButtonStyle}">
                             <Grid HorizontalAlignment="Stretch">
