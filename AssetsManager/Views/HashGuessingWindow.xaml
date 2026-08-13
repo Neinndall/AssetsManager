@@ -529,7 +529,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Domain" Width="130">
+                            <GridViewColumn Header="Domain" Width="96">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
@@ -557,7 +557,7 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Strategy" Width="170">
+                            <GridViewColumn Header="Strategy" Width="145">
                                 <GridViewColumn.HeaderContainerStyle>
                                     <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource ModernGridViewColumnHeader}">
                                         <EventSetter Event="SizeChanged" Handler="ResultsColumnHeader_SizeChanged"/>
