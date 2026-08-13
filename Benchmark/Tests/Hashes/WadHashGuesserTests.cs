@@ -462,13 +462,18 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             using var stream = new MemoryStream();
             tree.Write(stream);
 
+            var resolvedNames = new Dictionary<uint, string>
+            {
+                [Fnv1a.HashLower("joke_happy")] = "joke_happy",
+                [Fnv1a.HashLower("joke_sad")] = "joke_sad"
+            };
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "assets/characters/seraphine/skins/skin10/animations/joke_start.anm",
                 "assets/characters/seraphine/skins/skin10/animations/passive_attack_-90.anm",
                 "assets/shared/happy/file.bin",
                 "assets/shared/sad/file.bin"
-            }));
+            }), null, hash => resolvedNames.GetValueOrDefault(hash));
             var engine = new HashGuessEngine(
                 HashGuessDomain.Game,
                 new[] { happy, sad, passive }.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
@@ -503,31 +508,104 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void GameAnimationCandidatesCarryCharacterSkinNumberVariants()
+        public void GameAnimationBinLinksFindNestedDataPathFromResolvedClipHash()
         {
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/seraphine/skins/skin10/animations/seraphine_skin10_spell1.anm"
-            }));
+            const string expected = "data/characters/seraphine/skins/skin69/animations/seraphine_skin69_spell1.anm";
+            var resource = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AnimationResourceData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(expected))
+                });
+            var clip = new BinTreeStruct(0, Fnv1a.HashLower("AtomicClipData"), new[] { resource });
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, Fnv1a.HashLower("spell1")),
+                        clip)
+                });
+            var wrapper = new BinTreeStruct(0, Fnv1a.HashLower("Wrapper"), new BinTreeProperty[] { map });
+            var tree = new BinTree(
+                new[] { new BinTreeObject(1, Fnv1a.HashLower("Container"), new BinTreeProperty[] { wrapper }) },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
 
-            Assert.Contains(
-                game.GenerateAnimationContextCandidates("seraphine", "skin69"),
-                path => path == "assets/characters/seraphine/skins/skin69/animations/seraphine_skin69_spell1.anm");
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()), null, hash =>
+                hash == Fnv1a.HashLower("spell1") ? "spell1" : null);
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                1);
+
+            AssertResolved(engine, expected);
         }
 
         [Fact]
-        public void GameAnimationCandidatesDeriveReusableCharacterPrefixes()
+        public void GameAnimationBinLinksKeepLegacyStringPaths()
         {
+            const string expected = "assets/characters/seraphine/skins/skin69/animations/spell1.anm";
+            var resource = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AnimationResourceData"),
+                new BinTreeProperty[] { new BinTreeString(Fnv1a.HashLower("mAnimationFilePath"), expected) });
+            var clip = new BinTreeStruct(0, Fnv1a.HashLower("AtomicClipData"), new[] { resource });
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(new BinTreeHash(0, Fnv1a.HashLower("spell1")), clip)
+                });
+            var tree = new BinTree(
+                new[] { new BinTreeObject(1, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map }) },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, Array.Empty<string>()));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(stream.ToArray()),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                1);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
+        public void GameAnimationBinLinksReuseContextualPrefixes()
+        {
+            const string expected = "assets/characters/seraphine/skins/skin69/animations/p_spell1_to_idle.anm";
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
                 "assets/characters/seraphine/skins/skin10/animations/spell1_to_idle.anm",
                 "assets/characters/seraphine/skins/skin10/animations/p_spell1_to_run.anm",
                 "assets/characters/seraphine/skins/skin10/animations/spell1_to_run.anm"
             }));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
 
-            Assert.Contains(
-                game.GenerateAnimationContextCandidates("seraphine", "skin69"),
-                path => path == "assets/characters/seraphine/skins/skin69/animations/p_spell1_to_idle.anm");
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin("p_spell1_to_idle", XxHash64Ext.Hash(expected))),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                1);
+
+            AssertResolved(engine, expected);
         }
 
         [Fact]
@@ -1839,6 +1917,34 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Equal(0, engine.RemainingUnknownCount);
         }
 
+        private static byte[] CreateAnimationBin(string clipName, ulong pathHash)
+        {
+            var resource = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("AnimationResourceData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), pathHash)
+                });
+            var clip = new BinTreeStruct(0, Fnv1a.HashLower("AtomicClipData"), new[] { resource });
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("mClipDataMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, Fnv1a.HashLower(clipName)),
+                        clip)
+                });
+            var tree = new BinTree(
+                new[] { new BinTreeObject(1, Fnv1a.HashLower("AnimationGraphData"), new BinTreeProperty[] { map }) },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            return stream.ToArray();
+        }
+
         [Fact]
         public void GameNumberSubstitutionOnlyChangesNumbersInFileNames()
         {
@@ -1890,6 +1996,7 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             game.SubstituteBasenameWords(substitutionEngine, CancellationToken.None, candidateBudget: 3);
             Assert.Equal(3, substitutionEngine.CheckedCandidates);
 
+
             var additionEngine = new HashGuessEngine(HashGuessDomain.Game, neverMatching.ToHashSet());
             game.AddBasenameWord(additionEngine, CancellationToken.None, candidateBudget: 3);
             Assert.Equal(3, additionEngine.CheckedCandidates);
@@ -1913,5 +2020,6 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             await game.GuessSkinGroupsBin(capEngine, CancellationToken.None);
             AssertResolved(capEngine, withinCap);
         }
+
     }
 }

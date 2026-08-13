@@ -43,7 +43,7 @@ namespace AssetsManager.Services.Hashes
             _gameHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.game.txt"));
             _lcuHashFile = new HashFile(HashGuessDomain.Lcu, Path.Combine(_directoriesCreator.HashesPath, "hashes.lcu.txt"));
             _binEntriesHashFile = new HashFile(HashGuessDomain.Game, Path.Combine(_directoriesCreator.HashesPath, "hashes.binentries.txt"));
-            _gameGuesser = new GameHashGuesser(_gameHashFile, _logService);
+            _gameGuesser = new GameHashGuesser(_gameHashFile, _logService, _hashResolverService.ResolveBinHashGeneral);
             _lcuGuesser = new LcuHashGuesser(_lcuHashFile, _logService);
         }
 

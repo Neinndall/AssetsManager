@@ -57,7 +57,7 @@ Improvements
   - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
   - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
   - Hash Guessing Lab / GAME Extended now runs only skin groups, chroma groups, suffixes, skin numbers, character substitution and the GetCharacters corpus helper; custom attacks are reserved for a separate button.
-  - Hash Guessing Lab / GAME WAD animation links now use BIN clip-name hashes plus corpus-derived numeric and word variants for unresolved `.anm` paths.
+  - Hash Guessing Lab / GAME WAD animation links now resolve BIN clip hashes through targeted `.anm` candidates with lower scan time and memory use.
   - Viewer / Project Browser now features a unified context menu on both the tree view and file grid to easily close individual projects or clear the workspace.
   - Viewer / Adjusted default studio lighting to provide realistic 3D shading and highlights when loading models.
   - Viewer / Project Browser file tiles now use the same HoverColor for hover and selection without an extra border overlay.
