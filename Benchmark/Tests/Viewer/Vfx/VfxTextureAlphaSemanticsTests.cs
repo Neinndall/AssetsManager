@@ -9,13 +9,26 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
     public sealed class VfxTextureAlphaSemanticsTests
     {
         [Fact]
-        public void FullyOpaqueMeshTexturePreservesAuthoredAlpha()
+        public void FullyOpaqueAttachedMeshTexturePreservesAuthoredAlpha()
         {
             BitmapSource texture = CreateTexture(
                 0, 0, 0, 255,
                 255, 255, 255, 255);
 
             Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+                texture,
+                blendMode: 1,
+                VfxPrimitiveKind.AttachedMesh));
+        }
+
+        [Fact]
+        public void OpaqueMeshMaskUsesDarkRgbAsOpacity()
+        {
+            BitmapSource texture = CreateTexture(
+                0, 0, 0, 255,
+                255, 255, 255, 255);
+
+            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
                 texture,
                 blendMode: 1,
                 VfxPrimitiveKind.Mesh));

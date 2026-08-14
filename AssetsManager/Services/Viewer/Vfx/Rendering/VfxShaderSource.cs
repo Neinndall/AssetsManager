@@ -357,13 +357,16 @@ float colorLookUpChannel(vec4 source, int type){
 }
 vec4 applyParticleColor(vec4 texel){
     if (uHasColor == 0) return texel;
-    vec2 colorUv = vLocalUv;
     if (uColorLookUpTypeX != 0 || uColorLookUpTypeY != 0) {
-        colorUv = vec2(
+        vec2 colorUv = vec2(
             colorLookUpChannel(texel, uColorLookUpTypeX) * uColorLookUpScales.x,
             colorLookUpChannel(texel, uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
+        vec4 colorTex = texture(uColorMap, colorUv);
+        texel.rgb = colorTex.rgb;
+        texel.a *= colorTex.a;
+        return texel;
     }
-    vec4 colorTex = texture(uColorMap, colorUv);
+    vec4 colorTex = texture(uColorMap, vLocalUv);
     if ((uColorRenderFlags & 1) != 0) {
         texel.rgb *= colorTex.rgb;
         texel.a *= colorTex.a;
@@ -384,8 +387,9 @@ void main(){
     if (uHasPalette != 0) {
         float paletteCoverage = texel.a;
         float paletteIndex = dot(texel, uPaletteMixMask);
-        float paletteU = clamp((uPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
-        vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
+        float paletteU = clamp(paletteIndex, 0.0, 1.0);
+        float paletteV = clamp((uPaletteSelector + 0.5) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
+        vec4 palette = texture(uPaletteMap, vec2(paletteU, paletteV));
         if (uIsAdditive != 0) {
             texel.rgb = palette.rgb * max(texel.a, palette.a);
         } else {
@@ -491,13 +495,16 @@ float colorLookUpChannel(vec4 source, int type){
 }
 vec4 applyParticleColor(vec4 tex){
     if (uHasColor == 0) return tex;
-    vec2 colorUv = vLocalUv;
     if (uColorLookUpTypeX != 0 || uColorLookUpTypeY != 0) {
-        colorUv = vec2(
+        vec2 colorUv = vec2(
             colorLookUpChannel(tex, uColorLookUpTypeX) * uColorLookUpScales.x,
             colorLookUpChannel(tex, uColorLookUpTypeY) * uColorLookUpScales.y) + uColorLookUpOffsets;
+        vec4 colorTex = texture(uColorMap, colorUv);
+        tex.rgb = colorTex.rgb;
+        tex.a *= colorTex.a;
+        return tex;
     }
-    vec4 colorTex = texture(uColorMap, colorUv);
+    vec4 colorTex = texture(uColorMap, vLocalUv);
     if ((uColorRenderFlags & 1) != 0) {
         tex.rgb *= colorTex.rgb;
         tex.a *= colorTex.a;
@@ -518,8 +525,9 @@ void main(){
     if (uHasPalette != 0) {
         float paletteCoverage = t.a;
         float paletteIndex = dot(t, uPaletteMixMask);
-        float paletteU = clamp((vPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
-        vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
+        float paletteU = clamp(paletteIndex, 0.0, 1.0);
+        float paletteV = clamp((vPaletteSelector + 0.5) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
+        vec4 palette = texture(uPaletteMap, vec2(paletteU, paletteV));
         if (uIsAdditive != 0) {
             t.rgb = palette.rgb * max(t.a, palette.a);
         } else {
