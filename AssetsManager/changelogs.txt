@@ -8,7 +8,6 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 New Features
   - VFX Studio now applies authored stencil masks so clipped particles and meshes render without visible mask geometry.
   - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
-  - VFX Studio now reports standalone compatibility, scene requirements, approximations, and unsupported authored features for every system.
   - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
   - VFX Studio now shares one loading/resource cache per window and releases OpenGL, decoded texture, mesh, animation, and index resources when closed.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
@@ -58,7 +57,11 @@ New Features
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
+Fixes
+  - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
+
 Improvements
+  - VFX Studio now keeps its workspace focused on the viewport, emitters, textures, and meshes while authored ability sequences continue to play automatically.
   - VFX Studio now presents preview looping as a clear on/off transport control that remains active while changing effects.
   - VFX Studio now automatically plays the complete authored event sequence when a selected effect belongs to one unambiguous composition.
   - VFX Studio now builds one authored render queue across root, child, and ability-composed systems, honoring render phase, pass, stable importance, optional emitter depth sorting, and alpha-only output without leaking OpenGL state.

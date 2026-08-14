@@ -156,7 +156,7 @@
 				<Setter Property="BorderThickness" Value="0"/>
 				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
 				<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
-				<Setter Property="ItemContainerStyle" Value="{StaticResource ModernListViewItem}"/>
+				<Setter Property="ItemContainerStyle" Value="{StaticResource HashGuessingResultsListViewItem}"/>
 				<Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListView">

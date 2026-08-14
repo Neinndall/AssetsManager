@@ -17,7 +17,6 @@ using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
-using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
@@ -37,6 +36,7 @@ namespace AssetsManager.Views.Dialogs
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
+        private IReadOnlyList<VfxAbilityComposition> _abilityCompositions = Array.Empty<VfxAbilityComposition>();
         private bool _isCleanedUp;
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
@@ -275,7 +275,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 _model.DetectedSkins.Clear();
                 _model.Systems.Clear();
-                _model.Compositions.Clear();
+                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
 
                 var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
                 
@@ -368,8 +368,7 @@ namespace AssetsManager.Views.Dialogs
             try
             {
                 _model.Systems.Clear();
-                _model.Compositions.Clear();
-                _model.SelectedComposition = null;
+                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
                 _activeBundle = _loadingService.Load(binFilePath, _logService);
@@ -392,9 +391,6 @@ namespace AssetsManager.Views.Dialogs
                     VfxEmitterDefinition[] playableEmitters = sysDef.Emitters
                         .Where(emitter => !emitter.Disabled)
                         .ToArray();
-                    VfxCompatibilityReport compatibility = VfxCompatibilityAnalyzer.Analyze(
-                        sysDef,
-                        _activeBundle.OwnerSceneContext);
                     var item = new VfxSystemDiagnosticItem
                     {
                         Name = name,
@@ -406,33 +402,17 @@ namespace AssetsManager.Views.Dialogs
                             !string.IsNullOrWhiteSpace(e.TextureMultPath) ||
                             !string.IsNullOrWhiteSpace(e.ParticleColorTexturePath) ||
                             !string.IsNullOrWhiteSpace(e.PaletteDefinition?.PaletteTexturePath)),
-                        MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive),
-                        CompatibilityReport = compatibility,
-                        Status = compatibility.StatusText,
-                        StatusBrush = GetCompatibilityBrush(compatibility.Level)
+                        MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive)
                     };
                     _model.Systems.Add(item);
                 }
 
-                foreach (VfxAbilityComposition composition in VfxAbilityCompositionBuilder.BuildAll(
+                _abilityCompositions = VfxAbilityCompositionBuilder.BuildAll(
                     _activeBundle.EventSequences.Values,
                     _activeBundle.Systems,
-                    _activeBundle.ResourceMap))
-                {
-                    var diagnostic = new VfxAbilityCompositionDiagnosticItem { Composition = composition };
-                    foreach (VfxCompositionEvent compositionEvent in composition.Events)
-                    {
-                        diagnostic.Events.Add(new VfxCompositionEventDiagnosticItem
-                        {
-                            CompositionEvent = compositionEvent,
-                            TickDuration = composition.TickDuration
-                        });
-                    }
-                    _model.Compositions.Add(diagnostic);
-                }
-                _model.SelectedComposition = _model.Compositions.FirstOrDefault();
+                    _activeBundle.ResourceMap);
 
-                _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems and {_model.Compositions.Count} event compositions.");
+                _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
 
                 if (_model.Systems.Count > 0)
@@ -443,6 +423,7 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (Exception ex)
             {
+                _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[ERROR] Failed to load BIN: {ex.Message}");
             }
         }
@@ -505,7 +486,7 @@ namespace AssetsManager.Views.Dialogs
             string playbackContext = "standalone system";
             IReadOnlyList<VfxAbilityComposition> linkedCompositions = VfxAbilityCompositionBuilder.FindContainingSystem(
                 systemItem.PathHash,
-                _model.Compositions.Select(item => item.Composition));
+                _abilityCompositions);
             bool configuredComposition = false;
             if (linkedCompositions.Count == 1 && _activeBundle is not null && _vfxRenderer is not null)
             {
@@ -519,8 +500,6 @@ namespace AssetsManager.Views.Dialogs
                     _activeBundle.OwnerSceneContext);
                 if (configuredComposition)
                 {
-                    _model.SelectedComposition = _model.Compositions.FirstOrDefault(item =>
-                        item.Composition.SequencePathHash == composition.SequencePathHash);
                     playbackDuration = _vfxRenderer.ActiveSystem.TotalDuration;
                     playbackContext = $"authored sequence 0x{composition.SequencePathHash:X8}";
                     _model.LogMessages.Add(
@@ -532,7 +511,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 _model.LogMessages.Add(
                     $"[COMPOSITION AMBIGUOUS] {systemItem.Name} belongs to {linkedCompositions.Count} authored sequences; " +
-                    "standalone playback retained until a sequence is selected.");
+                    "standalone playback retained because no unique authored sequence can be selected automatically.");
             }
             else
             {
@@ -631,67 +610,6 @@ namespace AssetsManager.Views.Dialogs
 
             _model.StatusText = $"{systemItem.Name} · {playbackContext}.";
         }
-
-        private void CompositionEvent_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if ((sender as FrameworkElement)?.DataContext is not VfxCompositionEventDiagnosticItem item ||
-                item.CompositionEvent.System is null)
-            {
-                return;
-            }
-
-            VfxSystemDiagnosticItem system = _model.Systems.FirstOrDefault(candidate =>
-                candidate.PathHash == item.CompositionEvent.ResolvedSystemHash);
-            if (system is null) return;
-
-            _model.SelectedSystem = system;
-            TabViewport.IsChecked = true;
-            InspectSystem(system);
-        }
-
-        private void PlayComposition_Click(object sender, RoutedEventArgs e)
-        {
-            if (_model.SelectedComposition?.Composition is not VfxAbilityComposition composition ||
-                _activeBundle is null ||
-                _vfxRenderer is null)
-            {
-                return;
-            }
-
-            string searchDirectory = _model.RootPath;
-            if (!string.IsNullOrEmpty(searchDirectory) && File.Exists(searchDirectory))
-                searchDirectory = Path.GetDirectoryName(searchDirectory) ?? searchDirectory;
-            int seed = HashCode.Combine(composition.SequencePathHash, composition.Events.Count);
-            if (!_vfxRenderer.SetAbilityComposition(
-                    composition,
-                    _activeBundle.Systems,
-                    _activeBundle.ResourceMap,
-                    searchDirectory,
-                    seed,
-                    _activeBundle.OwnerSceneContext))
-            {
-                _model.StatusText = "The selected sequence has no resolved VFX events.";
-                return;
-            }
-
-            double duration = _vfxRenderer.ActiveSystem.TotalDuration;
-            _model.TotalDuration = ResolveTimelineDuration(duration);
-            _model.ActiveLoopDuration = duration;
-            _model.CurrentTime = 0;
-            _vfxRenderer.Play();
-            _model.IsPlaying = true;
-            _model.StatusText = $"Playing {composition.Events.Count} authored ability events.";
-            TabViewport.IsChecked = true;
-            UpdatePlayheadPosition();
-        }
-
-        private static Brush GetCompatibilityBrush(VfxCompatibilityLevel level) => level switch
-        {
-            VfxCompatibilityLevel.Ready => Brushes.LightGreen,
-            VfxCompatibilityLevel.ContextRequired => Brushes.DeepSkyBlue,
-            VfxCompatibilityLevel.Approximate => Brushes.Orange,
-            _ => Brushes.OrangeRed
-        };
 
         #region Timeline Deck Mechanics
 

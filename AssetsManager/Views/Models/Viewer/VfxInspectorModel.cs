@@ -1,48 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 namespace AssetsManager.Views.Models.Viewer
 {
-    public sealed class VfxAbilityCompositionDiagnosticItem
-    {
-        public VfxAbilityComposition Composition { get; init; }
-        public string DisplayName => $"Sequence 0x{Composition.SequencePathHash:X8}";
-        public string ClassText => $"Class 0x{Composition.SequenceClassHash:X8}";
-        public int EventCount => Composition.Events.Count;
-        public string ResolutionText => $"{Composition.ResolvedCount}/{EventCount} resolved";
-        public ObservableCollection<VfxCompositionEventDiagnosticItem> Events { get; } = new();
-    }
-
-    public sealed class VfxCompositionEventDiagnosticItem
-    {
-        public VfxCompositionEvent CompositionEvent { get; init; }
-        public float TickDuration { get; init; }
-        public float StartFrame => CompositionEvent.Event.StartFrame;
-        public float EndFrame => CompositionEvent.Event.EndFrame;
-        public double StartSeconds => Math.Max(0, StartFrame * TickDuration);
-        public string EventText => CompositionEvent.Event.EventHash != 0
-            ? $"0x{CompositionEvent.Event.EventHash:X8}"
-            : $"0x{CompositionEvent.Event.NameHash:X8}";
-        public string EffectText => !string.IsNullOrWhiteSpace(CompositionEvent.Event.EffectName)
-            ? CompositionEvent.Event.EffectName
-            : $"0x{(CompositionEvent.UsesEnemyEffect ? CompositionEvent.Event.EnemyEffectKey : CompositionEvent.Event.EffectKey):X8}";
-        public string SystemName => CompositionEvent.System?.Name ?? "Unresolved effect";
-        public string ResolutionText => CompositionEvent.System is null
-            ? "UNRESOLVED"
-            : $"0x{CompositionEvent.ResolvedSystemHash:X8}";
-        public string AttachmentText => CompositionEvent.Event.Attachments.Count == 0
-            ? "World / event origin"
-            : string.Join(", ", CompositionEvent.Event.Attachments.Select(pair =>
-                $"0x{pair.SourceBoneHash:X8} -> 0x{pair.TargetBoneHash:X8}"));
-        public bool IsResolved => CompositionEvent.System is not null;
-    }
-
     /// <summary>
     /// Item model representing a single VFX system definition inside the inspector.
     /// </summary>
@@ -54,9 +18,6 @@ namespace AssetsManager.Views.Models.Viewer
         private int _emitterCount;
         private int _textureCount;
         private int _meshCount;
-        private string _status = "Ready";
-        private Brush _statusBrush = Brushes.LightGreen;
-        private VfxCompatibilityReport _compatibilityReport;
 
         public string Name
         {
@@ -92,24 +53,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _meshCount;
             set { _meshCount = value; OnPropertyChanged(); }
-        }
-
-        public string Status
-        {
-            get => _status;
-            set { _status = value; OnPropertyChanged(); }
-        }
-
-        public Brush StatusBrush
-        {
-            get => _statusBrush;
-            set { _statusBrush = value; OnPropertyChanged(); }
-        }
-
-        public VfxCompatibilityReport CompatibilityReport
-        {
-            get => _compatibilityReport;
-            set { _compatibilityReport = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -471,8 +414,6 @@ namespace AssetsManager.Views.Models.Viewer
         private VfxSkinItem _selectedSkin;
         private string _searchQuery;
         private VfxSystemDiagnosticItem _selectedSystem;
-        private VfxAbilityCompositionDiagnosticItem _selectedComposition;
-        private VfxCompositionEventDiagnosticItem _selectedCompositionEvent;
         private bool _isPlaying;
         private double _currentTime;
         private double _totalDuration = 5.0;
@@ -489,7 +430,6 @@ namespace AssetsManager.Views.Models.Viewer
         public ObservableCollection<VfxEmitterDiagnosticItem> Emitters { get; } = new();
         public ObservableCollection<VfxTextureDiagnosticItem> Textures { get; } = new();
         public ObservableCollection<VfxMeshDiagnosticItem> Meshes { get; } = new();
-        public ObservableCollection<VfxAbilityCompositionDiagnosticItem> Compositions { get; } = new();
         public ObservableCollection<string> LogMessages { get; } = new();
 
         public double ActiveLoopDuration
@@ -535,18 +475,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             get => _selectedSystem;
             set { _selectedSystem = value; OnPropertyChanged(); }
-        }
-
-        public VfxAbilityCompositionDiagnosticItem SelectedComposition
-        {
-            get => _selectedComposition;
-            set { _selectedComposition = value; OnPropertyChanged(); }
-        }
-
-        public VfxCompositionEventDiagnosticItem SelectedCompositionEvent
-        {
-            get => _selectedCompositionEvent;
-            set { _selectedCompositionEvent = value; OnPropertyChanged(); }
         }
 
         public bool IsPlaying
