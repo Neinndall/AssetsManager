@@ -1800,11 +1800,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                     paths => HashGuessEngine.BuildBasenameWordlist(
                         paths.Where(path => path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))));
                 foreach (string prefix in prefixes)
-                foreach (string word in words)
                 {
-                    string stem = prefix + "_" + word;
-                    if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+                    foreach (string word in words)
+                    {
+                        string stem = prefix + "_" + word;
+                        if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+
+                        foreach (string word2 in words)
+                        {
+                            string stem2 = prefix + "_" + word + "_" + word2;
+                            if (nameHashes.Contains(Fnv1a.HashLower(stem2))) yield return stem2;
+                        }
+                    }
                 }
+            }
+
+            foreach (string name in sourceNames)
+            {
+                string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
+                if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
             }
 
             foreach (string name in GetAnimationNames(character, contextual: false))
