@@ -102,6 +102,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 or VfxPrimitiveKind.CameraUnitQuad
                 or VfxPrimitiveKind.ArbitraryQuad
                 or VfxPrimitiveKind.Mesh
+                or VfxPrimitiveKind.AttachedMesh
                 or VfxPrimitiveKind.CameraTrail
                 or VfxPrimitiveKind.ArbitraryTrail
                 or VfxPrimitiveKind.Ray
