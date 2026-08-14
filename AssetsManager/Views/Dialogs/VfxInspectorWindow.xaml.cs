@@ -330,7 +330,6 @@ namespace AssetsManager.Views.Dialogs
                 if (preferredSkin != null)
                 {
                     _model.SelectedSkin = preferredSkin;
-                    LoadBinFile(preferredSkin.BinPath);
                 }
 
                 _model.StatusText = $"Scanned {_model.DetectedSkins.Count} skins in {Path.GetFileName(rootFolder)}.";
