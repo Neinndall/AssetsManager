@@ -371,7 +371,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Backing up {processed} of {total} files: {detail}", processed, total, currentFile);
         }
 
-        public async void OnBackupCompleted(bool success)
+        public async Task OnBackupCompletedAsync(bool success)
         {
             // BackupsControl handles the success message/logic. We just close the progress UI.
             await FinishOperation();

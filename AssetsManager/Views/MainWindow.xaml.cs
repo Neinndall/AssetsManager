@@ -135,7 +135,7 @@ namespace AssetsManager.Views
 
             _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
             _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
-            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompleted;
+            _backupManager.BackupCompleted += _progressUIManager.OnBackupCompletedAsync;
 
             _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
             _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;

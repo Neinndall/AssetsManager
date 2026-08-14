@@ -58,6 +58,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Fixes
+  - Fixed the first backup run advancing before its final file count was rendered in the status bar.
   - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
 
 Improvements

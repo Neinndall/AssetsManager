@@ -56,6 +56,36 @@ namespace AssetsManager.BenchmarkTests.Monitor
         }
 
         [Fact]
+        public async Task BackupAwaitsCompletionObserversBeforeReturning()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string sourcePath = bridge.CreateDirectory("League of Legends");
+            await File.WriteAllTextAsync(Path.Combine(sourcePath, "game.dat"), "content");
+            string destinationPath = Path.Combine(bridge.RootPath, "League of Legends_old_20260814_120000");
+            var manager = new BackupManager(bridge.Directories, bridge.LogService, new AppSettings(), null);
+            var observerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseObserver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            manager.BackupCompleted += async success =>
+            {
+                Assert.True(success);
+                observerStarted.SetResult();
+                await releaseObserver.Task;
+            };
+
+            Task backupTask = manager.CreateLolPbeDirectoryBackupAsync(
+                sourcePath,
+                destinationPath,
+                CancellationToken.None);
+
+            await observerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(backupTask.IsCompleted);
+
+            releaseObserver.SetResult();
+            await backupTask;
+        }
+
+        [Fact]
         public void InstallationOutsideConfiguredRootsIsIdentifiedAsMain()
         {
             using var bridge = new AssetsManagerTestBridge();

@@ -16,7 +16,7 @@ namespace AssetsManager.Services.Monitor
     {
         public event Action<int> BackupStarted;
         public event Action<int, int, string> BackupProgressChanged;
-        public event Action<bool> BackupCompleted;
+        public event Func<bool, Task> BackupCompleted;
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -43,7 +43,7 @@ namespace AssetsManager.Services.Monitor
             string logMessage = "Starting backup...")
         {
             BackupStarted?.Invoke(0);
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -63,23 +63,23 @@ namespace AssetsManager.Services.Monitor
                     CopyDirectoryRecursive(sourceLolPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
                     
                     MarkCurrentSessionBackup(destinationBackupPath);
-                    BackupCompleted?.Invoke(true);
+                    await NotifyBackupCompletedAsync(true);
                 }
                 catch (OperationCanceledException)
                 {
-                    BackupCompleted?.Invoke(false);
                     // Clean up partially created backup if cancelled
                     if (Directory.Exists(destinationBackupPath))
                     {
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after cancelled operation."); }
                     }
+                    await NotifyBackupCompletedAsync(false);
                     throw;
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Backup failed for source: {sourceLolPath}");
-                    BackupCompleted?.Invoke(false);
+                    await NotifyBackupCompletedAsync(false);
                     throw; 
                 }
             }, cancellationToken);
@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Monitor
             CancellationToken cancellationToken)
         {
             BackupStarted?.Invoke(0);
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
@@ -111,25 +111,43 @@ namespace AssetsManager.Services.Monitor
                     CopyDirectoryRecursive(sourceBackupPath, destinationBackupPath, ref processedFiles, metrics.FileCount, cancellationToken);
 
                     MarkCurrentSessionBackup(destinationBackupPath);
-                    BackupCompleted?.Invoke(true);
+                    await NotifyBackupCompletedAsync(true);
                 }
                 catch (OperationCanceledException)
                 {
-                    BackupCompleted?.Invoke(false);
                     if (Directory.Exists(destinationBackupPath))
                     {
                         try { Directory.Delete(destinationBackupPath, true); } 
                         catch (Exception ex) { _logService.LogError(ex, "Could not clean up directory after failed/cancelled operation."); }
                     }
+                    await NotifyBackupCompletedAsync(false);
                     throw;
                 }
                 catch (Exception ex)
                 {
                     _logService.LogError(ex, $"Error cloning backup: {sourceBackupPath} to {destinationBackupPath}");
-                    BackupCompleted?.Invoke(false);
+                    await NotifyBackupCompletedAsync(false);
                     throw;
                 }
             }, cancellationToken);
+        }
+
+        private async Task NotifyBackupCompletedAsync(bool success)
+        {
+            Delegate[] handlers = BackupCompleted?.GetInvocationList();
+            if (handlers is null) return;
+
+            foreach (Func<bool, Task> handler in handlers.Cast<Func<bool, Task>>())
+            {
+                try
+                {
+                    await handler(success);
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogError(ex, "A backup completion observer failed.");
+                }
+            }
         }
 
         private void CopyDirectoryRecursive(string sourceDir, string destinationDir, ref int processedFiles, int totalFiles, CancellationToken cancellationToken)
