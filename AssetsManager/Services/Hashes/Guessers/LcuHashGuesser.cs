@@ -338,7 +338,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         words: variantWords,
                         oldWordCount: oldWordCount,
                         newWordCount: newWordCount,
-                        candidateBudget: 50_000_000,
+                        candidateBudget: 100_000_000,
                         progress: current => progress?.Report(
                             engine.CreateProgress(stage, progressOffset + current)));
                     variantCheckedCandidates += count;
@@ -363,7 +363,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 KnownPaths,
                 BuildWordlist(),
                 cancellationToken,
-                candidateBudget: 50_000_000,
+                candidateBudget: 100_000_000,
                 source: "LCU basename word addition",
                 progress: progress);
 
