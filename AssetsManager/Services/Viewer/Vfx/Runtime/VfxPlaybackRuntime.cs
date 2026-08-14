@@ -487,6 +487,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                 {
                     sizeX *= 2f;
                     sizeY *= 2f;
+                    if (d.IsGroundLayer && d.IsUniformScale)
+                        sizeY = sizeX;
                 }
                 Vector3 direction = p.Vel;
                 if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)

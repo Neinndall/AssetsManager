@@ -379,16 +379,16 @@ void main(){
         texel.a = dot(texel.rgb, vec3(0.2126, 0.7152, 0.0722));
     texel = applyParticleColor(texel);
     if (uHasPalette != 0) {
+        float paletteCoverage = texel.a;
         float paletteIndex = dot(texel, uPaletteMixMask);
         float paletteU = clamp((uPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
         vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
         if (uIsAdditive != 0) {
             texel.rgb = palette.rgb * max(texel.a, palette.a);
-            texel.a = max(texel.a, palette.a);
         } else {
             texel.rgb = mix(texel.rgb, palette.rgb, palette.a * texel.a);
-            texel.a = max(texel.a, palette.a * texel.a);
         }
+        texel.a = paletteCoverage;
     }
     if (uHasTexMult != 0) {
         vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);
@@ -510,16 +510,16 @@ void main(){
         t.a = dot(t.rgb, vec3(0.2126, 0.7152, 0.0722));
     t = applyParticleColor(t);
     if (uHasPalette != 0) {
+        float paletteCoverage = t.a;
         float paletteIndex = dot(t, uPaletteMixMask);
         float paletteU = clamp((vPaletteSelector + paletteIndex) / max(float(uPaletteCount), 1.0), 0.0, 1.0);
         vec4 palette = texture(uPaletteMap, vec2(paletteU, 0.5));
         if (uIsAdditive != 0) {
             t.rgb = palette.rgb * max(t.a, palette.a);
-            t.a = max(t.a, palette.a);
         } else {
             t.rgb = mix(t.rgb, palette.rgb, palette.a * t.a);
-            t.a = max(t.a, palette.a * t.a);
         }
+        t.a = paletteCoverage;
     }
     if (uHasTexMult != 0) {
         vec4 mult = texture(uTexMult, vUvMult) * addressMask(vLocalUvMult, uAddressModeMult);

@@ -197,6 +197,27 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void UniformGroundArbitraryQuadUsesCircularBirthScale()
+        {
+            var emitter = CreateEmitter(new Vector3(345f, 550f, 1f), VfxEmitterRenderState.Default) with
+            {
+                IsMeshPrimitive = false,
+                PrimitiveKind = VfxPrimitiveKind.ArbitraryQuad,
+                IsArbitraryQuad = true,
+                IsGroundLayer = true,
+                IsUniformScale = true
+            };
+            var simulator = new VfxPlaybackRuntime(7);
+
+            simulator.SetSystem(new VfxSystemDefinition(1, "ground-ring", "ground-ring", new[] { emitter }), Vector3.Zero);
+            simulator.Update(0.02f);
+
+            var state = Assert.Single(simulator.Emitters);
+            Assert.Equal(690f, state.Instances[3]);
+            Assert.Equal(690f, state.Instances[4]);
+        }
+
+        [Fact]
         public void MeshInterleavingPreservesPositionUvAndVertexColor()
         {
             float[] interleaved = VfxOpenGlRenderer.BuildMeshInterleaved(
