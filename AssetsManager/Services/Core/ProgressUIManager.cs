@@ -334,7 +334,7 @@ namespace AssetsManager.Services.Core
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
-            await FinishOperation(200);
+            await FinishOperation();
 
             await _owner.Dispatcher.InvokeAsync(() =>
             {

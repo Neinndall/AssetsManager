@@ -58,6 +58,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Fixes
+  - Version Manager now uses the unified 100 ms visual hold between verification and update completion phases.
   - Version downloads now wait for their final progress state before completing verification and update actions.
   - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
   - Fixed the first backup run advancing before its final file count was rendered in the status bar.

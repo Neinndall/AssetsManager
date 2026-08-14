@@ -273,7 +273,7 @@ public sealed class ManifestDownloader : IDisposable
         if (!filesToPatch.Any()) return 0;
 
         // Preserve the completed verification frame before the update phase replaces it.
-        await Task.Delay(200, cancellationToken);
+        await Task.Delay(100, cancellationToken);
 
         // Phase 3: Deduplicate missing chunks, download bundle ranges, verify, and patch by file offset.
         var filesToPatchList = filesToPatch.OrderBy(f => f.FileInfo.Name).ToList();
