@@ -78,8 +78,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomCharacterTexSampleSize = 20_000;
         private const int CustomWordAdditionSampleSize = 20_000;
         private const int CustomFocusedPathSampleSize = 20_000;
-        private const int CustomSwordlistCandidateBudget = 10_000_000;
-        private const int CustomWordlistCandidateBudget = 10_000_000;
+        private const int CustomBinCandidateBudget = 50_000_000;
+        private const int CustomDataBinCandidateBudget = 50_000_000;
+        private const int CustomCharacterDdsCandidateBudget = 50_000_000;
+        private const int CustomCharacterTexCandidateBudget = 50_000_000;
+        private const int CustomSwordlistCandidateBudget = 25_000_000;
+        private const int CustomWordlistCandidateBudget = 25_000_000;
+        private const int CustomWordAdditionCandidateBudget = 50_000_000;
+        private const int CustomShaderCandidateBudget = 50_000_000;
         private const int SkinGroupCandidateBudget = 5_000_000;
         private const int CharacterSubstitutionCandidateBudget = 10_000_000;
         private const int SkinNumberSubstitutionCandidateBudget = 10_000_000;
@@ -236,7 +242,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
+                candidateBudget: CustomBinCandidateBudget,
                 source: "GAME Custom: BIN basename wordlist",
                 progress);
         }
@@ -268,7 +274,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
+                candidateBudget: CustomDataBinCandidateBudget,
                 source: "GAME Custom: data BIN basename wordlist",
                 progress);
         }
@@ -300,7 +306,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
+                candidateBudget: CustomCharacterDdsCandidateBudget,
                 source: "GAME Custom: character DDS basename wordlist",
                 progress);
         }
@@ -332,7 +338,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 oldWordCount: 1,
                 newWordCount: 1,
                 cancellationToken,
-                candidateBudget: int.MaxValue,
+                candidateBudget: CustomCharacterTexCandidateBudget,
                 source: "GAME Custom: character TEX basename wordlist",
                 progress);
         }
@@ -354,7 +360,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 paths,
                 words,
                 cancellationToken,
-                candidateBudget: int.MaxValue);
+                candidateBudget: CustomWordAdditionCandidateBudget);
             progress?.Invoke(checkedCount);
             return checkedCount;
         }
@@ -489,7 +495,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             checkedCandidates += GuessCustomShaders(
                 engine,
                 cancellationToken,
-                candidateBudget: 10_000_000,
+                candidateBudget: CustomShaderCandidateBudget,
                 progress: count => progress?.Report(engine.CreateProgress(
                     "GAME Custom: shader vocabulary attack", progressOffset + count)));
 
