@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,6 +27,8 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             InitializeComponent();
             this.Loaded += ManageVersionsControl_Loaded;
+            this.Unloaded += ManageVersionsControl_Unloaded;
+            this.IsVisibleChanged += ManageVersionsControl_IsVisibleChanged;
         }
 
         private async void ManageVersionsControl_Loaded(object sender, RoutedEventArgs e)
@@ -37,10 +40,50 @@ namespace AssetsManager.Views.Controls.Monitor
                 await _viewModel.LoadVersionFilesAsync();
             }
 
-            if (_viewModel != null)
+            if (AppSettings != null)
             {
-                await _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings);
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+                AppSettings.ConfigurationSaved += OnConfigurationSaved;
             }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+                BackupManager.BackupsChanged += OnBackupsChanged;
+            }
+
+            await RefreshTargetInstallationsAsync();
+        }
+
+        private void ManageVersionsControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (AppSettings != null)
+            {
+                AppSettings.ConfigurationSaved -= OnConfigurationSaved;
+            }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+            }
+        }
+
+        private async void ManageVersionsControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.NewValue is true)
+            {
+                await RefreshTargetInstallationsAsync();
+            }
+        }
+
+        private async void OnBackupsChanged() => await RefreshTargetInstallationsAsync();
+
+        private async void OnConfigurationSaved(object sender, EventArgs e) => await RefreshTargetInstallationsAsync();
+
+        private async Task RefreshTargetInstallationsAsync()
+        {
+            if (_viewModel == null) return;
+            await Dispatcher.InvokeAsync(() => _viewModel.LoadTargetInstallationsAsync(BackupManager, AppSettings));
         }
 
         private async void FetchVersions_Click(object sender, RoutedEventArgs e)

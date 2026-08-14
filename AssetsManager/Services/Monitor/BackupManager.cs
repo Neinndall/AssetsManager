@@ -17,6 +17,7 @@ namespace AssetsManager.Services.Monitor
         public event Action<int> BackupStarted;
         public event Action<int, int, string> BackupProgressChanged;
         public event Func<bool, Task> BackupCompleted;
+        public event Action BackupsChanged;
 
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly LogService _logService;
@@ -134,6 +135,11 @@ namespace AssetsManager.Services.Monitor
 
         private async Task NotifyBackupCompletedAsync(bool success)
         {
+            if (success)
+            {
+                BackupsChanged?.Invoke();
+            }
+
             Delegate[] handlers = BackupCompleted?.GetInvocationList();
             if (handlers is null) return;
 
@@ -395,6 +401,7 @@ namespace AssetsManager.Services.Monitor
                         _logService.LogSuccess("The selected backup was deleted successfully.");
                     }
                     lock (_sessionBackupsSync) _currentSessionBackups.Remove(backupPath);
+                    BackupsChanged?.Invoke();
                     return true;
                 }
                 _logService.LogWarning($"Attempted to delete non-existent backup: {backupPath}");

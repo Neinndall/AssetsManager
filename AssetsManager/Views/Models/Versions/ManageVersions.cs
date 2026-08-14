@@ -129,9 +129,8 @@ namespace AssetsManager.Views.Models.Versions
         public async Task LoadTargetInstallationsAsync(BackupManager backupManager, AppSettings appSettings)
         {
             var previousSelectedPath = SelectedTargetInstallation?.Path;
-            TargetInstallations.Clear();
-
             var preferredClient = appSettings?.PreferredClient ?? PreferredClient.PBE;
+            var newInstallations = new List<TargetInstallationOption>();
 
             if (appSettings != null)
             {
@@ -140,7 +139,7 @@ namespace AssetsManager.Views.Models.Versions
                     string pbeVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolPbeDirectory) : null;
                     DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolPbeDirectory);
 
-                    TargetInstallations.Add(new TargetInstallationOption
+                    newInstallations.Add(new TargetInstallationOption
                     {
                         Name = "League of Legends PBE",
                         DisplayName = "League of Legends PBE",
@@ -156,7 +155,7 @@ namespace AssetsManager.Views.Models.Versions
                     string liveVer = _versionService != null ? await _versionService.GetGameVersionAsync(appSettings.LolLiveDirectory) : null;
                     DateTime? lastWriteTime = System.IO.Directory.GetLastWriteTime(appSettings.LolLiveDirectory);
 
-                    TargetInstallations.Add(new TargetInstallationOption
+                    newInstallations.Add(new TargetInstallationOption
                     {
                         Name = "League of Legends LIVE",
                         DisplayName = "League of Legends LIVE",
@@ -178,7 +177,7 @@ namespace AssetsManager.Views.Models.Versions
                     {
                         if (backup.IsMainClient) continue;
 
-                        TargetInstallations.Add(new TargetInstallationOption
+                        newInstallations.Add(new TargetInstallationOption
                         {
                             Name = backup.Name,
                             DisplayName = backup.DisplayName,
@@ -196,11 +195,21 @@ namespace AssetsManager.Views.Models.Versions
                 }
             }
 
+            TargetInstallations.Clear();
+            foreach (var item in newInstallations)
+            {
+                TargetInstallations.Add(item);
+            }
+
             if (TargetInstallations.Count > 0)
             {
                 SelectedTargetInstallation = TargetInstallations.FirstOrDefault(t => t.Path != null && t.Path.Equals(previousSelectedPath, StringComparison.OrdinalIgnoreCase))
                                            ?? TargetInstallations.FirstOrDefault(t => t.IsMain)
                                            ?? TargetInstallations.FirstOrDefault();
+            }
+            else
+            {
+                SelectedTargetInstallation = null;
             }
         }
 

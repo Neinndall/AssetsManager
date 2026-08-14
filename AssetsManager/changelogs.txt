@@ -63,6 +63,7 @@ Fixes
   - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
   - Fixed the first backup run advancing before its final file count was rendered in the status bar.
   - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
+  - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
 
 Improvements
   - VFX Studio now labels its preview loop control more concisely.

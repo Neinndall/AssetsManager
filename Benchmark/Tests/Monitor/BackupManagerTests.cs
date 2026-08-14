@@ -124,5 +124,28 @@ namespace AssetsManager.BenchmarkTests.Monitor
 
             Assert.Equal(expectedPaths, actualPaths);
         }
+
+        [Fact]
+        public async Task BackupsChangedFiresOnCreateCloneAndDelete()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string sourcePath = bridge.CreateDirectory("League of Legends (PBE)");
+            string clonePath = Path.Combine(bridge.RootPath, "League of Legends (PBE)_old_20260814_111111");
+            string backupPath = Path.Combine(bridge.RootPath, "League of Legends (PBE)_old_20260814_222222");
+            var settings = new AppSettings { LolPbeDirectory = sourcePath };
+            var manager = new BackupManager(bridge.Directories, bridge.LogService, settings, null);
+
+            int eventCount = 0;
+            manager.BackupsChanged += () => eventCount++;
+
+            await manager.CreateLolPbeDirectoryBackupAsync(sourcePath, backupPath, CancellationToken.None);
+            Assert.Equal(1, eventCount);
+
+            await manager.CloneBackupAsync(backupPath, clonePath, CancellationToken.None);
+            Assert.Equal(2, eventCount);
+
+            Assert.True(manager.DeleteBackup(clonePath));
+            Assert.Equal(3, eventCount);
+        }
     }
 }
