@@ -29,6 +29,7 @@ namespace AssetsManager.Utils
         private static readonly byte[] RST_SIGNATURE = { 0x52, 0x53, 0x54 }; // "RST"
         private static readonly byte[] BIN_PROP_SIGNATURE = { 0x50, 0x52, 0x4F, 0x50 }; // "PROP"
         private static readonly byte[] BIN_PTCH_SIGNATURE = { 0x50, 0x54, 0x43, 0x48 }; // "PTCH"
+        private static readonly byte[] BIN_IMAA_SIGNATURE = { 0x49, 0x4D, 0x41, 0x41 }; // "IMAA"
         private static readonly byte[] ICO_SIGNATURE = { 0x00, 0x00, 0x01, 0x00 };
         private static readonly byte[] TEX_SIGNATURE = { 0x54, 0x45, 0x58, 0x00 }; // "TEX\0"
         private static readonly byte[] ENCRYPTED_RIOT_TEX_SIGNATURE = { 0xC9, 0xE3, 0x44, 0x26 };
@@ -62,7 +63,7 @@ namespace AssetsManager.Utils
             if (StartsWith(data, PRELOAD_SIGNATURE)) return "preload";
             if (StartsWith(data, RST_SIGNATURE)) return "stringtable";
 
-            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE)) return "bin";
+            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE) || StartsWith(data, BIN_IMAA_SIGNATURE)) return "bin";
             if (StartsWith(data, ICO_SIGNATURE)) return "ico";
 
             // Riot UIAutoAtlas: no magic bytes, structural validation required.

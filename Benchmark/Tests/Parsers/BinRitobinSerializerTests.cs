@@ -202,5 +202,35 @@ namespace AssetsManager.BenchmarkTests.Parsers
             tree.Write(stream);
             return stream.ToArray();
         }
+
+        [Fact]
+        public async Task SerializerFormatsImaaAutoAtlasWithoutError()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            using HashResolverService resolver = CreateResolver(bridge);
+            var serializer = new BinRitobinSerializer(resolver);
+
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+            writer.Write(new byte[] { 0x49, 0x4D, 0x41, 0x41 }); // "IMAA"
+            writer.Write((uint)2); // Version 2
+            writer.Write((ulong)0x1111222233334444); // tex0
+            writer.Write((ulong)0x5555666677778888); // tex1
+            writer.Write((uint)1); // sprite count = 1
+            writer.Write((ulong)0xaabbccddeeff0011); // sprite hash
+            writer.Write(0.1f); // uMin
+            writer.Write(0.2f); // vMin
+            writer.Write(0.3f); // uMax
+            writer.Write(0.4f); // vMax
+            writer.Write((uint)0); // texIndex = 0
+
+            string ritobin = await serializer.WriteBinTreeAsRitobinAsync(ms.ToArray());
+
+            Assert.Contains("# Image Auto Atlas (IMAA v2)", ritobin);
+            Assert.Contains("textures: list[string]", ritobin);
+            Assert.Contains("sprites: map[hash, struct]", ritobin);
+            Assert.Contains("uvMin: vec2 = [0.1000, 0.2000]", ritobin);
+            Assert.Contains("uvMax: vec2 = [0.3000, 0.4000]", ritobin);
+        }
     }
 }

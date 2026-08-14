@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using LeagueToolkit.Core.Meta;
@@ -25,6 +26,9 @@ namespace AssetsManager.Services.Parsers
             ArgumentNullException.ThrowIfNull(data);
             return Task.Run(() =>
             {
+                if (ImageAutoAtlas.IsImaa(data))
+                    return WriteImaaAsRitobin(data);
+
                 BinTree tree = ReadTree(data);
                 using RitobinWriter writer = CreateWriter(tree);
                 return writer.WritePropertyBin(tree);
@@ -40,6 +44,13 @@ namespace AssetsManager.Services.Parsers
 
             return Task.Run(() =>
             {
+                if (ImageAutoAtlas.IsImaa(oldData) || ImageAutoAtlas.IsImaa(newData))
+                {
+                    string oldImaa = ImageAutoAtlas.IsImaa(oldData) ? WriteImaaAsRitobin(oldData) : string.Empty;
+                    string newImaa = ImageAutoAtlas.IsImaa(newData) ? WriteImaaAsRitobin(newData) : string.Empty;
+                    return (oldImaa, newImaa);
+                }
+
                 BinTree oldTree = ReadTree(oldData);
                 BinTree newTree = ReadTree(newData);
 
@@ -265,6 +276,13 @@ namespace AssetsManager.Services.Parsers
                 if (_hashResolver.IsKnownHash(hash))
                     yield return new KeyValuePair<ulong, string>(hash, _hashResolver.ResolveHash(hash));
             }
+        }
+
+        private string WriteImaaAsRitobin(byte[] data)
+        {
+            return ImageAutoAtlas.TryRead(data, out ImageAutoAtlas atlas)
+                ? atlas.ToRitobinText(_hashResolver)
+                : "# Invalid IMAA atlas file";
         }
     }
 }
