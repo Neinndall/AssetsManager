@@ -62,7 +62,28 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             Assert.Equal(VfxCompatibilityLevel.Limited, report.Level);
             Assert.Equal(1, report.ApproximationCount);
-            Assert.Equal(2, report.UnsupportedCount);
+            Assert.Equal(1, report.UnsupportedCount);
+        }
+
+        [Fact]
+        public void ReportsOnlyUnknownStencilModesAsUnsupported()
+        {
+            VfxEmitterDefinition supported = CreateEmitter() with
+            {
+                RenderState = VfxEmitterRenderState.Default with { StencilMode = 2, StencilReference = 7 },
+                AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasStencil: true)
+            };
+            VfxEmitterDefinition unknown = CreateEmitter() with
+            {
+                Name = "Unknown",
+                RenderState = VfxEmitterRenderState.Default with { StencilMode = 9 },
+                AuthoredFeatures = new VfxEmitterAuthoredFeatures(HasStencil: true)
+            };
+
+            Assert.Equal(VfxCompatibilityLevel.Ready, VfxCompatibilityAnalyzer.Analyze(SystemWith(supported)).Level);
+            VfxCompatibilityIssue issue = Assert.Single(VfxCompatibilityAnalyzer.Analyze(SystemWith(unknown)).Issues);
+            Assert.Equal("STENCIL_MODE", issue.Code);
+            Assert.Equal(VfxCompatibilitySeverity.Unsupported, issue.Severity);
         }
 
         [Fact]

@@ -84,6 +84,14 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                         VfxCompatibilitySeverity.Approximation);
                 }
 
+                byte stencilMode = (emitter.RenderState ?? VfxEmitterRenderState.Default).StencilMode;
+                if (!VfxStencilSemantics.TryGetDescriptor(stencilMode, out _))
+                {
+                    Add(issues, "STENCIL_MODE", emitterName, "Unsupported stencil mode",
+                        $"Authored stencil mode {stencilMode} has no verified preview operation.",
+                        VfxCompatibilitySeverity.Unsupported);
+                }
+
                 AddUnsupportedAuthoredFeatures(issues, emitterName, authored);
             }
 
@@ -99,8 +107,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             if (authored is null) return;
             if (authored.HasCustomMaterial)
                 Add(issues, "CUSTOM_MATERIAL", emitterName, "Custom material", "The emitter requires a Riot custom material shader.", VfxCompatibilitySeverity.Unsupported);
-            if (authored.HasStencil)
-                Add(issues, "STENCIL", emitterName, "Stencil state", "The emitter declares stencil operations that are not reproduced by the preview pipeline.", VfxCompatibilitySeverity.Unsupported);
             if (authored.HasEmissionMesh || authored.HasEmissionSurface)
                 Add(issues, "SURFACE_EMISSION", emitterName, "Mesh or surface emission", "Particle births from authored mesh surfaces are not yet sampled.", VfxCompatibilitySeverity.Unsupported);
             if (authored.UsesEmissionMeshNormal)

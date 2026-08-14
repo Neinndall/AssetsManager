@@ -153,7 +153,12 @@ namespace AssetsManager.Views.Dialogs
                     break;
             }
 
-            _gl.Clear(Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit | Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit);
+            _gl.ClearStencil(0);
+            _gl.StencilMask(0xFFu);
+            _gl.Clear(
+                Silk.NET.OpenGL.ClearBufferMask.ColorBufferBit |
+                Silk.NET.OpenGL.ClearBufferMask.DepthBufferBit |
+                Silk.NET.OpenGL.ClearBufferMask.StencilBufferBit);
 
             // Build View/Projection matrices directly from CustomCameraController's PerspectiveCamera
             var camera = _dummyViewport.Camera as PerspectiveCamera;

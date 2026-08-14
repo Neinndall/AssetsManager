@@ -899,6 +899,42 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void TransparentInstanceDataIsCopiedBackToFrontForTheCurrentCamera()
+        {
+            const int stride = VfxPlaybackRuntime.InstanceStride;
+            var source = new float[stride * 3];
+            source[2] = -2f;
+            source[stride + 2] = -10f;
+            source[stride * 2 + 2] = -5f;
+            source[3] = 2f;
+            source[stride + 3] = 10f;
+            source[stride * 2 + 3] = 5f;
+            var destination = new float[source.Length];
+
+            VfxRenderQueue.CopyInstancesBackToFront(
+                source,
+                3,
+                stride,
+                Matrix4x4.Identity,
+                destination,
+                new float[3],
+                new int[3]);
+
+            Assert.Equal(new[] { -10f, -5f, -2f }, new[]
+            {
+                destination[2],
+                destination[stride + 2],
+                destination[stride * 2 + 2]
+            });
+            Assert.Equal(new[] { 10f, 5f, 2f }, new[]
+            {
+                destination[3],
+                destination[stride + 3],
+                destination[stride * 2 + 3]
+            });
+        }
+
+        [Fact]
         public void AbilityCompositionSchedulesResolvedSystemFromAuthoredClipFrames()
         {
             VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);

@@ -842,7 +842,8 @@ namespace BenchmarkApp
             "birthVelocity" or "velocity" or "birthAcceleration" or "acceleration" or "worldAcceleration" or "birthDrag" or
             "drag" or "birthOrbitalVelocity" or "fieldCollectionDefinition" or "emissionSurfaceDefinition" or
             "childParticleSetDefinition" or "frameRate" or "birthFrameRate" or "numFrames" or "startFrame" or
-            "isRandomStartFrame" or "particleColorTexture" or "isDirectionOriented" => true,
+            "isRandomStartFrame" or "particleColorTexture" or "isDirectionOriented" or
+            "stencilMode" or "stencilRef" or "StencilReferenceId" => true,
             _ => false
         };
 

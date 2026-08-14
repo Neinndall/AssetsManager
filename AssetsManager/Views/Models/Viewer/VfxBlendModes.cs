@@ -56,7 +56,7 @@ namespace AssetsManager.Views.Models.Viewer
                 VfxBlendEquationKind.Add,
                 VfxBlendEquationKind.Add,
                 AllowsAlphaTest: true,
-                AllowsDepthWrite: true,
+                AllowsDepthWrite: false,
                 NeutralizeTransparentRgb: true),
             Additive(4),
             Alpha(5, "Alpha Blend")
@@ -116,7 +116,7 @@ namespace AssetsManager.Views.Models.Viewer
             VfxBlendEquationKind.Add,
             VfxBlendEquationKind.Add,
             AllowsAlphaTest: true,
-            AllowsDepthWrite: true,
+            AllowsDepthWrite: false,
             NeutralizeTransparentRgb: false);
 
         private static VfxBlendModeDescriptor Additive(int rawMode) => new(

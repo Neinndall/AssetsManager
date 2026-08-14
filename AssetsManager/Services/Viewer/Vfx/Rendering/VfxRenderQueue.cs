@@ -65,5 +65,52 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             order = left.Emitter.Def.Importance.CompareTo(right.Emitter.Def.Importance);
             return order != 0 ? order : left.QueueOrder.CompareTo(right.QueueOrder);
         }
+
+        /// <summary>
+        /// Copies packed instances in camera back-to-front order without mutating simulation state.
+        /// Transparent blending requires particle order even when authored emitter order is fixed.
+        /// </summary>
+        internal static void CopyInstancesBackToFront(
+            float[] source,
+            int instanceCount,
+            int stride,
+            Matrix4x4 view,
+            float[] destination,
+            float[] depthScratch,
+            int[] orderScratch)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(destination);
+            ArgumentNullException.ThrowIfNull(depthScratch);
+            ArgumentNullException.ThrowIfNull(orderScratch);
+            if (instanceCount < 0 || stride < 3 || source.Length < instanceCount * stride)
+                throw new ArgumentOutOfRangeException(nameof(instanceCount));
+            if (destination.Length < instanceCount * stride ||
+                depthScratch.Length < instanceCount ||
+                orderScratch.Length < instanceCount)
+                throw new ArgumentException("Instance sorting buffers are too small.");
+
+            for (int index = 0; index < instanceCount; index++)
+            {
+                int offset = index * stride;
+                float viewDepth = Vector3.Transform(
+                    new Vector3(source[offset], source[offset + 1], source[offset + 2]),
+                    view).Z;
+                depthScratch[index] = float.IsFinite(viewDepth) ? viewDepth : 0f;
+                orderScratch[index] = index;
+            }
+
+            // OpenGL view space looks down -Z, so ascending Z is back-to-front.
+            Array.Sort(depthScratch, orderScratch, 0, instanceCount);
+            for (int destinationIndex = 0; destinationIndex < instanceCount; destinationIndex++)
+            {
+                Array.Copy(
+                    source,
+                    orderScratch[destinationIndex] * stride,
+                    destination,
+                    destinationIndex * stride,
+                    stride);
+            }
+        }
     }
 }

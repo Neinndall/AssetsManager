@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio now applies authored stencil masks so clipped particles and meshes render without visible mask geometry.
   - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
   - VFX Studio now reports standalone compatibility, scene requirements, approximations, and unsupported authored features for every system.
   - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
@@ -260,6 +261,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Fixed transparent VFX layers clipping and flickering against each other when moving the camera.
   - Fixed oversized uniform mesh effects and stretched celebration screens in VFX Studio.
   - Fixed short VFX timelines restarting before the red playhead reached the real end; preview looping now requires the visible gold marker.
   - Fixed the VFX Studio compatibility tab failing to open because of an unsupported icon.

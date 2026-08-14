@@ -67,10 +67,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
         [Theory]
         [InlineData(1, 0, false)]
-        [InlineData(1, 5, true)]
+        [InlineData(1, 5, false)]
         [InlineData(2, 5, false)]
-        [InlineData(3, 5, true)]
-        public void ResolvesDepthWriteAlongsideAlphaSemantics(int rawMode, int alphaReference, bool expected)
+        [InlineData(3, 5, false)]
+        public void TransparentParticlesNeverInferDepthWriteFromAlphaReference(int rawMode, int alphaReference, bool expected)
         {
             Assert.Equal(expected, VfxBlendModes.ShouldWriteDepth(rawMode, alphaReference));
         }

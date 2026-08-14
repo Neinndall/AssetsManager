@@ -5,6 +5,7 @@ using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
 using AssetsManager.Views.Models.Viewer;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 
 namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
@@ -34,6 +35,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         private VfxTextureResourceCache _textures = null!;
         private VfxSceneCapture _capture = null!;
         private VfxMeshResourceCache _meshResources = null!;
+        private float[] _sortedInstances = Array.Empty<float>();
+        private float[] _instanceDepths = Array.Empty<float>();
+        private int[] _instanceOrder = Array.Empty<int>();
+        private readonly Dictionary<uint, byte> _stencilReferences = new();
+        private readonly bool[] _reservedStencilReferences = new bool[256];
         [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.StdCall)]
         private delegate void DrawElementsDelegate(uint mode, int count, uint type, IntPtr indices);
         private DrawElementsDelegate _drawElements = null!;
@@ -186,6 +192,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             bool cullFace = _gl.IsEnabled(EnableCap.CullFace);
             bool polygonOffset = _gl.IsEnabled(EnableCap.PolygonOffsetFill);
             bool blend = _gl.IsEnabled(EnableCap.Blend);
+            bool stencilTest = _gl.IsEnabled(EnableCap.StencilTest);
             _gl.GetInteger(GLEnum.DepthWritemask, out int depthWrite);
             _gl.GetInteger(GLEnum.DepthFunc, out int depthFunction);
             _gl.GetInteger(GLEnum.BlendSrcRgb, out int blendSource);
@@ -194,6 +201,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.GetInteger(GLEnum.BlendDstAlpha, out int blendDestinationAlpha);
             _gl.GetInteger(GLEnum.BlendEquationRgb, out int blendEquation);
             _gl.GetInteger(GLEnum.BlendEquationAlpha, out int blendEquationAlpha);
+            _gl.GetInteger(GLEnum.StencilFunc, out int stencilFrontFunction);
+            _gl.GetInteger(GLEnum.StencilRef, out int stencilFrontReference);
+            _gl.GetInteger(GLEnum.StencilValueMask, out int stencilFrontValueMask);
+            _gl.GetInteger(GLEnum.StencilWritemask, out int stencilFrontWriteMask);
+            _gl.GetInteger(GLEnum.StencilFail, out int stencilFrontFail);
+            _gl.GetInteger(GLEnum.StencilPassDepthFail, out int stencilFrontDepthFail);
+            _gl.GetInteger(GLEnum.StencilPassDepthPass, out int stencilFrontDepthPass);
+            _gl.GetInteger(GLEnum.StencilBackFunc, out int stencilBackFunction);
+            _gl.GetInteger(GLEnum.StencilBackRef, out int stencilBackReference);
+            _gl.GetInteger(GLEnum.StencilBackValueMask, out int stencilBackValueMask);
+            _gl.GetInteger(GLEnum.StencilBackWritemask, out int stencilBackWriteMask);
+            _gl.GetInteger(GLEnum.StencilBackFail, out int stencilBackFail);
+            _gl.GetInteger(GLEnum.StencilBackPassDepthFail, out int stencilBackDepthFail);
+            _gl.GetInteger(GLEnum.StencilBackPassDepthPass, out int stencilBackDepthPass);
             Span<int> colorWriteMask = stackalloc int[4];
             _gl.GetInteger(GLEnum.ColorWritemask, colorWriteMask);
             _gl.GetInteger(GLEnum.CurrentProgram, out int program);
@@ -209,6 +230,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 
             try
             {
+            IReadOnlyDictionary<uint, byte> stencilReferences = BuildStencilReferenceMap(renderQueue);
             _gl.UseProgram(_program);
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             _gl.Uniform3(_uCamRight, camRight.X, camRight.Y, camRight.Z);
@@ -241,24 +263,43 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 if (!es.IsVisible) continue;
                 VfxEmitterRenderState emitterRenderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
                 ApplyColorWriteMask(emitterRenderState);
+                ApplyEmitterStencilState(emitterRenderState, stencilReferences);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
                 if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && es.MeshVao == 0)
                     continue;
+
+                int floats = es.InstanceCount * Stride;
+                ReadOnlySpan<float> instancesSpan;
+                if (!VfxBlendModes.IsAdditive(es.Def.BlendMode) && es.InstanceCount > 1)
+                {
+                    EnsureInstanceSortCapacity(es.InstanceCount, floats);
+                    VfxRenderQueue.CopyInstancesBackToFront(
+                        es.Instances,
+                        es.InstanceCount,
+                        Stride,
+                        view,
+                        _sortedInstances,
+                        _instanceDepths,
+                        _instanceOrder);
+                    instancesSpan = new ReadOnlySpan<float>(_sortedInstances, 0, floats);
+                }
+                else
+                {
+                    instancesSpan = new ReadOnlySpan<float>(es.Instances, 0, floats);
+                }
+
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
                     ApplyEmitterDepthState(es.Def, isDistortion: false);
-                    RenderMeshEmitter(es, viewProj);
+                    RenderMeshEmitter(es, viewProj, instancesSpan);
                     continue;
                 }
                 if (!es.Def.IsVisual) continue;
                 bool isDistortion = es.Def.Distortion is not null;
                 if (isDistortion && (es.DistortionTexture == 0 || _capture.ColorTexture == 0)) continue;
 
-                int floats = es.InstanceCount * Stride;
                 _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _instVbo);
-
-                var instancesSpan = new ReadOnlySpan<float>(es.Instances, 0, floats);
                 if (floats > _instCapFloats)
                 {
                     _gl.BufferData(BufferTargetARB.ArrayBuffer, instancesSpan, BufferUsageARB.DynamicDraw);
@@ -450,10 +491,33 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     colorWriteMask[1] != 0,
                     colorWriteMask[2] != 0,
                     colorWriteMask[3] != 0);
+                _gl.StencilFuncSeparate(
+                    TriangleFace.Front,
+                    (StencilFunction)stencilFrontFunction,
+                    stencilFrontReference,
+                    (uint)stencilFrontValueMask);
+                _gl.StencilMaskSeparate(TriangleFace.Front, (uint)stencilFrontWriteMask);
+                _gl.StencilOpSeparate(
+                    TriangleFace.Front,
+                    (StencilOp)stencilFrontFail,
+                    (StencilOp)stencilFrontDepthFail,
+                    (StencilOp)stencilFrontDepthPass);
+                _gl.StencilFuncSeparate(
+                    TriangleFace.Back,
+                    (StencilFunction)stencilBackFunction,
+                    stencilBackReference,
+                    (uint)stencilBackValueMask);
+                _gl.StencilMaskSeparate(TriangleFace.Back, (uint)stencilBackWriteMask);
+                _gl.StencilOpSeparate(
+                    TriangleFace.Back,
+                    (StencilOp)stencilBackFail,
+                    (StencilOp)stencilBackDepthFail,
+                    (StencilOp)stencilBackDepthPass);
                 if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
                 if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
                 if (polygonOffset) _gl.Enable(EnableCap.PolygonOffsetFill); else _gl.Disable(EnableCap.PolygonOffsetFill);
                 if (blend) _gl.Enable(EnableCap.Blend); else _gl.Disable(EnableCap.Blend);
+                if (stencilTest) _gl.Enable(EnableCap.StencilTest); else _gl.Disable(EnableCap.StencilTest);
                 for (int unit = 0; unit < textureBindings.Length; unit++)
                 {
                     _gl.ActiveTexture((TextureUnit)((int)TextureUnit.Texture0 + unit));
@@ -498,6 +562,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             }
         }
 
+        private void EnsureInstanceSortCapacity(int instanceCount, int floatCount)
+        {
+            if (_sortedInstances.Length < floatCount)
+                _sortedInstances = new float[Math.Max(floatCount, Stride * 64)];
+            if (_instanceDepths.Length < instanceCount)
+                _instanceDepths = new float[Math.Max(instanceCount, 64)];
+            if (_instanceOrder.Length < instanceCount)
+                _instanceOrder = new int[Math.Max(instanceCount, 64)];
+        }
+
         private void ApplyTextureSampling(bool pixelated)
         {
             _gl.TexParameter(
@@ -528,6 +602,62 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         {
             bool writeColor = !renderState.WriteAlphaOnly;
             _gl.ColorMask(writeColor, writeColor, writeColor, true);
+        }
+
+        private void ApplyEmitterStencilState(
+            VfxEmitterRenderState renderState,
+            IReadOnlyDictionary<uint, byte> referenceIds)
+        {
+            if (!VfxStencilSemantics.TryGetDescriptor(renderState.StencilMode, out VfxStencilDescriptor descriptor) ||
+                descriptor.Operation == VfxStencilOperationKind.Disabled)
+            {
+                _gl.Disable(EnableCap.StencilTest);
+                _gl.StencilMask(0);
+                return;
+            }
+
+            int reference = VfxStencilSemantics.ResolveReference(renderState, referenceIds);
+            _gl.Enable(EnableCap.StencilTest);
+            _gl.StencilMask(descriptor.WritesStencil ? 0xFFu : 0u);
+            _gl.StencilOp(StencilOp.Keep, StencilOp.Keep,
+                descriptor.WritesStencil ? StencilOp.Replace : StencilOp.Keep);
+            _gl.StencilFunc(descriptor.Operation switch
+            {
+                VfxStencilOperationKind.WriteReference => StencilFunction.Always,
+                VfxStencilOperationKind.TestEqual => StencilFunction.Equal,
+                VfxStencilOperationKind.TestNotEqual => StencilFunction.Notequal,
+                _ => StencilFunction.Always
+            }, reference, 0xFFu);
+
+            if (!descriptor.WritesColor)
+                _gl.ColorMask(false, false, false, false);
+        }
+
+        private IReadOnlyDictionary<uint, byte> BuildStencilReferenceMap(
+            IReadOnlyList<VfxRenderQueueEntry> renderQueue)
+        {
+            _stencilReferences.Clear();
+            Array.Clear(_reservedStencilReferences, 0, _reservedStencilReferences.Length);
+            _reservedStencilReferences[0] = true;
+            foreach (VfxRenderQueueEntry entry in renderQueue)
+            {
+                byte authoredReference = (entry.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default).StencilReference;
+                _reservedStencilReferences[authoredReference] = true;
+            }
+
+            byte candidate = 1;
+            foreach (VfxRenderQueueEntry entry in renderQueue)
+            {
+                uint id = (entry.Emitter.Def.RenderState ?? VfxEmitterRenderState.Default).StencilReferenceId;
+                if (id == 0 || _stencilReferences.ContainsKey(id)) continue;
+                while (candidate != 0 && _reservedStencilReferences[candidate]) candidate++;
+                if (candidate == 0)
+                    throw new InvalidOperationException("The VFX render queue exhausts the 8-bit stencil reference space.");
+                _stencilReferences.Add(id, candidate);
+                _reservedStencilReferences[candidate] = true;
+                candidate++;
+            }
+            return _stencilReferences;
         }
 
         private static BlendingFactor ToOpenGl(VfxBlendFactor factor) => factor switch
@@ -682,7 +812,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 _meshResources.UpdatePositions(es, positions);
         }
 
-        private void RenderMeshEmitter(VfxPlaybackRuntime.EmitterState es, Matrix4x4 viewProj)
+        private void RenderMeshEmitter(
+            VfxPlaybackRuntime.EmitterState es,
+            Matrix4x4 viewProj,
+            ReadOnlySpan<float> instances)
         {
             if (es.MeshVao == 0 || es.MeshVertexCount == 0) return;
             if (es.MeshAnimation != null)
@@ -844,32 +977,32 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             for (int i = 0; i < es.InstanceCount; i++)
             {
                 int o = i * Stride;
-                _gl.Uniform3(_muWorldPos, es.Instances[o], es.Instances[o + 1], es.Instances[o + 2]);
-                float scaleX = ClampScale(es.Instances[o + 3]);
-                float scaleY = ClampScale(es.Instances[o + 4]);
-                float scaleZ = ClampScale(es.Instances[o + 18]);
+                _gl.Uniform3(_muWorldPos, instances[o], instances[o + 1], instances[o + 2]);
+                float scaleX = ClampScale(instances[o + 3]);
+                float scaleY = ClampScale(instances[o + 4]);
+                float scaleZ = ClampScale(instances[o + 18]);
                 _gl.Uniform3(_muScale, scaleX, scaleY, scaleZ);
                 Vector3 meshRotation = new(
-                    es.Instances[o + 15],
-                    es.Instances[o + 16],
-                    es.Instances[o + 17]);
+                    instances[o + 15],
+                    instances[o + 16],
+                    instances[o + 17]);
                 _gl.Uniform3(
                     _muRotation,
                     meshRotation.X,
                     meshRotation.Y,
                     meshRotation.Z);
-                _gl.Uniform4(_muColor, es.Instances[o + 5], es.Instances[o + 6], es.Instances[o + 7], es.Instances[o + 8]);
-                _gl.Uniform2(_muBirthUvOffset, es.Instances[o + 19], es.Instances[o + 20]);
-                _gl.Uniform2(_muUvScale, es.Instances[o + 21], es.Instances[o + 22]);
-                _gl.Uniform1(_muUvRotation, es.Instances[o + 23]);
-                _gl.Uniform1(_muErosionDrive, es.Instances[o + 24]);
-                _gl.Uniform4(_muErosionMixer, es.Instances[o + 25], es.Instances[o + 26], es.Instances[o + 27], es.Instances[o + 28]);
-                _gl.Uniform2(_muUvOffsetMult, es.Instances[o + 29], es.Instances[o + 30]);
-                _gl.Uniform2(_muUvScaleMult, es.Instances[o + 31], es.Instances[o + 32]);
-                _gl.Uniform1(_muUvRotationMult, es.Instances[o + 33]);
-                _gl.Uniform1(_muFrame, es.Instances[o + 10]);
-                _gl.Uniform1(_muTextureMultFrame, es.Instances[o + 34]);
-                _gl.Uniform1(_muPaletteSelector, es.Instances[o + 35]);
+                _gl.Uniform4(_muColor, instances[o + 5], instances[o + 6], instances[o + 7], instances[o + 8]);
+                _gl.Uniform2(_muBirthUvOffset, instances[o + 19], instances[o + 20]);
+                _gl.Uniform2(_muUvScale, instances[o + 21], instances[o + 22]);
+                _gl.Uniform1(_muUvRotation, instances[o + 23]);
+                _gl.Uniform1(_muErosionDrive, instances[o + 24]);
+                _gl.Uniform4(_muErosionMixer, instances[o + 25], instances[o + 26], instances[o + 27], instances[o + 28]);
+                _gl.Uniform2(_muUvOffsetMult, instances[o + 29], instances[o + 30]);
+                _gl.Uniform2(_muUvScaleMult, instances[o + 31], instances[o + 32]);
+                _gl.Uniform1(_muUvRotationMult, instances[o + 33]);
+                _gl.Uniform1(_muFrame, instances[o + 10]);
+                _gl.Uniform1(_muTextureMultFrame, instances[o + 34]);
+                _gl.Uniform1(_muPaletteSelector, instances[o + 35]);
 
                 if (es.MeshIndexCount > 0)
                 {
