@@ -547,7 +547,6 @@ namespace AssetsManager.Views.Dialogs
             _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
                 ? playbackDuration
                 : timelineMax;
-            _model.IsPreviewLoopEnabled = false;
             _model.TotalDuration = timelineMax;
             _vfxRenderer?.Play();
             _model.IsPlaying = true;
@@ -678,7 +677,6 @@ namespace AssetsManager.Views.Dialogs
             double duration = _vfxRenderer.ActiveSystem.TotalDuration;
             _model.TotalDuration = ResolveTimelineDuration(duration);
             _model.ActiveLoopDuration = duration;
-            _model.IsPreviewLoopEnabled = false;
             _model.CurrentTime = 0;
             _vfxRenderer.Play();
             _model.IsPlaying = true;

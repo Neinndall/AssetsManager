@@ -458,9 +458,12 @@
 
                                             <!-- Speed Selector -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <CheckBox IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}" Content="Preview loop"
-                                                          Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"
-                                                          ToolTip="Optional viewport repeat range. Does not modify authored emitter loops or lifetimes."/>
+                                                <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
+                                                              Style="{StaticResource TransparentIconToggleButton}"
+                                                              Width="28" Height="26" Margin="0,0,10,0"
+                                                              ToolTip="Enable or disable the optional viewport repeat range. Authored emitter loops and lifetimes are unchanged.">
+                                                    <materialIcons:MaterialIcon Kind="Autorenew" Width="15" Height="15"/>
+                                                </ToggleButton>
                                                 <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                                 <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
                                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
