@@ -72,7 +72,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex DottedBinPathRegex = new(
             @"^(?<prefix>.+)\.[0-9a-f]{8}\.bin$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private const int AnimationNumberLimit = 10_000;
+        private const int AnimationNumberLimit = 360;
         private const int CustomBinSampleSize = 30_000;
         private const int CustomCharacterDdsSampleSize = 25_000;
         private const int CustomCharacterTexSampleSize = 20_000;

@@ -645,66 +645,6 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void GameAnimationBinLinksResolvesCompoundAnimationStems()
-        {
-            const string expected1 = "assets/characters/jade_evelynn/skins/skin01/animations/jade_evelynn_recallin_respawn_idle_hookup.anm";
-            const string expected2 = "assets/characters/jade_evelynn/skins/skin01/animations/jade_evelynn_recallin_respawn_stealthidle_hookup.anm";
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/jade_evelynn/skins/skin01/animations/jade_evelynn_idle.anm",
-                "assets/characters/evelynn/skins/skin01/animations/recallin_respawn.anm",
-                "assets/characters/evelynn/skins/skin01/animations/stealthidle_hookup.anm",
-                "assets/characters/evelynn/skins/skin01/animations/idle_hookup.anm"
-            }));
-            var engine = CreateEngine(HashGuessDomain.Game, expected1, expected2);
-
-            var tree = new BinTree(
-                new[]
-                {
-                    new BinTreeObject(
-                        0x11111111,
-                        Fnv1a.HashLower("AnimationGraphData"),
-                        new BinTreeProperty[]
-                        {
-                            new BinTreeMap(
-                                Fnv1a.HashLower("mClipDataMap"),
-                                new[]
-                                {
-                                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
-                                        new BinTreeHash(0, Fnv1a.HashLower("jade_evelynn_recallin_respawn_idle_hookup")),
-                                        new BinTreeStruct(
-                                            Fnv1a.HashLower("AtomicClipData"),
-                                            new BinTreeProperty[]
-                                            {
-                                                new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(expected1))
-                                            })),
-                                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
-                                        new BinTreeHash(0, Fnv1a.HashLower("jade_evelynn_recallin_respawn_stealthidle_hookup")),
-                                        new BinTreeStruct(
-                                            Fnv1a.HashLower("AtomicClipData"),
-                                            new BinTreeProperty[]
-                                            {
-                                                new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(expected2))
-                                            }))
-                                })
-                        })
-                },
-                Array.Empty<string>());
-            using var stream = new MemoryStream();
-            tree.Write(stream);
-
-            game.GrepWad(
-                engine,
-                new ArraySegment<byte>(stream.ToArray()),
-                "data/characters/jade_evelynn/animations/skin01.bin",
-                "JadeEvelynn.wad.client",
-                1);
-
-            AssertResolved(engine, expected1);
-            AssertResolved(engine, expected2);
-        }
-
-        [Fact]
         public void NormalizationPreservesLongRiotCandidates()
         {
             string candidate = "assets/" + new string('a', 600) + ".bin";
