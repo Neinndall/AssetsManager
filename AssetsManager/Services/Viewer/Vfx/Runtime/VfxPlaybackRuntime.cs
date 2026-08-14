@@ -375,6 +375,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                     var angularStep = p.BirthOrbitalVelocity * dt;
                     var orbit = Quaternion.CreateFromYawPitchRoll(angularStep.Y, angularStep.X, angularStep.Z);
                     p.Pos = s.BasePos + Vector3.TransformNormal(Vector3.Transform(localRelative, orbit), _worldTransform);
+                    p.Rot += angularStep.Y;
                 }
                 if (d.IsRotationEnabled)
                 {
@@ -513,6 +514,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
                         sizeY = sizeX;
                 }
                 Vector3 direction = p.Vel;
+                if (p.BirthOrbitalVelocity.LengthSquared() > 1e-8f)
+                    direction += Vector3.Cross(p.BirthOrbitalVelocity, p.Pos - s.BasePos);
                 if (d.PrimitiveKind == VfxPrimitiveKind.Ray && d.RayTargetOffset is { } targetOffset)
                     direction = Vector3.TransformNormal(targetOffset, _worldTransform);
                 if (isTrail)
