@@ -793,10 +793,12 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
                 if (remaining <= 0 || engine.RemainingUnknownCount == 0) break;
+                IEnumerable<int> shaderIndices = Enumerable.Range(0, 32)
+                    .Concat(Enumerable.Range(1, 200).Select(index => index * 100));
                 IEnumerable<HashGuessCandidate> numberedVariants =
-                    ShaderVariants.SelectMany(variant => Enumerable.Range(0, 20000 / 100).Select(index =>
+                    ShaderVariants.SelectMany(variant => shaderIndices.Select(index =>
                         new HashGuessCandidate(
-                            $"{path}{variant}_{index * 100}",
+                            $"{path}{variant}_{index}",
                             HashGuessStrategy.ShaderVariant)));
                 if (remaining != int.MaxValue) numberedVariants = numberedVariants.Take(remaining);
                 checkedCount += CheckIter(engine, numberedVariants, "GAME shader variants", cancellationToken);
@@ -873,6 +875,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     : $"assets/shaders/hlsl/{path}");
             }
         }
+
+
 
         private static bool IsShaderPathByte(byte value) =>
             value is >= (byte)'0' and <= (byte)'9' or
@@ -1278,7 +1282,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            if (extension is "bin" or "inibin")
+            bool isBin = extension is "bin" or "inibin" ||
+                (data.Count >= 4 && ByteAt(data, 0) == 'P' && ByteAt(data, 1) == 'R' && ByteAt(data, 2) == 'O' && ByteAt(data, 3) == 'P');
+            if (isBin)
             {
                 foreach (int offset in FindBinPathOffsets(data))
                 {
@@ -1302,19 +1308,33 @@ namespace AssetsManager.Services.Hashes.Guessers
                         CheckGame(prefix + ".luabin64", HashGuessStrategy.LuaVariant);
                         CheckGame(prefix + ".preload", HashGuessStrategy.LuaVariant);
                     }
-                    else if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase))
+                    else if (path.StartsWith("shaders/", StringComparison.OrdinalIgnoreCase) ||
+                             path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) ||
+                             path.StartsWith("hlsl/", StringComparison.OrdinalIgnoreCase))
                     {
-                        CheckGameIter(
-                            ShaderExtensions.Select(extensionName =>
-                                $"assets/shaders/generated/{path}{extensionName}"));
-                        CheckGameIter(
-                            ShaderExtensions.SelectMany(extensionName =>
-                                ShaderVariants.Select(variant =>
-                                    $"assets/shaders/generated/{path}{extensionName}{variant}")));
-                        CheckGameIter(
-                            ShaderExtensions.SelectMany(extensionName =>
-                                ShaderVariants.Select(variant =>
-                                    $"assets/shaders/generated/{path}{extensionName}{variant}_0")));
+                        string cleanPath = path;
+                        if (cleanPath.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+                            cleanPath = cleanPath[7..];
+                        var prefixes = new[] { "assets/", "assets/shaders/", "assets/shaders/hlsl/", "assets/shaders/generated/" };
+                        foreach (string prefix in prefixes)
+                        {
+                            string candidateBase = cleanPath.StartsWith(prefix.TrimStart("assets/"), StringComparison.OrdinalIgnoreCase)
+                                ? $"assets/{cleanPath}"
+                                : $"{prefix.TrimEnd('/')}/{cleanPath.TrimStart('/')}";
+
+                            CheckGameIter(
+                                ShaderExtensions.Select(extensionName =>
+                                    $"{candidateBase}{extensionName}"));
+                            CheckGameIter(
+                                ShaderExtensions.SelectMany(extensionName =>
+                                    ShaderVariants.Select(variant =>
+                                        $"{candidateBase}{extensionName}{variant}")));
+                            CheckGameIter(
+                                ShaderExtensions.SelectMany(extensionName =>
+                                    ShaderVariants.SelectMany(variant =>
+                                        Enumerable.Range(0, 16).Select(index =>
+                                            $"{candidateBase}{extensionName}{variant}_{index}"))));
+                        }
                     }
                     else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
                     {
