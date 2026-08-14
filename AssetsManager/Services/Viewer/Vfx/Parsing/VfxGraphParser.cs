@@ -403,7 +403,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                     ClampUvScroll: GetBool(p, F_uvScrollClamp),
                     FlipU: GetBool(p, F_textureFlipU),
                     FlipV: GetBool(p, F_textureFlipV),
-                    DisableBackfaceCull: GetBool(p, F_disableCull)),
+                    DisableBackfaceCull: GetBool(p, F_disableCull),
+                    RenderPhase: (byte)(GetU8(p, F_renderPhaseOverride) ?? VfxAuthoredDefaults.RenderPhaseOverride),
+                    StencilMode: (byte)(GetU8(p, F_stencilMode) ?? VfxAuthoredDefaults.StencilMode),
+                    StencilReference: (byte)(GetU8(p, F_stencilRef) ?? VfxAuthoredDefaults.StencilReference),
+                    StencilReferenceId: AsU32(Get(p, F_stencilReferenceId)) ?? 0u,
+                    WriteAlphaOnly: GetBool(p, F_writeAlphaOnly),
+                    SortEmittersByPosition: GetBool(p, F_sortEmittersByPos)),
                 MiscRenderFlags: (byte)(GetU8(p, F_miscRenderFlags) ?? 0),
                 MeshRenderFlags: (byte)(GetU8(p, F_meshRenderFlags) ?? VfxAuthoredDefaults.MeshRenderFlags),
                 UseNavmeshMask: GetBool(p, F_useNavmeshMask),
@@ -473,7 +479,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 AuthoredFeatures: new VfxEmitterAuthoredFeatures(
                     PrimitiveClassHash: primitiveClass,
                     HasCustomMaterial: HasValue(p, F_customMaterial),
-                    HasStencil: (GetU8(p, F_stencilMode) ?? 0) != 0 || (GetU8(p, F_stencilRef) ?? 0) != 0,
+                    HasStencil: (GetU8(p, F_stencilMode) ?? 0) != 0 ||
+                        (GetU8(p, F_stencilRef) ?? 0) != 0 ||
+                        (AsU32(Get(p, F_stencilReferenceId)) ?? 0u) != 0,
                     HasEmissionMesh: HasValue(p, F_emissionMeshName),
                     HasEmissionSurface: HasValue(p, F_emissionSurfaceDefinition),
                     UsesEmissionMeshNormal: GetBool(p, F_useEmissionMeshNormal),

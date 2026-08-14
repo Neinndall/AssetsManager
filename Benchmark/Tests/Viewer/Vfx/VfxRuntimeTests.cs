@@ -988,6 +988,47 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void GlobalRenderQueueUsesAuthoredPhaseBeforePass()
+        {
+            VfxEmitterDefinition latePhase = CreateEmitter(Vector3.One,
+                new VfxEmitterRenderState(0, 0, 0, false, false, false, false, RenderPhase: 8)) with { Name = "late-phase" };
+            VfxEmitterDefinition earlyPhase = CreateEmitter(Vector3.One,
+                new VfxEmitterRenderState(99, 0, 0, false, false, false, false, RenderPhase: 6)) with { Name = "early-phase" };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "phases", "phases", new[] { latePhase, earlyPhase }), Vector3.Zero);
+
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+
+            Assert.Equal("early-phase", queue[0].Emitter.Def.Name);
+            Assert.Equal("late-phase", queue[1].Emitter.Def.Name);
+        }
+
+        [Fact]
+        public void GlobalRenderQueueSortsOptedInEmittersBackToFront()
+        {
+            var sortedState = new VfxEmitterRenderState(
+                0, 0, 0, false, false, false, false,
+                SortEmittersByPosition: true);
+            VfxEmitterDefinition near = CreateEmitter(Vector3.One, sortedState) with
+            {
+                Name = "near",
+                EmitterPosition = VfxCurve3.Const(new Vector3(0f, 0f, -2f))
+            };
+            VfxEmitterDefinition far = CreateEmitter(Vector3.One, sortedState) with
+            {
+                Name = "far",
+                EmitterPosition = VfxCurve3.Const(new Vector3(0f, 0f, -10f))
+            };
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "depth", "depth", new[] { near, far }), Vector3.Zero);
+
+            IReadOnlyList<VfxRenderQueueEntry> queue = VfxRenderQueue.Build(new[] { runtime.Emitters }, Matrix4x4.Identity);
+
+            Assert.Equal("far", queue[0].Emitter.Def.Name);
+            Assert.Equal("near", queue[1].Emitter.Def.Name);
+        }
+
+        [Fact]
         public void InspectorTimelineIgnoresAuthoredDisabledEmitters()
         {
             VfxEmitterDefinition playable = CreateEmitter(

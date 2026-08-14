@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using AssetsManager.Utils.Rendering;
@@ -173,9 +174,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
         public void CaptureScene(uint width, uint height, bool captureColor, bool captureDepth)
             => _capture.Capture(width, height, captureColor, captureDepth);
 
-        public void Render(VfxPlaybackRuntime sim, Matrix4x4 viewProj, Matrix4x4 view)
+        public void Render(IReadOnlyList<VfxRenderQueueEntry> renderQueue, Matrix4x4 viewProj, Matrix4x4 view)
         {
-            if (!_ready || sim.LiveParticleCount == 0) return;
+            if (!_ready || renderQueue is null || renderQueue.Count == 0) return;
 
             Matrix4x4.Invert(view, out var inv);
             var camRight = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, inv));
@@ -193,6 +194,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.GetInteger(GLEnum.BlendDstAlpha, out int blendDestinationAlpha);
             _gl.GetInteger(GLEnum.BlendEquationRgb, out int blendEquation);
             _gl.GetInteger(GLEnum.BlendEquationAlpha, out int blendEquationAlpha);
+            Span<int> colorWriteMask = stackalloc int[4];
+            _gl.GetInteger(GLEnum.ColorWritemask, colorWriteMask);
             _gl.GetInteger(GLEnum.CurrentProgram, out int program);
             _gl.GetInteger(GLEnum.VertexArrayBinding, out int vertexArray);
             _gl.GetInteger(GLEnum.ArrayBufferBinding, out int arrayBuffer);
@@ -231,9 +234,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _gl.Enable(EnableCap.Blend);
             _gl.BlendEquation(GLEnum.FuncAdd);
 
-            foreach (var es in sim.Emitters)
+            foreach (VfxRenderQueueEntry entry in renderQueue)
             {
+                VfxPlaybackRuntime.EmitterState es = entry.Emitter;
+                if (es.InstanceCount == 0) continue;
                 if (!es.IsVisible) continue;
+                VfxEmitterRenderState emitterRenderState = es.Def.RenderState ?? VfxEmitterRenderState.Default;
+                ApplyColorWriteMask(emitterRenderState);
                 // Never synthesize an AttachedMesh proxy. Render only geometry that was
                 // resolved from the real owner scene and filtered by authored submesh masks.
                 if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && es.MeshVao == 0)
@@ -438,6 +445,11 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                     (BlendingFactor)blendDestination,
                     (BlendingFactor)blendSourceAlpha,
                     (BlendingFactor)blendDestinationAlpha);
+                _gl.ColorMask(
+                    colorWriteMask[0] != 0,
+                    colorWriteMask[1] != 0,
+                    colorWriteMask[2] != 0,
+                    colorWriteMask[3] != 0);
                 if (depthTest) _gl.Enable(EnableCap.DepthTest); else _gl.Disable(EnableCap.DepthTest);
                 if (cullFace) _gl.Enable(EnableCap.CullFace); else _gl.Disable(EnableCap.CullFace);
                 if (polygonOffset) _gl.Enable(EnableCap.PolygonOffsetFill); else _gl.Disable(EnableCap.PolygonOffsetFill);
@@ -510,6 +522,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
                 ToOpenGl(descriptor.DestinationRgb),
                 ToOpenGl(descriptor.SourceAlpha),
                 ToOpenGl(descriptor.DestinationAlpha));
+        }
+
+        private void ApplyColorWriteMask(VfxEmitterRenderState renderState)
+        {
+            bool writeColor = !renderState.WriteAlphaOnly;
+            _gl.ColorMask(writeColor, writeColor, writeColor, true);
         }
 
         private static BlendingFactor ToOpenGl(VfxBlendFactor factor) => factor switch

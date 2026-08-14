@@ -188,7 +188,13 @@ namespace AssetsManager.Views.Models.Viewer
         bool ClampUvScroll,
         bool FlipU,
         bool FlipV,
-        bool DisableBackfaceCull)
+        bool DisableBackfaceCull,
+        byte RenderPhase = VfxAuthoredDefaults.RenderPhaseOverride,
+        byte StencilMode = VfxAuthoredDefaults.StencilMode,
+        byte StencilReference = VfxAuthoredDefaults.StencilReference,
+        uint StencilReferenceId = 0,
+        bool WriteAlphaOnly = false,
+        bool SortEmittersByPosition = false)
     {
         public static readonly VfxEmitterRenderState Default = new(
             0,
@@ -197,8 +203,15 @@ namespace AssetsManager.Views.Models.Viewer
             false,
             false,
             false,
+            false,
+            VfxAuthoredDefaults.RenderPhaseOverride,
+            VfxAuthoredDefaults.StencilMode,
+            VfxAuthoredDefaults.StencilReference,
+            0,
+            false,
             false);
         public float AlphaCutoff => AlphaReference / 255f;
+        public bool HasStencil => StencilMode != 0 || StencilReference != 0 || StencilReferenceId != 0;
     }
 
     /// <summary>Riot's screen-space particle distortion stage (heat haze/refraction).</summary>

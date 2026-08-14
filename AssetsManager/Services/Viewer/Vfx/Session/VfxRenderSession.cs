@@ -296,10 +296,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                 _viewportHeight,
                 emitters.Any(emitter => emitter.Def.Distortion != null),
                 emitters.Any(emitter => VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true)));
-            foreach (VfxPlaybackRuntime runtime in _graphs.SelectMany(graph => graph.Runtimes))
-            {
-                _renderer.Render(runtime, viewProjection, view);
-            }
+            IReadOnlyList<VfxRenderQueueEntry> renderQueue = VfxRenderQueue.Build(
+                _graphs.SelectMany(graph => graph.Runtimes).Select(runtime => runtime.Emitters),
+                view);
+            _renderer.Render(renderQueue, viewProjection, view);
         }
 
         private void UploadPendingResources()

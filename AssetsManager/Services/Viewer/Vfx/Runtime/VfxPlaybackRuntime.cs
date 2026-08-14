@@ -181,8 +181,13 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         {
             _emitters.Sort((left, right) =>
             {
-                int leftPass = (left.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
-                int rightPass = (right.Def.RenderState ?? VfxEmitterRenderState.Default).RenderPass;
+                VfxEmitterRenderState leftState = left.Def.RenderState ?? VfxEmitterRenderState.Default;
+                VfxEmitterRenderState rightState = right.Def.RenderState ?? VfxEmitterRenderState.Default;
+                int phaseOrder = leftState.RenderPhase.CompareTo(rightState.RenderPhase);
+                if (phaseOrder != 0) return phaseOrder;
+
+                int leftPass = leftState.RenderPass;
+                int rightPass = rightState.RenderPass;
                 int passOrder = leftPass.CompareTo(rightPass);
                 if (passOrder != 0) return passOrder;
 

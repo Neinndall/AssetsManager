@@ -229,6 +229,10 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeY, parsed.ColorLookUpTypeY);
             Assert.Equal(VfxAuthoredDefaults.MeshRenderFlags, parsed.MeshRenderFlags);
             Assert.Equal(VfxAuthoredDefaults.Importance, parsed.Importance);
+            Assert.Equal(VfxAuthoredDefaults.RenderPhaseOverride, parsed.RenderState.RenderPhase);
+            Assert.False(parsed.RenderState.HasStencil);
+            Assert.False(parsed.RenderState.WriteAlphaOnly);
+            Assert.False(parsed.RenderState.SortEmittersByPosition);
         }
 
         [Fact]
@@ -244,6 +248,11 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                     new BinTreeStruct(Fnv1a.HashLower("primitive"), primitiveHash, System.Array.Empty<BinTreeProperty>()),
                     new BinTreeStruct(Fnv1a.HashLower("CustomMaterial"), Fnv1a.HashLower("VfxCustomMaterial"), System.Array.Empty<BinTreeProperty>()),
                     new BinTreeU8(Fnv1a.HashLower("stencilMode"), 1),
+                    new BinTreeU8(Fnv1a.HashLower("stencilRef"), 4),
+                    new BinTreeHash(Fnv1a.HashLower("StencilReferenceId"), 0x12345678),
+                    new BinTreeU8(Fnv1a.HashLower("renderPhaseOverride"), 3),
+                    new BinTreeBitBool(Fnv1a.HashLower("WriteAlphaOnly"), true),
+                    new BinTreeBitBool(Fnv1a.HashLower("SortEmittersByPos"), true),
                     new BinTreeString(Fnv1a.HashLower("emissionMeshName"), "Body"),
                     new BinTreeStruct(Fnv1a.HashLower("rotationOverride"), Fnv1a.HashLower("ValueVector3"), System.Array.Empty<BinTreeProperty>()),
                     new BinTreeF32(Fnv1a.HashLower("period"), 2f)
@@ -278,6 +287,12 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(primitiveHash, parsedEmitter.AuthoredFeatures.PrimitiveClassHash);
             Assert.True(parsedEmitter.AuthoredFeatures.HasCustomMaterial);
             Assert.True(parsedEmitter.AuthoredFeatures.HasStencil);
+            Assert.Equal((byte)3, parsedEmitter.RenderState.RenderPhase);
+            Assert.Equal((byte)1, parsedEmitter.RenderState.StencilMode);
+            Assert.Equal((byte)4, parsedEmitter.RenderState.StencilReference);
+            Assert.Equal(0x12345678u, parsedEmitter.RenderState.StencilReferenceId);
+            Assert.True(parsedEmitter.RenderState.WriteAlphaOnly);
+            Assert.True(parsedEmitter.RenderState.SortEmittersByPosition);
             Assert.True(parsedEmitter.AuthoredFeatures.HasEmissionMesh);
             Assert.True(parsedEmitter.AuthoredFeatures.HasRotationOverride);
             Assert.True(parsedEmitter.AuthoredFeatures.HasPeriodControl);

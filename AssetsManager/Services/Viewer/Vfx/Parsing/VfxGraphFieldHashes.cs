@@ -105,6 +105,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
         private static readonly uint F_customMaterial = HashAlgorithms.Fnv1a("CustomMaterial");
         private static readonly uint F_stencilMode = HashAlgorithms.Fnv1a("stencilMode");
         private static readonly uint F_stencilRef = HashAlgorithms.Fnv1a("stencilRef");
+        private static readonly uint F_stencilReferenceId = HashAlgorithms.Fnv1a("StencilReferenceId");
+        private static readonly uint F_writeAlphaOnly = HashAlgorithms.Fnv1a("WriteAlphaOnly");
+        private static readonly uint F_renderPhaseOverride = HashAlgorithms.Fnv1a("renderPhaseOverride");
+        private static readonly uint F_sortEmittersByPos = HashAlgorithms.Fnv1a("SortEmittersByPos");
         private static readonly uint F_emissionMeshName = HashAlgorithms.Fnv1a("emissionMeshName");
         private static readonly uint F_emissionSurfaceDefinition = HashAlgorithms.Fnv1a("emissionSurfaceDefinition");
         private static readonly uint F_useEmissionMeshNormal = HashAlgorithms.Fnv1a("useEmissionMeshNormalForBirth");

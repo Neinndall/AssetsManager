@@ -12,5 +12,8 @@ namespace AssetsManager.Views.Models.Viewer
         public const byte ColorLookUpTypeY = 0;
         public const byte MeshRenderFlags = 1;
         public const byte Importance = 1;
+        public const byte RenderPhaseOverride = 7;
+        public const byte StencilMode = 0;
+        public const byte StencilReference = 0;
     }
 }
