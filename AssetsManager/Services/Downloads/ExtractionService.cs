@@ -32,11 +32,11 @@ namespace AssetsManager.Services.Downloads
 
         public event Action<int> ExtractionStarted;
         public event Action<int, int, string> ExtractionProgressChanged;
-        public event Action ExtractionCompleted;
+        public event Func<Task> ExtractionCompleted;
 
         public event Action<int> SavingStarted;
         public event Action<int, int, string> SavingProgressChanged;
-        public event Action SavingCompleted;
+        public event Func<Task> SavingCompleted;
 
         public ExtractionService(
             AppSettings appSettings,
@@ -68,7 +68,7 @@ namespace AssetsManager.Services.Downloads
             if (newDiffs.Count == 0)
             {
                 _logService.Log("No new assets to extract from the comparison.");
-                ExtractionCompleted?.Invoke();
+                await NotifyExtractionCompletedAsync();
                 return new List<ExtractResultItem>();
             }
 
@@ -92,7 +92,7 @@ namespace AssetsManager.Services.Downloads
         {
             if (diffs == null || diffs.Count == 0)
             {
-                ExtractionCompleted?.Invoke();
+                await NotifyExtractionCompletedAsync();
                 return new List<ExtractResultItem>();
             }
 
@@ -113,7 +113,7 @@ namespace AssetsManager.Services.Downloads
         {
             if (diffs == null || diffs.Count == 0)
             {
-                ExtractionCompleted?.Invoke();
+                await NotifyExtractionCompletedAsync();
                 return new List<ExtractResultItem>();
             }
 
@@ -243,7 +243,7 @@ namespace AssetsManager.Services.Downloads
                 _logService.LogInteractiveSuccess($"Extraction completed of {results.Count} assets in", destinationRootPath, relativePath);
             }
 
-            ExtractionCompleted?.Invoke();
+            await NotifyExtractionCompletedAsync();
             return results;
         }
 
@@ -257,7 +257,7 @@ namespace AssetsManager.Services.Downloads
         {
             if (nodes == null || nodes.Count == 0)
             {
-                ExtractionCompleted?.Invoke();
+                await NotifyExtractionCompletedAsync();
                 return;
             }
 
@@ -291,7 +291,7 @@ namespace AssetsManager.Services.Downloads
             }
             finally
             {
-                ExtractionCompleted?.Invoke();
+                await NotifyExtractionCompletedAsync();
             }
         }
 
@@ -305,7 +305,7 @@ namespace AssetsManager.Services.Downloads
         {
             if (nodes == null || nodes.Count == 0)
             {
-                SavingCompleted?.Invoke();
+                await NotifySavingCompletedAsync();
                 return;
             }
 
@@ -342,8 +342,20 @@ namespace AssetsManager.Services.Downloads
             }
             finally
             {
-                SavingCompleted?.Invoke();
+                await NotifySavingCompletedAsync();
             }
+        }
+
+        private async Task NotifyExtractionCompletedAsync()
+        {
+            if (ExtractionCompleted is not null)
+                await ExtractionCompleted();
+        }
+
+        private async Task NotifySavingCompletedAsync()
+        {
+            if (SavingCompleted is not null)
+                await SavingCompleted();
         }
 
         #endregion

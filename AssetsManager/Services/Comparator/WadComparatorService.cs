@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Comparator
 
         public event Action<int> ComparisonStarted;
         public event Action<int, string, bool, string> ComparisonProgressChanged;
-        public event Action<List<ChunkDiff>, string, string, string> ComparisonCompleted;
+        public event Func<List<ChunkDiff>, string, string, string, Task> ComparisonCompleted;
 
         private int _totalChunksGlobal;
         private int _completedChunksGlobal;
@@ -42,9 +42,10 @@ namespace AssetsManager.Services.Comparator
             ComparisonProgressChanged?.Invoke(completedFiles, currentWadFile, isSuccess, errorMessage);
         }
 
-        public void NotifyComparisonCompleted(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version)
+        public async Task NotifyComparisonCompletedAsync(List<ChunkDiff> allDiffs, string oldPbePath, string newPbePath, string version)
         {
-            ComparisonCompleted?.Invoke(allDiffs, oldPbePath, newPbePath, version);
+            if (ComparisonCompleted is not null)
+                await ComparisonCompleted(allDiffs, oldPbePath, newPbePath, version);
         }
 
         public async Task CompareSingleWadAsync(string oldWadFile, string newWadFile, string version, CancellationToken cancellationToken)
@@ -101,7 +102,7 @@ namespace AssetsManager.Services.Comparator
             }
             finally
             {
-                NotifyComparisonCompleted(allDiffs, oldWadFile, newWadFile, version);
+                await NotifyComparisonCompletedAsync(allDiffs, oldWadFile, newWadFile, version);
                 if (allDiffs != null)
                 {
                     if (allDiffs.Count == 0)
@@ -267,7 +268,7 @@ namespace AssetsManager.Services.Comparator
             }
             finally
             {
-                NotifyComparisonCompleted(allDiffs, oldDir, newDir, version);
+                await NotifyComparisonCompletedAsync(allDiffs, oldDir, newDir, version);
                 if (allDiffs != null)
                 {
                     if (allDiffs.Count == 0)

@@ -127,11 +127,11 @@ namespace AssetsManager.Views
             // --- Progress events wired directly to ProgressUIManager ---
             _wadComparatorService.ComparisonStarted += _progressUIManager.OnComparisonStarted;
             _wadComparatorService.ComparisonProgressChanged += _progressUIManager.OnComparisonProgressChanged;
-            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompleted;
+            _wadComparatorService.ComparisonCompleted += OnWadComparisonCompletedAsync;
 
             _extractionService.ExtractionStarted += _progressUIManager.OnExtractionStarted;
             _extractionService.ExtractionProgressChanged += _progressUIManager.OnExtractionProgressChanged;
-            _extractionService.ExtractionCompleted += OnExtractionCompleted;
+            _extractionService.ExtractionCompleted += _progressUIManager.OnExtractionCompletedAsync;
 
             _backupManager.BackupStarted += _progressUIManager.OnBackupStarted;
             _backupManager.BackupProgressChanged += _progressUIManager.OnBackupProgressChanged;
@@ -139,11 +139,11 @@ namespace AssetsManager.Views
 
             _extractionService.SavingStarted += _progressUIManager.OnSavingStarted;
             _extractionService.SavingProgressChanged += _progressUIManager.OnSavingProgressChanged;
-            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompleted;
+            _extractionService.SavingCompleted += _progressUIManager.OnSavingCompletedAsync;
 
             _versionService.VersionDownloadStarted += _progressUIManager.OnVersionDownloadStarted;
             _versionService.VersionDownloadProgressChanged += _progressUIManager.OnVersionDownloadProgressChanged;
-            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompleted;
+            _versionService.VersionDownloadCompleted += _progressUIManager.OnVersionDownloadCompletedAsync;
 
             _updateCheckService.UpdatesFound += OnUpdatesFound;
 
@@ -264,14 +264,6 @@ namespace AssetsManager.Views
             }
         }
         
-        private void OnExtractionCompleted()
-        {
-            Dispatcher.Invoke(() =>
-            {
-                _progressUIManager.OnExtractionCompleted();
-            });
-        }
-
         private async void StartExtractionAsync()
         {
             var cancellationToken = _taskCancellationManager.PrepareNewOperation();
@@ -279,7 +271,7 @@ namespace AssetsManager.Views
             ShowComparisonResultWindow(_diffsForExtraction, _extractionOldLolPath, _extractionNewLolPath, _extractionVersion, results);
         }
         
-        private async void OnWadComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
+        private async Task OnWadComparisonCompletedAsync(List<ChunkDiff> diffs, string oldPath, string newPath, string version)
         {
             // Ensure the progress window reaches 100% and closes before any follow-up UI is shown.
             await _progressUIManager.FinishComparisonAsync();

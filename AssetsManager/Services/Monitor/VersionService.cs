@@ -20,7 +20,7 @@ namespace AssetsManager.Services.Monitor
     {
         public event Action<string> VersionDownloadStarted;
         public event Action<string, int, int, string> VersionDownloadProgressChanged;
-        public event Action<string, bool, string> VersionDownloadCompleted;
+        public event Func<string, bool, string, Task> VersionDownloadCompleted;
 
         private readonly LogService _logService;
         private readonly HttpClient _httpClient;
@@ -84,7 +84,7 @@ namespace AssetsManager.Services.Monitor
 
             _logService.LogSuccess("Version fetch process completed successfully.");
 
-            VersionDownloadCompleted?.Invoke("Fetching Versions", true, "Success");
+            await NotifyVersionDownloadCompletedAsync("Fetching Versions", true, "Success");
         }
 
         private async Task<List<(string region, string os, string version, string url)>> DownloadAndExtractVersionAsync(
@@ -187,18 +187,24 @@ namespace AssetsManager.Services.Monitor
                 {
                     _logService.Log("No updates required for this manifest.");
                 }
-                VersionDownloadCompleted?.Invoke(taskName, true, "Finished");
+                await NotifyVersionDownloadCompletedAsync(taskName, true, "Finished");
             }
             catch (OperationCanceledException)
             {
                 // Note: Granular logging is handled inside ManifestDownloader for both Verification and Updating phases.
-                VersionDownloadCompleted?.Invoke(taskName, false, "Cancelled");
+                await NotifyVersionDownloadCompletedAsync(taskName, false, "Cancelled");
             }
             catch (Exception ex)
             {
                 _logService.LogError(ex, $"Error during native {taskName} update");
-                VersionDownloadCompleted?.Invoke(taskName, false, ex.Message);
+                await NotifyVersionDownloadCompletedAsync(taskName, false, ex.Message);
             }
+        }
+
+        private async Task NotifyVersionDownloadCompletedAsync(string taskName, bool success, string message)
+        {
+            if (VersionDownloadCompleted is not null)
+                await VersionDownloadCompleted(taskName, success, message);
         }
 
         public async Task<List<VersionFileInfo>> GetVersionFilesAsync()

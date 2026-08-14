@@ -250,7 +250,6 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Comparing {currentWadFile}", completedFiles, _totalFiles, currentWadFile, isSuccess, errorMessage);
         }
 
-        public async void OnComparisonCompleted(List<ChunkDiff> diffs, string oldPath, string newPath, string version) => await FinishComparisonAsync();
 
         /// <summary>
         /// Closes the comparison progress window after rendering the final 100% state.
@@ -283,7 +282,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Extracting {extractedCount} of {totalFiles} assets: {detail}", extractedCount, totalFiles, message);
         }
 
-        public async void OnExtractionCompleted() => await FinishOperation();
+        public Task OnExtractionCompletedAsync() => FinishOperation();
 
         // --- Saving ---
 
@@ -309,7 +308,7 @@ namespace AssetsManager.Services.Core
             UpdateOperation($"Saving {completedFiles} of {totalFiles} assets: {detail}", completedFiles, totalFiles, currentFile);
         }
 
-        public async void OnSavingCompleted() => await FinishOperation();
+        public Task OnSavingCompletedAsync() => FinishOperation();
 
         // --- Versions (Update) ---
 
@@ -331,7 +330,7 @@ namespace AssetsManager.Services.Core
             });
         }
 
-        public async void OnVersionDownloadCompleted(string taskName, bool success, string message)
+        public async Task OnVersionDownloadCompletedAsync(string taskName, bool success, string message)
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 

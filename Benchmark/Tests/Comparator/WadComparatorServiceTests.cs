@@ -26,7 +26,11 @@ namespace AssetsManager.BenchmarkTests.Tests.Comparator
                 ("assets/new-name.json", "renamed"));
             var comparator = bridge.CreateComparator();
             List<ChunkDiff> result = null;
-            comparator.ComparisonCompleted += (diffs, _, _, _) => result = diffs;
+            comparator.ComparisonCompleted += (diffs, _, _, _) =>
+            {
+                result = diffs;
+                return Task.CompletedTask;
+            };
 
             await comparator.CompareSingleWadAsync(oldWad, newWad, "test", CancellationToken.None);
 
@@ -44,7 +48,11 @@ namespace AssetsManager.BenchmarkTests.Tests.Comparator
             using var bridge = new AssetsManagerTestBridge();
             var comparator = bridge.CreateComparator();
             List<ChunkDiff> result = new();
-            comparator.ComparisonCompleted += (diffs, _, _, _) => result = diffs;
+            comparator.ComparisonCompleted += (diffs, _, _, _) =>
+            {
+                result = diffs;
+                return Task.CompletedTask;
+            };
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();
 
@@ -67,7 +75,11 @@ namespace AssetsManager.BenchmarkTests.Tests.Comparator
                 ("assets/new-a.json", "same"));
             var comparator = bridge.CreateComparator();
             List<ChunkDiff> result = null;
-            comparator.ComparisonCompleted += (diffs, _, _, _) => result = diffs;
+            comparator.ComparisonCompleted += (diffs, _, _, _) =>
+            {
+                result = diffs;
+                return Task.CompletedTask;
+            };
 
             await comparator.CompareSingleWadAsync(oldWad, newWad, "test", CancellationToken.None);
 
