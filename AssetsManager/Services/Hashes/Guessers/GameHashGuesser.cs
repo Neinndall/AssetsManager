@@ -86,9 +86,10 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomWordlistCandidateBudget = 250_000_000;
         private const int CustomWordAdditionCandidateBudget = 250_000_000;
         private const int CustomShaderCandidateBudget = 250_000_000;
-        private const int SkinGroupCandidateBudget = 25_000_000;
-        private const int CharacterSubstitutionCandidateBudget = 25_000_000;
-        private const int SkinNumberSubstitutionCandidateBudget = 25_000_000;
+        private const int SkinGroupCandidateBudget = 50_000_000;
+        private const int SuffixSubstitutionCandidateBudget = 50_000_000;
+        private const int CharacterSubstitutionCandidateBudget = 50_000_000;
+        private const int SkinNumberSubstitutionCandidateBudget = 50_000_000;
         private const int EsportsBannerSingleCandidateBudget = 2_000_000;
         private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
@@ -667,9 +668,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 source: "GAME basename word addition");
         }
 
-        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = int.MaxValue) => GenerateCharacterSubstitutionCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = int.MaxValue) => GenerateSkinNumberCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes() => GenerateSuffixCandidates(int.MaxValue);
+        internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = CharacterSubstitutionCandidateBudget) => GenerateCharacterSubstitutionCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = SkinNumberSubstitutionCandidateBudget) => GenerateSkinNumberCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = SuffixSubstitutionCandidateBudget) => GenerateSuffixCandidates(candidateBudget);
         internal int SubstituteLang(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
