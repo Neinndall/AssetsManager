@@ -190,7 +190,14 @@ namespace AssetsManager.Views.Models.Viewer
         bool FlipV,
         bool DisableBackfaceCull)
     {
-        public static readonly VfxEmitterRenderState Default = new(0, 0, 0, false, false, false, false);
+        public static readonly VfxEmitterRenderState Default = new(
+            0,
+            VfxAuthoredDefaults.AlphaReference,
+            0,
+            false,
+            false,
+            false,
+            false);
         public float AlphaCutoff => AlphaReference / 255f;
     }
 

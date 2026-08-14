@@ -58,6 +58,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio now preserves schema-authored emitter defaults and translates every BIN blend mode through explicit RGB/alpha render descriptors; Multiply particles and meshes keep transparent coverage neutral instead of darkening the framebuffer.
   - Hash Guessing Lab / GAME WAD grep now discovers generated dotted BIN paths from their embedded object identifiers.
   - Hash Guessing Lab / GAME Canonical now follows CDTB character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
   - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.

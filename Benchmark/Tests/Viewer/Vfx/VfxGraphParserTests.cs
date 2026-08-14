@@ -133,7 +133,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var parsed = Assert.Single(Assert.Single(document.Systems).Value.Emitters);
             Assert.Null(parsed.ParticleColorTexturePath);
-            Assert.Equal(0, parsed.ColorLookUpTypeX);
+            Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
             Assert.Equal(0, parsed.ColorLookUpTypeY);
             Assert.True(parsed.TextureMultFlipV);
             Assert.True(parsed.TextureMultRandomStartFrame);
@@ -194,6 +194,41 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
 
             Assert.Null(parsed.ModulationFactor);
+        }
+
+        [Fact]
+        public void UsesAuthoredSchemaDefaultsWhenEmitterFieldsAreOmitted()
+        {
+            var emitter = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("VfxEmitterDefinitionData"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("emitterName"), "SchemaDefaults")
+                });
+            var effectObject = new BinTreeObject(
+                "Effects/SchemaDefaults",
+                "VfxSystemDefinitionData",
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("particleName"), "SchemaDefaults"),
+                    new BinTreeContainer(
+                        Fnv1a.HashLower("complexEmitterDefinitionData"),
+                        BinPropertyType.Struct,
+                        new BinTreeProperty[] { emitter })
+                });
+            using var stream = new MemoryStream();
+            new BinTree(new[] { effectObject }, System.Array.Empty<string>()).Write(stream);
+
+            VfxEmitterDefinition parsed = Assert.Single(
+                Assert.Single(VfxGraphParser.ParseDocument(stream.ToArray()).Systems).Value.Emitters);
+
+            Assert.Equal(VfxAuthoredDefaults.BlendMode, parsed.BlendMode);
+            Assert.Equal(VfxAuthoredDefaults.AlphaReference, parsed.RenderState.AlphaReference);
+            Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeX, parsed.ColorLookUpTypeX);
+            Assert.Equal(VfxAuthoredDefaults.ColorLookUpTypeY, parsed.ColorLookUpTypeY);
+            Assert.Equal(VfxAuthoredDefaults.MeshRenderFlags, parsed.MeshRenderFlags);
+            Assert.Equal(VfxAuthoredDefaults.Importance, parsed.Importance);
         }
 
         [Fact]

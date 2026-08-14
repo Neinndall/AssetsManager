@@ -14,8 +14,31 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         [InlineData(5, VfxBlendModeKind.Alpha)]
         public void ResolvesAuthoredBlendModes(int rawMode, VfxBlendModeKind expected)
         {
+            VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDescriptor(rawMode);
+            Assert.Equal(rawMode, descriptor.RawMode);
+            Assert.Equal(expected, descriptor.Kind);
             Assert.Equal(expected, VfxBlendModes.Resolve(rawMode));
             Assert.True(VfxBlendModes.IsKnown(rawMode));
+        }
+
+        [Fact]
+        public void DescriptorsOwnSeparateRgbAndAlphaBlendState()
+        {
+            VfxBlendModeDescriptor alpha = VfxBlendModes.GetDescriptor(0);
+            Assert.Equal(VfxBlendFactor.SourceAlpha, alpha.SourceRgb);
+            Assert.Equal(VfxBlendFactor.OneMinusSourceAlpha, alpha.DestinationRgb);
+            Assert.Equal(VfxBlendFactor.One, alpha.SourceAlpha);
+            Assert.Equal(VfxBlendFactor.OneMinusSourceAlpha, alpha.DestinationAlpha);
+
+            VfxBlendModeDescriptor additive = VfxBlendModes.GetDescriptor(4);
+            Assert.Equal(VfxBlendFactor.SourceAlpha, additive.SourceRgb);
+            Assert.Equal(VfxBlendFactor.One, additive.DestinationRgb);
+            Assert.False(additive.AllowsDepthWrite);
+
+            VfxBlendModeDescriptor multiply = VfxBlendModes.GetDescriptor(3);
+            Assert.Equal(VfxBlendFactor.DestinationColor, multiply.SourceRgb);
+            Assert.Equal(VfxBlendFactor.Zero, multiply.DestinationRgb);
+            Assert.True(multiply.NeutralizeTransparentRgb);
         }
 
         [Theory]
@@ -67,7 +90,9 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         public void UnknownModesUseSafeAlphaFallback()
         {
             Assert.False(VfxBlendModes.IsKnown(255));
-            Assert.Equal(VfxBlendModeKind.Alpha, VfxBlendModes.Resolve(255));
+            VfxBlendModeDescriptor descriptor = VfxBlendModes.GetDescriptor(255);
+            Assert.Equal(-1, descriptor.RawMode);
+            Assert.Equal(VfxBlendModeKind.Alpha, descriptor.Kind);
             Assert.Contains("safe alpha fallback", VfxBlendModes.Describe(255));
         }
     }

@@ -314,6 +314,7 @@ uniform float uAlphaCutoff;
 uniform int uAlphaTest;
 uniform int uDeriveAlphaFromRgb;
 uniform float uEmissiveStrength;
+uniform int uIsMultiply;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
@@ -424,6 +425,8 @@ void main(){
     if (effectiveAlpha <= 0.0001 || (uAlphaTest != 0 && effectiveAlpha <= uAlphaCutoff)) discard;
     fragColor = texel * authoredColor;
     fragColor.rgb *= uEmissiveStrength;
+    if (uIsMultiply != 0)
+        fragColor.rgb = mix(vec3(1.0), fragColor.rgb, effectiveAlpha);
 }";
 
         internal const string ParticleFragment = @"
@@ -449,6 +452,7 @@ uniform float uAlphaCutoff;
 uniform int uAlphaTest;
 uniform int uDeriveAlphaFromRgb;
 uniform float uEmissiveStrength;
+uniform int uIsMultiply;
 uniform sampler2D uColorMap;
 uniform int uHasColor;
 uniform int uColorRenderFlags;
@@ -565,6 +569,8 @@ void main(){
     }
     fragColor = vec4(t.rgb * authoredColor.rgb, effectiveAlpha);
     fragColor.rgb *= uEmissiveStrength;
+    if (uIsMultiply != 0)
+        fragColor.rgb = mix(vec3(1.0), fragColor.rgb, effectiveAlpha);
 }        ";
     }
 }
