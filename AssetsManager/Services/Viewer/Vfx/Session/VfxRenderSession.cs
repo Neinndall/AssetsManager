@@ -232,18 +232,19 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _activeSystem.CurrentTime += elapsed;
             KillGraphsAt(_activeSystem.CurrentTime);
 
-            if (ShouldRestartPlayback(
+            if (ShouldFinishPlayback(
                     _activeSystem.HasFiniteDuration,
                     _activeSystem.CurrentTime,
                     _activeSystem.TotalDuration,
                     _graphs.All(graph => graph.IsComplete)))
             {
-                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
-                _activeSystem.CurrentTime = 0;
+                if (_activeSystem.HasFiniteDuration)
+                    _activeSystem.CurrentTime = _activeSystem.TotalDuration;
+                _isPlaying = false;
             }
         }
 
-        internal static bool ShouldRestartPlayback(
+        internal static bool ShouldFinishPlayback(
             bool hasFiniteDuration,
             double currentTime,
             double totalDuration,

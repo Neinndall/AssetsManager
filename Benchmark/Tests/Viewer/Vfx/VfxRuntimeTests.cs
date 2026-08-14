@@ -47,8 +47,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(4.8f, state.Instances[3], precision: 5);
-            Assert.Equal(0.6f, state.Instances[4], precision: 5);
-            Assert.Equal(0.6f, state.Instances[18], precision: 5);
+            Assert.Equal(4.8f, state.Instances[4], precision: 5);
+            Assert.Equal(4.8f, state.Instances[18], precision: 5);
         }
 
         [Fact]
@@ -140,7 +140,7 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void UniformMeshBirthScalePreservesAuthoredAxes()
+        public void UniformMeshBirthScaleUsesAuthoredScalarOnEveryAxis()
         {
             var emitter = CreateEmitter(new Vector3(1f, 45f, 40f), VfxEmitterRenderState.Default) with
             {
@@ -153,8 +153,8 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
 
             var state = Assert.Single(simulator.Emitters);
             Assert.Equal(1f, state.Instances[3]);
-            Assert.Equal(45f, state.Instances[4]);
-            Assert.Equal(40f, state.Instances[18]);
+            Assert.Equal(1f, state.Instances[4]);
+            Assert.Equal(1f, state.Instances[18]);
         }
 
         [Fact]
@@ -855,19 +855,19 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void FinitePlaybackWaitsForTimelineBoundaryAfterParticlesExpire()
+        public void PlaybackFinishesAtTimelineBoundaryWithoutImplicitLooping()
         {
-            Assert.False(VfxRenderSession.ShouldRestartPlayback(
+            Assert.False(VfxRenderSession.ShouldFinishPlayback(
                 hasFiniteDuration: true,
                 currentTime: 0.83,
                 totalDuration: 1.25,
                 graphIsComplete: true));
-            Assert.True(VfxRenderSession.ShouldRestartPlayback(
+            Assert.True(VfxRenderSession.ShouldFinishPlayback(
                 hasFiniteDuration: true,
                 currentTime: 1.25,
                 totalDuration: 1.25,
                 graphIsComplete: true));
-            Assert.True(VfxRenderSession.ShouldRestartPlayback(
+            Assert.True(VfxRenderSession.ShouldFinishPlayback(
                 hasFiniteDuration: false,
                 currentTime: 0.83,
                 totalDuration: 0,
@@ -889,6 +889,13 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
                 enabled: true,
                 currentTime: 0.30,
                 boundary: 0.30));
+        }
+
+        [Fact]
+        public void TimelineUsesTheRealPlaybackDurationInsteadOfAnArtificialMinimum()
+        {
+            Assert.Equal(0.30, VfxInspectorWindow.ResolveTimelineDuration(0.30), 6);
+            Assert.Equal(10.0, VfxInspectorWindow.ResolveTimelineDuration(double.PositiveInfinity), 6);
         }
 
         [Fact]

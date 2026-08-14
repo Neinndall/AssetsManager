@@ -71,6 +71,48 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Null(Assert.Single(composition.Events).System);
         }
 
+        [Fact]
+        public void FindsOnlyCompositionsWithAnExplicitResolvedSystemReference()
+        {
+            var selected = new VfxSystemDefinition(100, "Dash", "dash", new VfxEmitterDefinition[0]);
+            var sibling = new VfxSystemDefinition(200, "Dash_Trail", "dash_trail", new VfxEmitterDefinition[0]);
+            VfxAbilityComposition exact = VfxAbilityCompositionBuilder.Build(
+                new VfxEventSequenceDefinition(20, 1, 1f / 30f, 0, 30, new[] { Event(1, 0, 100) }),
+                new Dictionary<uint, VfxSystemDefinition> { [100] = selected, [200] = sibling },
+                new Dictionary<uint, uint>());
+            VfxAbilityComposition nameOnlySibling = VfxAbilityCompositionBuilder.Build(
+                new VfxEventSequenceDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 0, 200) }),
+                new Dictionary<uint, VfxSystemDefinition> { [100] = selected, [200] = sibling },
+                new Dictionary<uint, uint>());
+
+            IReadOnlyList<VfxAbilityComposition> matches = VfxAbilityCompositionBuilder.FindContainingSystem(
+                100,
+                new[] { nameOnlySibling, exact });
+
+            Assert.Same(exact, Assert.Single(matches));
+        }
+
+        [Fact]
+        public void PreservesEveryAuthoredCandidateWhenSystemBelongsToMultipleSequences()
+        {
+            var selected = new VfxSystemDefinition(100, "Trail", "trail", new VfxEmitterDefinition[0]);
+            var systems = new Dictionary<uint, VfxSystemDefinition> { [100] = selected };
+            VfxAbilityComposition first = VfxAbilityCompositionBuilder.Build(
+                new VfxEventSequenceDefinition(30, 1, 1f / 30f, 0, 30, new[] { Event(1, 2, 100) }),
+                systems,
+                new Dictionary<uint, uint>());
+            VfxAbilityComposition second = VfxAbilityCompositionBuilder.Build(
+                new VfxEventSequenceDefinition(10, 1, 1f / 30f, 0, 30, new[] { Event(2, 8, 100) }),
+                systems,
+                new Dictionary<uint, uint>());
+
+            IReadOnlyList<VfxAbilityComposition> matches = VfxAbilityCompositionBuilder.FindContainingSystem(
+                100,
+                new[] { first, second });
+
+            Assert.Equal(new[] { 10u, 30u }, System.Linq.Enumerable.Select(matches, match => match.SequencePathHash));
+        }
+
         private static VfxParticleEventDefinition Event(uint eventHash, float startFrame, uint effectKey)
             => new(
                 eventHash,

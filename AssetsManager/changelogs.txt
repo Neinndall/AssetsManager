@@ -58,6 +58,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - VFX Studio now automatically plays the complete authored event sequence when a selected effect belongs to one unambiguous composition.
   - VFX Studio now builds one authored render queue across root, child, and ability-composed systems, honoring render phase, pass, stable importance, optional emitter depth sorting, and alpha-only output without leaking OpenGL state.
   - VFX Studio now preserves schema-authored emitter defaults and translates every BIN blend mode through explicit RGB/alpha render descriptors; Multiply particles and meshes keep transparent coverage neutral instead of darkening the framebuffer.
   - Hash Guessing Lab / GAME WAD grep now discovers generated dotted BIN paths from their embedded object identifiers.
@@ -259,6 +260,9 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Fixed oversized uniform mesh effects and stretched celebration screens in VFX Studio.
+  - Fixed short VFX timelines restarting before the red playhead reached the real end; preview looping now requires the visible gold marker.
+  - Fixed the VFX Studio compatibility tab failing to open because of an unsupported icon.
   - Viewer VFX Studio / Palette textures now color particles without replacing their authored alpha coverage, fixing opaque colored cards such as `Aatrox_Base_P_Ready`.
   - Viewer VFX Studio / Uniform ground layers now retain circular proportions across their emitters.
   - Viewer / Fixed shared model materials leaking scoped texture effects into unrelated submeshes.

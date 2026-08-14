@@ -398,6 +398,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             var birthScale = d.BirthScale.SampleBirth(emitterT, _rng);
             if (d.BirthScale1 is { } birthScale1)
                 birthScale = Vector3.Lerp(birthScale, birthScale1.SampleBirth(emitterT, _rng), rangeRandom);
+            // Mesh emitters with the authored uniform flag use X as their scalar;
+            // billboard primitives retain their authored width/height vector.
+            if (d.IsMeshPrimitive && d.IsUniformScale)
+                birthScale = new Vector3(birthScale.X);
             birthScale *= ResolveFlexMultiplier(d.FlexShape?.ScaleBirthScaleByBoundObjectSize);
             var vel = d.BirthVelocity?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;
             var birthAccel = d.BirthAcceleration?.SampleBirth(emitterT, _rng) ?? Vector3.Zero;

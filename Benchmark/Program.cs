@@ -592,6 +592,23 @@ namespace BenchmarkApp
             var meshResolver = new AssetsManager.Services.Viewer.Vfx.Resources.VfxResourceResolver();
 
             string systemFilter = args.Length > 2 ? args[2] : null;
+            if (!string.IsNullOrWhiteSpace(systemFilter))
+            {
+                foreach (var composition in compositions.Where(item => item.Events.Any(compositionEvent =>
+                    compositionEvent.System?.Name?.Contains(systemFilter, StringComparison.OrdinalIgnoreCase) == true)))
+                {
+                    Console.WriteLine($" - Composition: 0x{composition.SequencePathHash:X8} | " +
+                        $"frames={composition.StartFrame}..{composition.EndFrame} | tick={composition.TickDuration} | " +
+                        $"resolved={composition.ResolvedCount}/{composition.Events.Count}");
+                    foreach (var compositionEvent in composition.Events)
+                    {
+                        Console.WriteLine($"   * frame={compositionEvent.Event.StartFrame}..{compositionEvent.Event.EndFrame} | " +
+                            $"system={compositionEvent.System?.Name ?? "UNRESOLVED"} | " +
+                            $"hash=0x{compositionEvent.ResolvedSystemHash:X8} | key=0x{compositionEvent.Event.EffectKey:X8} | " +
+                            $"loop={compositionEvent.Event.IsLoop} | kill={compositionEvent.Event.IsKillEvent}");
+                    }
+                }
+            }
             var selectedSystems = string.IsNullOrWhiteSpace(systemFilter)
                 ? bundle.Systems.Values.Take(20)
                 : bundle.Systems.Values.Where(system =>

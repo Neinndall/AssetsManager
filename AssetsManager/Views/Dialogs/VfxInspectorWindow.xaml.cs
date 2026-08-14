@@ -186,7 +186,10 @@ namespace AssetsManager.Views.Dialogs
                 {
                     _model.CurrentTime = 0;
                     _vfxRenderer.Seek(0);
+                    _vfxRenderer.Play();
                 }
+                else if (_model.CurrentTime >= _model.TotalDuration)
+                    _model.IsPlaying = false;
             }
             _vfxRenderer.Render(viewProj, view);
 
@@ -360,6 +363,8 @@ namespace AssetsManager.Views.Dialogs
             try
             {
                 _model.Systems.Clear();
+                _model.Compositions.Clear();
+                _model.SelectedComposition = null;
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
                 _activeBundle = _loadingService.Load(binFilePath, _logService);
@@ -476,14 +481,6 @@ namespace AssetsManager.Views.Dialogs
                 playbackSeed,
                 _activeBundle?.Systems,
                 _activeBundle?.ResourceMap);
-            double timelineMax = double.IsFinite(playbackDuration)
-                ? Math.Max(playbackDuration, 3.0)
-                : 10.0;
-            _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
-                ? playbackDuration
-                : timelineMax;
-            _model.IsPreviewLoopEnabled = false;
-            _model.TotalDuration = timelineMax;
 
             // 1. Prepare playback in OpenGL Viewport
             var systemModel = new VfxSystemModel
@@ -500,8 +497,53 @@ namespace AssetsManager.Views.Dialogs
             };
 
             _model.CurrentTime = 0;
+            string playbackContext = "standalone system";
+            IReadOnlyList<VfxAbilityComposition> linkedCompositions = VfxAbilityCompositionBuilder.FindContainingSystem(
+                systemItem.PathHash,
+                _model.Compositions.Select(item => item.Composition));
+            bool configuredComposition = false;
+            if (linkedCompositions.Count == 1 && _activeBundle is not null && _vfxRenderer is not null)
+            {
+                VfxAbilityComposition composition = linkedCompositions[0];
+                configuredComposition = _vfxRenderer.SetAbilityComposition(
+                    composition,
+                    _activeBundle.Systems,
+                    _activeBundle.ResourceMap,
+                    searchDir,
+                    HashCode.Combine(playbackSeed, composition.SequencePathHash),
+                    _activeBundle.OwnerSceneContext);
+                if (configuredComposition)
+                {
+                    _model.SelectedComposition = _model.Compositions.FirstOrDefault(item =>
+                        item.Composition.SequencePathHash == composition.SequencePathHash);
+                    playbackDuration = _vfxRenderer.ActiveSystem.TotalDuration;
+                    playbackContext = $"authored sequence 0x{composition.SequencePathHash:X8}";
+                    _model.LogMessages.Add(
+                        $"[COMPOSITION AUTO] {systemItem.Name} belongs to one authored sequence; " +
+                        $"playing all {composition.ResolvedCount} resolved events.");
+                }
+            }
+            else if (linkedCompositions.Count > 1)
+            {
+                _model.LogMessages.Add(
+                    $"[COMPOSITION AMBIGUOUS] {systemItem.Name} belongs to {linkedCompositions.Count} authored sequences; " +
+                    "standalone playback retained until a sequence is selected.");
+            }
+            else
+            {
+                _model.LogMessages.Add(
+                    $"[COMPOSITION STANDALONE] {systemItem.Name} has no explicit ParticleEventData composition reference.");
+            }
 
-            _vfxRenderer?.SetVfxSystem(systemModel);
+            if (!configuredComposition)
+                _vfxRenderer?.SetVfxSystem(systemModel);
+
+            double timelineMax = ResolveTimelineDuration(playbackDuration);
+            _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
+                ? playbackDuration
+                : timelineMax;
+            _model.IsPreviewLoopEnabled = false;
+            _model.TotalDuration = timelineMax;
             _vfxRenderer?.Play();
             _model.IsPlaying = true;
 
@@ -583,9 +625,7 @@ namespace AssetsManager.Views.Dialogs
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
 
-            VfxCompatibilityReport compatibility = systemItem.CompatibilityReport
-                ?? VfxCompatibilityAnalyzer.Analyze(def, _activeBundle?.OwnerSceneContext);
-            _model.StatusText = $"Inspecting {systemItem.Name} ({_model.Emitters.Count} emitters) · {compatibility.StatusText}.";
+            _model.StatusText = $"{systemItem.Name} · {playbackContext}.";
         }
 
         private void CompositionEvent_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -631,7 +671,7 @@ namespace AssetsManager.Views.Dialogs
             }
 
             double duration = _vfxRenderer.ActiveSystem.TotalDuration;
-            _model.TotalDuration = Math.Max(3.0, duration);
+            _model.TotalDuration = ResolveTimelineDuration(duration);
             _model.ActiveLoopDuration = duration;
             _model.IsPreviewLoopEnabled = false;
             _model.CurrentTime = 0;
@@ -761,6 +801,11 @@ namespace AssetsManager.Views.Dialogs
 
         internal static bool ShouldRestartPreview(bool enabled, double currentTime, double boundary)
             => enabled && boundary > 0 && currentTime >= boundary;
+
+        internal static double ResolveTimelineDuration(double playbackDuration)
+            => double.IsFinite(playbackDuration) && playbackDuration > 0
+                ? Math.Max(0.05, playbackDuration)
+                : 10.0;
 
         private bool _isDraggingLoopBoundary;
 

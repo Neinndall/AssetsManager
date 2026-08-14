@@ -70,6 +70,25 @@ namespace AssetsManager.Services.Viewer.Vfx.Composition
                 .ToArray();
         }
 
+        /// <summary>
+        /// Returns only compositions that explicitly resolve the selected system. Names and
+        /// sibling prefixes are intentionally ignored because they do not encode timing or placement.
+        /// </summary>
+        public static IReadOnlyList<VfxAbilityComposition> FindContainingSystem(
+            uint systemHash,
+            IEnumerable<VfxAbilityComposition> compositions)
+        {
+            ArgumentNullException.ThrowIfNull(compositions);
+            if (systemHash == 0) return Array.Empty<VfxAbilityComposition>();
+
+            return compositions
+                .Where(composition => composition.Events.Any(compositionEvent =>
+                    compositionEvent.System is not null &&
+                    compositionEvent.ResolvedSystemHash == systemHash))
+                .OrderBy(composition => composition.SequencePathHash)
+                .ToArray();
+        }
+
         private static (uint Hash, VfxSystemDefinition System) Resolve(
             uint effectKey,
             string effectName,
