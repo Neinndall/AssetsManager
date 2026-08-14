@@ -64,6 +64,7 @@ Fixes
   - Fixed the first backup run advancing before its final file count was rendered in the status bar.
   - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
   - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
+  - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
 
 Improvements
   - VFX Studio now labels its preview loop control more concisely.

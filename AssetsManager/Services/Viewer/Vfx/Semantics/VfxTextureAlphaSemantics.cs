@@ -12,7 +12,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
         // channel is opaque. Keep this compatibility path narrow: real meshes
         // retain their authored alpha and only dark RGB mask coverage qualifies.
         private const byte OpaqueAlphaFloor = 224;
-        private const byte NearOpaqueAlpha = 240;
         private const int RequiredNearOpaqueCoveragePercent = 98;
         private const byte DarkRgbLuminanceThreshold = 32;
         private const int RequiredDarkRgbCoveragePercent = 2;
@@ -26,7 +25,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
                 ShouldDeriveAlphaFromRgb(IsLegacyOpaqueRgbMask(texture), blendMode);
 
         public static bool ShouldDeriveAlphaFromRgb(bool hasLegacyOpaqueRgbMask, int blendMode)
-            => hasLegacyOpaqueRgbMask && VfxBlendModes.Resolve(blendMode) == VfxBlendModeKind.Alpha;
+            => hasLegacyOpaqueRgbMask && VfxBlendModes.Resolve(blendMode) is VfxBlendModeKind.Alpha or VfxBlendModeKind.Additive;
 
         public static bool ShouldDeriveAlphaFromRgb(
             bool hasLegacyOpaqueRgbMask,
@@ -58,9 +57,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Semantics
             for (int alpha = 3; alpha < pixels.Length; alpha += 4)
             {
                 byte value = pixels[alpha];
-                if (value < OpaqueAlphaFloor)
-                    return false;
-                if (value >= NearOpaqueAlpha)
+                if (value >= OpaqueAlphaFloor)
                     nearOpaqueCount++;
             }
 

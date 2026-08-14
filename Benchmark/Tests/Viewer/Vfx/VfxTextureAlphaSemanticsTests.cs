@@ -95,13 +95,13 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
-        public void AdditiveTextureDoesNotReplaceAuthoredAlpha()
+        public void AdditiveBillboardMaskUsesDarkRgbAsOpacity()
         {
             BitmapSource texture = CreateTexture(
                 0, 0, 0, 255,
                 255, 255, 255, 255);
 
-            Assert.False(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
+            Assert.True(VfxTextureAlphaSemantics.ShouldDeriveAlphaFromRgb(
                 texture,
                 blendMode: 4,
                 VfxPrimitiveKind.CameraQuad));
