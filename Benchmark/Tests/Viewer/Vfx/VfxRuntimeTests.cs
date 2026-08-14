@@ -220,12 +220,12 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         [Fact]
         public void MeshInterleavingPreservesPositionUvAndVertexColor()
         {
-            float[] interleaved = VfxOpenGlRenderer.BuildMeshInterleaved(
+            float[] interleaved = VfxMeshResourceCache.BuildInterleaved(
                 new[] { 1f, 2f, 3f },
                 new[] { 0.25f, 0.75f },
                 new[] { 0.1f, 0.2f, 0.3f, 0.4f });
 
-            Assert.Equal(VfxOpenGlRenderer.MeshVertexStride, interleaved.Length);
+            Assert.Equal(VfxMeshResourceCache.VertexStride, interleaved.Length);
             Assert.Equal(
                 new[] { 1f, 2f, 3f, 0.25f, 0.75f, 0.1f, 0.2f, 0.3f, 0.4f },
                 interleaved);
@@ -595,6 +595,26 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void RuntimeKillClearsParticlesAndResetRestoresPlayback()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var runtime = new VfxPlaybackRuntime(7);
+            runtime.SetSystem(new VfxSystemDefinition(1, "kill", "kill", new[] { emitter }), Vector3.Zero);
+            runtime.Update(0.02f);
+            Assert.True(runtime.LiveParticleCount > 0);
+
+            runtime.Kill();
+
+            Assert.True(runtime.IsComplete);
+            Assert.Equal(0, runtime.LiveParticleCount);
+            Assert.Empty(runtime.Emitters[0].Particles);
+
+            runtime.Reset();
+            runtime.Update(0.02f);
+            Assert.True(runtime.LiveParticleCount > 0);
+        }
+
+        [Fact]
         public void DurationIncludesParticleAndChildLifeButNotExternalLinger()
         {
             VfxEmitterDefinition childEmitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with
@@ -855,6 +875,71 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
         }
 
         [Fact]
+        public void PreviewLoopDoesNotRestartGraphUnlessExplicitlyEnabled()
+        {
+            Assert.False(VfxInspectorWindow.ShouldRestartPreview(
+                enabled: false,
+                currentTime: 0.30,
+                boundary: 0.30));
+            Assert.False(VfxInspectorWindow.ShouldRestartPreview(
+                enabled: true,
+                currentTime: 0.29,
+                boundary: 0.30));
+            Assert.True(VfxInspectorWindow.ShouldRestartPreview(
+                enabled: true,
+                currentTime: 0.30,
+                boundary: 0.30));
+        }
+
+        [Fact]
+        public void AbilityCompositionSchedulesResolvedSystemFromAuthoredClipFrames()
+        {
+            VfxEmitterDefinition emitter = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default);
+            var system = new VfxSystemDefinition(100, "event", "event", new[] { emitter });
+            var particleEvent = new VfxParticleEventDefinition(
+                EventHash: 1,
+                NameHash: 0,
+                StartFrame: 30f,
+                EndFrame: 60f,
+                EffectKey: 10,
+                EnemyEffectKey: 0,
+                EffectName: string.Empty,
+                IsLoop: false,
+                IsKillEvent: true,
+                IsDetachable: false,
+                IsSelfOnly: false,
+                FireIfAnimationEndsEarly: false,
+                SkipIfPastEndFrame: false,
+                ScalePlaySpeedWithAnimation: false,
+                Scale: 1f,
+                Attachments: Array.Empty<VfxParticleEventAttachment>());
+            var composition = new VfxAbilityComposition(
+                SequencePathHash: 5,
+                SequenceClassHash: 6,
+                TickDuration: 1f / 30f,
+                StartFrame: 0f,
+                EndFrame: 60f,
+                Events: new[] { new VfxCompositionEvent(particleEvent, 100, system, false) })
+            {
+                ResolvedCount = 1
+            };
+            using var session = new VfxRenderSession();
+
+            Assert.True(session.SetAbilityComposition(
+                composition,
+                new Dictionary<uint, VfxSystemDefinition> { [100] = system },
+                new Dictionary<uint, uint>(),
+                Path.GetTempPath(),
+                seed: 7));
+            session.Play();
+            session.Update(0.5f);
+            Assert.Equal(0, session.LiveParticleCount);
+
+            session.Update(0.6f);
+            Assert.True(session.LiveParticleCount > 0);
+        }
+
+        [Fact]
         public void EmitterVisibilityOnlyAffectsViewportRendering()
         {
             VfxEmitterDefinition first = CreateEmitter(Vector3.One, VfxEmitterRenderState.Default) with { Name = "first" };
@@ -1095,6 +1180,16 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer.Vfx
             Assert.Equal(MathF.PI / 2f, state.Instances[15], precision: 5);
             Assert.Equal(0f, state.Instances[16], precision: 5);
             Assert.Equal(0f, state.Instances[17], precision: 5);
+        }
+
+        [Fact]
+        public void PrimitiveEnumKeepsTheShaderInterfaceContract()
+        {
+            Assert.Equal(5, (int)VfxPrimitiveKind.CameraTrail);
+            Assert.Equal(6, (int)VfxPrimitiveKind.ArbitraryTrail);
+            Assert.Equal(7, (int)VfxPrimitiveKind.Ray);
+            Assert.Equal(8, (int)VfxPrimitiveKind.Beam);
+            Assert.Equal(9, (int)VfxPrimitiveKind.PlanarProjection);
         }
 
         private static VfxEmitterDefinition CreateEmitter(Vector3 birthScale, VfxEmitterRenderState renderState)

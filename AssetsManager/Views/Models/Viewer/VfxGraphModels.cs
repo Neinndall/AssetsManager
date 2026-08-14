@@ -22,7 +22,9 @@ namespace AssetsManager.Views.Models.Viewer
     internal sealed record VfxBinDocument(
         IReadOnlyDictionary<uint, VfxSystemDefinition> Systems,
         IReadOnlyDictionary<uint, uint> ResourceMap,
-        IReadOnlyList<string> Dependencies);
+        IReadOnlyList<string> Dependencies,
+        IReadOnlyList<VfxEventSequenceDefinition> EventSequences,
+        VfxOwnerSceneContext OwnerSceneContext);
 
     /// <summary>
     /// Domain graph for a League VFX system and its emitter nodes.
@@ -33,7 +35,8 @@ namespace AssetsManager.Views.Models.Viewer
         string ParticlePath,
         IReadOnlyList<VfxEmitterDefinition> Emitters,
         float VisibilityRadius = 0f,
-        Matrix4x4? Transform = null);
+        Matrix4x4? Transform = null,
+        VfxSystemAuthoredFeatures AuthoredFeatures = null);
 
     /// <summary>One emitter inside a system. Curves are absolute-valued (sampled over normalised particle age 0..1).</summary>
     public sealed record VfxEmitterDefinition(
@@ -151,13 +154,32 @@ namespace AssetsManager.Views.Models.Viewer
         string FalloffTexturePath = null,
         string AudioSoundOnCreate = null,
         IReadOnlyList<string> FilteringKeywordsExcluded = null,
-        Vector4? ModulationFactor = null)
+        Vector4? ModulationFactor = null,
+        IReadOnlyList<uint> AttachedSubmeshHashes = null,
+        VfxEmitterAuthoredFeatures AuthoredFeatures = null)
     {
         /// <summary>Does this emitter produce anything drawable (has a texture and isn't disabled)?</summary>
         public bool IsVisual => !Disabled && PrimitiveKind != VfxPrimitiveKind.AttachedMesh && (!string.IsNullOrEmpty(TexturePath) ||
             !string.IsNullOrEmpty(TextureMultPath) || !string.IsNullOrEmpty(MeshPath) ||
             Distortion is { NormalMapTexturePath.Length: > 0 });
     }
+
+    public sealed record VfxSystemAuthoredFeatures(
+        bool HasMaterialOverrides = false,
+        bool HasAssetRemapping = false);
+
+    public sealed record VfxEmitterAuthoredFeatures(
+        uint PrimitiveClassHash = 0,
+        bool HasCustomMaterial = false,
+        bool HasStencil = false,
+        bool HasEmissionMesh = false,
+        bool HasEmissionSurface = false,
+        bool UsesEmissionMeshNormal = false,
+        bool HasTranslationOverride = false,
+        bool HasRotationOverride = false,
+        bool HasScaleOverride = false,
+        bool HasPostRotateOrientationAxis = false,
+        bool HasPeriodControl = false);
 
     public sealed record VfxEmitterRenderState(
         int RenderPass,

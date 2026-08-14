@@ -12,7 +12,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
     /// </summary>
     public sealed class VfxOpenGlRenderer : IDisposable
     {
-        internal const int MeshVertexStride = VfxMeshResourceCache.VertexStride;
         private GL _gl = null!;
         private uint _program, _vao, _quadVbo, _instVbo;
         private int _uViewProj, _uCamRight, _uCamUp, _uTexDiv, _uTexSize, _uTex, _uEmitterUvOffset;
@@ -234,8 +233,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             foreach (var es in sim.Emitters)
             {
                 if (!es.IsVisible) continue;
-                // AttachedMesh requires the owner champion scene and is intentionally not standalone-rendered.
-                if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh)
+                // Never synthesize an AttachedMesh proxy. Render only geometry that was
+                // resolved from the real owner scene and filtered by authored submesh masks.
+                if (es.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh && es.MeshVao == 0)
                     continue;
                 if (es.Def.IsMeshPrimitive && es.MeshVao != 0)
                 {
@@ -640,13 +640,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             _meshResources.Upload(es, positions, uvs, colors, indices);
         }
 
-        internal static float[] BuildMeshInterleaved(float[] positions, float[] uvs, float[] colors)
-            => VfxMeshResourceCache.BuildInterleaved(positions, uvs, colors);
-
         private void ReleaseMeshes()
             => _meshResources.Clear();
 
-        public void UpdateEmitterMeshPositions(VfxPlaybackRuntime.EmitterState es, float[] positions)
+        private void UpdateEmitterMeshPositions(VfxPlaybackRuntime.EmitterState es, float[] positions)
         {
             if (_ready)
                 _meshResources.UpdatePositions(es, positions);
@@ -801,9 +798,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
             ApplyAddressMode(1);
             ApplyTextureSampling(false);
             _gl.ActiveTexture(TextureUnit.Texture0);
-            // Standalone VFX meshes are particle surfaces, not champion meshes. Their
-            // authored .scb assets can be thin or single-sided, so culling would make
-            // rotating particles disappear. AttachedMesh is skipped before this path.
+            // VFX meshes can be thin or single-sided. Attached owner submeshes also use
+            // authored particle material state here, so culling would hide valid surfaces.
             _gl.Disable(EnableCap.CullFace);
             ApplyBlendMode(es.Def.BlendMode);
 

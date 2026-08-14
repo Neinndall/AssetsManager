@@ -14,7 +14,7 @@ using AssetsManager.Services.Core;
 namespace AssetsManager.Services.Viewer.Vfx.Resources
 {
     /// <summary>Resolves and decodes resources referenced by an effect graph.</summary>
-    internal sealed class VfxResourceResolver
+    internal sealed class VfxResourceResolver : IDisposable
     {
         private static readonly string[] TextureExtensions = { ".tex", ".dds", ".png", ".tga" };
         private static readonly string[] MeshExtensions = { ".scb", ".sco", ".skn" };
@@ -32,7 +32,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
 
         public BitmapSource ResolveTexture(string authoredPath, string searchDirectory)
         {
-            if (string.IsNullOrWhiteSpace(authoredPath)) return null;
+            if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
             string key = CreateKey(authoredPath, searchDirectory);
             if (_textures.TryGetValue(key, out BitmapSource cached)) return cached;
             if (_missingTextures.Contains(key)) return null;
@@ -54,13 +54,36 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             string authoredPath,
             string searchDirectory)
         {
-            if (string.IsNullOrWhiteSpace(authoredPath)) return null;
+            if (string.IsNullOrWhiteSpace(authoredPath) || string.IsNullOrWhiteSpace(searchDirectory)) return null;
 
             string key = CreateKey(authoredPath, searchDirectory);
             if (_meshes.TryGetValue(key, out var cached)) return cached;
 
             string resolvedPath = ResolvePath(authoredPath, searchDirectory, MeshExtensions);
             var mesh = resolvedPath == null ? null : DecodeMesh(resolvedPath);
+            _meshes[key] = mesh;
+            return mesh;
+        }
+
+        public (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? ResolveAttachedMesh(
+            string authoredPath,
+            IReadOnlyList<uint> submeshHashes,
+            string searchDirectory,
+            float skinScale = 1f)
+        {
+            if (string.IsNullOrWhiteSpace(authoredPath) ||
+                string.IsNullOrWhiteSpace(searchDirectory) ||
+                submeshHashes is not { Count: > 0 }) return null;
+            string maskKey = string.Join(",", submeshHashes.OrderBy(static value => value));
+            float resolvedScale = float.IsFinite(skinScale) && skinScale > 0f ? skinScale : 1f;
+            string key = CreateKey(
+                $"{authoredPath}|attached|{maskKey}|scale:{resolvedScale:R}",
+                searchDirectory);
+            if (_meshes.TryGetValue(key, out var cached)) return cached;
+            string resolvedPath = ResolvePath(authoredPath, searchDirectory, new[] { ".skn" });
+            var mesh = resolvedPath == null
+                ? null
+                : DecodeAttachedSkinnedMesh(resolvedPath, submeshHashes, resolvedScale);
             _meshes[key] = mesh;
             return mesh;
         }
@@ -74,7 +97,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         {
             if (string.IsNullOrWhiteSpace(meshPath) ||
                 string.IsNullOrWhiteSpace(skeletonPath) ||
-                string.IsNullOrWhiteSpace(animationPath))
+                string.IsNullOrWhiteSpace(animationPath) ||
+                string.IsNullOrWhiteSpace(searchDirectory))
             {
                 return null;
             }
@@ -133,6 +157,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             _meshes.Clear();
             _meshAnimations.Clear();
         }
+
+        public void Dispose() => ClearCaches();
 
         private string ResolvePath(string authoredPath, string searchDirectory, IReadOnlyList<string> extensions)
         {
@@ -275,6 +301,60 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
             return indices.Length == 0 ? null : (positions, uvs, colors, indices);
         }
 
+        private static (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? DecodeAttachedSkinnedMesh(
+            string path,
+            IReadOnlyList<uint> submeshHashes,
+            float skinScale)
+        {
+            using var mesh = LeagueToolkit.Core.Mesh.SkinnedMesh.ReadFromSimpleSkin(path);
+            var requested = submeshHashes.ToHashSet();
+            var filteredIndices = new List<uint>();
+            foreach (var range in mesh.Ranges)
+            {
+                string material = range.Material.TrimEnd('\0');
+                if (!requested.Contains(Fnv1a.HashLower(material))) continue;
+                var subIndices = mesh.Indices.Slice(range.StartIndex, range.IndexCount);
+                bool usesGlobalIndices = true;
+                bool usesLocalIndices = range.StartVertex > 0;
+                for (int index = 0; index < range.IndexCount; index++)
+                {
+                    int value = (int)subIndices[index];
+                    usesGlobalIndices &= value >= range.StartVertex && value < range.StartVertex + range.VertexCount;
+                    usesLocalIndices &= value >= 0 && value < range.VertexCount;
+                }
+                if (!usesGlobalIndices && !usesLocalIndices) continue;
+                int vertexOffset = usesLocalIndices && !usesGlobalIndices ? range.StartVertex : 0;
+                for (int index = 0; index < range.IndexCount; index++)
+                    filteredIndices.Add((uint)(subIndices[index] + vertexOffset));
+            }
+            if (filteredIndices.Count == 0) return null;
+
+            var sourcePositions = mesh.VerticesView
+                .GetAccessor(LeagueToolkit.Core.Memory.VertexElement.POSITION.Name)
+                .AsVector3Array();
+            var sourceUvs = mesh.VerticesView
+                .GetAccessor(LeagueToolkit.Core.Memory.VertexElement.TEXCOORD_0.Name)
+                .AsVector2Array();
+            var positions = new float[sourcePositions.Count * 3];
+            var uvs = new float[sourceUvs.Count * 2];
+            var colors = new float[sourcePositions.Count * 4];
+            for (int index = 0; index < sourcePositions.Count; index++)
+            {
+                Vector3 position = sourcePositions[index];
+                positions[index * 3] = position.X * skinScale;
+                positions[index * 3 + 1] = position.Y * skinScale;
+                positions[index * 3 + 2] = position.Z * skinScale;
+                colors[index * 4] = colors[index * 4 + 1] = colors[index * 4 + 2] = colors[index * 4 + 3] = 1f;
+            }
+            for (int index = 0; index < sourceUvs.Count; index++)
+            {
+                Vector2 uv = sourceUvs[index];
+                uvs[index * 2] = uv.X;
+                uvs[index * 2 + 1] = uv.Y;
+            }
+            return (positions, uvs, colors, filteredIndices.ToArray());
+        }
+
         private static string CreateKey(string path, string directory)
             => path.Replace('\\', '/').ToLowerInvariant() + "|" + Path.GetFullPath(directory);
 
@@ -341,6 +421,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Resources
         public float[] Evaluate(float seconds)
         {
             float duration = Math.Max(0.0001f, _animation.Duration);
+            _pose.Clear();
             _animation.Evaluate(seconds % duration, _pose);
 
             for (int index = 0; index < _skeleton.Joints.Count; index++)

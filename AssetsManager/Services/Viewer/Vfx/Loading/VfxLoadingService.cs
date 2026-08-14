@@ -18,7 +18,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     /// <summary>
     /// Loads a model's complete effect catalog and prepares every referenced emitter resource.
     /// </summary>
-    public sealed class VfxLoadingService
+    public sealed class VfxLoadingService : IDisposable
     {
         private readonly VfxResourceResolver _resources = new();
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
@@ -28,15 +28,27 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             public Dictionary<uint, VfxSystemDefinition> Systems { get; } = new();
             public Dictionary<uint, uint> ResourceMap { get; } = new();
             public Dictionary<uint, string> SystemSources { get; } = new();
+            public Dictionary<uint, VfxEventSequenceDefinition> EventSequences { get; } = new();
+            public VfxOwnerSceneContext OwnerSceneContext { get; set; }
             public List<string> LoadedBins { get; } = new();
             public List<string> MissingDependencies { get; } = new();
             public List<string> AmbiguousDependencies { get; } = new();
         }
 
         public Bundle Load(string skinBinPath, LogService log)
-            => Load(skinBinPath, log, CancellationToken.None);
+        {
+            _catalogGate.Wait();
+            try
+            {
+                return LoadCore(skinBinPath, log, CancellationToken.None);
+            }
+            finally
+            {
+                _catalogGate.Release();
+            }
+        }
 
-        private Bundle Load(string skinBinPath, LogService log, CancellationToken cancellationToken)
+        private Bundle LoadCore(string skinBinPath, LogService log, CancellationToken cancellationToken)
         {
             var bundle = new Bundle();
             if (string.IsNullOrEmpty(skinBinPath) || !File.Exists(skinBinPath)) return bundle;
@@ -80,6 +92,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                         }
                         foreach (var kv in document.ResourceMap)
                             bundle.ResourceMap.TryAdd(kv.Key, kv.Value);
+                        foreach (VfxEventSequenceDefinition sequence in document.EventSequences)
+                            bundle.EventSequences.TryAdd(sequence.OwnerPathHash, sequence);
+                        bundle.OwnerSceneContext ??= document.OwnerSceneContext;
 
                         foreach (var dep in document.Dependencies)
                         {
@@ -132,7 +147,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             try
             {
                 return await Task.Run(
-                    () => Load(skinBinPath, log, cancellationToken),
+                    () => LoadCore(skinBinPath, log, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -146,7 +161,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             string searchDirectory,
             Matrix4x4 transform,
             int seed,
-            LogService log)
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext = null)
         {
             ArgumentNullException.ThrowIfNull(definition);
             var runtime = new VfxPlaybackRuntime(seed);
@@ -195,7 +211,18 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     searchDirectory);
                 if (gradient != null) emitter.PendingColorGradient = gradient;
 
-                if (emitter.Def.IsMeshPrimitive && emitter.Def.PrimitiveKind != VfxPrimitiveKind.AttachedMesh)
+                if (emitter.Def.PrimitiveKind == VfxPrimitiveKind.AttachedMesh)
+                {
+                    if (!string.IsNullOrWhiteSpace(ownerSceneContext?.MeshPath))
+                    {
+                        emitter.PendingMesh = _resources.ResolveAttachedMesh(
+                            ownerSceneContext.MeshPath,
+                            emitter.Def.AttachedSubmeshHashes,
+                            searchDirectory,
+                            ownerSceneContext.SkinScale);
+                    }
+                }
+                else if (emitter.Def.IsMeshPrimitive)
                 {
                     if (!string.IsNullOrWhiteSpace(emitter.Def.MeshPath))
                     {
@@ -225,7 +252,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
             string searchDirectory,
             Matrix4x4 transform,
             int seed,
-            LogService log)
+            LogService log,
+            VfxOwnerSceneContext ownerSceneContext = null)
         {
             return new VfxPlaybackGraphRuntime(
                 definition,
@@ -238,10 +266,23 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
                     searchDirectory,
                     childTransform,
                     childSeed,
-                    log));
+                    log,
+                    ownerSceneContext));
         }
 
-        public void ClearCaches() => _resources.ClearCaches();
+        internal BitmapSource ResolveTexture(string authoredPath, string searchDirectory)
+            => _resources.ResolveTexture(authoredPath, searchDirectory);
+
+        internal (float[] Positions, float[] Uvs, float[] Colors, uint[] Indices)? ResolveMesh(
+            string authoredPath,
+            string searchDirectory)
+            => _resources.ResolveMesh(authoredPath, searchDirectory);
+
+        public void Dispose()
+        {
+            _resources.Dispose();
+            _catalogGate.Dispose();
+        }
 
         private static string ResolveWadRoot(string skinBinPath)
         {

@@ -29,7 +29,106 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             return new VfxBinDocument(
                 ExtractAll(tree),
                 ExtractResourceMap(tree),
-                tree.Dependencies.ToArray());
+                tree.Dependencies.ToArray(),
+                ExtractEventSequences(tree),
+                ExtractOwnerSceneContext(tree));
+        }
+
+        private static VfxOwnerSceneContext ExtractOwnerSceneContext(BinTree tree)
+        {
+            foreach (BinTreeObject owner in tree.Objects.Values)
+            {
+                if (owner.ClassHash != SkinCharacterDataPropertiesClass ||
+                    Get(owner.Properties, F_skinMeshProperties) is not BinTreeStruct meshProperties)
+                {
+                    continue;
+                }
+
+                string meshPath = GetString(meshProperties.Properties, F_simpleSkin);
+                if (string.IsNullOrWhiteSpace(meshPath)) continue;
+                return new VfxOwnerSceneContext(
+                    meshPath,
+                    GetString(meshProperties.Properties, F_ownerSkeleton) ?? string.Empty,
+                    Math.Max(0.01f, GetF32(meshProperties.Properties, F_skinScale) ?? 1f));
+            }
+            return null;
+        }
+
+        private static IReadOnlyList<VfxEventSequenceDefinition> ExtractEventSequences(BinTree tree)
+        {
+            var sequences = new List<VfxEventSequenceDefinition>();
+            foreach (BinTreeObject owner in tree.Objects.Values)
+            {
+                AddEventSequence(sequences, owner.PathHash, owner.ClassHash, owner.Properties);
+                if (Get(owner.Properties, F_clipDataMap) is not BinTreeMap clipMap) continue;
+                foreach (var clipPair in clipMap)
+                {
+                    if (clipPair.Value is not BinTreeStruct clip) continue;
+                    AddEventSequence(
+                        sequences,
+                        AsU32(clipPair.Key) ?? owner.PathHash,
+                        clip.ClassHash,
+                        clip.Properties);
+                }
+            }
+            return sequences;
+        }
+
+        private static void AddEventSequence(
+            ICollection<VfxEventSequenceDefinition> sequences,
+            uint ownerPathHash,
+            uint ownerClassHash,
+            IReadOnlyDictionary<uint, BinTreeProperty> properties)
+        {
+            if (Get(properties, F_eventDataMap) is not BinTreeMap eventMap) return;
+            var events = new List<VfxParticleEventDefinition>();
+            foreach (var pair in eventMap)
+            {
+                if (pair.Value is not BinTreeStruct eventData || eventData.ClassHash != ParticleEventClass)
+                    continue;
+                events.Add(ParseParticleEvent(AsU32(pair.Key) ?? 0u, eventData));
+            }
+            if (events.Count == 0) return;
+            sequences.Add(new VfxEventSequenceDefinition(
+                ownerPathHash,
+                ownerClassHash,
+                Math.Max(0.0001f, GetF32(properties, F_clipTickDuration) ?? (1f / 30f)),
+                GetF32(properties, F_clipStartFrame) ?? 0f,
+                GetF32(properties, F_clipEndFrame) ?? -1f,
+                events));
+        }
+
+        private static VfxParticleEventDefinition ParseParticleEvent(uint eventHash, BinTreeStruct eventData)
+        {
+            IReadOnlyDictionary<uint, BinTreeProperty> properties = eventData.Properties;
+            var attachments = new List<VfxParticleEventAttachment>();
+            if (Get(properties, F_eventPairList) is BinTreeContainer pairs)
+            {
+                foreach (BinTreeStruct pair in pairs.Elements.OfType<BinTreeStruct>())
+                {
+                    attachments.Add(new VfxParticleEventAttachment(
+                        AsU32(Get(pair.Properties, F_eventSourceBone)) ?? 0u,
+                        AsU32(Get(pair.Properties, F_eventTargetBone)) ?? 0u));
+                }
+            }
+
+            return new VfxParticleEventDefinition(
+                eventHash,
+                AsU32(Get(properties, F_eventName)) ?? 0u,
+                GetF32(properties, F_eventStartFrame) ?? 0f,
+                GetF32(properties, F_eventEndFrame) ?? -1f,
+                AsU32(Get(properties, F_eventEffectKey)) ?? 0u,
+                AsU32(Get(properties, F_eventEnemyEffectKey)) ?? 0u,
+                GetString(properties, F_eventEffectName) ?? string.Empty,
+                GetBool(properties, F_eventIsLoop, defaultValue: true),
+                GetBool(properties, F_eventIsKill, defaultValue: true),
+                GetBool(properties, F_eventIsDetachable),
+                GetBool(properties, F_eventIsSelfOnly),
+                GetBool(properties, F_eventFireIfAnimationEndsEarly),
+                GetBool(properties, F_eventSkipIfPastEndFrame),
+                GetBool(properties, F_eventScalePlaySpeed),
+                GetF32(properties, F_eventScale) ?? 1f,
+                attachments);
         }
 
         private static IReadOnlyDictionary<uint, uint> ExtractResourceMap(BinTree tree)
@@ -91,7 +190,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 path,
                 emitters,
                 radius,
-                transform);
+                transform,
+                new VfxSystemAuthoredFeatures(
+                    HasMaterialOverrides: HasElements(o.Properties, F_materialOverrideDefinitions),
+                    HasAssetRemapping: HasElements(o.Properties, F_assetRemappingTable)));
         }
 
         private static VfxEmitterDefinition ParseEmitter(BinTreeStruct s)
@@ -129,12 +231,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
             bool isMesh = primitiveKind is VfxPrimitiveKind.Mesh or VfxPrimitiveKind.AttachedMesh;
             bool isArbitraryQuad = prim is BinTreeStruct aq && aq.ClassHash == PrimArbitraryQuad;
             string meshPath = null, meshSkl = null, meshAnm = null;
+            IReadOnlyList<uint> attachedSubmeshHashes = Array.Empty<uint>();
             VfxTrailDefinition trail = null;
             if (isMesh && prim is BinTreeStruct ps2 && Get(ps2.Properties, F_meshDef) is BinTreeStruct md)
             {
                 meshPath = GetString(md.Properties, F_simpleMesh) ?? GetString(md.Properties, F_meshName);
                 meshSkl = GetString(md.Properties, F_meshSkeleton);
                 meshAnm = GetString(md.Properties, F_meshAnim);
+                attachedSubmeshHashes = ReadHashContainer(Get(md.Properties, F_submeshesToDrawAlways))
+                    .Concat(ReadHashContainer(Get(md.Properties, F_submeshesToDraw)))
+                    .Distinct()
+                    .ToArray();
             }
             if (primitiveKind is VfxPrimitiveKind.CameraTrail or VfxPrimitiveKind.ArbitraryTrail &&
                 prim is BinTreeStruct trailPrimitive &&
@@ -361,8 +468,40 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 ParticlesShareRandomValue: GetBool(p, F_particlesShareRandomValue),
                 FalloffTexturePath: GetString(p, F_falloffTexture),
                 AudioSoundOnCreate: audioSoundOnCreate,
-                FilteringKeywordsExcluded: filteringKeywords);
+                FilteringKeywordsExcluded: filteringKeywords,
+                AttachedSubmeshHashes: attachedSubmeshHashes,
+                AuthoredFeatures: new VfxEmitterAuthoredFeatures(
+                    PrimitiveClassHash: primitiveClass,
+                    HasCustomMaterial: HasValue(p, F_customMaterial),
+                    HasStencil: (GetU8(p, F_stencilMode) ?? 0) != 0 || (GetU8(p, F_stencilRef) ?? 0) != 0,
+                    HasEmissionMesh: HasValue(p, F_emissionMeshName),
+                    HasEmissionSurface: HasValue(p, F_emissionSurfaceDefinition),
+                    UsesEmissionMeshNormal: GetBool(p, F_useEmissionMeshNormal),
+                    HasTranslationOverride: HasValue(p, F_translationOverride),
+                    HasRotationOverride: HasValue(p, F_rotationOverride),
+                    HasScaleOverride: HasValue(p, F_scaleOverride),
+                    HasPostRotateOrientationAxis: HasValue(p, F_postRotateOrientationAxis),
+                    HasPeriodControl: HasValue(p, F_period) || HasValue(p, F_timeActiveDuringPeriod)));
         }
+
+        private static bool HasValue(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint fieldHash)
+        {
+            if (!properties.TryGetValue(fieldHash, out BinTreeProperty property)) return false;
+            return property switch
+            {
+                BinTreeOptional optional => optional.Value is not null,
+                BinTreeStruct structure => structure.ClassHash != 0,
+                _ => true
+            };
+        }
+
+        private static bool HasElements(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint fieldHash)
+            => properties.TryGetValue(fieldHash, out BinTreeProperty property) && property switch
+            {
+                BinTreeContainer container => container.Elements.Count > 0,
+                BinTreeMap map => map.Count > 0,
+                _ => HasValue(properties, fieldHash)
+            };
 
         private static VfxFlexShapeDefinition ReadFlexShape(
             IReadOnlyDictionary<uint, BinTreeProperty> emitterProperties)
@@ -394,6 +533,17 @@ namespace AssetsManager.Services.Viewer.Vfx.Parsing
                 .OfType<BinTreeString>()
                 .Select(static value => value.Value)
                 .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+        }
+
+        private static IReadOnlyList<uint> ReadHashContainer(BinTreeProperty property)
+        {
+            if (property is not BinTreeContainer container || container.Elements.Count == 0)
+                return Array.Empty<uint>();
+            return container.Elements
+                .Select(AsU32)
+                .Where(static value => value is > 0)
+                .Select(static value => value.Value)
                 .ToArray();
         }
 

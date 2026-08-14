@@ -64,6 +64,28 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         }
         public void SetStartDelay(float seconds) => Root.SetStartDelay(seconds);
 
+        public void Kill()
+        {
+            foreach (VfxPlaybackRuntime runtime in _runtimes)
+            {
+                runtime.ParticleLifecycle -= OnParticleLifecycle;
+                runtime.Kill();
+            }
+            foreach (VfxPlaybackRuntime pending in _pendingChildren)
+            {
+                pending.ParticleLifecycle -= OnParticleLifecycle;
+                _depth.Remove(pending);
+                _localTransforms.Remove(pending);
+            }
+            _pendingChildren.Clear();
+            for (int index = _runtimes.Count - 1; index > 0; index--)
+            {
+                _depth.Remove(_runtimes[index]);
+                _localTransforms.Remove(_runtimes[index]);
+                _runtimes.RemoveAt(index);
+            }
+        }
+
         public void Reset()
         {
             for (int index = _runtimes.Count - 1; index > 0; index--)
@@ -83,6 +105,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _pendingChildren.Clear();
             _random = new Random(_initialSeed);
             _nextSeed = unchecked(_initialSeed + 1);
+            Root.ParticleLifecycle -= OnParticleLifecycle;
+            Root.ParticleLifecycle += OnParticleLifecycle;
             Root.Reset();
         }
 

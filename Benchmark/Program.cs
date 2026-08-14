@@ -41,6 +41,16 @@ namespace BenchmarkApp
                 AuditRawVfxBins(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && args[0] == "vfx-event-audit")
+            {
+                AuditVfxEvents(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && args[0] == "vfx-texture-export")
+            {
+                ExportVfxTexture(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && args[0] == "list-extensions")
             {
                 await ListAllExtensionsAsync();
@@ -564,6 +574,21 @@ namespace BenchmarkApp
 
             var bundle = service.Load(binPath, logService);
             Console.WriteLine($"\n[RESULT] Total VFX Systems Loaded: {bundle.Systems.Count}");
+            Console.WriteLine($"[RESULT] Event Sequences Loaded: {bundle.EventSequences.Count}");
+            Console.WriteLine($"[RESULT] BIN Files Loaded: {bundle.LoadedBins.Count}");
+            var compositions = AssetsManager.Services.Viewer.Vfx.Composition.VfxAbilityCompositionBuilder.BuildAll(
+                bundle.EventSequences.Values,
+                bundle.Systems,
+                bundle.ResourceMap);
+            Console.WriteLine($"[RESULT] Ability Compositions: {compositions.Count} " +
+                $"({compositions.Sum(item => item.ResolvedCount)} resolved events, " +
+                $"{compositions.Sum(item => item.UnresolvedCount)} unresolved events)");
+            Console.WriteLine($"[RESULT] Owner Scene: " +
+                (bundle.OwnerSceneContext is null
+                    ? "not resolved"
+                    : $"mesh={bundle.OwnerSceneContext.MeshPath}, skeleton={bundle.OwnerSceneContext.SkeletonPath}, scale={bundle.OwnerSceneContext.SkinScale}"));
+            foreach (string loadedBin in bundle.LoadedBins)
+                Console.WriteLine($"   BIN: {loadedBin}");
             var meshResolver = new AssetsManager.Services.Viewer.Vfx.Resources.VfxResourceResolver();
 
             string systemFilter = args.Length > 2 ? args[2] : null;
@@ -590,13 +615,23 @@ namespace BenchmarkApp
                           $"radius={emitter.SpawnShape.Radius}, height={emitter.SpawnShape.Height}, " +
                           $"offset={emitter.SpawnShape.EmitOffset.Constant}, flags={emitter.SpawnShape.Flags}]";
                     string meshBounds = "-";
-                    var mesh = meshResolver.ResolveMesh(emitter.MeshPath, rootPath);
+                    string textureInfo = DescribeVfxTexture(meshResolver.ResolveTexture(emitter.TexturePath, rootPath));
+                    var mesh = emitter.PrimitiveKind == AssetsManager.Views.Models.Viewer.VfxPrimitiveKind.AttachedMesh &&
+                               bundle.OwnerSceneContext is not null
+                        ? meshResolver.ResolveAttachedMesh(
+                            bundle.OwnerSceneContext.MeshPath,
+                            emitter.AttachedSubmeshHashes,
+                            rootPath,
+                            bundle.OwnerSceneContext.SkinScale)
+                        : meshResolver.ResolveMesh(emitter.MeshPath, rootPath);
                     if (mesh is { } decoded && decoded.Positions.Length >= 3)
                     {
                         var min = new System.Numerics.Vector3(float.PositiveInfinity);
                         var max = new System.Numerics.Vector3(float.NegativeInfinity);
-                        for (int index = 0; index + 2 < decoded.Positions.Length; index += 3)
+                        foreach (uint vertexIndex in decoded.Indices.Distinct())
                         {
+                            int index = checked((int)vertexIndex * 3);
+                            if (index + 2 >= decoded.Positions.Length) continue;
                             var position = new System.Numerics.Vector3(
                                 decoded.Positions[index],
                                 decoded.Positions[index + 1],
@@ -604,7 +639,7 @@ namespace BenchmarkApp
                             min = System.Numerics.Vector3.Min(min, position);
                             max = System.Numerics.Vector3.Max(max, position);
                         }
-                        meshBounds = $"{min}..{max} size={max - min}";
+                        meshBounds = $"indices={decoded.Indices.Length}, {min}..{max} size={max - min}";
                     }
                     Console.WriteLine(
                         $"   * {emitter.Name} | primitive={emitter.PrimitiveKind} | " +
@@ -615,16 +650,60 @@ namespace BenchmarkApp
                         $"birthScale={emitter.BirthScale.Constant} | scale0={emitter.ScaleOverLife?.Constant} | " +
                         $"uniform={emitter.IsUniformScale} | position={emitter.EmitterPosition.Constant} | " +
                         $"blend={emitter.BlendMode}/{AssetsManager.Views.Models.Viewer.VfxBlendModes.Describe(emitter.BlendMode)} | " +
-                        $"texture={emitter.TexturePath ?? "-"} | textureMult={emitter.TextureMultPath ?? "-"} | " +
+                        $"texture={emitter.TexturePath ?? "-"} [{textureInfo}] | textureMult={emitter.TextureMultPath ?? "-"} | " +
                         $"birthColor={emitter.BirthColor.Constant} | color={emitter.ColorOverLife?.Constant} | " +
                         $"birthRotation={emitter.BirthRotation?.Constant} | renderState={emitter.RenderState} | " +
                         $"reflection={emitter.Reflection} | erosion={emitter.AlphaErosion} | " +
                         $"spawn={spawn} | velocity={emitter.BirthVelocity?.Constant} | " +
                         $"acceleration={emitter.Acceleration?.Constant} | mesh={emitter.MeshPath ?? "-"} | " +
                         $"meshBounds={meshBounds} | " +
+                        $"attachedSubmeshes={string.Join(",", emitter.AttachedSubmeshHashes ?? Array.Empty<uint>())} | " +
                         $"children={children}");
                 }
             }
+        }
+
+        private static string DescribeVfxTexture(System.Windows.Media.Imaging.BitmapSource source)
+        {
+            if (source is null) return "missing";
+            var bitmap = source.Format == System.Windows.Media.PixelFormats.Bgra32
+                ? source
+                : new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                    source,
+                    System.Windows.Media.PixelFormats.Bgra32,
+                    null,
+                    0);
+            int stride = bitmap.PixelWidth * 4;
+            byte[] pixels = new byte[stride * bitmap.PixelHeight];
+            bitmap.CopyPixels(pixels, stride, 0);
+            int minimumAlpha = 255;
+            int maximumAlpha = 0;
+            long alphaTotal = 0;
+            for (int index = 3; index < pixels.Length; index += 4)
+            {
+                int alpha = pixels[index];
+                minimumAlpha = Math.Min(minimumAlpha, alpha);
+                maximumAlpha = Math.Max(maximumAlpha, alpha);
+                alphaTotal += alpha;
+            }
+            double averageAlpha = pixels.Length == 0 ? 0 : alphaTotal / (pixels.Length / 4d);
+            return $"{bitmap.PixelWidth}x{bitmap.PixelHeight}, alpha={minimumAlpha}..{maximumAlpha}, avg={averageAlpha:F1}";
+        }
+
+        private static void ExportVfxTexture(string[] args)
+        {
+            if (args.Length < 2)
+            {
+                Console.WriteLine("Usage: vfx-texture-export <texture.tex> <output.png>");
+                return;
+            }
+            var source = AssetsManager.Utils.TextureUtils.LoadTextureFromFile(Path.GetFullPath(args[0]));
+            if (source is null) throw new InvalidDataException("Texture could not be decoded.");
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
+            using var output = File.Create(Path.GetFullPath(args[1]));
+            encoder.Save(output);
+            Console.WriteLine($"Exported {source.PixelWidth}x{source.PixelHeight}: {Path.GetFullPath(args[1])}");
         }
 
         private static readonly Dictionary<uint, string> RawVfxNames = BuildRawVfxNames();
@@ -749,6 +828,42 @@ namespace BenchmarkApp
             "isRandomStartFrame" or "particleColorTexture" or "isDirectionOriented" => true,
             _ => false
         };
+
+        private static void AuditVfxEvents(string[] args)
+        {
+            if (args.Length < 1)
+            {
+                Console.WriteLine("Usage: vfx-event-audit <animation.bin>");
+                return;
+            }
+
+            string binPath = Path.GetFullPath(args[0]);
+            using var stream = File.OpenRead(binPath);
+            var tree = new BinTree(stream);
+            uint eventMapHash = Fnv1a.HashLower("mEventDataMap");
+            uint clipMapHash = Fnv1a.HashLower("mClipDataMap");
+            Console.WriteLine($"[VFX EVENTS] {binPath}");
+            Console.WriteLine($"mClipDataMap=0x{Fnv1a.HashLower("mClipDataMap"):x8} mEventDataMap=0x{eventMapHash:x8}");
+            Console.WriteLine($"Objects={tree.Objects.Count} Dependencies={tree.Dependencies.Count}");
+            foreach (BinTreeObject owner in tree.Objects.Values)
+            {
+                Console.WriteLine($"OBJECT path=0x{owner.PathHash:x8} class=0x{owner.ClassHash:x8}");
+                foreach (var entry in owner.Properties)
+                    Console.WriteLine($"  property=0x{entry.Key:x8} type={entry.Value.Type}");
+                if (owner.Properties.TryGetValue(clipMapHash, out BinTreeProperty clipProperty) && clipProperty is BinTreeMap clipMap)
+                {
+                    foreach (var clip in clipMap.Take(5))
+                        Console.WriteLine($"  CLIP key={DescribeRaw(clip.Key)} value={DescribeRaw(clip.Value)}");
+                }
+                if (!owner.Properties.TryGetValue(eventMapHash, out BinTreeProperty property)) continue;
+                Console.WriteLine($"OWNER path=0x{owner.PathHash:x8} class=0x{owner.ClassHash:x8} mapType={property.Type}");
+                if (property is not BinTreeMap map) continue;
+                foreach (var pair in map.Take(12))
+                {
+                    Console.WriteLine($"  key={DescribeRaw(pair.Key)} value={DescribeRaw(pair.Value)}");
+                }
+            }
+        }
 
         private static string RawString(IReadOnlyDictionary<uint, BinTreeProperty> properties, uint hash) =>
             properties.TryGetValue(hash, out BinTreeProperty property) && property is BinTreeString value

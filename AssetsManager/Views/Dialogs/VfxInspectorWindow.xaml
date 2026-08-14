@@ -6,6 +6,7 @@
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
         xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
+        xmlns:viewerModels="clr-namespace:AssetsManager.Views.Models.Viewer"
         xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Height="900" Width="1400"
@@ -136,13 +137,22 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListViewItem">
                                             <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="6" Padding="10,8" Margin="0,0,0,4">
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                                        <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
-                                                        <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                            <TextBlock Text="{Binding EmitterCount, StringFormat='{}Emitters: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,0,10,0"/>
+                                                            <TextBlock Text="{Binding TextureCount, StringFormat='{}Tex: {0}'}" FontSize="11" Foreground="{StaticResource TextMuted}"/>
+                                                        </StackPanel>
                                                     </StackPanel>
-                                                </StackPanel>
+                                                    <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" BorderBrush="{Binding StatusBrush}" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontWeight="Bold" FontSize="8.5"/>
+                                                    </Border>
+                                                </Grid>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -174,7 +184,7 @@
 
                     <!-- Segmented Tab Capsule Bar (Matching Hash Lab / Control Deck Style) -->
                     <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" CornerRadius="9" Padding="3" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" Margin="0,0,0,10">
-                        <UniformGrid Columns="4" Height="36">
+                        <UniformGrid Columns="6" Height="36">
                             <RadioButton x:Name="TabViewport" IsChecked="True" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="3D Live Viewport">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="CubeOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -197,6 +207,18 @@
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <materialIcons:MaterialIcon Kind="VectorTriangle" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="MESHES (.scb/.sco)" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TabComposition" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Ability event composition">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="ApplicationCogOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="ABILITY COMPOSITION" FontSize="9.5" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TabCompatibility" GroupName="VfxWorkspaceTabs" Style="{StaticResource SegmentedRadioButtonStyle}" ToolTip="Compatibility Report">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="ShieldSearchOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="COMPATIBILITY" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
                         </UniformGrid>
@@ -356,6 +378,16 @@
 
                                                  <!-- Active System Loop Boundary Needle Overlay Canvas (Placed ON TOP of Playhead for easy grabbing!) -->
                                                  <Canvas x:Name="LoopBoundaryCanvas" Panel.ZIndex="100">
+                                                     <Canvas.Style>
+                                                         <Style TargetType="Canvas">
+                                                             <Setter Property="Opacity" Value="1"/>
+                                                             <Style.Triggers>
+                                                                 <DataTrigger Binding="{Binding IsPreviewLoopEnabled}" Value="False">
+                                                                     <Setter Property="Opacity" Value="0.35"/>
+                                                                 </DataTrigger>
+                                                             </Style.Triggers>
+                                                         </Style>
+                                                     </Canvas.Style>
                                                      <!-- Vertical Golden Amber Line marking system loop boundary -->
                                                      <Line x:Name="LoopBoundaryLine" X1="0" Y1="0" X2="0" Y2="400"
                                                            Stroke="#FFD700" StrokeThickness="2" IsHitTestVisible="False"/>
@@ -365,7 +397,7 @@
                                                               PreviewMouseDown="LoopBoundaryHandle_PreviewMouseDown"
                                                               PreviewMouseMove="LoopBoundaryHandle_PreviewMouseMove"
                                                               PreviewMouseUp="LoopBoundaryHandle_PreviewMouseUp"
-                                                              ToolTip="Drag to adjust custom Loop Boundary (↺)">
+                                                              ToolTip="Drag to adjust the optional preview loop. Authored emitter lifetimes are not changed.">
                                                          <Ellipse.Effect>
                                                              <DropShadowEffect Color="#FFD700" BlurRadius="6" ShadowDepth="0" Opacity="0.9"/>
                                                          </Ellipse.Effect>
@@ -430,6 +462,9 @@
 
                                             <!-- Speed Selector -->
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <CheckBox IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}" Content="Preview loop"
+                                                          Foreground="{StaticResource TextMuted}" FontSize="10" VerticalAlignment="Center" Margin="0,0,10,0"
+                                                          ToolTip="Optional viewport repeat range. Does not modify authored emitter loops or lifetimes."/>
                                                 <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                                 <ComboBox x:Name="SpeedComboBox" Style="{StaticResource ModernComboBox}" Width="88" Height="26" SelectionChanged="Speed_SelectionChanged" SelectedIndex="1">
                                                     <ComboBoxItem Content="0.25x" Tag="0.25"/>
@@ -782,6 +817,221 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
+                        </Grid>
+
+                        <!-- TAB 5: ABILITY COMPOSITION -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabComposition, Converter={StaticResource BoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Margin="4,2,4,10">
+                                        <TextBlock Text="AUTHORED EVENT SEQUENCES" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="Bold"/>
+                                        <TextBlock Text="ParticleEventData found in the loaded BIN graph" Foreground="{StaticResource TextMuted}" FontSize="9.5" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <ListBox Grid.Row="1" ItemsSource="{Binding Compositions}" SelectedItem="{Binding SelectedComposition, Mode=TwoWay}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0,0,0,5"/>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,7">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding DisplayName}" Foreground="{StaticResource TextPrimary}" FontFamily="Consolas" FontSize="10.5" FontWeight="Bold"/>
+                                                            <TextBlock Text="{Binding ClassText}" Foreground="{StaticResource TextMuted}" FontFamily="Consolas" FontSize="9"/>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ResolutionText}" Foreground="{StaticResource AccentGreen}" FontSize="8.5" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="2" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="12">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <StackPanel Grid.Row="0" Margin="2,0,2,10">
+                                        <TextBlock Text="EVENT TIMELINE" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="Bold"/>
+                                        <TextBlock Text="Double-click a resolved event to inspect and play its VFX system." Foreground="{StaticResource TextMuted}" FontSize="9.5" Margin="0,2,0,0"/>
+                                        <Button Click="PlayComposition_Click" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Padding="10,5" Margin="0,8,0,0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="White" Margin="0,0,6,0"/>
+                                                <TextBlock Text="PLAY RESOLVED SEQUENCE" FontSize="9.5" FontWeight="Bold"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                    <ListBox Grid.Row="1" ItemsSource="{Binding SelectedComposition.Events}" SelectedItem="{Binding SelectedCompositionEvent, Mode=TwoWay}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="0,0,0,7"/>
+                                                <EventSetter Event="MouseDoubleClick" Handler="CompositionEvent_MouseDoubleClick"/>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{StaticResource CardBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="7" Padding="10,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="92"/>
+                                                            <ColumnDefinition Width="150"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="110"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="{Binding StartFrame, StringFormat='{}FRAME {0:0.##}'}" Foreground="{StaticResource AccentBlue}" FontFamily="Consolas" FontSize="10" FontWeight="Bold"/>
+                                                            <TextBlock Text="{Binding StartSeconds, StringFormat='{}{0:0.###}s'}" Foreground="{StaticResource TextMuted}" FontFamily="Consolas" FontSize="9"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                                            <TextBlock Text="{Binding EventText}" Foreground="{StaticResource TextSecondary}" FontFamily="Consolas" FontSize="9.5"/>
+                                                            <TextBlock Text="{Binding EffectText}" Foreground="{StaticResource TextPrimary}" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" Margin="0,0,10,0">
+                                                            <TextBlock Text="{Binding SystemName}" Foreground="{StaticResource TextPrimary}" FontSize="10.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding AttachmentText}" Foreground="{StaticResource TextMuted}" FontFamily="Consolas" FontSize="9" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <Border Grid.Column="3" Background="{StaticResource SidebarBackground}" CornerRadius="5" Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ResolutionText}" FontFamily="Consolas" FontSize="8.5" FontWeight="Bold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="OrangeRed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsResolved}" Value="True">
+                                                                                <Setter Property="Foreground" Value="{StaticResource AccentGreen}"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- TAB 6: COMPATIBILITY REPORT -->
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabCompatibility, Converter={StaticResource BoolToVis}}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialIcons:MaterialIcon Kind="ShieldCheckOutline" Width="20" Height="20" Foreground="{Binding SelectedSystem.StatusBrush}" Margin="0,0,8,0"/>
+                                            <TextBlock Text="{Binding SelectedSystem.CompatibilityReport.StatusText, FallbackValue='NO REPORT'}" Foreground="{Binding SelectedSystem.StatusBrush}" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <TextBlock Text="Standalone viewport fidelity based on authored BIN features and required scene context." Foreground="{StaticResource TextMuted}" FontSize="11" Margin="28,2,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,5" Margin="0,0,6,0">
+                                            <StackPanel>
+                                                <TextBlock Text="CONTEXT" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource AccentBlue}" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedSystem.CompatibilityReport.ContextCount, FallbackValue=0}" FontFamily="Consolas" FontSize="14" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,5" Margin="0,0,6,0">
+                                            <StackPanel>
+                                                <TextBlock Text="APPROX" FontSize="8.5" FontWeight="Bold" Foreground="{StaticResource AccentOrange}" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedSystem.CompatibilityReport.ApproximationCount, FallbackValue=0}" FontFamily="Consolas" FontSize="14" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="{StaticResource CardBackground}" CornerRadius="6" Padding="10,5">
+                                            <StackPanel>
+                                                <TextBlock Text="LIMITED" FontSize="8.5" FontWeight="Bold" Foreground="OrangeRed" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding SelectedSystem.CompatibilityReport.UnsupportedCount, FallbackValue=0}" FontFamily="Consolas" FontSize="14" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Grid Grid.Row="1">
+                                <TextBlock Text="All active emitters are supported by the standalone viewport."
+                                           Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="{Binding SelectedSystem.CompatibilityReport.Issues.Count, Converter={StaticResource CountToVis}, ConverterParameter=Invert}"/>
+                                <ListBox ItemsSource="{Binding SelectedSystem.CompatibilityReport.Issues}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0,0,0,8"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Focusable" Value="False"/>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1" CornerRadius="8" Padding="14,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="120"/>
+                                                        <ColumnDefinition Width="190"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="6" Padding="7,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="Bold">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="OrangeRed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Severity}" Value="{x:Static viewerModels:VfxCompatibilitySeverity.Context}">
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentBlue}"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding Severity}" Value="{x:Static viewerModels:VfxCompatibilitySeverity.Approximation}">
+                                                                            <Setter Property="Foreground" Value="{StaticResource AccentOrange}"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
+                                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding SourceText}" Foreground="{StaticResource TextMuted}" FontFamily="Consolas" FontSize="9.5" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="{StaticResource TextSecondary}" FontSize="10.5" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </Grid>

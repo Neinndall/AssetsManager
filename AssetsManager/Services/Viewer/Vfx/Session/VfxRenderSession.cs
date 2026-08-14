@@ -22,20 +22,29 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
     public sealed class VfxRenderSession : IDisposable
     {
         private readonly LogService _logService;
-        private readonly VfxLoadingService _loadingService = new();
+        private readonly VfxLoadingService _loadingService;
+        private readonly bool _ownsLoadingService;
         private readonly Dictionary<BitmapSource, uint> _textureCache = new();
         private VfxOpenGlRenderer _renderer;
         private VfxPlaybackGraphRuntime _graph;
+        private readonly List<VfxPlaybackGraphRuntime> _graphs = new();
+        private readonly Dictionary<VfxPlaybackGraphRuntime, Matrix4x4> _graphPlacements = new();
+        private readonly Dictionary<VfxPlaybackGraphRuntime, double> _graphKillTimes = new();
         private VfxSystemModel _activeSystem;
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private bool _isPlaying;
         private bool _ready;
+        private bool _disposed;
         private uint _viewportWidth;
         private uint _viewportHeight;
 
-        public VfxRenderSession(LogService logService = null)
+        public VfxRenderSession(
+            LogService logService = null,
+            VfxLoadingService loadingService = null)
         {
             _logService = logService;
+            _loadingService = loadingService ?? new VfxLoadingService();
+            _ownsLoadingService = loadingService is null;
         }
 
         internal int LiveParticleCount
@@ -43,10 +52,10 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             get
             {
                 int count = 0;
-                if (_graph == null) return count;
-                foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
+                foreach (VfxPlaybackGraphRuntime graph in _graphs)
                 {
-                    count += runtime.LiveParticleCount;
+                    foreach (VfxPlaybackRuntime runtime in graph.Runtimes)
+                        count += runtime.LiveParticleCount;
                 }
                 return count;
             }
@@ -66,6 +75,9 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
             _isPlaying = false;
             _activeSystem = system;
             _graph = null;
+            _graphs.Clear();
+            _graphPlacements.Clear();
+            _graphKillTimes.Clear();
             if (system != null) system.CurrentTime = 0;
 
             if (_ready)
@@ -83,8 +95,96 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
                     system.SearchDirectory,
                     _worldTransform,
                     system.PlaybackSeed,
-                    _logService);
+                    _logService,
+                    system.OwnerSceneContext);
+                _graphs.Add(_graph);
+                _graphPlacements[_graph] = Matrix4x4.Identity;
             }
+        }
+
+        public bool SetAbilityComposition(
+            VfxAbilityComposition composition,
+            IReadOnlyDictionary<uint, VfxSystemDefinition> systems,
+            IReadOnlyDictionary<uint, uint> resourceMap,
+            string searchDirectory,
+            int seed,
+            VfxOwnerSceneContext ownerSceneContext = null)
+        {
+            ArgumentNullException.ThrowIfNull(composition);
+            systems ??= new Dictionary<uint, VfxSystemDefinition>();
+            resourceMap ??= new Dictionary<uint, uint>();
+            _isPlaying = false;
+            _graph = null;
+            _graphs.Clear();
+            _graphPlacements.Clear();
+            _graphKillTimes.Clear();
+
+            if (_ready)
+            {
+                _renderer.ClearTextures();
+                _textureCache.Clear();
+            }
+
+            double duration = 0;
+            int eventIndex = 0;
+            foreach (VfxCompositionEvent compositionEvent in composition.Events)
+            {
+                if (compositionEvent.System is null) continue;
+                float eventScale = Math.Max(0.01f, compositionEvent.Event.Scale);
+                var graph = _loadingService.PreparePlaybackGraph(
+                    compositionEvent.System,
+                    systems,
+                    resourceMap,
+                    searchDirectory,
+                    Matrix4x4.CreateScale(eventScale) * _worldTransform,
+                    HashCode.Combine(seed, eventIndex++),
+                    _logService,
+                    ownerSceneContext);
+                float startSeconds = Math.Max(
+                    0f,
+                    (compositionEvent.Event.StartFrame - composition.StartFrame) * composition.TickDuration);
+                graph.SetStartDelay(startSeconds);
+                _graphs.Add(graph);
+                _graphPlacements[graph] = Matrix4x4.CreateScale(eventScale);
+                if (compositionEvent.Event.IsKillEvent &&
+                    compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
+                {
+                    _graphKillTimes[graph] = Math.Max(
+                        startSeconds,
+                        (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+                }
+                _graph ??= graph;
+
+                double effectDuration = VfxDurationCalculator.Calculate(
+                    compositionEvent.System,
+                    systems,
+                    resourceMap);
+                if (double.IsFinite(effectDuration))
+                    duration = Math.Max(duration, startSeconds + effectDuration);
+            }
+
+            if (composition.EndFrame > composition.StartFrame)
+                duration = Math.Max(duration, (composition.EndFrame - composition.StartFrame) * composition.TickDuration);
+            foreach (VfxCompositionEvent compositionEvent in composition.Events)
+            {
+                if (compositionEvent.Event.EndFrame >= compositionEvent.Event.StartFrame)
+                    duration = Math.Max(
+                        duration,
+                        (compositionEvent.Event.EndFrame - composition.StartFrame) * composition.TickDuration);
+            }
+
+            _activeSystem = new VfxSystemModel
+            {
+                Name = $"Ability 0x{composition.SequencePathHash:X8}",
+                SystemCatalog = systems,
+                ResourceMap = resourceMap,
+                SearchDirectory = searchDirectory,
+                OwnerSceneContext = ownerSceneContext,
+                PlaybackSeed = seed,
+                TotalDuration = Math.Max(0.1, duration),
+                Speed = 1.0
+            };
+            return _graphs.Count > 0;
         }
 
         public bool SetEmitterVisibility(int sourceOrder, bool isVisible)
@@ -100,7 +200,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void Stop()
         {
             _isPlaying = false;
-            _graph?.Reset();
+            foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
             if (_activeSystem != null) _activeSystem.CurrentTime = 0;
         }
 
@@ -113,7 +213,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         public void SetWorldTransform(Matrix4x4 transform)
         {
             _worldTransform = transform;
-            _graph?.SetTransform(_worldTransform);
+            foreach (VfxPlaybackGraphRuntime graph in _graphs)
+                graph.SetTransform(_graphPlacements.GetValueOrDefault(graph, Matrix4x4.Identity) * _worldTransform);
         }
 
         public void SetViewportSize(double width, double height)
@@ -124,19 +225,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Update(float deltaTime)
         {
-            if (!_isPlaying || _graph == null || _activeSystem == null) return;
+            if (!_isPlaying || _graphs.Count == 0 || _activeSystem == null) return;
             float speed = (float)Math.Clamp(_activeSystem.Speed, 0.25, 2.0);
             float elapsed = deltaTime * speed;
-            _graph.Update(elapsed);
+            foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(elapsed);
             _activeSystem.CurrentTime += elapsed;
+            KillGraphsAt(_activeSystem.CurrentTime);
 
             if (ShouldRestartPlayback(
                     _activeSystem.HasFiniteDuration,
                     _activeSystem.CurrentTime,
                     _activeSystem.TotalDuration,
-                    _graph.IsComplete))
+                    _graphs.All(graph => graph.IsComplete)))
             {
-                _graph.Reset();
+                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
                 _activeSystem.CurrentTime = 0;
             }
         }
@@ -152,35 +254,49 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Seek(double seconds)
         {
-            if (_graph == null || _activeSystem == null) return;
+            if (_graphs.Count == 0 || _activeSystem == null) return;
             double maxDuration = _activeSystem.HasFiniteDuration ? _activeSystem.TotalDuration : 10.0;
             double target = Math.Clamp(seconds, 0, maxDuration);
-            _graph.Reset();
+            foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Reset();
             double simulated = 0;
             const float step = 1f / 60f;
             while (simulated + step < target)
             {
-                _graph.Update(step);
+                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(step);
                 simulated += step;
+                KillGraphsAt(simulated);
             }
             float remainder = (float)(target - simulated);
-            if (remainder > 0) _graph.Update(remainder);
+            if (remainder > 0)
+            {
+                foreach (VfxPlaybackGraphRuntime graph in _graphs) graph.Update(remainder);
+                KillGraphsAt(target);
+            }
             _activeSystem.CurrentTime = target;
+        }
+
+        private void KillGraphsAt(double seconds)
+        {
+            foreach (var (graph, killTime) in _graphKillTimes)
+            {
+                if (seconds >= killTime)
+                    graph.Kill();
+            }
         }
 
         public void Render(Matrix4x4 viewProjection, Matrix4x4 view)
         {
-            if (!_ready || _graph == null) return;
+            if (!_ready || _graphs.Count == 0) return;
 
             UploadPendingResources();
             IEnumerable<VfxPlaybackRuntime.EmitterState> emitters =
-                _graph.Runtimes.SelectMany(runtime => runtime.Emitters).Where(emitter => emitter.IsVisible);
+                _graphs.SelectMany(graph => graph.Runtimes).SelectMany(runtime => runtime.Emitters).Where(emitter => emitter.IsVisible);
             _renderer.CaptureScene(
                 _viewportWidth,
                 _viewportHeight,
                 emitters.Any(emitter => emitter.Def.Distortion != null),
                 emitters.Any(emitter => VfxOpenGlRenderer.ShouldUseSoftParticles(emitter.Def, true)));
-            foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
+            foreach (VfxPlaybackRuntime runtime in _graphs.SelectMany(graph => graph.Runtimes))
             {
                 _renderer.Render(runtime, viewProjection, view);
             }
@@ -188,7 +304,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         private void UploadPendingResources()
         {
-            foreach (VfxPlaybackRuntime runtime in _graph.Runtimes)
+            foreach (VfxPlaybackRuntime runtime in _graphs.SelectMany(graph => graph.Runtimes))
             {
                 foreach (VfxPlaybackRuntime.EmitterState emitter in runtime.Emitters)
                 {
@@ -261,14 +377,20 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
             if (_ready)
             {
                 _renderer.Dispose();
                 _ready = false;
             }
             _textureCache.Clear();
-            _loadingService.ClearCaches();
+            if (_ownsLoadingService)
+                _loadingService.Dispose();
             _graph = null;
+            _graphs.Clear();
+            _graphPlacements.Clear();
+            _graphKillTimes.Clear();
             _activeSystem = null;
         }
     }

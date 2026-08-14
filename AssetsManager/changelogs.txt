@@ -6,6 +6,10 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
+  - VFX Studio now reports standalone compatibility, scene requirements, approximations, and unsupported authored features for every system.
+  - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
+  - VFX Studio now shares one loading/resource cache per window and releases OpenGL, decoded texture, mesh, animation, and index resources when closed.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Project Browser can load multiple selected animation files from its context menu.

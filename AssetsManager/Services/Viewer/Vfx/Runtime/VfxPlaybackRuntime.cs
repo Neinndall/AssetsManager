@@ -59,7 +59,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             public uint MeshVao, MeshVbo, MeshEbo;
             public int MeshVertexCount, MeshIndexCount;
             public float[] MeshInterleaved;
-            /// <summary>Emitter age in seconds — drives UV scroll + wing-flap animation time.</summary>
+            /// <summary>Emitter age in seconds; drives UV scroll and mesh animation time.</summary>
             public float EmitterAge => Age;
         }
 
@@ -87,6 +87,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         private Matrix4x4 _worldTransform = Matrix4x4.Identity;
         private Matrix4x4 _inverseWorldTransform = Matrix4x4.Identity;
         private Vector3 _worldScale = Vector3.One;
+        private bool _isKilled;
         public int LiveParticleCount { get; private set; }
         public object UserTag { get; set; }
         /// <summary>
@@ -135,12 +136,12 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             _rng = new Random(seed);
         }
 
-        /// <summary>Configure from a system placed at worldPos. Only visual emitters are simulated.</summary>
-        public void SetSystem(VfxSystemDefinition system, Vector3 worldPos, bool includeNonVisual = false)
-            => SetSystem(system, Matrix4x4.CreateTranslation(worldPos), includeNonVisual);
+        /// <summary>Configure from a system placed at worldPos.</summary>
+        public void SetSystem(VfxSystemDefinition system, Vector3 worldPos)
+            => SetSystem(system, Matrix4x4.CreateTranslation(worldPos));
 
         /// <summary>Configure a system with its complete authored placement transform.</summary>
-        public void SetSystem(VfxSystemDefinition system, Matrix4x4 worldTransform, bool includeNonVisual = false)
+        public void SetSystem(VfxSystemDefinition system, Matrix4x4 worldTransform)
         {
             _emitters.Clear();
             _worldTransform = worldTransform;
@@ -212,6 +213,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
         public void Reset()
         {
             _rng = new Random(_seed);
+            _isKilled = false;
             _startDelay = _configuredStartDelay;
             foreach (var s in _emitters) { s.Particles.Clear(); s.SpawnAccum = 0; s.Age = 0; s.BurstDone = false; s.InitialEmissionDone = false; s.InstanceCount = 0; }
             LiveParticleCount = 0;
@@ -229,19 +231,30 @@ namespace AssetsManager.Services.Viewer.Vfx.Runtime
             => Vector3.TransformNormal(localOffset, _worldTransform);
 
         public bool IsComplete
-            => _emitters.Count == 0 || _emitters.TrueForAll(state =>
+            => _isKilled || _emitters.Count == 0 || _emitters.TrueForAll(state =>
                 (state.BurstDone || (state.Def.EmitterLifetime is { } lifetime && state.Age > state.Def.TimeBeforeFirstEmission + lifetime)) &&
                 state.Particles.Count == 0);
 
         public void Update(float dt)
         {
-            if (dt <= 0f || !float.IsFinite(dt)) return;
+            if (_isKilled || dt <= 0f || !float.IsFinite(dt)) return;
             while (dt > 0f)
             {
                 float step = MathF.Min(dt, MaximumSimulationStep);
                 UpdateStep(step);
                 dt -= step;
             }
+        }
+
+        public void Kill()
+        {
+            _isKilled = true;
+            foreach (EmitterState emitter in _emitters)
+            {
+                emitter.Particles.Clear();
+                emitter.InstanceCount = 0;
+            }
+            LiveParticleCount = 0;
         }
 
         private void UpdateStep(float dt)

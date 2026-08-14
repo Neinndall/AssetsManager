@@ -14,9 +14,10 @@ using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
-using AssetsManager.Services.Viewer.Vfx.Resources;
+using AssetsManager.Services.Viewer.Vfx.Composition;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
+using AssetsManager.Services.Viewer.Vfx.Semantics;
 using AssetsManager.Utils;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
@@ -32,11 +33,11 @@ namespace AssetsManager.Views.Dialogs
     {
         private readonly VfxInspectorModel _model;
         private readonly VfxLoadingService _loadingService = new();
-        private readonly VfxResourceResolver _resolver = new();
         private readonly LogService _logService;
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
+        private bool _isCleanedUp;
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
@@ -65,7 +66,7 @@ namespace AssetsManager.Views.Dialogs
             _logService = logService;
             DataContext = _model;
 
-            Unloaded += (s, e) => _cameraController?.Dispose();
+            Unloaded += OnWindowUnloaded;
 
             var settings = new OpenTK.Wpf.GLWpfControlSettings
             {
@@ -106,10 +107,19 @@ namespace AssetsManager.Views.Dialogs
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, false);
-                _vfxRenderer = new VfxRenderSession(_logService);
+                _vfxRenderer = new VfxRenderSession(_logService, _loadingService);
                 _vfxRenderer.Initialize(_gl);
                 _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
+                _model.LogMessages.Add(
+                    $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
+                    $"Renderer={_gl.GetStringS(Silk.NET.OpenGL.StringName.Renderer)} | " +
+                    $"OpenGL={_gl.GetStringS(Silk.NET.OpenGL.StringName.Version)} | " +
+                    $"GLSL={_gl.GetStringS(Silk.NET.OpenGL.StringName.ShadingLanguageVersion)}");
+                _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxTextureImageUnits, out int textureUnits);
+                _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxVertexAttribs, out int vertexAttributes);
+                _model.LogMessages.Add(
+                    $"[GL] Limits: fragment texture units={textureUnits}, vertex attributes={vertexAttributes}.");
 
                 if (_model.SelectedSystem != null)
                 {
@@ -169,8 +179,10 @@ namespace AssetsManager.Views.Dialogs
                 _vfxRenderer.Update(dt);
                 if (_vfxRenderer.ActiveSystem != null)
                     _model.CurrentTime = _vfxRenderer.ActiveSystem.CurrentTime;
-                double loopBoundary = _model.ActiveLoopDuration > 0 ? _model.ActiveLoopDuration : _model.TotalDuration;
-                if (_model.CurrentTime >= loopBoundary)
+                if (ShouldRestartPreview(
+                    _model.IsPreviewLoopEnabled,
+                    _model.CurrentTime,
+                    _model.ActiveLoopDuration))
                 {
                     _model.CurrentTime = 0;
                     _vfxRenderer.Seek(0);
@@ -183,6 +195,29 @@ namespace AssetsManager.Views.Dialogs
         }
 
         #endregion
+
+        private void OnWindowUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
+            try
+            {
+                _cameraController?.Dispose();
+                _cameraController = null;
+                _vfxRenderer?.Dispose();
+                _vfxRenderer = null;
+                _gridRenderer?.Dispose();
+                _gridRenderer = null;
+                _loadingService.Dispose();
+                _gl?.Dispose();
+                _gl = null;
+                OpenTkControl.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logService?.LogError(ex, "Failed to release VFX Studio resources.");
+            }
+        }
 
         #region Camera Control
 
@@ -232,6 +267,7 @@ namespace AssetsManager.Views.Dialogs
             {
                 _model.DetectedSkins.Clear();
                 _model.Systems.Clear();
+                _model.Compositions.Clear();
 
                 var binFiles = Directory.GetFiles(rootFolder, "*.bin", SearchOption.AllDirectories);
                 
@@ -346,6 +382,9 @@ namespace AssetsManager.Views.Dialogs
                     VfxEmitterDefinition[] playableEmitters = sysDef.Emitters
                         .Where(emitter => !emitter.Disabled)
                         .ToArray();
+                    VfxCompatibilityReport compatibility = VfxCompatibilityAnalyzer.Analyze(
+                        sysDef,
+                        _activeBundle.OwnerSceneContext);
                     var item = new VfxSystemDiagnosticItem
                     {
                         Name = name,
@@ -358,13 +397,32 @@ namespace AssetsManager.Views.Dialogs
                             !string.IsNullOrWhiteSpace(e.ParticleColorTexturePath) ||
                             !string.IsNullOrWhiteSpace(e.PaletteDefinition?.PaletteTexturePath)),
                         MeshCount = playableEmitters.Count(e => e.IsMeshPrimitive),
-                        Status = "Ready",
-                        StatusBrush = Brushes.LightGreen
+                        CompatibilityReport = compatibility,
+                        Status = compatibility.StatusText,
+                        StatusBrush = GetCompatibilityBrush(compatibility.Level)
                     };
                     _model.Systems.Add(item);
                 }
 
-                _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems.");
+                foreach (VfxAbilityComposition composition in VfxAbilityCompositionBuilder.BuildAll(
+                    _activeBundle.EventSequences.Values,
+                    _activeBundle.Systems,
+                    _activeBundle.ResourceMap))
+                {
+                    var diagnostic = new VfxAbilityCompositionDiagnosticItem { Composition = composition };
+                    foreach (VfxCompositionEvent compositionEvent in composition.Events)
+                    {
+                        diagnostic.Events.Add(new VfxCompositionEventDiagnosticItem
+                        {
+                            CompositionEvent = compositionEvent,
+                            TickDuration = composition.TickDuration
+                        });
+                    }
+                    _model.Compositions.Add(diagnostic);
+                }
+                _model.SelectedComposition = _model.Compositions.FirstOrDefault();
+
+                _model.LogMessages.Add($"[BIN SUCCESS] Extracted {_model.Systems.Count} VFX systems and {_model.Compositions.Count} event compositions.");
                 _model.StatusText = $"Loaded {_model.Systems.Count} systems from {Path.GetFileName(binFilePath)}.";
 
                 if (_model.Systems.Count > 0)
@@ -424,6 +482,7 @@ namespace AssetsManager.Views.Dialogs
             _model.ActiveLoopDuration = double.IsFinite(playbackDuration) && playbackDuration > 0
                 ? playbackDuration
                 : timelineMax;
+            _model.IsPreviewLoopEnabled = false;
             _model.TotalDuration = timelineMax;
 
             // 1. Prepare playback in OpenGL Viewport
@@ -434,6 +493,7 @@ namespace AssetsManager.Views.Dialogs
                 SystemCatalog = _activeBundle?.Systems ?? new Dictionary<uint, VfxSystemDefinition>(),
                 ResourceMap = _activeBundle?.ResourceMap ?? new Dictionary<uint, uint>(),
                 SearchDirectory = searchDir,
+                OwnerSceneContext = _activeBundle?.OwnerSceneContext,
                 PlaybackSeed = playbackSeed,
                 TotalDuration = playbackDuration,
                 Speed = _model.Speed
@@ -454,9 +514,9 @@ namespace AssetsManager.Views.Dialogs
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
 
-                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _resolver.ResolveTexture(texPath, searchDir);
+                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _loadingService.ResolveTexture(texPath, searchDir);
                 var mesh = emitter.IsMeshPrimitive
-                    ? _resolver.ResolveMesh(meshPath, searchDir)
+                    ? _loadingService.ResolveMesh(meshPath, searchDir)
                     : null;
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
@@ -523,8 +583,72 @@ namespace AssetsManager.Views.Dialogs
             UpdateTimelineTrackMetrics();
             UpdatePlayheadPosition();
 
-            _model.StatusText = $"Inspecting {systemItem.Name} ({_model.Emitters.Count} emitters).";
+            VfxCompatibilityReport compatibility = systemItem.CompatibilityReport
+                ?? VfxCompatibilityAnalyzer.Analyze(def, _activeBundle?.OwnerSceneContext);
+            _model.StatusText = $"Inspecting {systemItem.Name} ({_model.Emitters.Count} emitters) · {compatibility.StatusText}.";
         }
+
+        private void CompositionEvent_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not VfxCompositionEventDiagnosticItem item ||
+                item.CompositionEvent.System is null)
+            {
+                return;
+            }
+
+            VfxSystemDiagnosticItem system = _model.Systems.FirstOrDefault(candidate =>
+                candidate.PathHash == item.CompositionEvent.ResolvedSystemHash);
+            if (system is null) return;
+
+            _model.SelectedSystem = system;
+            TabViewport.IsChecked = true;
+            InspectSystem(system);
+        }
+
+        private void PlayComposition_Click(object sender, RoutedEventArgs e)
+        {
+            if (_model.SelectedComposition?.Composition is not VfxAbilityComposition composition ||
+                _activeBundle is null ||
+                _vfxRenderer is null)
+            {
+                return;
+            }
+
+            string searchDirectory = _model.RootPath;
+            if (!string.IsNullOrEmpty(searchDirectory) && File.Exists(searchDirectory))
+                searchDirectory = Path.GetDirectoryName(searchDirectory) ?? searchDirectory;
+            int seed = HashCode.Combine(composition.SequencePathHash, composition.Events.Count);
+            if (!_vfxRenderer.SetAbilityComposition(
+                    composition,
+                    _activeBundle.Systems,
+                    _activeBundle.ResourceMap,
+                    searchDirectory,
+                    seed,
+                    _activeBundle.OwnerSceneContext))
+            {
+                _model.StatusText = "The selected sequence has no resolved VFX events.";
+                return;
+            }
+
+            double duration = _vfxRenderer.ActiveSystem.TotalDuration;
+            _model.TotalDuration = Math.Max(3.0, duration);
+            _model.ActiveLoopDuration = duration;
+            _model.IsPreviewLoopEnabled = false;
+            _model.CurrentTime = 0;
+            _vfxRenderer.Play();
+            _model.IsPlaying = true;
+            _model.StatusText = $"Playing {composition.Events.Count} authored ability events.";
+            TabViewport.IsChecked = true;
+            UpdatePlayheadPosition();
+        }
+
+        private static Brush GetCompatibilityBrush(VfxCompatibilityLevel level) => level switch
+        {
+            VfxCompatibilityLevel.Ready => Brushes.LightGreen,
+            VfxCompatibilityLevel.ContextRequired => Brushes.DeepSkyBlue,
+            VfxCompatibilityLevel.Approximate => Brushes.Orange,
+            _ => Brushes.OrangeRed
+        };
 
         #region Timeline Deck Mechanics
 
@@ -635,6 +759,9 @@ namespace AssetsManager.Views.Dialogs
             }
         }
 
+        internal static bool ShouldRestartPreview(bool enabled, double currentTime, double boundary)
+            => enabled && boundary > 0 && currentTime >= boundary;
+
         private bool _isDraggingLoopBoundary;
 
         private void LoopBoundaryHandle_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -675,6 +802,7 @@ namespace AssetsManager.Views.Dialogs
             double newLoopDur = Math.Round(ratio * totalDur, 2);
 
             _model.ActiveLoopDuration = Math.Max(0.05, newLoopDur);
+            _model.IsPreviewLoopEnabled = true;
             UpdatePlayheadPosition();
         }
 

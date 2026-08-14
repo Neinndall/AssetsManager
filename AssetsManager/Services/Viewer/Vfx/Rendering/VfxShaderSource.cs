@@ -2,6 +2,8 @@ namespace AssetsManager.Services.Viewer.Vfx.Rendering
 {
     internal static class VfxShaderSource
     {
+        // Numeric uPrimitiveKind branches mirror VfxPrimitiveKind. The contract is
+        // guarded by PrimitiveEnumKeepsTheShaderInterfaceContract in Benchmark.
         internal const string MeshVertex = @"
 layout(location=0) in vec3 aPos;
 layout(location=1) in vec2 aUv;
