@@ -24,7 +24,6 @@ namespace AssetsManager.Services.Hashes
             string patchFingerprint,
             CancellationToken cancellationToken)
         {
-            await _pathStore.SaveResearchMatchesAsync(matches, cancellationToken);
             await _pathStore.SaveUnknownHashesAsync(domain, remainingUnknowns, currentHashes, patchFingerprint, cancellationToken);
         }
 

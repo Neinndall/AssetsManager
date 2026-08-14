@@ -47,6 +47,30 @@ namespace AssetsManager.Services.Hashes
             _lcuGuesser = new LcuHashGuesser(_lcuHashFile, _logService);
         }
 
+        public async Task<HashUnknownSummary> ScanUnknownHashesAsync(
+            HashGuessDomain domain,
+            string rootDirectory,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            await _hashResolverService.LoadAllHashesAsync();
+
+            if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory))
+                throw new DirectoryNotFoundException("The selected game directory does not exist.");
+
+            HashGuesser guesser = CreateWadGuesser(domain);
+            string[] wadPaths = guesser.FindWads(rootDirectory);
+            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            await _persistence.CommitPathRunAsync(
+                domain,
+                Array.Empty<HashGuessMatch>(),
+                inventory.All,
+                inventory.Current,
+                inventory.PatchFingerprint,
+                cancellationToken);
+            return await _store.LoadUnknownSummaryAsync(domain, cancellationToken);
+        }
+
         public async Task<HashGuessRunResult> RunEmbeddedPathGrepAsync(
             HashGuessDomain domain,
             string rootDirectory,
@@ -61,8 +85,24 @@ namespace AssetsManager.Services.Hashes
 
             HashGuesser guesser = CreateWadGuesser(domain);
             string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
-            var unknownHashes = inventory.All;
+            var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
+            unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+
+            HashUnknownInventory inventory;
+            if (unknownHashes.Count == 0)
+            {
+                inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+                unknownHashes = inventory.All;
+            }
+            else
+            {
+                inventory = new HashUnknownInventory
+                {
+                    All = unknownHashes,
+                    Current = unknownHashes,
+                    PatchFingerprint = string.Empty
+                };
+            }
 
             HashGuessEngine engine = null;
             var runResult = await RunWithCancellationPersistenceAsync(() => Task.Run(() =>
@@ -726,29 +766,26 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IReadOnlySet<ulong> sessionResolved = null)
         {
-            HashUnknownInventory inventory = await _store.LoadUnknownInventoryAsync(domain, cancellationToken);
-            if (inventory == null)
-                throw new InvalidOperationException($"Run {domain} WAD Path Grep first to build the unknown hash inventory.");
-
-            // Verify if the game patch has changed since the inventory was built
-            HashGuesser guesser = CreateWadGuesser(domain);
-            string[] wadPaths = guesser.FindWads(rootDirectory);
-            HashWadInventory wadInventory = await Task.Run(() => guesser.FromWads(wadPaths, cancellationToken), cancellationToken);
-            string currentFingerprint = $"{domain}:{wadInventory.ChunkCount}:{wadInventory.HashXor:x16}:{wadInventory.HashSum:x16}";
-
-            if (currentFingerprint != inventory.PatchFingerprint)
-            {
-                throw new InvalidOperationException($"Game patch changed. Run {domain} WAD Path Grep first to rebuild the unknown inventory.");
-            }
-
-            inventory.All.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
-            inventory.Current.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
+            var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
+            unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
             if (sessionResolved != null)
             {
-                inventory.All.ExceptWith(sessionResolved);
-                inventory.Current.ExceptWith(sessionResolved);
+                unknownHashes.ExceptWith(sessionResolved);
             }
-            return inventory;
+
+            if (unknownHashes.Count == 0)
+            {
+                HashGuesser guesser = CreateWadGuesser(domain);
+                string[] wadPaths = guesser.FindWads(rootDirectory);
+                return await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved);
+            }
+
+            return new HashUnknownInventory
+            {
+                All = unknownHashes,
+                Current = unknownHashes,
+                PatchFingerprint = string.Empty
+            };
         }
 
         private static HashSet<ulong> CreateSessionPending(IEnumerable<ulong> hashes, ISet<ulong> sessionResolved)

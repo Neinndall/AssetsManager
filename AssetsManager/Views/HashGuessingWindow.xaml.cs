@@ -166,6 +166,8 @@ namespace AssetsManager.Views
             UpdateUnknownCountAsync();
         }
 
+        private async void RunScanUnknownsGame_Click(object sender, RoutedEventArgs e) => await RunScanUnknownsAsync(HashGuessDomain.Game);
+        private async void RunScanUnknownsLcu_Click(object sender, RoutedEventArgs e) => await RunScanUnknownsAsync(HashGuessDomain.Lcu);
         private async void RunGrepGame_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepGame);
         private async void RunGrepLcu_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepLcu);
         private async void RunGameBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameBasic);
@@ -520,6 +522,61 @@ namespace AssetsManager.Views
             if (elapsed.TotalHours >= 1)
                 return elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
             return elapsed.ToString(@"mm\:ss\.f", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private async System.Threading.Tasks.Task RunScanUnknownsAsync(HashGuessDomain domain)
+        {
+            if (_viewModel.IsRunning) return;
+
+            string rootPath = _appSettings.LolPbeDirectory?.Trim();
+            if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
+            {
+                _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
+                return;
+            }
+
+            var runCancellation = new CancellationTokenSource();
+            _cancellationTokenSource = runCancellation;
+            _viewModel.IsRunning = true;
+            _viewModel.ProgressValue = 0;
+            _viewModel.ProgressText = "Scanning";
+            _viewModel.IsProgressIndeterminate = true;
+            _viewModel.StatusText = $"Scanning {domain} WADs for unknown chunks...";
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
+                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, null, runCancellation.Token);
+                stopwatch.Stop();
+                string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
+                _viewModel.ProgressValue = 100;
+                _viewModel.ProgressText = "100%";
+                _viewModel.IsProgressIndeterminate = false;
+                _viewModel.StatusText = $"Completed in {elapsedTime}: Found {summary.Total:N0} unknown hashes in scope ({summary.Current:N0} in current patch).";
+                UpdateUnknownCountAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                _viewModel.ProgressText = "";
+                _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
+                _viewModel.StatusText = "Scan cancelled.";
+            }
+            catch (Exception ex)
+            {
+                _viewModel.ProgressText = "";
+                _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
+                _logService.LogError(ex, "Failed to scan unknown hashes.");
+                _viewModel.StatusText = $"Error: {ex.Message}";
+                _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
+            }
+            finally
+            {
+                _viewModel.IsRunning = false;
+                _cancellationTokenSource = null;
+            }
         }
 
         private enum HashGuessMode { GrepGame, GrepLcu, GameBasic, GameExtended, BannerGuess, GameCustom, LcuBasic, LcuExtended, LcuCustom, LcuV1Paths }

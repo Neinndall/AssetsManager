@@ -12,7 +12,6 @@ namespace AssetsManager.Services.Hashes
 {
     public class HashGuessingStore
     {
-        private const string ResearchFileName = "research.json";
         private const int RecentPatchThreshold = 3;
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly SemaphoreSlim _lock = new(1, 1);
@@ -22,43 +21,6 @@ namespace AssetsManager.Services.Hashes
         private string GetKnownHashFilePath(HashGuessDomain domain) => Path.Combine(
             _directoriesCreator.HashesPath,
             domain == HashGuessDomain.Game ? "hashes.game.txt" : "hashes.lcu.txt");
-
-        public async Task SaveResearchMatchesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
-        {
-            var incoming = matches?.ToList() ?? new List<HashGuessMatch>();
-            if (incoming.Count == 0) return;
-
-            await _lock.WaitAsync(cancellationToken);
-            try
-            {
-                Directory.CreateDirectory(_directoriesCreator.HashLabPath);
-                string path = Path.Combine(_directoriesCreator.HashLabPath, ResearchFileName);
-                List<HashGuessMatch> existing = new();
-
-                if (File.Exists(path))
-                {
-                    await using var source = File.OpenRead(path);
-                    existing = await JsonSerializer.DeserializeAsync<List<HashGuessMatch>>(source, cancellationToken: cancellationToken) ?? new List<HashGuessMatch>();
-                }
-
-                var merged = existing.Concat(incoming)
-                    .GroupBy(match => new { match.Domain, match.Hash })
-                    .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
-                    .OrderBy(match => match.Domain)
-                    .ThenBy(match => match.Path, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                string temporaryPath = path + ".tmp";
-                await using (var target = File.Create(temporaryPath))
-                    await JsonSerializer.SerializeAsync(target, merged, cancellationToken: cancellationToken);
-
-                File.Move(temporaryPath, path, true);
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
 
         public async Task SaveHashesAsync(IEnumerable<HashGuessMatch> matches, CancellationToken cancellationToken)
         {

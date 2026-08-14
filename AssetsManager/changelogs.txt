@@ -26,6 +26,7 @@ New Features
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
+  - Hash Guessing Lab / Added a dedicated 'Search Unknown Hashes' action to scan local WAD files and build the unknown hash dictionary independently.
   - Hash Guessing Lab / Added a dedicated Banner Guess action for esports sponsored banner hashes.
   - Hash Guessing Lab / GAME WAD grep now follows animation BIN `mAnimationFilePath` WadChunkLinks and derives contextual `.anm` GAME candidates from the known path corpus, including skin-number variants.
   - Hash Guessing Lab / GAME shader guessing now discovers executable-referenced HLSL families and immediate `_0` variants for generated platform targets.
@@ -65,6 +66,7 @@ Fixes
   - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
   - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
   - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
+  - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
 
 Improvements
   - VFX Studio now labels its preview loop control more concisely.
