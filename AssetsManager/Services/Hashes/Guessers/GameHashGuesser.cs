@@ -1282,8 +1282,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-            bool isBin = extension is "bin" or "inibin" ||
-                (data.Count >= 4 && ByteAt(data, 0) == 'P' && ByteAt(data, 1) == 'R' && ByteAt(data, 2) == 'O' && ByteAt(data, 3) == 'P');
+            bool isBin = extension is "bin" or "inibin";
             if (isBin)
             {
                 foreach (int offset in FindBinPathOffsets(data))

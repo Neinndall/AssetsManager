@@ -198,6 +198,9 @@ namespace AssetsManager.Services.Hashes
 
         internal static string InferChunkExtension(ArraySegment<byte> data, bool detectJson)
         {
+            string detected = FileTypeDetector.GuessExtension(data.AsSpan());
+            if (!string.IsNullOrEmpty(detected) && (detected != "json" || detectJson)) return detected;
+
             ReadOnlySpan<byte> bytes = data.AsSpan();
             string extension = LeagueFile.GetExtension(LeagueFile.GetFileType(bytes));
             if (extension.Length > 0 || !detectJson) return extension;
