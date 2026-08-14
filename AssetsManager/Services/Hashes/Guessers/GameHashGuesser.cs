@@ -1786,11 +1786,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .Where(link => targetHashes.Contains(link.PathHash) && link.NameHash != 0)
                 .Select(link => link.NameHash)
                 .ToHashSet();
-            foreach (string prefix in prefixes)
+
             foreach (string name in sourceNames)
             {
-                string stem = prefix + "_" + (name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name);
+                string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
                 if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+                foreach (string prefix in prefixes)
+                {
+                    string prefixed = prefix + "_" + stem;
+                    if (nameHashes.Contains(Fnv1a.HashLower(prefixed))) yield return prefixed;
+                }
             }
 
             if (nameHashes.Count > 0)
@@ -1799,12 +1804,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                     "animation-words",
                     paths => HashGuessEngine.BuildBasenameWordlist(
                         paths.Where(path => path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))));
+
+                var characterWords = prefixes.SelectMany(p => p.Split('_', StringSplitOptions.RemoveEmptyEntries))
+                    .Concat(sourceNames.SelectMany(n => n.Split(new[] { '_', '.' }, StringSplitOptions.RemoveEmptyEntries)))
+                    .Where(w => w.Length >= 2)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
                 foreach (string prefix in prefixes)
                 {
-                    foreach (string word in words)
+                    foreach (string word in characterWords)
                     {
                         string stem = prefix + "_" + word;
                         if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+
+                        foreach (string word2 in characterWords)
+                        {
+                            string stem2 = prefix + "_" + word + "_" + word2;
+                            if (nameHashes.Contains(Fnv1a.HashLower(stem2))) yield return stem2;
+                        }
 
                         foreach (string word2 in words)
                         {
@@ -1813,12 +1831,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
                 }
-            }
-
-            foreach (string name in sourceNames)
-            {
-                string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
-                if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
             }
 
             foreach (string name in GetAnimationNames(character, contextual: false))
