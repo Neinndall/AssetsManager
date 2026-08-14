@@ -61,6 +61,7 @@ Fixes
   - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
 
 Improvements
+  - VFX Studio now labels its preview loop control more concisely.
   - VFX Studio now keeps its workspace focused on the viewport, emitters, textures, and meshes while authored ability sequences continue to play automatically.
   - VFX Studio now presents preview looping as a clear on/off transport control that remains active while changing effects.
   - VFX Studio now automatically plays the complete authored event sequence when a selected effect belongs to one unambiguous composition.

@@ -447,7 +447,7 @@
                                                 <ToggleButton IsChecked="{Binding IsPreviewLoopEnabled, Mode=TwoWay}"
                                                               Style="{StaticResource TransparentIconToggleButton}"
                                                               Width="28" Height="26" Margin="0,0,10,0"
-                                                              ToolTip="Enable or disable the optional viewport repeat range. Authored emitter loops and lifetimes are unchanged.">
+                                                              ToolTip="Loop">
                                                     <materialIcons:MaterialIcon Kind="Autorenew" Width="15" Height="15"/>
                                                 </ToggleButton>
                                                 <TextBlock Text="Speed:" Foreground="{StaticResource TextMuted}" FontSize="10.5" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>

@@ -510,7 +510,6 @@
                           Grid.Row="4"
                           ItemsSource="{Binding Matches}"
                           Style="{StaticResource ModernTableListView}"
-                          ItemContainerStyle="{StaticResource HashGuessingResultsListViewItem}"
                           Loaded="ResultsListView_Loaded"
                           SizeChanged="ResultsListView_SizeChanged">
                     <ListView.View>
