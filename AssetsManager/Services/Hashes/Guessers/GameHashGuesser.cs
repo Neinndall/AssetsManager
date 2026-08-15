@@ -182,7 +182,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_" }).ToArray();
+            string[] values = (prefixes ?? new[] { "2x_", "2x_sd_", "4x_", "4x_sd_", "sd_", "tft_", "common_", "base_", "sru_", "icon_" }).ToArray();
             var candidates = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in KnownPaths)
             {
@@ -410,96 +410,103 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlySet<string> selectedSubMethods = null)
         {
             int checkedCandidates = 0;
             if (engine.RemainingUnknownCount == 0) return checkedCandidates;
 
-            progress?.Report(engine.CreateProgress("GAME Custom: BIN basename wordlist", checkedCandidates));
-            int progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteBinBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: BIN basename wordlist", progressOffset + count)));
+            bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
 
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            if (ShouldRun("game-custom-bin"))
+            {
+                progress?.Report(engine.CreateProgress("GAME Custom: BIN basename wordlist", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteBinBasenameWords(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: BIN basename wordlist", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: data BIN basename wordlist", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteDataBinBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: data BIN basename wordlist", progressOffset + count)));
+            if (ShouldRun("game-custom-databin"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: data BIN basename wordlist", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteDataBinBasenameWords(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: data BIN basename wordlist", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            if (ShouldRun("game-custom-dds"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: character DDS basename wordlist", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteCharacterDdsBasenameWords(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: character DDS basename wordlist", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: character DDS basename wordlist", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteCharacterDdsBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: character DDS basename wordlist", progressOffset + count)));
+            if (ShouldRun("game-custom-tex"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: character TEX basename wordlist", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteCharacterTexBasenameWords(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: character TEX basename wordlist", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            if (ShouldRun("game-custom-wordaddition"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: word addition", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += AddCustomBasenameWord(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: word addition", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: character TEX basename wordlist", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteCharacterTexBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: character TEX basename wordlist", progressOffset + count)));
+            if (ShouldRun("game-custom-swordlist"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: SwordList basename substitution", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += SubstituteSwordlistBasenameWords(
+                    engine,
+                    cancellationToken,
+                    count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: SwordList basename substitution", progressOffset + count)));
+                if (engine.RemainingUnknownCount == 0) return checkedCandidates;
+            }
 
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: SwordList basename substitution", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteSwordlistBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: SwordList basename substitution", progressOffset + count)));
-
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: WordList basename substitution", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += SubstituteWordlistBasenameWords(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: WordList basename substitution", progressOffset + count)));
-
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: basename word addition", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += AddCustomBasenameWord(
-                engine,
-                cancellationToken,
-                count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: basename word addition", progressOffset + count)));
-
-            if (engine.RemainingUnknownCount == 0) return checkedCandidates;
-
-            progress?.Report(engine.CreateProgress(
-                "GAME Custom: shader vocabulary attack", checkedCandidates));
-            progressOffset = checkedCandidates;
-            checkedCandidates += GuessCustomShaders(
-                engine,
-                cancellationToken,
-                candidateBudget: CustomShaderCandidateBudget,
-                progress: count => progress?.Report(engine.CreateProgress(
-                    "GAME Custom: shader vocabulary attack", progressOffset + count)));
+            if (ShouldRun("game-custom-shaders"))
+            {
+                progress?.Report(engine.CreateProgress(
+                    "GAME Custom: shader vocabulary attack", checkedCandidates));
+                int progressOffset = checkedCandidates;
+                checkedCandidates += GuessCustomShaders(
+                    engine,
+                    cancellationToken,
+                    candidateBudget: CustomShaderCandidateBudget,
+                    progress: count => progress?.Report(engine.CreateProgress(
+                        "GAME Custom: shader vocabulary attack", progressOffset + count)));
+            }
 
             return checkedCandidates;
         }
@@ -1205,17 +1212,19 @@ namespace AssetsManager.Services.Hashes.Guessers
             HashGuessEngine engine,
             string rootDirectory,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlySet<string> selectedSubMethods = null)
         {
             int checkedCandidates = 0;
+            bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
 
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skingroups"))
                 checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken, progress, checkedCandidates);
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-chromas"))
                 checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
                 checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
                     engine,
                     SubstituteSkinNumbers(SkinNumberSubstitutionCandidateBudget),
@@ -1223,7 +1232,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     cancellationToken,
                     progress,
                     checkedCandidates);
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-characters"))
                 checkedCandidates += CheckCandidates(
                     engine,
                     SubstituteCharacter(CharacterSubstitutionCandidateBudget),

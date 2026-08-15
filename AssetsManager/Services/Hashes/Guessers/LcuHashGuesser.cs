@@ -511,6 +511,16 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             char[] delimiters = { '-', '_' };
 
+            var progressClock = Stopwatch.StartNew();
+            void ReportThrottled(string stageName, int currentTotal)
+            {
+                if (progressClock.ElapsedMilliseconds >= 80)
+                {
+                    progress?.Report(engine.CreateProgress(stageName, currentTotal));
+                    progressClock.Restart();
+                }
+            }
+
             foreach (var group in pluginGroups)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -521,7 +531,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (pluginPaths.Count == 0) continue;
 
                 string stage = $"LCU Custom: scoped plugin {plugin}";
-                progress?.Report(engine.CreateProgress(stage, checkedCandidates));
+                ReportThrottled(stage, checkedCandidates);
 
                 var dirs = pluginPaths
                     .Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
@@ -566,15 +576,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                         foreach (var (oldWordCount, newWordCount) in variants)
                         {
                             if (engine.RemainingUnknownCount == 0) break;
-                            int subCount = SubstituteBasenameWords(
+                            int subCount = SubstituteBasenameWordsCore(
                                 engine,
+                                pluginPaths,
+                                pluginWords,
+                                oldWordCount,
+                                newWordCount,
                                 cancellationToken,
-                                plugin: plugin,
-                                words: pluginWords,
-                                oldWordCount: oldWordCount,
-                                newWordCount: newWordCount,
                                 candidateBudget: 1_000_000,
-                                progress: current => progress?.Report(engine.CreateProgress(stage, checkedCandidates + current)));
+                                source: $"Scoped plugin {plugin}",
+                                progress: current => ReportThrottled(stage, checkedCandidates + current));
                             checkedCandidates += subCount;
                         }
                     }
@@ -587,21 +598,33 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlySet<string> selectedSubMethods = null)
         {
             ArgumentNullException.ThrowIfNull(engine);
 
             int checkedCandidates = 0;
+            bool ShouldRun(string subId) => selectedSubMethods == null || selectedSubMethods.Contains(subId);
+
+            var customProgressClock = Stopwatch.StartNew();
+            void ReportCustomThrottled(string stageName, int currentTotal)
+            {
+                if (customProgressClock.ElapsedMilliseconds >= 80)
+                {
+                    progress?.Report(engine.CreateProgress(stageName, currentTotal));
+                    customProgressClock.Restart();
+                }
+            }
 
             // Phase 1: High-precision Scoped Plugin Engine (Intra-directory cross-product, scoped modifiers, scoped substitutions)
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-scoped"))
             {
                 int count = RunScopedPluginAttacks(engine, progress, cancellationToken);
                 checkedCandidates += count;
             }
 
             // Phase 2: Universal Modifier Matrix across all plugins
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-modifiers"))
             {
                 string stage = "LCU Custom: Universal modifier attack";
                 progress?.Report(engine.CreateProgress(stage, checkedCandidates));
@@ -609,7 +632,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     engine,
                     cancellationToken,
                     pluginPattern: "rcp-*",
-                    progress: current => progress?.Report(engine.CreateProgress(stage, checkedCandidates + current)));
+                    progress: current => ReportCustomThrottled(stage, checkedCandidates + current));
                 checkedCandidates += count;
             }
 
@@ -632,7 +655,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (engine.RemainingUnknownCount == 0) return variantCheckedCandidates;
 
                     string stage = $"LCU Custom: rcp-fe-lol-* {label} basename {oldWordCount}->{newWordCount}";
-                    progress?.Report(engine.CreateProgress(stage, checkedCandidates + variantCheckedCandidates));
+                    ReportCustomThrottled(stage, checkedCandidates + variantCheckedCandidates);
                     int progressOffset = checkedCandidates + variantCheckedCandidates;
                     int count = SubstituteBasenameWords(
                         engine,
@@ -643,21 +666,20 @@ namespace AssetsManager.Services.Hashes.Guessers
                         oldWordCount: oldWordCount,
                         newWordCount: newWordCount,
                         candidateBudget: 250_000_000,
-                        progress: current => progress?.Report(
-                            engine.CreateProgress(stage, progressOffset + current)));
+                        progress: current => ReportCustomThrottled(stage, progressOffset + current));
                     variantCheckedCandidates += count;
                 }
 
                 return variantCheckedCandidates;
             }
 
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-svg"))
                 checkedCandidates += RunVariants(BuildSswordlist(), new[] { "svg" }, "SVG");
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-png"))
                 checkedCandidates += RunVariants(BuildPngJpgSwordlist(), new[] { "png", "jpg" }, "PNG/JPG");
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-media"))
                 checkedCandidates += RunVariants(BuildMediaSwordlist(), new[] { "webm", "ogg" }, "Media");
-            if (engine.RemainingUnknownCount > 0)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-json"))
                 checkedCandidates += RunVariants(BuildSwordlist(), new[] { "json" }, "JSON");
 
             return checkedCandidates;

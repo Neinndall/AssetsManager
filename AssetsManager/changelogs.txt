@@ -25,6 +25,7 @@ New Features
   - VFX Studio / Added CPU skinning for authored `.skn + .skl + .anm` particle meshes and indexed skeleton/animation resources from extracted WAD trees.
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
+  - Hash Guessing Lab / Added interactive sub-algorithm checkboxes and Select/Deselect All tools per attack suite, allowing granular single-attack execution alongside instant single-click actions.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
   - Hash Guessing Lab / Added a dedicated 'Search Unknown Hashes' action to scan local WAD files and build the unknown hash dictionary independently.
   - Hash Guessing Lab / Added a dedicated Banner Guess action for esports sponsored banner hashes.
@@ -47,6 +48,7 @@ New Features
   - Hash Guessing Lab / Expanded LCU Custom guessing with dynamic media (WEBM/OGG) and data (JSON) wordlist suites automatically derived from the known hashes corpus.
   - Hash Guessing Lab / Added the Universal Plugin Modifier attack to LCU Custom, automatically applying Riot UI states, tiers, and layout modifiers across all client plugins.
   - Hash Guessing Lab / Added the Scoped Plugin Engine to LCU Custom, executing intra-plugin directory cross-products and contextual vocabulary substitutions.
+  - Hash Guessing Lab / Redesigned interface into a Master-Detail architecture with modular algorithm selection, real-time search filtering, and centralized WPF Themes templates.
   - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
   - Comparison Results now offer direct access to the output folder of any exported asset.
   - Added a News section with categorized Riot news feeds, search filtering, and full article reading.

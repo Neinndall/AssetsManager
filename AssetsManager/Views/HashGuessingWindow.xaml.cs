@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -6,12 +7,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
+using Material.Icons;
 
 namespace AssetsManager.Views
 {
@@ -23,6 +26,7 @@ namespace AssetsManager.Views
         private readonly CustomMessageBoxService _messageBoxService;
         private readonly LogService _logService;
         private readonly HashGuessLabModel _viewModel = new();
+        private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
         private bool _isUpdatingResultsColumns;
 
@@ -40,8 +44,307 @@ namespace AssetsManager.Views
             _messageBoxService = messageBoxService;
             _logService = logService;
             DataContext = _viewModel;
+            InitializeMethods();
             Unloaded += OnUnloaded;
-            Loaded += (s, e) => UpdateUnknownCountAsync();
+            Loaded += (s, e) =>
+            {
+                UpdateUnknownCountAsync();
+                RefreshMethodsForCurrentDomain();
+            };
+        }
+
+        private void InitializeMethods()
+        {
+            var accentBrush = (Brush)FindResource("AccentBrush") ?? Brushes.DodgerBlue;
+            var accentTeal = (Brush)FindResource("AccentTeal") ?? Brushes.MediumSeaGreen;
+            var accentOrange = (Brush)FindResource("AccentOrange") ?? Brushes.DarkOrange;
+            var accentPurple = (Brush)FindResource("AccentPurple") ?? Brushes.MediumPurple;
+            var accentGreen = (Brush)FindResource("AccentGreen") ?? Brushes.SeaGreen;
+            var accentRed = (Brush)FindResource("AccentRed") ?? Brushes.Crimson;
+
+            _allMethods.Clear();
+
+            // GAME (Domain 0)
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "game-scan",
+                DomainIndex = 0,
+                Name = "Search Unknown Hashes",
+                Description = "Scan game WADs for unknown chunks and build an updated target inventory.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.Radar,
+                BadgeText = "SCAN (~2s)",
+                BadgeBrush = accentBrush,
+                EstimatedTime = "~2s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "game-grep",
+                DomainIndex = 0,
+                Name = "Game GrepWad",
+                Description = "Extract valid game asset paths embedded directly in local WAD files.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.FileSearchOutline,
+                BadgeText = "⚡ FAST (~5s)",
+                BadgeBrush = accentTeal,
+                EstimatedTime = "~5s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "game-banner",
+                DomainIndex = 0,
+                Name = "Banner Guess",
+                Description = "Targeted discovery of esports sponsored banners and arena textures.",
+                Category = "Specialized",
+                IconKind = MaterialIconKind.TrophyOutline,
+                BadgeText = "⚡ FAST (~3s)",
+                BadgeBrush = accentOrange,
+                EstimatedTime = "~3s"
+            });
+
+            var gameBasic = new HashMethodItemModel
+            {
+                Id = "game-basic",
+                DomainIndex = 0,
+                Name = "GAME Basic Suite",
+                Description = "Standard champion paths, skin numbers, character templates, locales and short ranges.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.ShieldOutline,
+                BadgeText = "🚀 FAST (~10s)",
+                BadgeBrush = accentBrush,
+                EstimatedTime = "~10s"
+            };
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-crossdomain", Name = "GuessFromLcuHashes", Description = "Try client hash paths mapped to game structures", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-characters", Name = "GuessCharacterFiles", Description = "Champion and skin assets (characters/{champ}/skins/...)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-shaders", Name = "GuessShaderVariants", Description = "Permutations across HLSL families and platform variants", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-locales", Name = "SubstituteLang", Description = "28 region and language translations", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-extensions", Name = "SubstituteExtensions", Description = "Cross-extension permutations (.dds, .tex, .bin, .anm)", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-prefixes", Name = "CheckBasenamePrefixes", Description = "Basename prefixes (2x_, 4x_, sd_, tft_, common_, base_, sru_, icon_)", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-numbers", Name = "SubstituteBasicNumbers", Description = "Sequential numbers (1 to 200) and padded variants (01 to 99)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            _allMethods.Add(gameBasic);
+
+            var gameExtended = new HashMethodItemModel
+            {
+                Id = "game-extended",
+                DomainIndex = 0,
+                Name = "GAME Extended",
+                Description = "Combinatorial skin groups, chromas from skins.json, suffixes and character substitutions.",
+                Category = "Deep Search",
+                IconKind = MaterialIconKind.CrownOutline,
+                BadgeText = "⏳ DEEP (~1m)",
+                BadgeBrush = accentOrange,
+                EstimatedTime = "~1m"
+            };
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-skingroups", Name = "SubstituteSkinGroups", Description = "Combinatorial skin groups from known character skins", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-chromas", Name = "GuessChromaGroups", Description = "Chroma groupings parsed from local skins catalog", BadgeText = "⏳ DEEP", BadgeBrush = accentOrange });
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-suffixes", Name = "SubstituteSuffixes", Description = "Common asset suffixes substitution across paths", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-skinnumbers", Name = "SubstituteSkinNumbers", Description = "Combinations of skin numbers across champion templates", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-characters", Name = "SubstituteCharacter", Description = "Champion name substitutions across known game assets", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            _allMethods.Add(gameExtended);
+
+            var gameCustom = new HashMethodItemModel
+            {
+                Id = "game-custom",
+                DomainIndex = 0,
+                Name = "Game Custom Guess",
+                Description = "Permutations and word variations across 30,000 BIN, DDS, TEX and custom shader paths.",
+                Category = "Deep Search",
+                IconKind = MaterialIconKind.FlaskOutline,
+                BadgeText = "🚀 FAST (~15s)",
+                BadgeBrush = accentTeal,
+                EstimatedTime = "~15s"
+            };
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-bin", Name = "SubstituteBinBasenameWords", Description = "30,000 top BIN samples word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "data/*.bin basename word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Character .dds texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Character .tex texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-wordaddition", Name = "AddCustomBasenameWord", Description = "Basename word insertion attack across game paths", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
+            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
+            _allMethods.Add(gameCustom);
+
+            // LCU (Domain 1)
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "lcu-scan",
+                DomainIndex = 1,
+                Name = "Search Unknown Hashes",
+                Description = "Scan client WADs for unknown chunks and build an updated target inventory.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.Radar,
+                BadgeText = "SCAN (~2s)",
+                BadgeBrush = accentPurple,
+                EstimatedTime = "~2s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "lcu-grep",
+                DomainIndex = 1,
+                Name = "Lcu GrepWad",
+                Description = "Extract client paths and bundle references embedded in client WAD chunks.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.FileSearchOutline,
+                BadgeText = "⚡ FAST (~5s)",
+                BadgeBrush = accentPurple,
+                EstimatedTime = "~5s"
+            });
+
+            var lcuCustom = new HashMethodItemModel
+            {
+                Id = "lcu-custom",
+                DomainIndex = 1,
+                Name = "LCU Custom Guess",
+                Description = "Modular client attacks: Scoped Plugins, Universal UI Modifiers, and 4 dynamic token suites.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.FlaskOutline,
+                BadgeText = "🚀 FAST (~15s)",
+                BadgeBrush = accentTeal,
+                EstimatedTime = "~15s"
+            };
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-scoped", Name = "GuessScopedPlugins", Description = "Intra-plugin directory cross-products & isolated vocabularies", BadgeText = "⚡ ~5s", BadgeBrush = accentTeal });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-modifiers", Name = "GuessUniversalModifiers", Description = "Riot UI states (hover, active, disabled, tier1-4, mini, lg)", BadgeText = "⚡ ~2s", BadgeBrush = accentBrush });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-media", Name = "GuessMediaTokens", Description = "Targeted audio/video token substitution from client media", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-svg", Name = "GuessSvgTokens", Description = "Dynamic SVG vector icon token variants", BadgeText = "⚡ ~3s", BadgeBrush = accentTeal });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-png", Name = "GuessPngTokens", Description = "Dynamic PNG sprite and UI texture token variants", BadgeText = "⚡ ~3s", BadgeBrush = accentPurple });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-json", Name = "GuessJsonTokens", Description = "Dynamic manifest and data config tokens", BadgeText = "⚡ ~3s", BadgeBrush = accentBrush });
+            _allMethods.Add(lcuCustom);
+
+            var lcuBasic = new HashMethodItemModel
+            {
+                Id = "lcu-basic",
+                DomainIndex = 1,
+                Name = "LCU Basic Suite",
+                Description = "Directory mirroring, structural client patterns, plugin variants & GAME cross-domain.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.FileCabinet,
+                BadgeText = "🚀 FAST (~10s)",
+                BadgeBrush = accentPurple,
+                EstimatedTime = "~10s"
+            };
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-extensions", Name = "SubstituteExtensions", Description = "Permutations across client file extensions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-patterns", Name = "GuessKnownPatterns", Description = "Common structural client URL patterns", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-mirroring", Name = "MirrorDirectories", Description = "Mirroring folder structures across client plugins", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-crossdomain", Name = "GuessFromGameHashes", Description = "Game paths mapped into LCU plugins", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-plugins", Name = "SubstitutePlugins", Description = "Substitutions across rcp-fe-* and rcp-be-*", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-numbers", Name = "SubstituteNumbers", Description = "Numeric sequences (1 to 10,000)", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-locales", Name = "SubstituteLang", Description = "Regional and language token substitutions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-basenames", Name = "SubstituteBasenames", Description = "Direct basename substitutions across plugins", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-basenamewords", Name = "SubstituteBasenameWords", Description = "Word substitution in basenames", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
+            _allMethods.Add(lcuBasic);
+
+            var lcuExtended = new HashMethodItemModel
+            {
+                Id = "lcu-extended",
+                DomainIndex = 1,
+                Name = "LCU Extended",
+                Description = "Deep dictionary word insertion and legacy TFT word-pair patterns.",
+                Category = "Deep Search",
+                IconKind = MaterialIconKind.Sparkles,
+                BadgeText = "⏳ DEEP (~1m)",
+                BadgeBrush = accentRed,
+                EstimatedTime = "~1m"
+            };
+            lcuExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-ext-wordaddition", Name = "AddBasenameWord", Description = "Deep dictionary word insertion across client paths", BadgeText = "⏳ DEEP (~1m)", BadgeBrush = accentRed });
+            lcuExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-ext-v1tft", Name = "GuessV1TftPaths", Description = "Legacy TFT word-pair combinations", BadgeText = "🚀 FAST (~8s)", BadgeBrush = accentTeal });
+            _allMethods.Add(lcuExtended);
+
+            // BIN (Domain 2)
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "bin-inventory",
+                DomainIndex = 2,
+                Name = "Build BIN Inventory",
+                Description = "Scan BIN runtime and active Meta Schema for unknown type and field hashes.",
+                Category = "Inventory",
+                IconKind = MaterialIconKind.FileSearchOutline,
+                BadgeText = "INVENTORY",
+                BadgeBrush = accentBrush,
+                EstimatedTime = "~3s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "bin-context",
+                DomainIndex = 2,
+                Name = "BIN Context Attack",
+                Description = "Discover hashes using verified context-linked schema values and property patterns.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.CodeBraces,
+                BadgeText = "🚀 FAST (~5s)",
+                BadgeBrush = accentGreen,
+                EstimatedTime = "~5s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "bin-schema",
+                DomainIndex = 2,
+                Name = "Meta Schema Guess",
+                Description = "Generate review-only type and field name candidates from schema naming rules.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.ToyBrickOutline,
+                BadgeText = "🚀 FAST (~5s)",
+                BadgeBrush = accentPurple,
+                EstimatedTime = "~5s"
+            });
+
+            // RST (Domain 3)
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "rst-inventory",
+                DomainIndex = 3,
+                Name = "Build RST Inventory",
+                Description = "Parse string table assets and build the unknown RST hash inventory.",
+                Category = "Inventory",
+                IconKind = MaterialIconKind.FileSearchOutline,
+                BadgeText = "INVENTORY",
+                BadgeBrush = accentBrush,
+                EstimatedTime = "~3s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "rst-content",
+                DomainIndex = 3,
+                Name = "RST Content GREP",
+                Description = "Extract valid font/translation string keys directly from BIN and text resources.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.FormatLetterCase,
+                BadgeText = "🚀 FAST (~5s)",
+                BadgeBrush = accentGreen,
+                EstimatedTime = "~5s"
+            });
+            _allMethods.Add(new HashMethodItemModel
+            {
+                Id = "rst-structural",
+                DomainIndex = 3,
+                Name = "RST Structural Attack",
+                Description = "Cross-version and numeric key variations across localized string tables.",
+                Category = "Core Suites",
+                IconKind = MaterialIconKind.Numeric,
+                BadgeText = "🚀 FAST (~10s)",
+                BadgeBrush = accentGreen,
+                EstimatedTime = "~10s"
+            });
+        }
+
+        private void RefreshMethodsForCurrentDomain()
+        {
+            int domainIndex = DomainSelector?.SelectedIndex ?? 0;
+            string query = TxtMethodSearch?.Text?.Trim() ?? string.Empty;
+
+            var filtered = _allMethods
+                .Where(m => m.DomainIndex == domainIndex)
+                .Where(m => string.IsNullOrEmpty(query) ||
+                            m.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                            m.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                            m.Category.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            _viewModel.AvailableMethods.Clear();
+            _viewModel.AvailableMethods.AddRange(filtered);
+
+            if (_viewModel.SelectedMethod == null || !_viewModel.AvailableMethods.Contains(_viewModel.SelectedMethod))
+            {
+                _viewModel.SelectedMethod = _viewModel.AvailableMethods.FirstOrDefault();
+            }
         }
 
         private async void UpdateUnknownCountAsync()
@@ -57,7 +360,7 @@ namespace AssetsManager.Views
                     if (DomainSelector != null && DomainSelector.SelectedIndex == selectedIndex)
                     {
                         TxtUnknownCount.Text = $"{summary.Total:N0} unresolved";
-                        TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0} · Historical: {summary.Historical:N0}";
+                        TxtUnknownBreakdown.Text = $"Current: {summary.Current:N0} · Recent: {summary.Recent:N0}";
                     }
                 }
                 else
@@ -67,12 +370,12 @@ namespace AssetsManager.Views
                     {
                         if (selectedIndex == 2)
                         {
-                            TxtUnknownCount.Text = $"{summary.BinTotal:N0} BIN unresolved";
-                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
+                            TxtUnknownCount.Text = $"{summary.BinTotal:N0} unresolved";
+                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0}";
                         }
                         else
                         {
-                            TxtUnknownCount.Text = $"{summary.RstTotal:N0} RST unresolved";
+                            TxtUnknownCount.Text = $"{summary.RstTotal:N0} unresolved";
                             TxtUnknownBreakdown.Text = $"XXH3: {summary.RstXxh3:N0} · XXH64: {summary.RstXxh64:N0}";
                         }
                     }
@@ -88,8 +391,8 @@ namespace AssetsManager.Views
 
         private void ShowLiveUnknownCount(int remaining, int resolved)
         {
-            TxtUnknownCount.Text = $"{remaining + resolved:N0} session targets";
-            TxtUnknownBreakdown.Text = $"Unresolved: {remaining:N0} · Resolved: {resolved:N0}";
+            TxtUnknownCount.Text = $"{remaining:N0} unresolved";
+            TxtUnknownBreakdown.Text = $"Resolved: {resolved:N0} · Pending: {remaining:N0}";
         }
 
         private void ResultsListView_Loaded(object sender, RoutedEventArgs e)
@@ -166,23 +469,131 @@ namespace AssetsManager.Views
         private void DomainSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateUnknownCountAsync();
+            RefreshMethodsForCurrentDomain();
         }
 
-        private async void RunScanUnknownsGame_Click(object sender, RoutedEventArgs e) => await RunScanUnknownsAsync(HashGuessDomain.Game);
-        private async void RunScanUnknownsLcu_Click(object sender, RoutedEventArgs e) => await RunScanUnknownsAsync(HashGuessDomain.Lcu);
-        private async void RunGrepGame_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepGame);
-        private async void RunGrepLcu_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GrepLcu);
-        private async void RunGameBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameBasic);
-        private async void RunGameExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameExtended);
-        private async void RunBannerGuess_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.BannerGuess);
-        private async void RunGameCustom_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.GameCustom);
-        private async void RunLcuBasic_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuBasic);
-        private async void RunLcuExtended_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuExtended);
-        private async void RunLcuCustom_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuCustom);
-        private async void RunLcuV1Paths_Click(object sender, RoutedEventArgs e) => await RunAsync(HashGuessMode.LcuV1Paths);
-        private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
-        private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
-        private async void RunInternalStructural_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Structural);
+        private void TxtMethodSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshMethodsForCurrentDomain();
+        }
+
+        private void MethodsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Selected item updated via binding
+        }
+
+        private async void MethodsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (_viewModel.SelectedMethod != null && !_viewModel.IsRunning)
+            {
+                await ExecuteMethodByIdAsync(_viewModel.SelectedMethod.Id);
+            }
+        }
+
+        private async void RunSelectedMethod_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.SelectedMethod != null && !_viewModel.IsRunning)
+            {
+                await ExecuteMethodByIdAsync(_viewModel.SelectedMethod.Id);
+            }
+        }
+
+        private async Task ExecuteMethodByIdAsync(string methodId)
+        {
+            switch (methodId)
+            {
+                // GAME
+                case "game-prefixes":
+                    await RunAsync(HashGuessMode.GamePrefixes);
+                    break;
+                case "game-shaders":
+                    await RunAsync(HashGuessMode.GameShaders);
+                    break;
+                case "game-grep":
+                    await RunAsync(HashGuessMode.GrepGame);
+                    break;
+                case "game-scan":
+                    await RunScanUnknownsAsync(HashGuessDomain.Game);
+                    break;
+                case "game-basic":
+                    await RunAsync(HashGuessMode.GameBasic);
+                    break;
+                case "game-extended":
+                    await RunAsync(HashGuessMode.GameExtended);
+                    break;
+                case "game-banner":
+                    await RunAsync(HashGuessMode.BannerGuess);
+                    break;
+                case "game-custom":
+                    await RunAsync(HashGuessMode.GameCustom);
+                    break;
+
+                // LCU
+                case "lcu-scoped":
+                    await RunAsync(HashGuessMode.LcuScoped);
+                    break;
+                case "lcu-modifiers":
+                    await RunAsync(HashGuessMode.LcuModifiers);
+                    break;
+                case "lcu-media":
+                    await RunAsync(HashGuessMode.LcuMedia);
+                    break;
+                case "lcu-basic":
+                    await RunAsync(HashGuessMode.LcuBasic);
+                    break;
+                case "lcu-custom":
+                    await RunAsync(HashGuessMode.LcuCustom);
+                    break;
+                case "lcu-extended":
+                    await RunAsync(HashGuessMode.LcuExtended);
+                    break;
+                case "lcu-v1":
+                    await RunAsync(HashGuessMode.LcuV1Paths);
+                    break;
+                case "lcu-grep":
+                    await RunAsync(HashGuessMode.GrepLcu);
+                    break;
+                case "lcu-scan":
+                    await RunScanUnknownsAsync(HashGuessDomain.Lcu);
+                    break;
+
+                // BIN
+                case "bin-inventory":
+                    await RunInternalAsync(InternalHashAction.Inventory);
+                    break;
+                case "bin-context":
+                    await RunInternalAsync(InternalHashAction.Content);
+                    break;
+                case "bin-schema":
+                    await RunInternalAsync(InternalHashAction.Structural);
+                    break;
+
+                // RST
+                case "rst-inventory":
+                    await RunInternalAsync(InternalHashAction.Inventory);
+                    break;
+                case "rst-content":
+                    await RunInternalAsync(InternalHashAction.Content);
+                    break;
+                case "rst-structural":
+                    await RunInternalAsync(InternalHashAction.Structural);
+                    break;
+
+                default:
+                    _messageBoxService.ShowWarning("Hash Guessing Lab", $"Unknown algorithm action '{methodId}'.", Window.GetWindow(this));
+                    break;
+            }
+        }
+
+        private void SelectAllSubMethods_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedMethod?.SelectAllSubMethods(true);
+        }
+
+        private void DeselectAllSubMethods_Click(object sender, RoutedEventArgs e)
+        {
+            _viewModel.SelectedMethod?.SelectAllSubMethods(false);
+        }
 
         private async void ExportJson_Click(object sender, RoutedEventArgs e)
         {
@@ -199,7 +610,7 @@ namespace AssetsManager.Views
                 FileName = $"resolved_hashes_{DateTime.Now:yyyyMMdd_HHmmss}.json"
             };
 
-            if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+            if (dialog.ShowDialog() == true)
             {
                 try
                 {
@@ -230,12 +641,12 @@ namespace AssetsManager.Views
                             };
                         }
                         return (object)m;
-                    });
+                    }).ToList();
 
                     var exportData = new
                     {
-                        exportedAtUtc = DateTime.UtcNow,
-                        totalMatches = _viewModel.Matches.Count,
+                        exportedAt = DateTime.UtcNow.ToString("o"),
+                        totalMatches = items.Count,
                         matches = items
                     };
 
@@ -260,13 +671,13 @@ namespace AssetsManager.Views
             _cancellationTokenSource = null;
         }
 
-        private async System.Threading.Tasks.Task RunAsync(HashGuessMode mode)
+        private async Task RunAsync(HashGuessMode mode)
         {
             if (_viewModel.IsRunning) return;
 
             var domain = DomainSelector.SelectedIndex == 0 ? HashGuessDomain.Game : HashGuessDomain.Lcu;
             if (mode is HashGuessMode.GrepGame or HashGuessMode.BannerGuess or HashGuessMode.GameCustom) domain = HashGuessDomain.Game;
-            else if (mode is HashGuessMode.GrepLcu or HashGuessMode.LcuCustom) domain = HashGuessDomain.Lcu;
+            else if (mode is HashGuessMode.GrepLcu or HashGuessMode.LcuCustom or HashGuessMode.LcuScoped or HashGuessMode.LcuModifiers or HashGuessMode.LcuMedia) domain = HashGuessDomain.Lcu;
 
             string rootPath = _appSettings.LolPbeDirectory?.Trim();
             if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
@@ -274,6 +685,18 @@ namespace AssetsManager.Views
                 _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
                 return;
             }
+
+            var selectedSubMethods = _viewModel.SelectedMethod?.SubMethods?
+                .Where(s => s.IsSelected)
+                .Select(s => s.Id)
+                .ToHashSet();
+
+            if (_viewModel.SelectedMethod?.HasSubMethods == true && (selectedSubMethods == null || selectedSubMethods.Count == 0))
+            {
+                _messageBoxService.ShowWarning("Hash Guessing Lab", "Please select at least one sub-algorithm to execute.", Window.GetWindow(this));
+                return;
+            }
+
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
             _viewModel.IsRunning = true;
@@ -288,7 +711,7 @@ namespace AssetsManager.Views
             int sessionTargets = 0;
 
             _viewModel.Matches.Clear();
-            var displayedMatchHashes = new System.Collections.Generic.HashSet<ulong>();
+            var displayedMatchHashes = new HashSet<ulong>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             void UpdateStatus()
@@ -348,25 +771,30 @@ namespace AssetsManager.Views
                     currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
-                    UpdateStatus();
                 });
-                IProgress<HashGuessMatch> matchProgress = new Progress<HashGuessMatch>(match =>
+                var matchProgress = new Progress<HashGuessMatch>(match =>
                 {
                     if (displayedMatchHashes.Add(match.Hash))
                     {
                         _viewModel.Matches.Add(match);
-                        UpdateLiveProgress(matches: displayedMatchHashes.Count);
+                        foundMatches++;
+                        UpdateLiveProgress(matches: foundMatches);
                     }
                 });
                 var result = mode switch
                 {
-                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GamePrefixes => await _hashGuessingService.RunGamePrefixGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GameShaders => await _hashGuessingService.RunGameShaderGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
+                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
                     HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
                     HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
                     HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
@@ -408,7 +836,7 @@ namespace AssetsManager.Views
                 _viewModel.StatusText = "Pre-validation failed. Run WAD Path Grep first.";
                 _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
-            catch (System.IO.DirectoryNotFoundException ex)
+            catch (DirectoryNotFoundException ex)
             {
                 stopwatch.Stop();
                 timer.Stop();
@@ -424,182 +852,148 @@ namespace AssetsManager.Views
                 timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
-                _logService.LogError(ex, "Hash guessing failed.");
-                _viewModel.StatusText = "Hash guessing failed. Check application_errors.log.";
+                _logService.LogError(ex, "Unexpected error during hash guessing.");
+                _viewModel.StatusText = "Error during hash guessing execution.";
                 _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             finally
             {
                 timer.Stop();
-                if (ReferenceEquals(_cancellationTokenSource, runCancellation))
-                    _cancellationTokenSource = null;
-                runCancellation.Dispose();
-                _viewModel.IsProgressIndeterminate = false;
                 _viewModel.IsRunning = false;
-                UpdateUnknownCountAsync();
+                _cancellationTokenSource = null;
             }
         }
 
-        private async System.Threading.Tasks.Task RunInternalAsync(InternalHashAction action)
+        private async Task RunInternalAsync(InternalHashAction action)
         {
             if (_viewModel.IsRunning) return;
+
             string rootPath = _appSettings.LolPbeDirectory?.Trim();
-            if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
+            if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
             {
                 _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
                 return;
             }
 
-            bool includeBin = DomainSelector.SelectedIndex == 2;
-            bool includeRst = DomainSelector.SelectedIndex == 3;
+            int domainIndex = DomainSelector.SelectedIndex;
+            bool includeBin = domainIndex == 2;
+            bool includeRst = domainIndex == 3;
+            string domainName = includeBin ? "BIN" : "RST";
+
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
-            _viewModel.ProgressText = "Scanning";
-            _viewModel.IsProgressIndeterminate = action == InternalHashAction.Structural;
-            string internalDomain = includeBin ? "BIN" : "RST";
-            
-            string currentStage = action == InternalHashAction.Inventory ? $"Building {internalDomain} inventory" : "Preparing internal hash scan";
-            long totalChecked = 0;
-            int totalWads = 0;
-            int foundMatches = 0;
+            _viewModel.ProgressText = "Running";
+            _viewModel.IsProgressIndeterminate = true;
+            _viewModel.StatusText = $"Executing {domainName} {action}...";
 
             _viewModel.Matches.Clear();
-            var displayedInternalMatches = new System.Collections.Generic.HashSet<(InternalHashKind Kind, ulong Hash, string Value)>();
+            var displayedMatchHashes = new HashSet<ulong>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-            void UpdateStatus()
-            {
-                string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                _viewModel.StatusText = totalWads > 0
-                    ? $"{currentStage} · {totalChecked:N0} checked · {foundMatches:N0} found · Time: {timeText}"
-                    : $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
-            }
-
-            UpdateStatus();
-
-            var timer = new DispatcherTimer(DispatcherPriority.Normal)
-            {
-                Interval = TimeSpan.FromMilliseconds(100)
-            };
-            timer.Tick += (s, e) =>
-            {
-                if (_viewModel.IsRunning && stopwatch.IsRunning)
-                {
-                    UpdateStatus();
-                }
-            };
-            timer.Start();
 
             try
             {
-                var progress = new Progress<InternalHashProgress>(value =>
+                var progress = new Progress<InternalHashProgress>(p =>
                 {
-                    if (value.NewMatches.Count > 0)
+                    if (p.NewMatches != null && p.NewMatches.Count > 0)
                     {
-                        var newMatches = value.NewMatches
-                            .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
-                            .Cast<object>()
-                            .ToList();
-                        if (newMatches.Count > 0) _viewModel.Matches.AddRange(newMatches);
+                        foreach (var match in p.NewMatches)
+                        {
+                            if (displayedMatchHashes.Add(match.Hash))
+                            {
+                                _viewModel.Matches.Add(match);
+                            }
+                        }
                     }
-                    if (value.RemainingUnknowns.HasValue)
+
+                    if (p.TotalWads > 0)
                     {
-                        ShowLiveUnknownCount(value.RemainingUnknowns.Value, value.FoundMatches);
-                    }
-                    else
-                    {
-                        TxtUnknownCount.Text = "Scanning inventory";
-                        TxtUnknownBreakdown.Text = $"Parsed: {value.ProcessedFiles:N0} files";
-                    }
-                    _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
-                    if (value.TotalWads > 0)
-                    {
-                        _viewModel.ProgressValue = value.ProcessedWads * 100d / value.TotalWads;
+                        _viewModel.IsProgressIndeterminate = false;
+                        _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
                         _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
                     }
+                    else if (p.CheckedCandidates > 0)
+                    {
+                        _viewModel.IsProgressIndeterminate = false;
+                        _viewModel.ProgressText = $"{p.CheckedCandidates:N0} checked";
+                    }
                     else
                     {
-                        long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
-                        _viewModel.ProgressText = $"{checkedCount:N0} checked";
+                        _viewModel.IsProgressIndeterminate = true;
                     }
-                    currentStage = string.IsNullOrEmpty(value.CurrentStage) ? currentStage : value.CurrentStage;
-                    totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedFiles;
-                    totalWads = value.TotalWads;
-                    foundMatches = value.FoundMatches;
-                    UpdateStatus();
+
+                    _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found";
                 });
 
                 if (action == InternalHashAction.Inventory)
                 {
-                    var inventory = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
+                    var inv = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
                     stopwatch.Stop();
-                    timer.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
-                    _viewModel.StatusText = includeBin
-                        ? $"BIN inventory completed in {elapsedTime}: {inventory.ScannedBins:N0} files + Meta {inventory.MetaSchemaVersion} ({inventory.MetaSchemaTypes:N0} types, {inventory.MetaSchemaFields:N0} fields)."
-                        : $"RST inventory completed in {elapsedTime}: {inventory.ScannedStringTables:N0} stringtables parsed.";
+                    _viewModel.IsProgressIndeterminate = false;
+                    _viewModel.StatusText = $"Completed {domainName} inventory in {elapsedTime}: {inv.ScannedBins} BIN / {inv.ScannedStringTables} RST parsed.";
                 }
                 else
                 {
                     InternalHashRunResult result = action switch
                     {
                         InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
-                        _ => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token)
+                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
+                        _ => throw new ArgumentOutOfRangeException(nameof(action))
                     };
+
                     stopwatch.Stop();
-                    timer.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
-                    _viewModel.Matches.AddRange(result.Matches
-                        .Where(match => displayedInternalMatches.Add((match.Kind, match.Hash, match.Value)))
-                        .Cast<object>());
+                    _viewModel.Matches.AddRange(result.Matches.Where(m => displayedMatchHashes.Add(m.Hash)));
                     _viewModel.ProgressValue = 100;
                     _viewModel.ProgressText = "100%";
-                    int verified = result.Matches.Count(match => match.CanPromote);
-                    _viewModel.StatusText = $"Completed in {elapsedTime}: {verified:N0} verified, {result.Matches.Count - verified:N0} candidates.";
+                    _viewModel.IsProgressIndeterminate = false;
+                    _viewModel.StatusText = $"Completed {domainName} {action} in {elapsedTime}: {result.Matches.Count:N0} matches discovered.";
                 }
+
+                UpdateUnknownCountAsync();
             }
             catch (OperationCanceledException)
             {
-                stopwatch.Stop();
-                timer.Stop();
-                _viewModel.StatusText = "Internal hash guessing cancelled.";
+                _viewModel.ProgressText = "";
+                _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
+                _viewModel.StatusText = $"{domainName} operation cancelled.";
             }
             catch (Exception ex)
             {
-                stopwatch.Stop();
-                timer.Stop();
-                _logService.LogError(ex, "Internal hash guessing failed.");
-                _viewModel.StatusText = "Internal hash guessing failed. Check application_errors.log.";
+                _viewModel.ProgressText = "";
+                _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
+                _logService.LogError(ex, $"Failed to execute {domainName} {action}.");
+                _viewModel.StatusText = $"Error: {ex.Message}";
                 _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
             }
             finally
             {
-                timer.Stop();
-                if (ReferenceEquals(_cancellationTokenSource, runCancellation)) _cancellationTokenSource = null;
-                runCancellation.Dispose();
-                _viewModel.IsProgressIndeterminate = false;
                 _viewModel.IsRunning = false;
-                UpdateUnknownCountAsync();
+                _cancellationTokenSource = null;
             }
         }
 
         private static string FormatElapsedTime(TimeSpan elapsed)
         {
             if (elapsed.TotalHours >= 1)
-                return elapsed.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
-            return elapsed.ToString(@"mm\:ss\.f", System.Globalization.CultureInfo.InvariantCulture);
+                return $"{elapsed.Hours}h {elapsed.Minutes:D2}m {elapsed.Seconds:D2}s";
+            if (elapsed.TotalMinutes >= 1)
+                return $"{elapsed.Minutes}m {elapsed.Seconds:D2}s";
+            return $"{elapsed.TotalSeconds:F1}s";
         }
 
-        private async System.Threading.Tasks.Task RunScanUnknownsAsync(HashGuessDomain domain)
+        private async Task RunScanUnknownsAsync(HashGuessDomain domain)
         {
             if (_viewModel.IsRunning) return;
 
             string rootPath = _appSettings.LolPbeDirectory?.Trim();
-            if (string.IsNullOrWhiteSpace(rootPath) || !System.IO.Directory.Exists(rootPath))
+            if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
             {
                 _messageBoxService.ShowError("Hash Guessing Lab", "Please configure the LoL PBE Install Directory in Settings first.", Window.GetWindow(this));
                 return;
@@ -649,7 +1043,30 @@ namespace AssetsManager.Views
             }
         }
 
-        private enum HashGuessMode { GrepGame, GrepLcu, GameBasic, GameExtended, BannerGuess, GameCustom, LcuBasic, LcuExtended, LcuCustom, LcuV1Paths }
-        private enum InternalHashAction { Inventory, Content, Structural }
+        private enum HashGuessMode
+        {
+            GrepGame,
+            GrepLcu,
+            GamePrefixes,
+            GameShaders,
+            GameBasic,
+            GameExtended,
+            BannerGuess,
+            GameCustom,
+            LcuBasic,
+            LcuExtended,
+            LcuCustom,
+            LcuScoped,
+            LcuModifiers,
+            LcuMedia,
+            LcuV1Paths
+        }
+
+        private enum InternalHashAction
+        {
+            Inventory,
+            Content,
+            Structural
+        }
     }
 }
