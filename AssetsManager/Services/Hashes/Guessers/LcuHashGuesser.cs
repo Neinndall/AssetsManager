@@ -762,6 +762,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string label)
             {
                 int variantCheckedCandidates = 0;
+                var wordSubset = variantWords.Take(120).ToList();
                 foreach (string extension in extensions)
                 foreach ((int oldWordCount, int newWordCount) in variants)
                 {
@@ -775,10 +776,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                         cancellationToken,
                         plugin: "rcp-fe-lol-*",
                         fileExtension: extension,
-                        words: variantWords,
+                        words: wordSubset,
                         oldWordCount: oldWordCount,
                         newWordCount: newWordCount,
-                        candidateBudget: 250_000_000,
+                        candidateBudget: 500_000,
                         progress: current => ReportCustomThrottled(stage, progressOffset + current));
                     variantCheckedCandidates += count;
                 }
