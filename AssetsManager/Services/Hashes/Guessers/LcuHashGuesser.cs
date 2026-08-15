@@ -85,6 +85,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                         .Where(IsRcpFeLolPngJpgPath)
                         .Select(Path.GetFileName)));
 
+        internal IReadOnlyList<string> BuildMediaSwordlist() =>
+            Corpus.GetOrCreate(
+                "swordlist-media",
+                paths => HashGuessEngine.BuildWordlist(
+                    paths
+                        .Where(IsRcpFeLolMediaPath)
+                        .Select(Path.GetFileName)));
+
         private static bool IsRcpFeLolSvgPath(string path) =>
             path.Contains("-fe-lol-", StringComparison.Ordinal)
             && path.Contains(".svg", StringComparison.Ordinal);
@@ -93,6 +101,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             path.Contains("-fe-lol-", StringComparison.Ordinal)
             && (path.Contains(".png", StringComparison.Ordinal)
                 || path.Contains(".jpg", StringComparison.Ordinal));
+
+        private static bool IsRcpFeLolMediaPath(string path) =>
+            path.Contains("-fe-lol-", StringComparison.Ordinal)
+            && (path.Contains(".webm", StringComparison.Ordinal)
+                || path.Contains(".ogg", StringComparison.Ordinal));
 
         protected override bool IncludeNumberPath(string path) => !NumberExcludedPathRegex.IsMatch(path);
 
@@ -414,6 +427,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             checkedCandidates += RunVariants(words, new[] { "svg" }, "SVG");
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += RunVariants(BuildPngJpgSwordlist(), new[] { "png", "jpg" }, "PNG/JPG");
+            if (engine.RemainingUnknownCount > 0)
+                checkedCandidates += RunVariants(BuildMediaSwordlist(), new[] { "webm", "ogg" }, "Media");
+            if (engine.RemainingUnknownCount > 0)
+                checkedCandidates += RunVariants(BuildSwordlist(), new[] { "json" }, "JSON");
 
             return checkedCandidates;
         }

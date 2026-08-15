@@ -928,6 +928,27 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuBuildMediaSwordlistExtractsTokensFromWebmAndOggPaths()
+        {
+            var paths = new[]
+            {
+                "plugins/rcp-fe-lol-static-assets/global/default/videos/ranked/tier-promotion-to-gold.webm",
+                "plugins/rcp-fe-lol-static-assets/global/default/sounds/honor/sfx-honor-vote-outro.ogg",
+                "plugins/rcp-fe-lol-static-assets/global/default/images/icon.png"
+            };
+
+            var guesser = new LcuHashGuesser(paths, null);
+            var words = guesser.BuildMediaSwordlist();
+
+            Assert.Contains("tier", words);
+            Assert.Contains("promotion", words);
+            Assert.Contains("gold", words);
+            Assert.Contains("honor", words);
+            Assert.Contains("outro", words);
+            Assert.DoesNotContain("icon", words);
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";
