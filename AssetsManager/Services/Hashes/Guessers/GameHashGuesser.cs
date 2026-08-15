@@ -140,13 +140,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                         .Where(path => path.Contains(".bin", StringComparison.Ordinal))
                         .Select(GetBasename)));
 
-        internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 200, int? digits = null, bool inferDigits = false) =>
+        internal IEnumerable<HashGuessCandidate> SubstituteNumbers(int maximum = 100, int? digits = null, bool inferDigits = false) =>
             GenerateNumberCandidates(maximum, int.MaxValue, digits, inferDigits, includeCommonPadding: false);
 
         internal int SubstituteNumbers(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            int maximum = 200,
+            int maximum = 100,
             int? digits = null,
             Action<int> progress = null) =>
             base.SubstituteNumbersCore(
@@ -1537,7 +1537,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
-                GuessImageAutoAtlasPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
                 return;
             }
 
@@ -1756,7 +1755,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (!ImageAutoAtlas.IsAtlas(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
 
-            var knownDict = HashFile.Load();
+            IReadOnlyDictionary<ulong, string> knownDict = Corpus.GetOrCreate("known-hashes-dict", _ => HashFile.Load());
 
             // Ensure any sprite hash not in HashFile is marked unknown in engine
             bool hasUnresolvedSprites = false;

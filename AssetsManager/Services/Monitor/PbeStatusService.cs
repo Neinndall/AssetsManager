@@ -42,7 +42,9 @@ namespace AssetsManager.Services.Monitor
             string notificationMessage = null;
             try
             {
-                var response = await _httpClient.GetStringAsync(PbeStatusUrl, cancellationToken);
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+                var response = await _httpClient.GetStringAsync(PbeStatusUrl, linkedCts.Token);
                 cancellationToken.ThrowIfCancellationRequested();
                 string fullStatus = ExtractStatus(response);
                 string conciseStatus = ExtractConciseStatus(response);
@@ -65,7 +67,11 @@ namespace AssetsManager.Services.Monitor
                     }
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Cancellation was requested by the caller/app shutdown.
+            }
+            catch (Exception ex)
             {
                 _logService.LogError(ex, "Failed to check PBE status.");
             }
