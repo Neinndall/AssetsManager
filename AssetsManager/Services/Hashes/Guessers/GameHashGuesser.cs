@@ -1857,9 +1857,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (string path in knownPaths)
                 {
-                    if (path.Contains("/autoatlas/", StringComparison.OrdinalIgnoreCase) ||
-                        path.Contains("atlas_info", StringComparison.OrdinalIgnoreCase) ||
-                        path.Contains("atlas_", StringComparison.OrdinalIgnoreCase))
+                    if (path.EndsWith("atlas_info.bin", StringComparison.OrdinalIgnoreCase))
                     {
                         string dir = Path.GetDirectoryName(PathUtils.NormalizePath(path));
                         if (!string.IsNullOrEmpty(dir))
