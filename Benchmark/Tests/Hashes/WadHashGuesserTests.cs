@@ -1555,35 +1555,21 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
-        public void LcuCustomRunsAllRcpFeLolSvgBasenameWordVariants()
+        public void LcuCustomRunsScopedPluginAttacks()
         {
             var lcu = new LcuHashGuesser(new HashFile(HashGuessDomain.Lcu, new[]
             {
                 "plugins/rcp-fe-lol-home/global/default/navigation/old-icon.svg",
-                "plugins/rcp-fe-lol-home/global/default/navigation/new-alpha.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon.svg",
                 "plugins/rcp-fe-lol-other/global/default/navigation/old-icon.svg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/new-alpha.svg",
-                "plugins/rcp-fe-lol-home/global/default/navigation/old-icon.png",
-                "plugins/rcp-fe-lol-home/global/default/navigation/new-alpha.png",
-                "plugins/rcp-fe-lol-other/global/default/navigation/old-icon.jpg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/new-alpha.jpg",
-                "plugins/rcp-fe-other/global/default/navigation/old-icon.svg",
-                "plugins/rcp-fe-other/global/default/navigation/new-alpha.svg"
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon.svg"
             }), null);
             string[] expectedPaths =
             {
-                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon.svg",
-                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new-icon.svg",
-                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new.svg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon.svg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new-icon.svg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new.svg",
-                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon.png",
-                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new-icon.png",
-                "plugins/rcp-fe-lol-home/global/default/navigation/alpha-new.png",
-                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon.jpg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new-icon.jpg",
-                "plugins/rcp-fe-lol-other/global/default/navigation/alpha-new.jpg"
+                "plugins/rcp-fe-lol-home/global/default/navigation/old-icon-new.svg",
+                "plugins/rcp-fe-lol-home/global/default/navigation/new-icon-old.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/old-icon-new.svg",
+                "plugins/rcp-fe-lol-other/global/default/navigation/new-icon-old.svg"
             };
             var engine = new HashGuessEngine(
                 HashGuessDomain.Lcu,

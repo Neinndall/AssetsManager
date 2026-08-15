@@ -749,53 +749,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += count;
             }
 
-            var variants = new[]
-            {
-                (OldWordCount: 1, NewWordCount: 1),
-                (OldWordCount: 1, NewWordCount: 2),
-                (OldWordCount: 2, NewWordCount: 2)
-            };
-
-            int RunVariants(
-                IReadOnlyList<string> variantWords,
-                IEnumerable<string> extensions,
-                string label)
-            {
-                int variantCheckedCandidates = 0;
-                var wordSubset = variantWords.Take(120).ToList();
-                foreach (string extension in extensions)
-                foreach ((int oldWordCount, int newWordCount) in variants)
-                {
-                    if (engine.RemainingUnknownCount == 0) return variantCheckedCandidates;
-
-                    string stage = $"LCU Custom: rcp-fe-lol-* {label} basename {oldWordCount}->{newWordCount}";
-                    ReportCustomThrottled(stage, checkedCandidates + variantCheckedCandidates);
-                    int progressOffset = checkedCandidates + variantCheckedCandidates;
-                    int count = SubstituteBasenameWords(
-                        engine,
-                        cancellationToken,
-                        plugin: "rcp-fe-lol-*",
-                        fileExtension: extension,
-                        words: wordSubset,
-                        oldWordCount: oldWordCount,
-                        newWordCount: newWordCount,
-                        candidateBudget: 500_000,
-                        progress: current => ReportCustomThrottled(stage, progressOffset + current));
-                    variantCheckedCandidates += count;
-                }
-
-                return variantCheckedCandidates;
-            }
-
-            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-svg"))
-                checkedCandidates += RunVariants(BuildSswordlist(), new[] { "svg" }, "SVG");
-            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-png"))
-                checkedCandidates += RunVariants(BuildPngJpgSwordlist(), new[] { "png", "jpg" }, "PNG/JPG");
-            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-media"))
-                checkedCandidates += RunVariants(BuildMediaSwordlist(), new[] { "webm", "ogg" }, "Media");
-            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-json"))
-                checkedCandidates += RunVariants(BuildSwordlist(), new[] { "json" }, "JSON");
-
             return checkedCandidates;
         }
 

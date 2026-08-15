@@ -201,12 +201,8 @@ namespace AssetsManager.Views
                 BadgeBrush = accentTeal,
                 EstimatedTime = "~15s"
             };
-            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-scoped", Name = "GuessScopedPlugins", Description = "Intra-plugin directory cross-products & isolated vocabularies", BadgeText = "⚡ ~5s", BadgeBrush = accentTeal });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-scoped", Name = "GuessScopedPlugins", Description = "Intra-plugin directory topology, vocabulary, numeric ranges & component synthesis", BadgeText = "⚡ ~5s", BadgeBrush = accentTeal });
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-modifiers", Name = "GuessUniversalModifiers", Description = "Riot UI states (hover, active, disabled, tier1-4, mini, lg)", BadgeText = "⚡ ~2s", BadgeBrush = accentBrush });
-            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-media", Name = "GuessMediaTokens", Description = "Targeted audio/video token substitution from client media", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
-            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-svg", Name = "GuessSvgTokens", Description = "Dynamic SVG vector icon token variants", BadgeText = "⚡ ~3s", BadgeBrush = accentTeal });
-            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-png", Name = "GuessPngTokens", Description = "Dynamic PNG sprite and UI texture token variants", BadgeText = "⚡ ~3s", BadgeBrush = accentPurple });
-            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-json", Name = "GuessJsonTokens", Description = "Dynamic manifest and data config tokens", BadgeText = "⚡ ~3s", BadgeBrush = accentBrush });
             _allMethods.Add(lcuCustom);
 
             var lcuBasic = new HashMethodItemModel
