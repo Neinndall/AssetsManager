@@ -70,6 +70,7 @@ namespace AssetsManager.Services.Monitor
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 // Cancellation was requested by the caller/app shutdown.
+                throw;
             }
             catch (Exception ex)
             {

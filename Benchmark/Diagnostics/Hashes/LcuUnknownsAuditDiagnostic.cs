@@ -233,6 +233,7 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     if (staticUnknownSet.Contains(hash))
                     {
                         matched++;
+                        solvedPaths[hash] = path;
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"  [MATCH!] 0x{hash:x16} -> {path}");
                         Console.ResetColor();
@@ -240,36 +241,90 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     }
                 }
 
-            // Test 6: Figma SVG structure search across all plugins
+            // Universal JS/JSON/CSS Bundle Harvester across ALL WADs
             Console.WriteLine("\n==================================================");
-            Console.WriteLine(">>> SVG Figma Node Structure Matches across all WADs:");
+            Console.WriteLine(">>> Universal JS/JSON/CSS Bundle String Harvester:");
             Console.WriteLine("==================================================");
+            var harvestedStrings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var allPluginNames = wads.Select(w =>
+            {
+                string name = Path.GetFileNameWithoutExtension(w);
+                if (name.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                    name = Path.GetFileNameWithoutExtension(name);
+                return name;
+            }).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
             foreach (var w in wads)
             {
+                string pluginName = Path.GetFileNameWithoutExtension(w);
+                if (pluginName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                    pluginName = Path.GetFileNameWithoutExtension(pluginName);
+
                 try
                 {
                     using var pluginWad = new WadFile(w);
                     foreach (var p in pluginWad.Chunks)
                     {
-                        if (knownLcu.TryGetValue(p.Key, out string kPath) && kPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                        if (p.Value.UncompressedSize > 20 && p.Value.UncompressedSize < 15_000_000)
                         {
                             using var owner = pluginWad.LoadChunkDecompressed(p.Value);
                             var seg = owner.DangerousGetArray();
-                            string text = Encoding.UTF8.GetString(seg.Array, seg.Offset, seg.Count);
-                            if (text.Contains("path-1-outside-1"))
-                                Console.WriteLine($"  [SVG MATCH path-1-outside-1] {kPath}");
-                            if (text.Contains("3419_8358"))
-                                Console.WriteLine($"  [SVG MATCH 3419_8358] {kPath}");
-                            if (text.Contains("5045_77102"))
-                                Console.WriteLine($"  [SVG MATCH 5045_77102] {kPath}");
-                            if (text.Contains("4003_3667") || text.Contains("4003_3672"))
-                                Console.WriteLine($"  [SVG MATCH 4003_3667] {kPath}");
-                            if (text.Contains("5519_4182"))
-                                Console.WriteLine($"  [SVG MATCH 5519_4182] {kPath}");
+                            byte[] data = seg.Array[seg.Offset..(seg.Offset + seg.Count)];
+
+                            if (data[0] == 0x89 && data[1] == 0x50) continue; // PNG
+                            if (data[0] == 0x1A && data[1] == 0x45) continue; // WEBM
+                            if (data[0] == 0x4F && data[1] == 0x67) continue; // OGG
+                            if (data[0] == 0xFF && data[1] == 0xD8) continue; // JPG
+
+                            string text;
+                            try { text = Encoding.UTF8.GetString(data); } catch { continue; }
+
+                            if (text.Contains("function") || text.Contains("export") || text.Contains("import") ||
+                                text.Contains("{") || text.Contains("<") || text.Contains("webpack"))
+                            {
+                                var matches = Regex.Matches(text, @"[""']([^""'\r\n\t]{3,120})[""']|`([^`\r\n\t]{3,120})`");
+                                foreach (Match m in matches)
+                                {
+                                    string s = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                                    if (s.Contains('.') || s.Contains('/') || s.Contains('_') || s.Contains('-'))
+                                    {
+                                        harvestedStrings.Add(s);
+                                    }
+                                }
+
+                                var pathMatches = Regex.Matches(text, @"(?:/fe/|/assets/|/images/|/data/|/v1/)[a-zA-Z0-9_\-\.\/]+");
+                                foreach (Match m in pathMatches)
+                                {
+                                    harvestedStrings.Add(m.Value);
+                                }
+                            }
                         }
                     }
                 }
                 catch { }
+            }
+
+            Console.WriteLine($"Harvested {harvestedStrings.Count} unique tokens and string literals from all bundles!");
+
+            foreach (var str in harvestedStrings)
+            {
+                string clean = str.TrimStart('/');
+                if (clean.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                {
+                    TestCandidate(clean);
+                }
+
+                string ext = Path.GetExtension(clean);
+                if (!string.IsNullOrEmpty(ext) && ext.Length <= 5)
+                {
+                    foreach (var plugin in allPluginNames)
+                    {
+                        TestCandidate($"plugins/{plugin}/global/default/{clean}");
+                        TestCandidate($"plugins/{plugin}/global/default/assets/{clean}");
+                        TestCandidate($"plugins/{plugin}/global/default/images/{clean}");
+                        TestCandidate($"plugins/{plugin}/{clean}");
+                    }
+                }
             }
                 var allStaticBasenames = knownPathsInStatic.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 var allStaticDirs = knownPathsInStatic.Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/')).Distinct(StringComparer.OrdinalIgnoreCase).Where(d => !string.IsNullOrEmpty(d)).ToList();
@@ -444,6 +499,25 @@ namespace BenchmarkApp.Diagnostics.Hashes
 
                 Console.WriteLine($"Total chunks: {wad.Chunks.Count} | Resolved: {knownPaths.Count} | Unknown: {unknownChunks.Count}");
 
+                Console.WriteLine($"\n>>> Unknown Chunks in {targetPlugin}:");
+                foreach (var item in unknownChunks)
+                {
+                    string fileType = "UNKNOWN";
+                    string detail = string.Empty;
+                    try
+                    {
+                        using var owner = wad.LoadChunkDecompressed(item.Chunk);
+                        var seg = owner.DangerousGetArray();
+                        byte[] data = seg.Array[seg.Offset..(seg.Offset + seg.Count)];
+                        fileType = DetectFileType(data, out detail);
+                        var matches = Regex.Matches(Encoding.UTF8.GetString(data), @"[a-zA-Z0-9_\-\.\/]{4,}");
+                        var sampleStrings = matches.Cast<Match>().Select(m => m.Value).Distinct().Take(6);
+                        detail += $" | strings: [{string.Join(", ", sampleStrings)}]";
+                    }
+                    catch {}
+                    Console.WriteLine($"  0x{item.Hash:x16} | {fileType.PadRight(5)} | {item.Chunk.UncompressedSize,7} B | {detail}");
+                }
+
                 Console.WriteLine($"\n>>> Known Files in {targetPlugin}:");
                 foreach (var k in knownPaths.Take(50))
                 {
@@ -460,6 +534,7 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     if (pluginUnknownSet.Contains(hash))
                     {
                         pluginMatches++;
+                        solvedPaths[hash] = path;
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.WriteLine($"  [MATCH!] 0x{hash:x16} -> {path}");
                         Console.ResetColor();
@@ -502,7 +577,101 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     }
                 }
 
+                // Loot items, icons, and videos
+                if (targetPlugin == "rcp-fe-lol-loot")
+                {
+                    string[] lootTypes = { "chest", "capsule", "orb", "material", "tournamentlogo", "gem", "key", "token", "egg", "forge", "crate", "badge", "icon", "loot_item", "currency", "border", "shard", "rarity" };
+                    string[] lootFolders = { "assets/loot_item_icons", "assets/tray_icons", "assets/category_icons", "assets/tooltips", "assets/border_images", "assets/rarity_icons", "assets/reveal_redeem/rarity", "assets/disenchant_modal", "assets/mass_disenchant" };
+
+                    for (int i = 0; i <= 500; i++)
+                    {
+                        foreach (var folder in lootFolders)
+                        foreach (var type in lootTypes)
+                        {
+                            TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/{folder}/{type}_{i}.png");
+                            TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/{folder}/{type}_{i}_splash.png");
+                            TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/{folder}/{type}{i}.png");
+                            for (int j = 1; j <= 10; j++)
+                            {
+                                TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/{folder}/{type}_{i}_{j}.png");
+                                TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/{folder}/{type}_{i}_{j}_splash.png");
+                            }
+                        }
+                    }
+
+                    string[] videoNames = { "open_capsule", "open_chest", "open_orb", "open_honor_capsule", "loot_reroll", "small_rental", "large_rental", "portal_open" };
+                    string[] videoSub = { "intro", "loop", "outro", "in", "out", "image" };
+                    foreach (var vn in videoNames)
+                    foreach (var vs in videoSub)
+                    {
+                        TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/assets/videos/{vn}_{vs}.webm");
+                        TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/assets/videos/low_spec_images/{vn}_{vs}.png");
+                        TryPluginCandidate($"plugins/rcp-fe-lol-loot/global/default/assets/reroll_crafter/{vn}_{vs}.webm");
+                    }
+                }
+
+                if (targetPlugin == "rcp-fe-lol-store")
+                {
+                    string[] storeFolders = { "storefront/addon/public/img", "storefront/addon/public/img/sprite-source", "storefront/addon/public/img/composites", "storefront/addon/public/img/content/gift", "storefront/addon/public/img/content/transfer", "storefront/addon/public/img/content/rune_pages", "storefront/addon/public/img/csslib" };
+                    string[] storeNames = { "gift", "g-skin", "g-champion", "g-wardskin", "g-mc", "g-icon", "g-chest", "g-pass", "g-bundle", "g-tft", "close", "x-icon", "up-arrow", "down-arrow", "sort-up-arrow", "sort-down-arrow", "sale", "error", "bg-modal", "bg-chroma-card", "hextechmagicbg" };
+                    string[] modifiers = { "sm", "lg", "hover", "active", "disabled", "pressed", "selected", "default", "icon", "bg" };
+
+                    foreach (var folder in storeFolders)
+                    foreach (var name in storeNames)
+                    {
+                        TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}.png");
+                        TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}.jpg");
+                        TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}.svg");
+                        foreach (var m in modifiers)
+                        {
+                            TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}_{m}.png");
+                            TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}_{m}.jpg");
+                            TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}-{m}.png");
+                            TryPluginCandidate($"plugins/rcp-fe-lol-store/global/default/{folder}/{name}-{m}.jpg");
+                        }
+                    }
+                }
+
                 // Done inspecting
+            }
+
+            if (solvedPaths.Count > 0)
+            {
+                Console.WriteLine($"\n==================================================");
+                Console.WriteLine($"  TOTAL CRACKED PATHS: {solvedPaths.Count}");
+                Console.WriteLine($"==================================================");
+                foreach (var p in solvedPaths)
+                {
+                    Console.WriteLine($"  0x{p.Key:x16} {p.Value}");
+                }
+
+                string crackedOutPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "AssetsManager", "hash_lab", "cracked_lcu.txt");
+                File.WriteAllLines(crackedOutPath, solvedPaths.Select(p => $"{p.Key:x16} {p.Value}"));
+                Console.WriteLine($"\n[SUCCESS] Saved {solvedPaths.Count} cracked hashes to: {crackedOutPath}");
+
+                // Auto-append to hashes.lcu.txt if not already present
+                if (File.Exists(hashesLcuPath))
+                {
+                    var existingLines = new HashSet<string>(File.ReadLines(hashesLcuPath).Select(l => l.Trim()), StringComparer.OrdinalIgnoreCase);
+                    var toAppend = new List<string>();
+                    foreach (var pair in solvedPaths)
+                    {
+                        string lineWithHash = $"{pair.Key:x16} {pair.Value}";
+                        string linePlain = pair.Value;
+                        if (!existingLines.Contains(lineWithHash) && !existingLines.Contains(linePlain))
+                        {
+                            toAppend.Add(lineWithHash);
+                        }
+                    }
+
+                    if (toAppend.Count > 0)
+                    {
+                        File.AppendAllLines(hashesLcuPath, toAppend);
+                        Console.WriteLine($"[SUCCESS] Appended {toAppend.Count} new entries to: {hashesLcuPath}");
+                    }
+                }
             }
         }
 
