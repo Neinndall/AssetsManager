@@ -305,7 +305,7 @@ namespace AssetsManager.Services.Core
         {
             var tasks = new List<Task>();
 
-            // Checkeo al arrancar de Json Updates, Hashes and New Version App
+            // Checkeo al arrancar de Watcher Updates, Hashes and New Version App
             tasks.Add(CheckForGeneralUpdatesAsync(silent));
 
             // Checkeo al arrancar de PbeStatus

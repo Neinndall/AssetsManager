@@ -860,6 +860,18 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void TestShaderStep500IsMatched()
+        {
+            const string expected = "assets/shaders/generated/shaders/skinnedmesh/hkg_outline.ps-dx11_500";
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+            var guesser = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { "assets/shaders/generated/shaders/skinnedmesh/hkg_outline.ps" }));
+
+            guesser.GuessShaderVariants(engine, CancellationToken.None);
+
+            AssertResolved(engine, expected);
+        }
+
+        [Fact]
         public void GamePreloadAddsOnlyTheContextualPreloadForOrdinaryNames()
         {
             const string rawName = "logic/test";

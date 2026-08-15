@@ -1490,6 +1490,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                             ? new[] { path }
                             : new[] { $"assets/{path}", $"data/{path}", $"assets/shaders/generated/{path}" };
 
+                        var shaderIndices = Enumerable.Range(0, 32)
+                            .Concat(Enumerable.Range(1, 200).Select(index => index * 100));
+
                         foreach (string candidateBase in candidateBases)
                         {
                             CheckGameIter(
@@ -1502,7 +1505,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                             CheckGameIter(
                                 ShaderExtensions.SelectMany(extensionName =>
                                     ShaderVariants.SelectMany(variant =>
-                                        Enumerable.Range(0, 16).Select(index =>
+                                        shaderIndices.Select(index =>
                                             $"{candidateBase}{extensionName}{variant}_{index}"))));
                         }
                     }
