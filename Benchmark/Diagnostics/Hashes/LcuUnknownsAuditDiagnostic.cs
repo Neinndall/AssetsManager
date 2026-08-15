@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using AssetsManager.Services.Hashes;
+using AssetsManager.Services.Hashes.Guessers;
 using LeagueToolkit.Core.Wad;
 
 namespace BenchmarkApp.Diagnostics.Hashes
@@ -351,6 +353,115 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     }
                     catch { }
                     Console.WriteLine($"  0x{item.Hash:x16} | {fileType.PadRight(5)} | {item.Chunk.UncompressedSize,7} B | {detail}");
+                }
+            }
+
+            // [7] AUDIT: Store, TFT Troves, and Loot
+            foreach (string targetPlugin in new[] { "rcp-fe-lol-store", "rcp-fe-lol-tft-troves", "rcp-fe-lol-loot" })
+            {
+                var targetWad = wads.FirstOrDefault(w => w.Contains(targetPlugin, StringComparison.OrdinalIgnoreCase));
+                if (targetWad == null) continue;
+
+                Console.WriteLine($"\n==================================================");
+                Console.WriteLine($"  DEEP FORENSIC ANALYSIS: {targetPlugin}");
+                Console.WriteLine($"==================================================");
+
+                using var wad = new WadFile(targetWad);
+                var knownPaths = new List<string>();
+                var unknownChunks = new List<(ulong Hash, WadChunk Chunk)>();
+
+                foreach (var pair in wad.Chunks)
+                {
+                    if (knownLcu.TryGetValue(pair.Key, out string path))
+                        knownPaths.Add(path);
+                    else if (unknownHashes.Contains(pair.Key))
+                        unknownChunks.Add((pair.Key, pair.Value));
+                }
+
+                Console.WriteLine($"Total chunks: {wad.Chunks.Count} | Resolved: {knownPaths.Count} | Unknown: {unknownChunks.Count}");
+
+                Console.WriteLine($"\n>>> Known Files in {targetPlugin}:");
+                foreach (var k in knownPaths.Take(50))
+                {
+                    Console.WriteLine($"    {k}");
+                }
+
+                Console.WriteLine($"\n>>> Testing Candidate Patterns for {targetPlugin}:");
+                var pluginUnknownSet = unknownChunks.Select(u => u.Hash).ToHashSet();
+                int pluginMatches = 0;
+
+                void TryPluginCandidate(string path)
+                {
+                    ulong hash = LeagueToolkit.Hashing.XxHash64Ext.Hash(path.ToLowerInvariant());
+                    if (pluginUnknownSet.Contains(hash))
+                    {
+                        pluginMatches++;
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"  [MATCH!] 0x{hash:x16} -> {path}");
+                        Console.ResetColor();
+                        pluginUnknownSet.Remove(hash);
+                    }
+                }
+
+                // Cross-directory / Sibling attack within plugin
+                var basenames = knownPaths.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                var pluginDirs = knownPaths.Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/')).Distinct(StringComparer.OrdinalIgnoreCase).Where(d => !string.IsNullOrEmpty(d)).ToList();
+
+                foreach (var d in pluginDirs)
+                foreach (var b in basenames)
+                {
+                    TryPluginCandidate($"{d}/{b}");
+                }
+
+                // Readme test
+                foreach (var d in pluginDirs)
+                {
+                    TryPluginCandidate($"{d}/README.md");
+                    TryPluginCandidate($"{d}/readme.txt");
+                    TryPluginCandidate($"{d}/readme.md");
+                    TryPluginCandidate($"{d}/README.txt");
+                }
+
+                // TFT Troves item / banner variants
+                if (targetPlugin == "rcp-fe-lol-tft-troves")
+                {
+                    string[] tftSubfolders = { "images", "images/rotational-shop", "images/troves", "images/banners", "images/cards", "images/hub", "images/store", "images/home", "images/tokens", "rotational-shop", "troves", "banners", "cards" };
+                    string[] prefixes = { "tft_troves_", "tft_trove_", "troves_", "trove_", "tft_banner_", "tft_icon_", "tft_bg_", "tft_card_", "tft_modal_", "tft_splash_", "tft_header_", "tft_preview_", "tft_button_", "tft_holder_", "tft_currency_", "banner_", "bg_", "icon_", "filter-icon-", "tft_filter_", "tft_" };
+                    var words = HashGuessEngine.BuildWordlist(knownLcu.Values.Where(p => p.Contains("tft", StringComparison.OrdinalIgnoreCase)).Select(Path.GetFileName));
+
+                    foreach (var folder in tftSubfolders)
+                    foreach (var p in prefixes)
+                    foreach (var w in words)
+                    {
+                        TryPluginCandidate($"plugins/rcp-fe-lol-tft-troves/global/default/{folder}/{p}{w}.png");
+                        TryPluginCandidate($"plugins/rcp-fe-lol-tft-troves/global/default/{folder}/{w}.png");
+                    }
+                }
+
+                Console.WriteLine($"\n>>> Inspecting all TFT plugins across WADs:");
+                foreach (var w in wads.Where(w => w.Contains("tft", StringComparison.OrdinalIgnoreCase)))
+                {
+                    try
+                    {
+                        using var tftWad = new WadFile(w);
+                        string tftPluginName = Path.GetFileNameWithoutExtension(w);
+                        Console.WriteLine($"\n=== WAD: {Path.GetFileName(w)} (Total Chunks: {tftWad.Chunks.Count}) ===");
+                        foreach (var p in tftWad.Chunks)
+                        {
+                            if (knownLcu.TryGetValue(p.Key, out string path))
+                            {
+                                Console.WriteLine($"  [RESOLVED] {path}");
+                            }
+                            else if (unknownHashes.Contains(p.Key))
+                            {
+                                using var owner = tftWad.LoadChunkDecompressed(p.Value);
+                                var seg = owner.DangerousGetArray();
+                                string ft = DetectFileType(seg.Array[seg.Offset..(seg.Offset + seg.Count)], out string dtl);
+                                Console.WriteLine($"  [UNKNOWN] 0x{p.Key:x16} | {ft} | {p.Value.UncompressedSize} B | {dtl}");
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
         }

@@ -256,6 +256,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                 CheckPatternIter(new[] { $"plugins/rcp-fe-lol-static-assets/global/default/{folder}/{state}-{pos}.{ext}" });
             }
 
+            // Frontend developer README files across active plugin directories
+            var knownPluginDirs = KnownPaths
+                .Where(p => p.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                .Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+                .Where(d => !string.IsNullOrEmpty(d))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var dir in knownPluginDirs)
+            {
+                CheckPatternIter(new[] { $"{dir}/README.md", $"{dir}/readme.md" });
+            }
+
             foreach (string path in KnownPaths.Where(path =>
                          path.StartsWith("plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/", StringComparison.OrdinalIgnoreCase) &&
                          path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
