@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using AssetsManager.Services.Hashes;
+using AssetsManager.Utils;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Parsers
 {
@@ -29,6 +31,10 @@ namespace AssetsManager.Services.Parsers
             Sprites = sprites ?? Array.Empty<ImageAutoAtlasSprite>();
         }
 
+        public static bool IsAtlas(byte[] data) => IsImaa(data);
+
+        public static bool IsAtlas(ReadOnlySpan<byte> data) => IsImaa(data);
+
         public static bool IsImaa(byte[] data) =>
             data != null && data.Length >= 4 && data[0] == 0x49 && data[1] == 0x4D && data[2] == 0x41 && data[3] == 0x41;
 
@@ -38,7 +44,7 @@ namespace AssetsManager.Services.Parsers
         public static bool TryRead(byte[] data, out ImageAutoAtlas atlas)
         {
             atlas = null;
-            if (!IsImaa(data) || data.Length < 24)
+            if (data == null || data.Length < 16 || !IsImaa(data))
                 return false;
 
             try
@@ -52,7 +58,12 @@ namespace AssetsManager.Services.Parsers
                 uint version = reader.ReadUInt32();
                 var textures = new List<ulong>();
 
-                if (version == 2)
+                if (version == 1)
+                {
+                    ulong tex0 = reader.ReadUInt64();
+                    if (tex0 != 0) textures.Add(tex0);
+                }
+                else if (version == 2)
                 {
                     ulong tex0 = reader.ReadUInt64();
                     ulong tex1 = reader.ReadUInt64();

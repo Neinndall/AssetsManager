@@ -117,13 +117,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                         chunkCount++;
 
                         if (chunk.Compression == WadChunkCompression.Satellite) continue;
-                        if (chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 2_000_000)
+                        if (chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 300_000)
                         {
                             try
                             {
                                 using var dataOwner = wad.LoadChunkDecompressed(chunk);
                                 var data = dataOwner.DangerousGetArray();
-                                if (ImageAutoAtlas.IsImaa(data.AsSpan()) && ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out var atlas))
+                                if (ImageAutoAtlas.IsAtlas(data.AsSpan()) && ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out var atlas))
                                 {
                                     foreach (var sprite in atlas.Sprites)
                                     {

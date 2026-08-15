@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using AssetsManager.Services.Parsers;
 
 namespace AssetsManager.Utils
 {
@@ -63,7 +64,7 @@ namespace AssetsManager.Utils
             if (StartsWith(data, PRELOAD_SIGNATURE)) return "preload";
             if (StartsWith(data, RST_SIGNATURE)) return "stringtable";
 
-            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE) || StartsWith(data, BIN_IMAA_SIGNATURE)) return "bin";
+            if (StartsWith(data, BIN_PROP_SIGNATURE) || StartsWith(data, BIN_PTCH_SIGNATURE) || StartsWith(data, BIN_IMAA_SIGNATURE) || ImageAutoAtlas.IsAtlas(data)) return "bin";
             if (StartsWith(data, ICO_SIGNATURE)) return "ico";
 
             // Riot UIAutoAtlas: no magic bytes, structural validation required.

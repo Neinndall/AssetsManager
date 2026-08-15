@@ -1450,6 +1450,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return;
             }
 
+            if (ImageAutoAtlas.IsAtlas(data.AsSpan()))
+            {
+                GuessImageAutoAtlasPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+            }
+
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
             bool isBin = extension is "bin" or "inibin";
             if (isBin)
@@ -1748,11 +1753,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             ulong sourceChunkHash)
         {
             if (data.Array is null || data.Count == 0) return;
-            if (!ImageAutoAtlas.IsImaa(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
+            if (!ImageAutoAtlas.IsAtlas(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
 
-            // Ensure any sprite hash not in HashFile is marked unknown in engine
             var knownDict = HashFile.Load();
+
+            // Ensure any sprite hash not in HashFile is marked unknown in engine
             bool hasUnresolvedSprites = false;
             foreach (var sprite in atlas.Sprites)
             {

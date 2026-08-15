@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Hashes.Guessers;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
@@ -789,6 +790,24 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             Assert.Equal(expected1, engine.Matches[XxHash64Ext.Hash(expected1)].Path);
             Assert.Equal(expected2, engine.Matches[XxHash64Ext.Hash(expected2)].Path);
             Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+
+        [Fact]
+        public void TestFromWadsExtractsSmallIconsSprites()
+        {
+            string globalWad = @"C:\Riot Games\League of Legends (PBE)\Game\DATA\FINAL\Global.wad.client";
+            if (!File.Exists(globalWad))
+                globalWad = @"C:\Riot Games\League of Legends\Game\DATA\FINAL\Global.wad.client";
+            if (!File.Exists(globalWad)) return;
+
+            var guesser = new GameHashGuesser();
+            var inventory = guesser.FromWads(new[] { globalWad }, CancellationToken.None);
+
+            // Sprite hash 0x00676bcb6e800d01 from PBE smallicons atlas_info.bin
+            ulong spriteHash1 = 0x00676bcb6e800d01;
+            Assert.True(inventory.Hashes.Contains(spriteHash1), "FromWads failed to include sprite 0x00676bcb6e800d01 from PBE smallicons");
+            Assert.True(inventory.Hashes.Count > 400, $"Expected > 400 hashes in inventory, got {inventory.Hashes.Count}");
         }
 
         [Fact]
