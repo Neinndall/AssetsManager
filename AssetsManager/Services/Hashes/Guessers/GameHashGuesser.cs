@@ -1751,15 +1751,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (!ImageAutoAtlas.IsImaa(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
 
-            string baseDir = null;
+            var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             if (!string.IsNullOrEmpty(sourcePath) && !sourcePath.Equals(".bin", StringComparison.OrdinalIgnoreCase))
             {
                 string dir = Path.GetDirectoryName(PathUtils.NormalizePath(sourcePath));
                 if (!string.IsNullOrEmpty(dir))
-                    baseDir = dir.Replace('\\', '/');
+                    candidateDirs.Add(dir.Replace('\\', '/'));
             }
 
-            if (string.IsNullOrEmpty(baseDir) && atlas.TextureHashes.Count > 0)
+            if (atlas.TextureHashes.Count > 0)
             {
                 foreach (ulong texHash in atlas.TextureHashes)
                 {
@@ -1768,24 +1769,48 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         string dir = Path.GetDirectoryName(PathUtils.NormalizePath(resolved));
                         if (!string.IsNullOrEmpty(dir))
-                        {
-                            baseDir = dir.Replace('\\', '/');
-                            break;
-                        }
+                            candidateDirs.Add(dir.Replace('\\', '/'));
                     }
                 }
             }
 
-            if (string.IsNullOrEmpty(baseDir))
-                baseDir = "assets/items/icons2d/autoatlas/largeicons";
+            if (candidateDirs.Count == 0)
+            {
+                foreach (string dir in GetAllKnownAtlasDirectories())
+                    candidateDirs.Add(dir);
+            }
 
             IReadOnlyList<string> candidateNames = GetAutoAtlasSpriteNames();
-            foreach (string name in candidateNames)
+            foreach (string baseDir in candidateDirs)
             {
-                Check(engine, $"{baseDir}/{name}.png", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
-                Check(engine, $"{baseDir}/{name}.dds", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
-                Check(engine, $"{baseDir}/{name}.tex", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                foreach (string name in candidateNames)
+                {
+                    Check(engine, $"{baseDir}/{name}.png", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                    Check(engine, $"{baseDir}/{name}.dds", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                    Check(engine, $"{baseDir}/{name}.tex", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                }
+                if (engine.RemainingUnknownCount == 0) break;
             }
+        }
+
+        private IReadOnlyList<string> GetAllKnownAtlasDirectories()
+        {
+            return Corpus.GetOrCreate("all-known-atlas-directories", knownPaths =>
+            {
+                var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string path in knownPaths)
+                {
+                    if (path.Contains("/autoatlas/", StringComparison.OrdinalIgnoreCase) ||
+                        path.Contains("atlas_info", StringComparison.OrdinalIgnoreCase) ||
+                        path.Contains("atlas_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string dir = Path.GetDirectoryName(PathUtils.NormalizePath(path));
+                        if (!string.IsNullOrEmpty(dir))
+                            dirs.Add(dir.Replace('\\', '/'));
+                    }
+                }
+                return dirs.OrderBy(d => d, StringComparer.OrdinalIgnoreCase).ToList();
+            });
         }
 
         private IReadOnlyList<string> GetAutoAtlasSpriteNames()
