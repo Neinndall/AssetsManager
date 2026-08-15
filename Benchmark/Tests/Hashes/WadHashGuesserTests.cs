@@ -811,6 +811,87 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameFromWadsExtractsImageAutoAtlasSprites()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "Global.wad.client");
+            ulong spriteHash1 = 0x1234567890abcdef;
+            ulong spriteHash2 = 0xfedcba0987654321;
+
+            using var ms = new MemoryStream();
+            using (var writer = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true))
+            {
+                writer.Write(new byte[] { 0x49, 0x4D, 0x41, 0x41 }); // IMAA
+                writer.Write((uint)2); // version
+                writer.Write((ulong)0x1111); // tex0
+                writer.Write((ulong)0x2222); // tex1
+                writer.Write((uint)2); // count
+                writer.Write(spriteHash1);
+                writer.Write(0.1f); writer.Write(0.1f); writer.Write(0.2f); writer.Write(0.2f);
+                writer.Write((uint)0);
+                writer.Write(spriteHash2);
+                writer.Write(0.3f); writer.Write(0.3f); writer.Write(0.4f); writer.Write(0.4f);
+                writer.Write((uint)0);
+            }
+            byte[] imaaData = ms.ToArray();
+
+            var entries = new[]
+            {
+                new WadBakeEntry(
+                    "assets/items/icons2d/autoatlas/largeicons/atlas_info.bin",
+                    () => new MemoryStream(imaaData),
+                    WadChunkCompression.None)
+            };
+            WadBuilder.Bake(entries, wadPath, new WadBakeSettings());
+
+            try
+            {
+                var guesser = new GameHashGuesser();
+                var inventory = guesser.FromWads(new[] { wadPath }, CancellationToken.None);
+
+                Assert.Contains(spriteHash1, inventory.Hashes);
+                Assert.Contains(spriteHash2, inventory.Hashes);
+                Assert.Contains(XxHash64Ext.Hash("assets/items/icons2d/autoatlas/largeicons/atlas_info.bin"), inventory.Hashes);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
+        public void LcuFromWadsExtractsChunksDirectlyWithoutAtlasOverhead()
+        {
+            string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            string wadPath = Path.Combine(directory, "rcp-fe-lol-test.wad");
+
+            const string path1 = "plugins/rcp-fe-lol-test/global/default/app.js";
+            const string path2 = "plugins/rcp-fe-lol-test/global/default/manifest.json";
+            var entries = new[]
+            {
+                new WadBakeEntry(path1, () => new MemoryStream(Encoding.UTF8.GetBytes("console.log('hi');")), WadChunkCompression.None),
+                new WadBakeEntry(path2, () => new MemoryStream(Encoding.UTF8.GetBytes("{\"name\":\"test\"}")), WadChunkCompression.None)
+            };
+            WadBuilder.Bake(entries, wadPath, new WadBakeSettings());
+
+            try
+            {
+                var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+                var inventory = guesser.FromWads(new[] { wadPath }, CancellationToken.None);
+
+                Assert.Equal(2, inventory.Hashes.Count);
+                Assert.Contains(XxHash64Ext.Hash(path1), inventory.Hashes);
+                Assert.Contains(XxHash64Ext.Hash(path2), inventory.Hashes);
+            }
+            finally
+            {
+                Directory.Delete(directory, true);
+            }
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";
