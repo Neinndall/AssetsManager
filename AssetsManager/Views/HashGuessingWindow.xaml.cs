@@ -717,7 +717,7 @@ namespace AssetsManager.Views
             void UpdateStatus()
             {
                 string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                _viewModel.StatusText = totalWads > 0
+                _viewModel.StatusText = totalChecked > 0
                     ? $"{currentStage} · {totalChecked:N0} checked · {foundMatches:N0} found · Time: {timeText}"
                     : $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
             }

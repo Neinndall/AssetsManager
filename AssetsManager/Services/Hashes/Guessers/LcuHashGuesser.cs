@@ -512,9 +512,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             char[] delimiters = { '-', '_' };
 
             var progressClock = Stopwatch.StartNew();
-            void ReportThrottled(string stageName, int currentTotal)
+            void ReportThrottled(string stageName, int currentTotal, bool force = false)
             {
-                if (progressClock.ElapsedMilliseconds >= 80)
+                if (force || progressClock.ElapsedMilliseconds >= 80)
                 {
                     progress?.Report(engine.CreateProgress(stageName, currentTotal));
                     progressClock.Restart();
@@ -531,7 +531,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (pluginPaths.Count == 0) continue;
 
                 string stage = $"LCU Custom: scoped plugin {plugin}";
-                ReportThrottled(stage, checkedCandidates);
+                ReportThrottled(stage, checkedCandidates, force: true);
 
                 var dirs = pluginPaths
                     .Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
@@ -555,6 +555,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         engine.Check($"{dir}/{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
                         checkedCandidates++;
+                        if ((checkedCandidates & 0x1fff) == 0)
+                            ReportThrottled(stage, checkedCandidates);
                         if (engine.RemainingUnknownCount == 0) break;
                     }
                 }
@@ -571,6 +573,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                         engine.Check($"{dir}/{item.BaseName}{d}{mod}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
                         engine.Check($"{dir}/{mod}{d}{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
                         checkedCandidates += 2;
+                        if ((checkedCandidates & 0x1fff) == 0)
+                            ReportThrottled(stage, checkedCandidates);
                         if (engine.RemainingUnknownCount == 0) break;
                     }
                 }
