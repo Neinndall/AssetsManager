@@ -389,6 +389,91 @@ namespace AssetsManager.Services.Hashes.Guessers
                 cancellationToken, candidateBudget, "LCU basename word substitution", progress);
         }
 
+        internal int UniversalPluginModifierAttack(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            string pluginPattern = null,
+            IEnumerable<string> extensions = null,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (engine.RemainingUnknownCount == 0) return 0;
+
+            var extSet = extensions != null
+                ? new HashSet<string>(extensions.Select(e => e.TrimStart('.').ToLowerInvariant()), StringComparer.OrdinalIgnoreCase)
+                : null;
+
+            IEnumerable<string> paths = KnownPaths.Where(p => p.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(pluginPattern))
+            {
+                string prefix = pluginPattern.EndsWith("*", StringComparison.Ordinal)
+                    ? $"plugins/{pluginPattern[..^1]}"
+                    : $"plugins/{pluginPattern}/";
+                paths = paths.Where(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (extSet != null)
+            {
+                paths = paths.Where(p => extSet.Contains(Path.GetExtension(p).TrimStart('.').ToLowerInvariant()));
+            }
+
+            var pathList = paths.ToList();
+            if (pathList.Count == 0) return 0;
+
+            string[] modifiers =
+            {
+                "hover", "active", "selected", "disabled", "pressed", "clicked", "focused",
+                "locked", "unlocked", "claimed", "completed", "current", "future", "idle",
+                "small", "large", "mini", "medium", "sm", "md", "lg",
+                "bg", "background", "icon", "border", "glow", "frame", "badge", "crest", "emblem",
+                "tier1", "tier2", "tier3", "tier4", "tierone", "tiertwo", "tierthree",
+                "back", "front", "left", "right", "center", "top", "bottom",
+                "v2", "v3", "intro", "outro", "loop", "in", "out"
+            };
+
+            char[] delimiters = { '-', '_' };
+
+            int checkedCount = 0;
+            const string source = "LCU universal plugin modifier attack";
+
+            var dirGroups = pathList.GroupBy(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+                .Where(g => !string.IsNullOrEmpty(g.Key));
+
+            foreach (var group in dirGroups)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0) break;
+
+                string dir = group.Key;
+                var basenamesWithExt = group.Select(p => (
+                    BaseName: Path.GetFileNameWithoutExtension(p),
+                    Ext: Path.GetExtension(p)
+                )).Distinct().ToList();
+
+                var candidates = new List<HashGuessCandidate>();
+
+                foreach (var item in basenamesWithExt)
+                {
+                    string baseName = item.BaseName;
+                    string ext = item.Ext;
+
+                    foreach (string mod in modifiers)
+                    {
+                        foreach (char d in delimiters)
+                        {
+                            candidates.Add(new HashGuessCandidate($"{dir}/{baseName}{d}{mod}{ext}", HashGuessStrategy.WordlistVariant));
+                            candidates.Add(new HashGuessCandidate($"{dir}/{mod}{d}{baseName}{ext}", HashGuessStrategy.WordlistVariant));
+                        }
+                    }
+                }
+
+                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
+                progress?.Invoke(checkedCount);
+            }
+
+            return checkedCount;
+        }
+
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
@@ -396,8 +481,21 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             ArgumentNullException.ThrowIfNull(engine);
 
-            IReadOnlyList<string> words = BuildSswordlist();
             int checkedCandidates = 0;
+
+            // Phase 1: Universal Modifier Matrix across all plugins
+            if (engine.RemainingUnknownCount > 0)
+            {
+                string stage = "LCU Custom: Universal modifier attack";
+                progress?.Report(engine.CreateProgress(stage, checkedCandidates));
+                int count = UniversalPluginModifierAttack(
+                    engine,
+                    cancellationToken,
+                    pluginPattern: "rcp-*",
+                    progress: current => progress?.Report(engine.CreateProgress(stage, checkedCandidates + current)));
+                checkedCandidates += count;
+            }
+
             var variants = new[]
             {
                 (OldWordCount: 1, NewWordCount: 1),
@@ -436,7 +534,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return variantCheckedCandidates;
             }
 
-            checkedCandidates += RunVariants(words, new[] { "svg" }, "SVG");
+            if (engine.RemainingUnknownCount > 0)
+                checkedCandidates += RunVariants(BuildSswordlist(), new[] { "svg" }, "SVG");
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += RunVariants(BuildPngJpgSwordlist(), new[] { "png", "jpg" }, "PNG/JPG");
             if (engine.RemainingUnknownCount > 0)

@@ -949,6 +949,23 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuUniversalPluginModifierAttackDiscoversModifierVariants()
+        {
+            const string basePath = "plugins/rcp-fe-lol-store/global/default/images/button.png";
+            const string expectedTarget = "plugins/rcp-fe-lol-store/global/default/images/button-hover.png";
+            ulong targetHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(expectedTarget);
+
+            var guesser = new LcuHashGuesser(new[] { basePath }, null);
+            var engine = new HashGuessEngine(HashGuessDomain.Lcu, new HashSet<ulong> { targetHash });
+
+            int checkedCount = guesser.UniversalPluginModifierAttack(engine, CancellationToken.None);
+
+            Assert.True(checkedCount > 0);
+            Assert.True(engine.Matches.ContainsKey(targetHash));
+            Assert.Equal(expectedTarget, engine.Matches[targetHash].Path);
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";
