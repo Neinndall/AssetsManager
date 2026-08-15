@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Meta;
@@ -1531,6 +1532,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+                GuessImageAutoAtlasPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
                 return;
             }
 
@@ -1735,6 +1737,74 @@ namespace AssetsManager.Services.Hashes.Guessers
                         index.Add(hash, values = new List<string>());
                     if (!values.Contains(stem, StringComparer.OrdinalIgnoreCase)) values.Add(stem);
                 }
+            });
+        }
+
+        private void GuessImageAutoAtlasPaths(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash)
+        {
+            if (data.Array is null || data.Count == 0) return;
+            if (!ImageAutoAtlas.IsImaa(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
+                return;
+
+            string baseDir = null;
+            if (!string.IsNullOrEmpty(sourcePath) && !sourcePath.Equals(".bin", StringComparison.OrdinalIgnoreCase))
+            {
+                string dir = Path.GetDirectoryName(PathUtils.NormalizePath(sourcePath));
+                if (!string.IsNullOrEmpty(dir))
+                    baseDir = dir.Replace('\\', '/');
+            }
+
+            if (string.IsNullOrEmpty(baseDir) && atlas.TextureHashes.Count > 0)
+            {
+                foreach (ulong texHash in atlas.TextureHashes)
+                {
+                    string resolved = Corpus.Paths.FirstOrDefault(p => XxHash64Ext.Hash(PathUtils.NormalizePath(p)) == texHash);
+                    if (!string.IsNullOrEmpty(resolved))
+                    {
+                        string dir = Path.GetDirectoryName(PathUtils.NormalizePath(resolved));
+                        if (!string.IsNullOrEmpty(dir))
+                        {
+                            baseDir = dir.Replace('\\', '/');
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(baseDir))
+                baseDir = "assets/items/icons2d/autoatlas/largeicons";
+
+            IReadOnlyList<string> candidateNames = GetAutoAtlasSpriteNames();
+            foreach (string name in candidateNames)
+            {
+                Check(engine, $"{baseDir}/{name}.png", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                Check(engine, $"{baseDir}/{name}.dds", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                Check(engine, $"{baseDir}/{name}.tex", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+            }
+        }
+
+        private IReadOnlyList<string> GetAutoAtlasSpriteNames()
+        {
+            return Corpus.GetOrCreate("autoatlas-sprite-names", knownPaths =>
+            {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string path in knownPaths)
+                {
+                    if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string baseName = Path.GetFileNameWithoutExtension(path);
+                        if (!string.IsNullOrWhiteSpace(baseName) && baseName.Length <= 100)
+                            names.Add(baseName);
+                    }
+                }
+                return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
             });
         }
 

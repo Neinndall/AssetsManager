@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using AssetsManager.Services.Parsers;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
 using LeagueToolkit.Core.Wad;
@@ -108,12 +109,36 @@ namespace AssetsManager.Services.Hashes.Guessers
                 {
                     using var stream = File.OpenRead(wadPath);
                     using var wad = new WadFile(stream);
-                    foreach (ulong hash in wad.Chunks.Keys)
+                    foreach (WadChunk chunk in wad.Chunks.Values)
                     {
-                        hashes.Add(hash);
-                        hashXor ^= hash;
-                        hashSum = unchecked(hashSum + hash);
+                        hashes.Add(chunk.PathHash);
+                        hashXor ^= chunk.PathHash;
+                        hashSum = unchecked(hashSum + chunk.PathHash);
                         chunkCount++;
+
+                        if (chunk.Compression == WadChunkCompression.Satellite) continue;
+                        if (chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 100_000)
+                        {
+                            try
+                            {
+                                using var dataOwner = wad.LoadChunkDecompressed(chunk);
+                                var data = dataOwner.DangerousGetArray();
+                                if (ImageAutoAtlas.IsImaa(data.AsSpan()) && ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out var atlas))
+                                {
+                                    foreach (var sprite in atlas.Sprites)
+                                    {
+                                        if (hashes.Add(sprite.SpriteHash))
+                                        {
+                                            hashXor ^= sprite.SpriteHash;
+                                            hashSum = unchecked(hashSum + sprite.SpriteHash);
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
                     }
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)

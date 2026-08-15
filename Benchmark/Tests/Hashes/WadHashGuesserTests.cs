@@ -706,6 +706,49 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void GameImageAutoAtlasResolvesEmbeddedSpritesAndIconPaths()
+        {
+            const string expected1 = "assets/items/icons2d/autoatlas/largeicons/1001_class_t1_bootsofspeed.png";
+            const string expected2 = "assets/items/icons2d/autoatlas/largeicons/1040_obsidianedge.png";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/items/icons2d/1001_class_t1_bootsofspeed.png",
+                "assets/items/icons2d/1040_obsidianedge.dds"
+            }));
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
+            {
+                XxHash64Ext.Hash(expected1),
+                XxHash64Ext.Hash(expected2)
+            });
+
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+            writer.Write(new byte[] { 0x49, 0x4D, 0x41, 0x41 }); // IMAA
+            writer.Write((uint)2); // version 2
+            writer.Write((ulong)0x1111); // tex0
+            writer.Write((ulong)0x2222); // tex1
+            writer.Write((uint)2); // count = 2
+            writer.Write(XxHash64Ext.Hash(expected1));
+            writer.Write(0.1f); writer.Write(0.1f); writer.Write(0.2f); writer.Write(0.2f);
+            writer.Write((uint)0);
+            writer.Write(XxHash64Ext.Hash(expected2));
+            writer.Write(0.3f); writer.Write(0.3f); writer.Write(0.4f); writer.Write(0.4f);
+            writer.Write((uint)0);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(ms.ToArray()),
+                "assets/items/icons2d/autoatlas/largeicons/atlas_info.bin",
+                "Global.wad.client",
+                0xabcdef1234567890);
+
+            Assert.Equal(2, engine.Matches.Count);
+            Assert.Equal(expected1, engine.Matches[XxHash64Ext.Hash(expected1)].Path);
+            Assert.Equal(expected2, engine.Matches[XxHash64Ext.Hash(expected2)].Path);
+            Assert.Equal(0, engine.RemainingUnknownCount);
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";
