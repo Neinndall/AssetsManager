@@ -450,8 +450,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                     Ext: Path.GetExtension(p)
                 )).Distinct().ToList();
 
-                var candidates = new List<HashGuessCandidate>();
-
                 foreach (var item in basenamesWithExt)
                 {
                     string baseName = item.BaseName;
@@ -461,13 +459,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         foreach (char d in delimiters)
                         {
-                            candidates.Add(new HashGuessCandidate($"{dir}/{baseName}{d}{mod}{ext}", HashGuessStrategy.WordlistVariant));
-                            candidates.Add(new HashGuessCandidate($"{dir}/{mod}{d}{baseName}{ext}", HashGuessStrategy.WordlistVariant));
+                            cancellationToken.ThrowIfCancellationRequested();
+                            engine.Check($"{dir}/{baseName}{d}{mod}{ext}", HashGuessStrategy.WordlistVariant, source);
+                            engine.Check($"{dir}/{mod}{d}{baseName}{ext}", HashGuessStrategy.WordlistVariant, source);
+                            checkedCount += 2;
+                            if (engine.RemainingUnknownCount == 0) return checkedCount;
                         }
                     }
                 }
 
-                checkedCount += CheckIter(engine, candidates, source, cancellationToken);
                 progress?.Invoke(checkedCount);
             }
 
@@ -544,27 +544,36 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .Distinct()
                     .ToList();
 
-                var candidates = new List<HashGuessCandidate>();
+                string source = $"Scoped plugin {plugin}";
 
-                // 1. Intra-Plugin Directory Cross-Product
+                // 1. Intra-Plugin Directory Cross-Product (Direct streaming, 0 RAM overhead)
                 foreach (var dir in dirs)
-                foreach (var item in basenamesWithExt)
                 {
-                    candidates.Add(new HashGuessCandidate($"{dir}/{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0) break;
+                    foreach (var item in basenamesWithExt)
+                    {
+                        engine.Check($"{dir}/{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
+                        checkedCandidates++;
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
                 }
 
-                // 2. Intra-Plugin Modifier Matrix
+                // 2. Intra-Plugin Modifier Matrix (Direct streaming, 0 RAM overhead)
                 foreach (var dir in dirs)
-                foreach (var item in basenamesWithExt)
-                foreach (var mod in modifiers)
-                foreach (var d in delimiters)
                 {
-                    candidates.Add(new HashGuessCandidate($"{dir}/{item.BaseName}{d}{mod}{item.Ext}", HashGuessStrategy.WordlistVariant));
-                    candidates.Add(new HashGuessCandidate($"{dir}/{mod}{d}{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (engine.RemainingUnknownCount == 0) break;
+                    foreach (var item in basenamesWithExt)
+                    foreach (var mod in modifiers)
+                    foreach (var d in delimiters)
+                    {
+                        engine.Check($"{dir}/{item.BaseName}{d}{mod}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
+                        engine.Check($"{dir}/{mod}{d}{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant, source);
+                        checkedCandidates += 2;
+                        if (engine.RemainingUnknownCount == 0) break;
+                    }
                 }
-
-                int count = CheckIter(engine, candidates, $"Scoped plugin {plugin}", cancellationToken);
-                checkedCandidates += count;
 
                 // 3. Scoped Word Substitutions (1->1 and focused 1->2) using plugin's own vocabulary
                 if (engine.RemainingUnknownCount > 0 && pluginPaths.Count >= 2)
