@@ -1751,6 +1751,19 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (!ImageAutoAtlas.IsImaa(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
 
+            // Ensure any sprite hash not in HashFile is marked unknown in engine
+            var knownDict = HashFile.Load();
+            bool hasUnresolvedSprites = false;
+            foreach (var sprite in atlas.Sprites)
+            {
+                if (engine.UnknownHashes.Contains(sprite.SpriteHash) || !knownDict.ContainsKey(sprite.SpriteHash))
+                {
+                    engine.EnsureUnknown(sprite.SpriteHash);
+                    hasUnresolvedSprites = true;
+                }
+            }
+            if (!hasUnresolvedSprites) return;
+
             var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             if (!string.IsNullOrEmpty(sourcePath) && !sourcePath.Equals(".bin", StringComparison.OrdinalIgnoreCase))
@@ -1760,17 +1773,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                     candidateDirs.Add(dir.Replace('\\', '/'));
             }
 
-            if (atlas.TextureHashes.Count > 0)
+            if (candidateDirs.Count == 0 && atlas.TextureHashes.Count > 0)
             {
+                var texDirIndex = GetTextureHashToDirectoryIndex();
                 foreach (ulong texHash in atlas.TextureHashes)
                 {
-                    string resolved = Corpus.Paths.FirstOrDefault(p => XxHash64Ext.Hash(PathUtils.NormalizePath(p)) == texHash);
-                    if (!string.IsNullOrEmpty(resolved))
-                    {
-                        string dir = Path.GetDirectoryName(PathUtils.NormalizePath(resolved));
-                        if (!string.IsNullOrEmpty(dir))
-                            candidateDirs.Add(dir.Replace('\\', '/'));
-                    }
+                    if (texDirIndex.TryGetValue(texHash, out string dir))
+                        candidateDirs.Add(dir);
                 }
             }
 
@@ -1780,17 +1789,57 @@ namespace AssetsManager.Services.Hashes.Guessers
                     candidateDirs.Add(dir);
             }
 
-            IReadOnlyList<string> candidateNames = GetAutoAtlasSpriteNames();
+            IReadOnlyList<string> candidatePatterns = GetAutoAtlasCandidatePatterns();
             foreach (string baseDir in candidateDirs)
             {
-                foreach (string name in candidateNames)
+                foreach (string pattern in candidatePatterns)
                 {
-                    Check(engine, $"{baseDir}/{name}.png", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
-                    Check(engine, $"{baseDir}/{name}.dds", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
-                    Check(engine, $"{baseDir}/{name}.tex", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+                    Check(engine, $"{baseDir}/{pattern}", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
+
+                    // If all sprites in this atlas are resolved, stop immediately
+                    bool stillHasUnresolved = false;
+                    foreach (var sprite in atlas.Sprites)
+                    {
+                        if (engine.UnknownHashes.Contains(sprite.SpriteHash))
+                        {
+                            stillHasUnresolved = true;
+                            break;
+                        }
+                    }
+                    if (!stillHasUnresolved || engine.RemainingUnknownCount == 0) break;
                 }
-                if (engine.RemainingUnknownCount == 0) break;
+
+                bool anyRemaining = false;
+                foreach (var sprite in atlas.Sprites)
+                {
+                    if (engine.UnknownHashes.Contains(sprite.SpriteHash))
+                    {
+                        anyRemaining = true;
+                        break;
+                    }
+                }
+                if (!anyRemaining || engine.RemainingUnknownCount == 0) break;
             }
+        }
+
+        private IReadOnlyDictionary<ulong, string> GetTextureHashToDirectoryIndex()
+        {
+            return Corpus.GetOrCreate("texture-hash-to-dir-index", knownPaths =>
+            {
+                var dict = new Dictionary<ulong, string>();
+                foreach (string path in knownPaths)
+                {
+                    if (path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string norm = PathUtils.NormalizePath(path);
+                        string dir = Path.GetDirectoryName(norm)?.Replace('\\', '/');
+                        if (!string.IsNullOrEmpty(dir))
+                            dict[XxHash64Ext.Hash(norm)] = dir;
+                    }
+                }
+                return dict;
+            });
         }
 
         private IReadOnlyList<string> GetAllKnownAtlasDirectories()
@@ -1813,23 +1862,52 @@ namespace AssetsManager.Services.Hashes.Guessers
             });
         }
 
-        private IReadOnlyList<string> GetAutoAtlasSpriteNames()
+        private IReadOnlyList<string> GetAutoAtlasCandidatePatterns()
         {
-            return Corpus.GetOrCreate("autoatlas-sprite-names", knownPaths =>
+            return Corpus.GetOrCreate("autoatlas-candidate-patterns-v3", knownPaths =>
             {
-                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var patterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 foreach (string path in knownPaths)
                 {
+                    string norm = PathUtils.NormalizePath(path);
+
+                    // Extract relative filenames from any known autoatlas folders
+                    int autoAtlasIdx = norm.IndexOf("/autoatlas/", StringComparison.OrdinalIgnoreCase);
+                    if (autoAtlasIdx >= 0)
+                    {
+                        string sub = norm[(autoAtlasIdx + "/autoatlas/".Length)..];
+                        int firstSlash = sub.IndexOf('/');
+                        if (firstSlash >= 0 && firstSlash < sub.Length - 1)
+                        {
+                            string relFile = sub[(firstSlash + 1)..];
+                            if (!string.IsNullOrWhiteSpace(relFile) && !relFile.StartsWith("atlas_", StringComparison.OrdinalIgnoreCase))
+                                patterns.Add(relFile);
+                        }
+                    }
+
+                    // Extract generic image filenames and extension variants across the corpus
                     if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
                         path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                        path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".tga", StringComparison.OrdinalIgnoreCase))
                     {
-                        string baseName = Path.GetFileNameWithoutExtension(path);
-                        if (!string.IsNullOrWhiteSpace(baseName) && baseName.Length <= 100)
-                            names.Add(baseName);
+                        string fileName = Path.GetFileName(norm);
+                        if (!string.IsNullOrWhiteSpace(fileName) && !fileName.StartsWith("atlas_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            patterns.Add(fileName);
+                            string stem = Path.GetFileNameWithoutExtension(fileName);
+                            if (!string.IsNullOrWhiteSpace(stem) && stem.Length <= 100)
+                            {
+                                patterns.Add($"{stem}.png");
+                                patterns.Add($"{stem}.dds");
+                                patterns.Add($"{stem}.tex");
+                            }
+                        }
                     }
                 }
-                return names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
+
+                return patterns.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
             });
         }
 

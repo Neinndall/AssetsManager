@@ -34,6 +34,7 @@ namespace AssetsManager.Services.Hashes
         public IReadOnlyCollection<ulong> UnknownHashes => _unknownHashes;
         public long CheckedCandidates { get; private set; }
         public long DiscardedCandidates { get; private set; }
+        public void EnsureUnknown(ulong hash) => _unknownHashes.Add(hash);
 
         public bool Check(string candidate, HashGuessStrategy strategy, string source = "Generated", ulong sourceChunkHash = 0)
         {

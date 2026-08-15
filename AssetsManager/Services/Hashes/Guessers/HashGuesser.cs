@@ -117,7 +117,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         chunkCount++;
 
                         if (chunk.Compression == WadChunkCompression.Satellite) continue;
-                        if (chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 100_000)
+                        if (chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 2_000_000)
                         {
                             try
                             {
