@@ -566,27 +566,39 @@ namespace AssetsManager.Services.Hashes.Guessers
                 int count = CheckIter(engine, candidates, $"Scoped plugin {plugin}", cancellationToken);
                 checkedCandidates += count;
 
-                // 3. Scoped Word Substitutions (1->1 and 1->2) using plugin's own vocabulary
+                // 3. Scoped Word Substitutions (1->1 and focused 1->2) using plugin's own vocabulary
                 if (engine.RemainingUnknownCount > 0 && pluginPaths.Count >= 2)
                 {
                     var pluginWords = HashGuessEngine.BuildWordlist(pluginPaths.Select(Path.GetFileName));
-                    if (pluginWords.Count > 0 && pluginWords.Count <= 250)
+                    if (pluginWords.Count > 0)
                     {
-                        var variants = new[] { (Old: 1, New: 1), (Old: 1, New: 2) };
-                        foreach (var (oldWordCount, newWordCount) in variants)
+                        // 1 -> 1 word substitution with full plugin vocabulary
+                        int subCount1 = SubstituteBasenameWordsCore(
+                            engine,
+                            pluginPaths,
+                            pluginWords.Take(150),
+                            oldWordCount: 1,
+                            newWordCount: 1,
+                            cancellationToken,
+                            candidateBudget: 100_000,
+                            source: $"Scoped plugin {plugin}",
+                            progress: current => ReportThrottled(stage, checkedCandidates + current));
+                        checkedCandidates += subCount1;
+
+                        // 1 -> 2 word substitution with top 25 high-frequency words to avoid GC combinatorial explosion
+                        if (engine.RemainingUnknownCount > 0 && pluginWords.Count >= 3)
                         {
-                            if (engine.RemainingUnknownCount == 0) break;
-                            int subCount = SubstituteBasenameWordsCore(
+                            int subCount2 = SubstituteBasenameWordsCore(
                                 engine,
                                 pluginPaths,
-                                pluginWords,
-                                oldWordCount,
-                                newWordCount,
+                                pluginWords.Take(25),
+                                oldWordCount: 1,
+                                newWordCount: 2,
                                 cancellationToken,
-                                candidateBudget: 1_000_000,
+                                candidateBudget: 50_000,
                                 source: $"Scoped plugin {plugin}",
                                 progress: current => ReportThrottled(stage, checkedCandidates + current));
-                            checkedCandidates += subCount;
+                            checkedCandidates += subCount2;
                         }
                     }
                 }
