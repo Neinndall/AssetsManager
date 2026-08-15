@@ -490,6 +490,18 @@ namespace AssetsManager.Services.Hashes
 
                 if (engine.RemainingUnknownCount > 0)
                 {
+                    progress?.Report(engine.CreateProgress("LCU Basic: directory mirroring", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _lcuGuesser.MirrorDirectories(
+                        engine,
+                        cancellationToken,
+                        candidateBudget: int.MaxValue,
+                        progress: count => progress?.Report(
+                            engine.CreateProgress("LCU Basic: directory mirroring", progressOffset + count)));
+                }
+
+                if (engine.RemainingUnknownCount > 0)
+                {
                     progress?.Report(engine.CreateProgress("LCU Basic: GAME hash cross-domain", checkedCandidates));
                     int progressOffset = checkedCandidates;
                     checkedCandidates += _lcuGuesser.GuessFromGameHashes(

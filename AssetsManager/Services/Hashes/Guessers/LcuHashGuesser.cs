@@ -219,6 +219,30 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (engine.RemainingUnknownCount == 0 || checkedCount >= candidateBudget) return checkedCount;
 
+            // Sanctum and Gacha card frame variants
+            string[] sanctumFolders = { "sanctum", "images/sanctum", "exalted", "images/exalted", "transcendent", "images/transcendent" };
+            string[] sanctumTiers = { "tier1", "tier2", "tier3", "tierone", "tiertwo", "tierthree" };
+            string[] sanctumSides = { "", "-back", "-front" };
+            foreach (string folder in sanctumFolders)
+            foreach (string tier in sanctumTiers)
+            foreach (string side in sanctumSides)
+            foreach (string ext in new[] { "svg", "png" })
+            {
+                CheckPatternIter(new[] { $"plugins/rcp-fe-lol-static-assets/global/default/{folder}/card-frame-{tier}{side}.{ext}" });
+            }
+
+            // Reward and Milestone Tracker states
+            string[] trackerFolders = { "reward-tracker", "images/reward-tracker", "milestone-tracker", "images/milestone-tracker" };
+            string[] trackerStates = { "future", "completed", "current", "locked", "claimed", "unlocked", "active" };
+            string[] trackerPositions = { "left", "right", "center", "middle" };
+            foreach (string folder in trackerFolders)
+            foreach (string state in trackerStates)
+            foreach (string pos in trackerPositions)
+            foreach (string ext in new[] { "svg", "png" })
+            {
+                CheckPatternIter(new[] { $"plugins/rcp-fe-lol-static-assets/global/default/{folder}/{state}-{pos}.{ext}" });
+            }
+
             foreach (string path in KnownPaths.Where(path =>
                          path.StartsWith("plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/", StringComparison.OrdinalIgnoreCase) &&
                          path.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
@@ -230,6 +254,46 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progress?.Invoke(checkedCount);
             }
 
+            return checkedCount;
+        }
+
+        internal int MirrorDirectories(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = int.MaxValue,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (candidateBudget <= 0) return 0;
+
+            const string source = "LCU directory mirroring";
+            int checkedCount = 0;
+
+            foreach (string path in KnownPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
+
+                if (path.Contains("/global/default/images/"))
+                {
+                    string mirror = path.Replace("/global/default/images/", "/global/default/");
+                    Check(engine, mirror, HashGuessStrategy.LcuPattern, source);
+                    checkedCount++;
+                }
+                else if (path.Contains("/global/default/"))
+                {
+                    string mirror = path.Replace("/global/default/", "/global/default/images/");
+                    Check(engine, mirror, HashGuessStrategy.LcuPattern, source);
+                    checkedCount++;
+                }
+
+                if ((checkedCount & 0x1fff) == 0)
+                {
+                    progress?.Invoke(checkedCount);
+                }
+            }
+
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 

@@ -892,6 +892,42 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuMirrorDirectoriesDiscoversMirroredPaths()
+        {
+            const string knownPath = "plugins/rcp-fe-lol-static-assets/global/default/images/aram-wardrobe/open-lock.png";
+            const string expectedTarget = "plugins/rcp-fe-lol-static-assets/global/default/aram-wardrobe/open-lock.png";
+            ulong targetHash = XxHash64Ext.Hash(expectedTarget);
+
+            var guesser = new LcuHashGuesser(new[] { knownPath }, null);
+            var engine = new HashGuessEngine(HashGuessDomain.Lcu, new HashSet<ulong> { targetHash });
+
+            int checkedCount = guesser.MirrorDirectories(engine, CancellationToken.None);
+
+            Assert.True(checkedCount > 0);
+            Assert.True(engine.Matches.ContainsKey(targetHash));
+            Assert.Equal(expectedTarget, engine.Matches[targetHash].Path);
+        }
+
+        [Fact]
+        public void LcuGuessPatternsDiscoversSanctumAndTrackerPaths()
+        {
+            const string sanctumTarget = "plugins/rcp-fe-lol-static-assets/global/default/sanctum/card-frame-tier1-back.svg";
+            const string trackerTarget = "plugins/rcp-fe-lol-static-assets/global/default/reward-tracker/current-left.svg";
+            ulong sanctumHash = XxHash64Ext.Hash(sanctumTarget);
+            ulong trackerHash = XxHash64Ext.Hash(trackerTarget);
+
+            var guesser = new LcuHashGuesser(Array.Empty<string>(), null);
+            var engine = new HashGuessEngine(HashGuessDomain.Lcu, new HashSet<ulong> { sanctumHash, trackerHash });
+
+            guesser.GuessPatterns(engine, CancellationToken.None);
+
+            Assert.True(engine.Matches.ContainsKey(sanctumHash));
+            Assert.Equal(sanctumTarget, engine.Matches[sanctumHash].Path);
+            Assert.True(engine.Matches.ContainsKey(trackerHash));
+            Assert.Equal(trackerTarget, engine.Matches[trackerHash].Path);
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";

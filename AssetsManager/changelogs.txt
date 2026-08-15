@@ -43,6 +43,7 @@ New Features
   - Integrated advanced LCU TFT patterns (24 different path combinations) inside LCU Advanced guessing suite.
   - Enhanced numeric variant guessing to support padded formats (2-digit D2 and 3-digit D3 layouts).
   - Added Prefix Attack (check_basename_prefixes) inside GAME Extended guessing suite to target tft_, 2x_, sd_, and other common prefixes.
+  - Hash Guessing Lab / Added automatic LCU directory mirroring and modern client Sanctum, Gacha, and Reward Tracker pattern attacks to LCU Basic guessing.
   - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
   - Comparison Results now offer direct access to the output folder of any exported asset.
   - Added a News section with categorized Riot news feeds, search filtering, and full article reading.
