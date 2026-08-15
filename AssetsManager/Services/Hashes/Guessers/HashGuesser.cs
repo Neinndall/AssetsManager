@@ -89,7 +89,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal HashWadInventory FromWads(
             IEnumerable<string> wadPaths,
             CancellationToken cancellationToken,
-            Action<string, Exception> onUnreadableWad = null)
+            Action<string, Exception> onUnreadableWad = null,
+            Action<int, int, string> onProgress = null)
         {
             string expectedSuffix = WadPattern.TrimStart('*');
             string[] paths = wadPaths
@@ -102,9 +103,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             ulong hashSum = 0;
             long chunkCount = 0;
 
-            foreach (string wadPath in paths)
+            for (int i = 0; i < paths.Length; i++)
             {
+                string wadPath = paths[i];
                 cancellationToken.ThrowIfCancellationRequested();
+                onProgress?.Invoke(i + 1, paths.Length, Path.GetFileName(wadPath));
                 try
                 {
                     using var stream = File.OpenRead(wadPath);

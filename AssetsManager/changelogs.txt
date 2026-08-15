@@ -79,6 +79,7 @@ Improvements
   - Hash Guessing Lab / GAME Canonical now follows CDTB character templates and exact LCU-to-GAME mappings without duplicate Basic-suite scans.
   - Hash Guessing Lab / GAME Locale Variants now runs GameHashGuesser.SubstituteLang with per-format CheckIter calls matching CDTB.
   - Hash Guessing Lab / GAME Numeric Ranges now uses one GameHashGuesser.SubstituteNumbers call backed by HashGuesser.SubstituteNumbersCore, matching CDTB basename-only number substitution.
+  - Hash Guessing Lab / GAME Extended now reports live progress across skin and chroma group bin generations and builds unknown inventories with real-time WAD tracking.
   - Hash Guessing Lab / GAME Extended now runs only skin groups, chroma groups, suffixes, skin numbers, character substitution and the GetCharacters corpus helper; custom attacks are reserved for a separate button.
   - Hash Guessing Lab / Banner Guess now uses catalog-attested sports words and bounded compound variants for faster discovery.
   - Hash Guessing Lab / GAME WAD animation links now resolve BIN clip hashes through targeted `.anm` candidates with lower scan time and memory use.

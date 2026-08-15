@@ -294,7 +294,7 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             return await RunGameBasicMethodsGuessingAsync(
                 rootDirectory,
                 progress,
@@ -440,7 +440,7 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             return await RunLcuBasicMethodsGuessingAsync(
                 progress,
                 cancellationToken,
@@ -590,7 +590,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -623,7 +623,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -664,7 +664,7 @@ namespace AssetsManager.Services.Hashes
             IProgress<HashGuessMatch> matchProgress = null)
         {
             await _hashResolverService.LoadAllHashesAsync();
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Lcu, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -690,7 +690,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -717,7 +717,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -743,7 +743,7 @@ namespace AssetsManager.Services.Hashes
             CancellationToken cancellationToken,
             IProgress<HashGuessMatch> matchProgress = null)
         {
-            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken);
+            var inventory = await LoadPersistedInventoryAsync(HashGuessDomain.Game, rootDirectory, cancellationToken, null, progress);
             var unknown = inventory.All;
             int initial = unknown.Count;
             HashGuessEngine engine = null;
@@ -767,7 +767,8 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             string rootDirectory,
             CancellationToken cancellationToken,
-            IReadOnlySet<ulong> sessionResolved = null)
+            IReadOnlySet<ulong> sessionResolved = null,
+            IProgress<HashGuessProgress> progress = null)
         {
             var unknownHashes = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
             unknownHashes.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
@@ -780,7 +781,7 @@ namespace AssetsManager.Services.Hashes
             {
                 HashGuesser guesser = CreateWadGuesser(domain);
                 string[] wadPaths = guesser.FindWads(rootDirectory);
-                return await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved);
+                return await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, sessionResolved, progress);
             }
 
             return new HashUnknownInventory
@@ -803,14 +804,24 @@ namespace AssetsManager.Services.Hashes
             HashGuessDomain domain,
             IEnumerable<string> wadPaths,
             CancellationToken cancellationToken,
-            IReadOnlySet<ulong> sessionResolved = null)
+            IReadOnlySet<ulong> sessionResolved = null,
+            IProgress<HashGuessProgress> progress = null)
         {
             HashGuesser guesser = CreateWadGuesser(domain);
             var pending = await _store.LoadUnknownHashesAsync(domain, cancellationToken);
             pending.RemoveWhere(hash => _hashResolverService.IsKnownHash(hash));
             HashWadInventory wadInventory = await Task.Run(
-                () => guesser.FromWads(wadPaths, cancellationToken,
-                    (wadPath, exception) => _logService.LogError(exception, $"Hash Lab could not build inventory from WAD '{wadPath}'.")),
+                () => guesser.FromWads(
+                    wadPaths,
+                    cancellationToken,
+                    (wadPath, exception) => _logService.LogError(exception, $"Hash Lab could not build inventory from WAD '{wadPath}'."),
+                    (processedWads, totalWads, currentWad) => progress?.Report(new HashGuessProgress
+                    {
+                        CurrentWad = $"Scanning {currentWad} ({processedWads}/{totalWads})",
+                        ProcessedWads = processedWads,
+                        TotalWads = totalWads,
+                        RemainingUnknowns = pending.Count
+                    })),
                 cancellationToken);
             var current = wadInventory.Hashes.Where(hash => !_hashResolverService.IsKnownHash(hash)).ToHashSet();
 

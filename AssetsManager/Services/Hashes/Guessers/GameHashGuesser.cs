@@ -671,7 +671,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IEnumerable<HashGuessCandidate> SubstituteCharacter(int candidateBudget = CharacterSubstitutionCandidateBudget) => GenerateCharacterSubstitutionCandidates(candidateBudget);
         internal IEnumerable<HashGuessCandidate> SubstituteSkinNumbers(int candidateBudget = SkinNumberSubstitutionCandidateBudget) => GenerateSkinNumberCandidates(candidateBudget);
-        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = SuffixSubstitutionCandidateBudget) => GenerateSuffixCandidates(candidateBudget);
+        internal IEnumerable<HashGuessCandidate> SubstituteSuffixes(int candidateBudget = int.MaxValue) => GenerateSuffixCandidates(candidateBudget);
         internal int SubstituteLang(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
@@ -1210,9 +1210,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             int checkedCandidates = 0;
 
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken);
+                checkedCandidates += await GuessSkinGroupsBin(engine, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
-                checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken);
+                checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
                 checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0)
@@ -1244,6 +1244,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             IProgress<HashGuessProgress> progress = null,
             int progressOffset = 0)
         {
+            progress?.Report(engine.CreateProgress(source, progressOffset));
             return CheckIter(
                 engine,
                 candidates,
@@ -1256,9 +1257,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal async Task<int> GuessChromaGroupsAsync(
             HashGuessEngine engine,
             string rootDirectory,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IProgress<HashGuessProgress> progress = null,
+            int progressOffset = 0)
         {
             if (string.IsNullOrWhiteSpace(rootDirectory) || !Directory.Exists(rootDirectory)) return 0;
+            const string stageName = "GAME Extended: chroma group bins";
+            progress?.Report(engine.CreateProgress(stageName, progressOffset));
+
             string json = await Task.Run(() => LoadLocalSkinsJson(rootDirectory, cancellationToken), cancellationToken);
             if (json == null) return 0;
             try
@@ -1299,16 +1305,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                         .Select(group => group.First())
                         .Append(new List<string> { "_skins_root" }).ToList();
                     for (int length = 1; length <= tokens.Count; length++)
-                    foreach (IEnumerable<List<string>> combination in GetCombinations(tokens, length))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (generated >= SkinGroupCandidateBudget) return generated;
-                        string suffix = string.Concat(combination.SelectMany(value => value).OrderBy(value => value, StringComparer.Ordinal));
-                        Check(engine, "data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
-                        generated++;
-                        if (engine.RemainingUnknownCount == 0) return generated;
+                        foreach (var combination in GetCombinations(tokens, length))
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            if (generated >= SkinGroupCandidateBudget) return generated;
+                            string suffix = string.Concat(combination.SelectMany(value => value).OrderBy(value => value, StringComparer.Ordinal));
+                            Check(engine, "data/" + pair.Key + suffix + ".bin", HashGuessStrategy.ChromaGroupVariant, "Local skins.json chroma groups");
+                            generated++;
+                            if ((generated % 5000) == 0)
+                            {
+                                progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
+                            }
+                            if (engine.RemainingUnknownCount == 0) return generated;
+                        }
                     }
                 }
+                progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
                 return generated;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
@@ -1321,14 +1334,16 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal Task<int> GuessSkinGroupsBinUsingChromas(
             HashGuessEngine engine,
             string rootDirectory,
-            CancellationToken cancellationToken) =>
-            GuessChromaGroupsAsync(engine, rootDirectory, cancellationToken);
+            CancellationToken cancellationToken,
+            IProgress<HashGuessProgress> progress = null,
+            int progressOffset = 0) =>
+            GuessChromaGroupsAsync(engine, rootDirectory, cancellationToken, progress, progressOffset);
 
         private string LoadLocalSkinsJson(string rootDirectory, CancellationToken cancellationToken)
         {
             ulong skinsJsonHash = XxHash64Ext.Hash(RiotCatalogDefinitions.SkinsJsonPath);
-            IEnumerable<string> wadPaths = Directory.EnumerateFiles(rootDirectory, "*.wad", SearchOption.AllDirectories)
-                .Where(path => path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+            IEnumerable<string> wadPaths = Directory.EnumerateFiles(rootDirectory, "*.wad*", SearchOption.AllDirectories)
+                .Where(path => path.EndsWith(".wad", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(path => path.Contains("game-data", StringComparison.OrdinalIgnoreCase))
                 .ThenBy(path => path, StringComparer.OrdinalIgnoreCase);
 
@@ -1357,7 +1372,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             return null;
         }
 
-        internal Task<int> GuessSkinGroupsBinLocalAsync(HashGuessEngine engine, CancellationToken cancellationToken)
+        internal Task<int> GuessSkinGroupsBinLocalAsync(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            IProgress<HashGuessProgress> progress = null,
+            int progressOffset = 0)
         {
             return Task.Run(() =>
             {
@@ -1376,25 +1395,39 @@ namespace AssetsManager.Services.Hashes.Guessers
                     skins.Add(int.Parse(match.Groups[2].Value));
                 }
                 int generated = 0;
+                const string stageName = "GAME Extended: local skin groups";
+                progress?.Report(engine.CreateProgress(stageName, progressOffset));
+
                 foreach (var pair in characters.OrderBy(pair => pair.Value.Count))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var skins = pair.Value.Select(value => $"_skins_skin{value}").OrderBy(value => value).ToList();
+                    var skins = pair.Value.Select(value => $"_skins_skin{value}").OrderBy(value => value, StringComparer.Ordinal).ToList();
                     for (int length = 1; length <= skins.Count; length++)
-                    foreach (IEnumerable<string> combination in GetCombinations(skins, length))
                     {
-                        if (generated >= SkinGroupCandidateBudget) return generated;
-                        Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
-                        generated++;
-                        if (engine.RemainingUnknownCount == 0) return generated;
+                        foreach (var combination in GetCombinations(skins, length))
+                        {
+                            if (generated >= SkinGroupCandidateBudget) return generated;
+                            Check(engine, $"data/{pair.Key}{string.Concat(combination)}.bin", HashGuessStrategy.ChromaGroupVariant, "Local skin groups");
+                            generated++;
+                            if ((generated % 5000) == 0)
+                            {
+                                progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
+                            }
+                            if (engine.RemainingUnknownCount == 0) return generated;
+                        }
                     }
                 }
+                progress?.Report(engine.CreateProgress(stageName, progressOffset + generated));
                 return generated;
             }, cancellationToken);
         }
 
-        internal Task<int> GuessSkinGroupsBin(HashGuessEngine engine, CancellationToken cancellationToken) =>
-            GuessSkinGroupsBinLocalAsync(engine, cancellationToken);
+        internal Task<int> GuessSkinGroupsBin(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            IProgress<HashGuessProgress> progress = null,
+            int progressOffset = 0) =>
+            GuessSkinGroupsBinLocalAsync(engine, cancellationToken, progress, progressOffset);
 
         private List<string> ExtractWordsFromDirectoryJsons(string rootDirectory, CancellationToken cancellationToken)
         {
@@ -2411,12 +2444,37 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private static byte[][] ToAsciiPrefixes(params string[] prefixes) => prefixes.Select(Encoding.ASCII.GetBytes).ToArray();
 
-        private static IEnumerable<IEnumerable<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
+        private static IEnumerable<IReadOnlyList<T>> GetCombinations<T>(IReadOnlyList<T> values, int length)
         {
-            if (length == 1) return values.Select(value => new[] { value }.AsEnumerable());
-            return values.SelectMany(
-                (value, index) => GetCombinations(values.Skip(index + 1).ToList(), length - 1),
-                (value, tail) => new[] { value }.Concat(tail));
+            if (length <= 0 || values.Count < length) yield break;
+            if (length == 1)
+            {
+                for (int i = 0; i < values.Count; i++)
+                    yield return new[] { values[i] };
+                yield break;
+            }
+
+            int[] indices = new int[length];
+            for (int i = 0; i < length; i++)
+                indices[i] = i;
+
+            while (true)
+            {
+                T[] result = new T[length];
+                for (int i = 0; i < length; i++)
+                    result[i] = values[indices[i]];
+                yield return result;
+
+                int pos = length - 1;
+                while (pos >= 0 && indices[pos] == values.Count - length + pos)
+                    pos--;
+
+                if (pos < 0) break;
+
+                indices[pos]++;
+                for (int i = pos + 1; i < length; i++)
+                    indices[i] = indices[i - 1] + 1;
+            }
         }
 
         private static IEnumerable<IEnumerable<T>> GetPermutations<T>(IReadOnlyList<T> values, int length)
