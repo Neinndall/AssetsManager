@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -181,6 +183,74 @@ namespace AssetsManager.Views
         private async void BuildInternalInventory_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Inventory);
         private async void RunInternalContent_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Content);
         private async void RunInternalStructural_Click(object sender, RoutedEventArgs e) => await RunInternalAsync(InternalHashAction.Structural);
+
+        private async void ExportJson_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel.Matches.Count == 0)
+            {
+                _messageBoxService?.ShowWarning("Export JSON", "There are no resolved matches to export.", Window.GetWindow(this));
+                return;
+            }
+
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export Resolved Hashes as JSON",
+                Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*",
+                FileName = $"resolved_hashes_{DateTime.Now:yyyyMMdd_HHmmss}.json"
+            };
+
+            if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+            {
+                try
+                {
+                    var items = _viewModel.Matches.Select(m =>
+                    {
+                        if (m is HashGuessMatch gm)
+                        {
+                            return new
+                            {
+                                hash = gm.HashText,
+                                path = gm.Path,
+                                domain = gm.DomainText,
+                                strategy = gm.StrategyText,
+                                sourceWad = gm.SourceWadPath,
+                                foundAtUtc = gm.FoundAtUtc
+                            };
+                        }
+                        if (m is InternalHashGuessMatch im)
+                        {
+                            return new
+                            {
+                                hash = im.HashText,
+                                path = im.Value,
+                                domain = im.DomainText,
+                                strategy = im.Strategy.ToString(),
+                                sourceWad = im.SourceWad,
+                                foundAtUtc = im.FoundAtUtc
+                            };
+                        }
+                        return (object)m;
+                    });
+
+                    var exportData = new
+                    {
+                        exportedAtUtc = DateTime.UtcNow,
+                        totalMatches = _viewModel.Matches.Count,
+                        matches = items
+                    };
+
+                    string json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(dialog.FileName, json);
+                    _messageBoxService?.ShowSuccess("Export Complete", $"Successfully exported {_viewModel.Matches.Count} matches to JSON.", Window.GetWindow(this));
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "Failed to export hash matches to JSON.");
+                    _messageBoxService?.ShowError("Export Error", $"Failed to export JSON: {ex.Message}", Window.GetWindow(this));
+                }
+            }
+        }
+
         private void Cancel_Click(object sender, RoutedEventArgs e) => _cancellationTokenSource?.Cancel();
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
