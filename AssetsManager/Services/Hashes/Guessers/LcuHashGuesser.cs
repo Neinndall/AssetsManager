@@ -474,6 +474,116 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
+        private static string ExtractPluginName(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !path.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+            int nextSlash = path.IndexOf('/', 8);
+            return nextSlash > 8 ? path[8..nextSlash] : path[8..];
+        }
+
+        internal int RunScopedPluginAttacks(
+            HashGuessEngine engine,
+            IProgress<HashGuessProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (engine.RemainingUnknownCount == 0) return 0;
+
+            int checkedCandidates = 0;
+
+            var pluginGroups = KnownPaths
+                .Where(p => p.StartsWith("plugins/", StringComparison.OrdinalIgnoreCase))
+                .GroupBy(ExtractPluginName)
+                .Where(g => !string.IsNullOrEmpty(g.Key))
+                .ToList();
+
+            string[] modifiers =
+            {
+                "hover", "active", "selected", "disabled", "pressed", "clicked", "focused",
+                "locked", "unlocked", "claimed", "completed", "current", "future", "idle",
+                "small", "large", "mini", "medium", "sm", "md", "lg",
+                "bg", "background", "icon", "border", "glow", "frame", "badge", "crest", "emblem",
+                "tier1", "tier2", "tier3", "tier4", "tierone", "tiertwo", "tierthree",
+                "back", "front", "left", "right", "center", "top", "bottom",
+                "v2", "v3", "intro", "outro", "loop", "in", "out"
+            };
+
+            char[] delimiters = { '-', '_' };
+
+            foreach (var group in pluginGroups)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0) break;
+
+                string plugin = group.Key;
+                var pluginPaths = group.ToList();
+                if (pluginPaths.Count == 0) continue;
+
+                string stage = $"LCU Custom: scoped plugin {plugin}";
+                progress?.Report(engine.CreateProgress(stage, checkedCandidates));
+
+                var dirs = pluginPaths
+                    .Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/'))
+                    .Where(d => !string.IsNullOrEmpty(d))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var basenamesWithExt = pluginPaths
+                    .Select(p => (BaseName: Path.GetFileNameWithoutExtension(p), Ext: Path.GetExtension(p)))
+                    .Distinct()
+                    .ToList();
+
+                var candidates = new List<HashGuessCandidate>();
+
+                // 1. Intra-Plugin Directory Cross-Product
+                foreach (var dir in dirs)
+                foreach (var item in basenamesWithExt)
+                {
+                    candidates.Add(new HashGuessCandidate($"{dir}/{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant));
+                }
+
+                // 2. Intra-Plugin Modifier Matrix
+                foreach (var dir in dirs)
+                foreach (var item in basenamesWithExt)
+                foreach (var mod in modifiers)
+                foreach (var d in delimiters)
+                {
+                    candidates.Add(new HashGuessCandidate($"{dir}/{item.BaseName}{d}{mod}{item.Ext}", HashGuessStrategy.WordlistVariant));
+                    candidates.Add(new HashGuessCandidate($"{dir}/{mod}{d}{item.BaseName}{item.Ext}", HashGuessStrategy.WordlistVariant));
+                }
+
+                int count = CheckIter(engine, candidates, $"Scoped plugin {plugin}", cancellationToken);
+                checkedCandidates += count;
+
+                // 3. Scoped Word Substitutions (1->1 and 1->2) using plugin's own vocabulary
+                if (engine.RemainingUnknownCount > 0 && pluginPaths.Count >= 2)
+                {
+                    var pluginWords = HashGuessEngine.BuildWordlist(pluginPaths.Select(Path.GetFileName));
+                    if (pluginWords.Count > 0 && pluginWords.Count <= 250)
+                    {
+                        var variants = new[] { (Old: 1, New: 1), (Old: 1, New: 2) };
+                        foreach (var (oldWordCount, newWordCount) in variants)
+                        {
+                            if (engine.RemainingUnknownCount == 0) break;
+                            int subCount = SubstituteBasenameWords(
+                                engine,
+                                cancellationToken,
+                                plugin: plugin,
+                                words: pluginWords,
+                                oldWordCount: oldWordCount,
+                                newWordCount: newWordCount,
+                                candidateBudget: 1_000_000,
+                                progress: current => progress?.Report(engine.CreateProgress(stage, checkedCandidates + current)));
+                            checkedCandidates += subCount;
+                        }
+                    }
+                }
+            }
+
+            return checkedCandidates;
+        }
+
         internal int RunCustomAttacks(
             HashGuessEngine engine,
             IProgress<HashGuessProgress> progress,
@@ -483,7 +593,14 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             int checkedCandidates = 0;
 
-            // Phase 1: Universal Modifier Matrix across all plugins
+            // Phase 1: High-precision Scoped Plugin Engine (Intra-directory cross-product, scoped modifiers, scoped substitutions)
+            if (engine.RemainingUnknownCount > 0)
+            {
+                int count = RunScopedPluginAttacks(engine, progress, cancellationToken);
+                checkedCandidates += count;
+            }
+
+            // Phase 2: Universal Modifier Matrix across all plugins
             if (engine.RemainingUnknownCount > 0)
             {
                 string stage = "LCU Custom: Universal modifier attack";

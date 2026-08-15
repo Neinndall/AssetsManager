@@ -966,6 +966,29 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
         }
 
         [Fact]
+        public void LcuRunScopedPluginAttacksDiscoversIntraPluginAssets()
+        {
+            var known = new[]
+            {
+                "plugins/rcp-fe-lol-store/global/default/storefront/addon/public/img/silvershields.svg",
+                "plugins/rcp-fe-lol-store/global/default/storefront/addon/public/img/sprite-source/lcu-sale.png",
+                "plugins/rcp-fe-lol-loot/global/default/assets/loot_item_icons/chest_10.png"
+            };
+
+            const string expectedTarget = "plugins/rcp-fe-lol-store/global/default/storefront/addon/public/img/sprite-source/silvershields.svg";
+            ulong targetHash = LeagueToolkit.Hashing.XxHash64Ext.Hash(expectedTarget);
+
+            var guesser = new LcuHashGuesser(known, null);
+            var engine = new HashGuessEngine(HashGuessDomain.Lcu, new HashSet<ulong> { targetHash });
+
+            int checkedCount = guesser.RunScopedPluginAttacks(engine, null, CancellationToken.None);
+
+            Assert.True(checkedCount > 0);
+            Assert.True(engine.Matches.ContainsKey(targetHash));
+            Assert.Equal(expectedTarget, engine.Matches[targetHash].Path);
+        }
+
+        [Fact]
         public void GameFallbackRequiresContentAfterThePrefixLikeCdtbRegex()
         {
             const string barePrefix = "assets/";

@@ -46,6 +46,7 @@ New Features
   - Hash Guessing Lab / Added automatic LCU directory mirroring and modern client Sanctum, Gacha, and Reward Tracker pattern attacks to LCU Basic guessing.
   - Hash Guessing Lab / Expanded LCU Custom guessing with dynamic media (WEBM/OGG) and data (JSON) wordlist suites automatically derived from the known hashes corpus.
   - Hash Guessing Lab / Added the Universal Plugin Modifier attack to LCU Custom, automatically applying Riot UI states, tiers, and layout modifiers across all client plugins.
+  - Hash Guessing Lab / Added the Scoped Plugin Engine to LCU Custom, executing intra-plugin directory cross-products and contextual vocabulary substitutions.
   - Comparison Results now include a Results tab showing the export status of each new asset (EXPORTED / FAILED / QUEUED) with batch Extract and Save actions.
   - Comparison Results now offer direct access to the output folder of any exported asset.
   - Added a News section with categorized Riot news feeds, search filtering, and full article reading.

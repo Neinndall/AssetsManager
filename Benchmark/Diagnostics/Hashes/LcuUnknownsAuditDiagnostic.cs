@@ -107,25 +107,6 @@ namespace BenchmarkApp.Diagnostics.Hashes
                 }
             }
 
-            Console.WriteLine("\n[1] UNKNOWNS DISTRIBUTION BY PLUGIN:");
-            Console.WriteLine("--------------------------------------------------");
-            foreach (var kv in pluginStats.OrderByDescending(p => p.Value.Count))
-            {
-                var typeCounts = kv.Value.GroupBy(item => item.FileType)
-                    .Select(g => $"{g.Key}: {g.Count()}");
-                Console.WriteLine($"  {kv.Key.PadRight(42)} -> {kv.Value.Count,3} hashes ({string.Join(", ", typeCounts)})");
-            }
-
-            Console.WriteLine("\n[2] OVERALL FORMAT BREAKDOWN:");
-            Console.WriteLine("--------------------------------------------------");
-            var allByFormat = pluginStats.SelectMany(p => p.Value)
-                .GroupBy(item => item.FileType)
-                .OrderByDescending(g => g.Count());
-            foreach (var group in allByFormat)
-            {
-                Console.WriteLine($"  {group.Key.PadRight(20)}: {group.Count(),3} files");
-            }
-
             string hashesLcuPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "AssetsManager", "hashes", "hashes.lcu.txt");
@@ -147,6 +128,81 @@ namespace BenchmarkApp.Diagnostics.Hashes
                 }
             }
 
+            Console.WriteLine("\n[3] DEEP CHUNK INSPECTION ACROSS ALL UNKNOWNS:");
+            Console.WriteLine("--------------------------------------------------");
+            var allUnknownChunks = pluginStats.SelectMany(p => p.Value.Select(v => (Plugin: p.Key, Hash: v.Hash, Chunk: v.Chunk, FileType: v.FileType, Sample: v.Sample))).ToList();
+
+            var solvedPaths = new Dictionary<ulong, string>();
+
+            void TestCandidate(string path)
+            {
+                ulong h = LeagueToolkit.Hashing.XxHash64Ext.Hash(path.ToLowerInvariant());
+                if (unknownHashes.Contains(h) && !solvedPaths.ContainsKey(h))
+                {
+                    solvedPaths[h] = path;
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"  [CRACKED!] 0x{h:x16} -> {path}");
+                    Console.ResetColor();
+                }
+            }
+
+            // Test game data numeric paths
+            Console.WriteLine("\n>>> Testing rcp-be-lol-game-data numeric IDs...");
+            string[] gameDataFolders = {
+                "v1/items/icons2d", "v1/champion-icons", "v1/profile-icons", "v1/companion-species",
+                "v1/tft-items", "v1/perk-images/statmods", "v1/ward-skins", "v1/summoner-spells",
+                "v1/hextech-items", "v1/perk-images", "v1/emotes", "v1/arenas", "v1/augments"
+            };
+
+            for (int id = 0; id <= 200000; id++)
+            {
+                foreach (var folder in gameDataFolders)
+                {
+                    TestCandidate($"plugins/rcp-be-lol-game-data/global/default/{folder}/{id}.png");
+                }
+            }
+
+            foreach (var item in allUnknownChunks)
+            {
+                string pluginName = Path.GetFileNameWithoutExtension(item.Plugin);
+                if (pluginName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                    pluginName = Path.GetFileNameWithoutExtension(pluginName);
+
+                // Try to find the wad file
+                string wadPath = wads.FirstOrDefault(w => w.Contains(pluginName, StringComparison.OrdinalIgnoreCase));
+                if (wadPath == null) continue;
+
+                try
+                {
+                    using var wad = new WadFile(wadPath);
+                    if (!wad.Chunks.TryGetValue(item.Hash, out var chunk)) continue;
+                    using var owner = wad.LoadChunkDecompressed(chunk);
+                    var seg = owner.DangerousGetArray();
+                    byte[] data = seg.Array[seg.Offset..(seg.Offset + seg.Count)];
+
+                    // Extract all ASCII/UTF8 strings >= 4 chars from the chunk
+                    var text = Encoding.ASCII.GetString(data);
+                    var strMatches = Regex.Matches(text, @"[a-zA-Z0-9_\-\.\/]{4,}");
+                    var extractedWords = strMatches.Cast<Match>().Select(m => m.Value).Distinct().ToList();
+
+                    // Print sample info if it has text or interesting SVG / PNG data
+                    if (item.FileType == "SVG")
+                    {
+                        var utf8Text = Encoding.UTF8.GetString(data);
+                        var ids = Regex.Matches(utf8Text, @"id=""([^""]+)""").Cast<Match>().Select(m => m.Groups[1].Value).Take(4);
+                        var classes = Regex.Matches(utf8Text, @"class=""([^""]+)""").Cast<Match>().Select(m => m.Groups[1].Value).Take(4);
+                        Console.WriteLine($"  0x{item.Hash:x16} | {pluginName.PadRight(30)} | SVG  | ids=[{string.Join(", ", ids)}] classes=[{string.Join(", ", classes)}]");
+                    }
+                    else if (item.FileType == "PNG" || item.FileType == "JPG" || item.FileType == "WEBM" || item.FileType == "OGG")
+                    {
+                        // Check for embedded text chunks or metadata
+                        var interesting = extractedWords.Where(w => w.Contains('/') || w.Contains('.') || w.Contains('_') || w.Contains('-')).Take(5).ToList();
+                        string extra = interesting.Count > 0 ? $" | strings=[{string.Join(", ", interesting)}]" : "";
+                        Console.WriteLine($"  0x{item.Hash:x16} | {pluginName.PadRight(30)} | {item.FileType.PadRight(5)} | {item.Sample,-15} | {chunk.UncompressedSize,7} B{extra}");
+                    }
+                }
+                catch { }
+            }
             var staticAssetsWad = wads.FirstOrDefault(w => w.Contains("rcp-fe-lol-static-assets", StringComparison.OrdinalIgnoreCase));
             if (staticAssetsWad != null)
             {
@@ -184,29 +240,37 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     }
                 }
 
-                // Test 6: Figma SVG structure search across all plugins
-                Console.WriteLine("\n>>> Inspecting Known SVGs across all plugins for matching SVG patterns...");
-                foreach (var w in wads)
+            // Test 6: Figma SVG structure search across all plugins
+            Console.WriteLine("\n==================================================");
+            Console.WriteLine(">>> SVG Figma Node Structure Matches across all WADs:");
+            Console.WriteLine("==================================================");
+            foreach (var w in wads)
+            {
+                try
                 {
-                    try
+                    using var pluginWad = new WadFile(w);
+                    foreach (var p in pluginWad.Chunks)
                     {
-                        using var pluginWad = new WadFile(w);
-                        foreach (var p in pluginWad.Chunks)
+                        if (knownLcu.TryGetValue(p.Key, out string kPath) && kPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (knownLcu.TryGetValue(p.Key, out string kPath) && kPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
-                            {
-                                using var owner = pluginWad.LoadChunkDecompressed(p.Value);
-                                var seg = owner.DangerousGetArray();
-                                string text = Encoding.UTF8.GetString(seg.Array, seg.Offset, seg.Count);
-                                if (text.Contains("path-1-outside-1") || text.Contains("3419_8358") || text.Contains("5045_77102") || text.Contains("4003_3667") || text.Contains("5519_4182"))
-                                {
-                                    Console.WriteLine($"  [SVG PATTERN MATCH] {kPath}");
-                                }
-                            }
+                            using var owner = pluginWad.LoadChunkDecompressed(p.Value);
+                            var seg = owner.DangerousGetArray();
+                            string text = Encoding.UTF8.GetString(seg.Array, seg.Offset, seg.Count);
+                            if (text.Contains("path-1-outside-1"))
+                                Console.WriteLine($"  [SVG MATCH path-1-outside-1] {kPath}");
+                            if (text.Contains("3419_8358"))
+                                Console.WriteLine($"  [SVG MATCH 3419_8358] {kPath}");
+                            if (text.Contains("5045_77102"))
+                                Console.WriteLine($"  [SVG MATCH 5045_77102] {kPath}");
+                            if (text.Contains("4003_3667") || text.Contains("4003_3672"))
+                                Console.WriteLine($"  [SVG MATCH 4003_3667] {kPath}");
+                            if (text.Contains("5519_4182"))
+                                Console.WriteLine($"  [SVG MATCH 5519_4182] {kPath}");
                         }
                     }
-                    catch { }
                 }
+                catch { }
+            }
                 var allStaticBasenames = knownPathsInStatic.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 var allStaticDirs = knownPathsInStatic.Select(p => Path.GetDirectoryName(p)?.Replace('\\', '/')).Distinct(StringComparer.OrdinalIgnoreCase).Where(d => !string.IsNullOrEmpty(d)).ToList();
 
@@ -438,31 +502,7 @@ namespace BenchmarkApp.Diagnostics.Hashes
                     }
                 }
 
-                Console.WriteLine($"\n>>> Inspecting all TFT plugins across WADs:");
-                foreach (var w in wads.Where(w => w.Contains("tft", StringComparison.OrdinalIgnoreCase)))
-                {
-                    try
-                    {
-                        using var tftWad = new WadFile(w);
-                        string tftPluginName = Path.GetFileNameWithoutExtension(w);
-                        Console.WriteLine($"\n=== WAD: {Path.GetFileName(w)} (Total Chunks: {tftWad.Chunks.Count}) ===");
-                        foreach (var p in tftWad.Chunks)
-                        {
-                            if (knownLcu.TryGetValue(p.Key, out string path))
-                            {
-                                Console.WriteLine($"  [RESOLVED] {path}");
-                            }
-                            else if (unknownHashes.Contains(p.Key))
-                            {
-                                using var owner = tftWad.LoadChunkDecompressed(p.Value);
-                                var seg = owner.DangerousGetArray();
-                                string ft = DetectFileType(seg.Array[seg.Offset..(seg.Offset + seg.Count)], out string dtl);
-                                Console.WriteLine($"  [UNKNOWN] 0x{p.Key:x16} | {ft} | {p.Value.UncompressedSize} B | {dtl}");
-                            }
-                        }
-                    }
-                    catch { }
-                }
+                // Done inspecting
             }
         }
 
