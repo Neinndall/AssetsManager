@@ -438,17 +438,21 @@ namespace AssetsManager.Services.Hashes.Guessers
             var pathList = paths.ToList();
             if (pathList.Count == 0) return 0;
 
-            string[] modifiers =
+            var dynamicTokens = ExtractDynamicAffixes(pathList, limit: 150);
+
+            string[] baseModifiers =
             {
-                "hover", "active", "selected", "disabled", "pressed", "clicked", "focused",
+                "hover", "active", "selected", "disabled", "pressed", "clicked", "focused", "default", "normal",
                 "locked", "unlocked", "claimed", "completed", "current", "future", "idle",
-                "small", "large", "mini", "medium", "sm", "md", "lg",
+                "small", "large", "mini", "medium", "sm", "md", "lg", "xl",
                 "bg", "background", "icon", "border", "glow", "frame", "badge", "crest", "emblem",
-                "tier1", "tier2", "tier3", "tier4", "tierone", "tiertwo", "tierthree",
+                "tier1", "tier2", "tier3", "tier4", "tier5", "tier6", "tierone", "tiertwo", "tierthree",
                 "back", "front", "left", "right", "center", "top", "bottom",
-                "v2", "v3", "intro", "outro", "loop", "in", "out"
+                "v2", "v3", "intro", "outro", "loop", "in", "out",
+                "18x18", "12x24", "10x10", "13x13", "20x20", "24x24", "32x32", "64x64", "92x92", "112x112", "128x128", "256x256"
             };
 
+            var modifiers = baseModifiers.Concat(dynamicTokens).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             char[] delimiters = { '-', '_' };
 
             int checkedCount = 0;
@@ -481,14 +485,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                             engine.Check($"{dir}/{baseName}{d}{mod}{ext}", HashGuessStrategy.WordlistVariant, source);
                             engine.Check($"{dir}/{mod}{d}{baseName}{ext}", HashGuessStrategy.WordlistVariant, source);
                             checkedCount += 2;
+                            if ((checkedCount & 0x1fff) == 0)
+                            {
+                                progress?.Invoke(checkedCount);
+                            }
                             if (engine.RemainingUnknownCount == 0) return checkedCount;
                         }
                     }
                 }
-
-                progress?.Invoke(checkedCount);
             }
 
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 
@@ -556,7 +563,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             // Extract global dynamic affixes from known LCU assets corpus (zero hardcoded words)
-            var globalDynamicAffixes = ExtractDynamicAffixes(KnownPaths, limit: 50);
+            var globalDynamicAffixes = ExtractDynamicAffixes(KnownPaths, limit: 1000);
 
             foreach (var group in pluginGroups)
             {
@@ -599,7 +606,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .ToList();
 
                 // 1. Dynamic Intra-Plugin Directory Cross-Product (streaming & bounded)
-                int crossBudget = 35_000;
+                int crossBudget = 250_000;
                 int crossCount = 0;
                 foreach (var dir in dirs)
                 {
@@ -617,8 +624,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 // 2. Dynamic Affix Permutation (using dynamically harvested tokens from plugin & corpus)
-                var pluginAffixes = ExtractDynamicAffixes(pluginPaths, limit: 30)
-                    .Concat(globalDynamicAffixes.Take(20))
+                var pluginAffixes = ExtractDynamicAffixes(pluginPaths, limit: 600)
+                    .Concat(globalDynamicAffixes.Take(400))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
@@ -628,7 +635,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (engine.RemainingUnknownCount == 0) break;
 
                     var localItems = dirGroups.FirstOrDefault(g => g.Key == dir)?.Select(p => (BaseName: Path.GetFileNameWithoutExtension(p), Ext: Path.GetExtension(p))).Distinct().ToList()
-                        ?? basenamesWithExt.Take(30).ToList();
+                        ?? basenamesWithExt.Take(500).ToList();
 
                     foreach (var item in localItems)
                     {
@@ -655,7 +662,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 // 3. Dynamic Numeric Sequence Extrapolation (discovers sequences and tests forward range)
                 if (engine.RemainingUnknownCount > 0)
                 {
-                    var numberedPaths = pluginPaths.Where(p => Regex.IsMatch(Path.GetFileNameWithoutExtension(p), @"\d+")).Take(150);
+                    var numberedPaths = pluginPaths.Where(p => Regex.IsMatch(Path.GetFileNameWithoutExtension(p), @"\d+")).Take(1000);
                     foreach (var path in numberedPaths)
                     {
                         string dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
@@ -668,7 +675,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         {
                             string prefix = baseName[..match.Index];
                             string suffix = baseName[(match.Index + match.Length)..];
-                            int maxRange = Math.Clamp(seenNum + 20, 15, 250);
+                            int maxRange = Math.Clamp(seenNum + 50, 25, 500);
 
                             for (int num = 0; num <= maxRange; num++)
                             {
@@ -692,15 +699,54 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         int subCount1 = SubstituteBasenameWordsCore(
                             engine,
-                            pluginPaths.Take(300),
-                            pluginWords.Take(50),
+                            pluginPaths.Take(2500),
+                            pluginWords.Take(500),
                             oldWordCount: 1,
                             newWordCount: 1,
                             cancellationToken,
-                            candidateBudget: 5_000,
+                            candidateBudget: 250_000,
                             source: source,
                             progress: current => ReportThrottled(stage, checkedCandidates + current));
                         checkedCandidates += subCount1;
+                    }
+                }
+
+                // 5. Dynamic UI Component & Resolution Synthesis (Figma exports, scaled sprites & resolution matrices)
+                if (engine.RemainingUnknownCount > 0)
+                {
+                    string[] uiComponents = {
+                        "icon", "frame", "border", "divider", "bg", "background", "btn", "button",
+                        "mask", "overlay", "badge", "header", "footer", "panel", "card", "accent", "arrow", "chevron"
+                    };
+
+                    string[] dimensions = {
+                        "18x18", "12x24", "10x10", "13x13", "20x20", "24x24", "32x32", "64x64", "92x92", "112x112", "128x128", "256x256"
+                    };
+
+                    string[] uiExts = { ".png", ".svg", ".webm", ".jpg" };
+
+                    foreach (var dir in dirs)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (engine.RemainingUnknownCount == 0) break;
+
+                        foreach (var comp in uiComponents)
+                        {
+                            foreach (var ext in uiExts)
+                            {
+                                foreach (var dim in dimensions)
+                                {
+                                    engine.Check($"{dir}/{comp}_{dim}{ext}", HashGuessStrategy.WordlistVariant, source);
+                                    engine.Check($"{dir}/{comp}-{dim}{ext}", HashGuessStrategy.WordlistVariant, source);
+                                    checkedCandidates += 2;
+                                    if ((checkedCandidates & 0x1fff) == 0)
+                                        ReportThrottled(stage, checkedCandidates);
+                                    if (engine.RemainingUnknownCount == 0) break;
+                                }
+                                if (engine.RemainingUnknownCount == 0) break;
+                            }
+                            if (engine.RemainingUnknownCount == 0) break;
+                        }
                     }
                 }
             }

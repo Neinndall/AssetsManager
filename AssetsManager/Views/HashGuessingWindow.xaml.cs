@@ -194,7 +194,7 @@ namespace AssetsManager.Views
                 Id = "lcu-custom",
                 DomainIndex = 1,
                 Name = "LCU Custom Guess",
-                Description = "Modular client attacks: Scoped Plugins, Universal UI Modifiers, and 4 dynamic token suites.",
+                Description = "Targeted client attacks: Scoped Plugins and Universal UI Modifiers.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.FlaskOutline,
                 BadgeText = "🚀 FAST (~15s)",

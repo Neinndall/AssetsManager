@@ -47,21 +47,21 @@
             </Grid.ColumnDefinitions>
 
             <!-- LEFT PANEL: TARGET CLIENT, ACTIVE UNKNOWNS & METHODS LIST -->
-            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="14,14" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+            <Border Grid.Column="0" Background="{StaticResource CardBackground}" CornerRadius="12" Padding="16,16" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/> <!-- Target Client Header -->
-                        <RowDefinition Height="6"/>
-                        <RowDefinition Height="Auto"/> <!-- Target Client Selector -->
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/> <!-- Active Unknowns Header -->
-                        <RowDefinition Height="6"/>
-                        <RowDefinition Height="Auto"/> <!-- Active Unknowns Card -->
-                        <RowDefinition Height="14"/>
-                        <RowDefinition Height="Auto"/> <!-- Attack Algorithms Header -->
                         <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/> <!-- Search Box -->
+                        <RowDefinition Height="Auto"/> <!-- Target Client Selector -->
+                        <RowDefinition Height="18"/>
+                        <RowDefinition Height="Auto"/> <!-- Active Unknowns Header -->
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/> <!-- Active Unknowns Card -->
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="Auto"/> <!-- Attack Algorithms Header -->
                         <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/> <!-- Search Box -->
+                        <RowDefinition Height="12"/>
                         <RowDefinition Height="*"/>    <!-- ListBox of Methods -->
                     </Grid.RowDefinitions>
 
@@ -75,7 +75,7 @@
                               x:Name="DomainSelector"
                               Style="{StaticResource ModernComboBox}"
                               SelectedIndex="0"
-                              Height="34"
+                              Height="36"
                               VerticalContentAlignment="Center"
                               SelectionChanged="DomainSelector_SelectionChanged">
                         <ComboBoxItem Content="Game" Tag="Game"/>
@@ -91,7 +91,7 @@
                     </StackPanel>
 
                     <!-- ACTIVE UNKNOWNS CARD -->
-                    <Border Grid.Row="6" Background="{StaticResource HoverColor}" CornerRadius="8" Padding="12,10" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                    <Border Grid.Row="6" Background="{StaticResource HoverColor}" CornerRadius="8" Padding="14,12" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -99,9 +99,9 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center" Margin="0,0,8,0">
                                 <TextBlock x:Name="TxtUnknownCount" Text="Loading..." FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock x:Name="TxtUnknownBreakdown" Text="" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                <TextBlock x:Name="TxtUnknownBreakdown" Text="" FontSize="9.5" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"/>
                             </StackPanel>
-                            <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="28" Height="28" VerticalAlignment="Center">
+                            <Border Grid.Column="1" Background="{StaticResource SidebarBackground}" CornerRadius="6" Width="30" Height="30" VerticalAlignment="Center">
                                 <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="16" Height="16" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                         </Grid>
@@ -116,7 +116,7 @@
                     <TextBox Grid.Row="10"
                              x:Name="TxtMethodSearch"
                              Style="{StaticResource StandardSearchBoxStyle}"
-                             Height="32"
+                             Height="34"
                              Tag="Search algorithms..."
                              TextChanged="TxtMethodSearch_TextChanged"/>
 
