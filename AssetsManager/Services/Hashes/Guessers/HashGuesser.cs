@@ -119,7 +119,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                         hashSum = unchecked(hashSum + chunk.PathHash);
                         chunkCount++;
 
-                        if (Domain == HashGuessDomain.Game && chunk.Compression != WadChunkCompression.Satellite && chunk.UncompressedSize >= 24 && chunk.UncompressedSize <= 300_000)
+                        if (Domain == HashGuessDomain.Game &&
+                            chunk.Compression != WadChunkCompression.Satellite &&
+                            chunk.UncompressedSize >= 24 &&
+                            chunk.UncompressedSize <= 32_768)
                         {
                             try
                             {

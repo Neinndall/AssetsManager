@@ -2416,5 +2416,25 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             AssertResolved(capEngine, withinCap);
         }
 
+        [Fact]
+        public void GameCharacterFilesResolvesSkinFilesAndPetTiers()
+        {
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/skins/skin0/ahri.dds",
+                "assets/characters/petdssquid/tiers/root.bin"
+            }));
+
+            const string skinPath = "data/characters/ahri/skins/skin5.bin";
+            var skinEngine = CreateEngine(HashGuessDomain.Game, skinPath);
+            game.GuessCharacterFiles(skinEngine, CancellationToken.None);
+            AssertResolved(skinEngine, skinPath);
+
+            const string petTierPath = "data/characters/petdssquid/tiers/tier2.bin";
+            var petEngine = CreateEngine(HashGuessDomain.Game, petTierPath);
+            game.GuessCharacterFiles(petEngine, CancellationToken.None);
+            AssertResolved(petEngine, petTierPath);
+        }
+
     }
 }

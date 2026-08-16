@@ -64,7 +64,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly byte[][] WadBinPrefixesP = ToAsciiPrefixes("Patching/");
         private static readonly byte[][] WadBinPrefixesS = ToAsciiPrefixes("Shaders/");
         private static readonly Regex AnimationBinPathRegex = new(
-            @"^data/characters/(?<character>[^/]+)/animations/(?<skin>[^/]+)\.bin$",
+            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.bin$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex KnownAnimationPathRegex = new(
             @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
@@ -826,9 +826,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                     Enumerable.Range(0, skinLimit).Select(skin =>
                         $"data/characters/{character}/animations/skin{skin}.bin"));
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                {
                     checkedCount += CheckCharacterPaths(
                         Enumerable.Range(0, 10).Select(tier =>
                             $"data/characters/{character}/tiers/tier{tier}.bin"));
+                }
 
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
@@ -1912,7 +1914,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private IReadOnlyList<string> GetAutoAtlasCandidatePatterns()
         {
-            return Corpus.GetOrCreate("autoatlas-candidate-patterns-v3", knownPaths =>
+            return Corpus.GetOrCreate("autoatlas-candidate-patterns-v4", knownPaths =>
             {
                 var patterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1932,13 +1934,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                             if (!string.IsNullOrWhiteSpace(relFile) && !relFile.StartsWith("atlas_", StringComparison.OrdinalIgnoreCase))
                                 patterns.Add(relFile);
                         }
+                        else
+                        {
+                            string fileName = Path.GetFileName(norm);
+                            if (!string.IsNullOrWhiteSpace(fileName) && !fileName.StartsWith("atlas_", StringComparison.OrdinalIgnoreCase))
+                                patterns.Add(fileName);
+                        }
                     }
-
-                    // Extract generic image filenames and extension variants across the corpus
-                    if (path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith(".tga", StringComparison.OrdinalIgnoreCase))
+                    else if (norm.Contains("/icons2d/", StringComparison.OrdinalIgnoreCase) ||
+                             norm.StartsWith("ux/", StringComparison.OrdinalIgnoreCase) ||
+                             norm.StartsWith("clientstates/", StringComparison.OrdinalIgnoreCase))
                     {
                         string fileName = Path.GetFileName(norm);
                         if (!string.IsNullOrWhiteSpace(fileName) && !fileName.StartsWith("atlas_", StringComparison.OrdinalIgnoreCase))
@@ -2054,8 +2059,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
-            foreach (string name in GetAnimationNames(character, contextual: false))
-                yield return name;
+            if (contextualNames.Count == 0)
+            {
+                foreach (string name in GetAnimationNames(character, contextual: false).Take(1000))
+                    yield return name;
+            }
 
             foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
                          sourceNames.Where(name => name.Any(char.IsDigit)).Select(name => $"animations/{name}"),
@@ -2138,12 +2146,31 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
             stem = stem.ToLowerInvariant();
 
-            foreach (string root in AnimationRootPrefixes)
+            string paddedSkin = skin;
+            if (Regex.IsMatch(skin, @"^skin\d$"))
+                paddedSkin = "skin0" + skin[4..];
+            else if (Regex.IsMatch(skin, @"^skin0\d$"))
+                paddedSkin = "skin" + skin[5..];
+
+            string[] skinsToTry = string.Equals(skin, paddedSkin, StringComparison.OrdinalIgnoreCase)
+                ? new[] { skin }
+                : new[] { skin, paddedSkin };
+
+            string[] prefixModifiers = { "", "recallin_", "recall_", "respawn_", "death_", "idle_", "run_", "attack_" };
+            string[] suffixModifiers = { "", "_stage", "_homeguard", "_hookup", "_loop", "_in", "_out", "_channel", "_dash", "_impact" };
+
+            foreach (string sk in skinsToTry)
+            foreach (string pre in prefixModifiers)
+            foreach (string suf in suffixModifiers)
             {
-                yield return $"{root}/characters/{character}/skins/{skin}/animations/{stem}.anm";
-                yield return $"{root}/characters/{character}/skins/{skin}/animations/{character}_{stem}.anm";
-                yield return $"{root}/characters/{character}/skins/{skin}/animations/{character}_{skin}_{stem}.anm";
-                yield return $"{root}/characters/{character}/skins/{skin}/animations/{skin}_{stem}.anm";
+                string s = pre + stem + suf;
+                foreach (string root in AnimationRootPrefixes)
+                {
+                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{s}.anm";
+                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{s}.anm";
+                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{sk}_{s}.anm";
+                    yield return $"{root}/characters/{character}/skins/{sk}/animations/{sk}_{s}.anm";
+                }
             }
         }
 
