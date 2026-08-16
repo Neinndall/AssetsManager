@@ -495,17 +495,6 @@ namespace AssetsManager.Services.Hashes
                             engine.CreateProgress("LCU Basic: patterns", progressOffset + count)));
                 }
 
-                if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-basic-mirroring"))
-                {
-                    progress?.Report(engine.CreateProgress("LCU Basic: directory mirroring", checkedCandidates));
-                    int progressOffset = checkedCandidates;
-                    checkedCandidates += _lcuGuesser.MirrorDirectories(
-                        engine,
-                        cancellationToken,
-                        candidateBudget: int.MaxValue,
-                        progress: count => progress?.Report(
-                            engine.CreateProgress("LCU Basic: directory mirroring", progressOffset + count)));
-                }
 
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-basic-crossdomain"))
                 {

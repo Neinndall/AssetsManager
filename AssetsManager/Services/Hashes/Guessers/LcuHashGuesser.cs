@@ -319,15 +319,21 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 if (path.Contains("/global/default/images/"))
                 {
-                    string mirror = path.Replace("/global/default/images/", "/global/default/");
-                    Check(engine, mirror, HashGuessStrategy.LcuPattern, source);
-                    checkedCount++;
+                    Check(engine, path.Replace("/global/default/images/", "/global/default/"), HashGuessStrategy.LcuPattern, source);
+                    Check(engine, path.Replace("/global/default/images/", "/global/default/assets/"), HashGuessStrategy.LcuPattern, source);
+                    checkedCount += 2;
+                }
+                else if (path.Contains("/global/default/assets/"))
+                {
+                    Check(engine, path.Replace("/global/default/assets/", "/global/default/"), HashGuessStrategy.LcuPattern, source);
+                    Check(engine, path.Replace("/global/default/assets/", "/global/default/images/"), HashGuessStrategy.LcuPattern, source);
+                    checkedCount += 2;
                 }
                 else if (path.Contains("/global/default/"))
                 {
-                    string mirror = path.Replace("/global/default/", "/global/default/images/");
-                    Check(engine, mirror, HashGuessStrategy.LcuPattern, source);
-                    checkedCount++;
+                    Check(engine, path.Replace("/global/default/", "/global/default/images/"), HashGuessStrategy.LcuPattern, source);
+                    Check(engine, path.Replace("/global/default/", "/global/default/assets/"), HashGuessStrategy.LcuPattern, source);
+                    checkedCount += 2;
                 }
 
                 if ((checkedCount & 0x1fff) == 0)
@@ -788,7 +794,20 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCandidates += count;
             }
 
-            // Phase 2: Universal Modifier Matrix across all plugins
+            // Phase 2: Deep Directory Mirroring (/images/, /assets/, root)
+            if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-mirroring"))
+            {
+                string stage = "LCU Custom: Directory mirroring";
+                progress?.Report(engine.CreateProgress(stage, checkedCandidates));
+                int count = MirrorDirectories(
+                    engine,
+                    cancellationToken,
+                    candidateBudget: int.MaxValue,
+                    progress: current => ReportCustomThrottled(stage, checkedCandidates + current));
+                checkedCandidates += count;
+            }
+
+            // Phase 3: Universal Modifier Matrix across all plugins
             if (engine.RemainingUnknownCount > 0 && ShouldRun("lcu-custom-modifiers"))
             {
                 string stage = "LCU Custom: Universal modifier attack";

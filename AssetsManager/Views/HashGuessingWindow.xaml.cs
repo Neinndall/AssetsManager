@@ -194,7 +194,7 @@ namespace AssetsManager.Views
                 Id = "lcu-custom",
                 DomainIndex = 1,
                 Name = "LCU Custom Guess",
-                Description = "Targeted client attacks: Scoped Plugins and Universal UI Modifiers.",
+                Description = "Targeted client attacks: Scoped Plugins, Directory Mirroring and Universal UI Modifiers.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.FlaskOutline,
                 BadgeText = "🚀 FAST (~15s)",
@@ -202,6 +202,7 @@ namespace AssetsManager.Views
                 EstimatedTime = "~15s"
             };
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-scoped", Name = "GuessScopedPlugins", Description = "Intra-plugin directory topology, vocabulary, numeric ranges & component synthesis", BadgeText = "⚡ ~5s", BadgeBrush = accentTeal });
+            lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-mirroring", Name = "MirrorDirectories", Description = "Deep directory mirroring across /images/, /assets/, and root structures", BadgeText = "⚡ ~1s", BadgeBrush = accentPurple });
             lcuCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-custom-modifiers", Name = "GuessUniversalModifiers", Description = "Riot UI states (hover, active, disabled, tier1-4, mini, lg)", BadgeText = "⚡ ~2s", BadgeBrush = accentBrush });
             _allMethods.Add(lcuCustom);
 
@@ -210,7 +211,7 @@ namespace AssetsManager.Views
                 Id = "lcu-basic",
                 DomainIndex = 1,
                 Name = "LCU Basic Suite",
-                Description = "Directory mirroring, structural client patterns, plugin variants & GAME cross-domain.",
+                Description = "Structural client patterns, plugin variants, numeric sequences & GAME cross-domain.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.FileCabinet,
                 BadgeText = "🚀 FAST (~10s)",
@@ -219,7 +220,6 @@ namespace AssetsManager.Views
             };
             lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-extensions", Name = "SubstituteExtensions", Description = "Permutations across client file extensions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-patterns", Name = "GuessKnownPatterns", Description = "Common structural client URL patterns", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
-            lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-mirroring", Name = "MirrorDirectories", Description = "Mirroring folder structures across client plugins", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-crossdomain", Name = "GuessFromGameHashes", Description = "Game paths mapped into LCU plugins", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-plugins", Name = "SubstitutePlugins", Description = "Substitutions across rcp-fe-* and rcp-be-*", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             lcuBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "lcu-basic-numbers", Name = "SubstituteNumbers", Description = "Numeric sequences (1 to 10,000)", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
