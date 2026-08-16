@@ -1977,10 +1977,34 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (remaining.Count == 0) yield break;
 
             var attemptedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var (prefixes, suffixes) = GetDynamicAnimationAffixes();
+
             foreach (string name in EnumerateAnimationNameCandidates(character, links, remaining))
             {
                 if (!attemptedNames.Add(name)) continue;
-                foreach (string path in MatchAnimationVariants(name, character, skin, remaining))
+                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, prefixes, suffixes))
+                    yield return path;
+                if (remaining.Count == 0) yield break;
+            }
+
+            if (remaining.Count == 0) yield break;
+
+            IReadOnlyList<string> contextualNames = GetAnimationNames(character, contextual: true);
+            IReadOnlyList<string> sourceNames = contextualNames.Count > 0
+                ? contextualNames
+                : GetAnimationNames(character, contextual: false);
+
+            foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
+                         sourceNames.Where(name => name.Any(char.IsDigit)).Select(name => $"animations/{name}"),
+                         AnimationNumberLimit,
+                         int.MaxValue,
+                         digits: null,
+                         inferDigits: false,
+                         includeCommonPadding: false))
+            {
+                string name = GetBasename(candidate.Path);
+                if (!attemptedNames.Add(name)) continue;
+                foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers))
                     yield return path;
                 if (remaining.Count == 0) yield break;
             }
@@ -2039,21 +2063,26 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 foreach (string prefix in prefixes)
                 {
+                    uint prefixHash = Fnv1aIncremental.Append(Fnv1aIncremental.Hash(prefix), [(byte)'_']);
                     foreach (string word in characterWords)
                     {
-                        string stem = prefix + "_" + word;
-                        if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
+                        byte[] wordBytes = Encoding.UTF8.GetBytes(word.ToLowerInvariant());
+                        uint stemHash = Fnv1aIncremental.Append(prefixHash, wordBytes);
+                        if (nameHashes.Contains(stemHash)) yield return prefix + "_" + word;
 
+                        uint stem2BaseHash = Fnv1aIncremental.Append(stemHash, [(byte)'_']);
                         foreach (string word2 in characterWords)
                         {
-                            string stem2 = prefix + "_" + word + "_" + word2;
-                            if (nameHashes.Contains(Fnv1a.HashLower(stem2))) yield return stem2;
+                            byte[] word2Bytes = Encoding.UTF8.GetBytes(word2.ToLowerInvariant());
+                            if (nameHashes.Contains(Fnv1aIncremental.Append(stem2BaseHash, word2Bytes)))
+                                yield return prefix + "_" + word + "_" + word2;
                         }
 
                         foreach (string word2 in words)
                         {
-                            string stem2 = prefix + "_" + word + "_" + word2;
-                            if (nameHashes.Contains(Fnv1a.HashLower(stem2))) yield return stem2;
+                            byte[] word2Bytes = Encoding.UTF8.GetBytes(word2.ToLowerInvariant());
+                            if (nameHashes.Contains(Fnv1aIncremental.Append(stem2BaseHash, word2Bytes)))
+                                yield return prefix + "_" + word + "_" + word2;
                         }
                     }
                 }
@@ -2063,17 +2092,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 foreach (string name in GetAnimationNames(character, contextual: false).Take(1000))
                     yield return name;
-            }
-
-            foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
-                         sourceNames.Where(name => name.Any(char.IsDigit)).Select(name => $"animations/{name}"),
-                         AnimationNumberLimit,
-                         int.MaxValue,
-                         digits: null,
-                         inferDigits: false,
-                         includeCommonPadding: false))
-            {
-                yield return GetBasename(candidate.Path);
             }
         }
 
@@ -2121,13 +2139,46 @@ namespace AssetsManager.Services.Hashes.Guessers
             return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private static IEnumerable<string> MatchAnimationVariants(
+        private (IReadOnlyList<string> Prefixes, IReadOnlyList<string> Suffixes) GetDynamicAnimationAffixes()
+        {
+            return Corpus.GetOrCreate("dynamic-animation-affixes", knownPaths =>
+            {
+                var prefixes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var suffixes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (string path in knownPaths)
+                {
+                    if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
+                    string stem = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+                    int first = stem.IndexOf('_');
+                    if (first > 0 && first < stem.Length - 1 && path.Contains($"/{stem[..first]}/", StringComparison.OrdinalIgnoreCase))
+                        stem = stem[(first + 1)..];
+
+                    first = stem.IndexOf('_');
+                    if (first > 0 && first <= 16)
+                        prefixes[stem[..(first + 1)]] = prefixes.GetValueOrDefault(stem[..(first + 1)]) + 1;
+
+                    int last = stem.LastIndexOf('_');
+                    if (last >= 0 && last < stem.Length - 1 && (stem.Length - last) <= 16)
+                        suffixes[stem[last..]] = suffixes.GetValueOrDefault(stem[last..]) + 1;
+                }
+
+                static IReadOnlyList<string> Top(Dictionary<string, int> dict) =>
+                    new[] { "" }.Concat(dict.OrderByDescending(kv => kv.Value).Take(10).Select(kv => kv.Key)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+                return (Top(prefixes), Top(suffixes));
+            });
+        }
+
+        private IEnumerable<string> MatchAnimationVariants(
             string name,
             string character,
             string skin,
-            ISet<ulong> remaining)
+            ISet<ulong> remaining,
+            IReadOnlyList<string> prefixes = null,
+            IReadOnlyList<string> suffixes = null)
         {
-            foreach (string path in EnumerateAnimationNameVariants(character, skin, name))
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, name, prefixes, suffixes))
             {
                 if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
                     yield return path;
@@ -2135,33 +2186,28 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             string converted = AnimationSkinTokenRegex.Replace(name, skin);
             if (converted.Equals(name, StringComparison.OrdinalIgnoreCase)) yield break;
-            foreach (string path in EnumerateAnimationNameVariants(character, skin, converted))
+            foreach (string path in EnumerateAnimationNameVariants(character, skin, converted, prefixes, suffixes))
                 if (remaining.Remove(XxHash64Ext.Hash(PathUtils.NormalizePath(path))))
                     yield return path;
         }
 
-        private static IEnumerable<string> EnumerateAnimationNameVariants(string character, string skin, string name)
+        private static IEnumerable<string> EnumerateAnimationNameVariants(
+            string character,
+            string skin,
+            string name,
+            IReadOnlyList<string> prefixModifiers = null,
+            IReadOnlyList<string> suffixModifiers = null)
         {
             string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
             if (string.IsNullOrWhiteSpace(stem) || stem.Contains('/') || stem.Contains('\\')) yield break;
             stem = stem.ToLowerInvariant();
 
-            string paddedSkin = skin;
-            if (Regex.IsMatch(skin, @"^skin\d$"))
-                paddedSkin = "skin0" + skin[4..];
-            else if (Regex.IsMatch(skin, @"^skin0\d$"))
-                paddedSkin = "skin" + skin[5..];
-
-            string[] skinsToTry = string.Equals(skin, paddedSkin, StringComparison.OrdinalIgnoreCase)
-                ? new[] { skin }
-                : new[] { skin, paddedSkin };
-
-            string[] prefixModifiers = { "", "recallin_", "recall_", "respawn_", "death_", "idle_", "run_", "attack_" };
-            string[] suffixModifiers = { "", "_stage", "_homeguard", "_hookup", "_loop", "_in", "_out", "_channel", "_dash", "_impact" };
+            string paddedSkin = Regex.IsMatch(skin, @"^skin\d$") ? "skin0" + skin[4..] : (Regex.IsMatch(skin, @"^skin0\d$") ? "skin" + skin[5..] : skin);
+            string[] skinsToTry = string.Equals(skin, paddedSkin, StringComparison.OrdinalIgnoreCase) ? new[] { skin } : new[] { skin, paddedSkin };
 
             foreach (string sk in skinsToTry)
-            foreach (string pre in prefixModifiers)
-            foreach (string suf in suffixModifiers)
+            foreach (string pre in prefixModifiers ?? DefaultPrefixModifiers)
+            foreach (string suf in suffixModifiers ?? DefaultSuffixModifiers)
             {
                 string s = pre + stem + suf;
                 foreach (string root in AnimationRootPrefixes)
@@ -2173,6 +2219,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
         }
+
+        private static readonly string[] DefaultPrefixModifiers = { "" };
+        private static readonly string[] DefaultSuffixModifiers = { "" };
 
         private static readonly string[] AnimationRootPrefixes = { "assets", "data" };
 

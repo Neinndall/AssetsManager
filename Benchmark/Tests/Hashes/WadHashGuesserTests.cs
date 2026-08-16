@@ -2436,5 +2436,30 @@ namespace AssetsManager.BenchmarkTests.Services.Hashes
             AssertResolved(petEngine, petTierPath);
         }
 
+        [Fact]
+        public void GameAnimationBinLinksUseDynamicCorpusAffixes()
+        {
+            const string expected = "assets/characters/evelynn/skins/skin01/animations/evelynn_recallin_respawn_idle_hookup.anm";
+            var resolvedNames = new Dictionary<uint, string>
+            {
+                [Fnv1a.HashLower("respawn_idle")] = "respawn_idle"
+            };
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/ahri/skins/skin0/animations/ahri_recallin_intro.anm",
+                "assets/characters/akali/skins/skin0/animations/akali_run_hookup.anm"
+            }), null, hash => resolvedNames.GetValueOrDefault(hash));
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin("respawn_idle", XxHash64Ext.Hash(expected))),
+                "data/characters/evelynn/animations/skin1.bin",
+                "Evelynn.wad.client",
+                1);
+
+            AssertResolved(engine, expected);
+        }
+
     }
 }
