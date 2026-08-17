@@ -30,6 +30,7 @@ namespace AssetsManager.Views.Controls.Monitor
         public DirectoriesCreator DirectoriesCreator { get; set; }
 
         private DispatcherTimer _lcuConnectionTimer;
+        private Task _cachedDataLoadTask;
 
         // The state model for this view (Container Pattern: Owner)
         private readonly ApiModel _viewModel;
@@ -73,11 +74,24 @@ namespace AssetsManager.Views.Controls.Monitor
                 _lcuConnectionTimer.Start();
             }
 
-            // Explicit calls for each module's cache
-            await LoadSalesCacheAsync();
-            await LoadMythicShopCacheAsync();
-            await LoadPassRewardsCacheAsync();
-            await LoadAvailablePassesAsync();
+            // Cache data is loaded once when API Center is first opened. The image
+            // extraction methods already run off the UI thread and reuse local files.
+            await EnsureCachedDataLoadedAsync();
+        }
+
+        private Task EnsureCachedDataLoadedAsync()
+        {
+            return _cachedDataLoadTask ??= LoadCachedDataOnceAsync();
+        }
+
+        private async Task LoadCachedDataOnceAsync()
+        {
+            await Task.WhenAll(
+                LoadSalesCacheAsync(),
+                LoadMythicShopCacheAsync(),
+                LoadPassRewardsCacheAsync(),
+                LoadAvailablePassesAsync()
+            );
         }
 
         private async Task LoadAvailablePassesAsync()
@@ -121,8 +135,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 var progJson = await File.ReadAllTextAsync(progPath);
                 var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
 
-                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
-                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+                var prog = await Task.Run(() => JsonSerializer.Deserialize<ProgressionResponse>(progJson));
+                var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
 
                 if (prog != null && rewards != null)
                 {
@@ -135,14 +149,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(async () =>
-            {
-                UpdateAuthenticationStatus();
-                // Refresh caches if the paths might have changed
-                await LoadSalesCacheAsync();
-                await LoadMythicShopCacheAsync();
-                await LoadPassRewardsCacheAsync();
-            });
+            await Dispatcher.InvokeAsync(UpdateAuthenticationStatus);
         }
 
         private async Task LoadSalesCacheAsync()
@@ -153,7 +160,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 string json = await File.ReadAllTextAsync(filePath);
-                var catalog = JsonSerializer.Deserialize<SalesCatalog>(json);
+                var catalog = await Task.Run(() => JsonSerializer.Deserialize<SalesCatalog>(json));
                 if (catalog?.Catalog != null)
                 {
                     var salesItems = catalog.Catalog.Where(i => i.InventoryType == "CHAMPION_SKIN" && i.Sale != null && i.SubInventoryType != "RECOLOR").ToList();
@@ -172,7 +179,7 @@ namespace AssetsManager.Views.Controls.Monitor
             try
             {
                 string json = await File.ReadAllTextAsync(filePath);
-                var response = JsonSerializer.Deserialize<MythicShopResponse>(json);
+                var response = await Task.Run(() => JsonSerializer.Deserialize<MythicShopResponse>(json));
                 if (response != null) ProcessMythicShopData(response);
             }
             catch (Exception ex) { LogService.LogError(ex, "Failed to load mythic shop cache."); }
@@ -190,8 +197,8 @@ namespace AssetsManager.Views.Controls.Monitor
                 var progJson = await File.ReadAllTextAsync(progPath);
                 var rewardsJson = await File.ReadAllTextAsync(rewardsPath);
 
-                var prog = JsonSerializer.Deserialize<ProgressionResponse>(progJson);
-                var rewards = JsonSerializer.Deserialize<RewardsResponse>(rewardsJson);
+                var prog = await Task.Run(() => JsonSerializer.Deserialize<ProgressionResponse>(progJson));
+                var rewards = await Task.Run(() => JsonSerializer.Deserialize<RewardsResponse>(rewardsJson));
 
                 if (prog != null && rewards != null)
                 {

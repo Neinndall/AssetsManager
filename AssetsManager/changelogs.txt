@@ -66,6 +66,7 @@ New Features
 
 Fixes
   - Monitor / Mythic Shop now displays portrait and Classic Pass images instead of placeholders.
+  - Monitor now creates only the selected tab, preventing API Center cache work from running during Dashboard startup.
   - Version Manager now uses the unified 100 ms visual hold between verification and update completion phases.
   - Version downloads now wait for their final progress state before completing verification and update actions.
   - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
@@ -77,6 +78,7 @@ Fixes
 
 Improvements
   - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.
+  - API Center now loads sales, Mythic Shop, and pass caches once per view in background work and reuses them when switching tabs.
   - VFX Studio now labels its preview loop control more concisely.
   - VFX Studio now keeps its workspace focused on the viewport, emitters, textures, and meshes while authored ability sequences continue to play automatically.
   - VFX Studio now presents preview looping as a clear on/off transport control that remains active while changing effects.
