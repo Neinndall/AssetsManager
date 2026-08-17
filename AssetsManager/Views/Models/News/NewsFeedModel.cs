@@ -15,12 +15,12 @@ namespace AssetsManager.Views.Models.News
         public List<NewsCategoryOption> Categories { get; } = new()
         {
             new NewsCategoryOption { Category = NewsCategory.AllNews, Name = "All News", Accent = GetBrush("AccentBrush") },
-            new NewsCategoryOption { Category = NewsCategory.Dev, Name = "Dev News", Accent = GetBrush("AccentBlue") },
-            new NewsCategoryOption { Category = NewsCategory.Esports, Name = "Esports", Accent = GetBrush("AccentOrange") },
             new NewsCategoryOption { Category = NewsCategory.GameUpdates, Name = "Game Updates", Accent = GetBrush("AccentGreen") },
-            new NewsCategoryOption { Category = NewsCategory.Lore, Name = "Lore", Accent = GetBrush("AccentPurple") },
+            new NewsCategoryOption { Category = NewsCategory.Esports, Name = "Esports", Accent = GetBrush("AccentOrange") },
+            new NewsCategoryOption { Category = NewsCategory.Dev, Name = "Dev News", Accent = GetBrush("AccentBlue") },
             new NewsCategoryOption { Category = NewsCategory.Media, Name = "Media", Accent = GetBrush("AccentRed") },
-            new NewsCategoryOption { Category = NewsCategory.PatchNotes, Name = "Patch Notes", Accent = GetBrush("AccentYellow") }
+            new NewsCategoryOption { Category = NewsCategory.Community, Name = "Community", Accent = GetBrush("AccentBrush") },
+            new NewsCategoryOption { Category = NewsCategory.Merch, Name = "Merch", Accent = GetBrush("AccentTeal") }
         };
 
         private NewsCategoryOption _selectedCategory;

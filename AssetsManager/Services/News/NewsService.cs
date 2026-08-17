@@ -268,7 +268,7 @@ namespace AssetsManager.Services.News
         private async Task<List<NewsItemModel>> FetchAsync(NewsCategory category, CancellationToken cancellationToken)
         {
             // Fetch more items when filtering by category to ensure we get enough results
-            int limit = category == NewsCategory.AllNews ? MaxItemsPerCategory : 50;
+            int limit = category == NewsCategory.AllNews ? MaxItemsPerCategory : 200;
             string url = $"{NewsApiUrl}?locale=en_US&from=0&limit={limit}";
             var items = new List<NewsItemModel>();
             try
@@ -293,16 +293,13 @@ namespace AssetsManager.Services.News
                     return items;
                 }
 
-                string categoryFilter = GetCategoryMachineName(category);
-
                 foreach (var element in array.EnumerateArray())
                 {
                     var item = NewsItemModel.FromJson(element);
                     if (item == null) continue;
 
                     // Client-side category filtering
-                    if (categoryFilter != null &&
-                        !string.Equals(item.CategoryId, categoryFilter, StringComparison.OrdinalIgnoreCase))
+                    if (!MatchesCategory(item, category))
                     {
                         continue;
                     }
@@ -318,18 +315,26 @@ namespace AssetsManager.Services.News
             return items;
         }
 
+        private static bool MatchesCategory(NewsItemModel item, NewsCategory category)
+        {
+            if (category == NewsCategory.AllNews) return true;
+
+            string categoryFilter = GetCategoryMachineName(category);
+            return categoryFilter != null && string.Equals(item.CategoryId, categoryFilter, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// Maps a NewsCategory enum to the Riot API category machineName for client-side filtering.
         /// Returns null for AllNews (no filtering).
         /// </summary>
         private static string GetCategoryMachineName(NewsCategory category) => category switch
         {
-            NewsCategory.Dev => "dev",
-            NewsCategory.Esports => "esports",
             NewsCategory.GameUpdates => "game-updates",
-            NewsCategory.Lore => "lore",
+            NewsCategory.Esports => "esports",
+            NewsCategory.Dev => "dev",
             NewsCategory.Media => "media",
-            NewsCategory.PatchNotes => "patch_notes",
+            NewsCategory.Community => "community",
+            NewsCategory.Merch => "merch",
             _ => null // AllNews: no filter
         };
 

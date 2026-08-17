@@ -68,9 +68,9 @@ namespace AssetsManager.Views
                 "dev" => NewsCategory.Dev,
                 "esports" => NewsCategory.Esports,
                 "game-updates" => NewsCategory.GameUpdates,
-                "lore" => NewsCategory.Lore,
                 "media" => NewsCategory.Media,
-                "patch_notes" => NewsCategory.PatchNotes,
+                "community" => NewsCategory.Community,
+                "merch" => NewsCategory.Merch,
                 _ => NewsCategory.AllNews
             };
         }

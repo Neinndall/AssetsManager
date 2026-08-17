@@ -5,12 +5,12 @@ namespace AssetsManager.Views.Models.News
     public enum NewsCategory
     {
         AllNews,
-        Dev,
-        Esports,
         GameUpdates,
-        Lore,
+        Esports,
+        Dev,
         Media,
-        PatchNotes
+        Community,
+        Merch
     }
 
     public class NewsCategoryOption
