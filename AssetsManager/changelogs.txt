@@ -65,6 +65,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Fixes
+  - Monitor / Mythic Shop now displays portrait and Classic Pass images instead of placeholders.
   - Version Manager now uses the unified 100 ms visual hold between verification and update completion phases.
   - Version downloads now wait for their final progress state before completing verification and update actions.
   - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
@@ -75,6 +76,7 @@ Fixes
   - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
 
 Improvements
+  - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.
   - VFX Studio now labels its preview loop control more concisely.
   - VFX Studio now keeps its workspace focused on the viewport, emitters, textures, and meshes while authored ability sequences continue to play automatically.
   - VFX Studio now presents preview looping as a clear on/off transport control that remains active while changing effects.

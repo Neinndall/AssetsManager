@@ -25,10 +25,7 @@ namespace AssetsManager.Services.Monitor
         private readonly WadContentProvider _wadContentProvider;
         private readonly SemaphoreSlim _extractionSemaphore = new(1, 1);
 
-        private Dictionary<string, string> _skinNamePathMap;
-        private Dictionary<string, string> _emoteNamePathMap;
-        private Dictionary<string, string> _wardNamePathMap;
-        private Dictionary<string, string> _iconNamePathMap;
+        private Dictionary<string, string> _assetPathMap;
         private readonly Dictionary<string, string> _localEndpoints;
         private readonly Dictionary<string, string> _remoteEndpoints;
 
@@ -44,53 +41,62 @@ namespace AssetsManager.Services.Monitor
             // Pattern: Thread-safe one-time initialization task
             return _metadataLoadTask ??= Task.Run(async () =>
             {
-                _skinNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _emoteNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _wardNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                _iconNamePathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                _assetPathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
                 string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
                 if (string.IsNullOrEmpty(lolDirectory)) return;
 
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
 
-                // Mapping definitions to our internal dictionaries
+                // Each catalog supplies the JSON path, name field, and image field.
                 var catalogs = new[] {
-                    new { Info = RiotCatalogDefinitions.SkinCatalog, Map = _skinNamePathMap },
-                    new { Info = RiotCatalogDefinitions.EmoteCatalog, Map = _emoteNamePathMap },
-                    new { Info = RiotCatalogDefinitions.WardCatalog, Map = _wardNamePathMap },
-                    new { Info = RiotCatalogDefinitions.IconCatalog, Map = _iconNamePathMap }
+                    RiotCatalogDefinitions.SkinCatalog,
+                    RiotCatalogDefinitions.EmoteCatalog,
+                    RiotCatalogDefinitions.WardCatalog,
+                    RiotCatalogDefinitions.IconCatalog,
+                    RiotCatalogDefinitions.PortraitCatalog,
+                    RiotCatalogDefinitions.LootCatalog,
+                    RiotCatalogDefinitions.EventPassCatalog,
+                    RiotCatalogDefinitions.NexusFinisherCatalog
                 };
                 var catalogNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(
-                    catalogs.Select(catalog => catalog.Info.Path),
+                    catalogs.Select(catalog => catalog.Path),
                     pluginPath);
 
                 foreach (var catalog in catalogs)
                 {
                     try
                     {
-                        if (!catalogNodes.TryGetValue(catalog.Info.Path, out var node)) continue;
+                        if (!catalogNodes.TryGetValue(catalog.Path, out var node)) continue;
 
                         byte[] jsonData = await _wadContentProvider.GetVirtualFileBytesAsync(node);
                         if (jsonData == null) continue;
 
                         using var doc = JsonDocument.Parse(jsonData);
-                        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                        JsonElement root = doc.RootElement;
+                        if (root.ValueKind == JsonValueKind.Object
+                            && root.TryGetProperty("LootItems", out var lootItems))
                         {
-                            foreach (var item in doc.RootElement.EnumerateArray())
-                                AddEntryToMap(item, catalog.Map, catalog.Info.NameKey, catalog.Info.PathKey);
+                            root = lootItems;
                         }
-                        else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+
+                        if (root.ValueKind == JsonValueKind.Array)
                         {
-                            foreach (var property in doc.RootElement.EnumerateObject())
-                                AddEntryToMap(property.Value, catalog.Map, catalog.Info.NameKey, catalog.Info.PathKey);
+                            foreach (var item in root.EnumerateArray())
+                                AddEntryToMap(item, _assetPathMap, catalog.NameKey, catalog.PathKey);
+                        }
+                        else if (root.ValueKind == JsonValueKind.Object)
+                        {
+                            foreach (var property in root.EnumerateObject())
+                                AddEntryToMap(property.Value, _assetPathMap, catalog.NameKey, catalog.PathKey);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logService.LogError(ex, $"Error loading metadata for {catalog.Info.Path}");
+                        _logService.LogError(ex, $"Error loading metadata for {catalog.Path}");
                     }
                 }
+
             });
         }
 
@@ -101,29 +107,10 @@ namespace AssetsManager.Services.Monitor
                 string name = nameProp.GetString();
                 if (string.IsNullOrEmpty(name)) return;
 
-                // Intentamos la clave principal
                 if (element.TryGetProperty(pathKey, out var pathProp))
                 {
                     string path = pathProp.GetString();
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        map[name] = path;
-                        return;
-                    }
-                }
-
-                // Fallback para iconos que pueden usar imagePath o iconPath indistintamente
-                if (pathKey == "imagePath" || pathKey == "iconPath")
-                {
-                    string fallbackKey = pathKey == "imagePath" ? "iconPath" : "imagePath";
-                    if (element.TryGetProperty(fallbackKey, out var fallbackProp))
-                    {
-                        string path = fallbackProp.GetString();
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            map[name] = path;
-                        }
-                    }
+                    if (!string.IsNullOrEmpty(path)) map.TryAdd(name, path);
                 }
             }
         }
@@ -135,13 +122,8 @@ namespace AssetsManager.Services.Monitor
             await LoadMetadataMapsAsync();
 
             string cleanedName = PathUtils.CleanRiotName(name);
-            var maps = new[] { _skinNamePathMap, _emoteNamePathMap, _wardNamePathMap, _iconNamePathMap };
-
-            foreach (var map in maps)
-            {
-                if (map.TryGetValue(name, out var path)) return path;
-                if (cleanedName != name && map.TryGetValue(cleanedName, out var cleanedPath)) return cleanedPath;
-            }
+            if (_assetPathMap.TryGetValue(name, out var path)) return path;
+            if (cleanedName != name && _assetPathMap.TryGetValue(cleanedName, out var cleanedPath)) return cleanedPath;
 
             return null;
         }

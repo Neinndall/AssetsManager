@@ -500,7 +500,7 @@ namespace AssetsManager.Views.Controls.Monitor
                             foreach (var entry in section.CatalogEntries)
                             {
                                 var purchaseUnit = entry.PurchaseUnits.FirstOrDefault();
-                                if (purchaseUnit == null) continue;
+                                if (purchaseUnit == null || purchaseUnit.Fulfillment == null) continue;
 
                                 var payment = purchaseUnit.PaymentOptions.FirstOrDefault()?.Payments.FirstOrDefault();
                                 if (payment == null) continue;
@@ -551,7 +551,7 @@ namespace AssetsManager.Views.Controls.Monitor
                         string name = (string)nameProperty.GetValue(item);
                         if (string.IsNullOrEmpty(name)) continue;
 
-                        // Unified lookup for skins, emotes, wards, and icons
+                        // Unified lookup for all catalog-backed Mythic items.
                         var assetPath = await RiotApiService.GetMythicAssetPathAsync(name);
                         
                         if (!string.IsNullOrEmpty(assetPath))
