@@ -14,7 +14,7 @@ namespace AssetsManager.Services.News
 {
     public class NewsService
     {
-        private const string NewsApiBaseUrl = "https://soraclee.github.io/riotgames-news-api/data/lol/";
+        private const string NewsApiUrl = "https://content.publishing.riotgames.com/publishing-content/v2.0/public/channel/league_of_legends_website/list/lol_news_page_list";
         public const string BrowserUserAgent =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
         private const int MaxSeenEntries = 1000;
@@ -267,7 +267,9 @@ namespace AssetsManager.Services.News
 
         private async Task<List<NewsItemModel>> FetchAsync(NewsCategory category, CancellationToken cancellationToken)
         {
-            string url = NewsApiBaseUrl + GetEndpoint(category);
+            // Fetch more items when filtering by category to ensure we get enough results
+            int limit = category == NewsCategory.AllNews ? MaxItemsPerCategory : 50;
+            string url = $"{NewsApiUrl}?locale=en_US&from=0&limit={limit}";
             var items = new List<NewsItemModel>();
             try
             {
@@ -276,12 +278,36 @@ namespace AssetsManager.Services.News
                 await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
 
-                if (doc.RootElement.ValueKind != JsonValueKind.Array) return items;
+                // Official API wraps articles in { "data": [...] }
+                JsonElement array;
+                if (doc.RootElement.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                {
+                    array = dataElement;
+                }
+                else if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    array = doc.RootElement;
+                }
+                else
+                {
+                    return items;
+                }
 
-                foreach (var element in doc.RootElement.EnumerateArray())
+                string categoryFilter = GetCategoryMachineName(category);
+
+                foreach (var element in array.EnumerateArray())
                 {
                     var item = NewsItemModel.FromJson(element);
-                    if (item != null) items.Add(item);
+                    if (item == null) continue;
+
+                    // Client-side category filtering
+                    if (categoryFilter != null &&
+                        !string.Equals(item.CategoryId, categoryFilter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    items.Add(item);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -291,6 +317,21 @@ namespace AssetsManager.Services.News
             }
             return items;
         }
+
+        /// <summary>
+        /// Maps a NewsCategory enum to the Riot API category machineName for client-side filtering.
+        /// Returns null for AllNews (no filtering).
+        /// </summary>
+        private static string GetCategoryMachineName(NewsCategory category) => category switch
+        {
+            NewsCategory.Dev => "dev",
+            NewsCategory.Esports => "esports",
+            NewsCategory.GameUpdates => "game-updates",
+            NewsCategory.Lore => "lore",
+            NewsCategory.Media => "media",
+            NewsCategory.PatchNotes => "patch_notes",
+            _ => null // AllNews: no filter
+        };
 
         public async Task<ArticleFullContent> FetchArticleFullContentAsync(string articleUrl, CancellationToken cancellationToken = default)
         {
@@ -433,17 +474,6 @@ namespace AssetsManager.Services.News
             string result = string.Join("\n\n", lines);
             return string.IsNullOrWhiteSpace(result) ? null : result;
         }
-
-        private static string GetEndpoint(NewsCategory category) => category switch
-        {
-            NewsCategory.Dev => "devEn.json",
-            NewsCategory.Esports => "esportsEn.json",
-            NewsCategory.GameUpdates => "gameUpdatesEn.json",
-            NewsCategory.Lore => "loreEn.json",
-            NewsCategory.Media => "mediaEn.json",
-            NewsCategory.PatchNotes => "patchNoteEn.json",
-            _ => "allNewsEn.json"
-        };
 
         private sealed class CacheEntry
         {

@@ -64,21 +64,12 @@ New Features
   - Core / Centralized the GIF sequence export pipeline (frame sampling, sequence mapping and encoding) under ImageExportUtils.
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
-Fixes
-  - Monitor / Mythic Shop now displays portrait and Classic Pass images instead of placeholders.
-  - Monitor now creates only the selected tab, preventing API Center cache work from running during Dashboard startup.
-  - Version Manager now uses the unified 100 ms visual hold between verification and update completion phases.
-  - Version downloads now wait for their final progress state before completing verification and update actions.
-  - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
-  - Fixed the first backup run advancing before its final file count was rendered in the status bar.
-  - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
-  - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
-  - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
-  - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
-
 Improvements
   - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.
   - API Center now loads sales, Mythic Shop, and pass caches once per view in background work and reuses them when switching tabs.
+  - Monitor / Dashboard now implements IDisposable with proper event unsubscription, releasing service references only when leaving the Monitor view entirely.
+  - Monitor / Backups now shows a mini loading indicator with spinning icon when loading backups for the first time, matching the News loading style.
+  - News now fetches directly from the official Riot Games Publishing Content API instead of the third-party soraclee mirror, ensuring categories like Esports are always up to date.
   - VFX Studio now labels its preview loop control more concisely.
   - VFX Studio now keeps its workspace focused on the viewport, emitters, textures, and meshes while authored ability sequences continue to play automatically.
   - VFX Studio now presents preview looping as a clear on/off transport control that remains active while changing effects.
@@ -444,3 +435,15 @@ Bug Fixes
   - Fixed a texture mismatch issue where models could load incorrect textures (such as Ahri textures on Locke) due to dictionary property ordering.
   - Removed legacy static mesh loader (ScoLoadingService) and its associated file formats (.sco and .scb) to clean up the codebase.
   - Home / Fixed PBE, LIVE and LOCAL card descriptions rendering lower than the rest of the grid because the background watermark inflated the tile layout.
+  - Monitor / Mythic Shop now displays portrait and Classic Pass images instead of placeholders.
+  - Monitor now creates only the selected tab, preventing API Center cache work from running during Dashboard startup.
+  - Monitor / Dashboard now retains its full state (PBE status, Watcher metrics, Tracker data) when switching between Monitor tabs instead of resetting to blank.
+  - Monitor / Backups now retains loaded backups in memory when switching tabs, preventing a jarring reload on every tab return.
+  - Version Manager now uses the unified 100 ms visual hold between verification and update completion phases.
+  - Version downloads now wait for their final progress state before completing verification and update actions.
+  - Comparator and Explorer extraction/save now keep their final progress state visible before opening follow-up views.
+  - Fixed the first backup run advancing before its final file count was rendered in the status bar.
+  - Fixed shared GridView rows rendering diagnostic object type names instead of their authored table columns in VFX Studio.
+  - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
+  - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
+  - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
