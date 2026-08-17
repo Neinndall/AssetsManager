@@ -57,6 +57,13 @@ namespace AssetsManager.Views.Controls.Monitor
                 AppSettings.ConfigurationSaved += OnConfigurationSaved;
                 ApplyPreferredClientFilter();
             }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+                BackupManager.BackupsChanged += OnBackupsChanged;
+            }
+
             try
             {
                 await LoadBackupsAsync();
@@ -73,17 +80,18 @@ namespace AssetsManager.Views.Controls.Monitor
             {
                 AppSettings.ConfigurationSaved -= OnConfigurationSaved;
             }
+
+            if (BackupManager != null)
+            {
+                BackupManager.BackupsChanged -= OnBackupsChanged;
+            }
+
             _loadCancellation?.Cancel();
             _loadCancellation?.Dispose();
             _loadCancellation = null;
-
-            // Clear heavy data from memory when not in use
-            if (ViewModel != null)
-            {
-                ViewModel.AllBackups.Clear();
-            }
-            _loadedBackups.Clear();
         }
+
+        private async void OnBackupsChanged() => await LoadBackupsAsync();
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
@@ -98,6 +106,11 @@ namespace AssetsManager.Views.Controls.Monitor
         private async Task LoadBackupsAsync()
         {
             if (BackupManager == null) return;
+
+            if (_loadedBackups.Count == 0 && ViewModel != null)
+            {
+                ViewModel.IsLoading = true;
+            }
 
             try
             {
@@ -114,6 +127,13 @@ namespace AssetsManager.Views.Controls.Monitor
             catch (Exception ex)
             {
                 LogService.LogError(ex, "Error loading backups.");
+            }
+            finally
+            {
+                if (ViewModel != null)
+                {
+                    ViewModel.IsLoading = false;
+                }
             }
         }
 
