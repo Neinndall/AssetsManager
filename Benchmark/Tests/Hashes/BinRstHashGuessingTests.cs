@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Hashing;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -65,6 +66,128 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             Assert.Empty(matcher.Matches);
             Assert.Contains(hash, targets[InternalHashKind.BinFields]);
+        }
+
+        [Fact]
+        public async Task ContentAttackScansLooseBinFilesAndResolvesLocalFieldEvidence()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string root = bridge.CreateDirectory("Game");
+            string binDirectory = Path.Combine(root, "DATA", "FINAL", "UI.wad.client");
+            Directory.CreateDirectory(binDirectory);
+            string binPath = Path.Combine(binDirectory, "gameplay.combatoverview.bin");
+
+            const string fieldName = "SyntheticFieldName";
+            uint fieldHash = Fnv1a.HashLower(fieldName);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(
+                    Fnv1a.HashLower("SyntheticClass"),
+                    Fnv1a.HashLower("SyntheticClass"),
+                    new BinTreeProperty[] { new BinTreeString(fieldHash, fieldName) })
+            }, Array.Empty<string>());
+            await using (FileStream output = File.Create(binPath))
+                tree.Write(output);
+
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            var pathStore = new HashGuessingStore(bridge.Directories);
+            var persistence = new HashGuessPersistenceService(pathStore, store);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            using var httpClient = new HttpClient(new StaticMetaSchemaHandler());
+            var metaSchema = new MetaSchemaHashSource(httpClient, bridge.Directories, bridge.LogService);
+            var service = new BinRstHashGuessingService(store, persistence, resolver, bridge.Directories, bridge.LogService, metaSchema);
+
+            InternalHashInventory inventory = await service.BuildInventoryAsync(root, true, false, null, CancellationToken.None);
+            Assert.Equal(1, inventory.ScannedBins);
+            Assert.Contains((ulong)fieldHash, await store.LoadUnknownAsync(InternalHashKind.BinFields, CancellationToken.None));
+            string markerPath = Path.Combine(bridge.Directories.HashLabPath, "internal.bin.patch.txt");
+            string markerBeforeGuess = await File.ReadAllTextAsync(markerPath);
+            await File.WriteAllBytesAsync(Path.Combine(binDirectory, "new-unindexed.bin"), Encoding.ASCII.GetBytes("not a BIN"));
+
+            InternalHashRunResult result = await service.RunContentGuessingAsync(root, true, false, null, CancellationToken.None);
+            InternalHashGuessMatch match = Assert.Single(result.Matches, item => item.Kind == InternalHashKind.BinFields);
+            Assert.Equal(fieldName, match.Value);
+            Assert.True(match.CanPromote);
+            Assert.Equal(markerBeforeGuess, await File.ReadAllTextAsync(markerPath));
+        }
+
+        [Fact]
+        public void BinContextResolvesGenericHashLinkMaps()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            const string target = "Characters/Test/Particles/SharedTrail";
+            uint targetHash = Fnv1a.HashLower(target);
+            const uint linkedEntry = 0x12345678;
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{linkedEntry:x8} {target}{Environment.NewLine}");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(targetHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var map = new BinTreeMap(
+                Fnv1a.HashLower("unknownMap"),
+                BinPropertyType.Hash,
+                BinPropertyType.ObjectLink,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, targetHash),
+                        new BinTreeObjectLink(0, linkedEntry))
+                });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("UnknownMapOwner"), new BinTreeProperty[] { map })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "unknown-map.bin", resolver: resolver);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+            Assert.Equal(target, match.Value);
+            Assert.Equal(InternalHashEvidence.ObservedHashPair, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.Empty(targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void BinContextResolvesFieldFromResolvedHashPathLeaf()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            const string fieldName = "LinkedNode";
+            const string targetPath = "ClientStates/Test/LinkedNode";
+            uint fieldHash = Fnv1a.HashLower(fieldName);
+            uint targetHash = Fnv1a.HashLower(targetPath);
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt"),
+                $"{targetHash:x8} {targetPath}{Environment.NewLine}");
+
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinFields].Add(fieldHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(
+                    0x11111111,
+                    Fnv1a.HashLower("SyntheticOwner"),
+                    new BinTreeProperty[] { new BinTreeHash(fieldHash, targetHash) })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "linked-node.bin", resolver: resolver);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinFields, match.Kind);
+            Assert.Equal(fieldName, match.Value);
+            Assert.Equal(InternalHashEvidence.SemanticReference, match.Evidence);
+            Assert.True(match.CanPromote);
+            Assert.Empty(targets[InternalHashKind.BinFields]);
         }
 
         [Fact]
@@ -1386,6 +1509,15 @@ namespace AssetsManager.BenchmarkTests.Hashes
                     new BinTreeString(Fnv1a.HashLower(field), value)
                 })
             }, System.Array.Empty<string>());
+
+        private sealed class StaticMetaSchemaHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+                Task.FromResult(new HttpResponseMessage
+                {
+                    Content = new StringContent("{\"latest\":\"test\",\"classes\":{}}")
+                });
+        }
 
     }
 }

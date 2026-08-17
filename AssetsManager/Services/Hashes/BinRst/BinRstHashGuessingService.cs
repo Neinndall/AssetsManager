@@ -73,6 +73,7 @@ namespace AssetsManager.Services.Hashes
             if (!includeBin && !includeRst) throw new ArgumentException("At least one internal hash domain must be selected.");
             await _resolver.LoadAllHashesAsync();
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
+            string[] looseBins = includeBin ? EnumerateLooseBinFiles(rootDirectory) : Array.Empty<string>();
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             var observed = CreateObservedSets();
             int scannedBins = 0, scannedRst = 0;
@@ -157,16 +158,53 @@ namespace AssetsManager.Services.Hashes
                     progress?.Report(new InternalHashProgress
                     {
                         ProcessedWads = index + 1,
-                        TotalWads = wads.Length,
+                        TotalWads = wads.Length + looseBins.Length,
                         ProcessedFiles = scannedBins + scannedRst,
                         CurrentStage = includeBin ? "Building BIN inventory" : "Building RST inventory",
                         Elapsed = stopwatch.Elapsed
                     });
                 }
+
+                if (includeBin)
+                {
+                    for (int index = 0; index < looseBins.Length; index++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        string binPath = looseBins[index];
+                        string path = GetRelativeSourcePath(rootDirectory, binPath);
+                        try
+                        {
+                            using var stream = new FileStream(
+                                binPath,
+                                FileMode.Open,
+                                FileAccess.Read,
+                                FileShare.Read,
+                                64 * 1024,
+                                FileOptions.SequentialScan);
+                            ReadBinInventory(stream, observed);
+                            scannedBins++;
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _log.LogDebug($"Internal Hash Lab skipped loose BIN '{path}': {ex.Message}");
+                        }
+                        progress?.Report(new InternalHashProgress
+                        {
+                            ProcessedWads = wads.Length + index + 1,
+                            TotalWads = wads.Length + looseBins.Length,
+                            ProcessedFiles = scannedBins + scannedRst,
+                            CurrentStage = "Building BIN inventory",
+                            Elapsed = stopwatch.Elapsed
+                        });
+                    }
+                }
             }, cancellationToken);
 
             string inventoryDomain = includeBin ? "bin" : "rst";
-            string fingerprint = BuildFingerprint(wads, inventoryDomain, metaSchema.Version);
+            string[] fingerprintSources = includeBin
+                ? wads.Concat(looseBins).ToArray()
+                : wads;
+            string fingerprint = BuildFingerprint(fingerprintSources, inventoryDomain, metaSchema.Version);
             var selectedObserved = observed.Where(pair =>
                 (includeBin && IsBinKind(pair.Key)) ||
                 (includeRst && pair.Key is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64))
@@ -200,12 +238,14 @@ namespace AssetsManager.Services.Hashes
         {
             ValidateRoot(rootDirectory);
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
+            await _resolver.LoadAllHashesAsync();
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
-            int initial = matcher.Remaining;
             progress?.Report(CreateProgress(matcher, stopwatch, "Loading game hashes dictionary", 0));
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
+            string[] looseBins = includeBin ? EnumerateLooseBinFiles(rootDirectory) : Array.Empty<string>();
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
+            int totalSources = wads.Length + looseBins.Length;
             int scanned = 0;
             int contentStartedCandidates = matcher.CheckedCandidates > int.MaxValue
                 ? int.MaxValue
@@ -217,7 +257,7 @@ namespace AssetsManager.Services.Hashes
             {
                 await Task.Run(() =>
                 {
-                    progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN context files", 0, 0, wads.Length));
+                    progress?.Report(CreateProgress(matcher, stopwatch, "Scanning BIN context files", 0, 0, totalSources));
                     for (int index = 0; index < wads.Length && matcher.Remaining > 0 && !ContentBudgetExceeded(); index++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -288,7 +328,40 @@ namespace AssetsManager.Services.Hashes
                             _log.LogError(ex, $"Internal Hash Lab could not scan WAD '{wadPath}'.");
                         }
                         string stageText = includeBin ? "Scanning BIN context files" : "Scanning RST text content";
-                        progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, wads.Length));
+                        progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, totalSources));
+                    }
+
+                    if (includeBin)
+                    {
+                        for (int index = 0; index < looseBins.Length && matcher.Remaining > 0 && !ContentBudgetExceeded(); index++)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            string binPath = looseBins[index];
+                            string path = GetRelativeSourcePath(rootDirectory, binPath);
+                            try
+                            {
+                                using var stream = new FileStream(
+                                    binPath,
+                                    FileMode.Open,
+                                    FileAccess.Read,
+                                    FileShare.Read,
+                                    64 * 1024,
+                                    FileOptions.SequentialScan);
+                                BinContentEvidenceSource.ScanBinContextualMatches(stream, matcher, path, null, _resolver);
+                                scanned++;
+                            }
+                            catch (Exception ex) when (ex is not OperationCanceledException)
+                            {
+                                _log.LogDebug($"Internal Hash Lab could not scan loose BIN '{path}': {ex.Message}");
+                            }
+                            progress?.Report(CreateProgress(
+                                matcher,
+                                stopwatch,
+                                "Scanning BIN context files",
+                                scanned,
+                                wads.Length + index + 1,
+                                totalSources));
+                        }
                     }
                 }, cancellationToken);
 
@@ -331,7 +404,9 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
                 }
-                if (includeBin && matcher.GetRemainingCount(InternalHashKind.BinEntries) > 0)
+                if (includeBin &&
+                    (matcher.GetRemainingCount(InternalHashKind.BinEntries) > 0 ||
+                     matcher.GetRemainingCount(InternalHashKind.BinHashes) > 0))
                 {
                     string gameHashesPath = Path.Combine(_directories.HashesPath, "hashes.game.txt");
                     if (File.Exists(gameHashesPath))
@@ -344,7 +419,7 @@ namespace AssetsManager.Services.Hashes
                     }
                 }
                 progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", scanned));
-                return await CompleteRunAsync(matcher, initial, scanned);
+                return await CompleteRunAsync(matcher, scanned);
             }
             catch (OperationCanceledException)
             {
@@ -365,7 +440,6 @@ namespace AssetsManager.Services.Hashes
             await EnsureInventoryAsync(rootDirectory, includeBin, includeRst, progress, cancellationToken);
             var matcher = await CreateMatcherAsync(includeBin, includeRst, cancellationToken);
             var stopwatch = Stopwatch.StartNew();
-            int initial = matcher.Remaining;
             progress?.Report(CreateProgress(matcher, stopwatch, "Loading catalogs", 0));
             var binKnown = new List<string>();
             foreach (InternalHashKind kind in new[] { InternalHashKind.BinEntries, InternalHashKind.BinFields, InternalHashKind.BinTypes, InternalHashKind.BinHashes })
@@ -471,7 +545,7 @@ namespace AssetsManager.Services.Hashes
 
                 int checkedCount = checkedCandidates > int.MaxValue ? int.MaxValue : (int)checkedCandidates;
                 progress?.Report(CreateProgress(matcher, stopwatch, "Saving resolved internal hashes", checkedCount));
-                return await CompleteRunAsync(matcher, initial, checkedCount);
+                return await CompleteRunAsync(matcher, checkedCount);
             }
             catch (OperationCanceledException)
             {
@@ -491,13 +565,10 @@ namespace AssetsManager.Services.Hashes
             await PersistCancelledMatchesAsync(matcher);
         }
 
-        private async Task<InternalHashRunResult> CompleteRunAsync(InternalHashEvidenceMatcher matcher, int initial, int scanned)
+        private async Task<InternalHashRunResult> CompleteRunAsync(InternalHashEvidenceMatcher matcher, int scanned)
         {
             var matches = matcher.Matches.OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
             await PersistMatchesAsync(matches);
-            int verified = matches.Count(match => match.CanPromote);
-            int candidates = matches.Count - verified;
-            _log.LogSuccess($"Internal Hash Lab completed: {verified} verified values and {candidates} candidates from {initial} unknown hashes.");
             return new InternalHashRunResult { ScannedFiles = scanned, Matches = matches };
         }
 
@@ -554,15 +625,10 @@ namespace AssetsManager.Services.Hashes
             foreach (string domain in GetSelectedDomains(includeBin, includeRst))
             {
                 bool isBinDomain = string.Equals(domain, "bin", StringComparison.Ordinal);
-                string[] wads = EnumerateWadContainers(rootDirectory, isBinDomain, !isBinDomain);
-                string schemaVersion = isBinDomain
-                    ? (await _metaSchema.GetSnapshotAsync(cancellationToken)).Version
-                    : "none";
-                string fingerprint = BuildFingerprint(wads, domain, schemaVersion);
                 string marker = Path.Combine(_directories.HashLabPath, $"internal.{domain}.patch.txt");
-                string stored = File.Exists(marker) ? (await File.ReadAllTextAsync(marker, cancellationToken)).Trim() : string.Empty;
-                if (!string.Equals(stored, fingerprint, StringComparison.Ordinal))
-                    await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
+                if (File.Exists(marker)) continue;
+
+                await BuildInventoryAsync(rootDirectory, isBinDomain, !isBinDomain, progress, cancellationToken);
             }
         }
 
@@ -597,6 +663,16 @@ namespace AssetsManager.Services.Hashes
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
+
+        private static string[] EnumerateLooseBinFiles(string rootDirectory) =>
+            Directory.EnumerateFiles(rootDirectory, "*.bin", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+        private static string GetRelativeSourcePath(string rootDirectory, string filePath) =>
+            Path.GetRelativePath(rootDirectory, filePath)
+                .Replace(Path.DirectorySeparatorChar, '/')
+                .Replace(Path.AltDirectorySeparatorChar, '/');
 
         private async Task<InternalHashEvidenceMatcher> CreateMatcherAsync(bool includeBin, bool includeRst, CancellationToken cancellationToken)
         {
@@ -772,7 +848,7 @@ namespace AssetsManager.Services.Hashes
                 ulong value = unchecked((ulong)info.Length ^ (ulong)info.LastWriteTimeUtc.Ticks);
                 xor ^= value; sum = unchecked(sum + value); count++;
             }
-            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "3" : "1";
+            string schema = string.Equals(domain, "bin", StringComparison.Ordinal) ? "4" : "1";
             return $"internal:{domain}:v{schema}:{sourceVersion}:{count}:{xor:x16}:{sum:x16}";
         }
 

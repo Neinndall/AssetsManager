@@ -249,11 +249,11 @@ namespace AssetsManager.Views
             {
                 Id = "bin-inventory",
                 DomainIndex = 2,
-                Name = "Build BIN Inventory",
-                Description = "Scan BIN runtime and active Meta Schema for unknown type and field hashes.",
-                Category = "Inventory",
-                IconKind = MaterialIconKind.FileSearchOutline,
-                BadgeText = "INVENTORY",
+                Name = "Search Unknown Hashes",
+                Description = "Scan BIN WAD chunks and loose BIN files to build the unknown hash inventory.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.Radar,
+                BadgeText = "SCAN (~3s)",
                 BadgeBrush = accentBrush,
                 EstimatedTime = "~3s"
             });
@@ -262,7 +262,7 @@ namespace AssetsManager.Views
                 Id = "bin-context",
                 DomainIndex = 2,
                 Name = "BIN Context Attack",
-                Description = "Discover hashes using verified context-linked schema values and property patterns.",
+                Description = "Discover hashes using verified BIN relationships, resolved links and property patterns.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.CodeBraces,
                 BadgeText = "🚀 FAST (~5s)",
@@ -287,11 +287,11 @@ namespace AssetsManager.Views
             {
                 Id = "rst-inventory",
                 DomainIndex = 3,
-                Name = "Build RST Inventory",
-                Description = "Parse string table assets and build the unknown RST hash inventory.",
-                Category = "Inventory",
-                IconKind = MaterialIconKind.FileSearchOutline,
-                BadgeText = "INVENTORY",
+                Name = "Search Unknown Hashes",
+                Description = "Scan RST assets and build the unknown hash inventory.",
+                Category = "Inspection",
+                IconKind = MaterialIconKind.Radar,
+                BadgeText = "SCAN (~3s)",
                 BadgeBrush = accentBrush,
                 EstimatedTime = "~3s"
             });

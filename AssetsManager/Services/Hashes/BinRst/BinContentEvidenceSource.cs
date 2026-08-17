@@ -66,6 +66,7 @@ namespace AssetsManager.Services.Hashes
         {
             MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
             MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
+            MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
             MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
             if (matcher.Remaining > 0)
             {
@@ -279,6 +280,82 @@ namespace AssetsManager.Services.Hashes
                         }
                         break;
                 }
+            }
+        }
+
+        private static void MatchResolvedHashPathLeafEvidence(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath,
+            HashResolverService resolver)
+        {
+            if (resolver == null) return;
+
+            var resolvedHashes = new Dictionary<uint, string>();
+            foreach (BinTreeObject item in tree.Objects.Values)
+                foreach (BinTreeProperty property in item.Properties.Values)
+                    Visit(property);
+            foreach (BinTreeDataOverride item in tree.DataOverrides)
+                Visit(item.Property);
+
+            void Visit(BinTreeProperty property)
+            {
+                // A number of UI BIN fields point at a named child node. When the
+                // child hash is already known, its final path component is an exact
+                // BIN field candidate (e.g. .../TooltipGroup -> TooltipGroup).
+                // This remains BIN context: it does not consult Meta Schema names.
+                if (property.NameHash != 0 && property is BinTreeHash hash &&
+                    TryGetPathLeaf(hash.Value, out string leaf))
+                {
+                    matcher.CheckContextualCandidate(
+                        InternalHashKind.BinFields,
+                        leaf,
+                        path,
+                        wadPath,
+                        property.NameHash,
+                        InternalHashEvidence.SemanticReference);
+                }
+
+                switch (property)
+                {
+                    case BinTreeStruct structure:
+                        foreach (BinTreeProperty child in structure.Properties.Values) Visit(child);
+                        break;
+                    case BinTreeContainer container:
+                        foreach (BinTreeProperty child in container.Elements) Visit(child);
+                        break;
+                    case BinTreeOptional option when option.Value != null:
+                        Visit(option.Value);
+                        break;
+                    case BinTreeMap map:
+                        foreach (var pair in map)
+                        {
+                            Visit(pair.Key);
+                            Visit(pair.Value);
+                        }
+                        break;
+                }
+            }
+
+            bool TryGetPathLeaf(uint hash, out string leaf)
+            {
+                if (!resolvedHashes.TryGetValue(hash, out string resolved))
+                {
+                    resolved = resolver.ResolveBinHashGeneral(hash);
+                    resolvedHashes[hash] = resolved;
+                }
+
+                if (string.IsNullOrWhiteSpace(resolved) ||
+                    string.Equals(resolved, hash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
+                {
+                    leaf = null;
+                    return false;
+                }
+
+                int slash = resolved.LastIndexOf('/');
+                leaf = slash >= 0 ? resolved[(slash + 1)..] : resolved;
+                return InternalHashEvidenceMatcher.IsIdentifier(leaf);
             }
         }
 
@@ -543,6 +620,18 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
+            void MatchGenericHashLinkMap(BinTreeMap map)
+            {
+                if (resolver == null || map.KeyType != BinPropertyType.Hash || map.ValueType != BinPropertyType.ObjectLink) return;
+                foreach (var pair in map)
+                {
+                    if (pair.Key is not BinTreeHash key || pair.Value is not BinTreeObjectLink link) continue;
+                    string target = resolver.ResolveBinEntry(link.Value);
+                    if (string.Equals(target, link.Value.ToString("x8"), StringComparison.Ordinal)) continue;
+                    matcher.CheckContextualCandidate(InternalHashKind.BinHashes, target, path, wadPath, key.Value);
+                }
+            }
+
             void MatchEntryPattern(uint entryHash, BinTreeObject item, string field, Func<string, string> format)
             {
                 if (TryGetString(item.Properties, field, out string value)) MatchObservedEntry(entryHash, format(value));
@@ -603,6 +692,7 @@ namespace AssetsManager.Services.Hashes
                         Visit(option.Value);
                         break;
                     case BinTreeMap map:
+                        MatchGenericHashLinkMap(map);
                         foreach (var child in map) { Visit(child.Key); Visit(child.Value); }
                         break;
                 }
@@ -631,6 +721,13 @@ namespace AssetsManager.Services.Hashes
                         foreach (BinTreeProperty child in container.Elements) VisitStrings(child, check);
                         break;
                     case BinTreeOptional option when option.Value != null: VisitStrings(option.Value, check); break;
+                    case BinTreeMap map:
+                        foreach (var pair in map)
+                        {
+                            VisitStrings(pair.Key, check);
+                            VisitStrings(pair.Value, check);
+                        }
+                        break;
                 }
             }
         }
