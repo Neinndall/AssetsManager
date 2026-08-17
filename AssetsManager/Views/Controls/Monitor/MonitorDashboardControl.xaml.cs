@@ -10,7 +10,7 @@ using AssetsManager.Views.Models.Monitor;
 
 namespace AssetsManager.Views.Controls.Monitor
 {
-    public partial class MonitorDashboardControl : UserControl
+    public partial class MonitorDashboardControl : UserControl, IDisposable
     {
         // Public properties for Service Injection from Parent Window
         private MonitorService _monitorService;
@@ -36,12 +36,10 @@ namespace AssetsManager.Views.Controls.Monitor
         public MonitorDashboardControl()
         {
             InitializeComponent();
-            Unloaded += MonitorDashboardControl_Unloaded;
         }
 
-        private void MonitorDashboardControl_Unloaded(object sender, RoutedEventArgs e)
+        public void Dispose()
         {
-            Unloaded -= MonitorDashboardControl_Unloaded;
             if (DataContext is IDisposable disposableModel)
             {
                 disposableModel.Dispose();

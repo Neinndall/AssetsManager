@@ -226,6 +226,13 @@ namespace AssetsManager.Views
         private void MonitorWindow_Unloaded(object sender, RoutedEventArgs e)
         {
             MonitorContentArea.Content = null;
+            foreach (var control in _tabControls.Values)
+            {
+                if (control is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
             _tabControls.Clear();
             _activeTab = null;
         }
