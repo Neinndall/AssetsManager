@@ -96,4 +96,22 @@
         <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
+    <!-- [WadComparisonOverviewControl.xaml] Overview display card style -->
+    <Style x:Key="OverviewDisplayCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="14,10"/>
+    </Style>
+
+    <!-- [WadComparisonOverviewControl.xaml] Overview KPI tile card style -->
+    <Style x:Key="OverviewKpiCard" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource CardBackground}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="20,16"/>
+    </Style>
+
 </ResourceDictionary>

@@ -7,6 +7,7 @@ using AssetsManager.Views.Models.Wad;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Views.Helpers;
+using Material.Icons;
 
 namespace AssetsManager.Views.Models.Dialogs.Controls
 {
@@ -21,16 +22,40 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         // 2. Analytical Insights (The Dashboard)
         public ObservableRangeCollection<AssetCategoryStats> CategoryDistribution { get; } = new ObservableRangeCollection<AssetCategoryStats>();
         public ObservableRangeCollection<TopImpactFile> TopImpactFiles { get; } = new ObservableRangeCollection<TopImpactFile>();
-        public ObservableRangeCollection<AffectedArea> AffectedAreas { get; } = new ObservableRangeCollection<AffectedArea>();
-        
-        // Dashboard Toggle State
-        private bool _dashboardToggleChecked = false;
-        public bool DashboardToggleChecked
+        public ObservableRangeCollection<TopWadImpact> TopWadPackages { get; } = new ObservableRangeCollection<TopWadImpact>();
+        public ObservableRangeCollection<PatchAreaStats> FeatureAreas { get; } = new ObservableRangeCollection<PatchAreaStats>();
+
+        // Metrics & KPI
+        private string _addedPayloadText = "+0 B";
+        public string AddedPayloadText
         {
-            get => _dashboardToggleChecked;
-            set { _dashboardToggleChecked = value; OnPropertyChanged(); }
+            get => _addedPayloadText;
+            set { _addedPayloadText = value; OnPropertyChanged(); }
         }
 
+        private string _removedPayloadText = "-0 B";
+        public string RemovedPayloadText
+        {
+            get => _removedPayloadText;
+            set { _removedPayloadText = value; OnPropertyChanged(); }
+        }
+
+        private string _netSizeChangeText = "0 B";
+        public string NetSizeChangeText
+        {
+            get => _netSizeChangeText;
+            set { _netSizeChangeText = value; OnPropertyChanged(); }
+        }
+
+        private int _unknownHashesCount;
+        public int UnknownHashesCount
+        {
+            get => _unknownHashesCount;
+            set { _unknownHashesCount = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasUnknownHashes)); }
+        }
+
+        public bool HasUnknownHashes => _unknownHashesCount > 0;
+        
         // --- Surgical Filtering States ---
         private bool _showNew = true;
         private bool _showModified = true;
@@ -149,6 +174,8 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public int Count { get; set; }
         public double Percentage { get; set; }
         public long TotalSizeChange { get; set; }
+        public string ExtensionFilter { get; set; }
+        public MaterialIconKind IconKind { get; set; }
         private string _sizeChangeText;
         public string SizeChangeText => _sizeChangeText ?? (_sizeChangeText = (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(TotalSizeChange)));
     }
@@ -161,13 +188,31 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public ulong OldSize { get; set; }
         public ulong NewSize { get; set; }
         public long SizeDiff { get; set; }
+        public SerializableChunkDiff Diff { get; set; }
+        public MaterialIconKind IconKind { get; set; }
         private string _sizeDiffText;
         public string SizeDiffText => _sizeDiffText ?? (_sizeDiffText = (SizeDiff >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(SizeDiff)));
     }
 
-    public class AffectedArea
+    public class TopWadImpact
+    {
+        public string WadName { get; set; }
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+        public long TotalSizeChange { get; set; }
+        private string _sizeChangeText;
+        public string SizeChangeText => _sizeChangeText ?? (_sizeChangeText = (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(TotalSizeChange)));
+    }
+
+    public class PatchAreaStats
     {
         public string Name { get; set; }
+        public MaterialIconKind IconKind { get; set; }
+        public string ColorBrushKey { get; set; }
         public int Count { get; set; }
+        public long TotalSizeChange { get; set; }
+        public string FilterQuery { get; set; }
+        private string _sizeChangeText;
+        public string SizeChangeText => _sizeChangeText ?? (_sizeChangeText = (TotalSizeChange >= 0 ? "+" : "") + FormatUtils.FormatSize(Math.Abs(TotalSizeChange)));
     }
 }
