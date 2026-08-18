@@ -130,6 +130,7 @@
                              ItemContainerStyle="{StaticResource HashMethodItemStyle}"
                              Background="Transparent"
                              BorderThickness="0"
+                             VirtualizingPanel.ScrollUnit="Pixel"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                 </Grid>
@@ -244,7 +245,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <ScrollViewer Grid.Row="2" MaxHeight="170" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ScrollViewer Grid.Row="2" MaxHeight="170" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
                                 <ItemsControl ItemsSource="{Binding SelectedMethod.SubMethods}"
                                               ItemTemplate="{StaticResource HashMethodSubItemTemplate}"/>
                             </ScrollViewer>
