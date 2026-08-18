@@ -461,8 +461,8 @@ namespace AssetsManager.Services.Hashes
                         foreach (string val in rst3) wordlist.AddName(val);
                         foreach (string val in rst64) wordlist.AddName(val);
                         foreach (string val in wadPaths) wordlist.AddName(val);
-                        foreach (string val in metaSchema.KnownTypeNames) wordlist.AddName(val);
-                        foreach (string val in metaSchema.KnownFieldNames) wordlist.AddName(val);
+                        foreach (string val in metaSchema.KnownTypeNames) wordlist.AddTypeName(val);
+                        foreach (string val in metaSchema.KnownFieldNames) wordlist.AddFieldName(val);
                         wordlist.FinalizeList();
 
                         // 1. Suffix Folding in State Space (O(Words) with 0 noise explosion)
@@ -821,24 +821,6 @@ namespace AssetsManager.Services.Hashes
             scanner.Complete();
         }
 
-        private static readonly string[] AttestedClassSuffixes = new[]
-        {
-            "Data", "Controller", "Driver", "Def", "Definition", "Component", "ComponentDef",
-            "Settings", "Instance", "Part", "Descriptor", "Context", "Resource", "Properties",
-            "Config", "Configuration", "Template", "Block", "Filter", "Action", "Condition",
-            "Effect", "Event", "Handler", "Manager", "Module", "Param", "Params", "Parameters",
-            "Rule", "Rules", "State", "System", "Tracker", "Value", "View", "Visual", "Binding",
-            "Collection", "ClipData", "Info", "Table", "Item", "Group", "Element", "Description"
-        };
-
-        private static readonly string[] AttestedPropertySuffixes = new[]
-        {
-            "Name", "Id", "Data", "List", "Map", "Type", "Value", "Values", "Count", "Index",
-            "Rate", "Scale", "Time", "Duration", "Distance", "Speed", "Radius", "Color", "Alpha",
-            "Size", "Offset", "Angle", "Mode", "Flags", "Target", "Source", "Enabled", "Disabled",
-            "Visible", "Min", "Max", "Amount", "Weight", "Group", "Priority", "Level", "Width", "Height"
-        };
-
         private static void ExecuteSuffixFoldingPass(
             InternalHashEvidenceMatcher matcher,
             TokenWordlist wordlist,
@@ -854,7 +836,7 @@ namespace AssetsManager.Services.Hashes
             // FoldedState -> List<(uint TargetHash, string Suffix, InternalHashKind Kind)>
             var stateMap = new Dictionary<uint, List<(uint TargetHash, string Suffix, InternalHashKind Kind)>>();
 
-            void RegisterFoldedStates(HashSet<uint> targets, string[] suffixes, InternalHashKind kind)
+            void RegisterFoldedStates(HashSet<uint> targets, IEnumerable<string> suffixes, InternalHashKind kind)
             {
                 foreach (uint target in targets)
                 {
@@ -871,10 +853,13 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
+            var typeSuffixes = wordlist.TypeSuffixes.Count > 0 ? wordlist.TypeSuffixes : wordlist.Suffixes.Select(s => wordlist.Case(s)).ToList();
+            var fieldSuffixes = wordlist.FieldSuffixes.Count > 0 ? wordlist.FieldSuffixes : wordlist.Suffixes.Select(s => wordlist.Case(s)).ToList();
+
             if (remainingTypes.Count > 0)
-                RegisterFoldedStates(remainingTypes, AttestedClassSuffixes, InternalHashKind.BinTypes);
+                RegisterFoldedStates(remainingTypes, typeSuffixes, InternalHashKind.BinTypes);
             if (remainingFields.Count > 0)
-                RegisterFoldedStates(remainingFields, AttestedPropertySuffixes, InternalHashKind.BinFields);
+                RegisterFoldedStates(remainingFields, fieldSuffixes, InternalHashKind.BinFields);
 
             if (stateMap.Count == 0) return;
 
@@ -1106,9 +1091,40 @@ namespace AssetsManager.Services.Hashes
             // Commonest final words of known names, for tail combination.
             public List<string> Suffixes { get; } = new();
 
+            public List<string> TypeSuffixes { get; } = new();
+            public List<string> FieldSuffixes { get; } = new();
+
             private readonly Dictionary<(string A, string B), int> _bigramCounts = new();
             private readonly Dictionary<string, Dictionary<string, int>> _spellings = new(StringComparer.OrdinalIgnoreCase);
             private readonly Dictionary<string, int> _suffixCounts = new(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, int> _typeSuffixCounts = new(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, int> _fieldSuffixCounts = new(StringComparer.OrdinalIgnoreCase);
+
+            public void AddTypeName(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return;
+                AddName(name);
+                string[] words = WordSplitter.Split(name).ToArray();
+                if (words.Length > 0)
+                {
+                    string last = words[^1].ToLowerInvariant();
+                    _typeSuffixCounts.TryGetValue(last, out int count);
+                    _typeSuffixCounts[last] = count + 1;
+                }
+            }
+
+            public void AddFieldName(string name)
+            {
+                if (string.IsNullOrWhiteSpace(name)) return;
+                AddName(name);
+                string[] words = WordSplitter.Split(name).ToArray();
+                if (words.Length > 0)
+                {
+                    string last = words[^1].ToLowerInvariant();
+                    _fieldSuffixCounts.TryGetValue(last, out int count);
+                    _fieldSuffixCounts[last] = count + 1;
+                }
+            }
 
             public void AddName(string name)
             {
@@ -1205,8 +1221,20 @@ namespace AssetsManager.Services.Hashes
                 Suffixes.Clear();
                 Suffixes.AddRange(_suffixCounts.OrderByDescending(pair => pair.Value)
                     .ThenBy(pair => pair.Key, StringComparer.Ordinal)
-                    .Take(12)
+                    .Take(25)
                     .Select(pair => pair.Key));
+
+                TypeSuffixes.Clear();
+                TypeSuffixes.AddRange(_typeSuffixCounts.OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(50)
+                    .Select(pair => Case(pair.Key)));
+
+                FieldSuffixes.Clear();
+                FieldSuffixes.AddRange(_fieldSuffixCounts.OrderByDescending(pair => pair.Value)
+                    .ThenBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Take(50)
+                    .Select(pair => Case(pair.Key)));
             }
 
             // Attested spelling when the corpus knows one, else conventional upper-first casing.
