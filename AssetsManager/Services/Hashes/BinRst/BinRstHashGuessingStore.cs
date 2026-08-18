@@ -20,21 +20,14 @@ namespace AssetsManager.Services.Hashes
         public BinRstHashGuessingStore(DirectoriesCreator directories) => _directories = directories;
 
         public string GetKnownPath(InternalHashKind kind) => Path.Combine(_directories.HashesPath, GetKnownFileName(kind));
-        public string GetVerifiedPath(InternalHashKind kind) =>
-            Path.Combine(_directories.HashLabPath, "verified", GetKnownFileName(kind));
-
-        [Obsolete("Legacy overrides are quarantined and are no longer loaded. Use GetVerifiedPath.")]
-        public string GetOverridePath(InternalHashKind kind) =>
-            Path.Combine(_directories.HashLabPath, "overrides", GetKnownFileName(kind));
 
         public async Task<Dictionary<ulong, string>> LoadKnownAsync(InternalHashKind kind, CancellationToken cancellationToken)
         {
             var result = new Dictionary<ulong, string>();
             int width = IsRst(kind) ? 16 : 8;
-            IEnumerable<string> paths = new[] { GetKnownPath(kind), GetVerifiedPath(kind) };
-            foreach (string path in paths)
+            string path = GetKnownPath(kind);
+            if (File.Exists(path))
             {
-                if (!File.Exists(path)) continue;
                 using var reader = new StreamReader(path);
                 while (await reader.ReadLineAsync(cancellationToken) is string line)
                 {
@@ -100,7 +93,7 @@ namespace AssetsManager.Services.Hashes
                 Directory.CreateDirectory(_directories.HashLabPath);
                 List<InternalHashGuessMatch> research = await SaveResearchAsync(
                     Array.Empty<InternalHashGuessMatch>(), cancellationToken);
-                await RebuildVerifiedCatalogsAsync(research, cancellationToken);
+                await PromoteMatchesToKnownCatalogsAsync(research, cancellationToken);
                 foreach (var pair in observed)
                 {
                     var known = await LoadKnownAsync(pair.Key, cancellationToken);
@@ -127,15 +120,13 @@ namespace AssetsManager.Services.Hashes
 
         public async Task SaveMatchesAsync(IEnumerable<InternalHashGuessMatch> matches, CancellationToken cancellationToken)
         {
-            var materialized = matches
-                .Where(match => match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema)
-                .ToList();
+            var materialized = (matches ?? Enumerable.Empty<InternalHashGuessMatch>()).ToList();
             await _lock.WaitAsync(cancellationToken);
             try
             {
                 List<InternalHashGuessMatch> research = await SaveResearchAsync(materialized, cancellationToken);
                 IReadOnlyList<InternalHashGuessMatch> verified =
-                    await RebuildVerifiedCatalogsAsync(research, cancellationToken);
+                    await PromoteMatchesToKnownCatalogsAsync(research, cancellationToken);
                 var groups = verified.GroupBy(match => match.Kind).ToList();
                 foreach (var group in groups)
                 {
@@ -170,13 +161,8 @@ namespace AssetsManager.Services.Hashes
                 existing = await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(
                     input, cancellationToken: cancellationToken) ?? new();
             }
-            var legacy = existing.Where(match =>
-                match.VerificationSchema < InternalHashGuessMatch.CurrentVerificationSchema).ToList();
-            if (legacy.Count > 0)
-                await SaveLegacyQuarantineAsync(legacy, cancellationToken);
 
             var merged = existing
-                .Where(match => match.VerificationSchema >= InternalHashGuessMatch.CurrentVerificationSchema)
                 .Concat(incoming).GroupBy(match => new { match.Kind, match.Hash, match.Value })
                 .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
                 .OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal).ToList();
@@ -194,15 +180,10 @@ namespace AssetsManager.Services.Hashes
             return merged;
         }
 
-        private async Task<IReadOnlyList<InternalHashGuessMatch>> RebuildVerifiedCatalogsAsync(
+        private async Task<IReadOnlyList<InternalHashGuessMatch>> PromoteMatchesToKnownCatalogsAsync(
             IReadOnlyCollection<InternalHashGuessMatch> research,
             CancellationToken cancellationToken)
         {
-            string verifiedDirectory = Path.Combine(_directories.HashLabPath, "verified");
-            Directory.CreateDirectory(verifiedDirectory);
-            string schemaPath = Path.Combine(verifiedDirectory, VerificationSchemaFileName);
-            if (File.Exists(schemaPath)) File.Delete(schemaPath);
-
             List<InternalHashGuessMatch> verified = research
                 .Where(match => match.CanPromote)
                 .GroupBy(match => (match.Kind, match.Hash))
@@ -227,10 +208,14 @@ namespace AssetsManager.Services.Hashes
                 .ToList();
             await WriteCollisionsAsync(collisions, cancellationToken);
 
+            Directory.CreateDirectory(_directories.HashesPath);
             foreach (InternalHashKind kind in Enum.GetValues<InternalHashKind>())
             {
+                var matchesForKind = verified.Where(match => match.Kind == kind).ToList();
+                if (matchesForKind.Count == 0) continue;
+
                 int width = IsRst(kind) ? 16 : 8;
-                string path = GetVerifiedPath(kind);
+                string path = GetKnownPath(kind);
                 var mergedMap = new Dictionary<ulong, string>();
                 if (File.Exists(path))
                 {
@@ -241,7 +226,7 @@ namespace AssetsManager.Services.Hashes
                             mergedMap[h] = line[(width + 1)..].Trim();
                     }
                 }
-                foreach (var match in verified.Where(match => match.Kind == kind))
+                foreach (var match in matchesForKind)
                     mergedMap[match.Hash] = match.Value;
 
                 IEnumerable<string> lines = mergedMap
@@ -250,10 +235,6 @@ namespace AssetsManager.Services.Hashes
                 await WriteTextAtomicallyAsync(path, lines, cancellationToken);
             }
 
-            await WriteTextAtomicallyAsync(
-                schemaPath,
-                new[] { InternalHashGuessMatch.CurrentVerificationSchema.ToString(CultureInfo.InvariantCulture) },
-                cancellationToken);
             return verified;
         }
 
@@ -285,47 +266,6 @@ namespace AssetsManager.Services.Hashes
             {
                 await using (var output = File.Create(temporary))
                     await JsonSerializer.SerializeAsync(output, payload, cancellationToken: cancellationToken);
-                File.Move(temporary, path, true);
-            }
-            finally
-            {
-                if (File.Exists(temporary)) File.Delete(temporary);
-            }
-        }
-
-        private bool HasCurrentVerificationSchema()
-        {
-            string path = Path.Combine(
-                _directories.HashLabPath,
-                "verified",
-                VerificationSchemaFileName);
-            return File.Exists(path) &&
-                   int.TryParse(File.ReadAllText(path).Trim(), out int schema) &&
-                   schema == InternalHashGuessMatch.CurrentVerificationSchema;
-        }
-
-        private async Task SaveLegacyQuarantineAsync(
-            IEnumerable<InternalHashGuessMatch> incoming,
-            CancellationToken cancellationToken)
-        {
-            string path = Path.Combine(_directories.HashLabPath, "internal.legacy-quarantine.json");
-            var existing = new List<InternalHashGuessMatch>();
-            if (File.Exists(path))
-            {
-                await using var input = File.OpenRead(path);
-                existing = await JsonSerializer.DeserializeAsync<List<InternalHashGuessMatch>>(
-                    input, cancellationToken: cancellationToken) ?? new();
-            }
-            var merged = existing.Concat(incoming)
-                .GroupBy(match => new { match.Kind, match.Hash, match.Value })
-                .Select(group => group.OrderByDescending(match => match.FoundAtUtc).First())
-                .OrderBy(match => match.Kind).ThenBy(match => match.Value, StringComparer.Ordinal)
-                .ToList();
-            string temporary = path + ".tmp";
-            try
-            {
-                await using (var output = File.Create(temporary))
-                    await JsonSerializer.SerializeAsync(output, merged, cancellationToken: cancellationToken);
                 File.Move(temporary, path, true);
             }
             finally

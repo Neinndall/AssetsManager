@@ -197,6 +197,11 @@ namespace AssetsManager.Services.Hashes
                 ? values
                 : Array.Empty<ulong>();
 
+        internal HashSet<ulong> InterfaceTypes { get; set; } = new();
+
+        internal static bool IsInterfaceName(string name) =>
+            !string.IsNullOrEmpty(name) && name.Length >= 2 && name[0] == 'I' && char.IsUpper(name[1]);
+
         internal bool IsRemaining(InternalHashKind kind, ulong hash) =>
             _targets.TryGetValue(kind, out HashSet<ulong> values) && values.Contains(hash);
 
@@ -212,11 +217,13 @@ namespace AssetsManager.Services.Hashes
             if (kind is not (InternalHashKind.BinTypes or InternalHashKind.BinFields) ||
                 string.IsNullOrWhiteSpace(value) ||
                 value.Length > 128)
-            {                return false;
+            {
+                return false;
             }
             string candidate = value.Trim();
             if (!IsIdentifier(candidate))
-            {                return false;
+            {
+                return false;
             }
             candidate = preserveCasing
                 ? candidate
@@ -225,8 +232,20 @@ namespace AssetsManager.Services.Hashes
                     : char.ToLowerInvariant(candidate[0]) + candidate[1..];
             uint hash = Fnv1a.HashLower(candidate);
             if (!_targets[kind].Contains(hash))
-            {                return false;
+            {
+                return false;
             }
+
+            // Interface pruning: If candidate is named like an interface (I[A-Z]),
+            // verify against schema metadata. If the class is NOT an interface, reject the candidate.
+            if (kind == InternalHashKind.BinTypes && InterfaceTypes != null && InterfaceTypes.Count > 0)
+            {
+                bool isInterfaceCandidate = IsInterfaceName(candidate);
+                bool isActualInterface = InterfaceTypes.Contains(hash);
+                if (isInterfaceCandidate && !isActualInterface) return false;
+                if (!isInterfaceCandidate && isActualInterface) return false;
+            }
+
             _matched[kind].Add(hash);
             var key = (kind, (ulong)hash, candidate);
             if (_matches.ContainsKey(key)) return false;

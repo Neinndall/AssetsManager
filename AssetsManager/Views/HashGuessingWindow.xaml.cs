@@ -257,7 +257,8 @@ namespace AssetsManager.Views
                 BadgeBrush = accentBrush,
                 EstimatedTime = "~3s"
             });
-            _allMethods.Add(new HashMethodItemModel
+
+            var binContext = new HashMethodItemModel
             {
                 Id = "bin-context",
                 DomainIndex = 2,
@@ -268,19 +269,35 @@ namespace AssetsManager.Views
                 BadgeText = "🚀 FAST (~5s)",
                 BadgeBrush = accentGreen,
                 EstimatedTime = "~5s"
-            });
-            _allMethods.Add(new HashMethodItemModel
+            };
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-owning", Name = "OwningEntryStrings", Description = "Resolve object entry names from embedded strings", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-objectlocal", Name = "ObjectLocalHashPairs", Description = "Correlate strings and hash pairs inside the same struct", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-pathleaf", Name = "ResolvedHashPathLeaf", Description = "Infer child property names from resolved child hashes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-structures", Name = "ContextualStructures", Description = "Heuristics for Spells, VFX, Characters and MapSkins", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-gamepath", Name = "GamePathDirectCatalog", Description = "Cross-reference exact catalog paths and skin variants", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "LiteralBinStrings", Description = "Scan all binary strings against local target domains", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
+            _allMethods.Add(binContext);
+
+            var binSchema = new HashMethodItemModel
             {
                 Id = "bin-schema",
                 DomainIndex = 2,
                 Name = "Meta Schema Guess",
-                Description = "Generate review-only type and field name candidates from schema naming rules.",
+                Description = "Generate review-only type and field name candidates with zero noise explosion.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.ToyBrickOutline,
                 BadgeText = "🚀 FAST (~5s)",
                 BadgeBrush = accentPurple,
                 EstimatedTime = "~5s"
-            });
+            };
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-reverse-suffix", Name = "SuffixFoldingEngine", Description = "Reverse-fold 45+ class/field suffixes in state space (O(Words))", BadgeText = "🚀 FAST", BadgeBrush = accentGreen });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-family-lattice", Name = "BaseClassFamilyLattice", Description = "Inherit sibling suffixes & vocabulary from base classes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-crossdomain", Name = "CrossDomainDictionary", Description = "Known types as fields, known fields as types, 3D bones", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-bigram-chain", Name = "MarkovBigramChains", Description = "Attested 2..4 word transitions from meta dictionary", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-word-reduction", Name = "WordReductionPass", Description = "Delete 1 inner word from known schema names", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-word-swap", Name = "WordSubstitutionPass", Description = "Substitute corpus words into attested name positions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-path-templates", Name = "StructuralTemplates", Description = "Path and field numeric and character substitutions", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            _allMethods.Add(binSchema);
 
             // RST (Domain 3)
             _allMethods.Add(new HashMethodItemModel
@@ -295,7 +312,8 @@ namespace AssetsManager.Views
                 BadgeBrush = accentBrush,
                 EstimatedTime = "~3s"
             });
-            _allMethods.Add(new HashMethodItemModel
+
+            var rstContent = new HashMethodItemModel
             {
                 Id = "rst-content",
                 DomainIndex = 3,
@@ -306,8 +324,12 @@ namespace AssetsManager.Views
                 BadgeText = "🚀 FAST (~5s)",
                 BadgeBrush = accentGreen,
                 EstimatedTime = "~5s"
-            });
-            _allMethods.Add(new HashMethodItemModel
+            };
+            rstContent.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "BinStringExtraction", Description = "Extract font, tooltip and translation keys from BIN files", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            rstContent.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-content-text", Name = "TextResourceGrep", Description = "Scan JSON, XML, YAML, INI, and script text resources", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            _allMethods.Add(rstContent);
+
+            var rstStructural = new HashMethodItemModel
             {
                 Id = "rst-structural",
                 DomainIndex = 3,
@@ -318,7 +340,11 @@ namespace AssetsManager.Views
                 BadgeText = "🚀 FAST (~10s)",
                 BadgeBrush = accentGreen,
                 EstimatedTime = "~10s"
-            });
+            };
+            rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-crossversion", Name = "CrossVersionKeys", Description = "Test known XXH3 against XXH64 and vice versa", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-binkeys", Name = "BinDictionaryKeys", Description = "Test known BIN property/entry names as RST keys", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-gamepaths", Name = "GamePathsToRst", Description = "Map game asset catalog paths to RST 64-bit keys", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            _allMethods.Add(rstStructural);
         }
 
         private void RefreshMethodsForCurrentDomain()
@@ -485,6 +511,11 @@ namespace AssetsManager.Views
 
         private async Task ExecuteMethodByIdAsync(string methodId)
         {
+            var methodModel = _allMethods.FirstOrDefault(m => string.Equals(m.Id, methodId, StringComparison.OrdinalIgnoreCase));
+            IReadOnlySet<string> selectedSubMethods = methodModel != null && methodModel.HasSubMethods
+                ? methodModel.SubMethods.Where(s => s.IsSelected).Select(s => s.Id).ToHashSet()
+                : null;
+
             switch (methodId)
             {
                 // GAME
@@ -544,24 +575,24 @@ namespace AssetsManager.Views
 
                 // BIN
                 case "bin-inventory":
-                    await RunInternalAsync(InternalHashAction.Inventory);
+                    await RunInternalAsync(InternalHashAction.Inventory, selectedSubMethods);
                     break;
                 case "bin-context":
-                    await RunInternalAsync(InternalHashAction.Content);
+                    await RunInternalAsync(InternalHashAction.Content, selectedSubMethods);
                     break;
                 case "bin-schema":
-                    await RunInternalAsync(InternalHashAction.Structural);
+                    await RunInternalAsync(InternalHashAction.Structural, selectedSubMethods);
                     break;
 
                 // RST
                 case "rst-inventory":
-                    await RunInternalAsync(InternalHashAction.Inventory);
+                    await RunInternalAsync(InternalHashAction.Inventory, selectedSubMethods);
                     break;
                 case "rst-content":
-                    await RunInternalAsync(InternalHashAction.Content);
+                    await RunInternalAsync(InternalHashAction.Content, selectedSubMethods);
                     break;
                 case "rst-structural":
-                    await RunInternalAsync(InternalHashAction.Structural);
+                    await RunInternalAsync(InternalHashAction.Structural, selectedSubMethods);
                     break;
 
                 default:
@@ -847,7 +878,7 @@ namespace AssetsManager.Views
             }
         }
 
-        private async Task RunInternalAsync(InternalHashAction action)
+        private async Task RunInternalAsync(InternalHashAction action, IReadOnlySet<string> selectedSubMethods = null)
         {
             if (_viewModel.IsRunning) return;
 
@@ -923,8 +954,8 @@ namespace AssetsManager.Views
                 {
                     InternalHashRunResult result = action switch
                     {
-                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
-                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token),
+                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token, selectedSubMethods: selectedSubMethods),
+                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token, selectedSubMethods: selectedSubMethods),
                         _ => throw new ArgumentOutOfRangeException(nameof(action))
                     };
 

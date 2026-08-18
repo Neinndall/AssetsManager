@@ -42,6 +42,12 @@ namespace AssetsManager.Services.Hashes
             return hash;
         }
 
+        internal static uint Rewind(uint hash, string suffix)
+        {
+            ReadOnlySpan<byte> bytes = System.Text.Encoding.UTF8.GetBytes(suffix);
+            return Rewind(hash, bytes);
+        }
+
         internal static uint Hash(string value)
         {
             ReadOnlySpan<byte> bytes = System.Text.Encoding.UTF8.GetBytes(value);

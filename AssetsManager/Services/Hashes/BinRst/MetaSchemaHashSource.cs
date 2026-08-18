@@ -16,6 +16,8 @@ namespace AssetsManager.Services.Hashes
         public string Version { get; init; } = "unavailable";
         public HashSet<ulong> UnknownTypes { get; init; } = new();
         public HashSet<ulong> UnknownFields { get; init; } = new();
+        public HashSet<ulong> InterfaceTypes { get; init; } = new();
+        public HashSet<ulong> ValueTypes { get; init; } = new();
         public IReadOnlyList<string> KnownTypeNames { get; init; } = Array.Empty<string>();
         public IReadOnlyList<string> KnownFieldNames { get; init; } = Array.Empty<string>();
         public IReadOnlyDictionary<ulong, string> KnownTypeEntries { get; init; } =
@@ -24,6 +26,10 @@ namespace AssetsManager.Services.Hashes
             new Dictionary<ulong, string>();
         public IReadOnlyDictionary<ulong, IReadOnlyList<string>> TypeContexts { get; init; } =
             new Dictionary<ulong, IReadOnlyList<string>>();
+        public IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> BaseToChildren { get; init; } =
+            new Dictionary<ulong, IReadOnlyList<ulong>>();
+        public IReadOnlyDictionary<ulong, IReadOnlyList<ulong>> ClassBases { get; init; } =
+            new Dictionary<ulong, IReadOnlyList<ulong>>();
     }
 
     public sealed class MetaSchemaHashSource
@@ -98,11 +104,15 @@ namespace AssetsManager.Services.Hashes
                 : "unknown";
             var unknownTypes = new HashSet<ulong>();
             var unknownFields = new HashSet<ulong>();
+            var interfaceTypes = new HashSet<ulong>();
+            var valueTypes = new HashSet<ulong>();
             var knownTypes = new HashSet<string>(StringComparer.Ordinal);
             var knownFields = new HashSet<string>(StringComparer.Ordinal);
             var knownTypeEntries = new Dictionary<ulong, string>();
             var knownFieldEntries = new Dictionary<ulong, string>();
             var typeContexts = new Dictionary<ulong, HashSet<string>>();
+            var baseToChildren = new Dictionary<ulong, HashSet<ulong>>();
+            var classBases = new Dictionary<ulong, HashSet<ulong>>();
 
             if (root.TryGetProperty("classes", out JsonElement classes) &&
                 classes.ValueKind == JsonValueKind.Object)
@@ -122,6 +132,19 @@ namespace AssetsManager.Services.Hashes
                     JsonElement classValue = classProperty.Value;
                     if (!IsActive(classValue)) continue;
                     bool hasClassHash = TryParseHash(classProperty.Name, out ulong currentClassHash);
+
+                    if (TryGetActiveRevision(classValue, out JsonElement classRevision))
+                    {
+                        if (classRevision.TryGetProperty("interface", out JsonElement ifaceEl) && ifaceEl.ValueKind == JsonValueKind.True)
+                        {
+                            if (hasClassHash) interfaceTypes.Add(currentClassHash);
+                        }
+                        if (classRevision.TryGetProperty("value", out JsonElement valEl) && valEl.ValueKind == JsonValueKind.True)
+                        {
+                            if (hasClassHash) valueTypes.Add(currentClassHash);
+                        }
+                    }
+
                     if (TryReadName(classValue, out string className))
                     {
                         knownTypes.Add(className);
@@ -133,7 +156,7 @@ namespace AssetsManager.Services.Hashes
                     string ownerName = TryReadName(classValue, out className)
                         ? className
                         : classProperty.Name;
-                    if (TryGetActiveRevision(classValue, out JsonElement classRevision) &&
+                    if (TryGetActiveRevision(classValue, out classRevision) &&
                         classRevision.TryGetProperty("bases", out JsonElement bases))
                     {
                         foreach (ulong referencedHash in EnumerateHashes(bases))
@@ -146,6 +169,20 @@ namespace AssetsManager.Services.Hashes
                                     ? knownBase
                                     : $"0x{referencedHash:x8}";
                                 AddTypeContext(currentClassHash, $"inherits {baseName}");
+
+                                if (!baseToChildren.TryGetValue(referencedHash, out var children))
+                                {
+                                    children = new HashSet<ulong>();
+                                    baseToChildren[referencedHash] = children;
+                                }
+                                children.Add(currentClassHash);
+
+                                if (!classBases.TryGetValue(currentClassHash, out var myBases))
+                                {
+                                    myBases = new HashSet<ulong>();
+                                    classBases[currentClassHash] = myBases;
+                                }
+                                myBases.Add(referencedHash);
                             }
                         }
                     }
@@ -185,13 +222,21 @@ namespace AssetsManager.Services.Hashes
                 Version = version,
                 UnknownTypes = unknownTypes,
                 UnknownFields = unknownFields,
+                InterfaceTypes = interfaceTypes,
+                ValueTypes = valueTypes,
                 KnownTypeNames = knownTypes.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 KnownFieldNames = knownFields.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
                 KnownTypeEntries = knownTypeEntries,
                 KnownFieldEntries = knownFieldEntries,
                 TypeContexts = typeContexts.ToDictionary(
                     pair => pair.Key,
-                    pair => (IReadOnlyList<string>)pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray())
+                    pair => (IReadOnlyList<string>)pair.Value.OrderBy(value => value, StringComparer.Ordinal).ToArray()),
+                BaseToChildren = baseToChildren.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<ulong>)pair.Value.OrderBy(value => value).ToArray()),
+                ClassBases = classBases.ToDictionary(
+                    pair => pair.Key,
+                    pair => (IReadOnlyList<ulong>)pair.Value.OrderBy(value => value).ToArray())
             };
 
             void AddTypeContext(ulong hash, string context)

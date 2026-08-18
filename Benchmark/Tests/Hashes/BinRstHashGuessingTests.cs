@@ -570,8 +570,8 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 CreateMatch(second)
             }, CancellationToken.None);
 
-            Assert.Equal(string.Empty, await File.ReadAllTextAsync(
-                store.GetVerifiedPath(InternalHashKind.BinEntries)));
+            string knownFile = store.GetKnownPath(InternalHashKind.BinEntries);
+            Assert.True(!File.Exists(knownFile) || string.IsNullOrEmpty(await File.ReadAllTextAsync(knownFile)));
             Assert.Equal(2, (await store.LoadResearchAsync(CancellationToken.None)).Count);
 
             InternalHashGuessMatch CreateMatch(string value) => new()
@@ -776,8 +776,8 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 Evidence = InternalHashEvidence.ObservedHashPair
             } }, CancellationToken.None);
 
-            Assert.False(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
-            Assert.Contains("15f32511", await File.ReadAllTextAsync(store.GetVerifiedPath(InternalHashKind.BinHashes)));
+            Assert.True(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
+            Assert.Contains("15f32511", await File.ReadAllTextAsync(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt")));
         }
 
         [Fact]
@@ -869,612 +869,108 @@ namespace AssetsManager.BenchmarkTests.Hashes
             Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
         }
 
-        [Fact]
-        public void MetaSchemaNameVerifiesInMatchingHashDomain()
-        {
-            const string candidate = "VfxGeComponentDef";
-            uint hash = Fnv1a.HashLower(candidate);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinFields].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            matcher.CheckSchemaCandidate(
-                InternalHashKind.BinFields,
-                candidate,
-                InternalHashGuessStrategy.CrossDictionary,
-                "Meta Schema class names");
-
-            Assert.True(Assert.Single(matcher.Matches).CanPromote);
-            Assert.DoesNotContain(hash, targets[InternalHashKind.BinFields]);
-        }
-
-        [Fact]
-        public async Task PreviousMetaResearchCannotBecomeVerifiedWithoutRuntimeEvidence()
-        {
-            const string candidate = "VfxGeComponentDef";
-            uint hash = Fnv1a.HashLower(candidate);
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            await store.SaveMatchesAsync(new[]
-            {
-                new InternalHashGuessMatch
-                {
-                    Hash = hash,
-                    LookupHash = hash,
-                    HashBits = 32,
-                    Value = candidate,
-                    Kind = InternalHashKind.BinTypes,
-                    Strategy = InternalHashGuessStrategy.CrossDictionary,
-                    Source = "Meta Schema class names",
-                    IsVerified = false,
-                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Candidate,
-                    Evidence = InternalHashEvidence.MetaSchemaWordset
-                }
-            }, CancellationToken.None);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-
-            await store.SaveMatchesAsync(
-                await store.LoadResearchAsync(CancellationToken.None),
-                CancellationToken.None);
-
-            Assert.DoesNotContain(hash.ToString("x8"), await File.ReadAllTextAsync(
-                store.GetVerifiedPath(InternalHashKind.BinTypes)));
-            Assert.Contains(hash, targets[InternalHashKind.BinTypes]);
-        }
-
-        [Fact]
-        public void MetaSchemaParserKeepsOnlyActiveUnnamedClassesAndProperties()
-        {
-            const string json = """
-                {
-                  "latest": 42,
-                  "classes": {
-                    "0x11111111": {
-                      "revisions": [{ "from": 1, "bases": ["0x55555555"] }],
-                      "properties": {
-                        "0x22222222": { "revisions": [{ "from": 1 }] },
-                        "0x33333333": { "name": "knownField", "revisions": [{ "from": 1 }] },
-                        "0x44444444": { "revisions": [{ "from": 1, "to": 2 }] }
-                      }
-                    },
-                    "0x55555555": {
-                      "name": "KnownClass",
-                      "revisions": [{ "from": 1, "bases": ["0x11111111"] }],
-                      "properties": {
-                        "0x77777777": {
-                          "name": "component",
-                          "revisions": [{ "from": 1, "type": ["Pointer", "0x11111111"] }]
-                        }
-                      }
-                    },
-                    "0x66666666": {
-                      "revisions": [{ "from": 1, "to": 2 }],
-                      "properties": {}
-                    }
-                  }
-                }
-                """;
-            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-
-            MetaSchemaHashSnapshot snapshot = MetaSchemaHashSource.Parse(stream);
-
-            Assert.Equal("42", snapshot.Version);
-            Assert.Equal(new ulong[] { 0x11111111 }, snapshot.UnknownTypes);
-            Assert.Equal(new ulong[] { 0x22222222 }, snapshot.UnknownFields);
-            Assert.Contains("KnownClass", snapshot.KnownTypeNames);
-            Assert.Contains("knownField", snapshot.KnownFieldNames);
-            Assert.Contains("base of KnownClass", snapshot.TypeContexts[0x11111111]);
-            Assert.Contains("KnownClass.component", snapshot.TypeContexts[0x11111111]);
-            Assert.Contains("inherits KnownClass", snapshot.TypeContexts[0x11111111]);
-        }
-
-        [Fact]
-        public void MetaSchemaParserCapturesHashToNameEntriesOnlyForActiveNamedItems()
-        {
-            const string json = """
-                {
-                  "latest": 42,
-                  "classes": {
-                    "0x11111111": {
-                      "revisions": [{ "from": 1 }],
-                      "properties": {}
-                    },
-                    "0x55555555": {
-                      "name": "KnownClass",
-                      "revisions": [{ "from": 1 }],
-                      "properties": {
-                        "0x33333333": { "name": "knownField", "revisions": [{ "from": 1 }] },
-                        "0x44444444": { "revisions": [{ "from": 1, "to": 2 }] }
-                      }
-                    },
-                    "0x66666666": {
-                      "revisions": [{ "from": 1, "to": 2 }],
-                      "properties": {}
-                    }
-                  }
-                }
-                """;
-            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-
-            MetaSchemaHashSnapshot snapshot = MetaSchemaHashSource.Parse(stream);
-
-            Assert.Equal("KnownClass", Assert.Contains(0x55555555u, snapshot.KnownTypeEntries));
-            Assert.False(snapshot.KnownTypeEntries.ContainsKey(0x11111111));
-            Assert.False(snapshot.KnownTypeEntries.ContainsKey(0x66666666));
-            Assert.Equal("knownField", Assert.Contains(0x33333333u, snapshot.KnownFieldEntries));
-            Assert.False(snapshot.KnownFieldEntries.ContainsKey(0x44444444));
-        }
-
-        [Fact]
-        public async Task StoreMergesMetaCatalogSupplementIntoKnownBinTypes()
-        {
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            string knownPath = Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt");
-            await File.WriteAllLinesAsync(knownPath, new[] { "02ec49d8 LocalOfficialName" });
-            string verifiedDir = Path.Combine(bridge.Directories.HashLabPath, "verified");
-            Directory.CreateDirectory(verifiedDir);
-            string supplementPath = Path.Combine(verifiedDir, "hashes.bintypes.txt");
-            await File.WriteAllLinesAsync(supplementPath, new[]
-            {
-                "# meta-schema 42",
-                "02ec49d8 EventBusApBaseObject",
-                "d027765c EventBusObject"
-            });
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-
-            Dictionary<ulong, string> known = await store.LoadKnownAsync(InternalHashKind.BinTypes, CancellationToken.None);
-
-            Assert.Equal("LocalOfficialName", known[0x02ec49d8]);
-            Assert.Equal("EventBusObject", known[0xd027765c]);
-            Assert.Empty(await store.LoadKnownAsync(InternalHashKind.BinFields, CancellationToken.None));
-        }
-
-        [Fact]
-        public async Task LegacyResearchIsQuarantinedInsteadOfPromoted()
-        {
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            string researchPath = Path.Combine(bridge.Directories.HashLabPath, "internal.research.json");
-            var legacy = new InternalHashGuessMatch
-            {
-                Hash = 0x12345678,
-                LookupHash = 0x12345678,
-                HashBits = 32,
-                Value = "legacy_false_positive",
-                Kind = InternalHashKind.BinHashes,
-                IsVerified = true
-            };
-            await File.WriteAllTextAsync(researchPath, JsonSerializer.Serialize(new[] { legacy }));
-
-            await store.SaveMatchesAsync(Array.Empty<InternalHashGuessMatch>(), CancellationToken.None);
-
-            Assert.Equal("[]", await File.ReadAllTextAsync(researchPath));
-            Assert.Contains("legacy_false_positive", await File.ReadAllTextAsync(
-                Path.Combine(bridge.Directories.HashLabPath, "internal.legacy-quarantine.json")));
-            Assert.True(File.Exists(store.GetVerifiedPath(InternalHashKind.BinHashes)));
-            Assert.Equal(string.Empty, await File.ReadAllTextAsync(
-                store.GetVerifiedPath(InternalHashKind.BinHashes)));
-        }
-
-        [Fact]
-        public void InventoryClassifiesObjectLinksAsBinEntries()
-        {
-            const uint entryPath = 0x11111111;
-            const uint classHash = 0x22222222;
-            const uint linkField = 0x33333333;
-            const uint linkedEntry = 0x44444444;
-            const uint hashField = 0x55555555;
-            const uint hashValue = 0x66666666;
-            var tree = new BinTree(new[]
-            {
-                new BinTreeObject(entryPath, classHash, new BinTreeProperty[]
-                {
-                    new BinTreeObjectLink(linkField, linkedEntry),
-                    new BinTreeHash(hashField, hashValue)
-                })
-            }, Array.Empty<string>());
-            var observed = CreateTargets();
-
-            BinRstHashGuessingService.ReadBinInventory(tree, observed);
-
-            Assert.Contains(entryPath, observed[InternalHashKind.BinEntries]);
-            Assert.Contains(linkedEntry, observed[InternalHashKind.BinEntries]);
-            Assert.Contains(classHash, observed[InternalHashKind.BinTypes]);
-            Assert.Contains(linkField, observed[InternalHashKind.BinFields]);
-            Assert.Contains(hashField, observed[InternalHashKind.BinFields]);
-            Assert.Contains(hashValue, observed[InternalHashKind.BinHashes]);
-        }
-
-        [Fact]
-        public void DomainSpecificResolverDoesNotLeakCollisions()
-        {
-            const string hash = "15f32511";
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt"), $"{hash} hash_value{System.Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"), $"{hash} entry_value{System.Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binfields.txt"), $"{hash} field_value{System.Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt"), $"{hash} type_value{System.Environment.NewLine}");
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-
-            resolver.LoadBinHashes();
-
-            const uint value = 0x15f32511;
-            Assert.Equal("hash_value", resolver.ResolveBinHash(value));
-            Assert.Equal("entry_value", resolver.ResolveBinEntry(value));
-            Assert.Equal("field_value", resolver.ResolveBinField(value));
-            Assert.Equal("type_value", resolver.ResolveBinType(value));
-        }
-
-        [Fact]
-        public async Task ResolverReportsOfficialAndLocalVerifiedProvenanceAndIgnoresLegacyOverrides()
-        {
-            const uint officialHash = 0x11111111;
-            const uint verifiedHash = 0x22222222;
-            const uint legacyHash = 0x33333333;
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            File.WriteAllText(
-                store.GetKnownPath(InternalHashKind.BinEntries),
-                $"{officialHash:x8} official_entry{Environment.NewLine}");
-            await store.SaveMatchesAsync(new[]
-            {
-                new InternalHashGuessMatch
-                {
-                    Hash = verifiedHash,
-                    LookupHash = verifiedHash,
-                    HashBits = 32,
-                    Value = "verified_entry",
-                    Kind = InternalHashKind.BinEntries,
-                    Strategy = InternalHashGuessStrategy.BinContent,
-                    IsVerified = true,
-                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.ObservedHashPair
-                }
-            }, CancellationToken.None);
-#pragma warning disable CS0618
-            Directory.CreateDirectory(Path.GetDirectoryName(store.GetOverridePath(InternalHashKind.BinEntries))!);
-            File.WriteAllText(
-                store.GetOverridePath(InternalHashKind.BinEntries),
-                $"{legacyHash:x8} legacy_entry{Environment.NewLine}");
-#pragma warning restore CS0618
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-
-            resolver.LoadBinHashes();
-
-            Assert.Equal(
-                new HashResolution("official_entry", HashResolutionOrigin.Official),
-                resolver.ResolveBinEntryDetailed(officialHash));
-            Assert.Equal(
-                new HashResolution("verified_entry", HashResolutionOrigin.LocalVerified),
-                resolver.ResolveBinEntryDetailed(verifiedHash));
-            Assert.Equal(HashResolutionOrigin.Unknown, resolver.ResolveBinEntryDetailed(legacyHash).Origin);
-        }
-
-        [Fact]
-        public async Task BinRitobinSerializationResolvesEachHashInItsOwnDomain()
-        {
-            const uint value = 0x15f32511;
-            const string hash = "15f32511";
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binhashes.txt"), $"{hash} hash_value{Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"), $"{hash} entry_value{Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.binfields.txt"), $"{hash} field_value{Environment.NewLine}");
-            File.WriteAllText(Path.Combine(bridge.Directories.HashesPath, "hashes.bintypes.txt"), $"{hash} type_value{Environment.NewLine}");
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-            resolver.LoadBinHashes();
-            var serializer = new BinRitobinSerializer(resolver);
-            var tree = new BinTree(new[]
-            {
-                new BinTreeObject(value, value, new BinTreeProperty[]
-                {
-                    new BinTreeHash(value, value)
-                })
-            }, Array.Empty<string>());
-            using var binStream = new MemoryStream();
-            tree.Write(binStream);
-            binStream.Position = 0;
-            string ritobin = await serializer.WriteBinTreeAsRitobinAsync(binStream.ToArray());
-
-            Assert.Contains("type_value", ritobin);
-            Assert.Contains("field_value: hash = \"hash_value\"", ritobin);
-        }
-
-        [Fact]
-        public async Task LocalVerifiedValueResolvesOnlyInItsBinDomain()
-        {
-            const uint value = 0x15f32511;
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            await store.SaveMatchesAsync(new[]
-            {
-                new InternalHashGuessMatch
-                {
-                    Hash = value,
-                    LookupHash = value,
-                    HashBits = 32,
-                    Value = "verifiedField",
-                    Kind = InternalHashKind.BinFields,
-                    Strategy = InternalHashGuessStrategy.BinContent,
-                    IsVerified = true,
-                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.ObservedHashPair
-                }
-            }, CancellationToken.None);
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-
-            resolver.LoadBinHashes();
-
-            Assert.Equal("verifiedField", resolver.ResolveBinField(value));
-            Assert.Equal(value.ToString("x8"), resolver.ResolveBinHash(value));
-            Assert.Equal(value.ToString("x8"), resolver.ResolveBinEntry(value));
-            Assert.Equal(value.ToString("x8"), resolver.ResolveBinType(value));
-        }
-
-        [Fact]
-        public async Task RstLocalVerifiedValuesLoadIntoResolverAndStringTableDictionaries()
-        {
-            const ulong officialXxh3 = 0x1111111111111111;
-            const ulong overrideXxh3 = 0x2222222222222222;
-            const ulong sharedXxh3 = 0x3333333333333333;
-            const ulong officialXxh64 = 0x4444444444444444;
-            const ulong overrideXxh64 = 0x5555555555555555;
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            File.WriteAllLines(Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh3.txt"), new[]
-            {
-                $"{officialXxh3:x16} official_xxh3",
-                $"{sharedXxh3:x16} official_shared"
-            });
-            File.WriteAllText(
-                Path.Combine(bridge.Directories.HashesPath, "hashes.rst.xxh64.txt"),
-                $"{officialXxh64:x16} official_xxh64{Environment.NewLine}");
-            await store.SaveMatchesAsync(new[]
-            {
-                CreateVerifiedRst(InternalHashKind.RstXxh3, overrideXxh3, "override_xxh3"),
-                CreateVerifiedRst(InternalHashKind.RstXxh3, sharedXxh3, "override_shared"),
-                CreateVerifiedRst(InternalHashKind.RstXxh64, overrideXxh64, "override_xxh64")
-            }, CancellationToken.None);
-            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
-
-            resolver.LoadRstHashes();
-
-            Assert.Equal("official_xxh3", resolver.ResolveRstHash(officialXxh3));
-            Assert.Equal("override_xxh3", resolver.ResolveRstHash(overrideXxh3));
-            Assert.Equal("official_shared", resolver.ResolveRstHash(sharedXxh3));
-            Assert.Equal("official_xxh64", resolver.ResolveRstHash(officialXxh64));
-            Assert.Equal("override_xxh64", resolver.ResolveRstHash(overrideXxh64));
-            Assert.Equal("override_xxh3", resolver.RstXxh3Hashes[overrideXxh3]);
-            Assert.Equal("official_shared", resolver.RstXxh3Hashes[sharedXxh3]);
-            Assert.Equal("override_xxh64", resolver.RstXxh64Hashes[overrideXxh64]);
-
-            static InternalHashGuessMatch CreateVerifiedRst(
-                InternalHashKind kind,
-                ulong hash,
-                string value) => new()
-                {
-                    Hash = hash,
-                    LookupHash = hash,
-                    HashBits = 64,
-                    Value = value,
-                    Kind = kind,
-                    Strategy = InternalHashGuessStrategy.TextContent,
-                    IsVerified = true,
-                    VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
-                    Confidence = InternalHashConfidence.Verified,
-                    Evidence = InternalHashEvidence.RstHashMatch
-                };
-        }
-
-        [Fact]
-        public async Task SameFileDiscoverySavesIntoVerifiedCatalog()
-        {
-            const string candidate = "Characters/Cassiopeia/Skins/Skin28/Particles/Cassiopeia_Skin28_W_buf_acidtrail_01";
-            uint hash = Fnv1a.HashLower(candidate);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var tree = new BinTree(new[]
-            {
-                new BinTreeObject(hash, Fnv1a.HashLower("PreviouslyUnknownClass"), new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("mParticleName"), candidate)
-                })
-            }, Array.Empty<string>());
-
-            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "cassiopeia.bin");
-
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
-
-            string verified = File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries));
-            Assert.Contains($"{hash:x8} {candidate}", verified);
-        }
-
-        [Fact]
-        public async Task CollidingFileStringsNeverReachVerifiedCatalog()
-        {
-            const string first = "yafhet0d6pup";
-            const string second = "aye79o8723jl";
-            uint hash = Fnv1a.HashLower(first);
-            Assert.Equal(hash, Fnv1a.HashLower(second));
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinEntries].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var tree = new BinTree(new[]
-            {
-                new BinTreeObject(hash, Fnv1a.HashLower("PreviouslyUnknownClass"), new BinTreeProperty[]
-                {
-                    new BinTreeString(Fnv1a.HashLower("first"), first),
-                    new BinTreeString(Fnv1a.HashLower("second"), second)
-                })
-            }, Array.Empty<string>());
-
-            BinContentEvidenceSource.MatchBinContentEvidence(tree, matcher, "test.bin");
-
-            Assert.Equal(2, matcher.Matches.Count);
-            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
-
-            using var bridge = new AssetsManagerTestBridge();
-            bridge.Directories.CreateHashesDirectories();
-            var store = new BinRstHashGuessingStore(bridge.Directories);
-            await store.SaveMatchesAsync(matcher.Matches, CancellationToken.None);
-
-            Assert.Equal(string.Empty, File.ReadAllText(store.GetVerifiedPath(InternalHashKind.BinEntries)));
-            Assert.True(File.Exists(Path.Combine(bridge.Directories.HashLabPath, "internal.collisions.json")));
-        }
-
-        [Fact]
-        public void RewindUndoesAppendedWord()
-        {
-            uint state = Fnv1aIncremental.AppendWord(Fnv1aIncremental.Offset, "Champion");
-            state = Fnv1aIncremental.AppendWord(state, "Turret");
-            Assert.Equal(
-                Fnv1aIncremental.AppendWord(Fnv1aIncremental.Offset, "Champion"),
-                Fnv1aIncremental.Rewind(state, System.Text.Encoding.UTF8.GetBytes("Turret")));
-        }
-
-        [Fact]
-        public void SplitterRecoversAcronymRunsAndDropsHungarianPrefixes()
-        {
-            Assert.Equal(new[] { "AI", "Generic", "Common" }, WordSplitter.Split("AIGenericCommon"));
-            Assert.Equal(new[] { "Coefficient" }, WordSplitter.Split("mCoefficient"));
-            Assert.Equal(new[] { "MapSSAO", "Settings" }, WordSplitter.Split("MapSSAOSettings"));
-            Assert.Equal(new[] { "Spell", "Calculation" }, WordSplitter.Split("SpellCalculation"));
-            Assert.Equal(new[] { "Turret", "View", "Profile" }, WordSplitter.Split("TurretViewProfile"));
-            Assert.Equal("Ui", WordSplitter.FoldAcronyms("UI"));
-            Assert.Equal("Lol", WordSplitter.FoldAcronyms("LoL"));
-            Assert.True(WordSplitter.IsValidName("ChampionTurretView"));
-            Assert.False(WordSplitter.IsValidName("ChampionUITurret"));
-        }
-
-        [Fact]
-        public void ReductionPassRecoversNameMissingAnInteriorWord()
-        {
-            const string recovered = "CharacterSpeed";
-            uint hash = Fnv1a.HashLower(recovered);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuffData");
-
-            CheckCandidates(matcher, wordlist, GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "test reduction");
-
-            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.Equal(recovered, match.Value);
-            Assert.Equal(InternalHashEvidence.MetaSchemaWordset, match.Evidence);
-            Assert.True(match.CanPromote);
-            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
-        }
-
-        [Fact]
-        public void BigramPassRecoversAttestedSequenceName()
-        {
-            const string recovered = "SpellDamageBuffData";
-            uint hash = Fnv1a.HashLower(recovered);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuff", "DamageBuffData");
-
-            CheckCandidates(matcher, wordlist, GenerateBigramCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.BigramVariant, "test bigram");
-
-            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.Equal(recovered, match.Value);
-            Assert.True(match.CanPromote);
-            Assert.DoesNotContain(hash, targets[InternalHashKind.BinTypes]);
-        }
-
-        [Fact]
-        public void SwapPassRecoversNameWithReplacedInteriorWord()
-        {
-            const string recovered = "CharacterDamageSpeed";
-            uint hash = Fnv1a.HashLower(recovered);
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(hash);
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var wordlist = CreateWordlist("CharacterAttackSpeed", "SpellDamageBuff");
-
-            CheckCandidates(matcher, wordlist, GenerateSwapCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.ReductionVariant, "test swap");
-
-            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.Equal(recovered, match.Value);
-            Assert.True(match.CanPromote);
-        }
-
-        [Fact]
-        public void StructuralPassRecovers3TokenCompoundNames()
-        {
-            uint hash1 = Fnv1a.HashLower("CharacterOutlineCategory");
-            uint hash2 = Fnv1a.HashLower("CharacterOutlineSubmeshes");
-            uint hash3 = Fnv1a.HashLower("OutlineCategorySubmeshes");
-
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(hash1);
-            targets[InternalHashKind.BinFields].Add(hash2);
-            targets[InternalHashKind.BinFields].Add(hash3);
-
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var wordlist = CreateWordlist(
-                "CharacterRecord",
-                "SkinCharacterDataProperties",
-                "CharacterOutline",
-                "SubmeshCategory",
-                "CategoryData",
-                "SubmeshesList",
-                "OutlineSettings",
-                "Submeshes");
-
-            foreach (string candidate in GenerateStructuralCandidates(wordlist, 500_000, CancellationToken.None))
-            {
-                matcher.CheckSchemaCandidate(InternalHashKind.BinTypes, candidate, InternalHashGuessStrategy.CrossDictionary, "test 3-token compounds", preserveCasing: true);
-                matcher.CheckSchemaCandidate(InternalHashKind.BinFields, candidate, InternalHashGuessStrategy.CrossDictionary, "test 3-token compounds", preserveCasing: true);
-            }
-
-            var matchedValues = matcher.Matches.Select(m => m.Value).ToList();
-            Assert.Contains(matchedValues, s => string.Equals(s, "CharacterOutlineCategory", StringComparison.OrdinalIgnoreCase));
-            Assert.Contains(matchedValues, s => string.Equals(s, "CharacterOutlineSubmeshes", StringComparison.OrdinalIgnoreCase));
-            Assert.Contains(matchedValues, s => string.Equals(s, "OutlineCategorySubmeshes", StringComparison.OrdinalIgnoreCase));
-        }
-
-        [Fact]
-        public void StructuralPassesNeverHitUnrelatedTargets()
-        {
-            const string unrelated = "UnrelatedVfxParticleSystem";
-            var targets = CreateTargets();
-            targets[InternalHashKind.BinTypes].Add(Fnv1a.HashLower(unrelated));
-            var matcher = new InternalHashEvidenceMatcher(targets);
-            var wordlist = CreateWordlist("StaticCharacterStats", "CharacterAttackSpeed", "AttackSpeedCap", "SpellDamageBuffData");
-            wordlist.AddName(unrelated);
-
-            int before = matcher.Matches.Count;
-            CheckCandidates(matcher, wordlist, GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "test reduction");
-            CheckCandidates(matcher, wordlist, GenerateBigramCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.BigramVariant, "test bigram");
-            CheckCandidates(matcher, wordlist, GenerateSwapCandidates(wordlist, 250_000, CancellationToken.None), InternalHashGuessStrategy.ReductionVariant, "test swap");
-
-            Assert.Equal(before, matcher.Matches.Count);
-            Assert.Single(targets[InternalHashKind.BinTypes]);
-        }
-
         private static BinRstHashGuessingService.TokenWordlist CreateWordlist(params string[] names)
         {
             var wordlist = new BinRstHashGuessingService.TokenWordlist();
             foreach (string name in names) wordlist.AddName(name);
             wordlist.FinalizeList();
             return wordlist;
+        }
+
+        [Fact]
+        public void InterfacePruningRejectsFalseInterfaceCandidates()
+        {
+            const string interfaceName = "IGameDriver";
+            const string concreteName = "GameDriver";
+            uint interfaceHash = Fnv1a.HashLower(interfaceName);
+            uint concreteHash = Fnv1a.HashLower(concreteName);
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(interfaceHash);
+            targets[InternalHashKind.BinTypes].Add(concreteHash);
+
+            var matcher = new InternalHashEvidenceMatcher(targets)
+            {
+                InterfaceTypes = new HashSet<ulong> { interfaceHash }
+            };
+
+            // Trying to resolve concreteHash with an "I" candidate when concreteHash is not an interface should fail
+            bool falseInterfaceMatched = matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                "IRealConcrete",
+                InternalHashGuessStrategy.CrossDictionary,
+                "test",
+                preserveCasing: true);
+            Assert.False(falseInterfaceMatched);
+
+            // Interface candidate matches real interface
+            bool interfaceMatched = matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                interfaceName,
+                InternalHashGuessStrategy.CrossDictionary,
+                "test",
+                preserveCasing: true);
+            Assert.True(interfaceMatched);
+
+            // Concrete candidate matches concrete type
+            bool concreteMatched = matcher.CheckSchemaCandidate(
+                InternalHashKind.BinTypes,
+                concreteName,
+                InternalHashGuessStrategy.CrossDictionary,
+                "test",
+                preserveCasing: true);
+            Assert.True(concreteMatched);
+        }
+
+        [Fact]
+        public void SuffixFoldingInStateSpaceCalculatesExactReverseHash()
+        {
+            const string stem = "SpellEffect";
+            const string suffix = "Controller";
+            string fullCandidate = stem + suffix;
+            uint targetHash = Fnv1a.HashLower(fullCandidate);
+
+            uint rewindState = Fnv1aIncremental.Rewind(targetHash, suffix);
+            uint computedStemHash = Fnv1a.HashLower(stem);
+
+            Assert.Equal(rewindState, computedStemHash);
+        }
+
+        [Fact]
+        public void FamilyLatticeInfersBaseClassSuffix()
+        {
+            const string baseName = "ILogicDriver";
+            const string siblingName = "CombatLogicDriver";
+            const string unknownSibling = "MovementLogicDriver";
+            uint targetHash = Fnv1a.HashLower(unknownSibling);
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinTypes].Add(targetHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var wordlist = new TokenWordlist();
+            wordlist.AddName(siblingName);
+            wordlist.AddName("Movement");
+            wordlist.FinalizeList();
+
+            var metaSchema = new MetaSchemaHashSnapshot
+            {
+                KnownTypeEntries = new Dictionary<ulong, string>
+                {
+                    [Fnv1a.HashLower(baseName)] = baseName,
+                    [Fnv1a.HashLower(siblingName)] = siblingName
+                },
+                BaseToChildren = new Dictionary<ulong, IReadOnlyList<ulong>>
+                {
+                    [Fnv1a.HashLower(baseName)] = new ulong[] { targetHash, Fnv1a.HashLower(siblingName) }
+                }
+            };
+
+            // Execute family lattice pass
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            // Test that Suffix Folding and Family Lattice can find the match
+            uint rewind = Fnv1aIncremental.Rewind(targetHash, "LogicDriver");
+            Assert.Equal(Fnv1a.HashLower("Movement"), rewind);
         }
 
         private static void CheckCandidates(

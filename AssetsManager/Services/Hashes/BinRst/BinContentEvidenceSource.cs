@@ -62,13 +62,20 @@ namespace AssetsManager.Services.Hashes
             InternalHashEvidenceMatcher matcher,
             string path,
             string wadPath = null,
-            HashResolverService resolver = null)
+            HashResolverService resolver = null,
+            IReadOnlySet<string> selectedSubMethods = null)
         {
-            MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
-            MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
-            MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
-            MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
-            if (matcher.Remaining > 0)
+            bool ShouldRun(string id) => selectedSubMethods == null || selectedSubMethods.Contains(id);
+
+            if (ShouldRun("bin-context-owning"))
+                MatchOwningEntryStringEvidence(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-structures"))
+                MatchBinContextualEvidence(tree, matcher, path, wadPath, resolver);
+            if (ShouldRun("bin-context-pathleaf"))
+                MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
+            if (ShouldRun("bin-context-objectlocal"))
+                MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
+            if (matcher.Remaining > 0 && ShouldRun("bin-context-strings"))
             {
                 IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
                 VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
