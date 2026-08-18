@@ -59,7 +59,6 @@ namespace AssetsManager.Services.Hashes
             {
                 await Task.Run(() =>
                 {
-                    MigrateLegacyVerifiedFolder();
                     LoadHashes();
                     LoadBinHashes();
                     LoadRstHashes();
@@ -229,58 +228,7 @@ namespace AssetsManager.Services.Hashes
             LoadRstHashes();
         }
 
-        private void MigrateLegacyVerifiedFolder()
-        {
-            try
-            {
-                string verifiedDir = Path.Combine(_directoriesCreator.HashLabPath, "verified");
-                if (!Directory.Exists(verifiedDir)) return;
 
-                string[] fileNames = {
-                    "hashes.binhashes.txt", "hashes.binentries.txt", "hashes.binfields.txt",
-                    "hashes.bintypes.txt", "hashes.rst.xxh3.txt", "hashes.rst.xxh64.txt"
-                };
-
-                Directory.CreateDirectory(_directoriesCreator.HashesPath);
-                foreach (string fileName in fileNames)
-                {
-                    string verifiedFile = Path.Combine(verifiedDir, fileName);
-                    if (!File.Exists(verifiedFile)) continue;
-
-                    string mainFile = Path.Combine(_directoriesCreator.HashesPath, fileName);
-                    int width = fileName.Contains("rst") ? 16 : 8;
-
-                    var mergedMap = new Dictionary<ulong, string>();
-                    if (File.Exists(mainFile))
-                    {
-                        foreach (string line in File.ReadAllLines(mainFile))
-                        {
-                            if (line.Length > width && line[width] == ' ' &&
-                                ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h))
-                                mergedMap[h] = line[(width + 1)..].Trim();
-                        }
-                    }
-                    foreach (string line in File.ReadAllLines(verifiedFile))
-                    {
-                        if (line.Length > width && line[width] == ' ' &&
-                            ulong.TryParse(line.AsSpan(0, width), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out ulong h))
-                            mergedMap[h] = line[(width + 1)..].Trim();
-                    }
-
-                    var lines = mergedMap
-                        .OrderBy(pair => pair.Value, StringComparer.Ordinal)
-                        .Select(pair => $"{pair.Key.ToString(width == 16 ? "x16" : "x8")} {pair.Value}");
-                    File.WriteAllLines(mainFile, lines);
-                }
-
-                Directory.Delete(verifiedDir, true);
-                _logService.LogSuccess("Legacy verified hashes migrated to main Hashes directory.");
-            }
-            catch (Exception ex)
-            {
-                _logService.LogWarning($"Legacy verified migration: {ex.Message}");
-            }
-        }
 
         public Task ForceReloadHashesAsync()
         {
