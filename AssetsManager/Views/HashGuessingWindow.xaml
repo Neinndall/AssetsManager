@@ -124,8 +124,6 @@
                              x:Name="MethodsListBox"
                              ItemsSource="{Binding AvailableMethods}"
                              SelectedItem="{Binding SelectedMethod}"
-                             SelectionChanged="MethodsListBox_SelectionChanged"
-                             MouseDoubleClick="MethodsListBox_MouseDoubleClick"
                              ItemTemplate="{StaticResource HashMethodTemplate}"
                              ItemContainerStyle="{StaticResource HashMethodItemStyle}"
                              Background="Transparent"

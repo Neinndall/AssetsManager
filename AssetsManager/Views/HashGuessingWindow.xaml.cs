@@ -473,18 +473,7 @@ namespace AssetsManager.Views
             RefreshMethodsForCurrentDomain();
         }
 
-        private void MethodsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            // Selected item updated via binding
-        }
 
-        private async void MethodsListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            if (_viewModel.SelectedMethod != null && !_viewModel.IsRunning)
-            {
-                await ExecuteMethodByIdAsync(_viewModel.SelectedMethod.Id);
-            }
-        }
 
         private async void RunSelectedMethod_Click(object sender, RoutedEventArgs e)
         {
