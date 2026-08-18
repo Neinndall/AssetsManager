@@ -745,9 +745,13 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 Check(engine, candidatePath, HashGuessStrategy.CrossDomainGame, source);
                 checkedCount++;
-                progress?.Invoke(checkedCount);
+                if ((checkedCount & 0x1fff) == 0)
+                {
+                    progress?.Invoke(checkedCount);
+                }
             }
 
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 

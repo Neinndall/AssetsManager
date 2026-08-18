@@ -294,9 +294,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
                 Check(engine, path[..^4] + "_splash.png", HashGuessStrategy.LcuPattern, source);
                 checkedCount++;
-                progress?.Invoke(checkedCount);
+                if ((checkedCount & 0x1fff) == 0)
+                {
+                    progress?.Invoke(checkedCount);
+                }
             }
 
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 
@@ -939,7 +943,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) return false;
                 Check(engine, path, HashGuessStrategy.CrossDomainAsset, source);
                 checkedCount++;
-                progress?.Invoke(checkedCount);
+                if ((checkedCount & 0x1fff) == 0)
+                {
+                    progress?.Invoke(checkedCount);
+                }
                 return true;
             }
 
@@ -960,6 +967,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
+            progress?.Invoke(checkedCount);
             return checkedCount;
         }
 
