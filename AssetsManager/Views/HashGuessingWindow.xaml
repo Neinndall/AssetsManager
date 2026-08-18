@@ -237,9 +237,13 @@
                                     <materialIcons:MaterialIcon Kind="Tune" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
                                     <TextBlock Text="SELECT SUB-ALGORITHMS TO EXECUTE" FontSize="10" FontWeight="Bold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                    <Button Content="Select All" Style="{StaticResource SecondaryButton}" Height="24" Padding="8,0" FontSize="10" Click="SelectAllSubMethods_Click" Margin="0,0,6,0"/>
-                                    <Button Content="Deselect All" Style="{StaticResource SecondaryButton}" Height="24" Padding="8,0" FontSize="10" Click="DeselectAllSubMethods_Click"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Click="SelectAllSubMethods_Click" ToolTip="Select All" Margin="0,0,4,0">
+                                        <materialIcons:MaterialIcon Kind="SelectAll" Width="16" Height="16"/>
+                                    </Button>
+                                    <Button Style="{StaticResource TransparentIconButton}" Width="26" Height="26" Click="DeselectAllSubMethods_Click" ToolTip="Deselect All">
+                                        <materialIcons:MaterialIcon Kind="SelectRemove" Width="16" Height="16"/>
+                                    </Button>
                                 </StackPanel>
                             </Grid>
 
