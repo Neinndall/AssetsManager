@@ -34,7 +34,7 @@
                         </Border>
                         <TextBlock Text="WAD Comparator" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Advanced differential analysis with byte-level precision. Features rename detection via checksum mapping and automated backup packaging for historical fidelity." 
+                    <TextBlock Grid.Row="1" Text="Differential analysis between patch archives. Features Image Diff, 3D Mesh Skn Diff, and BIN/JSON tree comparison with automated backup packaging." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -52,13 +52,13 @@
                         </Border>
                         <TextBlock Text="Archive Explorer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="High-performance archive navigation. Powered by a thin-path optimization engine for low RAM usage and smart VO/SFX filtering for a clean hierarchy." 
+                    <TextBlock Grid.Row="1" Text="High-performance archive navigation and extraction. Features BIN property tree exploration, audio event linkage, and instant texture rendering." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
 
-            <!-- Models -->
-            <Border Style="{StaticResource SettingsCard}" Margin="0,12,12,0">
+            <!-- 3D & VFX Inspector -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,12,12,12">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -68,15 +68,33 @@
                         <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="CubeOutline" Foreground="{StaticResource AccentPurple}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Model Viewer" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        <TextBlock Text="3D Viewer &amp; VFX Inspector" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in real-time. Supports Linear Blend Skinning (LBS) and animation synchronization across all scene assets." 
+                    <TextBlock Grid.Row="1" Text="Inspect champions, skins, and maps in 3D with animation playback. Includes a dedicated VFX particle inspector with keyframe curves and timeline scrubbing." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
 
-            <!-- Monitor -->
-            <Border Style="{StaticResource SettingsCard}" Margin="12,12,0,0">
+            <!-- Hash Lab -->
+            <Border Style="{StaticResource SettingsCard}" Margin="12,12,0,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="FlaskOutline" Foreground="{StaticResource AccentTeal}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Hash Lab" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="Deterministic hash guessing and cryptanalysis engine for Game, LCU, BIN, and RST hashes powered by token dictionaries and schemas." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+
+            <!-- Monitor & Version Manager -->
+            <Border Style="{StaticResource SettingsCard}" Margin="0,12,12,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -86,9 +104,27 @@
                         <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
                             <materialIcons:MaterialIcon Kind="Radar" Foreground="{StaticResource AccentRed}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Real-time Monitor" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        <TextBlock Text="Monitor &amp; Versions" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Text="Global integrity tracking for PBE and CDN assets. Detects file changes post-patch using shadow caching and real-time maintenance status analysis." 
+                    <TextBlock Grid.Row="1" Text="Surveillance dashboard for PBE and CDN assets. High-speed RMAN manifest patching, live server status, and automated snapshot backup management." 
+                               FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
+                </Grid>
+            </Border>
+
+            <!-- Audio & News Hub -->
+            <Border Style="{StaticResource SettingsCard}" Margin="12,12,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Background="{StaticResource HoverColor}" Width="42" Height="42" CornerRadius="10">
+                            <materialIcons:MaterialIcon Kind="NewspaperVariantOutline" Foreground="{StaticResource AccentBrush}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Audio &amp; News Hub" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Text="Decrypt and play embedded Wwise audio bank events (BNK/WPK) alongside an integrated surveillance feed for official patch notes and esports." 
                                FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                 </Grid>
             </Border>
@@ -112,8 +148,8 @@
                             <TextBlock Text="1" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Environment Setup" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Navigate to Settings and configure your game paths. Use the 'Preferred Client' option to automate WAD discovery and jump directly to roots." 
+                            <TextBlock Text="Environment &amp; Client Setup" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Navigate to Settings and configure your game paths. Use the 'Preferred Client' option to automate WAD discovery and target installations." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -128,8 +164,8 @@
                             <TextBlock Text="2" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Asset Surveillance" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="The app periodically checks for PBE status and asset updates using ETags. Check the Monitor Dashboard for versioning and server health alerts." 
+                            <TextBlock Text="Asset Surveillance &amp; Updates" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="The app periodically checks for PBE status and manifest updates. Check the Monitor Dashboard for versioning and server health alerts." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -144,8 +180,8 @@
                             <TextBlock Text="3" Foreground="{StaticResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Differential Analysis" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
-                            <TextBlock Text="Use the WAD Comparator to isolate changes between versions. Leverage 'Quick Select' to automatically find matching archives for analysis." 
+                            <TextBlock Text="Differential Analysis &amp; Extraction" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="Use the WAD Comparator to isolate changes between versions, explore assets with Archive Explorer, or run deterministic cracking in Hash Lab." 
                                        FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                         </StackPanel>
                     </Grid>
@@ -182,11 +218,11 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Background="{StaticResource HoverColor}" Width="44" Height="44" CornerRadius="10" VerticalAlignment="Top">
-                        <materialIcons:MaterialIcon Kind="Audio" Foreground="{StaticResource AccentBlue}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <materialIcons:MaterialIcon Kind="FlaskOutline" Foreground="{StaticResource AccentTeal}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="20,0,0,0">
-                        <TextBlock Text="Linked Audio Banks" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
-                        <TextBlock Text="The explorer automatically detects and links voice-over (VO) regional banks to their master containers, allowing full HIRC logic resolution." 
+                        <TextBlock Text="Targeted Cryptanalysis" FontSize="13" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="In Hash Lab, select specific attack algorithms or sub-methods to target unknown BIN entries, fields, or RST hashes with maximum speed." 
                                    FontSize="12" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" LineHeight="20"/>
                     </StackPanel>
                 </Grid>
