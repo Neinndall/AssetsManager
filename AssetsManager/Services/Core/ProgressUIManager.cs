@@ -334,8 +334,8 @@ namespace AssetsManager.Services.Core
         {
             bool wasCancelled = _taskCancellationManager.IsCancelling;
 
-            // Hold the final updating state for 100 ms before closing the progress UI.
-            await FinishOperation();
+            // Hold the final updating state for 200 ms before closing the progress UI.
+            await FinishOperation(200);
 
             await _owner.Dispatcher.InvokeAsync(() =>
             {
