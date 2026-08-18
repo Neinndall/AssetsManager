@@ -121,7 +121,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
                 _loadedBackups.Clear();
                 _loadedBackups.AddRange(backups);
-                ApplyFilterAndSort();
+                Dispatcher.Invoke(ApplyFilterAndSort);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
