@@ -41,8 +41,7 @@
                            Margin="0,2,0,0"
                            FontSize="9.5"
                            Foreground="{StaticResource TextSecondary}"
-                           TextTrimming="CharacterEllipsis"
-                           ToolTip="{Binding Description}"/>
+                           TextWrapping="Wrap"/>
             </StackPanel>
         </Grid>
     </DataTemplate>
@@ -112,8 +111,7 @@
                                Margin="0,2,0,0"
                                FontSize="9.5"
                                Foreground="{StaticResource TextSecondary}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding Description}"/>
+                               TextWrapping="Wrap"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -367,7 +367,7 @@ namespace AssetsManager.Views
                         if (selectedIndex == 2)
                         {
                             TxtUnknownCount.Text = $"{summary.BinTotal:N0} unresolved";
-                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0} · Types: {summary.BinTypes:N0}";
+                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0}\nTypes: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
                         }
                         else
                         {
@@ -648,7 +648,7 @@ namespace AssetsManager.Views
 
                     string json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions { WriteIndented = true });
                     await File.WriteAllTextAsync(dialog.FileName, json);
-                    _messageBoxService?.ShowSuccess("Export Complete", $"Successfully exported {_viewModel.Matches.Count} matches to JSON.", Window.GetWindow(this));
+                    _logService.LogInteractiveSuccess($"Successfully exported {_viewModel.Matches.Count} matches to", dialog.FileName, Path.GetFileName(dialog.FileName));
                 }
                 catch (Exception ex)
                 {
