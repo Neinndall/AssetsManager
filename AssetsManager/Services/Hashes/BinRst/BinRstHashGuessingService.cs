@@ -160,7 +160,7 @@ namespace AssetsManager.Services.Hashes
                         ProcessedWads = index + 1,
                         TotalWads = wads.Length + looseBins.Length,
                         ProcessedFiles = scannedBins + scannedRst,
-                        CurrentStage = includeBin ? "Building BIN inventory" : "Building RST inventory",
+                        CurrentStage = $"Building inventory: {Path.GetFileName(wadPath)}",
                         Elapsed = stopwatch.Elapsed
                     });
                 }
@@ -337,14 +337,15 @@ namespace AssetsManager.Services.Hashes
                         {
                             // Skip corrupted container
                         }
-                        string stageText = includeBin ? "Scanning BIN context files" : "Scanning RST text content";
+                        string stageText = $"Scanning {Path.GetFileName(wadPath)}";
                         progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, totalSources));
                     }
 
                     if (includeBin && matcher.Remaining > 0 && !ContentBudgetExceeded())
                     {
-                        foreach (string looseBin in looseBins)
+                        for (int lIdx = 0; lIdx < looseBins.Length; lIdx++)
                         {
+                            string looseBin = looseBins[lIdx];
                             if (ContentBudgetExceeded()) break;
                             cancellationToken.ThrowIfCancellationRequested();
                             try
@@ -363,7 +364,7 @@ namespace AssetsManager.Services.Hashes
                                 // Continue
                             }
                             scanned++;
-                            progress?.Report(CreateProgress(matcher, stopwatch, "Scanning loose BIN files", scanned, 0, totalSources));
+                            progress?.Report(CreateProgress(matcher, stopwatch, $"Scanning loose BIN: {Path.GetFileName(looseBin)}", scanned, wads.Length + lIdx + 1, totalSources));
                             if (matcher.Remaining == 0) break;
                         }
                     }

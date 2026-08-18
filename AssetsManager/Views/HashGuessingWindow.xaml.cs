@@ -937,7 +937,8 @@ namespace AssetsManager.Views
                         _viewModel.IsProgressIndeterminate = true;
                     }
 
-                    _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found";
+                    string timeText = FormatElapsedTime(stopwatch.Elapsed);
+                    _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
                 });
 
                 if (action == InternalHashAction.Inventory)
