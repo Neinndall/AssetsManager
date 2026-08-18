@@ -753,19 +753,6 @@ namespace AssetsManager.Views
 
             UpdateStatus();
 
-            var timer = new DispatcherTimer(DispatcherPriority.Normal)
-            {
-                Interval = TimeSpan.FromMilliseconds(100)
-            };
-            timer.Tick += (s, e) =>
-            {
-                if (_viewModel.IsRunning && stopwatch.IsRunning)
-                {
-                    UpdateStatus();
-                }
-            };
-            timer.Start();
-
             try
             {
                 var progress = new Progress<HashGuessProgress>(value =>
@@ -815,7 +802,6 @@ namespace AssetsManager.Views
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
                 stopwatch.Stop();
-                timer.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.Matches.AddRange(result.Matches.Where(match => displayedMatchHashes.Add(match.Hash)));
                 UpdateLiveProgress(result.UnknownHashesAtStart - result.Matches.Count, result.Matches.Count);
@@ -835,15 +821,13 @@ namespace AssetsManager.Views
             catch (OperationCanceledException)
             {
                 stopwatch.Stop();
-                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
-                _viewModel.StatusText = "Hash guessing cancelled.";
+                _viewModel.StatusText = "Operation was canceled by user.";
             }
             catch (InvalidOperationException ex)
             {
                 stopwatch.Stop();
-                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogWarning(ex.Message);
@@ -853,7 +837,6 @@ namespace AssetsManager.Views
             catch (DirectoryNotFoundException ex)
             {
                 stopwatch.Stop();
-                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogWarning(ex.Message);
@@ -863,7 +846,6 @@ namespace AssetsManager.Views
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                timer.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
                 _logService.LogError(ex, "Unexpected error during hash guessing.");
@@ -872,7 +854,6 @@ namespace AssetsManager.Views
             }
             finally
             {
-                timer.Stop();
                 _viewModel.IsRunning = false;
                 _cancellationTokenSource = null;
             }
