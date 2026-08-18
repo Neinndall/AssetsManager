@@ -367,7 +367,7 @@ namespace AssetsManager.Views
                         if (selectedIndex == 2)
                         {
                             TxtUnknownCount.Text = $"{summary.BinTotal:N0} unresolved";
-                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Fields: {summary.BinFields:N0}\nTypes: {summary.BinTypes:N0} · Hashes: {summary.BinHashes:N0}";
+                            TxtUnknownBreakdown.Text = $"Entries: {summary.BinEntries:N0} · Types: {summary.BinTypes:N0}\nFields: {summary.BinFields:N0} · Hashes: {summary.BinHashes:N0}";
                         }
                         else
                         {
