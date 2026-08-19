@@ -155,6 +155,202 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void CdragonTftShopPatternResolvesSetScopedEntryPath()
+        {
+            const string name = "SyntheticShopItem";
+            const string expected = "Maps/Shipping/Map22/Sets/TFTSet7/Shop/SyntheticShopItem";
+            uint expectedHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(expectedHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(expectedHash, Fnv1a.HashLower("TftShopData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mName"), name)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-shop.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-tft-shop" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(InternalHashKind.BinEntries, match.Kind);
+            Assert.Equal(expected, match.Value);
+        }
+
+        [Fact]
+        public void CdragonAugmentPatternResolvesAugmentAndRootSpellPaths()
+        {
+            const string augmentName = "SyntheticAugment";
+            string augmentPath = $"Maps/ModeSpecificData/Augments/{augmentName}";
+            string rootSpellPath = $"{augmentPath}/Augment_{augmentName}";
+            uint augmentHash = Fnv1a.HashLower(augmentPath);
+            uint rootSpellHash = Fnv1a.HashLower(rootSpellPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(augmentHash);
+            targets[InternalHashKind.BinEntries].Add(rootSpellHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(augmentHash, Fnv1a.HashLower("AugmentData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("AugmentNameId"), augmentName),
+                    new BinTreeObjectLink(Fnv1a.HashLower("RootSpell"), rootSpellHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-augment.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-augment" });
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.Contains(matcher.Matches, match => match.Value == augmentPath);
+            Assert.Contains(matcher.Matches, match => match.Value == rootSpellPath);
+        }
+
+        [Fact]
+        public void CdragonQuestPatternResolvesModeQuestEntryPath()
+        {
+            const string questName = "SyntheticQuest";
+            const string expected = "Maps/ModeSpecificData/ModesQuests/SyntheticQuest";
+            uint expectedHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(expectedHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(expectedHash, 0x8d31b69b, new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("QuestName"), questName)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-quest.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-quests" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(expected, match.Value);
+        }
+
+        [Fact]
+        public void CdragonNamedAttributePatternResolvesEntryPath()
+        {
+            const string expected = "UI/Scenes/SyntheticScene";
+            uint expectedHash = Fnv1a.HashLower(expected);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(expectedHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(expectedHash, Fnv1a.HashLower("UISceneData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), expected)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-ui.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-attributes" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(expected, match.Value);
+        }
+
+        [Fact]
+        public void CdragonRelationPatternsResolveStringGroupLinksAndGdsMapObjects()
+        {
+            const string groupPath = "Maps/Shipping/Map22/MapGroups/SyntheticGroup";
+            const string objectPath = "Maps/Shipping/Map22/Objects/SyntheticObject";
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(groupPath));
+            targets[InternalHashKind.BinEntries].Add(Fnv1a.HashLower(objectPath));
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var items = new BinTreeMap(
+                Fnv1a.HashLower("items"),
+                BinPropertyType.Hash,
+                BinPropertyType.Struct,
+                new[]
+                {
+                    new KeyValuePair<BinTreeProperty, BinTreeProperty>(
+                        new BinTreeHash(0, 0x12345678),
+                        new BinTreeStruct(
+                            0,
+                            Fnv1a.HashLower("GdsMapObject"),
+                            new BinTreeProperty[]
+                            {
+                                new BinTreeString(0xad304db5, objectPath)
+                            }))
+                });
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x11111111, Fnv1a.HashLower("TftMapSkin"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("GroupLink"), groupPath)
+                }),
+                new BinTreeObject(0x22222222, Fnv1a.HashLower("MapPlaceableContainer"), new BinTreeProperty[]
+                {
+                    items
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "synthetic-relations.bin",
+                selectedSubMethods: new HashSet<string> { "bin-context-relations" });
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.Contains(matcher.Matches, match => match.Value == groupPath);
+            Assert.Contains(matcher.Matches, match => match.Value == objectPath);
+        }
+
+        [Fact]
+        public void LegacyRelationObjectLinksRemainResolvable()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            const string groupPath = "Maps/Shipping/Map22/MapGroups/LegacyGroup";
+            uint groupHash = Fnv1a.HashLower(groupPath);
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{groupHash:x8} {groupPath}{Environment.NewLine}");
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            resolver.LoadBinHashes();
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(groupHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(0x33333333, Fnv1a.HashLower("TftMapSkin"), new BinTreeProperty[]
+                {
+                    new BinTreeObjectLink(Fnv1a.HashLower("GroupLink"), groupHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContentEvidence(
+                tree,
+                matcher,
+                "legacy-relations.bin",
+                resolver: resolver,
+                selectedSubMethods: new HashSet<string> { "bin-context-relations" });
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(groupPath, match.Value);
+        }
+
+        [Fact]
         public void BinContextResolvesFieldFromResolvedHashPathLeaf()
         {
             using var bridge = new AssetsManagerTestBridge();

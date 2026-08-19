@@ -12,6 +12,43 @@ namespace AssetsManager.Services.Hashes
 {
     internal static class BinContentEvidenceSource
     {
+        private static readonly HashSet<uint> NamedEntryTypes = new()
+        {
+            Fnv1a.HashLower("StaticMaterialDef"),
+            Fnv1a.HashLower("UISceneData"),
+            Fnv1a.HashLower("UiElementEffectAmmoData"),
+            Fnv1a.HashLower("UiElementEffectAnimatedRotatingIconData"),
+            Fnv1a.HashLower("UiElementEffectAnimationData"),
+            Fnv1a.HashLower("UiElementEffectArcFillData"),
+            Fnv1a.HashLower("UiElementEffectCircleMaskCooldownData"),
+            Fnv1a.HashLower("UiElementEffectCircleMaskDesaturateData"),
+            Fnv1a.HashLower("UiElementEffectCooldownData"),
+            Fnv1a.HashLower("UiElementEffectCooldownRadialData"),
+            Fnv1a.HashLower("UiElementEffectCustomMaterialData"),
+            Fnv1a.HashLower("UiElementEffectData"),
+            Fnv1a.HashLower("UiElementEffectDesaturateData"),
+            Fnv1a.HashLower("UiElementEffectFillPercentageData"),
+            Fnv1a.HashLower("UiElementEffectGlowConstantData"),
+            Fnv1a.HashLower("UiElementEffectGlowData"),
+            Fnv1a.HashLower("UiElementEffectGlowingRotatingIconData"),
+            Fnv1a.HashLower("UiElementEffectInstancedData"),
+            Fnv1a.HashLower("UiElementEffectLineData"),
+            Fnv1a.HashLower("UiElementEffectRotatingIconData"),
+            Fnv1a.HashLower("UiElementGroupButtonData"),
+            Fnv1a.HashLower("UiElementGroupData"),
+            Fnv1a.HashLower("UiElementGroupFramedData"),
+            Fnv1a.HashLower("UiElementGroupManagedLayoutData"),
+            Fnv1a.HashLower("UiElementGroupMeterData"),
+            Fnv1a.HashLower("UiElementGroupSliderData"),
+            Fnv1a.HashLower("UiElementIconData"),
+            Fnv1a.HashLower("UiElementParticleSystemData"),
+            Fnv1a.HashLower("UiElementRegionData"),
+            Fnv1a.HashLower("UiElementScissorRegionData"),
+            Fnv1a.HashLower("UiElementSpineAnimationData"),
+            Fnv1a.HashLower("UiElementTextData"),
+            Fnv1a.HashLower("UiSceneViewPaneData")
+        };
+
         private static readonly Dictionary<string, string> SharedBufferLeaves = new()
         {
             ["CharacterPerDrawVertexCB"] = "CharacterPerDrawVS",
@@ -473,7 +510,9 @@ namespace AssetsManager.Services.Hashes
             {
                 uint classHash = pair.Value.ClassHash;
 
-                if (classHash == Fnv1a.HashLower("ContextualActionData"))
+                if (NamedEntryTypes.Contains(classHash))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "name", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("ContextualActionData"))
                     MatchDirectEntryAttribute(pair.Key, pair.Value, "mObjectPath", matcher, path, wadPath);
                 else if (classHash == Fnv1a.HashLower("CustomShaderDef"))
                     MatchDirectEntryAttribute(pair.Key, pair.Value, "objectPath", matcher, path, wadPath);
@@ -496,44 +535,51 @@ namespace AssetsManager.Services.Hashes
             string wadPath,
             HashResolverService resolver)
         {
-            if (resolver == null)
-            {
-                return;
-            }
-
             uint tftMapSkinClassHash = Fnv1a.HashLower("TftMapSkin");
+            uint gdsMapObjectClassHash = Fnv1a.HashLower("GdsMapObject");
             uint mapPlaceableContainerClassHash = Fnv1a.HashLower("MapPlaceableContainer");
-            uint taggedObjectHash = Fnv1a.HashLower("ad304db5");
+            const uint taggedObjectHash = 0xad304db5;
 
             foreach (var pair in tree.Objects)
             {
                 BinTreeObject item = pair.Value;
                 if (item.ClassHash == tftMapSkinClassHash &&
-                    TryGetObjectLink(item.Properties, "GroupLink", out BinTreeObjectLink groupLink))
+                    TryGetString(item.Properties, "GroupLink", out string groupPath))
+                {
+                    matcher.CheckContextualCandidate(InternalHashKind.BinEntries, groupPath, path, wadPath);
+                }
+                else if (item.ClassHash == tftMapSkinClassHash &&
+                         resolver != null &&
+                         TryGetObjectLink(item.Properties, "GroupLink", out BinTreeObjectLink groupLink))
                 {
                     MatchResolvedEntryLink(groupLink.Value, matcher, resolver, path, wadPath);
                 }
 
                 if (item.ClassHash == mapPlaceableContainerClassHash &&
-                    item.Properties.TryGetValue(Fnv1a.HashLower("items"), out BinTreeProperty items))
+                    item.Properties.TryGetValue(Fnv1a.HashLower("items"), out BinTreeProperty items) &&
+                    items is BinTreeMap itemMap &&
+                    itemMap.KeyType == BinPropertyType.Hash &&
+                    itemMap.ValueType == BinPropertyType.Struct)
                 {
-                    VisitTaggedObjectLinks(items, taggedObjectHash, link =>
-                        MatchResolvedEntryLink(link.Value, matcher, resolver, path, wadPath));
-                }
-            }
-        }
+                    foreach (var mapItem in itemMap)
+                    {
+                        if (mapItem.Value is not BinTreeStruct mapObject ||
+                            mapObject.ClassHash != gdsMapObjectClassHash)
+                        {
+                            continue;
+                        }
 
-        private static void MatchDirectEntryAttribute(
-            uint entryHash,
-            BinTreeObject item,
-            string field,
-            InternalHashEvidenceMatcher matcher,
-            string path,
-            string wadPath)
-        {
-            if (TryGetString(item.Properties, field, out string value))
-            {
-                CheckEntryCandidate(matcher, entryHash, value, path, wadPath);
+                        if (TryGetStringByHash(mapObject.Properties, taggedObjectHash, out string objectPath))
+                        {
+                            matcher.CheckContextualCandidate(InternalHashKind.BinEntries, objectPath, path, wadPath);
+                        }
+                        else if (resolver != null &&
+                                 TryGetObjectLinkByHash(mapObject.Properties, taggedObjectHash, out BinTreeObjectLink objectLink))
+                        {
+                            MatchResolvedEntryLink(objectLink.Value, matcher, resolver, path, wadPath);
+                        }
+                    }
+                }
             }
         }
 
@@ -560,35 +606,17 @@ namespace AssetsManager.Services.Hashes
                 InternalHashEvidence.SemanticReference);
         }
 
-        private static void VisitTaggedObjectLinks(
-            BinTreeProperty property,
-            uint tagHash,
-            Action<BinTreeObjectLink> check)
+        private static void MatchDirectEntryAttribute(
+            uint entryHash,
+            BinTreeObject item,
+            string field,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
         {
-            switch (property)
+            if (TryGetString(item.Properties, field, out string value))
             {
-                case BinTreeStruct structure:
-                    foreach (var child in structure.Properties)
-                    {
-                        if (child.Key == tagHash && child.Value is BinTreeObjectLink taggedLink)
-                            check(taggedLink);
-                        VisitTaggedObjectLinks(child.Value, tagHash, check);
-                    }
-                    break;
-                case BinTreeContainer container:
-                    foreach (BinTreeProperty child in container.Elements)
-                        VisitTaggedObjectLinks(child, tagHash, check);
-                    break;
-                case BinTreeOptional optional when optional.Value != null:
-                    VisitTaggedObjectLinks(optional.Value, tagHash, check);
-                    break;
-                case BinTreeMap map:
-                    foreach (var child in map)
-                    {
-                        VisitTaggedObjectLinks(child.Key, tagHash, check);
-                        VisitTaggedObjectLinks(child.Value, tagHash, check);
-                    }
-                    break;
+                CheckEntryCandidate(matcher, entryHash, value, path, wadPath);
             }
         }
 
@@ -635,6 +663,38 @@ namespace AssetsManager.Services.Hashes
             }
 
             value = null;
+            return false;
+        }
+
+        private static bool TryGetStringByHash(
+            Dictionary<uint, BinTreeProperty> properties,
+            uint fieldHash,
+            out string value)
+        {
+            if (properties.TryGetValue(fieldHash, out BinTreeProperty property) &&
+                property is BinTreeString text)
+            {
+                value = text.Value;
+                return true;
+            }
+
+            value = null;
+            return false;
+        }
+
+        private static bool TryGetObjectLinkByHash(
+            Dictionary<uint, BinTreeProperty> properties,
+            uint fieldHash,
+            out BinTreeObjectLink link)
+        {
+            if (properties.TryGetValue(fieldHash, out BinTreeProperty property) &&
+                property is BinTreeObjectLink objectLink)
+            {
+                link = objectLink;
+                return true;
+            }
+
+            link = null;
             return false;
         }
 

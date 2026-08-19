@@ -68,6 +68,7 @@ New Features
 
 Improvements
   - Hash Guessing Lab / RST now selects XXH64 or XXH3 and the 38/39/40-bit layout from the detected game version, scans BIN string contexts in RST mode, and cross-references GAME/LCU paths safely.
+  - Hash Guessing Lab / BIN guesses now resolve map and UI entry names more accurately while avoiding generic false positives.
   - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.
   - API Center now loads sales, Mythic Shop, and pass caches once per view in background work and reuses them when switching tabs.
   - Monitor / Dashboard now implements IDisposable with proper event unsubscription, releasing service references only when leaving the Monitor view entirely.
