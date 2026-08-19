@@ -260,20 +260,23 @@ namespace AssetsManager.Views.Controls.Explorer
             // First, do the synchronous checks to decide the initial UI state.
             bool shouldLoadWadTree = _viewModel.IsWadMode && wadPath != null;
             bool shouldLoadDirTree = !_viewModel.IsWadMode && !string.IsNullOrEmpty(DirectoriesCreator.AssetsDownloadedPath) && Directory.Exists(DirectoriesCreator.AssetsDownloadedPath);
+            bool shouldLoadHashes = (shouldLoadWadTree || shouldLoadDirTree) &&
+                                    HashResolverService?.HasLocalHashCatalogs == true;
 
-            if (shouldLoadWadTree || shouldLoadDirTree)
+            if (shouldLoadHashes)
             {
                 // Start with Hashes since it's the first async operation
                 _viewModel.SetLoadingState(ExplorerLoadingState.LoadingHashes);
             }
-            else
+            else if (!shouldLoadWadTree && !shouldLoadDirTree)
             {
                 // If we are not going to load, show the correct placeholder immediately.
                 _viewModel.UpdateEmptyState(_viewModel.IsWadMode);
             }
 
             // Now, perform the async hash loading.
-            await HashResolverService.LoadAllHashesAsync();
+            if (shouldLoadHashes)
+                await HashResolverService.LoadAllHashesAsync();
 
             // Finally, trigger the tree build if needed.
             if (shouldLoadWadTree)

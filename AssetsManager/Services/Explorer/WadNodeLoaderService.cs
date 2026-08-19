@@ -456,17 +456,18 @@ namespace AssetsManager.Services.Explorer
                 
                 try
                 {
+                    bool hasPathHashCatalogs = _hashResolverService.HasLocalPathHashCatalogs;
                     using (var wadFile = new WadFile(pathToWad))
                     {
                         foreach (var chunk in wadFile.Chunks.Values)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
-                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+                            string virtualPath = hasPathHashCatalogs
+                                ? _hashResolverService.ResolveHash(chunk.PathHash)
+                                : chunk.PathHash.ToString("x16");
 
-                            bool isUnresolved = virtualPath == chunk.PathHash.ToString("x16");
-                            bool noExtension = !Path.HasExtension(virtualPath);
-
-                            if (isUnresolved || noExtension)
+                            if (hasPathHashCatalogs &&
+                                (virtualPath == chunk.PathHash.ToString("x16") || !Path.HasExtension(virtualPath)))
                             {
                                 using (var stream = wadFile.OpenChunk(chunk))
                                 {
@@ -524,6 +525,7 @@ namespace AssetsManager.Services.Explorer
 
                 try
                 {
+                    bool hasPathHashCatalogs = _hashResolverService.HasLocalPathHashCatalogs;
                     using (var wadFile = new WadFile(wadPath))
                     {
                         // Create a virtual root to build the tree structure
@@ -532,7 +534,9 @@ namespace AssetsManager.Services.Explorer
 
                         foreach (var chunk in wadFile.Chunks.Values)
                         {
-                            string virtualPath = _hashResolverService.ResolveHash(chunk.PathHash);
+                            string virtualPath = hasPathHashCatalogs
+                                ? _hashResolverService.ResolveHash(chunk.PathHash)
+                                : chunk.PathHash.ToString("x16");
                             if (string.IsNullOrEmpty(virtualPath) || virtualPath == chunk.PathHash.ToString("x16"))
                             {
                                 virtualPath = chunk.PathHash.ToString("x16"); // Just the hash as the name

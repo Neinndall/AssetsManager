@@ -23,6 +23,28 @@ namespace AssetsManager.BenchmarkTests.Hashes
     public sealed class BinRstHashGuessingTests
     {
         [Fact]
+        public async Task HashResolverSkipsEmptyCatalogWarmupAndLoadsLaterCatalogs()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+
+            Assert.False(resolver.HasLocalHashCatalogs);
+            await resolver.LoadAllHashesAsync();
+
+            const ulong hash = 0x1234567890abcdef;
+            const string path = "assets/hash-resolver-late-load.bin";
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.game.txt"),
+                $"{hash:x16} {path}{Environment.NewLine}");
+
+            Assert.True(resolver.HasLocalHashCatalogs);
+            await resolver.LoadAllHashesAsync();
+
+            Assert.Equal(path, resolver.ResolveHash(hash));
+        }
+
+        [Fact]
         public void EvidenceMatcherPublishesEachLiteralMatchExactlyOnce()
         {
             const string candidate = "data/test/example.bin";

@@ -37,16 +37,43 @@ namespace AssetsManager.Services.Hashes
         private readonly LogService _logService;
         private Task _loadingTask = null;
 
+        private static readonly string[] HashCatalogFileNames =
+        {
+            "hashes.game.txt",
+            "hashes.lcu.txt",
+            "hashes.binhashes.txt",
+            "hashes.binentries.txt",
+            "hashes.binfields.txt",
+            "hashes.bintypes.txt",
+            "hashes.rst.xxh3.txt",
+            "hashes.rst.xxh64.txt"
+        };
+
         public HashResolverService(DirectoriesCreator directoriesCreator, LogService logService)
         {
             _directoriesCreator = directoriesCreator;
             _logService = logService;
         }
 
+        public bool HasLocalHashCatalogs => HashCatalogFileNames.Any(HasLocalHashCatalog);
+
+        public bool HasLocalPathHashCatalogs =>
+            HasLocalHashCatalog("hashes.game.txt") ||
+            HasLocalHashCatalog("hashes.lcu.txt");
+
+        private bool HasLocalHashCatalog(string fileName)
+        {
+            string textPath = Path.Combine(_directoriesCreator.HashesPath, fileName);
+            return File.Exists(textPath) || File.Exists(Path.ChangeExtension(textPath, ".bin"));
+        }
+
         public Task LoadAllHashesAsync()
         {
             if (_loadingTask == null)
             {
+                if (!HasLocalHashCatalogs)
+                    return Task.CompletedTask;
+
                 _loadingTask = LoadAllHashesInternalAsync();
             }
             return _loadingTask;
@@ -57,6 +84,9 @@ namespace AssetsManager.Services.Hashes
             await _hashFileAccessLock.WaitAsync();
             try
             {
+                if (!HasLocalHashCatalogs)
+                    return;
+
                 await Task.Run(() =>
                 {
                     LoadHashes();

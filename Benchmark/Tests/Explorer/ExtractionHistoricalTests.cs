@@ -140,6 +140,38 @@ namespace AssetsManager.BenchmarkTests.Services.Explorer
                 CreateLoader(bridge).LoadFromBackupAsync(jsonPath, true, cancellation.Token));
         }
 
+        [Fact]
+        public async Task WadsWithoutPathHashCatalogsDoNotProbeChunkContent()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            string wadPath = Path.Combine(bridge.RootPath, "empty-hashes.wad");
+            byte[] pngSignature = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+
+            WadBuilder.Bake(
+                new[]
+                {
+                    new WadBakeEntry(
+                        "assets/unknown.bin",
+                        () => new MemoryStream(pngSignature),
+                        WadChunkCompression.None)
+                },
+                wadPath,
+                new WadBakeSettings());
+
+            ulong pathHash;
+            using (var wad = new WadFile(wadPath))
+            {
+                pathHash = Assert.Single(wad.Chunks.Values).PathHash;
+            }
+
+            var children = await CreateLoader(bridge).LoadChildrenAsync(
+                new FileSystemNodeModel(wadPath),
+                CancellationToken.None);
+            FileSystemNodeModel file = Flatten(children).Single(node => node.Type == NodeType.VirtualFile);
+
+            Assert.Equal(pathHash.ToString("x16"), file.Name);
+        }
+
         private static AssetExportService CreateExporter(AssetsManagerTestBridge bridge, WadNodeLoaderService loader = null)
         {
             loader ??= CreateLoader(bridge);
