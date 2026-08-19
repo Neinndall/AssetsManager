@@ -20,6 +20,16 @@ namespace AssetsManager.BenchmarkTests.Utils
         }
 
         [Fact]
+        public void GuessExtensionRecognizesEncryptedRiotTexAndDds()
+        {
+            byte[] encryptedTex = { 0xC9, 0xE3, 0x44, 0x26, 0x64, 0xBB, 0x01, 0x61 };
+            byte[] dds = { 0x44, 0x44, 0x53, 0x20 };
+
+            Assert.Equal("tex", FileTypeDetector.GuessExtension(encryptedTex));
+            Assert.Equal("dds", FileTypeDetector.GuessExtension(dds));
+        }
+
+        [Fact]
         public void GuessExtensionRecognizesMultiTextureUiAtlas()
         {
             using var stream = new MemoryStream();

@@ -46,7 +46,7 @@ namespace AssetsManager.Utils
                 return string.Empty;
 
             if (StartsWith(data, DDS_SIGNATURE)) return "dds";
-            if (StartsWith(data, TEX_SIGNATURE)) return "tex";
+            if (StartsWith(data, TEX_SIGNATURE) || StartsWith(data, ENCRYPTED_RIOT_TEX_SIGNATURE)) return "tex";
             if (StartsWith(data, WASM_SIGNATURE)) return "wasm";
             if (StartsWith(data, UNITYFS_SIGNATURE) || StartsWith(data, UNITYWEB_SIGNATURE) || StartsWith(data, UNITYRAW_SIGNATURE)) return "assetbundle";
             if (StartsWith(data, PNG_SIGNATURE)) return "png";
