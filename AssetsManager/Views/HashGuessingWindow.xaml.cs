@@ -274,7 +274,11 @@ namespace AssetsManager.Views
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-objectlocal", Name = "ObjectLocalHashPairs", Description = "Correlate strings and hash pairs inside the same struct", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-pathleaf", Name = "ResolvedHashPathLeaf", Description = "Infer child property names from resolved child hashes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-structures", Name = "ContextualStructures", Description = "Heuristics for Spells, VFX, Characters and MapSkins", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
-            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-gamepath", Name = "GamePathDirectCatalog", Description = "Cross-reference exact catalog paths and skin variants", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-tft-shop", Name = "TftShopPaths", Description = "Resolve TFT shop entries from set and item names", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-augment", Name = "AugmentSpellPaths", Description = "Resolve augment entries and their root spells", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-quests", Name = "ModeQuestPaths", Description = "Resolve mode quest entries from quest names", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-attributes", Name = "AttributeEntryPaths", Description = "Map known BIN attributes directly to entry paths", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-relations", Name = "ObjectLinkRelations", Description = "Resolve entry links exposed by map and loadout structures", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             binContext.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "LiteralBinStrings", Description = "Scan all binary strings against local target domains", BadgeText = "⚡ ~3s", BadgeBrush = accentOrange });
             _allMethods.Add(binContext);
 
@@ -318,14 +322,14 @@ namespace AssetsManager.Views
                 Id = "rst-content",
                 DomainIndex = 3,
                 Name = "RST Content GREP",
-                Description = "Extract valid font/translation string keys directly from BIN and text resources.",
+                Description = "Extract valid font/translation string keys from BIN payloads and text resources.",
                 Category = "Core Suites",
                 IconKind = MaterialIconKind.FormatLetterCase,
                 BadgeText = "🚀 FAST (~5s)",
                 BadgeBrush = accentGreen,
                 EstimatedTime = "~5s"
             };
-            rstContent.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-context-strings", Name = "BinStringExtraction", Description = "Extract font, tooltip and translation keys from BIN files", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
+            rstContent.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-content-binstrings", Name = "BinStringExtraction", Description = "Extract font, tooltip and translation keys from BIN payloads", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             rstContent.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-content-text", Name = "TextResourceGrep", Description = "Scan JSON, XML, YAML, INI, and script text resources", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
             _allMethods.Add(rstContent);
 
@@ -343,7 +347,7 @@ namespace AssetsManager.Views
             };
             rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-crossversion", Name = "CrossVersionKeys", Description = "Test known XXH3 against XXH64 and vice versa", BadgeText = "⚡ FAST", BadgeBrush = accentGreen });
             rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-binkeys", Name = "BinDictionaryKeys", Description = "Test known BIN property/entry names as RST keys", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
-            rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-gamepaths", Name = "GamePathsToRst", Description = "Map game asset catalog paths to RST 64-bit keys", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            rstStructural.SubMethods.Add(new HashMethodSubItemModel { Id = "rst-struct-gamepaths", Name = "GamePathsToRst", Description = "Cross-reference GAME and LCU asset paths against versioned RST keys", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             _allMethods.Add(rstStructural);
         }
 

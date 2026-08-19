@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
+using AssetsManager.Services.Monitor;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Core.Wad;
@@ -43,6 +44,7 @@ namespace AssetsManager.Services.Hashes
         private readonly DirectoriesCreator _directories;
         private readonly LogService _log;
         private readonly MetaSchemaHashSource _metaSchema;
+        private readonly VersionService _versionService;
 
         public BinRstHashGuessingService(
             BinRstHashGuessingStore store,
@@ -50,7 +52,8 @@ namespace AssetsManager.Services.Hashes
             HashResolverService resolver,
             DirectoriesCreator directories,
             LogService log,
-            MetaSchemaHashSource metaSchema)
+            MetaSchemaHashSource metaSchema,
+            VersionService versionService = null)
         {
             _store = store;
             _persistence = persistence;
@@ -58,6 +61,7 @@ namespace AssetsManager.Services.Hashes
             _directories = directories;
             _log = log;
             _metaSchema = metaSchema;
+            _versionService = versionService;
         }
 
         public Task<InternalHashSummary> GetSummaryAsync(CancellationToken cancellationToken) => _store.LoadSummaryAsync(cancellationToken);
@@ -80,6 +84,9 @@ namespace AssetsManager.Services.Hashes
             MetaSchemaHashSnapshot metaSchema = includeBin
                 ? await _metaSchema.GetSnapshotAsync(cancellationToken)
                 : new MetaSchemaHashSnapshot();
+            int? gameVersion = includeRst
+                ? await DetectGameVersionAsync(rootDirectory)
+                : null;
 
             var stopwatch = Stopwatch.StartNew();
 
@@ -141,7 +148,7 @@ namespace AssetsManager.Services.Hashes
                                 }
                                 else
                                 {
-                                    ReadRstInventory(stream, observed[InternalHashKind.RstXxh3], observed[InternalHashKind.RstXxh64]);
+                                    ReadRstInventory(stream, observed[InternalHashKind.RstXxh3], observed[InternalHashKind.RstXxh64], gameVersion);
                                     scannedRst++;
                                 }
                             }
@@ -204,7 +211,10 @@ namespace AssetsManager.Services.Hashes
             string[] fingerprintSources = includeBin
                 ? wads.Concat(looseBins).ToArray()
                 : wads;
-            string fingerprint = BuildFingerprint(fingerprintSources, inventoryDomain, metaSchema.Version);
+            string fingerprintVersion = includeRst
+                ? $"{metaSchema.Version};rst-game={gameVersion?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}"
+                : metaSchema.Version;
+            string fingerprint = BuildFingerprint(fingerprintSources, inventoryDomain, fingerprintVersion);
             var selectedObserved = observed.Where(pair =>
                 (includeBin && IsBinKind(pair.Key)) ||
                 (includeRst && pair.Key is InternalHashKind.RstXxh3 or InternalHashKind.RstXxh64))
@@ -244,7 +254,10 @@ namespace AssetsManager.Services.Hashes
             var stopwatch = Stopwatch.StartNew();
             progress?.Report(CreateProgress(matcher, stopwatch, "Loading game hashes dictionary", 0));
             string[] wads = EnumerateWadContainers(rootDirectory, includeBin, includeRst);
-            string[] looseBins = includeBin ? EnumerateLooseBinFiles(rootDirectory) : Array.Empty<string>();
+            bool shouldScanBinContent = selectedSubMethods == null || selectedSubMethods.Any(id =>
+                id.StartsWith("bin-context-", StringComparison.Ordinal) ||
+                string.Equals(id, "rst-content-binstrings", StringComparison.Ordinal));
+            string[] looseBins = shouldScanBinContent ? EnumerateLooseBinFiles(rootDirectory) : Array.Empty<string>();
             var wadPaths = await LoadWadPathsAsync(includeRst, cancellationToken);
             int totalSources = wads.Length + looseBins.Length;
             int scanned = 0;
@@ -253,8 +266,6 @@ namespace AssetsManager.Services.Hashes
                 : (int)matcher.CheckedCandidates;
 
             bool ContentBudgetExceeded() => matcher.CheckedCandidates - contentStartedCandidates >= ContentBudget;
-            bool ShouldRun(string id) => selectedSubMethods == null || selectedSubMethods.Contains(id);
-
             try
             {
                 await Task.Run(() =>
@@ -276,12 +287,12 @@ namespace AssetsManager.Services.Hashes
                                 bool isText = false;
                                 if (wadPaths.TryGetValue(pair.Key, out path))
                                 {
-                                    isBin = includeBin && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+                                    isBin = shouldScanBinContent && path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
                                     isText = includeRst && IsTextCandidatePath(path) && pair.Value.UncompressedSize <= MaximumTextChunkSize;
                                     if (!isBin && !isText)
                                     {
                                         string sig = GetChunkSignature(wad, pair.Value);
-                                        if (sig == "PROP" || sig == "PTCH")
+                                        if (shouldScanBinContent && (sig == "PROP" || sig == "PTCH"))
                                         {
                                             isBin = true;
                                         }
@@ -289,7 +300,7 @@ namespace AssetsManager.Services.Hashes
                                 }
                                 else
                                 {
-                                    if (includeBin)
+                                    if (shouldScanBinContent)
                                     {
                                         string sig = GetChunkSignature(wad, pair.Value);
                                         if (sig == "PROP" || sig == "PTCH")
@@ -302,7 +313,7 @@ namespace AssetsManager.Services.Hashes
                                 if (!isBin && !isText) continue;
 
                                 using var data = wad.LoadChunkDecompressed(pair.Value);
-                                if (isBin && (ShouldRun("bin-context-strings") || ShouldRun("bin-context-owning") || ShouldRun("bin-context-objectlocal") || ShouldRun("bin-context-pathleaf") || ShouldRun("bin-context-structures")))
+                                if (isBin && shouldScanBinContent)
                                 {
                                     try
                                     {
@@ -341,7 +352,7 @@ namespace AssetsManager.Services.Hashes
                         progress?.Report(CreateProgress(matcher, stopwatch, stageText, scanned, index + 1, totalSources));
                     }
 
-                    if (includeBin && matcher.Remaining > 0 && !ContentBudgetExceeded())
+                    if (shouldScanBinContent && matcher.Remaining > 0 && !ContentBudgetExceeded())
                     {
                         for (int lIdx = 0; lIdx < looseBins.Length; lIdx++)
                         {
@@ -369,20 +380,6 @@ namespace AssetsManager.Services.Hashes
                         }
                     }
 
-                    // Direct Game Path Verification pass
-                    if (matcher.Remaining > 0 && ShouldRun("bin-context-gamepath"))
-                    {
-                        string gameHashPath = Path.Combine(_directories.HashesPath, "hashes.game.txt");
-                        if (File.Exists(gameHashPath))
-                        {
-                            progress?.Report(CreateProgress(matcher, stopwatch, "Cross-referencing game path catalog", scanned, 0, totalSources));
-                            GamePathCandidateSource.Discover(
-                                File.ReadLines(gameHashPath),
-                                matcher,
-                                "hashes.game.txt",
-                                cancellationToken);
-                        }
-                    }
                 }, cancellationToken);
 
                 int checkedCount = matcher.CheckedCandidates > int.MaxValue ? int.MaxValue : (int)matcher.CheckedCandidates;
@@ -443,6 +440,12 @@ namespace AssetsManager.Services.Hashes
                         {
                             CheckCandidates(rst3, InternalHashGuessStrategy.CrossVersion, "RST XXH3 keys");
                             CheckCandidates(rst64, InternalHashGuessStrategy.CrossVersion, "RST XXH64 keys");
+                        }
+                        if (matcher.Remaining > 0 && ShouldRun("rst-struct-gamepaths"))
+                        {
+                            progress?.Report(CreateProgress(matcher, stopwatch, "Cross-referencing GAME/LCU paths for RST", 0));
+                            GamePathCandidateSource.Discover(wadPaths, matcher, "GAME/LCU path catalogs", cancellationToken);
+                            progress?.Report(CreateProgress(matcher, stopwatch, "GAME/LCU paths cross-referenced", 0));
                         }
                     }
 
@@ -781,22 +784,57 @@ namespace AssetsManager.Services.Hashes
         }
 
 
-        private static void ReadRstInventory(Stream stream, HashSet<ulong> observedMasked, HashSet<ulong> observedFull)
+        internal static void ReadRstInventory(
+            Stream stream,
+            HashSet<ulong> observedXxh3,
+            HashSet<ulong> observedXxh64,
+            int? gameVersion = null)
         {
             using var reader = new BinaryReader(stream, Encoding.UTF8, true);
             if (Encoding.ASCII.GetString(reader.ReadBytes(3)) != "RST") throw new InvalidDataException("Invalid RST signature.");
             int version = reader.ReadByte();
-            int bits = 40;
             if (version == 2 && reader.ReadBoolean()) reader.BaseStream.Seek(reader.ReadUInt32(), SeekOrigin.Current);
-            else if (version is 4 or 5) bits = 38;
             if (version is < 2 or > 5) throw new InvalidDataException($"Unsupported RST version {version}.");
-            ulong mask = (1UL << bits) - 1;
+            int[] bitOptions = GetRstHashBitOptions(version, gameVersion);
+            bool? useXxh3 = gameVersion.HasValue ? gameVersion.Value >= 1415 : null;
             uint count = reader.ReadUInt32();
             for (int index = 0; index < count; index++)
             {
-                ulong hash = reader.ReadUInt64();
-                observedMasked.Add(hash & mask);
-                observedFull.Add(hash);
+                ulong packedHash = reader.ReadUInt64();
+                foreach (int bits in bitOptions)
+                {
+                    ulong entryHash = packedHash & ((1UL << bits) - 1);
+                    if (useXxh3 != false) observedXxh3.Add(entryHash);
+                    if (useXxh3 != true) observedXxh64.Add(entryHash);
+                }
+            }
+        }
+
+        private static int[] GetRstHashBitOptions(int rstVersion, int? gameVersion)
+        {
+            if (rstVersion is 2 or 3) return new[] { 40 };
+            if (gameVersion.HasValue) return new[] { gameVersion.Value >= 1502 ? 38 : 39 };
+            return new[] { 38, 39 };
+        }
+
+        private async Task<int?> DetectGameVersionAsync(string rootDirectory)
+        {
+            if (_versionService == null) return null;
+            try
+            {
+                string version = await _versionService.GetGameVersionAsync(rootDirectory);
+                if (string.IsNullOrWhiteSpace(version)) return null;
+                string[] parts = version.Split('.', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2 ||
+                    !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int major) ||
+                    !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int minor))
+                    return null;
+                return major * 100 + minor;
+            }
+            catch (Exception ex)
+            {
+                _log.LogDebug($"RST game-version detection skipped: {ex.Message}");
+                return null;
             }
         }
 

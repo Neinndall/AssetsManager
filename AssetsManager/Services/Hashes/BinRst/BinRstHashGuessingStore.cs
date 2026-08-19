@@ -290,8 +290,6 @@ namespace AssetsManager.Services.Hashes
         private static HashSet<ulong> BuildKnownLookupSet(InternalHashKind kind, IEnumerable<ulong> known)
         {
             if (!IsRst(kind)) return known.ToHashSet();
-            if (kind == InternalHashKind.RstXxh3)
-                return known.Select(hash => hash & ((1UL << 38) - 1)).ToHashSet();
             var lookups = new HashSet<ulong>();
             foreach (ulong hash in known)
             {

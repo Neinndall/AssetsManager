@@ -75,7 +75,18 @@ namespace AssetsManager.Services.Hashes
                 MatchResolvedHashPathLeafEvidence(tree, matcher, path, wadPath, resolver);
             if (ShouldRun("bin-context-objectlocal"))
                 MatchObjectLocalHashEvidence(tree, matcher, path, wadPath);
-            if (matcher.Remaining > 0 && ShouldRun("bin-context-strings"))
+            if (ShouldRun("bin-context-tft-shop"))
+                MatchTftShopPaths(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-augment"))
+                MatchAugmentPaths(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-quests"))
+                MatchModeQuestPaths(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-attributes"))
+                MatchAttributeEntryPaths(tree, matcher, path, wadPath);
+            if (ShouldRun("bin-context-relations"))
+                MatchObjectLinkRelations(tree, matcher, path, wadPath, resolver);
+            if (matcher.Remaining > 0 &&
+                (ShouldRun("bin-context-strings") || ShouldRun("rst-content-binstrings")))
             {
                 IReadOnlyDictionary<InternalHashKind, HashSet<ulong>> localTargets = CollectLocalTargets(tree);
                 VisitBinStrings(tree, value => matcher.Check(value, InternalHashGuessStrategy.BinContent, path, wadPath, path, localTargets));
@@ -364,6 +375,267 @@ namespace AssetsManager.Services.Hashes
                 leaf = slash >= 0 ? resolved[(slash + 1)..] : resolved;
                 return InternalHashEvidenceMatcher.IsIdentifier(leaf);
             }
+        }
+
+        private static void MatchTftShopPaths(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
+        {
+            uint classHash = Fnv1a.HashLower("TftShopData");
+            foreach (var pair in tree.Objects)
+            {
+                if (pair.Value.ClassHash != classHash ||
+                    !TryGetString(pair.Value.Properties, "mName", out string name))
+                {
+                    continue;
+                }
+
+                foreach (int set in Enumerable.Range(1, 29))
+                {
+                    if (CheckEntryCandidate(
+                        matcher,
+                        pair.Key,
+                        $"Maps/Shipping/Map22/Sets/TFTSet{set}/Shop/{name}",
+                        path,
+                        wadPath))
+                    {
+                        break;
+                    }
+                }
+
+                CheckEntryCandidate(matcher, pair.Key, $"Maps/Shipping/Map22/Shop/{name}", path, wadPath);
+            }
+        }
+
+        private static void MatchAugmentPaths(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
+        {
+            uint classHash = Fnv1a.HashLower("AugmentData");
+            foreach (var pair in tree.Objects)
+            {
+                if (pair.Value.ClassHash != classHash ||
+                    !TryGetString(pair.Value.Properties, "AugmentNameId", out string augmentName))
+                {
+                    continue;
+                }
+
+                string augmentPath = $"Maps/ModeSpecificData/Augments/{augmentName}";
+                CheckEntryCandidate(matcher, pair.Key, augmentPath, path, wadPath);
+
+                if (TryGetObjectLink(pair.Value.Properties, "RootSpell", out BinTreeObjectLink rootSpell))
+                {
+                    CheckEntryCandidate(
+                        matcher,
+                        rootSpell.Value,
+                        $"{augmentPath}/Augment_{augmentName}",
+                        path,
+                        wadPath);
+                }
+            }
+        }
+
+        private static void MatchModeQuestPaths(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
+        {
+            const uint modeQuestClassHash = 0x8d31b69b;
+            foreach (var pair in tree.Objects)
+            {
+                if (pair.Value.ClassHash != modeQuestClassHash ||
+                    !TryGetString(pair.Value.Properties, "QuestName", out string questName))
+                {
+                    continue;
+                }
+
+                CheckEntryCandidate(
+                    matcher,
+                    pair.Key,
+                    $"Maps/ModeSpecificData/ModesQuests/{questName}",
+                    path,
+                    wadPath);
+            }
+        }
+
+        private static void MatchAttributeEntryPaths(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
+        {
+            foreach (var pair in tree.Objects)
+            {
+                uint classHash = pair.Value.ClassHash;
+
+                if (classHash == Fnv1a.HashLower("ContextualActionData"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "mObjectPath", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("CustomShaderDef"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "objectPath", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("RewardGroup"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "internalName", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("Sequence"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "path", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("MapContainer"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "mapPath", matcher, path, wadPath);
+                else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") ||
+                         classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
+                    MatchDirectEntryAttribute(pair.Key, pair.Value, "particlePath", matcher, path, wadPath);
+            }
+        }
+
+        private static void MatchObjectLinkRelations(
+            BinTree tree,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath,
+            HashResolverService resolver)
+        {
+            if (resolver == null)
+            {
+                return;
+            }
+
+            uint tftMapSkinClassHash = Fnv1a.HashLower("TftMapSkin");
+            uint mapPlaceableContainerClassHash = Fnv1a.HashLower("MapPlaceableContainer");
+            uint taggedObjectHash = Fnv1a.HashLower("ad304db5");
+
+            foreach (var pair in tree.Objects)
+            {
+                BinTreeObject item = pair.Value;
+                if (item.ClassHash == tftMapSkinClassHash &&
+                    TryGetObjectLink(item.Properties, "GroupLink", out BinTreeObjectLink groupLink))
+                {
+                    MatchResolvedEntryLink(groupLink.Value, matcher, resolver, path, wadPath);
+                }
+
+                if (item.ClassHash == mapPlaceableContainerClassHash &&
+                    item.Properties.TryGetValue(Fnv1a.HashLower("items"), out BinTreeProperty items))
+                {
+                    VisitTaggedObjectLinks(items, taggedObjectHash, link =>
+                        MatchResolvedEntryLink(link.Value, matcher, resolver, path, wadPath));
+                }
+            }
+        }
+
+        private static void MatchDirectEntryAttribute(
+            uint entryHash,
+            BinTreeObject item,
+            string field,
+            InternalHashEvidenceMatcher matcher,
+            string path,
+            string wadPath)
+        {
+            if (TryGetString(item.Properties, field, out string value))
+            {
+                CheckEntryCandidate(matcher, entryHash, value, path, wadPath);
+            }
+        }
+
+        private static void MatchResolvedEntryLink(
+            uint linkHash,
+            InternalHashEvidenceMatcher matcher,
+            HashResolverService resolver,
+            string path,
+            string wadPath)
+        {
+            string candidate = resolver.ResolveBinEntry(linkHash);
+            if (string.IsNullOrWhiteSpace(candidate) ||
+                string.Equals(candidate, linkHash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            matcher.CheckContextualCandidate(
+                InternalHashKind.BinEntries,
+                candidate,
+                path,
+                wadPath,
+                linkHash,
+                InternalHashEvidence.SemanticReference);
+        }
+
+        private static void VisitTaggedObjectLinks(
+            BinTreeProperty property,
+            uint tagHash,
+            Action<BinTreeObjectLink> check)
+        {
+            switch (property)
+            {
+                case BinTreeStruct structure:
+                    foreach (var child in structure.Properties)
+                    {
+                        if (child.Key == tagHash && child.Value is BinTreeObjectLink taggedLink)
+                            check(taggedLink);
+                        VisitTaggedObjectLinks(child.Value, tagHash, check);
+                    }
+                    break;
+                case BinTreeContainer container:
+                    foreach (BinTreeProperty child in container.Elements)
+                        VisitTaggedObjectLinks(child, tagHash, check);
+                    break;
+                case BinTreeOptional optional when optional.Value != null:
+                    VisitTaggedObjectLinks(optional.Value, tagHash, check);
+                    break;
+                case BinTreeMap map:
+                    foreach (var child in map)
+                    {
+                        VisitTaggedObjectLinks(child.Key, tagHash, check);
+                        VisitTaggedObjectLinks(child.Value, tagHash, check);
+                    }
+                    break;
+            }
+        }
+
+        private static bool CheckEntryCandidate(
+            InternalHashEvidenceMatcher matcher,
+            uint hash,
+            string candidate,
+            string path,
+            string wadPath) =>
+            matcher.CheckContextualCandidate(
+                InternalHashKind.BinEntries,
+                candidate,
+                path,
+                wadPath,
+                hash,
+                InternalHashEvidence.SemanticReference);
+
+        private static bool TryGetObjectLink(
+            Dictionary<uint, BinTreeProperty> properties,
+            string field,
+            out BinTreeObjectLink link)
+        {
+            if (properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) &&
+                property is BinTreeObjectLink objectLink)
+            {
+                link = objectLink;
+                return true;
+            }
+
+            link = null;
+            return false;
+        }
+
+        private static bool TryGetString(
+            Dictionary<uint, BinTreeProperty> properties,
+            string field,
+            out string value)
+        {
+            if (properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) &&
+                property is BinTreeString text)
+            {
+                value = text.Value;
+                return true;
+            }
+
+            value = null;
+            return false;
         }
 
         internal static void MatchBinContextualEvidence(

@@ -124,8 +124,8 @@
                              x:Name="MethodsListBox"
                              ItemsSource="{Binding AvailableMethods}"
                              SelectedItem="{Binding SelectedMethod}"
-                             ItemTemplate="{StaticResource HashMethodTemplate}"
-                             ItemContainerStyle="{StaticResource HashMethodItemStyle}"
+                             ItemTemplate="{StaticResource HashGuessingTemplate}"
+                             ItemContainerStyle="{StaticResource HashGuessingItemStyle}"
                              Background="Transparent"
                              BorderThickness="0"
                              VirtualizingPanel.ScrollUnit="Pixel"
@@ -249,7 +249,7 @@
 
                             <ScrollViewer Grid.Row="2" MaxHeight="170" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False">
                                 <ItemsControl ItemsSource="{Binding SelectedMethod.SubMethods}"
-                                              ItemTemplate="{StaticResource HashMethodSubItemTemplate}"/>
+                                              ItemTemplate="{StaticResource HashGuessingSubItemTemplate}"/>
                             </ScrollViewer>
                         </Grid>
 

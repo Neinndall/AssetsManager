@@ -67,6 +67,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab / RST now selects XXH64 or XXH3 and the 38/39/40-bit layout from the detected game version, scans BIN string contexts in RST mode, and cross-references GAME/LCU paths safely.
   - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.
   - API Center now loads sales, Mythic Shop, and pass caches once per view in background work and reuses them when switching tabs.
   - Monitor / Dashboard now implements IDisposable with proper event unsubscription, releasing service references only when leaving the Monitor view entirely.
@@ -279,6 +280,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash Guessing Lab / Fixed RST inventory entries retaining packed offsets and prevented legacy GAME-path evidence from promoting values into BIN catalogs.
   - Fixed transparent VFX layers clipping and flickering against each other when moving the camera.
   - Fixed oversized uniform mesh effects and stretched celebration screens in VFX Studio.
   - Fixed short VFX timelines restarting before the red playhead reached the real end; preview looping now requires the visible gold marker.

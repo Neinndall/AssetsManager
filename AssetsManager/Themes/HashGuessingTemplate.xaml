@@ -6,7 +6,7 @@
     </ResourceDictionary.MergedDictionaries>
 
     <!-- Hash Method List Item DataTemplate -->
-    <DataTemplate x:Key="HashMethodTemplate">
+    <DataTemplate x:Key="HashGuessingTemplate">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="42"/>
@@ -47,7 +47,7 @@
     </DataTemplate>
 
     <!-- Hash Method List Item Style -->
-    <Style x:Key="HashMethodItemStyle" TargetType="ListBoxItem">
+    <Style x:Key="HashGuessingItemStyle" TargetType="ListBoxItem">
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Padding" Value="0"/>
@@ -82,7 +82,7 @@
     </Style>
 
     <!-- Sub-Method Card Item DataTemplate -->
-    <DataTemplate x:Key="HashMethodSubItemTemplate">
+    <DataTemplate x:Key="HashGuessingSubItemTemplate">
         <Border Background="{StaticResource CardBackground}"
                 BorderBrush="{StaticResource BorderColor}"
                 BorderThickness="1"

@@ -87,7 +87,6 @@ namespace AssetsManager.Views.Models.Hashes
                 InternalHashEvidence.OwningEntryPrefix or
                 InternalHashEvidence.OwningFileString or
                 InternalHashEvidence.RstHashMatch or
-                InternalHashEvidence.GamePathExactMatch or
                 InternalHashEvidence.MetaSchemaWordset or
                 InternalHashEvidence.MetaSchemaRelation or
                 InternalHashEvidence.MetaSchemaUnique or

@@ -31,7 +31,7 @@
                 <ResourceDictionary Source="/Themes/Converters.xaml"/>
                 <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
                 <ResourceDictionary Source="/Themes/HudWindowStyles.xaml"/>
-                <ResourceDictionary Source="/Themes/HashMethodTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/HashGuessingTemplate.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

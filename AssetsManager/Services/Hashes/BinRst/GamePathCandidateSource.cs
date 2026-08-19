@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Threading;
-using AssetsManager.Utils;
 using AssetsManager.Views.Models.Hashes;
-using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Hashes
 {
@@ -20,12 +16,16 @@ namespace AssetsManager.Services.Hashes
             string source,
             CancellationToken cancellationToken = default)
         {
-            HashSet<ulong> entryTargets = matcher.GetRemaining(InternalHashKind.BinEntries).ToHashSet();
-            HashSet<ulong> hashTargets = matcher.GetRemaining(InternalHashKind.BinHashes).ToHashSet();
-            if (entryTargets.Count == 0 && hashTargets.Count == 0 &&
-                matcher.GetRemainingCount(InternalHashKind.RstXxh3) == 0 &&
+            // A GAME/WAD path is not evidence that the same string is a BIN
+            // entry or a BIN hash.  The two catalogs use different hashing
+            // domains, and a 32-bit FNV hit against an internal unknown can be
+            // a coincidental or merely unrelated value from a BIN.  Only the
+            // RST domain is safe here because its keys are themselves derived
+            // from arbitrary shipped paths.
+            if (matcher.GetRemainingCount(InternalHashKind.RstXxh3) == 0 &&
                 matcher.GetRemainingCount(InternalHashKind.RstXxh64) == 0) return;
             int generatedVariants = 0;
+            var seenCandidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (string line in gameHashLines)
             {
@@ -36,53 +36,31 @@ namespace AssetsManager.Services.Hashes
                 path = InternalHashEvidenceMatcher.NormalizeCandidate(path);
                 if (path.Length < 3 || !path.Contains('/')) continue;
 
-                // Exact known path: entry name only (asset paths are never entry keys).
-                Consider(path, checkHashes: false, includeTruncatedRst: true);
+                Consider(path, includeTruncatedRst: true);
 
                 int extensionIndex = path.LastIndexOf('.');
-                int slashIndex = path.LastIndexOf('/');
-                if (extensionIndex > slashIndex + 1)
+                if (extensionIndex > path.LastIndexOf('/') + 1)
                 {
-                    // Extension-stripped known path: entry name and file hash alike.
-                    Consider(path[..extensionIndex], checkHashes: true, includeTruncatedRst: true);
+                    Consider(path[..extensionIndex], includeTruncatedRst: true);
                     if (generatedVariants < VariantBudget)
-                        ConsiderVariants(path[..extensionIndex], checkHashes: true);
+                        ConsiderVariants(path[..extensionIndex]);
                 }
                 if (generatedVariants < VariantBudget)
-                    ConsiderVariants(path, checkHashes: false);
+                    ConsiderVariants(path);
 
-                // Parent directories are real shipped paths too; check them both.
+                // Parent directories are real shipped paths too.
                 int dirEnd = path.Length;
                 while ((dirEnd = path.LastIndexOf('/', dirEnd - 1)) > 0)
-                    Consider(path[..dirEnd], checkHashes: true, includeTruncatedRst: true);
+                    Consider(path[..dirEnd], includeTruncatedRst: true);
             }
 
-            void Consider(string value, bool checkHashes, bool includeTruncatedRst)
+            void Consider(string value, bool includeTruncatedRst)
             {
-                uint hash = Fnv1a.HashLower(value);
-                if (entryTargets.Remove(hash))
-                {
-                    matcher.CheckResearchCandidate(
-                        InternalHashKind.BinEntries,
-                        value,
-                        InternalHashGuessStrategy.GamePath,
-                        source,
-                        InternalHashEvidence.GamePathExactMatch,
-                        verified: true);
-                }
-                if (checkHashes && hashTargets.Count > 0 && hashTargets.Remove(hash))
-                {
-                    matcher.CheckResearchCandidate(
-                        InternalHashKind.BinHashes,
-                        value,
-                        InternalHashGuessStrategy.GamePath,
-                        source,
-                        InternalHashEvidence.GamePathExactMatch,
-                        verified: true);
-                }
                 // Known paths are real string-table strings; resolve RST targets too.
-                // Synthetic variants keep only full 64-bit XXH64 checks (a 38-bit
+                // Synthetic variants keep only full 64-bit checks (a truncated
                 // prefix match cannot prove a derived string).
+                value = InternalHashEvidenceMatcher.NormalizeCandidate(value);
+                if (!seenCandidates.Add(value)) return;
                 matcher.Check(
                     value,
                     InternalHashGuessStrategy.GamePath,
@@ -90,11 +68,10 @@ namespace AssetsManager.Services.Hashes
                     includeTruncatedRst: includeTruncatedRst);
             }
 
-            // Sibling skin/set enumeration: every variant is an exact FNV1a hit on a
-            // real catalog template, so any match is proof of the entry name.
-            // The skin/set digits renumber everywhere in the path, so the directory
-            // and the basename (aatrox_skin03.skn -> aatrox_skin17.skn) both follow.
-            void ConsiderVariants(string value, bool checkHashes)
+            // Sibling skin/set enumeration is retained for RST keys: the generated
+            // strings are still checked against their actual XXH targets below. It
+            // never promotes the generated path into a BIN catalog.
+            void ConsiderVariants(string value)
             {
                 foreach ((string marker, int min, int max) in new[] { ("skins/skin", 0, 49), ("sets/set", 1, 29) })
                 {
@@ -110,7 +87,7 @@ namespace AssetsManager.Services.Hashes
                         generatedVariants++;
                         if (generatedVariants > VariantBudget) return;
                         string replacement = $"{segment[..^value[digitsStart..digitsEnd].Length]}{number:D2}";
-                        Consider(value.Replace(segment, replacement), checkHashes, includeTruncatedRst: false);
+                        Consider(value.Replace(segment, replacement), includeTruncatedRst: false);
                     }
                 }
             }

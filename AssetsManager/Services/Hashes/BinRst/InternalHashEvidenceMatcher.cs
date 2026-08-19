@@ -11,6 +11,7 @@ namespace AssetsManager.Services.Hashes
 {
     internal sealed class InternalHashEvidenceMatcher
     {
+        private static readonly int[] RstBitOptions = { 64, 40, 39, 38 };
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _targets;
         private readonly Dictionary<InternalHashKind, HashSet<ulong>> _matched;
         private readonly Dictionary<(InternalHashKind Kind, ulong Hash, string Value), InternalHashGuessMatch> _matches = new();
@@ -81,13 +82,16 @@ namespace AssetsManager.Services.Hashes
                 bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;
                 if (hasXxh3 || hasXxh64)
                 {
-                    int byteCount = Encoding.UTF8.GetByteCount(candidate);
+                    // RST keys are hashed after lower-casing. Keep the original
+                    // spelling in the finding, but never hash the display casing.
+                    string rstCandidate = candidate.ToLowerInvariant();
+                    int byteCount = Encoding.UTF8.GetByteCount(rstCandidate);
                     Span<byte> bytes = byteCount <= 1536 ? stackalloc byte[byteCount] : new byte[byteCount];
-                    Encoding.UTF8.GetBytes(candidate, bytes);
+                    Encoding.UTF8.GetBytes(rstCandidate, bytes);
                     if (hasXxh3)
-                        CheckRst(InternalHashKind.RstXxh3, XxHash3.HashToUInt64(bytes), candidate, strategy, source, new[] { 38 }, sourceWad, sourceBin);
+                        CheckRst(InternalHashKind.RstXxh3, XxHash3.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? RstBitOptions : new[] { 64 }, sourceWad, sourceBin);
                     if (hasXxh64)
-                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? new[] { 64, 38, 39, 40 } : new[] { 64 }, sourceWad, sourceBin);
+                        CheckRst(InternalHashKind.RstXxh64, XxHash64.HashToUInt64(bytes), candidate, strategy, source, includeTruncatedRst ? RstBitOptions : new[] { 64 }, sourceWad, sourceBin);
                 }
             }
         }

@@ -606,7 +606,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void GamePathCatalogPathsVerifyDirectlyAsBinEntries()
+        public void GamePathCatalogPathsDoNotVerifyAsBinEntries()
         {
             string[] paths =
             {
@@ -622,18 +622,12 @@ namespace AssetsManager.BenchmarkTests.Hashes
 
             GamePathCandidateSource.Discover(lines, matcher, "hashes.game.txt");
 
-            Assert.Equal(3, matcher.Matches.Count);
-            Assert.All(matcher.Matches, match =>
-            {
-                Assert.True(match.CanPromote);
-                Assert.Equal(InternalHashConfidence.Verified, match.Confidence);
-                Assert.Equal(InternalHashEvidence.GamePathExactMatch, match.Evidence);
-            });
-            Assert.Empty(targets[InternalHashKind.BinEntries]);
+            Assert.Empty(matcher.Matches);
+            Assert.Equal(3, targets[InternalHashKind.BinEntries].Count);
         }
 
         [Fact]
-        public void IsolatedGamePathExactHitVerifiesSingleEntry()
+        public void IsolatedGamePathExactHitDoesNotVerifyBinEntry()
         {
             const string path = "assets/test/single.dds";
             var targets = CreateTargets();
@@ -645,14 +639,12 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 matcher,
                 "hashes.game.txt");
 
-            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
-            Assert.True(match.CanPromote);
-            Assert.Equal(path, match.Value);
-            Assert.Empty(targets[InternalHashKind.BinEntries]);
+            Assert.Empty(matcher.Matches);
+            Assert.Contains(Fnv1a.HashLower(path), targets[InternalHashKind.BinEntries]);
         }
 
         [Fact]
-        public void GamePathParentDirectoriesResolveEntryAndHashTargets()
+        public void GamePathParentDirectoriesDoNotResolveBinTargets()
         {
             const string path = "data/characters/x/skins/skin00/body.dds";
             var targets = CreateTargets();
@@ -665,12 +657,9 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 matcher,
                 "hashes.game.txt");
 
-            Assert.Equal(2, matcher.Matches.Count);
-            Assert.Contains(matcher.Matches, match =>
-                match.Kind == InternalHashKind.BinEntries && match.Value == "data/characters/x/skins/skin00");
-            Assert.Contains(matcher.Matches, match =>
-                match.Kind == InternalHashKind.BinHashes && match.Value == "data/characters/x/skins");
-            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+            Assert.Empty(matcher.Matches);
+            Assert.Single(targets[InternalHashKind.BinEntries]);
+            Assert.Single(targets[InternalHashKind.BinHashes]);
         }
 
         [Fact]
@@ -696,6 +685,63 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
+        public void RstCandidatesUseLowercaseAndSupportAllPackedBitWidths()
+        {
+            const string candidate = "ClientStates/Gameplay/TranslationKey";
+            byte[] bytes = Encoding.UTF8.GetBytes(candidate.ToLowerInvariant());
+            ulong xxh3 = XxHash3.HashToUInt64(bytes);
+            ulong xxh64 = XxHash64.HashToUInt64(bytes);
+            var targets = CreateTargets();
+            targets[InternalHashKind.RstXxh3].Add(xxh3 & ((1UL << 39) - 1));
+            targets[InternalHashKind.RstXxh64].Add(xxh64 & ((1UL << 40) - 1));
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            matcher.Check(candidate, InternalHashGuessStrategy.CrossDictionary, "test");
+
+            Assert.Equal(2, matcher.Matches.Count);
+            Assert.All(matcher.Matches, match =>
+            {
+                Assert.Equal(candidate, match.Value);
+                Assert.True(match.CanPromote);
+                Assert.Contains(match.HashBits, new[] { 39, 40 });
+            });
+            Assert.Empty(targets[InternalHashKind.RstXxh3]);
+            Assert.Empty(targets[InternalHashKind.RstXxh64]);
+        }
+
+        [Fact]
+        public void RstInventoryUnpacksOffsetAndSelectsAlgorithmByPatch()
+        {
+            const ulong hash39 = (1UL << 38) | 0x12345UL;
+            const ulong hash38 = 0x23456UL;
+            var xxh3 = new HashSet<ulong>();
+            var xxh64 = new HashSet<ulong>();
+
+            using (MemoryStream stream = CreateRstStream(5, (7UL << 39) | hash39))
+                BinRstHashGuessingService.ReadRstInventory(stream, xxh3, xxh64, gameVersion: 1501);
+
+            Assert.Contains(hash39, xxh3);
+            Assert.Empty(xxh64);
+
+            xxh3.Clear();
+            xxh64.Clear();
+            using (MemoryStream stream = CreateRstStream(5, (7UL << 38) | hash38))
+                BinRstHashGuessingService.ReadRstInventory(stream, xxh3, xxh64, gameVersion: 1502);
+
+            Assert.Contains(hash38, xxh3);
+            Assert.Empty(xxh64);
+
+            xxh3.Clear();
+            xxh64.Clear();
+            using (MemoryStream stream = CreateRstStream(5, (7UL << 39) | hash39))
+                BinRstHashGuessingService.ReadRstInventory(stream, xxh3, xxh64, gameVersion: 1409);
+
+            Assert.Empty(xxh3);
+            Assert.Contains(hash39, xxh64);
+            Assert.DoesNotContain(7UL << 39, xxh64);
+        }
+
+        [Fact]
         public void GamePathSkinVariantsDoNotResolveTruncatedRstTargets()
         {
             const string path = "data/characters/aatrox/skins/skin03/aatrox_skin03.skn";
@@ -715,7 +761,7 @@ namespace AssetsManager.BenchmarkTests.Hashes
         }
 
         [Fact]
-        public void GamePathSkinVariantsResolveEntryAndHashTargets()
+        public void GamePathSkinVariantsDoNotResolveBinTargets()
         {
             const string path = "data/characters/aatrox/skins/skin03/aatrox_skin03.skn";
             var targets = CreateTargets();
@@ -728,12 +774,81 @@ namespace AssetsManager.BenchmarkTests.Hashes
                 matcher,
                 "hashes.game.txt");
 
-            Assert.Equal(2, matcher.Matches.Count);
-            Assert.Contains(matcher.Matches, match =>
-                match.Kind == InternalHashKind.BinEntries && match.Value == "data/characters/aatrox/skins/skin17/aatrox_skin17.skn");
-            Assert.Contains(matcher.Matches, match =>
-                match.Kind == InternalHashKind.BinHashes && match.Value == "data/characters/aatrox/skins/skin17/aatrox_skin17");
-            Assert.All(matcher.Matches, match => Assert.True(match.CanPromote));
+            Assert.Empty(matcher.Matches);
+            Assert.Single(targets[InternalHashKind.BinEntries]);
+            Assert.Single(targets[InternalHashKind.BinHashes]);
+        }
+
+        [Fact]
+        public void LegacyGamePathEvidenceCannotPromoteBinCatalogValues()
+        {
+            var match = new InternalHashGuessMatch
+            {
+                Hash = 0x12345678,
+                LookupHash = 0x12345678,
+                HashBits = 32,
+                Value = "assets/test/file.dds",
+                Kind = InternalHashKind.BinEntries,
+                Strategy = InternalHashGuessStrategy.GamePath,
+                IsVerified = true,
+                VerificationSchema = InternalHashGuessMatch.CurrentVerificationSchema,
+                Confidence = InternalHashConfidence.Verified,
+                Evidence = InternalHashEvidence.GamePathExactMatch
+            };
+
+            Assert.False(match.CanPromote);
+        }
+
+        [Fact]
+        public async Task RstContentCanScanLooseBinStringsWithoutEnablingBinTargets()
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            string root = bridge.CreateDirectory("Game");
+            string binPath = Path.Combine(root, "translation.bin");
+            const string candidate = "ClientStates/Gameplay/TranslationKey";
+            ulong target = XxHash3.HashToUInt64(Encoding.UTF8.GetBytes(candidate.ToLowerInvariant())) & ((1UL << 38) - 1);
+
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashLabPath, "current.rst.xxh3.38.txt"),
+                target.ToString("x16"));
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashLabPath, "internal.rst.patch.txt"),
+                "fixture");
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(
+                    0x11111111,
+                    Fnv1a.HashLower("TranslationOwner"),
+                    new BinTreeProperty[]
+                    {
+                        new BinTreeString(Fnv1a.HashLower("mKey"), candidate)
+                    })
+            }, Array.Empty<string>());
+            await using (FileStream output = File.Create(binPath))
+                tree.Write(output);
+
+            var store = new BinRstHashGuessingStore(bridge.Directories);
+            var pathStore = new HashGuessingStore(bridge.Directories);
+            var persistence = new HashGuessPersistenceService(pathStore, store);
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+            using var httpClient = new HttpClient(new StaticMetaSchemaHandler());
+            var metaSchema = new MetaSchemaHashSource(httpClient, bridge.Directories, bridge.LogService);
+            var service = new BinRstHashGuessingService(store, persistence, resolver, bridge.Directories, bridge.LogService, metaSchema);
+
+            InternalHashRunResult result = await service.RunContentGuessingAsync(
+                root,
+                includeBin: false,
+                includeRst: true,
+                progress: null,
+                cancellationToken: CancellationToken.None,
+                selectedSubMethods: new HashSet<string> { "rst-content-binstrings" });
+
+            InternalHashGuessMatch match = Assert.Single(result.Matches);
+            Assert.Equal(InternalHashKind.RstXxh3, match.Kind);
+            Assert.Equal(candidate, match.Value);
+            Assert.False(File.Exists(Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt")));
         }
 
         [Fact]
@@ -996,6 +1111,20 @@ namespace AssetsManager.BenchmarkTests.Hashes
             [InternalHashKind.RstXxh3] = new(),
             [InternalHashKind.RstXxh64] = new()
         };
+
+        private static MemoryStream CreateRstStream(int version, ulong packedHash)
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(Encoding.ASCII.GetBytes("RST"));
+                writer.Write((byte)version);
+                writer.Write((uint)1);
+                writer.Write(packedHash);
+            }
+            stream.Position = 0;
+            return stream;
+        }
 
         private static BinTree CreateEntryTree(uint hash, string className, string field, string value) =>
             new(new[]
