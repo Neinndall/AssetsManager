@@ -75,6 +75,11 @@
                               x:Name="FoldersTreeView"
                               Style="{StaticResource ModernTreeView}"
                               SelectedItemChanged="FoldersTreeView_SelectedItemChanged">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
                         <TreeView.ContextMenu>
                             <ContextMenu Opened="FoldersContextMenu_Opened">
                                 <MenuItem Header="Close Project" Click="CloseSelectedProject_Click">

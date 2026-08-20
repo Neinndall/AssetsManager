@@ -18,7 +18,7 @@ namespace AssetsManager.Views.Controls.Viewer
 {
     public class ProjectExplorerNode : INotifyPropertyChanged, ISelectableTreeNode
     {
-        private bool _isExpanded = true;
+        private bool _isExpanded;
         private bool _isSelected;
         private bool _isMultiSelected;
 
@@ -148,7 +148,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 IsFile = false,
                 IconKind = node.IconKind,
                 IconColor = node.IconColor,
-                IsExpanded = node.IsExpanded
+                IsExpanded = node.IsExpanded,
+                IsSelected = node.IsSelected
             };
 
             foreach (var child in node.Children)
@@ -411,8 +412,48 @@ namespace AssetsManager.Views.Controls.Viewer
             if (folderNode == null || folderNode.IsFile) return;
 
             _currentFolderNode = folderNode;
+            SynchronizeFolderTree(folderNode.FullPath);
             FilesListBox.ItemsSource = folderNode.Children;
             UpdateBreadcrumbs(folderNode);
+        }
+
+        private void SynchronizeFolderTree(string folderPath)
+        {
+            SynchronizeFolderTree(_folderOnlyNodes, folderPath);
+            if (FoldersTreeView.ItemsSource is IEnumerable<ProjectExplorerNode> visibleRoots &&
+                !ReferenceEquals(visibleRoots, _folderOnlyNodes))
+            {
+                SynchronizeFolderTree(visibleRoots, folderPath);
+            }
+        }
+
+        private static void SynchronizeFolderTree(
+            IEnumerable<ProjectExplorerNode> roots,
+            string folderPath)
+        {
+            foreach (ProjectExplorerNode root in roots)
+            {
+                if (SynchronizeFolderNode(root, folderPath))
+                {
+                    break;
+                }
+            }
+        }
+
+        private static bool SynchronizeFolderNode(ProjectExplorerNode node, string folderPath)
+        {
+            bool isTarget = string.Equals(node.FullPath, folderPath, StringComparison.OrdinalIgnoreCase);
+            bool containsTarget = isTarget;
+
+            foreach (ProjectExplorerNode child in node.Children.Where(child => !child.IsFile))
+            {
+                containsTarget |= SynchronizeFolderNode(child, folderPath);
+            }
+
+            node.IsSelected = isTarget;
+            if (containsTarget && !isTarget)
+                node.IsExpanded = true;
+            return containsTarget;
         }
 
         private void UpdateBreadcrumbs(ProjectExplorerNode folderNode)
