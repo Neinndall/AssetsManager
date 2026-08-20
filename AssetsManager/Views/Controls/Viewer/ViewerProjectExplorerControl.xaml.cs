@@ -528,7 +528,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     string.Equals(n.Name, pathOrName, StringComparison.OrdinalIgnoreCase));
             }
 
-            targetRoot ??= FindRootNodeFor(FoldersTreeView.SelectedItem as ProjectExplorerNode)
+            targetRoot ??= FindRootNodeFor(FindNodeByPath((FoldersTreeView.SelectedItem as ProjectExplorerNode)?.FullPath))
                        ?? FindRootNodeFor(_currentFolderNode)
                        ?? _allNodes.LastOrDefault();
 
