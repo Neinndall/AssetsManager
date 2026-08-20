@@ -991,21 +991,24 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void ResetCamera(bool smooth = true)
         {
-            bool isMap = Panel?.ViewModel?.IsMapMode == true;
+            bool isMap = _isMapGeometry;
 
             Point3D position;
             Vector3D lookDirection;
             Vector3D upDirection = new Vector3D(0.00, 1.00, 0.00);
 
-            if (TryGetModelBounds(out var center, out var maxDim))
+            if (TryGetModelBounds(isMap, out var center, out var maxDim, out var horizontalDim))
             {
-                double distance = isMap ? maxDim * 0.55 : maxDim * 1.25;
+                double distance = isMap ? horizontalDim * 0.18 : maxDim * 1.25;
                 if (distance < 50) distance = 250;
 
-                double heightFactor = isMap ? 1.2 : 0.15;
-                double depthFactor = isMap ? 1.0 : 1.0;
+                double heightFactor = isMap ? 1.30 : 0.15;
+                double horizontalAngle = isMap ? Math.PI * 0.75 : Math.PI / 2;
 
-                position = new Point3D(center.X, center.Y + distance * heightFactor, center.Z + distance * depthFactor);
+                position = new Point3D(
+                    center.X + Math.Cos(horizontalAngle) * distance,
+                    center.Y + distance * heightFactor,
+                    center.Z + Math.Sin(horizontalAngle) * distance);
                 lookDirection = center - position;
 
                 if (smooth)
@@ -1066,15 +1069,18 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_cameraController == null || sender is not Button btn || btn.Tag is not string viewType) return;
 
+            bool isMap = _isMapGeometry;
+
             // Compute dynamic target center and distance if model is available
             double baselineY = 1000;
             Point3D targetPoint = new Point3D(0, 90.00 + baselineY, 0);
             double distance = 300.00;
 
-            if (TryGetModelBounds(out var center, out var maxDim))
+            if (TryGetModelBounds(isMap, out var center, out var maxDim, out var horizontalDim))
             {
                 targetPoint = center;
-                distance = (Panel?.ViewModel?.IsMapMode == true ? 1.5 : 1.25) * maxDim;
+                double framingDim = isMap ? horizontalDim : maxDim;
+                distance = (isMap ? 1.5 : 1.25) * framingDim;
                 if (distance < 50) distance = 250;
             }
 
@@ -1131,31 +1137,44 @@ namespace AssetsManager.Views.Controls.Viewer
             };
         }
 
-        private bool TryGetModelBounds(out Point3D center, out double maxDim)
+        private bool TryGetModelBounds(
+            bool isMapGeometry,
+            out Point3D center,
+            out double maxDim,
+            out double horizontalDim)
         {
             center = new Point3D();
             maxDim = 0;
+            horizontalDim = 0;
 
             if (_activeSceneModel?.Parts?.Count > 0)
             {
                 var bounds = Rect3D.Empty;
+                var playableBounds = Rect3D.Empty;
                 foreach (var part in _activeSceneModel.Parts)
                 {
                     if (part.Geometry?.Geometry is MeshGeometry3D mesh)
                     {
                         bounds.Union(mesh.Bounds);
+                        if (isMapGeometry && part.Name?.StartsWith("LM_", StringComparison.OrdinalIgnoreCase) == true)
+                            playableBounds.Union(mesh.Bounds);
                     }
                 }
 
                 if (!bounds.IsEmpty)
                 {
-                    double centerX = bounds.X + bounds.SizeX / 2 + _activeSceneModel.PositionX;
-                    double centerY = bounds.Y + bounds.SizeY / 2 + _activeSceneModel.PositionY;
-                    double centerZ = bounds.Z + bounds.SizeZ / 2 + _activeSceneModel.PositionZ;
+                    Rect3D focusBounds = isMapGeometry && !playableBounds.IsEmpty ? playableBounds : bounds;
+                    double centerX = focusBounds.X + focusBounds.SizeX / 2 + _activeSceneModel.PositionX;
+                    double focusHeight = isMapGeometry ? 0.85 : 0.5;
+                    double centerY = focusBounds.Y + focusBounds.SizeY * focusHeight + _activeSceneModel.PositionY;
+                    double centerZ = focusBounds.Z + focusBounds.SizeZ / 2 + _activeSceneModel.PositionZ;
                     center = new Point3D(centerX, centerY, centerZ);
 
                     maxDim = Math.Max(bounds.SizeX, Math.Max(bounds.SizeY, bounds.SizeZ));
                     if (maxDim <= 0) maxDim = 150;
+                    horizontalDim = Math.Max(bounds.SizeX, bounds.SizeZ);
+                    if (horizontalDim <= 0) horizontalDim = maxDim;
+
                     return true;
                 }
             }
