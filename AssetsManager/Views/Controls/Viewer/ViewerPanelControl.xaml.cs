@@ -916,6 +916,19 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private static string FindProjectRoot(string mapGeoPath)
+        {
+            for (var directory = new DirectoryInfo(Path.GetDirectoryName(mapGeoPath)); directory != null; directory = directory.Parent)
+            {
+                if (directory.Name.EndsWith(".wad.client", StringComparison.OrdinalIgnoreCase) ||
+                    (Directory.Exists(Path.Combine(directory.FullName, "assets")) &&
+                     Directory.Exists(Path.Combine(directory.FullName, "data"))))
+                    return directory.FullName;
+            }
+
+            return Path.GetDirectoryName(mapGeoPath);
+        }
+
         public async Task OpenMapGeometry()
         {
             var openMapGeoDialog = new OpenFileDialog
@@ -936,9 +949,19 @@ namespace AssetsManager.Views.Controls.Viewer
                     WindowViewModel.IsLoadingVisible = true;
                 }
 
-                string gameDataPath = !string.IsNullOrEmpty(ProjectExplorer?.CurrentRootFolder)
-                    ? ProjectExplorer.CurrentRootFolder
-                    : Path.GetDirectoryName(mapGeoPath);
+                string gameDataPath = ProjectExplorer?.CurrentRootFolder;
+
+                if (string.IsNullOrEmpty(gameDataPath))
+                {
+                    gameDataPath = FindProjectRoot(mapGeoPath);
+                    ProjectExplorer?.LoadProjectFolder(gameDataPath);
+
+                    if (ProjectExplorer != null && WindowViewModel != null)
+                        WindowViewModel.IsProjectExplorerVisible = true;
+
+                    gameDataPath = ProjectExplorer?.CurrentRootFolder ?? gameDataPath;
+                }
+
                 await LoadMapGeometry(mapGeoPath, materialsBinPath, gameDataPath);
 
                 if (WindowViewModel != null)
