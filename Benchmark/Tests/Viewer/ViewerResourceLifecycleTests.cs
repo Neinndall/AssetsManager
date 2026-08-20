@@ -93,6 +93,30 @@ namespace AssetsManager.BenchmarkTests.Services.Viewer
         }
 
         [Fact]
+        public void ProjectionNearPlaneAllowsSubUnitMapDistance()
+        {
+            float nearPlane = ViewerViewportControl.CalculateProjectionNearPlane(
+                Vector3.UnitY,
+                isMapGeometry: true);
+
+            Assert.Equal(0.01f, nearPlane);
+        }
+
+        [Fact]
+        public void MapCameraCollisionPreservesHorizontalMovementAboveGround()
+        {
+            var requestedPosition = new Point3D(120, -50, -340);
+
+            Point3D constrained = CustomCameraController.ConstrainMapPosition(
+                requestedPosition,
+                collisionEnabled: true);
+
+            Assert.Equal(120, constrained.X);
+            Assert.Equal(CustomCameraController.MapGroundHeight, constrained.Y);
+            Assert.Equal(-340, constrained.Z);
+        }
+
+        [Fact]
         public void TexturePremultiplicationRemovesInvisibleRgbFromGeneratedMipmaps()
         {
             byte[] pixels =

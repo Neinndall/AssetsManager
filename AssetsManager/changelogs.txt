@@ -284,6 +284,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Map Environment zoom now remains continuous at close range without crossing the terrain or losing nearby surfaces.
   - Hash Guessing Lab / Fixed RST inventory entries retaining packed offsets and prevented legacy GAME-path evidence from promoting values into BIN catalogs.
   - Explorer / Skips hash catalog initialization when no local hash catalogs exist, avoiding an unnecessary loading delay on empty installations.
   - Explorer / Skips per-chunk type probing when no GAME/LCU path catalogs exist, so empty hash installations build WAD trees without opening every asset payload.

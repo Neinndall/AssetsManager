@@ -22,8 +22,11 @@ namespace AssetsManager.Views.Helpers
         private bool _isTransitioning;
         private const double SmoothFactor = 0.15; 
         private const double TransitionThreshold = 0.05;
+        internal const double MapGroundHeight = 10.0;
+        private const double MinimumZoomDistance = 0.05;
 
         public double ZoomSensitivity { get; set; } = 80.0;
+        public bool IsMapGroundCollisionEnabled { get; set; }
 
         public CustomCameraController(Viewport3D viewport, FrameworkElement inputSurface = null)
         {
@@ -92,7 +95,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
 
-            _targetPosition = position;
+            _targetPosition = ConstrainMapPosition(position);
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
             _isTransitioning = true;
@@ -102,6 +105,7 @@ namespace AssetsManager.Views.Helpers
         {
             if (_viewport?.Camera is not ProjectionCamera camera) return;
 
+            position = ConstrainMapPosition(position);
             _targetPosition = position;
             _targetLookDirection = lookDirection;
             _targetUpDirection = upDirection;
@@ -128,7 +132,8 @@ namespace AssetsManager.Views.Helpers
 
             // Interpolate Position
             var currentPos = camera.Position;
-            var newPos = currentPos + (_targetPosition - currentPos) * SmoothFactor;
+            var newPos = ConstrainMapPosition(
+                currentPos + (_targetPosition - currentPos) * SmoothFactor);
             camera.Position = newPos;
 
             // Interpolate LookDirection
@@ -248,11 +253,6 @@ namespace AssetsManager.Views.Helpers
             if (camera == null) return;
 
             var delta = e.Delta > 0 ? 1 : -1;
-            var lookDir = camera.LookDirection;
-            double currentDistance = lookDir.Length;
-            if (!double.IsFinite(currentDistance) || currentDistance <= 0.001) return;
-
-            lookDir.Normalize();
 
             double speedMultiplier = 1.0;
             if (Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift))
@@ -273,28 +273,23 @@ namespace AssetsManager.Views.Helpers
                 _isTransitioning = true;
             }
 
-            // Calculate dynamic zoom step based on distance so zooming is smooth at both macro (map) and micro (street/model) scales.
+            var lookDir = _targetLookDirection;
+            double currentDistance = lookDir.Length;
+            if (!double.IsFinite(currentDistance) || currentDistance <= 0.001) return;
+
+            lookDir.Normalize();
+
+            // Calculate dynamic zoom step based on the logical orbit distance, not the interpolating camera.
             double baseStep = Math.Clamp(currentDistance * 0.08, 5.0, 120.0);
             double step = baseStep * speedMultiplier;
-            var shift = lookDir * delta * step;
+            if (delta > 0)
+                step = Math.Min(step, Math.Max(currentDistance - MinimumZoomDistance, 0));
 
-            if (delta > 0) // Zooming IN
-            {
-                if (currentDistance - step < 5.0)
-                {
-                    _targetPosition += lookDir * step;
-                }
-                else
-                {
-                    _targetPosition += shift;
-                    _targetLookDirection -= shift;
-                }
-            }
-            else // Zooming OUT
-            {
-                _targetPosition += shift;
-                _targetLookDirection -= shift;
-            }
+            var requestedShift = lookDir * delta * step;
+            var nextPosition = ConstrainMapPosition(_targetPosition + requestedShift);
+            var actualShift = nextPosition - _targetPosition;
+            _targetPosition = nextPosition;
+            _targetLookDirection -= actualShift;
         }
 
         private void Rotate(Vector3D delta)
@@ -310,7 +305,8 @@ namespace AssetsManager.Views.Helpers
             transform.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(Vector3D.CrossProduct(up, -camera.LookDirection), -delta.Y)));
 
 
-            var newPosition = transform.Transform(camera.Position - target) + target;
+            var newPosition = ConstrainMapPosition(
+                transform.Transform(camera.Position - target) + target);
             var newLookDirection = target - newPosition;
             var newUpDirection = transform.Transform(up);
 
@@ -339,7 +335,18 @@ namespace AssetsManager.Views.Helpers
 
             var translation = rightDir * (-delta.X * sensitivity) + orthoUp * (delta.Y * sensitivity);
 
-            camera.Position += translation;
+            camera.Position = ConstrainMapPosition(camera.Position + translation);
         }
+
+        internal static Point3D ConstrainMapPosition(Point3D position, bool collisionEnabled)
+        {
+            if (collisionEnabled && position.Y < MapGroundHeight)
+                position.Y = MapGroundHeight;
+
+            return position;
+        }
+
+        private Point3D ConstrainMapPosition(Point3D position) =>
+            ConstrainMapPosition(position, IsMapGroundCollisionEnabled);
     }
 }

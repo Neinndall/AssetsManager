@@ -455,6 +455,8 @@ namespace AssetsManager.Views.Controls.Viewer
         public void SetupScene(bool isMapGeometry)
         {
             _isMapGeometry = isMapGeometry;
+            if (_cameraController != null)
+                _cameraController.IsMapGroundCollisionEnabled = isMapGeometry;
 
             if (isMapGeometry)
             {
@@ -1042,10 +1044,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             float cameraDistance = lookDirection.Length();
             if (!float.IsFinite(cameraDistance) || cameraDistance <= 0f)
-                return isMapGeometry ? 0.1f : 1f;
+                return isMapGeometry ? 0.01f : 1f;
 
             return isMapGeometry
-                ? Math.Clamp(cameraDistance * 0.001f, 0.1f, 2.5f)
+                ? Math.Clamp(cameraDistance * 0.001f, 0.01f, 2.5f)
                 : Math.Clamp(cameraDistance * 0.01f, 0.1f, 500f);
         }
 
