@@ -108,12 +108,15 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
         internal static SknMaterialTextureResolution Resolve(
             BinTree binTree,
-            IEnumerable<string> availableTextureKeys) =>
-            Resolve(ReadMetadata(binTree), availableTextureKeys);
+            IEnumerable<string> availableTextureKeys,
+            Func<ulong, string> wadChunkPathResolver = null) =>
+            Resolve(ReadMetadata(binTree, wadChunkPathResolver), availableTextureKeys);
 
-        internal static SknMaterialTextureMetadata ReadMetadata(BinTree binTree)
+        internal static SknMaterialTextureMetadata ReadMetadata(
+            BinTree binTree,
+            Func<ulong, string> wadChunkPathResolver = null)
         {
-            var materialDefinitions = BuildMaterialDefinitionMap(binTree);
+            var materialDefinitions = BuildMaterialDefinitionMap(binTree, wadChunkPathResolver);
             var overrideTexturePaths = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
             var overrideMaterials = new Dictionary<string, SknMaterialDefinition>(StringComparer.OrdinalIgnoreCase);
             string defaultTexturePath = null;
@@ -129,7 +132,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 }
 
                 if (defaultTexturePath == null &&
-                    TryGetString(meshProperties, Texture, out string texturePath))
+                    TryGetTexturePath(meshProperties, Texture, wadChunkPathResolver, out string texturePath))
                 {
                     defaultTexturePath = texturePath;
                 }
@@ -163,7 +166,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
 
                     var candidates = new List<string>(2);
-                    if (TryGetString(entry, Texture, out string directTexturePath))
+                    if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
                     {
                         candidates.Add(directTexturePath);
                     }
@@ -437,7 +440,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return Regex.Replace(key, @"[^a-z0-9]", string.Empty);
         }
 
-        private static Dictionary<uint, SknMaterialDefinition> BuildMaterialDefinitionMap(BinTree binTree)
+        private static Dictionary<uint, SknMaterialDefinition> BuildMaterialDefinitionMap(
+            BinTree binTree,
+            Func<ulong, string> wadChunkPathResolver)
         {
             var result = new Dictionary<uint, SknMaterialDefinition>();
             foreach ((uint pathHash, BinTreeObject obj) in binTree.Objects)
@@ -447,7 +452,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     continue;
                 }
 
-                List<SknMaterialSampler> samplers = ReadSamplers(obj);
+                List<SknMaterialSampler> samplers = ReadSamplers(obj, wadChunkPathResolver);
                 Dictionary<string, Vector4> parameters = ReadParameters(obj);
                 if (samplers.Count > 0 || parameters.Count > 0)
                 {
@@ -458,7 +463,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
-        private static List<SknMaterialSampler> ReadSamplers(BinTreeObject materialObject)
+        private static List<SknMaterialSampler> ReadSamplers(
+            BinTreeObject materialObject,
+            Func<ulong, string> wadChunkPathResolver)
         {
             var result = new List<SknMaterialSampler>();
             if (!materialObject.Properties.TryGetValue(SamplerValues, out BinTreeProperty property) ||
@@ -471,7 +478,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             {
                 if (element is BinTreeStruct sampler &&
                     TryGetString(sampler, TextureName, out string textureName) &&
-                    TryGetString(sampler, TexturePath, out string texturePath))
+                    TryGetTexturePath(sampler, TexturePath, wadChunkPathResolver, out string texturePath))
                 {
                     result.Add(new SknMaterialSampler(textureName, texturePath));
                 }
@@ -600,6 +607,32 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 !string.IsNullOrWhiteSpace(text.Value))
             {
                 result = text.Value;
+                return true;
+            }
+
+            result = null;
+            return false;
+        }
+
+        private static bool TryGetTexturePath(
+            BinTreeStruct value,
+            uint propertyHash,
+            Func<ulong, string> wadChunkPathResolver,
+            out string result)
+        {
+            if (!value.Properties.TryGetValue(propertyHash, out BinTreeProperty property))
+            {
+                result = null;
+                return false;
+            }
+
+            if (property is BinTreeWadChunkLink link)
+            {
+                string resolvedPath = wadChunkPathResolver?.Invoke(link.Value);
+                result = PathUtils.ToVirtualPath(
+                    string.IsNullOrWhiteSpace(resolvedPath)
+                        ? $"{link.Value:x16}"
+                        : resolvedPath);
                 return true;
             }
 

@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Services.Viewer.Loading;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
+using SknResolver = AssetsManager.Services.Viewer.Resolvers.SknMaterialTextureResolver;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -14,6 +17,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
 {
     public class SknMaterialTextureResolverTests
     {
+        private static readonly ConcurrentDictionary<ulong, string> TestTexturePaths = new();
+
         [Fact]
         public void Resolve_UsesSkinMeshTextureAsDefaultWithoutStaticMaterials()
         {
@@ -29,12 +34,54 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_AcceptsWadChunkLinksForSkinAndMaterialTextures()
+        {
+            const string defaultTexturePath =
+                "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_TX_CM.tex";
+            const string materialTexturePath =
+                "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_Sword_TX_CM.tex";
+            const string materialPath = "Characters/Aatrox/Skins/Base/Materials/Sword";
+            ulong defaultTextureHash = XxHash64Ext.Hash(defaultTexturePath.ToLowerInvariant());
+            ulong materialTextureHash = XxHash64Ext.Hash(materialTexturePath.ToLowerInvariant());
+
+            BinTree tree = CreateSkinTree(
+                defaultTexturePath,
+                CreateOverride(
+                    "Sword",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterial(
+                    materialPath,
+                    CreateSampler(
+                        "Diffuse_Texture",
+                        new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), materialTextureHash))),
+                defaultTextureProperty: new BinTreeWadChunkLink(
+                    Fnv1a.HashLower("texture"),
+                    defaultTextureHash));
+
+            Func<ulong, string> resolvePath = pathHash => pathHash == defaultTextureHash
+                ? defaultTexturePath
+                : pathHash == materialTextureHash
+                    ? materialTexturePath
+                    : $"{pathHash:x16}";
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "aatrox_base_tx_cm", "aatrox_base_sword_tx_cm" },
+                resolvePath);
+
+            Assert.Equal("aatrox_base_tx_cm", resolution.DefaultTextureKey);
+            Assert.Equal("aatrox_base_sword_tx_cm", resolution.Overrides["sword"]);
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree, resolvePath);
+            AssertContainsPath(defaultTexturePath, metadata.ReferencedTexturePaths);
+            AssertContainsPath(materialTexturePath, metadata.ReferencedTexturePaths);
+        }
+
+        [Fact]
         public void Resolve_UsesDirectTextureOverrideForSubmesh()
         {
             BinTreeEmbedded pixieOverride = CreateOverride(
                 "Autumn_Pixie",
-                new BinTreeString(
-                    Fnv1a.HashLower("texture"),
+                CreateTextureLink(
+                    "texture",
                     "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_Pixies_Autumn_TX_CM.tex"));
             BinTree tree = CreateSkinTree(
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex",
@@ -92,7 +139,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 new[] { "aatrox_skin33_sword_vfx_tx_cm", "aatrox_skin33_tx_cm" });
 
             Assert.Equal("aatrox_skin33_tx_cm", resolution.DefaultTextureKey);
-            Assert.Contains(
+            AssertContainsPath(
                 materialTexturePath,
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
@@ -138,8 +185,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
 
             // Verified metadata contains both referenced texture paths
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
-            Assert.Contains(bodyTexturePath, metadata.ReferencedTexturePaths);
-            Assert.Contains(swordTexturePath, metadata.ReferencedTexturePaths);
+            AssertContainsPath(bodyTexturePath, metadata.ReferencedTexturePaths);
+            AssertContainsPath(swordTexturePath, metadata.ReferencedTexturePaths);
         }
 
         [Fact]
@@ -150,7 +197,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_TX_CM.tex",
                 CreateOverride(
                     "Head",
-                    new BinTreeString(Fnv1a.HashLower("texture"), "missing.tex"),
+                    CreateTextureLink("texture", "missing.tex"),
                     new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
                 CreateMaterial(
                     materialPath,
@@ -204,8 +251,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
 
             Assert.Equal(textureName.ToLowerInvariant(), resolution.Overrides[expectedMaterialKey]);
-            Assert.Contains(texturePath, metadata.ReferencedTexturePaths);
-            Assert.DoesNotContain(
+            AssertContainsPath(texturePath, metadata.ReferencedTexturePaths);
+            AssertDoesNotContainPath(
                 "ASSETS/Characters/Shared/Overlay.tex",
                 metadata.ReferencedTexturePaths);
         }
@@ -278,7 +325,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             Assert.Equal(new Vector2(-0.1f, 0.1f), effect.ScrollSpeed);
             Assert.Equal(new Vector2(3f, 2f), effect.Tiling);
             Assert.Equal(new Vector4(0.18f, 0.67f, 1f, 0f), effect.Color);
-            Assert.Contains(
+            AssertContainsPath(
                 "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
@@ -442,7 +489,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             Assert.Equal("dissolve_texture", effect.TextureName);
             Assert.Equal(0.35f, effect.DissolveThreshold);
             Assert.Equal(0.2f, effect.DissolveSoftness);
-            Assert.Contains(dissolvePath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+            AssertContainsPath(dissolvePath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
 
         [Fact]
@@ -489,8 +536,8 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             Assert.Equal(new Vector2(0f, -2f), effect.EmissionScrollSpeed);
             Assert.Equal(1.25f, effect.EmissionStrength);
             Assert.Equal(new Vector4(1f, 0.63f, 0f, 1f), effect.EmissionColor);
-            Assert.Contains(emissionPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
-            Assert.Contains(maskPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+            AssertContainsPath(emissionPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+            AssertContainsPath(maskPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
 
         [Fact]
@@ -585,7 +632,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             Assert.Equal(ModelMaterialEffectKind.Bloom, effect.Kind);
             Assert.Equal("belveth_skin29_ult_bloommask_tx_cm", effect.MaskTextureName);
             Assert.Equal(5f, effect.BloomIntensity);
-            Assert.Contains(
+            AssertContainsPath(
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Skin29_Ult_BloomMask_TX_CM.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
@@ -627,7 +674,7 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             Assert.Equal(new Vector2(0.1f, -0.2f), effect.ScrollSpeed);
             Assert.Equal(0.35f, effect.DissolveThreshold);
             Assert.Equal(0.08f, effect.DissolveSoftness);
-            Assert.Contains(
+            AssertContainsPath(
                 "ASSETS/Characters/Belveth/Skins/Skin29/Belveth_Transition_Noise.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
         }
@@ -940,17 +987,36 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
             }
         }
 
+        private static BinTreeWadChunkLink CreateTextureLink(string propertyName, string texturePath)
+        {
+            ulong pathHash = XxHash64Ext.Hash(texturePath.ToLowerInvariant());
+            TestTexturePaths[pathHash] = texturePath;
+            return new BinTreeWadChunkLink(Fnv1a.HashLower(propertyName), pathHash);
+        }
+
+        private static string ResolveTestTexturePath(ulong pathHash) =>
+            TestTexturePaths.TryGetValue(pathHash, out string texturePath)
+                ? texturePath
+                : $"{pathHash:x16}";
+
+        private static void AssertContainsPath(string expected, IEnumerable<string> paths) =>
+            Assert.Contains(paths, path => path.Equals(expected, StringComparison.OrdinalIgnoreCase));
+
+        private static void AssertDoesNotContainPath(string expected, IEnumerable<string> paths) =>
+            Assert.DoesNotContain(paths, path => path.Equals(expected, StringComparison.OrdinalIgnoreCase));
+
         private static BinTree CreateSkinTree(
             string defaultTexturePath,
             BinTreeEmbedded materialOverride = null,
             BinTreeObject material = null,
             string simpleSkinPath = null,
             BinTreeEmbedded materialOverride2 = null,
-            string defaultMaterialPath = null)
+            string defaultMaterialPath = null,
+            BinTreeProperty defaultTextureProperty = null)
         {
             var meshPropertyList = new System.Collections.Generic.List<BinTreeProperty>
             {
-                new BinTreeString(Fnv1a.HashLower("texture"), defaultTexturePath)
+                defaultTextureProperty ?? CreateTextureLink("texture", defaultTexturePath)
             };
             if (!string.IsNullOrWhiteSpace(simpleSkinPath))
             {
@@ -1039,13 +1105,57 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 });
 
         private static BinTreeEmbedded CreateSampler(string textureName, string texturePath) =>
+            CreateSampler(
+                textureName,
+                CreateTextureLink("texturePath", texturePath));
+
+        private static BinTreeEmbedded CreateSampler(string textureName, BinTreeProperty texturePath) =>
             new(
                 0,
                 Fnv1a.HashLower("StaticMaterialShaderSamplerDef"),
                 new BinTreeProperty[]
                 {
                     new BinTreeString(Fnv1a.HashLower("textureName"), textureName),
-                    new BinTreeString(Fnv1a.HashLower("texturePath"), texturePath)
+                    texturePath
                 });
+
+        private static class SknMaterialTextureResolver
+        {
+            internal static SknMaterialTextureResolution Resolve(
+                BinTree binTree,
+                IEnumerable<string> availableTextureKeys) =>
+                SknResolver.Resolve(
+                    binTree,
+                    availableTextureKeys,
+                    SknMaterialTextureResolverTests.ResolveTestTexturePath);
+
+            internal static SknMaterialTextureResolution Resolve(
+                BinTree binTree,
+                IEnumerable<string> availableTextureKeys,
+                Func<ulong, string> wadChunkPathResolver) =>
+                SknResolver.Resolve(binTree, availableTextureKeys, wadChunkPathResolver);
+
+            internal static SknMaterialTextureMetadata ReadMetadata(BinTree binTree) =>
+                SknResolver.ReadMetadata(
+                    binTree,
+                    SknMaterialTextureResolverTests.ResolveTestTexturePath);
+
+            internal static SknMaterialTextureMetadata ReadMetadata(
+                BinTree binTree,
+                Func<ulong, string> wadChunkPathResolver) =>
+                SknResolver.ReadMetadata(binTree, wadChunkPathResolver);
+
+            internal static bool IsReferencedSampler(SknMaterialSampler sampler) =>
+                SknResolver.IsReferencedSampler(sampler);
+
+            internal static string FindUnambiguousFallback(IEnumerable<string> availableTextureKeys) =>
+                SknResolver.FindUnambiguousFallback(availableTextureKeys);
+
+            internal static string TryResolveBinPath(string sknPath) =>
+                SknResolver.TryResolveBinPath(sknPath);
+
+            internal static string TryResolveTexturePath(string sknPath, string assetTexturePath) =>
+                SknResolver.TryResolveTexturePath(sknPath, assetTexturePath);
+        }
     }
 }

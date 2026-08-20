@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using AssetsManager.Utils;
 using AssetsManager.Utils.Framework;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
 
@@ -28,16 +29,23 @@ namespace AssetsManager.Services.Viewer.Loading
     public class SknLoadingService
     {
         private readonly LogService _logService;
+        private readonly HashResolverService _hashResolverService;
 
 
-        public SknLoadingService(LogService logService)
+        public SknLoadingService(
+            LogService logService,
+            HashResolverService hashResolverService = null)
         {
             _logService = logService;
+            _hashResolverService = hashResolverService;
         }
 
         // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
         public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath, CancellationToken cancellationToken = default)
         {
+            if (_hashResolverService != null)
+                await _hashResolverService.LoadHashesAsync();
+
             return await Task.Run(async () =>
             {
                 try
@@ -70,6 +78,9 @@ namespace AssetsManager.Services.Viewer.Loading
         // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
         public async Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
         {
+            if (_hashResolverService != null)
+                await _hashResolverService.LoadHashesAsync();
+
             return await Task.Run(async () =>
             {
                 try
@@ -347,8 +358,11 @@ namespace AssetsManager.Services.Viewer.Loading
             {
                 using var stream = File.OpenRead(skinBinPath);
                 var binTree = new BinTree(stream);
+                Func<ulong, string> wadChunkPathResolver = _hashResolverService == null
+                    ? null
+                    : _hashResolverService.ResolveHash;
                 SknMaterialTextureMetadata metadata =
-                    SknMaterialTextureResolver.ReadMetadata(binTree);
+                    SknMaterialTextureResolver.ReadMetadata(binTree, wadChunkPathResolver);
                 if (loadReferencedTextures)
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
