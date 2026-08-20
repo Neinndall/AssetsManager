@@ -12,6 +12,7 @@ using LeagueToolkit.Core.Environment;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Memory;
 using AssetsManager.Services.Core;
+using AssetsManager.Services.Hashes;
 using AssetsManager.Services.Viewer.Composition;
 using AssetsManager.Services.Viewer.Resolvers;
 using AssetsManager.Views.Models.Viewer;
@@ -25,10 +26,14 @@ namespace AssetsManager.Services.Viewer.Loading
         private const int MapTextureMaxSize = 1024;
 
         private readonly LogService _logService;
+        private readonly HashResolverService _hashResolverService;
 
-        public MapGeometryLoadingService(LogService logService)
+        public MapGeometryLoadingService(
+            LogService logService,
+            HashResolverService hashResolverService = null)
         {
             _logService = logService;
+            _hashResolverService = hashResolverService;
         }
 
         internal static EnvironmentVisibility? ResolveBaseVisibility(
@@ -72,6 +77,9 @@ namespace AssetsManager.Services.Viewer.Loading
             string gameDataPath,
             CancellationToken cancellationToken = default)
         {
+            if (_hashResolverService != null)
+                await _hashResolverService.LoadHashesAsync();
+
             return await Task.Run(async () =>
             {
                 BinTree materialsBin = null;
@@ -150,7 +158,11 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var materialResolver = new MapGeometryMaterialResolver(materialsBin);
+            var materialResolver = new MapGeometryMaterialResolver(
+                materialsBin,
+                _hashResolverService == null
+                    ? null
+                    : _hashResolverService.ResolveHash);
 
             var dataList = new List<MapGeometrySubmeshData>();
             var allTexturePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -221,7 +233,9 @@ namespace AssetsManager.Services.Viewer.Loading
                     var subPositions = new Point3D[submesh.VertexCount];
                     for (int i = 0; i < submesh.VertexCount; i++)
                     {
-                        var p = positions[submesh.MinVertex + i];
+                        var p = System.Numerics.Vector3.Transform(
+                            positions[submesh.MinVertex + i],
+                            mesh.Transform);
                         subPositions[i] = new Point3D(p.X, p.Y, p.Z);
                     }
 
@@ -300,7 +314,6 @@ namespace AssetsManager.Services.Viewer.Loading
                         subPositions,
                         triangleIndices,
                         subTexCoords,
-                        mesh.Transform,
                         primaryTexturePath,
                         primarySampler?.AddressU == 0 || primarySampler?.AddressV == 0,
                         materialPlan.Kind == MapGeometryMaterialKind.SolidColor
@@ -471,7 +484,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 if (fallbackMaterial.CanFreeze) fallbackMaterial.Freeze();
                 var geometryModel = new GeometryModel3D(mesh, fallbackMaterial)
                 {
-                    Transform = ToMediaTransform(data.Transform),
                     BackMaterial = data.IsDoubleSided ? fallbackMaterial : null
                 };
 
@@ -563,18 +575,6 @@ namespace AssetsManager.Services.Viewer.Loading
                 colors[offset + 3] = source[3];
             }
             return colors;
-        }
-
-        private static Transform3D ToMediaTransform(System.Numerics.Matrix4x4 value)
-        {
-            if (value == System.Numerics.Matrix4x4.Identity)
-                return Transform3D.Identity;
-
-            return new MatrixTransform3D(new Matrix3D(
-                value.M11, value.M12, value.M13, value.M14,
-                value.M21, value.M22, value.M23, value.M24,
-                value.M31, value.M32, value.M33, value.M34,
-                value.M41, value.M42, value.M43, value.M44));
         }
 
         private void LogMaterialDiagnostics(MapGeometryProcessingResult result, bool hasMaterials)
@@ -713,7 +713,6 @@ namespace AssetsManager.Services.Viewer.Loading
             Point3D[] Positions,
             int[] TriangleIndices,
             Point[] TextureCoordinates,
-            System.Numerics.Matrix4x4 Transform,
             string TexturePath,
             bool IsTextureTiled,
             System.Numerics.Vector4? TintColor,

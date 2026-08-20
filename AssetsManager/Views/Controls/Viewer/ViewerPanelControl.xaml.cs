@@ -936,7 +936,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     WindowViewModel.IsLoadingVisible = true;
                 }
 
-                await LoadMapGeometry(mapGeoPath, materialsBinPath, Path.GetDirectoryName(mapGeoPath));
+                string gameDataPath = !string.IsNullOrEmpty(ProjectExplorer?.CurrentRootFolder)
+                    ? ProjectExplorer.CurrentRootFolder
+                    : Path.GetDirectoryName(mapGeoPath);
+                await LoadMapGeometry(mapGeoPath, materialsBinPath, gameDataPath);
 
                 if (WindowViewModel != null)
                     WindowViewModel.IsLoadingVisible = false;

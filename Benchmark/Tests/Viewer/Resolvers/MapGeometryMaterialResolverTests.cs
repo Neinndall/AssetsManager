@@ -14,34 +14,43 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
     public class MapGeometryMaterialResolverTests
     {
         [Fact]
-        public void TryResolve_UsesMaterialPathHashWithoutExternalHashCatalog()
+        public void TryResolve_UsesMaterialPathHashAndModernTextureLink()
         {
             const string materialPath = "Maps/KitPieces/Jade/Materials/Unknown_To_Catalog";
+            const string texturePath = "assets/maps/jade/diffuse.tex";
             var material = CreateMaterial(
                 materialPath,
-                CreateSampler("DiffuseTexture", "ASSETS/Maps/Jade/diffuse.tex"));
-            var resolver = new MapGeometryMaterialResolver(new BinTree(new[] { material }, Array.Empty<string>()));
+                CreateSampler("DiffuseTexture", texturePath));
+            var resolver = CreateResolver(material, texturePath);
 
             bool resolved = resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition);
 
             Assert.True(resolved);
             MapGeometryMaterialPlan plan = MapGeometryMaterialResolver.CreateRenderPlan(definition);
             Assert.Equal(MapGeometryMaterialKind.Diffuse, plan.Kind);
-            Assert.Equal("ASSETS/Maps/Jade/diffuse.tex", plan.PrimarySampler.TexturePath);
+            Assert.Equal(texturePath, plan.PrimarySampler.TexturePath);
         }
 
         [Fact]
         public void TryResolve_LayeredMaterialSelectsColorLayerInsteadOfMask()
         {
             const string materialPath = "Maps/KitPieces/Jade/Materials/Ground";
+            string[] texturePaths =
+            {
+                "ASSETS/Maps/Jade/mask.tex",
+                "ASSETS/Maps/Jade/dirt.tex",
+                "ASSETS/Maps/Jade/rock.tex",
+                "ASSETS/Maps/Jade/grass.tex",
+                "ASSETS/Maps/Jade/details.tex"
+            };
             var material = CreateMaterial(
                 materialPath,
-                CreateSampler("Mask_Texture", "ASSETS/Maps/Jade/mask.tex"),
-                CreateSampler("Bottom_Texture", "ASSETS/Maps/Jade/dirt.tex"),
-                CreateSampler("Middle_Texture", "ASSETS/Maps/Jade/rock.tex"),
-                CreateSampler("Top_Texture", "ASSETS/Maps/Jade/grass.tex"),
-                CreateSampler("Extras_Texture", "ASSETS/Maps/Jade/details.tex"));
-            var resolver = new MapGeometryMaterialResolver(new BinTree(new[] { material }, Array.Empty<string>()));
+                CreateSampler("Mask_Texture", texturePaths[0]),
+                CreateSampler("Bottom_Texture", texturePaths[1]),
+                CreateSampler("Middle_Texture", texturePaths[2]),
+                CreateSampler("Top_Texture", texturePaths[3]),
+                CreateSampler("Extras_Texture", texturePaths[4]));
+            var resolver = CreateResolver(material, texturePaths);
 
             Assert.True(resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition));
             MapGeometryMaterialPlan plan = MapGeometryMaterialResolver.CreateRenderPlan(definition);
@@ -84,10 +93,11 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
         public void TryResolve_AuxiliarySamplerIsNotUsedAsDiffuseColor()
         {
             const string materialPath = "Maps/Materials/NormalOnly";
+            const string texturePath = "ASSETS/Maps/normal.tex";
             var material = CreateMaterial(
                 materialPath,
-                CreateSampler("NormalTexture", "ASSETS/Maps/normal.tex"));
-            var resolver = new MapGeometryMaterialResolver(new BinTree(new[] { material }, Array.Empty<string>()));
+                CreateSampler("NormalTexture", texturePath));
+            var resolver = CreateResolver(material, texturePath);
 
             Assert.True(resolver.TryResolve(materialPath, out MapGeometryMaterialDefinition definition));
             Assert.Equal(
@@ -165,10 +175,24 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                 new BinTreeProperty[]
                 {
                     new BinTreeString(Fnv1a.HashLower("textureName"), textureName),
-                    new BinTreeString(Fnv1a.HashLower("texturePath"), texturePath),
+                    new BinTreeWadChunkLink(
+                        Fnv1a.HashLower("texturePath"),
+                        XxHash64Ext.Hash(texturePath)),
                     new BinTreeU32(Fnv1a.HashLower("addressU"), 0),
                     new BinTreeU32(Fnv1a.HashLower("addressV"), 0)
                 });
+
+        private static MapGeometryMaterialResolver CreateResolver(
+            BinTreeObject material,
+            params string[] texturePaths)
+        {
+            Dictionary<ulong, string> paths = texturePaths.ToDictionary(
+                path => XxHash64Ext.Hash(path),
+                path => path);
+            return new MapGeometryMaterialResolver(
+                new BinTree(new[] { material }, Array.Empty<string>()),
+                hash => paths.TryGetValue(hash, out string path) ? path : hash.ToString("x16"));
+        }
 
         private static MapGeometryTextureSampler Sampler(string name, string path) =>
             new(name, string.Empty, path, 0, 0);

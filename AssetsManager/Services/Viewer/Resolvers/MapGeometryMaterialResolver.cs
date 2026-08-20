@@ -5,6 +5,7 @@ using System.Numerics;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
+using AssetsManager.Utils;
 
 namespace AssetsManager.Services.Viewer.Resolvers
 {
@@ -49,10 +50,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
         };
 
         private readonly BinTree _materials;
+        private readonly Func<ulong, string> _wadChunkPathResolver;
 
-        public MapGeometryMaterialResolver(BinTree materials)
+        public MapGeometryMaterialResolver(
+            BinTree materials,
+            Func<ulong, string> wadChunkPathResolver = null)
         {
             _materials = materials;
+            _wadChunkPathResolver = wadChunkPathResolver;
         }
 
         public bool TryResolve(string materialName, out MapGeometryMaterialDefinition definition)
@@ -149,7 +154,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 name.Equals(sampler.TextureName, StringComparison.OrdinalIgnoreCase) ||
                 name.Equals(sampler.SamplerName, StringComparison.OrdinalIgnoreCase));
 
-        private static List<MapGeometryTextureSampler> ReadSamplers(BinTreeObject materialObject)
+        private List<MapGeometryTextureSampler> ReadSamplers(BinTreeObject materialObject)
         {
             var result = new List<MapGeometryTextureSampler>();
             if (!materialObject.Properties.TryGetValue(SamplerValuesHash, out BinTreeProperty property) ||
@@ -160,7 +165,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             foreach (BinTreeStruct sampler in container.Elements.OfType<BinTreeStruct>())
             {
-                string texturePath = ReadString(sampler, TexturePathHash);
+                string texturePath = ReadTexturePath(sampler);
                 if (string.IsNullOrWhiteSpace(texturePath))
                     continue;
 
@@ -266,6 +271,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
             identity.Contains("metal", StringComparison.Ordinal) ||
             identity.Contains("noise", StringComparison.Ordinal) ||
             identity.Contains("depth", StringComparison.Ordinal);
+
+        private string ReadTexturePath(BinTreeStruct value)
+        {
+            if (!value.Properties.TryGetValue(TexturePathHash, out BinTreeProperty property))
+                return string.Empty;
+
+            if (property is not BinTreeWadChunkLink link)
+                return string.Empty;
+
+            string resolvedPath = _wadChunkPathResolver?.Invoke(link.Value);
+            return PathUtils.ToVirtualPath(
+                string.IsNullOrWhiteSpace(resolvedPath)
+                    ? $"{link.Value:x16}"
+                    : resolvedPath);
+        }
 
         private static string ReadString(BinTreeStruct value, uint hash) =>
             value.Properties.TryGetValue(hash, out BinTreeProperty property) && property is BinTreeString text
