@@ -23,7 +23,6 @@ namespace AssetsManager.Views.Helpers
         private const double SmoothFactor = 0.15; 
         private const double TransitionThreshold = 0.05;
         internal const double MapGroundHeight = 10.0;
-        private const double MinimumZoomDistance = 0.05;
 
         public double ZoomSensitivity { get; set; } = 80.0;
         public bool IsMapGroundCollisionEnabled { get; set; }
@@ -214,7 +213,7 @@ namespace AssetsManager.Views.Helpers
                 var currentMousePosition = e.GetPosition(_inputSurface);
                 var delta = new System.Windows.Point(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
 
-                double sensitivity = 0.5;
+                double sensitivity = 0.25;
                 var delta3D = new Vector3D(-delta.X * sensitivity, delta.Y * sensitivity, 0);
                 Rotate(delta3D);
 
@@ -279,17 +278,11 @@ namespace AssetsManager.Views.Helpers
 
             lookDir.Normalize();
 
-            // Calculate dynamic zoom step based on the logical orbit distance, not the interpolating camera.
+            // Scale movement from the current camera distance.
             double baseStep = Math.Clamp(currentDistance * 0.08, 5.0, 120.0);
             double step = baseStep * speedMultiplier;
-            if (delta > 0)
-                step = Math.Min(step, Math.Max(currentDistance - MinimumZoomDistance, 0));
-
-            var requestedShift = lookDir * delta * step;
-            var nextPosition = ConstrainMapPosition(_targetPosition + requestedShift);
-            var actualShift = nextPosition - _targetPosition;
-            _targetPosition = nextPosition;
-            _targetLookDirection -= actualShift;
+            _targetPosition = ConstrainMapPosition(
+                _targetPosition + lookDir * (delta * step));
         }
 
         private void Rotate(Vector3D delta)
@@ -334,8 +327,12 @@ namespace AssetsManager.Views.Helpers
             double sensitivity = distance * 0.0012;
 
             var translation = rightDir * (-delta.X * sensitivity) + orthoUp * (delta.Y * sensitivity);
+            var nextPosition = camera.Position + translation;
 
-            camera.Position = ConstrainMapPosition(camera.Position + translation);
+            if (IsMapGroundCollisionEnabled && nextPosition.Y < MapGroundHeight)
+                nextPosition -= orthoUp * (delta.Y * sensitivity);
+
+            camera.Position = ConstrainMapPosition(nextPosition);
         }
 
         internal static Point3D ConstrainMapPosition(Point3D position, bool collisionEnabled)
