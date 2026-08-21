@@ -37,8 +37,12 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal bool EmissionTexturesResolved;
             internal string LoadedEmissionTextureKey;
             internal string LoadedEmissionMaskTextureKey;
-            internal BitmapSource LoadedEmissionBitmap;
-            internal BitmapSource LoadedEmissionMaskBitmap;
+						internal BitmapSource LoadedEmissionBitmap;
+						internal BitmapSource LoadedEmissionMaskBitmap;
+						internal uint IridescenceTexture;
+						internal bool IridescenceTextureResolved;
+						internal string LoadedIridescenceTextureKey;
+						internal BitmapSource LoadedIridescenceBitmap;
             internal uint LightmapTexture;
             internal bool LightmapTextureResolved;
             internal string LoadedLightmapTextureKey;
@@ -59,10 +63,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
         private readonly GL _gl;
         private readonly ConditionalWeakTable<ModelPart, PartResources> _partResources = new();
         private readonly HashSet<PartResources> _liveResources = new();
-        private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures =
-            new(ReferenceEqualityComparer.Instance);
-        private readonly Dictionary<BitmapSource, SharedTexture> _sharedLightmapTextures =
-            new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<BitmapSource, SharedTexture> _sharedTextures = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<BitmapSource, SharedTexture> _sharedLightmapTextures = new(ReferenceEqualityComparer.Instance);
         private readonly HashSet<ModelPart> _pendingReleases = new();
 
         internal GlMeshResourceCache(GL gl)
@@ -85,6 +87,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             EnsureBaseTexture(part, resources);
             EnsureEffectTextures(part, resources);
             EnsureEmissionTextures(part, resources);
+            EnsureIridescenceTexture(part, resources);
             EnsureLightmapTexture(part, resources);
             resources = EnsureMeshBuffers(part, resources);
             EnsureLightmapVertexBuffer(part, resources);
@@ -371,6 +374,42 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             }
         }
 
+        private void EnsureIridescenceTexture(ModelPart part, PartResources resources)
+        {
+            ModelMaterialEffectDefinition effect =
+                part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
+            bool hasIridescence = (effect.Kind & ModelMaterialEffectKind.Iridescence) != 0;
+            string iridescenceTextureKey = hasIridescence ? effect.IridescenceTextureName : null;
+
+            if (resources.IridescenceTextureResolved &&
+                resources.LoadedIridescenceTextureKey == iridescenceTextureKey)
+            {
+                return;
+            }
+
+            ReleaseIridescenceTexture(resources);
+            resources.IridescenceTextureResolved = true;
+            resources.LoadedIridescenceTextureKey = iridescenceTextureKey;
+            resources.LoadedIridescenceBitmap = TextureUtils.ResolveTexture(
+                part.AllTextures,
+                iridescenceTextureKey);
+
+            if (resources.LoadedIridescenceBitmap != null)
+            {
+                resources.IridescenceTexture = AcquireTexture(
+                    _sharedTextures,
+                    resources.LoadedIridescenceBitmap,
+                    () => UploadTexture(resources.LoadedIridescenceBitmap));
+            }
+        }
+
+        private void ReleaseIridescenceTexture(PartResources resources)
+        {
+            ReleaseSharedTexture(_sharedTextures, resources.LoadedIridescenceBitmap);
+            resources.IridescenceTexture = 0;
+            resources.LoadedIridescenceBitmap = null;
+        }
+
         private static uint AcquireTexture(
             Dictionary<BitmapSource, SharedTexture> textures,
             BitmapSource bitmap,
@@ -393,6 +432,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             ReleaseBaseTexture(resources);
             ReleaseEffectTextures(resources);
             ReleaseEmissionTextures(resources);
+            ReleaseIridescenceTexture(resources);
             ReleaseLightmapTexture(resources);
             DeleteHandle(resources.Vao, _gl.DeleteVertexArray);
             DeleteHandle(resources.Vbo, _gl.DeleteBuffer);

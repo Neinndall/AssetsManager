@@ -607,7 +607,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "emissiontexture" or
                 "emissionrtexture" or
                 "emissivetexture" or
-                "emissionrdistortiongtexture";
+                "emissionrdistortiongtexture" or
+                "iridescenttex" or
+                "matcaptex";
         }
 
         internal static bool IsNeutralTexturePath(string texturePath) =>

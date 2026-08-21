@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Viewer.Loading
             _hashResolverService = hashResolverService;
         }
 
-        // Este método carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
+        // Este mÃ©todo carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
         public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath, CancellationToken cancellationToken = default)
         {
             if (_hashResolverService != null)
@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Viewer.Loading
             }, cancellationToken);
         }
 
-        // Este método carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estándar).
+        // Este mÃ©todo carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estÃ¡ndar).
         public async Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
         {
             if (_hashResolverService != null)
@@ -330,13 +330,13 @@ namespace AssetsManager.Services.Viewer.Loading
                 materialTextureOverrides.TryGetValue(normalizedMaterialName, out string overrideTextureKey) &&
                 loadedTextures.ContainsKey(overrideTextureKey))
             {
-                _logService.LogDebug($"Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
+                _logService.LogInfo($"[IRIDIAG] Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
                 return overrideTextureKey;
             }
 
             if (defaultTextureKey != null)
             {
-                _logService.LogDebug($"Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");
+                _logService.LogInfo($"[IRIDIAG] Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");
             }
 
             return defaultTextureKey;
@@ -406,3 +406,4 @@ namespace AssetsManager.Services.Viewer.Loading
 
     }
 }
+

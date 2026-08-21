@@ -31,6 +31,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             effect = ApplyTransition(effect, material, textureKeys);
             effect = ApplyFresnel(effect, material, textureKeys);
             effect = ApplyEmission(effect, material, textureKeys);
+            effect = ApplyIridescence(effect, material, textureKeys);
             return ApplySimpleWave(effect, material);
         }
 
@@ -331,6 +332,36 @@ namespace AssetsManager.Services.Viewer.Resolvers
             }
 
             return effect;
+        }
+
+        private static ModelMaterialEffectDefinition ApplyIridescence(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            string iridescenceTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "iridescentTex",
+                "IridescentTex",
+                "Iridescent_Texture",
+                "IridescenceTex");
+            if (iridescenceTexture == null)
+            {
+                return effect;
+            }
+
+            return effect with
+            {
+                Kind = effect.Kind | ModelMaterialEffectKind.Iridescence,
+                IridescenceTextureName = iridescenceTexture,
+                IridescenceStrength = ReadFloat(
+                    material.Parameters,
+                    0.85f,
+                    "Iridescence_Strength",
+                    "IridescenceStrength",
+                    "Iridescence_Intensity")
+            };
         }
 
         private static ModelMaterialEffectDefinition ApplyEmission(

@@ -56,11 +56,14 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform sampler2D uEffectMask;
 					uniform sampler2D uEmissionTex;
 					uniform sampler2D uEmissionMask;
+					uniform sampler2D uIridescenceTex;
 					uniform int uHasLightmap;
 					uniform int uEffectKind;
 					uniform int uHasEffectTex;
 					uniform int uHasEmissionTex;
 					uniform int uHasEmissionMask;
+					uniform int uHasIridescenceTex;
+					uniform float uIridescenceStrength;
 					uniform float uEffectTime;
 					uniform vec2 uEffectScrollSpeed;
 					uniform vec2 uEffectTiling;
@@ -234,6 +237,27 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 							{
 								float bloomEmission = clamp(uBloomIntensity * BLOOM_EMISSION_SCALE, 0.0, 1.0);
 								finalColor += uBloomColor.rgb * bloomEmission * effectMask;
+							}
+							if ((uEffectKind & 512) != 0 && uHasIridescenceTex != 0)
+							{
+								vec3 iriNormal = normalize(vNormal);
+								vec3 iriViewDir = normalize(uCameraPosition - vWorldPosition);
+								float facing = max(dot(iriNormal, iriViewDir), 0.0);
+								vec2 matcapUv = clamp(
+									iriNormal.xy * 0.5 + 0.5,
+									vec2(0.002),
+									vec2(0.998));
+								vec3 iridescenceSample = texture(uIridescenceTex, matcapUv).rgb;
+								float rim = pow(1.0 - facing, 1.25);
+								float blend = clamp(
+									uIridescenceStrength * (0.4 + 0.6 * rim),
+									0.0,
+									1.0);
+								finalColor = mix(
+									finalColor,
+									finalColor * 0.45 +
+										iridescenceSample * (0.45 + 0.75 * rim),
+									blend);
 							}
 							fragColor = vec4(finalColor, texColor.a);
 				}";

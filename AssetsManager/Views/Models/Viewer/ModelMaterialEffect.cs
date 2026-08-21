@@ -15,7 +15,8 @@ namespace AssetsManager.Views.Models.Viewer
         AnimatedWave = 32,
         FresnelNoise = 64,
         Emission = 128,
-        GradientPulse = 256
+        GradientPulse = 256,
+        Iridescence = 512
     }
 
     public sealed record ModelMaterialEffectDefinition(
@@ -52,6 +53,8 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 EmissionColor { get; init; } = Vector4.One;
         public float EmissionStrength { get; init; }
         public int EmissionChannel { get; init; } = -1;
+        public string IridescenceTextureName { get; init; }
+        public float IridescenceStrength { get; init; } = 0.85f;
 
         public static ModelMaterialEffectDefinition None { get; } = new(
             ModelMaterialEffectKind.None,

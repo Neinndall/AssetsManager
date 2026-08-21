@@ -53,6 +53,9 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uEmissionColor;
         private int _uEmissionStrength;
         private int _uEmissionChannel;
+        private int _uIridescenceTex;
+        private int _uHasIridescenceTex;
+        private int _uIridescenceStrength;
         private int _uWaveDirection;
         private int _uWaveSpeed;
         private int _uWaveFrequency;
@@ -139,6 +142,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform1(_uEffectMask, 3);
             _gl.Uniform1(_uEmissionTex, 4);
             _gl.Uniform1(_uEmissionMask, 5);
+            _gl.Uniform1(_uIridescenceTex, 6);
             _gl.Uniform1(
                 _uEffectTime,
                 (float)((Stopwatch.GetTimestamp() - _startTimestamp) / (double)Stopwatch.Frequency));
@@ -199,6 +203,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uEmissionColor = gl.GetUniformLocation(_program, "uEmissionColor");
             _uEmissionStrength = gl.GetUniformLocation(_program, "uEmissionStrength");
             _uEmissionChannel = gl.GetUniformLocation(_program, "uEmissionChannel");
+            _uIridescenceTex = gl.GetUniformLocation(_program, "uIridescenceTex");
+            _uHasIridescenceTex = gl.GetUniformLocation(_program, "uHasIridescenceTex");
+            _uIridescenceStrength = gl.GetUniformLocation(_program, "uIridescenceStrength");
             _uWaveDirection = gl.GetUniformLocation(_program, "uWaveDirection");
             _uWaveSpeed = gl.GetUniformLocation(_program, "uWaveSpeed");
             _uWaveFrequency = gl.GetUniformLocation(_program, "uWaveFrequency");
@@ -256,6 +263,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 ModelMaterialEffectDefinition effect =
                     part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
                 _gl.Uniform1(_uEffectKind, (int)effect.Kind);
+                _gl.Uniform1(_uHasIridescenceTex, resources.IridescenceTexture != 0 ? 1 : 0);
+                _gl.Uniform1(_uIridescenceStrength, effect.IridescenceStrength);
                 if (effect.Kind != ModelMaterialEffectKind.None)
                 {
                     _gl.Uniform1(_uHasEffectTex, resources.EffectTexture != 0 ? 1 : 0);
@@ -281,7 +290,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.Uniform2(_uEmissionTiling, effect.EmissionTiling.X, effect.EmissionTiling.Y);
                     _gl.Uniform4(_uEmissionColor, effect.EmissionColor.X, effect.EmissionColor.Y, effect.EmissionColor.Z, effect.EmissionColor.W);
                     _gl.Uniform1(_uEmissionStrength, effect.EmissionStrength);
-                    _gl.Uniform1(_uEmissionChannel, effect.EmissionChannel);
+                        _gl.Uniform1(_uEmissionChannel, effect.EmissionChannel);
                     _gl.Uniform3(_uWaveDirection, effect.WaveDirection);
                     _gl.Uniform1(_uWaveSpeed, effect.WaveSpeed);
                     _gl.Uniform1(_uWaveFrequency, effect.WaveFrequency);
@@ -308,10 +317,15 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
                     resources.EmissionTexture);
+                _gl.Uniform1(_uEmissionMask, 5);
                 _gl.ActiveTexture(TextureUnit.Texture5);
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
                     resources.EmissionMaskTexture != 0 ? resources.EmissionMaskTexture : _resources.WhiteTexture);
+                _gl.ActiveTexture(TextureUnit.Texture6);
+                _gl.BindTexture(
+                    TextureTarget.Texture2D,
+                    resources.IridescenceTexture != 0 ? resources.IridescenceTexture : _resources.WhiteTexture);
                 _gl.ActiveTexture(TextureUnit.Texture0);
 
                 _drawElements?.Invoke(
@@ -324,6 +338,8 @@ namespace AssetsManager.Services.Viewer.Rendering
 
         private void UnbindSceneTextures()
         {
+            _gl.ActiveTexture(TextureUnit.Texture6);
+            _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture5);
             _gl.BindTexture(TextureTarget.Texture2D, 0);
             _gl.ActiveTexture(TextureUnit.Texture4);
