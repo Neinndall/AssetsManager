@@ -43,7 +43,7 @@ namespace AssetsManager.Views
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
             ViewportControl.AppSettings = appSettings;
- 
+
             PanelControl.SknLoadingService = sknLoadingService;
             PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
             PanelControl.ChromaLoadingService = chromaLoadingService;
@@ -51,8 +51,10 @@ namespace AssetsManager.Views
             PanelControl.CustomMessageBoxService = customMessageBoxService;
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
- 
+
             ChromaSelectionOverlay.LoadingService = chromaLoadingService;
+
+            VfxStudio.LogService = _logService;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
@@ -90,11 +92,7 @@ namespace AssetsManager.Views
 
         private void OpenVfxInspector_Click(object sender, RoutedEventArgs e)
         {
-            var window = new AssetsManager.Views.Dialogs.VfxInspectorWindow(_logService)
-            {
-                Owner = Window.GetWindow(this)
-            };
-            window.ShowDialog();
+            _viewModel.IsVfxStudioVisible = true;
         }
 
         private void OpenProjectFolder_Click(object sender, RoutedEventArgs e)
@@ -195,6 +193,7 @@ namespace AssetsManager.Views
 
                 ViewportControl?.Cleanup();
                 PanelControl?.Cleanup();
+                VfxStudio?.Cleanup();
             }
             catch (Exception ex)
             {

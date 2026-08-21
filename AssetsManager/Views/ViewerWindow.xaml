@@ -230,8 +230,12 @@
 
 
             <!-- CHROMA SELECTION OVERLAY -->
-            <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay" 
+            <viewer:ChromaSelectionControl x:Name="ChromaSelectionOverlay"
                                            Visibility="{Binding ViewModel.IsChromaGalleryVisible, ElementName=PanelControl, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+            <!-- VFX STUDIO VIEW -->
+            <viewer:VfxInspectorControl x:Name="VfxStudio"
+                                        Visibility="{Binding ViewModel.IsVfxStudioVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>

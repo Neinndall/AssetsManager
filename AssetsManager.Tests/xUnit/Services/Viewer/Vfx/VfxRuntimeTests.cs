@@ -7,7 +7,7 @@ using AssetsManager.Services.Viewer.Vfx.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Resources;
 using AssetsManager.Services.Viewer.Vfx.Runtime;
 using AssetsManager.Services.Viewer.Vfx.Session;
-using AssetsManager.Views.Dialogs;
+using AssetsManager.Views.Controls.Viewer;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
 
@@ -877,15 +877,15 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void PreviewLoopDoesNotRestartGraphUnlessExplicitlyEnabled()
         {
-            Assert.False(VfxInspectorWindow.ShouldRestartPreview(
+            Assert.False(VfxInspectorControl.ShouldRestartPreview(
                 enabled: false,
                 currentTime: 0.30,
                 boundary: 0.30));
-            Assert.False(VfxInspectorWindow.ShouldRestartPreview(
+            Assert.False(VfxInspectorControl.ShouldRestartPreview(
                 enabled: true,
                 currentTime: 0.29,
                 boundary: 0.30));
-            Assert.True(VfxInspectorWindow.ShouldRestartPreview(
+            Assert.True(VfxInspectorControl.ShouldRestartPreview(
                 enabled: true,
                 currentTime: 0.30,
                 boundary: 0.30));
@@ -894,8 +894,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
         [Fact]
         public void TimelineUsesTheRealPlaybackDurationInsteadOfAnArtificialMinimum()
         {
-            Assert.Equal(0.30, VfxInspectorWindow.ResolveTimelineDuration(0.30), 6);
-            Assert.Equal(10.0, VfxInspectorWindow.ResolveTimelineDuration(double.PositiveInfinity), 6);
+            Assert.Equal(0.30, VfxInspectorControl.ResolveTimelineDuration(0.30), 6);
+            Assert.Equal(10.0, VfxInspectorControl.ResolveTimelineDuration(double.PositiveInfinity), 6);
         }
 
         [Fact]
@@ -1095,8 +1095,8 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 "timeline",
                 new[] { playable, disabled });
 
-            Assert.True(VfxInspectorWindow.HasPlayableEmitters(system));
-            Assert.Equal(1.5, VfxInspectorWindow.CalculatePlaybackDuration(system), precision: 3);
+            Assert.True(VfxInspectorControl.HasPlayableEmitters(system));
+            Assert.Equal(1.5, VfxInspectorControl.CalculatePlaybackDuration(system), precision: 3);
         }
 
         [Fact]
@@ -1114,13 +1114,13 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Vfx
                 "disabled",
                 new[] { disabled });
 
-            Assert.False(VfxInspectorWindow.HasPlayableEmitters(system));
+            Assert.False(VfxInspectorControl.HasPlayableEmitters(system));
         }
 
         [Fact]
         public void DelayedEmitterTrackStartsAtItsEmissionMarker()
         {
-            var metrics = VfxInspectorWindow.CalculateEmitterTrackMetrics(
+            var metrics = VfxInspectorControl.CalculateEmitterTrackMetrics(
                 delay: 5,
                 duration: 3,
                 totalDuration: 13,

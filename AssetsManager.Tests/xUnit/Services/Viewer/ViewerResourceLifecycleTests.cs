@@ -5,7 +5,6 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Views.Controls.Viewer;
-using AssetsManager.Views.Dialogs;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Xunit;
@@ -243,7 +242,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         [Fact]
         public void VfxStudioCameraPreservesItsRealDistanceToTheOrigin()
         {
-            PerspectiveCamera camera = VfxInspectorWindow.CreateVfxCamera();
+            PerspectiveCamera camera = VfxInspectorControl.CreateVfxCamera();
             Point3D target = camera.Position + camera.LookDirection;
 
             Assert.Equal(new Point3D(0, 0, 0), target);

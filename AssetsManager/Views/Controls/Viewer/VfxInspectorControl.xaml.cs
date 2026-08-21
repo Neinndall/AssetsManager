@@ -22,22 +22,25 @@ using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Models.Viewer;
 using Microsoft.Win32;
 
-namespace AssetsManager.Views.Dialogs
+namespace AssetsManager.Views.Controls.Viewer
 {
     /// <summary>
     /// Code-behind for the VFX Inspector & Diagnostic Studio.
     /// Provides deep inspection of LoL champion VFX definitions, emitters, .scb meshes, textures, and OpenGL rendering.
     /// </summary>
-    public partial class VfxInspectorWindow : HudWindow
+    public partial class VfxInspectorControl : UserControl, IDisposable
     {
         private readonly VfxInspectorModel _model;
         private readonly VfxLoadingService _loadingService = new();
-        private readonly LogService _logService;
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
         private IReadOnlyList<VfxAbilityComposition> _abilityCompositions = Array.Empty<VfxAbilityComposition>();
         private bool _isCleanedUp;
+        private bool _isGlStarted;
+
+        /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
+        public LogService LogService { get; set; }
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
@@ -59,22 +62,104 @@ namespace AssetsManager.Views.Dialogs
                 45);
         }
 
-        public VfxInspectorWindow(LogService logService = null)
+        public VfxInspectorControl()
         {
             _model = new VfxInspectorModel();
             InitializeComponent();
-            _logService = logService;
             DataContext = _model;
 
-            Unloaded += OnWindowUnloaded;
+            Loaded += OnControlLoaded;
+            Unloaded += OnControlUnloaded;
+        }
 
-            var settings = new OpenTK.Wpf.GLWpfControlSettings
+        private void OnControlLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_isGlStarted || _isCleanedUp) return;
+
+            try
             {
-                MajorVersion = 3,
-                MinorVersion = 3,
-                RenderContinuously = true
-            };
-            OpenTkControl.Start(settings);
+                var settings = new OpenTK.Wpf.GLWpfControlSettings
+                {
+                    MajorVersion = 3,
+                    MinorVersion = 3,
+                    RenderContinuously = true
+                };
+                OpenTkControl.Start(settings);
+                _isGlStarted = true;
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to initialize the VFX Studio OpenGL viewport.");
+                _model.LogMessages.Add($"[ERROR] Failed to initialize the OpenGL viewport: {ex.Message}");
+            }
+        }
+
+        private void OnControlUnloaded(object sender, RoutedEventArgs e)
+        {
+            Cleanup();
+        }
+
+        public void Dispose()
+        {
+            Cleanup();
+        }
+
+        /// <summary>
+        /// Releases all resources owned by this control. Idempotent: the explicit host teardown
+        /// and the Unloaded hook may both invoke it safely without double-release side effects.
+        /// </summary>
+        public void Cleanup()
+        {
+            if (_isCleanedUp) return;
+            _isCleanedUp = true;
+
+            var cameraController = _cameraController;
+            _cameraController = null;
+            RunReleaseStep(nameof(CustomCameraController), () => cameraController?.Dispose());
+
+            var vfxRenderer = _vfxRenderer;
+            _vfxRenderer = null;
+            RunReleaseStep(nameof(VfxRenderSession), () => vfxRenderer?.Dispose(), gpuBound: true);
+
+            var gridRenderer = _gridRenderer;
+            _gridRenderer = null;
+            RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
+
+            var loadingService = _loadingService;
+            RunReleaseStep(nameof(VfxLoadingService), () => loadingService?.Dispose());
+
+            var gl = _gl;
+            _gl = null;
+            RunReleaseStep("OpenGL API", () => gl?.Dispose());
+
+            RunReleaseStep(nameof(OpenTkControl), OpenTkControl.Dispose, gpuBound: true);
+            _isGlStarted = false;
+
+            _model.LogMessages.Add("[GL] VFX Studio resources released.");
+        }
+
+        /// <summary>
+        /// Runs one disposal step in isolation so a broken component cannot abort the remaining
+        /// teardown. GPU-bound steps throw a symbol-loading exception when the OpenGL context is
+        /// already destroyed; that is expected because the driver releases every GPU object
+        /// created on the context along with it. Any other error is logged and does not stop
+        /// the remaining releases.
+        /// </summary>
+        private void RunReleaseStep(string componentName, Action? release, bool gpuBound = false)
+        {
+            if (release == null) return;
+
+            try
+            {
+                release();
+            }
+            catch (Silk.NET.Core.Loader.SymbolLoadingException) when (gpuBound)
+            {
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, $"Failed to release VFX Studio {componentName}.");
+            }
         }
 
         #region OpenTK OpenGL Viewport Initialization & Rendering
@@ -107,7 +192,7 @@ namespace AssetsManager.Views.Dialogs
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
                 _gridRenderer = new GridRenderer();
                 _gridRenderer.Initialize(_gl, false);
-                _vfxRenderer = new VfxRenderSession(_logService, _loadingService);
+                _vfxRenderer = new VfxRenderSession(LogService, _loadingService);
                 _vfxRenderer.Initialize(_gl);
                 _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
@@ -135,6 +220,7 @@ namespace AssetsManager.Views.Dialogs
         private void OpenTkControl_Render(TimeSpan delta)
         {
             if (_gl == null || _vfxRenderer == null) return;
+            if (!IsVisible) return;
 
             float dt = (float)delta.TotalSeconds;
             if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
@@ -203,29 +289,6 @@ namespace AssetsManager.Views.Dialogs
         }
 
         #endregion
-
-        private void OnWindowUnloaded(object sender, RoutedEventArgs e)
-        {
-            if (_isCleanedUp) return;
-            _isCleanedUp = true;
-            try
-            {
-                _cameraController?.Dispose();
-                _cameraController = null;
-                _vfxRenderer?.Dispose();
-                _vfxRenderer = null;
-                _gridRenderer?.Dispose();
-                _gridRenderer = null;
-                _loadingService.Dispose();
-                _gl?.Dispose();
-                _gl = null;
-                OpenTkControl.Dispose();
-            }
-            catch (Exception ex)
-            {
-                _logService?.LogError(ex, "Failed to release VFX Studio resources.");
-            }
-        }
 
         #region Camera Control
 
@@ -336,7 +399,7 @@ namespace AssetsManager.Views.Dialogs
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, "Failed to scan ROOT directory");
+                LogService?.LogError(ex, "Failed to scan ROOT directory");
             }
         }
 
@@ -370,7 +433,7 @@ namespace AssetsManager.Views.Dialogs
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                _activeBundle = _loadingService.Load(binFilePath, _logService);
+                _activeBundle = _loadingService.Load(binFilePath, LogService);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
