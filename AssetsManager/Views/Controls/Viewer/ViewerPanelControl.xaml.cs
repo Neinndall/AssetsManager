@@ -26,7 +26,7 @@ using System.Linq;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ViewerPanelControl : UserControl, IDisposable
+    public partial class ViewerPanelControl : UserControl
     {
         private readonly ViewerPanelModel _viewModel;
         public ViewerPanelModel ViewModel => _viewModel;
@@ -409,11 +409,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 LogService.LogError(ex, "Error during ViewerPanelControl.Cleanup");
             }
-        }
-
-        public void Dispose()
-        {
-            Cleanup();
         }
 
         private void SafeDisposeModel(SceneModel model)

@@ -28,7 +28,7 @@ namespace AssetsManager.Views.Controls.Viewer
     /// Code-behind for the VFX Inspector & Diagnostic Studio.
     /// Provides deep inspection of LoL champion VFX definitions, emitters, .scb meshes, textures, and OpenGL rendering.
     /// </summary>
-    public partial class VfxInspectorControl : UserControl, IDisposable
+    public partial class VfxInspectorControl : UserControl
     {
         private readonly VfxInspectorModel _model;
         private readonly VfxLoadingService _loadingService = new();
@@ -95,11 +95,6 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
-        {
-            Cleanup();
-        }
-
-        public void Dispose()
         {
             Cleanup();
         }

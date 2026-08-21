@@ -28,7 +28,7 @@ using System.Numerics;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
-    public partial class ViewerViewportControl : UserControl, IDisposable
+    public partial class ViewerViewportControl : UserControl
     {
         private Silk.NET.OpenGL.GL _gl;
         private GlMeshRenderer _meshRenderer;
@@ -599,10 +599,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void Dispose()
-        {
-            Cleanup();
-        }
 
         public void SetAnimation(AnimationModel animationModel)
         {

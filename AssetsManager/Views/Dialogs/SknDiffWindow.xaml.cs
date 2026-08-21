@@ -113,9 +113,9 @@ namespace AssetsManager.Views.Dialogs
             _oldCameraChangedHandler = null;
             _newCameraChangedHandler = null;
 
-            // Dispose viewports to clean up rendering loops, cameras, controllers
-            OldViewport.Dispose();
-            NewViewport.Dispose();
+            // Clean up viewports: rendering loops, cameras and controllers
+            OldViewport.Cleanup();
+            NewViewport.Cleanup();
 
             // Clear lists and scenes
             _partItems.Clear();
