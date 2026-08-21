@@ -44,6 +44,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private int _uDissolveSoftness;
         private int _uBloomColor;
         private int _uBloomIntensity;
+        private int _uPulseRate;
+        private int _uPulseMax;
+        private int _uPulseOffset;
+        private int _uGradientSharpness;
         private int _uEmissionScrollSpeed;
         private int _uEmissionTiling;
         private int _uEmissionColor;
@@ -186,6 +190,10 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uDissolveSoftness = gl.GetUniformLocation(_program, "uDissolveSoftness");
             _uBloomColor = gl.GetUniformLocation(_program, "uBloomColor");
             _uBloomIntensity = gl.GetUniformLocation(_program, "uBloomIntensity");
+            _uPulseRate = gl.GetUniformLocation(_program, "uPulseRate");
+            _uPulseMax = gl.GetUniformLocation(_program, "uPulseMax");
+            _uPulseOffset = gl.GetUniformLocation(_program, "uPulseOffset");
+            _uGradientSharpness = gl.GetUniformLocation(_program, "uGradientSharpness");
             _uEmissionScrollSpeed = gl.GetUniformLocation(_program, "uEmissionScrollSpeed");
             _uEmissionTiling = gl.GetUniformLocation(_program, "uEmissionTiling");
             _uEmissionColor = gl.GetUniformLocation(_program, "uEmissionColor");
@@ -265,6 +273,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.Uniform1(_uDissolveSoftness, effect.DissolveSoftness);
                     _gl.Uniform4(_uBloomColor, effect.BloomColor.X, effect.BloomColor.Y, effect.BloomColor.Z, effect.BloomColor.W);
                     _gl.Uniform1(_uBloomIntensity, effect.BloomIntensity);
+                    _gl.Uniform1(_uPulseRate, effect.PulseRate);
+                    _gl.Uniform1(_uPulseMax, effect.PulseMax);
+                    _gl.Uniform1(_uPulseOffset, effect.PulseOffset);
+                    _gl.Uniform1(_uGradientSharpness, effect.GradientSharpness);
                     _gl.Uniform2(_uEmissionScrollSpeed, effect.EmissionScrollSpeed.X, effect.EmissionScrollSpeed.Y);
                     _gl.Uniform2(_uEmissionTiling, effect.EmissionTiling.X, effect.EmissionTiling.Y);
                     _gl.Uniform4(_uEmissionColor, effect.EmissionColor.X, effect.EmissionColor.Y, effect.EmissionColor.Z, effect.EmissionColor.W);

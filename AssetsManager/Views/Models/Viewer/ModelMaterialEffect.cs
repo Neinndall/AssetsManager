@@ -14,7 +14,8 @@ namespace AssetsManager.Views.Models.Viewer
         Bloom = 16,
         AnimatedWave = 32,
         FresnelNoise = 64,
-        Emission = 128
+        Emission = 128,
+        GradientPulse = 256
     }
 
     public sealed record ModelMaterialEffectDefinition(
@@ -34,6 +35,10 @@ namespace AssetsManager.Views.Models.Viewer
         public float DissolveSoftness { get; init; } = 0.05f;
         public Vector4 BloomColor { get; init; } = Vector4.One;
         public float BloomIntensity { get; init; }
+        public float PulseRate { get; init; }
+        public float PulseMax { get; init; }
+        public float PulseOffset { get; init; }
+        public float GradientSharpness { get; init; } = 1f;
         public Vector3 WaveDirection { get; init; } = Vector3.UnitY;
         public float WaveSpeed { get; init; }
         public float WaveFrequency { get; init; } = 1f;

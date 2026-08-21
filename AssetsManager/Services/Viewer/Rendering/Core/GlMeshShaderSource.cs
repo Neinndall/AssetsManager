@@ -75,6 +75,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform float uDissolveSoftness;
 					uniform vec4 uBloomColor;
 					uniform float uBloomIntensity;
+					uniform float uPulseRate;
+					uniform float uPulseMax;
+					uniform float uPulseOffset;
+					uniform float uGradientSharpness;
 					uniform vec2 uEmissionScrollSpeed;
 					uniform vec2 uEmissionTiling;
 					uniform vec4 uEmissionColor;
@@ -92,6 +96,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform vec3 uLightColor2;
 					uniform vec3 uAmbient;
 					const float BLOOM_EMISSION_SCALE = 0.2;
+					const float GRADIENT_BLOOM_SCALE = 0.05;
+					const float GRADIENT_PULSE_SCALE = 0.1;
 					const float EMISSION_TEXTURE_SCALE = 0.5;
 					out vec4 fragColor;
 					float effectHash(vec2 value){
@@ -135,6 +141,28 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 							}
 							float effectMask = texture(uEffectMask, vUv).r;
 							vec2 effectUv = vUv * max(uEffectTiling, vec2(0.0001));
+							if ((uEffectKind & 256) != 0 && uHasEffectTex != 0)
+							{
+								float gradientMask = clamp(effectMask * uEffectStrength, 0.0, 1.0);
+								if (uDissolveThreshold > 0.0)
+								{
+									gradientMask *= smoothstep(uDissolveThreshold - uDissolveSoftness,
+										uDissolveThreshold + uDissolveSoftness, gradientMask);
+								}
+								vec2 gradientUv = effectUv + uEffectScrollSpeed * uEffectTime;
+								vec3 gradientColor = texture(uEffectTex, gradientUv).rgb;
+								float gradientStrength = pow(
+									clamp(gradientColor.r, 0.0, 1.0),
+									max(uGradientSharpness, 0.001));
+								float pulse = 1.0 + sin((uEffectTime * uPulseRate + uPulseOffset) * 6.2831853) * uPulseMax;
+								float bloom = clamp(uBloomIntensity * GRADIENT_BLOOM_SCALE, 0.0, 1.0);
+								vec3 gradientTint = gradientColor * uEffectColor.rgb * gradientStrength;
+								float effectAmount = clamp(gradientMask * GRADIENT_PULSE_SCALE *
+									(max(pulse, 0.0) + bloom), 0.0, 1.0);
+								vec3 colorDodge = min(finalColor /
+									max(vec3(1.0) - gradientTint, vec3(0.001)), vec3(2.0));
+								finalColor = mix(finalColor, colorDodge, effectAmount);
+							}
 							if (uHasEffectTex != 0)
 							{
 								if ((uEffectKind & 1) != 0)

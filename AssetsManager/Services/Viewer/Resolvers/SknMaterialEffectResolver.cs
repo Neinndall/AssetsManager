@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 submesh,
                 textureKeys,
                 submeshes);
+            effect = ApplyGradientPulse(effect, material, textureKeys);
             effect = ApplyTransition(effect, material, textureKeys);
             effect = ApplyFresnel(effect, material, textureKeys);
             effect = ApplyEmission(effect, material, textureKeys);
@@ -139,6 +140,84 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "FlowmapIntensity",
                     "FlowIntensity",
                     "Flow_Amount"));
+        }
+
+        private static ModelMaterialEffectDefinition ApplyGradientPulse(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material,
+            IReadOnlyList<string> textureKeys)
+        {
+            if (effect.Kind != ModelMaterialEffectKind.None)
+            {
+                return effect;
+            }
+
+            string gradientTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "Gradient_Texture",
+                "Gradient",
+                "GradientMap");
+            string maskTexture = FindMaterialMask(material, textureKeys);
+            IReadOnlyDictionary<string, Vector4> parameters = material.Parameters;
+            bool hasGradientDriver = HasAnyParameter(
+                parameters,
+                "Pulse_Rate",
+                "Pulse_Max",
+                "Pulse_Offset") ||
+                (material.HasSwitch("USE_ADDATIVE", "USE_ADDITIVE") &&
+                 HasAnyParameter(parameters, "Scrolling_Rate", "Scrolling_Scale"));
+
+            if (gradientTexture == null || maskTexture == null || !hasGradientDriver)
+            {
+                return effect;
+            }
+
+            return new ModelMaterialEffectDefinition(
+                ModelMaterialEffectKind.GradientPulse,
+                gradientTexture,
+                maskTexture,
+                ReadVector2(
+                    parameters,
+                    Vector2.Zero,
+                    "Scrolling_Rate",
+                    "Scroll_Speed"),
+                ReadVector2(
+                    parameters,
+                    Vector2.One,
+                    "Scrolling_Scale",
+                    "UV_Scale"),
+                ReadVector4(
+                    parameters,
+                    Vector4.One,
+                    "Color",
+                    "Gradient_Color"),
+                ReadFloat(parameters, 1f, "Mask_Intensity"),
+                0f)
+            {
+                PulseRate = ReadFloat(parameters, 0f, "Pulse_Rate"),
+                PulseMax = ReadFloat(parameters, 0f, "Pulse_Max"),
+                PulseOffset = ReadFloat(parameters, 0f, "Pulse_Offset"),
+                GradientSharpness = ReadFloat(
+                    parameters,
+                    1f,
+                    "Gradient_Sharpness"),
+                BloomColor = ReadVector4(
+                    parameters,
+                    Vector4.One,
+                    "Bloom_Color",
+                    "Color"),
+                BloomIntensity = ReadFloat(
+                    parameters,
+                    0f,
+                    "Bloom_Intensity"),
+                DissolveThreshold = ReadFloat(
+                    parameters,
+                    0f,
+                    "Dissolve_Bias",
+                    "DissolveBias"),
+                DissolveSoftness = ReadDissolveSoftness(parameters)
+            };
         }
 
         private static ModelMaterialEffectDefinition ApplyTransition(

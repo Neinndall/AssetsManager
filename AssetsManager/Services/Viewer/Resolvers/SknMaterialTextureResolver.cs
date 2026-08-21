@@ -48,6 +48,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
         IReadOnlyList<SknMaterialSampler> Samplers,
         IReadOnlyDictionary<string, Vector4> Parameters)
     {
+        internal IReadOnlySet<string> Switches { get; init; } =
+            new HashSet<string>(StringComparer.Ordinal);
+
         private Dictionary<string, SknMaterialSampler> _normalizedSamplers;
 
         internal SknMaterialSampler FindSampler(string normalizedToken)
@@ -66,6 +69,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
             return _normalizedSamplers.TryGetValue(normalizedToken, out SknMaterialSampler matchedSampler) ? matchedSampler : null;
         }
+
+        internal bool HasSwitch(params string[] names) =>
+            names.Any(name => Switches.Contains(SknMaterialTextureResolver.NormalizeToken(name)));
     }
 
     internal sealed record SknMaterialTextureMetadata(
@@ -103,6 +109,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private static readonly uint TextureName = Fnv1a.HashLower("textureName");
         private static readonly uint TexturePath = Fnv1a.HashLower("texturePath");
         private static readonly uint ParamValues = Fnv1a.HashLower("paramValues");
+        private static readonly uint SwitchesProperty = Fnv1a.HashLower("switches");
+        private static readonly uint SwitchOn = Fnv1a.HashLower("on");
         private static readonly uint ParameterName = Fnv1a.HashLower("name");
         private static readonly uint ParameterValue = Fnv1a.HashLower("value");
 
@@ -454,9 +462,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
 
                 List<SknMaterialSampler> samplers = ReadSamplers(obj, wadChunkPathResolver);
                 Dictionary<string, Vector4> parameters = ReadParameters(obj);
-                if (samplers.Count > 0 || parameters.Count > 0)
+                HashSet<string> switches = ReadSwitches(obj);
+                if (samplers.Count > 0 || parameters.Count > 0 || switches.Count > 0)
                 {
-                    result[pathHash] = new SknMaterialDefinition(samplers, parameters);
+                    result[pathHash] = new SknMaterialDefinition(samplers, parameters)
+                    {
+                        Switches = switches
+                    };
                 }
             }
 
@@ -512,6 +524,31 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return result;
         }
 
+        private static HashSet<string> ReadSwitches(BinTreeObject materialObject)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            if (!materialObject.Properties.TryGetValue(SwitchesProperty, out BinTreeProperty property) ||
+                property is not BinTreeContainer switches)
+            {
+                return result;
+            }
+
+            foreach (BinTreeProperty element in switches.Elements)
+            {
+                if (element is not BinTreeStruct switchDefinition ||
+                    !TryGetString(switchDefinition, ParameterName, out string name) ||
+                    (switchDefinition.Properties.TryGetValue(SwitchOn, out BinTreeProperty enabled) &&
+                     enabled is BinTreeBool flag && !flag.Value))
+                {
+                    continue;
+                }
+
+                result.Add(NormalizeToken(name));
+            }
+
+            return result;
+        }
+
         private static string SelectColorTexturePath(IReadOnlyList<SknMaterialSampler> samplers) =>
             (samplers ?? Array.Empty<SknMaterialSampler>())
                 .Where(sampler => RankColorSampler(sampler.TextureName) > 0)
@@ -553,6 +590,9 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "flowtexture" or
                 "flowmaptexture" or
                 "flowmask" or
+                "gradient" or
+                "gradienttexture" or
+                "gradientmap" or
                 "noisedisturb" or
                 "noisetexture" or
                 "transitionpatterntexture" or

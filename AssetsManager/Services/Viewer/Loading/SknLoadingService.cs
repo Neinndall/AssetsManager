@@ -181,7 +181,7 @@ namespace AssetsManager.Services.Viewer.Loading
             string filePath,
             CancellationToken cancellationToken)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(TextureUtils.GetColorTextureCandidates(loadedTextures.Keys));
             string defaultTextureKey = materialTextures?.DefaultTextureKey ??
                 SknMaterialTextureResolver.FindUnambiguousFallback(loadedTextures.Keys);
 

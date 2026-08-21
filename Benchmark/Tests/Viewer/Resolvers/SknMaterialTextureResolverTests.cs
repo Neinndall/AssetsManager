@@ -421,6 +421,100 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_RecognizesMaskedGradientPulseMaterial()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Skin0/Materials/Aatrox_VFXBase";
+            const string diffusePath = "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_TX_CM.tex";
+            const string maskPath = "ASSETS/Characters/Aatrox/Skins/Base/Particles/Aatrox_Base_R_body_mask.tex";
+            const string gradientPath = "ASSETS/Shared/Materials/Gradient_test_01.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Mask_Texture", maskPath),
+                        CreateSampler("Gradient_Texture", gradientPath)
+                    },
+                    CreateParameter("Pulse_Rate", new Vector4(3f, 0f, 0f, 0f)),
+                    CreateParameter("Pulse_Max", new Vector4(0.4f, 0f, 0f, 0f)),
+                    CreateParameter("Pulse_Offset", new Vector4(0.3f, 0f, 0f, 0f)),
+                    CreateParameter("Gradient_Sharpness", new Vector4(0.5f, 0f, 0f, 0f)),
+                    CreateParameter("Mask_Intensity", Vector4.One),
+                    CreateParameter("Dissolve_Bias", new Vector4(-0.2f, 0f, 0f, 0f)),
+                    CreateParameter("Dissolve_SmoothStep", new Vector4(0f, 0.15f, 0f, 0f)),
+                    CreateParameter("Bloom_Intensity", new Vector4(10f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "aatrox_base_tx_cm",
+                    "aatrox_base_r_body_mask",
+                    "gradient_test_01"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
+            Assert.Equal("gradient_test_01", effect.TextureName);
+            Assert.Equal("aatrox_base_r_body_mask", effect.MaskTextureName);
+            Assert.Equal(3f, effect.PulseRate);
+            Assert.Equal(0.4f, effect.PulseMax);
+            Assert.Equal(0.3f, effect.PulseOffset);
+            Assert.Equal(0.5f, effect.GradientSharpness);
+            Assert.Equal(10f, effect.BloomIntensity);
+            Assert.Equal(-0.2f, effect.DissolveThreshold);
+            Assert.Equal(0.075f, effect.DissolveSoftness);
+            AssertContainsPath(gradientPath, SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_RecognizesGradientScrollEnabledByMaterialSwitch()
+        {
+            const string materialPath = "Characters/Aatrox/Skins/Base/Materials/Wings";
+            const string diffusePath = "ASSETS/Characters/Aatrox/Skins/Base/Aatrox_Base_Wings_TX_CM.tex";
+            const string maskPath = "ASSETS/Characters/Aatrox/Skins/Base/Particles/Aatrox_Base_R_wing_mask.tex";
+            const string gradientPath = "ASSETS/Shared/Materials/Gradient_test_01.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Wings",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithSwitches(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Mask_Texture", maskPath),
+                        CreateSampler("Gradient_Texture", gradientPath)
+                    },
+                    new[] { "USE_ADDATIVE" },
+                    CreateParameter("Scrolling_Rate", new Vector4(-0.5f, -0.5f, 0f, 0f)),
+                    CreateParameter("Scrolling_Scale", Vector4.One),
+                    CreateParameter("Dissolve_Bias", new Vector4(0.785f, 0f, 0f, 0f)),
+                    CreateParameter("Dissolve_SmoothStep", new Vector4(0f, 0.5f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[]
+                {
+                    "aatrox_base_wings_tx_cm",
+                    "aatrox_base_r_wing_mask",
+                    "gradient_test_01"
+                });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["wings"];
+            Assert.Equal(ModelMaterialEffectKind.GradientPulse, effect.Kind);
+            Assert.Equal(new Vector2(-0.5f, -0.5f), effect.ScrollSpeed);
+            Assert.Equal(0.785f, effect.DissolveThreshold);
+            Assert.Equal(0.25f, effect.DissolveSoftness);
+        }
+
+        [Fact]
         public void Resolve_RecognizesRealScrollSamplerAliases()
         {
             const string materialPath = "Characters/Lux/Skins/Skin58/Materials/Body";
@@ -1092,6 +1186,40 @@ namespace AssetsManager.BenchmarkTests.Tests.Viewer.Resolvers
                         Fnv1a.HashLower("paramValues"),
                         BinPropertyType.Embedded,
                         parameters)
+                });
+
+        private static BinTreeObject CreateMaterialWithSwitches(
+            string path,
+            BinTreeEmbedded[] samplers,
+            string[] enabledSwitches,
+            params BinTreeEmbedded[] parameters) =>
+            new(
+                path,
+                "StaticMaterialDef",
+                new BinTreeProperty[]
+                {
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("samplerValues"),
+                        BinPropertyType.Embedded,
+                        samplers),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("paramValues"),
+                        BinPropertyType.Embedded,
+                        parameters),
+                    new BinTreeUnorderedContainer(
+                        Fnv1a.HashLower("switches"),
+                        BinPropertyType.Embedded,
+                        enabledSwitches.Select(CreateSwitch).ToArray())
+                });
+
+        private static BinTreeEmbedded CreateSwitch(string name) =>
+            new(
+                0,
+                Fnv1a.HashLower("StaticMaterialSwitchDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("name"), name),
+                    new BinTreeBool(Fnv1a.HashLower("on"), true)
                 });
 
         private static BinTreeEmbedded CreateParameter(string name, Vector4 value) =>
