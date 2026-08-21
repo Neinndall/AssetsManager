@@ -291,6 +291,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Viewer / Ground logo opacity now affects the rendered logo correctly.
   - Viewer / Map Environment pan now stops cleanly at the ground collision boundary without lateral drift.
   - Viewer / Map Environment zoom now remains continuous at close range without crossing the terrain or losing nearby surfaces.
   - Viewer / Browser Project now clears the file panel when closing the selected project.

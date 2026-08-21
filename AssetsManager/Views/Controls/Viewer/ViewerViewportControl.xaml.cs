@@ -468,6 +468,9 @@ namespace AssetsManager.Views.Controls.Viewer
                             string texName = "tex_" + part.Name;
                             part.AllTextures[texName] = bitmap;
                             part.SelectedTextureName = texName;
+                            float opacity = (float)Math.Clamp(imgBrush.Opacity, 0.0, 1.0);
+                            part.ColorTint = new Vector4(1f, 1f, 1f, opacity);
+                            if (opacity < 1f) part.AlphaCutoff = 0f;
                         }
 
                         sceneModel.AddPart(part);
