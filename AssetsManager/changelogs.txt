@@ -68,6 +68,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / Ground logo settings now update the active viewport live and after saving, including opacity, size, and path changes.
   - Viewer / Champion skin materials now resolve masked gradient pulse effects from BIN samplers, parameters, and UV scrolling.
   - Viewer / Champion skin texture selectors now show only color textures; material masks and effect maps remain loaded internally.
   - Viewer / Reworked zoom into continuous forward/backward camera movement for models and map environments.

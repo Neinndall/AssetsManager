@@ -3,7 +3,9 @@ using System.IO;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -14,7 +16,7 @@ using AssetsManager.Views.Models.Audio;
 
 namespace AssetsManager.Utils
 {
-    public class AppSettings
+    public class AppSettings : INotifyPropertyChanged
     {
         public bool SyncHashesWithCDTB { get; set; }
         public bool EnableExtraction { get; set; } 
@@ -41,9 +43,27 @@ namespace AssetsManager.Utils
         public string LastPbeCheckTime { get; set; }
         public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
-        public string CustomGroundLogoPath { get; set; } = string.Empty;
-        public double GroundLogoScale { get; set; } = 1.0;
-        public double GroundLogoOpacity { get; set; } = 1.0;
+        private string _customGroundLogoPath = string.Empty;
+        private double _groundLogoScale = 1.0;
+        private double _groundLogoOpacity = 1.0;
+
+        public string CustomGroundLogoPath
+        {
+            get => _customGroundLogoPath;
+            set => SetGroundLogoProperty(ref _customGroundLogoPath, value);
+        }
+
+        public double GroundLogoScale
+        {
+            get => _groundLogoScale;
+            set => SetGroundLogoProperty(ref _groundLogoScale, value);
+        }
+
+        public double GroundLogoOpacity
+        {
+            get => _groundLogoOpacity;
+            set => SetGroundLogoProperty(ref _groundLogoOpacity, value);
+        }
 
         private static IList<T> WrapList<T>(IList<T> value) =>
             value is SafeList<T> sl ? sl : new SafeList<T>(value ?? new List<T>());
@@ -119,7 +139,15 @@ namespace AssetsManager.Utils
 
         public ApiSettings ApiSettings { get; set; }
 
+        public event PropertyChangedEventHandler PropertyChanged;
         public event EventHandler ConfigurationSaved;
+
+        private void SetGroundLogoProperty<T>(ref T field, T value, [CallerMemberName] string propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         private const string ConfigFilePath = "config.json";
         private static readonly SemaphoreSlim _saveSemaphore = new SemaphoreSlim(1, 1);

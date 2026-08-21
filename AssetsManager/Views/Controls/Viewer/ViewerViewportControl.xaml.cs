@@ -288,6 +288,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private ModelVisual3D _groundVisual;
         private SceneModel _groundModel;
         private SceneModel _skyModel;
+        private DispatcherOperation _groundRefreshOperation;
 
         public ViewerViewportControl()
         {
@@ -352,6 +353,13 @@ namespace AssetsManager.Views.Controls.Viewer
         private async void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
+            if (AppSettings != null)
+            {
+                AppSettings.PropertyChanged -= OnAppSettingsPropertyChanged;
+                AppSettings.PropertyChanged += OnAppSettingsPropertyChanged;
+                AppSettings.ConfigurationSaved -= OnAppSettingsSaved;
+                AppSettings.ConfigurationSaved += OnAppSettingsSaved;
+            }
             _modelPlayers.Clear();
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
@@ -370,6 +378,36 @@ namespace AssetsManager.Views.Controls.Viewer
 
             ResetRenderTiming();
             _fpsStopwatch.Restart();
+        }
+
+        private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e) =>
+            RequestGroundPlaneRefresh();
+
+        private void OnAppSettingsSaved(object sender, EventArgs e) => RequestGroundPlaneRefresh();
+
+        private void RequestGroundPlaneRefresh()
+        {
+            if (_isCleanedUp || _isMapGeometry ||
+                _groundRefreshOperation?.Status == DispatcherOperationStatus.Pending)
+            {
+                return;
+            }
+
+            _groundRefreshOperation = Dispatcher.InvokeAsync(RefreshGroundPlane, DispatcherPriority.Render);
+        }
+
+        private void RefreshGroundPlane()
+        {
+            if (_isCleanedUp || _isMapGeometry) return;
+
+            if (_groundVisual != null && Viewport.Children.Contains(_groundVisual))
+                Viewport.Children.Remove(_groundVisual);
+
+            _meshRenderer?.QueueRelease(_groundModel);
+            _groundModel?.Dispose();
+            _groundVisual = null;
+            _groundModel = null;
+            SetupScene(false);
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -512,6 +550,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
                 // 1. Desuscribir eventos
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
+                AppSettings?.PropertyChanged -= OnAppSettingsPropertyChanged;
+                AppSettings?.ConfigurationSaved -= OnAppSettingsSaved;
+                _groundRefreshOperation?.Abort();
+                _groundRefreshOperation = null;
 
                 // 2. Limpiar escena y animaciones
                 ResetScene();
