@@ -429,7 +429,7 @@ namespace AssetsManager.Views.Controls.Explorer
             var openFileDialog = new OpenFileDialog
             {
                 Title = "Select a comparison result file",
-                Filter = "WAD Comparison JSON (*.wadcomparison.json)|*.wadcomparison.json|All files (*.*)|*.*",
+                Filter = "WadComparison (*.json)|*.json|All files (*.*)|*.*",
                 InitialDirectory = DirectoriesCreator.WadComparisonSavePath
             };
 
