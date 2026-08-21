@@ -202,11 +202,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     parameters,
                     1f,
                     "Gradient_Sharpness"),
-                BloomColor = ReadVector4(
-                    parameters,
-                    Vector4.One,
-                    "Bloom_Color",
-                    "Color"),
                 BloomIntensity = ReadFloat(
                     parameters,
                     0f,
