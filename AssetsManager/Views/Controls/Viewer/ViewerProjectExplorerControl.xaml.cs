@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AssetsManager.Views.Controls.Explorer;
 using AssetsManager.Views.Helpers;
 using Microsoft.Win32;
@@ -411,10 +412,46 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (folderNode == null || folderNode.IsFile) return;
 
+            ClearImagePreview();
             _currentFolderNode = folderNode;
             SynchronizeFolderTree(folderNode.FullPath);
             FilesListBox.ItemsSource = folderNode.Children;
             UpdateBreadcrumbs(folderNode);
+        }
+
+        public void ShowImagePreview(string filePath, BitmapSource image)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || image == null)
+            {
+                ClearImagePreview();
+                return;
+            }
+
+            BrowserPreviewImage.Source = image;
+            UpdateImagePreviewBreadcrumb(filePath);
+            ImagePreviewSplitter.Visibility = Visibility.Visible;
+            ImagePreviewPanel.Visibility = Visibility.Visible;
+        }
+
+        public void ClearImagePreview()
+        {
+            bool hadPreview = BrowserPreviewImage.Source != null;
+            BrowserPreviewImage.Source = null;
+            ImagePreviewPanel.Visibility = Visibility.Collapsed;
+            ImagePreviewSplitter.Visibility = Visibility.Collapsed;
+
+            if (hadPreview && _currentFolderNode != null)
+            {
+                UpdateBreadcrumbs(_currentFolderNode);
+            }
+        }
+
+        private void UpdateImagePreviewBreadcrumb(string filePath)
+        {
+            if (_currentFolderNode == null) return;
+
+            UpdateBreadcrumbs(_currentFolderNode);
+            Breadcrumbs.Items.Add(new BreadcrumbItem(Path.GetFileName(filePath), filePath, false));
         }
 
         private void SynchronizeFolderTree(string folderPath)
@@ -602,6 +639,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _currentRootFolder = null;
             _currentFolderNode = null;
             FilesListBox.ItemsSource = null;
+            ClearImagePreview();
             Breadcrumbs.Clear();
             SearchBox.Text = string.Empty;
         }

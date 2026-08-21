@@ -61,9 +61,6 @@ namespace AssetsManager.Views.Models.Viewer
         private string _modelsSearchText = string.Empty;
         private string _animationsSearchText = string.Empty;
 
-        private string _selectedImagePath = string.Empty;
-        private string _selectedImageName = string.Empty;
-
         public ObservableRangeCollection<SceneModel> LoadedModels => _loadedModels;
         public ObservableRangeCollection<AnimationModel> AnimationModels => _animationModels;
 
@@ -214,35 +211,6 @@ namespace AssetsManager.Views.Models.Viewer
         public bool HasAnimationsSearchText => !string.IsNullOrWhiteSpace(_animationsSearchText);
 
         public IEnumerable<SceneModel> FilteredModels => _filteredModelsList;
-
-        public string SelectedImagePath
-        {
-            get => _selectedImagePath;
-            set
-            {
-                if (_selectedImagePath != value)
-                {
-                    _selectedImagePath = value;
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(HasSelectedImage));
-                }
-            }
-        }
-
-        public string SelectedImageName
-        {
-            get => _selectedImageName;
-            set
-            {
-                if (_selectedImageName != value)
-                {
-                    _selectedImageName = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public bool HasSelectedImage => !string.IsNullOrEmpty(_selectedImagePath);
 
         public IEnumerable<AnimationModel> FilteredAnimations => _filteredAnimationsList;
 

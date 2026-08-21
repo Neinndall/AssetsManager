@@ -111,13 +111,19 @@ namespace AssetsManager.Views
         private async void ProjectExplorer_ModelSelected(object sender, string filePath)
         {
             var extension = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+            bool isImage = SupportedFileTypes.IsImage(filePath);
+            if (!isImage)
+            {
+                ProjectExplorer.ClearImagePreview();
+            }
+
             if (extension == ".skl")
             {
                 PanelControl.LoadSkeleton(filePath);
             }
-            else if (extension == ".dds" || extension == ".tex" || extension == ".png" || extension == ".jpg" || extension == ".tga")
+            else if (isImage)
             {
-                PanelControl.ShowImagePreview(filePath);
+                ShowProjectImagePreview(filePath);
             }
             else if (extension == ".anm")
             {
@@ -141,6 +147,19 @@ namespace AssetsManager.Views
             {
                 PanelControl.ViewModel.ShowMainContent();
                 await PanelControl.LoadInitialModel(filePath);
+            }
+        }
+
+        private void ShowProjectImagePreview(string filePath)
+        {
+            try
+            {
+                ProjectExplorer.ShowImagePreview(filePath, TextureUtils.LoadTextureFromFile(filePath));
+            }
+            catch (Exception ex)
+            {
+                ProjectExplorer.ClearImagePreview();
+                _logService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
             }
         }
 

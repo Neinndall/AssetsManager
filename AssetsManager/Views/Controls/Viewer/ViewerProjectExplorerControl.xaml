@@ -60,6 +60,8 @@
                     <ColumnDefinition Width="180" MinWidth="120" MaxWidth="300"/> <!-- Folder Tree -->
                     <ColumnDefinition Width="Auto"/>                             <!-- Splitter -->
                     <ColumnDefinition Width="*"/>                                <!-- Files Wrap Panel Grid -->
+                    <ColumnDefinition Width="Auto"/>                             <!-- Preview Splitter -->
+                    <ColumnDefinition Width="Auto"/>                             <!-- Image Preview -->
                 </Grid.ColumnDefinitions>
 
                 <!-- 1. Folder Tree View Section -->
@@ -181,6 +183,28 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- 3. Collapsible image preview -->
+                <GridSplitter Grid.Column="3"
+                              x:Name="ImagePreviewSplitter"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Stretch"
+                              Width="1"
+                              Background="{StaticResource BorderColor}"
+                              ResizeBehavior="PreviousAndNext"
+                              ResizeDirection="Columns"
+                              Visibility="Collapsed"/>
+
+                <Grid Grid.Column="4"
+                      x:Name="ImagePreviewPanel"
+                      Width="250"
+                      Margin="4"
+                      Visibility="Collapsed">
+                    <Image x:Name="BrowserPreviewImage"
+                           Stretch="Uniform"
+                           Margin="4"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Grid>
             </Grid>
         </Grid>
     </Border>

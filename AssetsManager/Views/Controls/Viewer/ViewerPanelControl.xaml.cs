@@ -1076,35 +1076,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        public void ShowImagePreview(string filePath)
-        {
-            try
-            {
-                var bmp = TextureUtils.LoadTextureFromFile(filePath);
-                if (bmp != null)
-                {
-                    PreviewImageSource.Source = bmp;
-                    _viewModel.SelectedImagePath = filePath;
-                    _viewModel.SelectedImageName = System.IO.Path.GetFileName(filePath);
-                }
-                else
-                {
-                    LogService.LogWarning($"[IMAGE PREVIEW] TextureUtils returned null for: {filePath}. The format might not be supported or is corrupted.");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogService.LogError(ex, $"[IMAGE PREVIEW] Failed to load preview image: {filePath}");
-            }
-        }
-
-        private void CloseImagePreview_Click(object sender, RoutedEventArgs e)
-        {
-            _viewModel.SelectedImagePath = string.Empty;
-            _viewModel.SelectedImageName = string.Empty;
-            PreviewImageSource.Source = null;
-        }
-
         public void LoadAnimationDirectly(string filePath)
             => LoadAnimationsDirectly(new[] { filePath });
 
