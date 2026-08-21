@@ -42,6 +42,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="AssetsManager.BenchmarkTests" />
+    <InternalsVisibleTo Include="BenchmarkApp" />
   </ItemGroup>
   
   <ItemGroup>

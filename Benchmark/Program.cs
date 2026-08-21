@@ -26,10 +26,35 @@ namespace BenchmarkApp
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "game-baseline", StringComparison.OrdinalIgnoreCase))
+            {
+                await GameBaselineDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-unknowns-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                GameUnknownsAuditDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-crack-lab", StringComparison.OrdinalIgnoreCase))
+            {
+                GameCrackLabDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "lcu-unknowns-audit", StringComparison.OrdinalIgnoreCase))
             {
                 string pbe = args.Length > 1 ? args[1] : PbeDirectory;
                 LcuUnknownsAuditDiagnostic.Run(pbe);
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-export-unknowns", StringComparison.OrdinalIgnoreCase))
+            {
+                LcuExportUnknownsDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "lcu-crack-lab", StringComparison.OrdinalIgnoreCase))
+            {
+                LcuCrackLabDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
             if (args.Length > 0 && args[0] == "check-plugins")
