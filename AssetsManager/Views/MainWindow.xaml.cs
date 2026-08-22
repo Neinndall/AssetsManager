@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Comparator;
@@ -57,9 +58,8 @@ namespace AssetsManager.Views
         private readonly NewsService _newsService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private ComparatorWindow _comparatorWindow;
+        private bool _isUpdatePromptOpen;
 
-        private string _latestAppVersionAvailable;
-        
         // New fields to manage the state of the extraction after comparison
         private string _extractionOldLolPath;
         private string _extractionNewLolPath;
@@ -220,13 +220,8 @@ namespace AssetsManager.Views
         }
 
         // --- End Taskbar Logic ---
-        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
-            if (!string.IsNullOrEmpty(latestVersion))
-            {
-                _latestAppVersionAvailable = latestVersion;
-            }
-
             // Resolve adaptive title for toast balloon notification
             string toastTitle = NotificationTitleResolver.ResolveToastTitle(message, category, title, newsItem);
 
@@ -260,7 +255,52 @@ namespace AssetsManager.Views
             }
             else
             {
-                ShowNotification(true, message, category, notificationTitle);
+                bool isStableUpdate = category == NotificationCategory.Updates &&
+                                      !string.IsNullOrEmpty(latestVersion);
+
+                if (isStableUpdate || updateAction != null)
+                {
+                    _notificationService.AddNotification(
+                        notificationTitle,
+                        message,
+                        NotificationType.Info,
+                        onClick: () => OpenUpdatePrompt(updateAction),
+                        category: category,
+                        actionText: "UPDATE NOW");
+                }
+                else
+                {
+                    ShowNotification(true, message, category, notificationTitle);
+                }
+            }
+        }
+
+        private async void OpenUpdatePrompt(Func<Window, Task> updateAction)
+        {
+            if (_isUpdatePromptOpen) return;
+
+            _isUpdatePromptOpen = true;
+
+            try
+            {
+                var hubWindow = Application.Current.Windows
+                    .OfType<NotificationHubWindow>()
+                    .FirstOrDefault();
+
+                hubWindow?.Close();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+                if (updateAction == null)
+                {
+                    await _updateManager.CheckForUpdatesAsync(this, true);
+                }
+                else
+                {
+                    await updateAction(this);
+                }
+            }
+            finally
+            {
+                _isUpdatePromptOpen = false;
             }
         }
         
@@ -405,17 +445,11 @@ namespace AssetsManager.Views
             }
         }
 
-        public async void OnNotificationHubRequested(object sender, EventArgs e)
+        public void OnNotificationHubRequested(object sender, EventArgs e)
         {
             var hubWindow = _serviceProvider.GetRequiredService<NotificationHubWindow>();
             hubWindow.Owner = this;
             hubWindow.ShowDialog();
-
-            if (!string.IsNullOrEmpty(_latestAppVersionAvailable))
-            {
-                await _updateManager.CheckForUpdatesAsync(this, true);
-                _latestAppVersionAvailable = null;
-            }
         }
 
         public async void OnSidebarNavigationRequested(string viewTag)

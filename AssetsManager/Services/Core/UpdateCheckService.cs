@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Timers;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Windows;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
@@ -33,8 +34,10 @@ namespace AssetsManager.Services.Core
         private readonly BackgroundJobGate _assetTrackerJob = new();
         private readonly BackgroundJobGate _pbeStatusJob = new();
         private readonly BackgroundJobGate _newsJob = new();
+        private string _notifiedStableVersionThisSession;
+        private string _notifiedQaBuildShaThisSession;
 
-        public event Action<string, string, NotificationCategory, string, NewsItemModel> UpdatesFound;
+        public event Action<string, string, NotificationCategory, string, NewsItemModel, Func<Window, Task>> UpdatesFound;
 
         public string AvailableVersion { get; private set; }
 
@@ -186,12 +189,12 @@ namespace AssetsManager.Services.Core
                 {
                     if (updatedCategoryNames.Count == 1)
                     {
-                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null);
+                        UpdatesFound?.Invoke($"New assets have been found in {updatedCategoryNames[0]} category", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null, null);
                     }
                     else
                     {
                         string categories = string.Join(", ", updatedCategoryNames);
-                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null);
+                        UpdatesFound?.Invoke($"New assets found in categories: {categories}", null, NotificationCategory.Tracker, "Asset Tracker Discovery", null, null);
                     }
                 }
             });
@@ -209,7 +212,7 @@ namespace AssetsManager.Services.Core
             {
                 string pbeStatusMessage = await _pbeStatusService.CheckPbeStatusAsync(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.System, "PBE Status Update", null);
+                if (!string.IsNullOrEmpty(pbeStatusMessage)) UpdatesFound?.Invoke(pbeStatusMessage, null, NotificationCategory.System, "PBE Status Update", null, null);
             });
             if (!completed) _logService.LogDebug("PBE status check skipped because it is already running or monitoring stopped.");
         }
@@ -232,7 +235,7 @@ namespace AssetsManager.Services.Core
                     string message = string.IsNullOrEmpty(item.CategoryTitle)
                         ? item.Title
                         : $"{item.Title} ({item.CategoryTitle})";
-                    UpdatesFound?.Invoke(message, null, NotificationCategory.News, "Riot News", item);
+                    UpdatesFound?.Invoke(message, null, NotificationCategory.News, "Riot News", item, null);
                 }
             });
             if (!completed) _logService.LogDebug("News check skipped because it is already running or monitoring stopped.");
@@ -257,7 +260,7 @@ namespace AssetsManager.Services.Core
                     tasks.Add(_status.SyncHashesIfNeeds(_appSettings.SyncHashesWithCDTB, silent, () =>
                     {
                         if (silent && !cancellationToken.IsCancellationRequested)
-                            UpdatesFound?.Invoke("New hashes are available!", null, NotificationCategory.Updates, "Hash Update", null);
+                            UpdatesFound?.Invoke("New hashes are available!", null, NotificationCategory.Updates, "Hash Update", null, null);
                     }));
                 }
 
@@ -278,15 +281,14 @@ namespace AssetsManager.Services.Core
                     if (!Version.TryParse(currentVerStr, out var currentVer) ||
                         !Version.TryParse(latestVerStr, out var latestVer)) return;
 
-                    if (string.Equals(_appSettings.LastNotifiedStableVersion, newVersion, StringComparison.OrdinalIgnoreCase)) return;
+                    if (string.Equals(_notifiedStableVersionThisSession, newVersion, StringComparison.OrdinalIgnoreCase)) return;
+
+                    _notifiedStableVersionThisSession = newVersion;
 
                     string message = VersionInfo.IsQA && latestVer <= currentVer
                         ? $"New stable version {newVersion} is available!"
                         : $"New version {newVersion} is available!";
-                    UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available", null);
-
-                    _appSettings.LastNotifiedStableVersion = newVersion;
-                    await PersistNotificationMarkerAsync("Failed to persist the last notified Stable version.");
+                    UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available", null, null);
                 }
 
                 async Task CheckExperimentalBuildAsync()
@@ -316,21 +318,24 @@ namespace AssetsManager.Services.Core
 
                     string latestBuildSha = latestBuild.ShortSha;
                     if (string.IsNullOrEmpty(latestBuildSha) ||
-                        string.Equals(_appSettings.LastNotifiedQaBuildSha, latestBuildSha, StringComparison.OrdinalIgnoreCase))
+                        string.Equals(_notifiedQaBuildShaThisSession, latestBuildSha, StringComparison.OrdinalIgnoreCase))
                     {
                         return;
                     }
 
                     string availableVersion = $"{VersionInfo.BaseVersion}-{latestBuildSha}";
+                    _notifiedQaBuildShaThisSession = latestBuildSha;
                     UpdatesFound?.Invoke(
                         $"New experimental version {availableVersion} is available!",
                         null,
                         NotificationCategory.Updates,
                         "App Update Available",
-                        null);
-
-                    _appSettings.LastNotifiedQaBuildSha = latestBuildSha;
-                    await PersistNotificationMarkerAsync("Failed to persist the last notified QA build.");
+                        null,
+                        owner => _updateManager.DownloadAndInstallDevelopmentBuildAsync(
+                            latestBuild.DownloadableAsset.DownloadUrl,
+                            latestBuild.DownloadableAsset.Size,
+                            latestBuildSha,
+                            owner));
                 }
 
                 async Task CheckMonitoredAssetsAsync()
@@ -342,22 +347,10 @@ namespace AssetsManager.Services.Core
                     string message = updatedNames.Count > 0
                         ? $"Monitored assets updated: {string.Join(", ", updatedNames)}"
                         : "Some monitored local assets have been updated!";
-                    UpdatesFound?.Invoke(message, null, NotificationCategory.Watcher, "Monitored Assets Updated", null);
+                    UpdatesFound?.Invoke(message, null, NotificationCategory.Watcher, "Monitored Assets Updated", null, null);
                 }
             });
             if (!completed) _logService.LogDebug("General update check skipped because it is already running or monitoring stopped.");
-        }
-
-        private async Task PersistNotificationMarkerAsync(string errorMessage)
-        {
-            try
-            {
-                await _appSettings.SaveAsync();
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, errorMessage);
-            }
         }
 
         /// <summary>

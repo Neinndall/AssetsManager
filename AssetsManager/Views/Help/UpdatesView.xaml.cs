@@ -1,5 +1,7 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Core;
@@ -45,7 +47,7 @@ namespace AssetsManager.Views.Help
             _updateCheckService.UpdatesFound -= OnUpdatesFound;
         }
 
-        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem)
+        private void OnUpdatesFound(string message, string latestVersion, NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
             UpdateModelState();
         }

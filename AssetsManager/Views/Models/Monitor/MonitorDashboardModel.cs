@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Collections.Specialized;
@@ -548,7 +549,7 @@ namespace AssetsManager.Views.Models.Monitor
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title, NewsItemModel newsItem)
+        private void OnUpdatesFound(string message, string latestVersion, Notifications.NotificationCategory category, string title, NewsItemModel newsItem, Func<Window, Task> updateAction)
         {
             if (!string.IsNullOrEmpty(latestVersion))
             {
