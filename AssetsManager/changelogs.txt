@@ -71,6 +71,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Experimental update installation no longer adds internal extraction progress to Notification Hub.
   - Comparison Results now allow extracting or saving new, modified, renamed and removed assets from their available version side.
   - Comparison Results now validates the selected source side and reports failed exports instead of silently accepting missing assets.
   - Explorer Smart Save now handles standalone WEM files from the local filesystem.
