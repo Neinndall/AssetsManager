@@ -55,7 +55,22 @@ namespace AssetsManager.Views.Models.Versions
         }
 
         public ObservableCollection<LocaleOption> AvailableLocales { get; set; }
+        public ObservableCollection<ManifestDateOption> ManifestDateOptions { get; }
         public ObservableCollection<TargetInstallationOption> TargetInstallations { get; } = new();
+
+        private ManifestDateOption _selectedManifestDate;
+        public ManifestDateOption SelectedManifestDate
+        {
+            get => _selectedManifestDate;
+            set
+            {
+                if (_selectedManifestDate != value)
+                {
+                    _selectedManifestDate = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         private TargetInstallationOption _selectedTargetInstallation;
         public TargetInstallationOption SelectedTargetInstallation
@@ -83,6 +98,22 @@ namespace AssetsManager.Views.Models.Versions
             LoLGameClientPaginator = new PaginationModel<VersionFileInfo>();
 
             _paginator = LeagueClientPaginator;
+
+            DateTime today = DateTime.Today;
+            ManifestDateOptions = new ObservableCollection<ManifestDateOption>(
+                new[] { new ManifestDateOption(null, "All") }
+                    .Concat(Enumerable.Range(0, 7).Select(offset =>
+                {
+                    DateTime date = today.AddDays(-offset);
+                    string label = offset switch
+                    {
+                        0 => "Today",
+                        1 => "Yesterday",
+                        _ => $"{offset} days ago"
+                    };
+                    return new ManifestDateOption(date, $"{label} - {date:dd/MM/yyyy}");
+                })));
+            SelectedManifestDate = ManifestDateOptions[0];
 
             AvailableLocales = new ObservableCollection<LocaleOption>
             {

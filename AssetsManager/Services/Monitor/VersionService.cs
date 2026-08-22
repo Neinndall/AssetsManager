@@ -54,13 +54,20 @@ namespace AssetsManager.Services.Monitor
             VersionDownloadProgressChanged?.Invoke(taskName, current, total, fileName);
         }
 
-        public async Task FetchAllVersionsAsync(CancellationToken cancellationToken = default)
+        public Task FetchAllVersionsAsync(CancellationToken cancellationToken = default)
+        {
+            return FetchAllVersionsAsync(null, cancellationToken);
+        }
+
+        public async Task FetchAllVersionsAsync(
+            DateTime? manifestDate,
+            CancellationToken cancellationToken = default)
         {
             _logService.Log("Starting get versions from league client and game client...");
 
             _directoriesCreator.CreateDirectory(_directoriesCreator.VersionsPath);
 
-            var riotVersions = await _riotApiService.FetchVersionsAsync(cancellationToken);
+            var riotVersions = await _riotApiService.FetchVersionsAsync(manifestDate, cancellationToken);
 
             if (!riotVersions.Any())
             {

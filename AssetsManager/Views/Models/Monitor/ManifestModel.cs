@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -111,4 +112,5 @@ public class RiotVersionInfo
     public string Category { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string ManifestUrl { get; set; } = string.Empty;
+    public DateTimeOffset? CreatedAt { get; set; }
 }

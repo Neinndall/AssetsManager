@@ -23,6 +23,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- ROW 1: Locales -->
@@ -59,8 +60,37 @@
                 <!-- DIVIDER LINE -->
                 <Border Grid.Row="0" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Margin="60,-7,0,-7" Opacity="0.3"/>
 
-                <!-- ROW 2: Target Installation (Quick Select Pattern) -->
+                <!-- ROW 2: Manifest Date Filter -->
                 <Grid Grid.Row="1" Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Grid.Column="0">
+                        <Border Background="{StaticResource HoverColor}" CornerRadius="10" Width="42" Height="42" Margin="0,0,16,0">
+                            <materialIcons:MaterialIcon Kind="CalendarClock" Foreground="{StaticResource AccentPurple}" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Filter Manifest" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="-2,0,0,0"/>
+                            <TextBlock Text="Select a Game Client day or fetch all manifests" FontSize="11" Foreground="{StaticResource TextSecondary}" Margin="-2,2,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <ComboBox Grid.Column="1"
+                              Width="190" Height="36"
+                              Style="{StaticResource ModernComboBox}"
+                              ItemsSource="{Binding ManifestDateOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedItem="{Binding SelectedManifestDate, Mode=TwoWay}"
+                              VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- DIVIDER LINE -->
+                <Border Grid.Row="1" VerticalAlignment="Bottom" Height="1" Background="{StaticResource BorderColor}" Margin="60,-7,0,-7" Opacity="0.3"/>
+
+                <!-- ROW 3: Target Installation (Quick Select Pattern) -->
+                <Grid Grid.Row="2" Margin="0,14,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>

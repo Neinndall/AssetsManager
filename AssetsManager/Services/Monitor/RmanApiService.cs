@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -25,9 +26,16 @@ public sealed class RmanApiService
         _logService = logService;
     }
 
-    public async Task<List<RiotVersionInfo>> FetchVersionsAsync(CancellationToken cancellationToken = default)
+    public Task<List<RiotVersionInfo>> FetchVersionsAsync(CancellationToken cancellationToken = default)
     {
-        Task<List<RiotVersionInfo>> gameVersions = FetchGameVersionsAsync(cancellationToken);
+        return FetchVersionsAsync(null, cancellationToken);
+    }
+
+    public async Task<List<RiotVersionInfo>> FetchVersionsAsync(
+        DateTime? manifestDate,
+        CancellationToken cancellationToken = default)
+    {
+        Task<List<RiotVersionInfo>> gameVersions = FetchGameVersionsAsync(manifestDate, cancellationToken);
         Task<List<RiotVersionInfo>> clientVersions = FetchClientVersionsAsync(cancellationToken);
         await Task.WhenAll(gameVersions, clientVersions).ConfigureAwait(false);
 
@@ -37,7 +45,9 @@ public sealed class RmanApiService
             .ToList();
     }
 
-    private async Task<List<RiotVersionInfo>> FetchGameVersionsAsync(CancellationToken cancellationToken)
+    private async Task<List<RiotVersionInfo>> FetchGameVersionsAsync(
+        DateTime? manifestDate,
+        CancellationToken cancellationToken)
     {
         var versions = new List<RiotVersionInfo>();
         try
@@ -70,9 +80,16 @@ public sealed class RmanApiService
                     Product = "Game Client",
                     Category = artifactId,
                     Version = version,
-                    ManifestUrl = manifestUrl
+                    ManifestUrl = manifestUrl,
+                    CreatedAt = TryGetTimestamp(releaseInfo, "created_at")
                 });
             }
+
+            if (!manifestDate.HasValue) return versions;
+
+            return versions.Where(version => version.CreatedAt.HasValue
+                                             && version.CreatedAt.Value.ToLocalTime().Date == manifestDate.Value.Date)
+                .ToList();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -144,5 +161,17 @@ public sealed class RmanApiService
         return element.TryGetProperty(name, out JsonElement property)
                && property.ValueKind == JsonValueKind.String
                && !string.IsNullOrWhiteSpace(value = property.GetString());
+    }
+
+    private static DateTimeOffset? TryGetTimestamp(JsonElement element, string name)
+    {
+        return TryGetString(element, name, out string value)
+               && DateTimeOffset.TryParse(
+                   value,
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                   out DateTimeOffset timestamp)
+            ? timestamp
+            : null;
     }
 }

@@ -94,7 +94,8 @@ namespace AssetsManager.Views.Controls.Monitor
                     ? new HashSet<string>(_viewModel.AllLeagueClientVersions.Concat(_viewModel.AllLoLGameClientVersions).Select(f => f.FileName))
                     : new HashSet<string>();
 
-                await VersionService.FetchAllVersionsAsync();
+                DateTime? manifestDate = _viewModel?.SelectedManifestDate?.Date;
+                await VersionService.FetchAllVersionsAsync(manifestDate);
                 if (_viewModel != null)
                 {
                     await _viewModel.LoadVersionFilesAsync(preservePage: true);
