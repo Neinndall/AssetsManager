@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -71,18 +72,37 @@ namespace AssetsManager.Views
             ProjectExplorer.AnimationsSelected += (_, paths) => PanelControl.LoadAnimationsDirectly(paths);
             ProjectExplorer.CloseRequested += (s, e) => _viewModel.IsProjectExplorerVisible = false;
 
-            _viewModel.PropertyChanged += (s, e) =>
-            {
-                if (e.PropertyName == nameof(ViewerWindowModel.IsProjectExplorerVisible))
-                {
-                    UpdateProjectExplorerRowHeight();
-                }
-            };
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // Set initial state
             UpdateProjectExplorerRowHeight();
 
-            Loaded += (s, e) => _isCleanedUp = false;
+            Unloaded += OnViewerUnloaded;
+        }
+
+        private void OnViewModelPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewerWindowModel.IsProjectExplorerVisible))
+            {
+                UpdateProjectExplorerRowHeight();
+            }
+
+            if (e.PropertyName == nameof(ViewerWindowModel.IsVfxStudioVisible))
+            {
+                if (_viewModel.IsVfxStudioVisible)
+                {
+                    VfxStudio.Activate();
+                }
+                else
+                {
+                    VfxStudio.Deactivate();
+                }
+            }
+        }
+
+        private void OnViewerUnloaded(object sender, RoutedEventArgs e)
+        {
+            CleanupResources();
         }
 
         // Empty-state handlers: thin 1-liners that delegate to the Panel
@@ -190,6 +210,7 @@ namespace AssetsManager.Views
             try
             {
                 _taskCancellationManager?.CancelCurrentOperation(false);
+                _viewModel.IsVfxStudioVisible = false;
 
                 ViewportControl?.Cleanup();
                 PanelControl?.Cleanup();

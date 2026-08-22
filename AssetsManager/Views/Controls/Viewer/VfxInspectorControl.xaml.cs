@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -31,13 +32,18 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class VfxInspectorControl : UserControl
     {
         private readonly VfxInspectorModel _model;
-        private readonly VfxLoadingService _loadingService = new();
+        private VfxLoadingService _loadingService;
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
         private IReadOnlyList<VfxAbilityComposition> _abilityCompositions = Array.Empty<VfxAbilityComposition>();
         private bool _isCleanedUp;
+        private bool _isActive;
         private bool _isGlStarted;
+        private VfxSystemDiagnosticItem _pendingSystem;
+        private VfxSystemDiagnosticItem _inspectedSystem;
+
+        private VfxLoadingService LoadingService => _loadingService ??= new VfxLoadingService();
 
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
@@ -67,14 +73,61 @@ namespace AssetsManager.Views.Controls.Viewer
             _model = new VfxInspectorModel();
             InitializeComponent();
             DataContext = _model;
+            _model.PropertyChanged += OnModelPropertyChanged;
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;
         }
 
+        private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
+            {
+                RequestSystemInspection(_model.SelectedSystem);
+            }
+        }
+
         private void OnControlLoaded(object sender, RoutedEventArgs e)
         {
-            if (_isGlStarted || _isCleanedUp) return;
+            if (_isActive)
+            {
+                EnsureOpenGlStarted();
+            }
+        }
+
+        /// <summary>
+        /// Activates the VFX viewport when its host view becomes visible.
+        /// </summary>
+        public void Activate()
+        {
+            if (_isCleanedUp) return;
+
+            _isActive = true;
+            if (!HasSelectedSystemReady())
+            {
+                RequestSystemInspection(_model.SelectedSystem);
+            }
+
+            if (IsLoaded)
+            {
+                EnsureOpenGlStarted();
+            }
+        }
+
+        /// <summary>
+        /// Pauses VFX work while the host view is hidden without destroying reusable GPU state.
+        /// </summary>
+        public void Deactivate()
+        {
+            _isActive = false;
+            _pendingSystem = null;
+            _model.IsPlaying = false;
+            _vfxRenderer?.Pause();
+        }
+
+        private void EnsureOpenGlStarted()
+        {
+            if (!_isActive || _isGlStarted || _isCleanedUp || !IsLoaded) return;
 
             try
             {
@@ -96,17 +149,20 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OnControlUnloaded(object sender, RoutedEventArgs e)
         {
-            Cleanup();
+            Deactivate();
         }
 
         /// <summary>
-        /// Releases all resources owned by this control. Idempotent: the explicit host teardown
-        /// and the Unloaded hook may both invoke it safely without double-release side effects.
+        /// Releases all resources owned by this control. The host calls this once when the Viewer
+        /// is torn down; repeated calls are safe.
         /// </summary>
         public void Cleanup()
         {
             if (_isCleanedUp) return;
+
+            Deactivate();
             _isCleanedUp = true;
+            _model.PropertyChanged -= OnModelPropertyChanged;
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -121,6 +177,7 @@ namespace AssetsManager.Views.Controls.Viewer
             RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
 
             var loadingService = _loadingService;
+            _loadingService = null;
             RunReleaseStep(nameof(VfxLoadingService), () => loadingService?.Dispose());
 
             var gl = _gl;
@@ -140,7 +197,7 @@ namespace AssetsManager.Views.Controls.Viewer
         /// created on the context along with it. Any other error is logged and does not stop
         /// the remaining releases.
         /// </summary>
-        private void RunReleaseStep(string componentName, Action? release, bool gpuBound = false)
+        private void RunReleaseStep(string componentName, Action release, bool gpuBound = false)
         {
             if (release == null) return;
 
@@ -181,16 +238,76 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private GridRenderer _gridRenderer;
 
+        private void EnsureVfxRenderSession()
+        {
+            if (_vfxRenderer != null || _gl == null || !_isActive || _isCleanedUp) return;
+
+            var renderer = new VfxRenderSession(LogService, LoadingService);
+            try
+            {
+                renderer.Initialize(_gl);
+                _vfxRenderer = renderer;
+            }
+            catch
+            {
+                RunReleaseStep(nameof(VfxRenderSession), renderer.Dispose, gpuBound: true);
+                throw;
+            }
+        }
+
+        private void RequestSystemInspection(VfxSystemDiagnosticItem systemItem)
+        {
+            if (_isCleanedUp) return;
+            if (ReferenceEquals(_pendingSystem, systemItem)) return;
+            if (ReferenceEquals(_model.SelectedSystem, systemItem) && HasSelectedSystemReady()) return;
+
+            _inspectedSystem = null;
+            _pendingSystem = systemItem;
+        }
+
+        private void TryInspectPendingSystem()
+        {
+            if (!_isActive || _isCleanedUp || _gl == null || _pendingSystem == null)
+                return;
+
+            VfxSystemDiagnosticItem systemItem = _pendingSystem;
+            _pendingSystem = null;
+
+            try
+            {
+                EnsureVfxRenderSession();
+                if (_vfxRenderer == null)
+                {
+                    return;
+                }
+
+                InspectSystem(systemItem);
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to prepare the selected VFX system.");
+                _model.LogMessages.Add($"[ERROR] Failed to prepare VFX system: {ex.Message}");
+            }
+        }
+
         private void OpenTkControl_Ready()
         {
             try
             {
+                if (_isCleanedUp) return;
+
                 _gl = Silk.NET.OpenGL.GL.GetApi(GetOpenGLProcAddress);
-                _gridRenderer = new GridRenderer();
-                _gridRenderer.Initialize(_gl, false);
-                _vfxRenderer = new VfxRenderSession(LogService, _loadingService);
-                _vfxRenderer.Initialize(_gl);
-                _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
+                if (_gridRenderer == null)
+                {
+                    _gridRenderer = new GridRenderer();
+                    _gridRenderer.Initialize(_gl, false);
+                }
+
+                if (_cameraController == null)
+                {
+                    _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
+                }
+
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
                 _model.LogMessages.Add(
                     $"[GL] Vendor={_gl.GetStringS(Silk.NET.OpenGL.StringName.Vendor)} | " +
@@ -202,10 +319,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 _model.LogMessages.Add(
                     $"[GL] Limits: fragment texture units={textureUnits}, vertex attributes={vertexAttributes}.");
 
-                if (_model.SelectedSystem != null)
-                {
-                    InspectSystem(_model.SelectedSystem);
-                }
             }
             catch (Exception ex)
             {
@@ -215,8 +328,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OpenTkControl_Render(TimeSpan delta)
         {
-            if (_gl == null || _vfxRenderer == null) return;
-            if (!IsVisible) return;
+            if (_gl == null || !_isActive || !IsVisible) return;
 
             float dt = (float)delta.TotalSeconds;
             if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
@@ -257,8 +369,18 @@ namespace AssetsManager.Views.Controls.Viewer
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovRadians, aspect, 1f, 10000f);
             var viewProj = view * proj;
 
+            // OpenTK has the current context here, so deferred session creation and resource
+            // preparation are safe even when WPF selected the system before the GL control was ready.
+            TryInspectPendingSystem();
+
             // Render 3D Ground Grid (matching main viewer)
             _gridRenderer?.Render(viewProj);
+
+            if (_vfxRenderer == null)
+            {
+                _model.LiveParticleCount = 0;
+                return;
+            }
 
             _vfxRenderer.SetViewportSize(OpenTkControl.ActualWidth, OpenTkControl.ActualHeight);
             if (_model.IsPlaying && !_isUserSeeking)
@@ -425,11 +547,12 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
+                _model.SelectedSystem = null;
                 _model.Systems.Clear();
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                _activeBundle = _loadingService.Load(binFilePath, LogService);
+                _activeBundle = LoadingService.Load(binFilePath, LogService);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
@@ -495,13 +618,6 @@ namespace AssetsManager.Views.Controls.Viewer
         #endregion
 
         #region System & Emitter Diagnostics
-
-        private void SystemsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_model.SelectedSystem == null) return;
-
-            InspectSystem(_model.SelectedSystem);
-        }
 
         private void InspectSystem(VfxSystemDiagnosticItem systemItem)
         {
@@ -597,9 +713,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
 
-                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : _loadingService.ResolveTexture(texPath, searchDir);
+                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : LoadingService.ResolveTexture(texPath, searchDir);
                 var mesh = emitter.IsMeshPrimitive
-                    ? _loadingService.ResolveMesh(meshPath, searchDir)
+                    ? LoadingService.ResolveMesh(meshPath, searchDir)
                     : null;
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
@@ -667,6 +783,7 @@ namespace AssetsManager.Views.Controls.Viewer
             UpdatePlayheadPosition();
 
             _model.StatusText = $"{systemItem.Name} · {playbackContext}.";
+            _inspectedSystem = systemItem;
         }
 
         #region Timeline Deck Mechanics
@@ -939,13 +1056,19 @@ namespace AssetsManager.Views.Controls.Viewer
 
         #region Viewport Playback Control Events
 
+        private bool HasSelectedSystemReady()
+            => _model.SelectedSystem != null &&
+               _pendingSystem == null &&
+               ReferenceEquals(_inspectedSystem, _model.SelectedSystem) &&
+               _vfxRenderer?.ActiveSystem != null;
+
         private void Play_Click(object sender, RoutedEventArgs e)
         {
             if (_model.SelectedSystem != null)
             {
-                if (_vfxRenderer == null || _vfxRenderer.ActiveSystem == null)
+                if (!HasSelectedSystemReady())
                 {
-                    InspectSystem(_model.SelectedSystem);
+                    RequestSystemInspection(_model.SelectedSystem);
                 }
                 else
                 {
@@ -967,9 +1090,9 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (_model.SelectedSystem != null)
                 {
-                    if (_vfxRenderer == null || _vfxRenderer.ActiveSystem == null)
+                    if (!HasSelectedSystemReady())
                     {
-                        InspectSystem(_model.SelectedSystem);
+                        RequestSystemInspection(_model.SelectedSystem);
                     }
                     else if (_vfxRenderer.ActiveSystem.CurrentTime >= _model.TotalDuration)
                     {

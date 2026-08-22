@@ -11,7 +11,7 @@ New Features
   - VFX Studio now applies authored stencil masks so clipped particles and meshes render without visible mask geometry.
   - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
   - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
-  - VFX Studio now shares one loading/resource cache per window and releases OpenGL, decoded texture, mesh, animation, and index resources when closed.
+  - VFX Studio now activates OpenGL only while visible, keeps folder/BIN scanning independent from GPU startup, creates its render session on the first selected system with a valid context, shares one loading/resource cache per window, and releases OpenGL, decoded texture, mesh, animation, and index resources when the Viewer closes.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
   - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.

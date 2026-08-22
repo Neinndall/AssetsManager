@@ -123,7 +123,7 @@
 
                     <!-- Systems List -->
                     <ListView Grid.Row="2" ItemsSource="{Binding Systems}" SelectedItem="{Binding SelectedSystem, Mode=TwoWay}"
-                              SelectionChanged="SystemsListView_SelectionChanged" Background="Transparent" BorderThickness="0"
+                              Background="Transparent" BorderThickness="0"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
