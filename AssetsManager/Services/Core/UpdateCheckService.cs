@@ -10,7 +10,6 @@ using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Updater;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.News;
-using AssetsManager.Info;
 using AssetsManager.Views.Models.Notifications;
 using AssetsManager.Views.Models.News;
 
@@ -21,6 +20,7 @@ namespace AssetsManager.Services.Core
         private readonly AppSettings _appSettings;
         private readonly Status _status;
         private readonly UpdateManager _updateManager;
+        private readonly GitHubApiService _gitHubApiService;
         private readonly LogService _logService;
         private readonly MonitorService _monitorService;
         private readonly PbeStatusService _pbeStatusService;
@@ -38,11 +38,12 @@ namespace AssetsManager.Services.Core
 
         public string AvailableVersion { get; private set; }
 
-        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NewsService newsService)
+        public UpdateCheckService(AppSettings appSettings, Status status, UpdateManager updateManager, GitHubApiService gitHubApiService, LogService logService, MonitorService monitorService, PbeStatusService pbeStatusService, NewsService newsService)
         {
             _appSettings = appSettings;
             _status = status;
             _updateManager = updateManager;
+            _gitHubApiService = gitHubApiService;
             _logService = logService;
             _monitorService = monitorService;
             _pbeStatusService = pbeStatusService;
@@ -249,6 +250,7 @@ namespace AssetsManager.Services.Core
                 var tasks = new List<Task>();
 
                 tasks.Add(CheckApplicationUpdateAsync());
+                if (VersionInfo.IsQA) tasks.Add(CheckExperimentalBuildAsync());
 
                 if (_appSettings.SyncHashesWithCDTB)
                 {
@@ -271,15 +273,66 @@ namespace AssetsManager.Services.Core
                     AvailableVersion = appUpdateAvailable ? newVersion : null;
                     if (!appUpdateAvailable) return;
 
-                    string currentVerStr = ApplicationInfos.Version.Split('-')[0].Replace("v", "");
+                    string currentVerStr = VersionInfo.BaseVersion.Replace("v", "");
                     string latestVerStr = newVersion.Replace("v", "");
                     if (!Version.TryParse(currentVerStr, out var currentVer) ||
                         !Version.TryParse(latestVerStr, out var latestVer)) return;
 
-                    string message = ApplicationInfos.IsQA && latestVer <= currentVer
+                    string message = VersionInfo.IsQA && latestVer <= currentVer
                         ? $"New stable version {newVersion} is available!"
                         : $"New version {newVersion} is available!";
                     UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available", null);
+                }
+
+                async Task CheckExperimentalBuildAsync()
+                {
+                    var commits = await _gitHubApiService.GetEnrichedCommitsAsync("qa", "qa-testing", 100);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    string installedSha = VersionInfo.QaCommitSha;
+                    if (string.IsNullOrEmpty(installedSha)) return;
+
+                    var installedCommit = commits.FirstOrDefault(commit =>
+                        string.Equals(commit.ShortSha, installedSha, StringComparison.OrdinalIgnoreCase));
+                    if (installedCommit == null)
+                    {
+                        _logService.LogWarning($"Installed QA commit '{installedSha}' was not found in the recent QA history.");
+                        return;
+                    }
+
+                    var latestBuild = commits.FirstOrDefault(commit =>
+                        commit.DownloadableAsset != null &&
+                        !string.IsNullOrWhiteSpace(commit.DownloadableAsset.DownloadUrl));
+                    if (latestBuild == null) return;
+
+                    int installedIndex = commits.IndexOf(installedCommit);
+                    int latestBuildIndex = commits.IndexOf(latestBuild);
+                    if (installedIndex < 0 || latestBuildIndex < 0 || latestBuildIndex >= installedIndex) return;
+
+                    string latestBuildSha = latestBuild.ShortSha;
+                    if (string.IsNullOrEmpty(latestBuildSha) ||
+                        string.Equals(_appSettings.LastNotifiedQaBuildSha, latestBuildSha, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return;
+                    }
+
+                    string availableVersion = $"{VersionInfo.BaseVersion}-{latestBuildSha}";
+                    UpdatesFound?.Invoke(
+                        $"New version {availableVersion} is available!",
+                        null,
+                        NotificationCategory.Updates,
+                        "App Update Available",
+                        null);
+
+                    _appSettings.LastNotifiedQaBuildSha = latestBuildSha;
+                    try
+                    {
+                        await _appSettings.SaveAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logService.LogError(ex, "Failed to persist the last notified QA build.");
+                    }
                 }
 
                 async Task CheckMonitoredAssetsAsync()

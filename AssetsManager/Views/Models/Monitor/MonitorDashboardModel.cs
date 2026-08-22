@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Collections.Specialized;
-using AssetsManager.Info;
 using AssetsManager.Services;
 using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Monitor;
@@ -163,10 +162,10 @@ namespace AssetsManager.Views.Models.Monitor
             set { _appVersionText = value; OnPropertyChanged(); }
         }
 
-        public string BuildType => ApplicationInfos.BuildType;
-        public string BuildChannel => ApplicationInfos.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
+        public string BuildType => VersionInfo.IsQA ? "Experimental Build" : "Stable Build";
+        public string BuildChannel => VersionInfo.IsQA ? "QA / EXPERIMENTAL" : "PRODUCTION / STABLE";
         private static string _cachedBuildSha;
-        public string BuildSha => _cachedBuildSha ??= ApplicationInfos.IsQA ? ApplicationInfos.Version.Split('-').Last() : "N/A";
+        public string BuildSha => _cachedBuildSha ??= VersionInfo.QaCommitSha ?? "N/A";
 
         private Brush _appVersionColor;
         public Brush AppVersionColor
@@ -244,7 +243,7 @@ namespace AssetsManager.Views.Models.Monitor
         private void UpdateAppVersionFooter()
         {
             string shaPart = BuildSha != null && BuildSha != "N/A" ? $" · {BuildSha}" : string.Empty;
-            AppVersionFooterText = $"Channel: {ApplicationInfos.BuildType}{shaPart}";
+            AppVersionFooterText = $"Channel: {BuildType}{shaPart}";
         }
 
         public MonitorDashboardModel(MonitorService monitorService, PbeStatusService pbeStatusService, AppSettings appSettings, VersionService versionService, Status statusService, UpdateCheckService updateCheckService)
@@ -257,11 +256,11 @@ namespace AssetsManager.Views.Models.Monitor
             _updateCheckService = updateCheckService;
 
             // Set Initial App Version State based on Build Type (Stable vs Experimental)
-            AppVersionText = ApplicationInfos.Version;
+            AppVersionText = VersionInfo.Version;
 
-            // Map ApplicationInfos color and icon dynamically
-            AppVersionColor = (Brush)Application.Current.FindResource(ApplicationInfos.BuildColorKey);
-            AppVersionIconKind = ApplicationInfos.BuildIcon;
+            // Map build color and icon dynamically.
+            AppVersionColor = (Brush)Application.Current.FindResource(VersionInfo.IsQA ? "AccentOrange" : "AccentGreen");
+            AppVersionIconKind = VersionInfo.IsQA ? MaterialIconKind.Flask : MaterialIconKind.CheckDecagram;
 
             // Check if an update was already found (Higher priority than Build Type)
             if (!string.IsNullOrEmpty(_updateCheckService.AvailableVersion))

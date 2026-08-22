@@ -11,7 +11,6 @@ using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using AssetsManager.Utils;
 using AssetsManager.Views.Dialogs;
-using AssetsManager.Info;
 
 namespace AssetsManager.Services.Updater
 {
@@ -68,7 +67,7 @@ namespace AssetsManager.Services.Updater
                 Version latestVer = new Version(parsedLatestVersion);
 
                 bool isNewer = latestVer.CompareTo(currentVer) > 0;
-                bool isExperimentalToStable = ApplicationInfos.IsQA;
+                bool isExperimentalToStable = VersionInfo.IsQA;
 
                 if (isNewer || isExperimentalToStable)
                 {
@@ -302,7 +301,7 @@ namespace AssetsManager.Services.Updater
                 Version currentVer = new Version(parsedCurrentVersion);
                 Version latestVer = new Version(parsedLatestVersion);
 
-                if (latestVer.CompareTo(currentVer) > 0 || ApplicationInfos.IsQA)
+                if (latestVer.CompareTo(currentVer) > 0 || VersionInfo.IsQA)
                 {
                     return (true, latestVersionRaw);
                 }
