@@ -323,7 +323,7 @@ namespace AssetsManager.Services.Core
 
                     string availableVersion = $"{VersionInfo.BaseVersion}-{latestBuildSha}";
                     UpdatesFound?.Invoke(
-                        $"New version {availableVersion} is available!",
+                        $"New experimental version {availableVersion} is available!",
                         null,
                         NotificationCategory.Updates,
                         "App Update Available",
