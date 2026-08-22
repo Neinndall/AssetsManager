@@ -691,6 +691,42 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_IgnoresOutOfRangeDissolveBiasFromOpaqueSkinMaterial()
+        {
+            const string bodyTexturePath =
+                "ASSETS/Characters/Gwen/Skins/Base/Gwen_Base_Main_TX_CM.tex";
+            const string dissolvePath =
+                "ASSETS/Characters/Gwen/Skins/Base/Particles/Gwen_Base_R_SmokeErode.tex";
+            const string materialPath = "Characters/Gwen/Skins/Base/Materials/Body";
+
+            BinTree tree = CreateSkinTree(
+                bodyTexturePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", bodyTexturePath),
+                        CreateSampler("Dissolve_Texture", dissolvePath),
+                        CreateSampler("Alt_Diffuse_Texture", bodyTexturePath)
+                    },
+                    CreateParameter("DissolveIntensity", new Vector4(10f, 0f, 0f, 0f)),
+                    CreateParameter("DissolveBias", new Vector4(1.5575f, 0f, 0f, 0f)),
+                    CreateParameter("DissolveWidth", new Vector4(0.1f, 0f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "gwen_base_main_tx_cm", "gwen_base_r_smokeerode" });
+
+            Assert.Equal("gwen_base_main_tx_cm", resolution.Overrides["body"]);
+            Assert.DoesNotContain("body", resolution.Effects);
+        }
+
+        [Fact]
         public void Resolve_RecognizesRedChannelEmissionTexture()
         {
             const string materialPath = "Characters/Aatrox/Skins/Skin37/Materials/Sword";

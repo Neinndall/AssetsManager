@@ -287,6 +287,23 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return effect;
             }
 
+            float dissolveThreshold = ReadFloat(
+                material.Parameters,
+                0.5f,
+                "DissolveThreshold",
+                "DissolveAmount",
+                "Dissolve",
+                "DissolveValue",
+                "DissolveBias",
+                "Dissolve_Bias",
+                "TransitionAmount");
+            if (!float.IsFinite(dissolveThreshold) ||
+                dissolveThreshold < 0f ||
+                dissolveThreshold > 1f)
+            {
+                return effect;
+            }
+
             return new ModelMaterialEffectDefinition(
                 ModelMaterialEffectKind.Dissolve,
                 texture,
@@ -307,16 +324,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 1f,
                 0f)
             {
-                DissolveThreshold = ReadFloat(
-                    material.Parameters,
-                    0.5f,
-                    "DissolveThreshold",
-                    "DissolveAmount",
-                    "Dissolve",
-                    "DissolveValue",
-                    "DissolveBias",
-                    "Dissolve_Bias",
-                    "TransitionAmount"),
+                DissolveThreshold = dissolveThreshold,
                 DissolveSoftness = ReadDissolveSoftness(material.Parameters)
             };
         }
