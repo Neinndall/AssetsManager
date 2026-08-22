@@ -79,7 +79,7 @@ namespace AssetsManager.Services.Downloads
                 _appSettings.DataExportFormat);
 
             return await ExtractDiffsCoreAsync(
-                newDiffs, newLolPath, cancellationToken,
+                newDiffs, null, newLolPath, cancellationToken,
                 diff => GetModeFromSettings(diff),
                 settingsFormats);
         }
@@ -87,6 +87,7 @@ namespace AssetsManager.Services.Downloads
         /// <summary>Manual "Extract" action: raw data, no conversion (same as Explorer Extract).</summary>
         public async Task<List<ExtractResultItem>> ExtractRawAsync(
             List<SerializableChunkDiff> diffs,
+            string oldLolPath,
             string newLolPath,
             CancellationToken cancellationToken)
         {
@@ -97,7 +98,7 @@ namespace AssetsManager.Services.Downloads
             }
 
             return await ExtractDiffsCoreAsync(
-                diffs, newLolPath, cancellationToken,
+                diffs, oldLolPath, newLolPath, cancellationToken,
                 _ => WadExportMode.Original,
                 RawFormats);
         }
@@ -108,6 +109,7 @@ namespace AssetsManager.Services.Downloads
         /// </summary>
         public async Task<List<ExtractResultItem>> ExtractSmartAsync(
             List<SerializableChunkDiff> diffs,
+            string oldLolPath,
             string newLolPath,
             CancellationToken cancellationToken)
         {
@@ -118,7 +120,7 @@ namespace AssetsManager.Services.Downloads
             }
 
             return await ExtractDiffsCoreAsync(
-                diffs, newLolPath, cancellationToken,
+                diffs, oldLolPath, newLolPath, cancellationToken,
                 diff => GetModeForSmartExport(diff),
                 ExportFormats.ExplorerSmart(_appSettings.AudioExportFormat));
         }
@@ -155,6 +157,7 @@ namespace AssetsManager.Services.Downloads
         /// </summary>
         private async Task<List<ExtractResultItem>> ExtractDiffsCoreAsync(
             List<SerializableChunkDiff> diffs,
+            string oldLolPath,
             string newLolPath,
             CancellationToken cancellationToken,
             Func<SerializableChunkDiff, WadExportMode> modeSelector,
@@ -165,7 +168,7 @@ namespace AssetsManager.Services.Downloads
 
             string destinationRootPath = _directoriesCreator.GetNewSubAssetsDownloadedPath();
 
-            _logService.Log($"Starting extraction of {totalFiles} new assets.");
+            _logService.Log($"Starting extraction of {totalFiles} assets.");
 
             var results = new List<ExtractResultItem>(totalFiles);
             int processed = 0;
@@ -184,17 +187,35 @@ namespace AssetsManager.Services.Downloads
                 var result = new ExtractResultItem { Diff = diff };
                 try
                 {
-                    string sourceWadFullPath = PathUtils.ResolveWadPath(newLolPath, diff.SourceWadFile);
-                    var node = new FileSystemNodeModel(diff.FileName, false, diff.NewPath, sourceWadFullPath)
+                    bool useOldSide = diff.Type == ChunkDiffType.Removed;
+                    string sourceRootPath = useOldSide ? oldLolPath : newLolPath;
+                    string sourceVirtualPath = useOldSide ? diff.OldPath : diff.NewPath;
+                    ulong sourcePathHash = useOldSide ? diff.OldPathHash : diff.NewPathHash;
+                    if (string.IsNullOrWhiteSpace(sourceVirtualPath))
+                        throw new InvalidDataException($"The selected source path is missing for '{diff.FileName}'.");
+
+                    if (string.IsNullOrEmpty(sourceRootPath) && string.IsNullOrEmpty(diff.BackupChunkPath))
+                        throw new InvalidOperationException($"No source root or backup chunk is available for '{diff.FileName}'.");
+
+                    string sourceWadFullPath = string.IsNullOrEmpty(sourceRootPath)
+                        ? null
+                        : PathUtils.ResolveWadPath(sourceRootPath, diff.SourceWadFile);
+
+                    var node = new FileSystemNodeModel(diff.FileName, false, sourceVirtualPath, sourceWadFullPath)
                     {
-                        SourceChunkPathHash = diff.NewPathHash,
-                        Status = DiffStatus.New
+                        SourceChunkPathHash = sourcePathHash,
+                        ChunkDiff = diff,
+                        BackupChunkPath = diff.BackupChunkPath,
+                        OldPath = diff.Type == ChunkDiffType.Renamed ? diff.OldPath : null
                     };
 
                     string fileDestinationDirectory;
+                    string sourceDirectory = Path.GetDirectoryName(sourceVirtualPath);
                     if (_appSettings.OrganizeExtractedAssets)
                     {
-                        fileDestinationDirectory = Path.Combine(destinationRootPath, Path.GetDirectoryName(diff.NewPath));
+                        fileDestinationDirectory = string.IsNullOrEmpty(sourceDirectory)
+                            ? destinationRootPath
+                            : Path.Combine(destinationRootPath, sourceDirectory);
                     }
                     else
                     {
@@ -205,15 +226,20 @@ namespace AssetsManager.Services.Downloads
 
                     result.Mode = modeSelector(diff);
                     result.OutputPath = fileDestinationDirectory;
+                    bool outputProduced = false;
+                    Action<string> onFileExported = _ => outputProduced = true;
 
                     if (result.Mode == WadExportMode.Original)
                     {
-                        await _assetExportService.ExportAsync(node, fileDestinationDirectory, cancellationToken, null);
+                        await _assetExportService.ExportAsync(node, fileDestinationDirectory, cancellationToken, onFileExported);
                     }
                     else
                     {
-                        await _assetExportService.ExportSmartAsync(node, fileDestinationDirectory, null, newLolPath, cancellationToken, null, smartFormats);
+                        await _assetExportService.ExportSmartAsync(node, fileDestinationDirectory, null, sourceRootPath, cancellationToken, onFileExported, smartFormats);
                     }
+
+                    if (!outputProduced)
+                        throw new IOException($"No output was produced for '{diff.FileName}'.");
 
                     result.Success = true;
                 }

@@ -520,7 +520,20 @@ namespace AssetsManager.Services.Formatting
 
         private async Task HandleWemFileAsync(FileSystemNodeModel node, string destinationPath, AudioExportFormat format, CancellationToken cancellationToken, Action<string> onFileSavedCallback)
         {
-            var wemData = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken);
+            byte[] wemData;
+            if (node.Type == NodeType.WemFile)
+            {
+                wemData = await _wadContentProvider.GetWemFileBytesAsync(node, cancellationToken);
+            }
+            else if (node.Type == NodeType.RealFile)
+            {
+                wemData = await File.ReadAllBytesAsync(node.VirtualPath, cancellationToken);
+            }
+            else
+            {
+                wemData = await _wadContentProvider.GetVirtualFileBytesAsync(node, cancellationToken);
+            }
+
             if (wemData == null) return;
 
             byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);

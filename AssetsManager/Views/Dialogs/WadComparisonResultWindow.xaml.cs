@@ -589,9 +589,14 @@ namespace AssetsManager.Views.Dialogs
 
         private async Task ReExportAsync(List<WadResultItemModel> items, WadExportMode? mode = null)
         {
-            if (string.IsNullOrEmpty(_newPbePath)) return;
+            if (string.IsNullOrEmpty(_oldPbePath) &&
+                string.IsNullOrEmpty(_newPbePath) &&
+                items.All(item => string.IsNullOrEmpty(item.Diff.BackupChunkPath)))
+            {
+                return;
+            }
 
-            var diffs = items.Select(i => i.Diff).Where(d => d.Type == ChunkDiffType.New).ToList();
+            var diffs = items.Where(i => i.CanExport).Select(i => i.Diff).ToList();
             if (diffs.Count == 0) return;
 
             using var cancellation = new CancellationTokenSource();
@@ -599,19 +604,19 @@ namespace AssetsManager.Views.Dialogs
 
             if (mode == WadExportMode.Smart)
             {
-                results.AddRange(await _extractionService.ExtractSmartAsync(diffs, _newPbePath, cancellation.Token));
+                results.AddRange(await _extractionService.ExtractSmartAsync(diffs, _oldPbePath, _newPbePath, cancellation.Token));
             }
             else if (mode == WadExportMode.Original)
             {
-                results.AddRange(await _extractionService.ExtractRawAsync(diffs, _newPbePath, cancellation.Token));
+                results.AddRange(await _extractionService.ExtractRawAsync(diffs, _oldPbePath, _newPbePath, cancellation.Token));
             }
             else
             {
                 // Retry: re-export each failed item with the mode it was attempted with.
-                var rawDiffs = items.Where(i => i.Mode == WadExportMode.Original).Select(i => i.Diff).ToList();
-                var smartDiffs = items.Where(i => i.Mode == WadExportMode.Smart).Select(i => i.Diff).ToList();
-                results.AddRange(await _extractionService.ExtractRawAsync(rawDiffs, _newPbePath, cancellation.Token));
-                results.AddRange(await _extractionService.ExtractSmartAsync(smartDiffs, _newPbePath, cancellation.Token));
+                var rawDiffs = items.Where(i => i.CanExport && i.Mode == WadExportMode.Original).Select(i => i.Diff).ToList();
+                var smartDiffs = items.Where(i => i.CanExport && i.Mode == WadExportMode.Smart).Select(i => i.Diff).ToList();
+                results.AddRange(await _extractionService.ExtractRawAsync(rawDiffs, _oldPbePath, _newPbePath, cancellation.Token));
+                results.AddRange(await _extractionService.ExtractSmartAsync(smartDiffs, _oldPbePath, _newPbePath, cancellation.Token));
             }
 
             if (results.Count == 0) return;

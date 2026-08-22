@@ -67,22 +67,22 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         public bool IsSuccess => Status == NewAssetExportStatus.Success;
         public bool IsFailed => Status == NewAssetExportStatus.Failed;
         public bool IsNotExported => Status == NewAssetExportStatus.NotExported;
+        public bool CanExport => Diff.Type is ChunkDiffType.New
+            or ChunkDiffType.Modified
+            or ChunkDiffType.Renamed
+            or ChunkDiffType.Removed;
 
         public string StatusLabel
         {
             get
             {
-                if (Diff.Type == ChunkDiffType.New)
+                return Status switch
                 {
-                    return Status switch
-                    {
-                        NewAssetExportStatus.Success => "EXPORTED",
-                        NewAssetExportStatus.Failed => "FAILED",
-                        _ => "QUEUED"
-                    };
-                }
-
-                return Diff.Type.ToString().ToUpper();
+                    NewAssetExportStatus.Success => "EXPORTED",
+                    NewAssetExportStatus.Failed => "FAILED",
+                    _ when Diff.Type == ChunkDiffType.New => "QUEUED",
+                    _ => Diff.Type.ToString().ToUpper()
+                };
             }
         }
 
@@ -90,15 +90,16 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
         {
             get
             {
-                if (Diff.Type == ChunkDiffType.New)
+                if (Status == NewAssetExportStatus.Success)
                 {
-                    return Status switch
-                    {
-                        NewAssetExportStatus.Success => Brushes.Green,
-                        NewAssetExportStatus.Failed => Brushes.Red,
-                        _ => QueuedBrush
-                    };
+                    return Brushes.Green;
                 }
+
+                if (Status == NewAssetExportStatus.Failed)
+                    return Brushes.Red;
+
+                if (Diff.Type == ChunkDiffType.New)
+                    return QueuedBrush;
 
                 return (Brush)_diffTypeToBrush.Convert(Diff.Type, typeof(Brush), null, System.Globalization.CultureInfo.InvariantCulture);
             }

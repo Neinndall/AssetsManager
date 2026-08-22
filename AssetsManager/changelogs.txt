@@ -71,6 +71,9 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Comparison Results now allow extracting or saving new, modified, renamed and removed assets from their available version side.
+  - Comparison Results now validates the selected source side and reports failed exports instead of silently accepting missing assets.
+  - Explorer Smart Save now handles standalone WEM files from the local filesystem.
   - News / Manual Refresh now checks for newly published articles and adds them to the unread notification hub.
   - Comparison Results / Results now follows the global New, Modified, Removed, and Renamed filters instead of a separate diff-type selector.
   - Monitor / Version Manager: Fetch Versions now defaults to All and supports optional publication-day filtering for Game Client manifests.

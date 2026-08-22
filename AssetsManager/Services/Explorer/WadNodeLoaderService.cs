@@ -268,13 +268,7 @@ namespace AssetsManager.Services.Explorer
                 return Path.Combine(backupRoot, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
             }
 
-            string newPath = Path.Combine(backupRoot, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
-            if (File.Exists(newPath))
-            {
-                return newPath;
-            }
-
-            return Path.Combine(backupRoot, "wad_chunks", "old", diff.SourceWadFile, $"{diff.OldPathHash:X16}.chunk");
+            return Path.Combine(backupRoot, "wad_chunks", "new", diff.SourceWadFile, $"{diff.NewPathHash:X16}.chunk");
         }
 
         private DiffStatus GetDiffStatus(ChunkDiffType type)

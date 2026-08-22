@@ -33,7 +33,7 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             _allItems = items ?? new List<WadResultItemModel>();
             CountText.Text = _allItems.Count.ToString();
-            RetryFailedButton.Visibility = _allItems.Any(i => i.Diff.Type == ChunkDiffType.New && i.IsFailed)
+            RetryFailedButton.Visibility = _allItems.Any(i => i.CanExport && i.IsFailed)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             UpdateActionButtonsEnabled();
@@ -42,18 +42,18 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void UpdateActionButtonsEnabled()
         {
-            bool allSelectedAreNew = ResultsListBox?.SelectedItems.Count > 0 && ResultsListBox.SelectedItems
+            bool allSelectedAreExportable = ResultsListBox?.SelectedItems.Count > 0 && ResultsListBox.SelectedItems
                 .OfType<WadResultItemModel>()
-                .All(item => item.Diff.Type == ChunkDiffType.New);
-            if (ExtractButton != null) ExtractButton.IsEnabled = allSelectedAreNew;
-            if (SaveButton != null) SaveButton.IsEnabled = allSelectedAreNew;
+                .All(item => item.CanExport);
+            if (ExtractButton != null) ExtractButton.IsEnabled = allSelectedAreExportable;
+            if (SaveButton != null) SaveButton.IsEnabled = allSelectedAreExportable;
         }
 
         public List<WadResultItemModel> GetAllItems() => _allItems;
 
         public void UpdateRetryButton()
         {
-            RetryFailedButton.Visibility = _allItems.Any(i => i.Diff.Type == ChunkDiffType.New && i.IsFailed)
+            RetryFailedButton.Visibility = _allItems.Any(i => i.CanExport && i.IsFailed)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }
