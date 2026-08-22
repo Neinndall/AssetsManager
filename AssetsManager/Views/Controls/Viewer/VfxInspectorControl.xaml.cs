@@ -32,7 +32,6 @@ namespace AssetsManager.Views.Controls.Viewer
     public partial class VfxInspectorControl : UserControl
     {
         private readonly VfxInspectorModel _model;
-        private VfxLoadingService _loadingService;
         private Silk.NET.OpenGL.GL _gl;
         private VfxRenderSession _vfxRenderer;
         private VfxLoadingService.Bundle _activeBundle;
@@ -43,10 +42,11 @@ namespace AssetsManager.Views.Controls.Viewer
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
 
-        private VfxLoadingService LoadingService => _loadingService ??= new VfxLoadingService();
-
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
+
+        /// <summary>Injected by the host and owned by ViewerWindow.</summary>
+        public VfxLoadingService VfxLoadingService { get; set; }
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
@@ -176,10 +176,6 @@ namespace AssetsManager.Views.Controls.Viewer
             _gridRenderer = null;
             RunReleaseStep(nameof(GridRenderer), () => gridRenderer?.Dispose(), gpuBound: true);
 
-            var loadingService = _loadingService;
-            _loadingService = null;
-            RunReleaseStep(nameof(VfxLoadingService), () => loadingService?.Dispose());
-
             var gl = _gl;
             _gl = null;
             RunReleaseStep("OpenGL API", () => gl?.Dispose());
@@ -215,6 +211,10 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
+        private VfxLoadingService RequireLoadingService()
+            => VfxLoadingService ?? throw new InvalidOperationException(
+                "VfxInspectorControl requires a VfxLoadingService from ViewerWindow.");
+
         #region OpenTK OpenGL Viewport Initialization & Rendering
 
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
@@ -242,7 +242,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_vfxRenderer != null || _gl == null || !_isActive || _isCleanedUp) return;
 
-            var renderer = new VfxRenderSession(LogService, LoadingService);
+            var renderer = new VfxRenderSession(LogService, RequireLoadingService());
             try
             {
                 renderer.Initialize(_gl);
@@ -552,7 +552,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                _activeBundle = LoadingService.Load(binFilePath, LogService);
+                _activeBundle = RequireLoadingService().Load(binFilePath, LogService);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
@@ -713,9 +713,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
 
-                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : LoadingService.ResolveTexture(texPath, searchDir);
+                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : RequireLoadingService().ResolveTexture(texPath, searchDir);
                 var mesh = emitter.IsMeshPrimitive
-                    ? LoadingService.ResolveMesh(meshPath, searchDir)
+                    ? RequireLoadingService().ResolveMesh(meshPath, searchDir)
                     : null;
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);

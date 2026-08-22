@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.Win32;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
 
@@ -21,6 +22,7 @@ namespace AssetsManager.Views
         private readonly ViewerWindowModel _viewModel;
         private readonly LogService _logService;
         private readonly TaskCancellationManager _taskCancellationManager;
+        private readonly VfxLoadingService _vfxLoadingService;
         private bool _isCleanedUp;
         private double _lastExplorerHeight = 220;
 
@@ -31,6 +33,7 @@ namespace AssetsManager.Views
             SknLoadingService sknLoadingService,
             MapGeometryLoadingService mapGeometryLoadingService,
             ChromaLoadingService chromaLoadingService,
+            VfxLoadingService vfxLoadingService,
             CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
@@ -40,6 +43,7 @@ namespace AssetsManager.Views
  
             _logService = logService;
             _taskCancellationManager = taskCancellationManager;
+            _vfxLoadingService = vfxLoadingService;
  
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
@@ -53,19 +57,20 @@ namespace AssetsManager.Views
             PanelControl.TaskCancellationManager = _taskCancellationManager;
             PanelControl.WindowViewModel = _viewModel;
 
-            ChromaSelectionOverlay.LoadingService = chromaLoadingService;
+            ChromaSelectionControl.ChromaLoadingService = chromaLoadingService;
 
-            VfxStudio.LogService = _logService;
+            VfxInspectorControl.LogService = _logService;
+            VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
             PanelControl.ViewModel.ViewportViewModel = ViewportControl.ViewModel;
-            PanelControl.ChromaGallery = ChromaSelectionOverlay;
+            PanelControl.ChromaGallery = ChromaSelectionControl;
 
             ViewportControl.Panel = PanelControl;
 
             PanelControl.ProjectExplorer = ProjectExplorer;
-            ChromaSelectionOverlay.ParentPanel = PanelControl;
+            ChromaSelectionControl.ParentPanel = PanelControl;
 
             // Project Explorer event wiring
             ProjectExplorer.ModelSelected += ProjectExplorer_ModelSelected;
@@ -91,11 +96,11 @@ namespace AssetsManager.Views
             {
                 if (_viewModel.IsVfxStudioVisible)
                 {
-                    VfxStudio.Activate();
+                    VfxInspectorControl.Activate();
                 }
                 else
                 {
-                    VfxStudio.Deactivate();
+                    VfxInspectorControl.Deactivate();
                 }
             }
         }
@@ -207,18 +212,29 @@ namespace AssetsManager.Views
             if (_isCleanedUp) return;
             _isCleanedUp = true;
 
+            TryCleanupStep(
+                "task cancellation",
+                () => _taskCancellationManager?.CancelCurrentOperation(false));
+            TryCleanupStep(
+                "VFX visibility",
+                () => _viewModel.IsVfxStudioVisible = false);
+
+            // Release the VFX consumer before disposing the service it uses.
+            TryCleanupStep("VfxInspectorControl", () => VfxInspectorControl?.Cleanup());
+            TryCleanupStep("ViewportControl", () => ViewportControl?.Cleanup());
+            TryCleanupStep("PanelControl", () => PanelControl?.Cleanup());
+            TryCleanupStep("VfxLoadingService", () => _vfxLoadingService?.Dispose());
+        }
+
+        private void TryCleanupStep(string name, Action cleanup)
+        {
             try
             {
-                _taskCancellationManager?.CancelCurrentOperation(false);
-                _viewModel.IsVfxStudioVisible = false;
-
-                ViewportControl?.Cleanup();
-                PanelControl?.Cleanup();
-                VfxStudio?.Cleanup();
+                cleanup();
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
+                _logService?.LogError(ex, $"Error during ViewerWindow cleanup: {name}");
             }
         }
     }

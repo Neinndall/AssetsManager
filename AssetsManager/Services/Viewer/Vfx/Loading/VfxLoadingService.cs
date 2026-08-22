@@ -22,6 +22,7 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
     {
         private readonly VfxResourceResolver _resources = new();
         private readonly SemaphoreSlim _catalogGate = new(1, 1);
+        private int _disposeState;
 
         public sealed class Bundle
         {
@@ -280,8 +281,16 @@ namespace AssetsManager.Services.Viewer.Vfx.Loading
 
         public void Dispose()
         {
-            _resources.Dispose();
-            _catalogGate.Dispose();
+            if (Interlocked.Exchange(ref _disposeState, 1) != 0) return;
+
+            try
+            {
+                _resources.Dispose();
+            }
+            finally
+            {
+                _catalogGate.Dispose();
+            }
         }
 
         private static string ResolveWadRoot(string skinBinPath)

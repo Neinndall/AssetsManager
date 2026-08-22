@@ -14,7 +14,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public ChromaSelectionModel ViewModel => _viewModel;
 
-        public ChromaLoadingService LoadingService { get; set; }
+        public ChromaLoadingService ChromaLoadingService { get; set; }
 
         public ViewerPanelControl ParentPanel { get; set; }
 
@@ -28,13 +28,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public async Task InitializeAsync(string skinsPath)
         {
-            if (LoadingService == null) return;
+            if (ChromaLoadingService == null) return;
 
             _viewModel.SetScanningState(System.IO.Path.GetFileName(skinsPath));
 
             try
             {
-                var families = await LoadingService.LoadFamiliesAsync(skinsPath);
+                var families = await ChromaLoadingService.LoadFamiliesAsync(skinsPath);
                 _viewModel.SetFamilies(families);
 
                 if (families.Count == 0)
