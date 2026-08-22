@@ -211,10 +211,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private VfxLoadingService RequireLoadingService()
-            => VfxLoadingService ?? throw new InvalidOperationException(
-                "VfxInspectorControl requires a VfxLoadingService from ViewerWindow.");
-
         #region OpenTK OpenGL Viewport Initialization & Rendering
 
         [System.Runtime.InteropServices.DllImport("opengl32.dll", EntryPoint = "wglGetProcAddress", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
@@ -242,7 +238,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_vfxRenderer != null || _gl == null || !_isActive || _isCleanedUp) return;
 
-            var renderer = new VfxRenderSession(LogService, RequireLoadingService());
+            var renderer = new VfxRenderSession(LogService, VfxLoadingService);
             try
             {
                 renderer.Initialize(_gl);
@@ -552,7 +548,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _abilityCompositions = Array.Empty<VfxAbilityComposition>();
                 _model.LogMessages.Add($"[BIN] Loading BIN definitions from: {Path.GetFileName(binFilePath)}");
 
-                _activeBundle = RequireLoadingService().Load(binFilePath, LogService);
+                _activeBundle = VfxLoadingService.Load(binFilePath, LogService);
 
                 foreach (var (hash, sysDef) in _activeBundle.Systems)
                 {
@@ -713,9 +709,9 @@ namespace AssetsManager.Views.Controls.Viewer
                 string texPath = emitter.TexturePath;
                 string meshPath = emitter.MeshPath;
 
-                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : RequireLoadingService().ResolveTexture(texPath, searchDir);
+                BitmapSource tex = string.IsNullOrEmpty(texPath) ? null : VfxLoadingService.ResolveTexture(texPath, searchDir);
                 var mesh = emitter.IsMeshPrimitive
-                    ? RequireLoadingService().ResolveMesh(meshPath, searchDir)
+                    ? VfxLoadingService.ResolveMesh(meshPath, searchDir)
                     : null;
 
                 (string textureStatus, Brush textureStatusBrush) = DescribeTextureStatus(emitter, tex);
