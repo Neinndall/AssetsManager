@@ -17,8 +17,8 @@ namespace AssetsManager.Views
     {
         private enum NewsTypeFilter { All, Articles, Videos }
 
-        private readonly IServiceProvider _serviceProvider;
         private readonly NewsService _newsService;
+        private readonly UpdateCheckService _updateCheckService;
         private readonly LogService _logService;
         private readonly NewsFeedModel _viewModel;
         private readonly List<NewsItemModel> _allItems = new();
@@ -31,8 +31,8 @@ namespace AssetsManager.Views
         {
             InitializeComponent();
 
-            _serviceProvider = serviceProvider;
             _newsService = serviceProvider.GetRequiredService<NewsService>();
+            _updateCheckService = serviceProvider.GetRequiredService<UpdateCheckService>();
             _logService = serviceProvider.GetRequiredService<LogService>();
             _viewModel = new NewsFeedModel();
             DataContext = _viewModel;
@@ -82,9 +82,9 @@ namespace AssetsManager.Views
             await LoadCategoryAsync(_viewModel.SelectedCategory.Category);
         }
 
-        private async Task LoadCategoryAsync(NewsCategory category, bool forceRefresh = false)
+        private async Task<bool> LoadCategoryAsync(NewsCategory category, bool forceRefresh = false)
         {
-            if (_viewModel.IsBusy) return;
+            if (_viewModel.IsBusy) return false;
 
             _currentCategory = category;
             _viewModel.IsBusy = true;
@@ -97,11 +97,13 @@ namespace AssetsManager.Views
                 _allItems.Clear();
                 _allItems.AddRange(items);
                 ApplyFilters();
+                return true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _viewModel.HasError = true;
                 _viewModel.ErrorMessage = ex.Message;
+                return false;
             }
             finally
             {
@@ -109,9 +111,21 @@ namespace AssetsManager.Views
             }
         }
 
-        private void Refresh_Click(object sender, RoutedEventArgs e)
+        private async void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            _ = LoadCategoryAsync(_currentCategory, forceRefresh: true);
+            try
+            {
+                if (!await LoadCategoryAsync(_currentCategory, forceRefresh: true)) return;
+                await _updateCheckService.CheckForNewsAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                _logService.LogDebug("Manual news refresh was cancelled.");
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, "Manual news notification check failed.");
+            }
         }
 
         private void Retry_Click(object sender, RoutedEventArgs e)

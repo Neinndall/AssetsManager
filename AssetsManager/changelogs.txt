@@ -71,6 +71,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - News / Manual Refresh now checks for newly published articles and adds them to the unread notification hub.
   - Comparison Results / Results now follows the global New, Modified, Removed, and Renamed filters instead of a separate diff-type selector.
   - Monitor / Version Manager: Fetch Versions now defaults to All and supports optional publication-day filtering for Game Client manifests.
   - Viewer / Skin materials no longer infer transparency from partial alpha in color textures unless the material explicitly authorizes it.

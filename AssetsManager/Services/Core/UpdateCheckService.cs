@@ -215,10 +215,11 @@ namespace AssetsManager.Services.Core
 
         /// <summary>
         /// Checks for newly published Riot news articles.
-        /// This method is used by its dedicated background timer (_newsTimer).
+        /// This method is used by its dedicated background timer (_newsTimer)
+        /// and on-demand news refreshes.
         /// It fires an 'UpdatesFound' event per new article.
         /// </summary>
-        private async Task CheckForNewsAsync()
+        public async Task CheckForNewsAsync()
         {
             bool completed = await _newsJob.TryRunAsync(async cancellationToken =>
             {
