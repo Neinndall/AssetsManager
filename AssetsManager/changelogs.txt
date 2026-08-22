@@ -78,6 +78,7 @@ Improvements
   - Viewer / Map Environment now starts with a closer automatic panoramic framing centered on the playable area.
   - Viewer / Project Browser now starts collapsed and keeps the folder tree synchronized with navigation.
   - Viewer / Project Browser now opens textures and image assets in a dedicated collapsible preview panel.
+  - Viewer / Project Browser search now keeps matching files and their parent folder branches synchronized.
   - Hash Guessing Lab / RST now selects XXH64 or XXH3 and the 38/39/40-bit layout from the detected game version, scans BIN string contexts in RST mode, and cross-references GAME/LCU paths safely.
   - Hash Guessing Lab / BIN guesses now resolve map and UI entry names more accurately while avoiding generic false positives.
   - Monitor / Mythic Shop now resolves images through one catalog lookup covering skins, emotes, wards, icons, portraits, loot, event passes, and nexus finishers.

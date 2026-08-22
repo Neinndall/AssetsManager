@@ -267,78 +267,96 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void ApplyFilter(string filter)
         {
-            if (string.IsNullOrEmpty(filter))
+            if (string.IsNullOrWhiteSpace(filter))
             {
                 FoldersTreeView.ItemsSource = _folderOnlyNodes;
                 if (_currentFolderNode != null) NavigateToFolder(_currentFolderNode);
                 return;
             }
 
-            var filtered = new List<ProjectExplorerNode>();
-            foreach (var node in _folderOnlyNodes)
-            {
-                var copy = FilterFolderNodeRecursive(node, filter.ToLowerInvariant());
-                if (copy != null)
-                {
-                    filtered.Add(copy);
-                }
-            }
-            FoldersTreeView.ItemsSource = filtered;
+            string normalizedFilter = filter.Trim();
+            var filteredFolders = new List<ProjectExplorerNode>();
+            var matchingFiles = new List<ProjectExplorerNode>();
 
-            // Also search flat files in the right side ListBox if filter is active
-            var flatSearchResults = new List<ProjectExplorerNode>();
             foreach (var rootNode in _allNodes)
             {
-                FindFlatMatchingFiles(rootNode, filter.ToLowerInvariant(), flatSearchResults);
+                var copy = FilterFolderNodeRecursive(rootNode, normalizedFilter, matchingFiles);
+                if (copy != null)
+                {
+                    filteredFolders.Add(copy);
+                }
             }
-            FilesListBox.ItemsSource = flatSearchResults;
+
+            FoldersTreeView.ItemsSource = filteredFolders;
+            if (_currentFolderNode != null)
+            {
+                SynchronizeFolderTree(filteredFolders, _currentFolderNode.FullPath);
+            }
+
+            FilesListBox.ItemsSource = matchingFiles;
         }
 
-        private void FindFlatMatchingFiles(ProjectExplorerNode node, string filter, List<ProjectExplorerNode> results)
+        private ProjectExplorerNode FilterFolderNodeRecursive(
+            ProjectExplorerNode node,
+            string filter,
+            List<ProjectExplorerNode> matchingFiles)
         {
             if (node.IsFile)
             {
-                if (node.Name.ToLowerInvariant().Contains(filter))
+                if (MatchesFilter(node.Name, filter))
                 {
-                    results.Add(node);
+                    matchingFiles.Add(node);
                 }
-                return;
+
+                return null;
             }
+
+            var matchingChildFolders = new List<ProjectExplorerNode>();
+            bool hasMatchingFile = false;
 
             foreach (var child in node.Children)
             {
-                FindFlatMatchingFiles(child, filter, results);
-            }
-        }
+                if (child.IsFile)
+                {
+                    if (MatchesFilter(child.Name, filter))
+                    {
+                        matchingFiles.Add(child);
+                        hasMatchingFile = true;
+                    }
 
-        private ProjectExplorerNode FilterFolderNodeRecursive(ProjectExplorerNode node, string filter)
-        {
-            var matchingChildren = new List<ProjectExplorerNode>();
-            foreach (var child in node.Children)
-            {
-                var matchedChild = FilterFolderNodeRecursive(child, filter);
+                    continue;
+                }
+
+                var matchedChild = FilterFolderNodeRecursive(child, filter, matchingFiles);
                 if (matchedChild != null)
                 {
-                    matchingChildren.Add(matchedChild);
+                    matchingChildFolders.Add(matchedChild);
                 }
             }
 
-            if (matchingChildren.Count > 0 || node.Name.ToLowerInvariant().Contains(filter))
+            bool folderMatches = MatchesFilter(node.Name, filter);
+            if (!folderMatches && !hasMatchingFile && matchingChildFolders.Count == 0)
             {
-                var copy = new ProjectExplorerNode
-                {
-                    Name = node.Name,
-                    FullPath = node.FullPath,
-                    IsFile = node.IsFile,
-                    IconKind = node.IconKind,
-                    IconColor = node.IconColor,
-                    IsExpanded = true
-                };
-                copy.Children.AddRange(matchingChildren);
-                return copy;
+                return null;
             }
 
-            return null;
+            var folderCopy = new ProjectExplorerNode
+            {
+                Name = node.Name,
+                FullPath = node.FullPath,
+                IsFile = false,
+                IconKind = node.IconKind,
+                IconColor = node.IconColor,
+                IsExpanded = true
+            };
+            folderCopy.Children.AddRange(matchingChildFolders);
+            return folderCopy;
+        }
+
+        private static bool MatchesFilter(string value, string filter)
+        {
+            return !string.IsNullOrEmpty(value) &&
+                value.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void SearchBox_SearchTextChanged(object sender, RoutedEventArgs e)
@@ -415,7 +433,10 @@ namespace AssetsManager.Views.Controls.Viewer
             ClearImagePreview();
             _currentFolderNode = folderNode;
             SynchronizeFolderTree(folderNode.FullPath);
-            FilesListBox.ItemsSource = folderNode.Children;
+            if (string.IsNullOrWhiteSpace(SearchBox.Text))
+            {
+                FilesListBox.ItemsSource = folderNode.Children;
+            }
             UpdateBreadcrumbs(folderNode);
         }
 
@@ -445,6 +466,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 UpdateBreadcrumbs(_currentFolderNode);
             }
         }
+
+        private void CloseImagePreview_Click(object sender, RoutedEventArgs e) => ClearImagePreview();
 
         private void UpdateImagePreviewBreadcrumb(string filePath)
         {

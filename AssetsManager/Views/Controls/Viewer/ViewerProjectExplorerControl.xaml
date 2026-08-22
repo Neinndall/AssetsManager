@@ -204,6 +204,30 @@
                            Stretch="Uniform"
                            Margin="4"
                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <Button x:Name="CloseImagePreviewButton"
+                            Width="26"
+                            Height="26"
+                            Margin="0,0,2,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Panel.ZIndex="1"
+           Click="CloseImagePreview_Click"
+           ToolTip="Close image preview">
+      <Button.Style>
+          <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+              <Setter Property="Background" Value="Transparent"/>
+              <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+              <Style.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True">
+                      <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                  </Trigger>
+              </Style.Triggers>
+          </Style>
+      </Button.Style>
+      <materialIcons:MaterialIcon Kind="Close"
+                                  Width="14"
+                                  Height="14"/>
+  </Button>
                 </Grid>
             </Grid>
         </Grid>
