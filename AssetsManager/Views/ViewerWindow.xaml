@@ -236,7 +236,7 @@
 
             <!-- VFX STUDIO VIEW -->
             <viewer:VfxInspectorControl x:Name="VfxInspectorControl"
-                                        Visibility="{Binding ViewModel.IsVfxStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        Visibility="{Binding DataContext.IsVfxStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>
