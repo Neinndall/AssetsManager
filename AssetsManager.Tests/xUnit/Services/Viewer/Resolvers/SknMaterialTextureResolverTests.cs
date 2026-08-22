@@ -18,6 +18,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
     public class SknMaterialTextureResolverTests
     {
         private static readonly ConcurrentDictionary<ulong, string> TestTexturePaths = new();
+        private static readonly string[] SeraphineBodyTextureKeys =
+        {
+            "seraphine_skin69_body_tx_cm",
+            "seraphine_skin69_cloth_iridescent",
+            "seraphine_skin69_cloth_tx_cm_mask",
+            "white",
+            "black"
+        };
 
         [Fact]
         public void Resolve_UsesSkinMeshTextureAsDefaultWithoutStaticMaterials()
@@ -328,6 +336,32 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             AssertContainsPath(
                 "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_Mat_HatMask.tex",
                 SknMaterialTextureResolver.ReadMetadata(tree).ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_IgnoresUntintedStaticWhiteAdditiveSource()
+        {
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                CreateSeraphineIridescentBodyTree(includeAdditiveTint: false),
+                SeraphineBodyTextureKeys);
+
+            Assert.Equal("seraphine_skin69_body_tx_cm", resolution.Overrides["body"]);
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.False((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
+            Assert.Equal("seraphine_skin69_cloth_iridescent", effect.IridescenceTextureName);
+        }
+
+        [Fact]
+        public void Resolve_PreservesTintedWhiteAdditiveSource()
+        {
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                CreateSeraphineIridescentBodyTree(includeAdditiveTint: true),
+                SeraphineBodyTextureKeys);
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
         }
 
         [Fact]
@@ -1079,6 +1113,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     Directory.Delete(root, true);
                 }
             }
+        }
+
+        private static BinTree CreateSeraphineIridescentBodyTree(bool includeAdditiveTint)
+        {
+            const string materialPath =
+                "Characters/Seraphine/Skins/Skin69/Materials/Seraphine_Cloth_Iridescent";
+            const string bodyTexturePath =
+                "ASSETS/Characters/Seraphine/Skins/Skin69/Seraphine_Skin69_Body_TX_CM.tex";
+            const string iridescenceTexturePath =
+                "ASSETS/Characters/Seraphine/Skins/Skin69/Seraphine_Skin69_Cloth_Iridescent.tex";
+            const string additiveMaskPath =
+                "ASSETS/Characters/Seraphine/Skins/Skin69/Seraphine_Skin69_Cloth_TX_CM_Mask.tex";
+
+            var parameters = new List<BinTreeEmbedded>
+            {
+                CreateParameter("AdditiveTexTile", Vector4.One),
+                CreateParameter("AdditiveStrength_R", Vector4.One),
+                CreateParameter("IridescentControl", new Vector4(1.1f, 1f, 3f, 0f))
+            };
+            if (includeAdditiveTint)
+            {
+                parameters.Add(
+                    CreateParameter(
+                        "AdditiveScroll_ColorTint_R",
+                        new Vector4(0.5f, 0.75f, 1f, 0f)));
+            }
+
+            return CreateSkinTree(
+                bodyTexturePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Pattern_Mask", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("ScreenSpace_Texture", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("MatCap_Tex", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("Color_Mask_Texture", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("Diffuse_Texture", bodyTexturePath),
+                        CreateSampler("iridescentTex", iridescenceTexturePath),
+                        CreateSampler("AdditiveScrollTex", "ASSETS/Shared/Materials/white.tex"),
+                        CreateSampler("AdditiveScroll_Mask", additiveMaskPath),
+                        CreateSampler("Diffuse_Texture2", "ASSETS/Shared/Materials/black.tex")
+                    },
+                    parameters.ToArray()));
         }
 
         private static BinTreeWadChunkLink CreateTextureLink(string propertyName, string texturePath)

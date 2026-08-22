@@ -14,6 +14,7 @@ New Features
   - VFX Studio now shares one loading/resource cache per window and releases OpenGL, decoded texture, mesh, animation, and index resources when closed.
   - Viewer / Model materials now animate BIN-authored vertex waves and Fresnel noise when the material declares those features.
   - Viewer / Model materials now apply BIN-authored Fresnel, masked emission, and simple dissolve transitions alongside animated scroll and flow textures.
+  - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.
   - Viewer / Project Browser can load multiple selected animation files from its context menu.
   - Viewer / Map Environment now applies map-authored sun, ambient lighting, and baked lightmaps to static geometry.
   - Viewer / Champion skin materials now resolve WadChunkLink texture paths.

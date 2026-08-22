@@ -54,6 +54,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "Scroll_Tex_Mask",
                 "Scroll_Texture_Mask",
                 "Scroll_Mask");
+            // Riot uses a white neutral source in some iridescent graphs.
+            // Without authored scroll/tint controls it is not an additive layer.
+            if (additiveMask != null && IsWhiteIridescentPlaceholder(material))
+            {
+                additiveTexture = null;
+            }
+
             float additiveStrength = ReadFloat(
                 material.Parameters,
                 1f,
@@ -141,6 +148,35 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     "FlowmapIntensity",
                     "FlowIntensity",
                     "Flow_Amount"));
+        }
+
+        private static bool IsWhiteIridescentPlaceholder(SknMaterialDefinition material)
+        {
+            SknMaterialSampler sampler = material.FindSampler("additivescrolltex") ??
+                material.FindSampler("scrolltex") ??
+                material.FindSampler("scrolltexture");
+            string sourceName = SknMaterialTextureResolver.NormalizeToken(
+                Path.GetFileNameWithoutExtension(sampler?.TexturePath ?? string.Empty));
+            bool hasIridescence = HasSampler(material, "iridescentTex") ||
+                HasSampler(material, "IridescentTex") ||
+                HasSampler(material, "Iridescent_Texture") ||
+                HasSampler(material, "IridescenceTex");
+            return sampler != null &&
+                sourceName.Equals("white", StringComparison.Ordinal) &&
+                hasIridescence &&
+                !HasAnyParameter(
+                    material.Parameters,
+                    "AdditiveTexScrollSpeed_R",
+                    "ScrollSpeed_R",
+                    "Scroll_Speed",
+                    "ScrollSpeed") &&
+                !HasAnyParameter(
+                    material.Parameters,
+                    "AdditiveScroll_ColorTint_R",
+                    "AdditiveScroll_ColorTint",
+                    "Scroll_Color_Tint_R",
+                    "ScrollColor",
+                    "ScrollColorTint");
         }
 
         private static ModelMaterialEffectDefinition ApplyGradientPulse(

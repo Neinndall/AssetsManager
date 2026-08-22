@@ -330,13 +330,13 @@ namespace AssetsManager.Services.Viewer.Loading
                 materialTextureOverrides.TryGetValue(normalizedMaterialName, out string overrideTextureKey) &&
                 loadedTextures.ContainsKey(overrideTextureKey))
             {
-                _logService.LogInfo($"[IRIDIAG] Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
+                _logService.LogDebug($"Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
                 return overrideTextureKey;
             }
 
             if (defaultTextureKey != null)
             {
-                _logService.LogInfo($"[IRIDIAG] Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");
+                _logService.LogDebug($"Using skin-bin default texture '{defaultTextureKey}' for submesh '{materialName}'.");
             }
 
             return defaultTextureKey;
