@@ -73,6 +73,7 @@ New Features
 Improvements
   - Monitor / Version Manager: Fetch Versions now defaults to All and supports optional publication-day filtering for Game Client manifests.
   - Viewer / Skin materials no longer infer transparency from partial alpha in color textures unless the material explicitly authorizes it.
+  - Viewer / Maximized viewport now stays above the project explorer so the toolbar toggle remains accessible.
   - Viewer / Ground logo settings now update the active viewport live and after saving, including opacity, size, and path changes.
   - Viewer / Champion skin materials now resolve masked gradient pulse effects from BIN samplers, parameters, and UV scrolling.
   - Viewer / Champion skin texture selectors now show only color textures; material masks and effect maps remain loaded internally.
