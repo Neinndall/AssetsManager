@@ -42,6 +42,7 @@ namespace AssetsManager.Utils
         public string LastPbeStatusMessage { get; set; }
         public string LastPbeCheckTime { get; set; }
         public string LastNotifiedQaBuildSha { get; set; }
+        public string LastNotifiedStableVersion { get; set; }
         public PreferredClient PreferredClient { get; set; } = PreferredClient.PBE;
         public PreferredDirectory PreferredDirectory { get; set; } = PreferredDirectory.All;
         private string _customGroundLogoPath = string.Empty;
@@ -282,6 +283,7 @@ namespace AssetsManager.Utils
                 LastPbeStatusMessage = null,
                 LastPbeCheckTime = null,
                 LastNotifiedQaBuildSha = null,
+                LastNotifiedStableVersion = null,
                 PreferredClient = PreferredClient.PBE,
                 PreferredDirectory = PreferredDirectory.All,
                 HashesSizes = new ConcurrentDictionary<string, long>(),
@@ -335,6 +337,7 @@ namespace AssetsManager.Utils
             MinimizeToTrayOnClose = defaultSettings.MinimizeToTrayOnClose;
             LastPbeStatusMessage = defaultSettings.LastPbeStatusMessage;
             LastNotifiedQaBuildSha = defaultSettings.LastNotifiedQaBuildSha;
+            LastNotifiedStableVersion = defaultSettings.LastNotifiedStableVersion;
             PreferredClient = defaultSettings.PreferredClient;
             PreferredDirectory = defaultSettings.PreferredDirectory;
             UpdateCheckFrequency = defaultSettings.UpdateCheckFrequency;

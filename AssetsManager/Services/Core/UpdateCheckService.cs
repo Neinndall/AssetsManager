@@ -278,10 +278,15 @@ namespace AssetsManager.Services.Core
                     if (!Version.TryParse(currentVerStr, out var currentVer) ||
                         !Version.TryParse(latestVerStr, out var latestVer)) return;
 
+                    if (string.Equals(_appSettings.LastNotifiedStableVersion, newVersion, StringComparison.OrdinalIgnoreCase)) return;
+
                     string message = VersionInfo.IsQA && latestVer <= currentVer
                         ? $"New stable version {newVersion} is available!"
                         : $"New version {newVersion} is available!";
                     UpdatesFound?.Invoke(message, newVersion, NotificationCategory.Updates, "App Update Available", null);
+
+                    _appSettings.LastNotifiedStableVersion = newVersion;
+                    await PersistNotificationMarkerAsync("Failed to persist the last notified Stable version.");
                 }
 
                 async Task CheckExperimentalBuildAsync()
@@ -325,14 +330,7 @@ namespace AssetsManager.Services.Core
                         null);
 
                     _appSettings.LastNotifiedQaBuildSha = latestBuildSha;
-                    try
-                    {
-                        await _appSettings.SaveAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logService.LogError(ex, "Failed to persist the last notified QA build.");
-                    }
+                    await PersistNotificationMarkerAsync("Failed to persist the last notified QA build.");
                 }
 
                 async Task CheckMonitoredAssetsAsync()
@@ -348,6 +346,18 @@ namespace AssetsManager.Services.Core
                 }
             });
             if (!completed) _logService.LogDebug("General update check skipped because it is already running or monitoring stopped.");
+        }
+
+        private async Task PersistNotificationMarkerAsync(string errorMessage)
+        {
+            try
+            {
+                await _appSettings.SaveAsync();
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, errorMessage);
+            }
         }
 
         /// <summary>

@@ -73,6 +73,7 @@ New Features
 Improvements
   - Core / Renamed the application identity metadata to VersionInfo and separated version data from view-specific build presentation.
   - Background update checks now notify Experimental builds when a newer downloadable QA commit is available.
+  - Background application update notifications now avoid repeating the same Stable release or QA build.
   - Experimental update installation no longer adds internal extraction progress to Notification Hub.
   - Comparison Results now allow extracting or saving new, modified, renamed and removed assets from their available version side.
   - Comparison Results now validates the selected source side and reports failed exports instead of silently accepting missing assets.
