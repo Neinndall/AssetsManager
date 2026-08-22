@@ -5,7 +5,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
              xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
-             xmlns:models="clr-namespace:AssetsManager.Views.Models.Wad"
              xmlns:controls="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
@@ -133,19 +132,6 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <TextBlock Text="DIFF TYPE" Style="{StaticResource ToolSectionLabel}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <ComboBox x:Name="DiffTypeComboBox"
-                              Style="{StaticResource ModernComboBox}"
-                              Width="130" Height="30"
-                              VerticalAlignment="Center" Margin="0,0,16,0"
-                              SelectionChanged="DiffTypeComboBox_SelectionChanged"
-                              ToolTip="Filter by diff type">
-                        <ComboBoxItem Content="New" Tag="{x:Static models:ChunkDiffType.New}" IsSelected="True"/>
-                        <ComboBoxItem Content="Modified" Tag="{x:Static models:ChunkDiffType.Modified}"/>
-                        <ComboBoxItem Content="Renamed" Tag="{x:Static models:ChunkDiffType.Renamed}"/>
-                        <ComboBoxItem Content="Removed" Tag="{x:Static models:ChunkDiffType.Removed}"/>
-                    </ComboBox>
-
                     <controls:FileTypeFilterControl x:Name="FileTypeFilter"/>
                 </StackPanel>
             </Grid>

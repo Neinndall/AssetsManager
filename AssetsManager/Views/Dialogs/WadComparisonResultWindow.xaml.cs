@@ -41,12 +41,12 @@ namespace AssetsManager.Views.Dialogs
         private readonly DirectoriesCreator _directoriesCreator;
         private readonly SemaphoreSlim _thumbnailLoadLimiter = new(2, 2);
         private readonly Dictionary<SerializableChunkDiff, CancellationTokenSource> _thumbnailLoads = new();
+        private readonly Dictionary<SerializableChunkDiff, WadResultItemModel> _resultItems = new();
 
         private string _oldPbePath;
         private string _newPbePath;
         private string _sourceJsonPath;
         private string _version;
-        private List<ExtractResultItem> _extractionResults;
 
         private readonly WadComparisonResultModel _viewModel;
 
@@ -88,7 +88,6 @@ namespace AssetsManager.Views.Dialogs
             _viewModel.TreeModel.FilterChanged += OnTreeFilterChanged;
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             ResultsControl.ItemVisibilityChanged += OnResultsItemVisibilityChanged;
-            ResultsControl.DiffTypeChanged += OnResultsDiffTypeChanged;
             ResultsControl.FilterApplied += OnResultsFilterApplied;
 
             Loaded += WadComparisonResultWindow_Loaded;
@@ -131,11 +130,11 @@ namespace AssetsManager.Views.Dialogs
             }
             else if (visible == total)
             {
-                _viewModel.ResultsSummaryText = $"Showing {visible} {ResultsControl.SelectedDiffType} results.";
+                _viewModel.ResultsSummaryText = $"Showing {visible} results.";
             }
             else
             {
-                _viewModel.ResultsSummaryText = $"Showing {visible} of {total} {ResultsControl.SelectedDiffType} results.";
+                _viewModel.ResultsSummaryText = $"Showing {visible} of {total} results.";
             }
         }
 
@@ -219,29 +218,32 @@ namespace AssetsManager.Views.Dialogs
         {
             if (_serializableDiffs == null) return;
 
-            var filtered = _serializableDiffs.Where(d => 
+            var typeFiltered = _serializableDiffs.Where(d => IsDiffTypeVisible(d.Type)).ToList();
+            var filtered = typeFiltered.Where(d =>
             {
-                bool stateMatch = false;
-                if (d.Type == ChunkDiffType.New && _viewModel.TreeModel.ShowNew) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Modified && _viewModel.TreeModel.ShowModified) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Removed && _viewModel.TreeModel.ShowRemoved) stateMatch = true;
-                else if (d.Type == ChunkDiffType.Renamed && _viewModel.TreeModel.ShowRenamed) stateMatch = true;
-                
-                if (!stateMatch) return false;
-
                 if (string.IsNullOrWhiteSpace(_viewModel.FilterText)) return true;
                 return d.FileName.IndexOf(_viewModel.FilterText, StringComparison.OrdinalIgnoreCase) >= 0;
             }).ToList();
 
-            var wadGroups = PrepareGroupedResults(filtered);
-            _viewModel.SetResults(filtered, wadGroups);
+            _viewModel.SetResults(filtered, PrepareGroupedResults(filtered));
+            SetFilteredResultItems(typeFiltered);
         }
+
+        private bool IsDiffTypeVisible(ChunkDiffType type) => type switch
+        {
+            ChunkDiffType.New => _viewModel.TreeModel.ShowNew,
+            ChunkDiffType.Modified => _viewModel.TreeModel.ShowModified,
+            ChunkDiffType.Removed => _viewModel.TreeModel.ShowRemoved,
+            ChunkDiffType.Renamed => _viewModel.TreeModel.ShowRenamed,
+            _ => false
+        };
 
         public void Initialize(List<ChunkDiff> diffs, string oldPbePath, string newPbePath, string version = null)
         {
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _version = version;
+            _resultItems.Clear();
             _serializableDiffs = diffs.Select(d => new SerializableChunkDiff
             {
                 Type = d.Type,
@@ -259,12 +261,16 @@ namespace AssetsManager.Views.Dialogs
 
         public void Initialize(List<SerializableChunkDiff> serializableDiffs, string oldPbePath = null, string newPbePath = null, string sourceJsonPath = null, string version = null, List<ExtractResultItem> extractionResults = null)
         {
+            _resultItems.Clear();
             _serializableDiffs = serializableDiffs;
             _oldPbePath = oldPbePath;
             _newPbePath = newPbePath;
             _sourceJsonPath = sourceJsonPath;
             _version = version;
-            _extractionResults = extractionResults;
+            foreach (var result in extractionResults ?? Enumerable.Empty<ExtractResultItem>())
+            {
+                _resultItems[result.Diff] = new WadResultItemModel(result);
+            }
 
             // Default to the Results view when a batch extraction just finished.
             if (extractionResults != null && extractionResults.Count > 0)
@@ -278,7 +284,6 @@ namespace AssetsManager.Views.Dialogs
             Loaded -= WadComparisonResultWindow_Loaded;
             Closed -= OnWindowClosed;
             ResultsControl.ItemVisibilityChanged -= OnResultsItemVisibilityChanged;
-            ResultsControl.DiffTypeChanged -= OnResultsDiffTypeChanged;
             ResultsControl.FilterApplied -= OnResultsFilterApplied;
             ResetThumbnailLoading();
 
@@ -291,6 +296,7 @@ namespace AssetsManager.Views.Dialogs
                 }
             }
             _serializableDiffs = null;
+            _resultItems.Clear();
             _viewModel.TreeModel.WadGroups?.Clear();
             ResultsTree.Cleanup();
             DataContext = null;
@@ -302,41 +308,13 @@ namespace AssetsManager.Views.Dialogs
             _viewModel.SetLoadingState(ComparisonLoadingState.ResolvingHashes);
 
             var diffs = _serializableDiffs;
-            var wadGroups = await Task.Run(() =>
-            {
-                TryResolveHashes(diffs);
-                return PrepareGroupedResults(diffs);
-            });
+            await Task.Run(() => TryResolveHashes(diffs));
 
             if (_serializableDiffs != null)
             {
-                _viewModel.SetResults(diffs, wadGroups);
-                PopulateResults(ChunkDiffType.New);
+                ApplyFilters();
                 QueueResultsThumbnailLoading();
             }
-        }
-
-        private void OnResultsDiffTypeChanged(ChunkDiffType type)
-        {
-            if (_serializableDiffs == null) return;
-            PopulateResults(type);
-        }
-
-        private void PopulateResults(ChunkDiffType type)
-        {
-            if (_serializableDiffs == null) return;
-
-            var diffs = _serializableDiffs.Where(d => d.Type == type).ToList();
-            var resultMap = (type == ChunkDiffType.New ? _extractionResults ?? new List<ExtractResultItem>() : new List<ExtractResultItem>())
-                .GroupBy(r => r.Diff)
-                .ToDictionary(g => g.Key, g => g.Last());
-
-            var items = diffs.Select(diff =>
-                resultMap.TryGetValue(diff, out var result)
-                    ? new WadResultItemModel(result)
-                    : new WadResultItemModel(diff, _extractionService != null ? _extractionService.GetModeFromSettings(diff) : WadExportMode.Original)).ToList();
-
-            ResultsControl.SetItems(items);
         }
 
         // --- Handle methods for direct peer communication ---
@@ -466,10 +444,18 @@ namespace AssetsManager.Views.Dialogs
             return groups;
         }
 
-        private void PopulateResults(List<SerializableChunkDiff> diffs)
+        private void SetFilteredResultItems(List<SerializableChunkDiff> diffs)
         {
-            var wadGroups = PrepareGroupedResults(diffs);
-            _viewModel.SetResults(diffs, wadGroups);
+            var items = diffs.Select(diff =>
+            {
+                if (_resultItems.TryGetValue(diff, out var existing)) return existing;
+
+                var item = new WadResultItemModel(diff, _extractionService != null ? _extractionService.GetModeFromSettings(diff) : WadExportMode.Original);
+                _resultItems[diff] = item;
+                return item;
+            }).ToList();
+
+            ResultsControl.SetItems(items);
         }
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -534,7 +520,7 @@ namespace AssetsManager.Views.Dialogs
                         ResolveStoredPath(diff.NewPathHash, diff.NewPath, value => diff.NewPath = value);
                     }
                 });
-                PopulateResults(_serializableDiffs);
+                ApplyFilters();
                 _customMessageBoxService.ShowSuccess("Success", "Hashes have been reloaded and the result tree has been refreshed.", this);
             }
             catch (Exception ex)

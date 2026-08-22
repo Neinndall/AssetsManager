@@ -14,13 +14,9 @@ namespace AssetsManager.Views.Dialogs.Controls
     {
         public event Action<SerializableChunkDiff, bool> ItemVisibilityChanged;
 
-        public event Action<ChunkDiffType> DiffTypeChanged;
-
         public event Action FilterApplied;
 
         public WadComparisonResultWindow ParentWindow { get; set; }
-
-        public ChunkDiffType SelectedDiffType { get; private set; } = ChunkDiffType.New;
 
         private readonly ObservableRangeCollection<WadResultItemModel> _displayItems = new();
         private List<WadResultItemModel> _allItems = new();
@@ -37,38 +33,29 @@ namespace AssetsManager.Views.Dialogs.Controls
         {
             _allItems = items ?? new List<WadResultItemModel>();
             CountText.Text = _allItems.Count.ToString();
-            RetryFailedButton.Visibility = SelectedDiffType == ChunkDiffType.New && _allItems.Any(i => i.IsFailed)
+            RetryFailedButton.Visibility = _allItems.Any(i => i.Diff.Type == ChunkDiffType.New && i.IsFailed)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             UpdateActionButtonsEnabled();
             ApplyFilter(FileTypeFilter.SelectedFilter);
         }
 
-        private void DiffTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (DiffTypeComboBox.SelectedItem is ComboBoxItem { Tag: ChunkDiffType type })
-            {
-                SelectedDiffType = type;
-                RetryFailedButton.Visibility = type == ChunkDiffType.New && _allItems.Any(i => i.IsFailed)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-                UpdateActionButtonsEnabled();
-                DiffTypeChanged?.Invoke(type);
-            }
-        }
-
         private void UpdateActionButtonsEnabled()
         {
-            bool isNew = SelectedDiffType == ChunkDiffType.New;
-            if (ExtractButton != null) ExtractButton.IsEnabled = isNew;
-            if (SaveButton != null) SaveButton.IsEnabled = isNew;
+            bool allSelectedAreNew = ResultsListBox?.SelectedItems.Count > 0 && ResultsListBox.SelectedItems
+                .OfType<WadResultItemModel>()
+                .All(item => item.Diff.Type == ChunkDiffType.New);
+            if (ExtractButton != null) ExtractButton.IsEnabled = allSelectedAreNew;
+            if (SaveButton != null) SaveButton.IsEnabled = allSelectedAreNew;
         }
 
         public List<WadResultItemModel> GetAllItems() => _allItems;
 
         public void UpdateRetryButton()
         {
-            RetryFailedButton.Visibility = _allItems.Any(i => i.IsFailed) ? Visibility.Visible : Visibility.Collapsed;
+            RetryFailedButton.Visibility = _allItems.Any(i => i.Diff.Type == ChunkDiffType.New && i.IsFailed)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         public void LoadRealizedItems()
@@ -148,6 +135,7 @@ namespace AssetsManager.Views.Dialogs.Controls
             int count = ResultsListBox.SelectedItems.Count;
             SelectedCountText.Text = count == 1 ? "1 selected" : $"{count} selected";
             ActionBarBorder.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdateActionButtonsEnabled();
             UpdateOpenFolderButtonState();
         }
 
