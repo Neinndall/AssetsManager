@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Utils;
+using AssetsManager.Views.Models.Viewer;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
@@ -74,46 +76,29 @@ namespace AssetsManager.Tests.xUnit.Utils
         }
 
         [Fact]
-        public void HasTranslucentAlpha_DetectsPartialTextureAlpha()
+        public void ModelPart_DoesNotInferTransparencyFromColorTextureAlpha()
         {
             BitmapSource bitmap = BitmapSource.Create(
-                3,
+                1,
                 1,
                 96,
                 96,
                 PixelFormats.Bgra32,
                 null,
-                new byte[]
-                {
-                    0, 0, 0, 0,
-                    0, 0, 0, 128,
-                    0, 0, 0, 255
-                },
-                12);
+                new byte[] { 0, 0, 0, 128 },
+                4);
             bitmap.Freeze();
 
-            Assert.True(TextureUtils.HasTranslucentAlpha(bitmap));
-        }
-
-        [Fact]
-        public void HasTranslucentAlpha_IgnoresOpaqueAndCutoutOnlyTextures()
-        {
-            BitmapSource bitmap = BitmapSource.Create(
-                2,
-                1,
-                96,
-                96,
-                PixelFormats.Bgra32,
-                null,
-                new byte[]
+            var part = new ModelPart
+            {
+                AllTextures = new Dictionary<string, BitmapSource>
                 {
-                    0, 0, 0, 0,
-                    0, 0, 0, 255
+                    ["skin_tx_cm"] = bitmap
                 },
-                8);
-            bitmap.Freeze();
+                SelectedTextureName = "skin_tx_cm"
+            };
 
-            Assert.False(TextureUtils.HasTranslucentAlpha(bitmap));
+            Assert.False(part.IsAlphaBlended);
         }
 
         [Fact]

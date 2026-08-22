@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,13 +22,6 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        private sealed class AlphaInfo
-        {
-            internal bool HasTranslucentAlpha { get; init; }
-        }
-
-        private static readonly ConditionalWeakTable<BitmapSource, AlphaInfo> AlphaInfoCache = new();
-
         public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
         {
             var keys = textureKeys?.ToList() ?? new List<string>();
@@ -81,44 +73,6 @@ namespace AssetsManager.Utils
 
             allTextures.TryGetValue(selectedTextureName, out BitmapSource texture);
             return texture;
-        }
-
-        internal static bool HasTranslucentAlpha(
-            Dictionary<string, BitmapSource> allTextures,
-            string selectedTextureName) =>
-            HasTranslucentAlpha(ResolveTexture(allTextures, selectedTextureName));
-
-        internal static bool HasTranslucentAlpha(BitmapSource texture)
-        {
-            if (texture == null)
-            {
-                return false;
-            }
-
-            if (AlphaInfoCache.TryGetValue(texture, out AlphaInfo cached))
-            {
-                return cached.HasTranslucentAlpha;
-            }
-
-            BitmapSource bitmap = texture.Format == PixelFormats.Bgra32
-                ? texture
-                : new FormatConvertedBitmap(texture, PixelFormats.Bgra32, null, 0);
-            int stride = bitmap.PixelWidth * 4;
-            byte[] pixels = new byte[bitmap.PixelHeight * stride];
-            bitmap.CopyPixels(pixels, stride, 0);
-
-            bool hasTranslucentAlpha = false;
-            for (int index = 3; index < pixels.Length; index += 4)
-            {
-                if (pixels[index] is > 0 and < 255)
-                {
-                    hasTranslucentAlpha = true;
-                    break;
-                }
-            }
-
-            AlphaInfoCache.Add(texture, new AlphaInfo { HasTranslucentAlpha = hasTranslucentAlpha });
-            return hasTranslucentAlpha;
         }
 
         public static void UpdateMaterial(ModelPart modelPart)
