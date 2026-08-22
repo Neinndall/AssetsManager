@@ -212,29 +212,30 @@ namespace AssetsManager.Views
             if (_isCleanedUp) return;
             _isCleanedUp = true;
 
-            TryCleanupStep(
-                "task cancellation",
-                () => _taskCancellationManager?.CancelCurrentOperation(false));
-            TryCleanupStep(
-                "VFX visibility",
-                () => _viewModel.IsVfxStudioVisible = false);
-
-            // Release the VFX consumer before disposing the service it uses.
-            TryCleanupStep("VfxInspectorControl", () => VfxInspectorControl?.Cleanup());
-            TryCleanupStep("ViewportControl", () => ViewportControl?.Cleanup());
-            TryCleanupStep("PanelControl", () => PanelControl?.Cleanup());
-            TryCleanupStep("VfxLoadingService", () => _vfxLoadingService?.Dispose());
-        }
-
-        private void TryCleanupStep(string name, Action cleanup)
-        {
             try
             {
-                cleanup();
+                _taskCancellationManager?.CancelCurrentOperation(false);
+                _viewModel.IsVfxStudioVisible = false;
+
+                // Release the VFX consumer before disposing the service it uses.
+                VfxInspectorControl?.Cleanup();
+                ViewportControl?.Cleanup();
+                PanelControl?.Cleanup();
             }
             catch (Exception ex)
             {
-                _logService?.LogError(ex, $"Error during ViewerWindow cleanup: {name}");
+                _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
+            }
+            finally
+            {
+                try
+                {
+                    _vfxLoadingService?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    _logService?.LogError(ex, "Error during VfxLoadingService cleanup");
+                }
             }
         }
     }
