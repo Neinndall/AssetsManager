@@ -1,4 +1,5 @@
 <UserControl x:Class="AssetsManager.Views.ViewerWindow"
+             x:Name="ViewerRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -235,7 +236,7 @@
 
             <!-- VFX STUDIO VIEW -->
             <viewer:VfxInspectorControl x:Name="VfxStudio"
-                                        Visibility="{Binding ViewModel.IsVfxStudioVisible, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        Visibility="{Binding ViewModel.IsVfxStudioVisible, ElementName=ViewerRoot, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
     </Grid>
 </UserControl>

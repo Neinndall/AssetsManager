@@ -349,7 +349,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialEffectDefinition effect = resolution.Effects["body"];
             Assert.False((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
-            Assert.Equal("seraphine_skin69_cloth_iridescent", effect.IridescenceTextureName);
+            Assert.Equal("seraphine_skin69_cloth_iridescent", effect.Iridescence.LutTextureName);
+            Assert.Equal("seraphine_skin69_cloth_tx_cm_mask", effect.Iridescence.MaskTextureName);
+            Assert.Equal(new Vector4(1.1f, 1f, 3f, 0f), effect.Iridescence.Control);
+            Assert.Equal(new Vector2(1f, 0f), effect.Iridescence.PulseSpeedMin);
+            Assert.Equal(new Vector2(0f, 1f), effect.Iridescence.FresnelAlphaMinMax);
+            Assert.True(effect.Iridescence.UsesPulse);
+            Assert.True(effect.Iridescence.UsesLocalizedAlpha);
+            Assert.True(effect.RequiresAlphaBlend);
         }
 
         [Fact]
@@ -362,6 +369,69 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             ModelMaterialEffectDefinition effect = resolution.Effects["body"];
             Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
             Assert.True((effect.Kind & ModelMaterialEffectKind.Iridescence) != 0);
+            Assert.Equal("seraphine_skin69_cloth_tx_cm_mask", effect.Iridescence.MaskTextureName);
+        }
+
+        [Fact]
+        public void Resolve_PreservesExplicitWhiteAdditiveTint()
+        {
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                CreateSeraphineIridescentBodyTree(
+                    includeAdditiveTint: false,
+                    includeExplicitWhiteTint: true),
+                SeraphineBodyTextureKeys);
+
+            Assert.True((resolution.Effects["body"].Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+        }
+
+        [Fact]
+        public void Resolve_IgnoresZeroSpeedWhiteAdditiveSource()
+        {
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                CreateSeraphineIridescentBodyTree(
+                    includeAdditiveTint: false,
+                    includeZeroAdditiveSpeed: true),
+                SeraphineBodyTextureKeys);
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.False((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.Equal("seraphine_skin69_cloth_tx_cm_mask", effect.Iridescence.MaskTextureName);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotEnableOptionalIridescenceFeaturesWithoutSwitches()
+        {
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                CreateSeraphineIridescentBodyTree(
+                    includeAdditiveTint: false,
+                    includeIridescenceSwitches: false),
+                SeraphineBodyTextureKeys);
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.False(effect.Iridescence.UsesPulse);
+            Assert.False(effect.Iridescence.UsesLocalizedAlpha);
+            Assert.False(effect.RequiresAlphaBlend);
+        }
+
+        [Fact]
+        public void Resolve_LeavesMissingIridescenceMaskForWhiteFallback()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "iridescentTex",
+                        "ASSETS/Characters/Seraphine/Skins/Skin69/Seraphine_Skin69_Cloth_Iridescent.tex")
+                },
+                new Dictionary<string, Vector4>());
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "Body",
+                new[] { "seraphine_skin69_cloth_iridescent" },
+                new[] { "Body" });
+
+            Assert.Null(effect.Iridescence.MaskTextureName);
         }
 
         [Fact]
@@ -1115,7 +1185,11 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             }
         }
 
-        private static BinTree CreateSeraphineIridescentBodyTree(bool includeAdditiveTint)
+        private static BinTree CreateSeraphineIridescentBodyTree(
+            bool includeAdditiveTint,
+            bool includeZeroAdditiveSpeed = false,
+            bool includeIridescenceSwitches = true,
+            bool includeExplicitWhiteTint = false)
         {
             const string materialPath =
                 "Characters/Seraphine/Skins/Skin69/Materials/Seraphine_Cloth_Iridescent";
@@ -1130,14 +1204,26 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             {
                 CreateParameter("AdditiveTexTile", Vector4.One),
                 CreateParameter("AdditiveStrength_R", Vector4.One),
-                CreateParameter("IridescentControl", new Vector4(1.1f, 1f, 3f, 0f))
+                CreateParameter("IridescentControl", new Vector4(1.1f, 1f, 3f, 0f)),
+                CreateParameter("Iridescence_Pulse_Speed_Min", new Vector4(1f, 0f, 0f, 0f)),
+                CreateParameter("fresnelAlpha_minmax", new Vector4(0f, 1f, 0f, 0f)),
+                CreateParameter("Diffuse_Fade_Mask_Value", Vector4.One)
             };
-            if (includeAdditiveTint)
+            if (includeAdditiveTint || includeExplicitWhiteTint)
             {
                 parameters.Add(
                     CreateParameter(
                         "AdditiveScroll_ColorTint_R",
-                        new Vector4(0.5f, 0.75f, 1f, 0f)));
+                        includeAdditiveTint
+                            ? new Vector4(0.5f, 0.75f, 1f, 0f)
+                            : Vector4.One));
+            }
+            if (includeZeroAdditiveSpeed)
+            {
+                parameters.Add(
+                    CreateParameter(
+                        "AdditiveTexScrollSpeed_R",
+                        Vector4.Zero));
             }
 
             return CreateSkinTree(
@@ -1147,7 +1233,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                     new BinTreeObjectLink(
                         Fnv1a.HashLower("Material"),
                         Fnv1a.HashLower(materialPath))),
-                CreateMaterialWithParameters(
+                CreateMaterialWithSwitches(
                     materialPath,
                     new[]
                     {
@@ -1161,6 +1247,9 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                         CreateSampler("AdditiveScroll_Mask", additiveMaskPath),
                         CreateSampler("Diffuse_Texture2", "ASSETS/Shared/Materials/black.tex")
                     },
+                    includeIridescenceSwitches
+                        ? new[] { "IRIDESCENCE_PULSE", "USE_FRESNEL_ALPHA", "ALPHA_BLEND_ON" }
+                        : Array.Empty<string>(),
                     parameters.ToArray()));
         }
 

@@ -60,7 +60,10 @@ namespace AssetsManager.Views.Models.Viewer
         public bool IsDoubleSided { get; set; } = true;
         public bool IsDecal { get; set; }
         public System.Numerics.Vector4 ColorTint { get; set; } = System.Numerics.Vector4.One;
-        internal bool IsAlphaBlended => ColorTint.W < 1f;
+        internal bool IsAlphaBlended =>
+            ColorTint.W < 0.999f ||
+            TextureUtils.HasTranslucentAlpha(AllTextures, SelectedTextureName) ||
+            MaterialEffect?.RequiresAlphaBlend == true;
         internal float AlphaCutoff { get; set; } = 0.1f;
         internal bool UsesBakedDiffuse { get; set; }
         internal byte[] VertexColors { get; set; }

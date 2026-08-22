@@ -164,7 +164,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             return sampler != null &&
                 sourceName.Equals("white", StringComparison.Ordinal) &&
                 hasIridescence &&
-                !HasAnyParameter(
+                !HasEffectiveScrollSpeed(
                     material.Parameters,
                     "AdditiveTexScrollSpeed_R",
                     "ScrollSpeed_R",
@@ -387,16 +387,49 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return effect;
             }
 
+            Vector4 control = ReadVector4(
+                material.Parameters,
+                new Vector4(1f, 1f, 1f, 0f),
+                "IridescentControl",
+                "IridescenceControl");
+            bool usesPulse = material.HasSwitch("IRIDESCENCE_PULSE");
+            bool usesLocalizedAlpha = material.HasSwitch(
+                "ALPHA_BLEND_ON",
+                "USE_FRESNEL_ALPHA");
             return effect with
             {
                 Kind = effect.Kind | ModelMaterialEffectKind.Iridescence,
-                IridescenceTextureName = iridescenceTexture,
-                IridescenceStrength = ReadFloat(
-                    material.Parameters,
-                    0.85f,
-                    "Iridescence_Strength",
-                    "IridescenceStrength",
-                    "Iridescence_Intensity")
+                Iridescence = new ModelIridescenceDefinition(
+                    iridescenceTexture,
+                    FindSamplerKey(
+                        material,
+                        textureKeys,
+                        "Iridescence_Mask",
+                        "Iridescent_Mask",
+                        "AdditiveScroll_Mask",
+                        "Scroll_Tex_Mask",
+                        "Scroll_Texture_Mask",
+                        "Scroll_Mask",
+                        "Pattern_Mask"),
+                    control,
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.Zero,
+                        "Iridescence_Pulse_Speed_Min",
+                        "IridescencePulseSpeedMin"),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.One,
+                        "fresnelAlpha_minmax",
+                        "Iridescence_Alpha_MinMax",
+                        "IridescenceAlphaMinMax"),
+                    ReadFloat(
+                        material.Parameters,
+                        0f,
+                        "Diffuse_Fade_Mask_Value",
+                        "DiffuseFadeMaskValue"),
+                    usesPulse,
+                    usesLocalizedAlpha)
             };
         }
 
@@ -691,6 +724,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyDictionary<string, Vector4> parameters,
             params string[] names) =>
             names.Any(parameters.ContainsKey);
+
+        private static bool HasEffectiveScrollSpeed(
+            IReadOnlyDictionary<string, Vector4> parameters,
+            params string[] names) =>
+            names.Any(name =>
+                parameters.TryGetValue(name, out Vector4 value) &&
+                (MathF.Abs(value.X) > Epsilon || MathF.Abs(value.Y) > Epsilon));
 
         private static bool HasAllParameters(
             IReadOnlyDictionary<string, Vector4> parameters,

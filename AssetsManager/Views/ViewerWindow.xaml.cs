@@ -13,7 +13,7 @@ namespace AssetsManager.Views
     /// Passive orchestrator for the Viewer module.
     /// Responsibility: Dependency Injection and Peer-to-Peer linking between sub-controls.
     /// </summary>
-    public partial class ViewerWindow : UserControl, IDisposable
+    public partial class ViewerWindow : UserControl
     {
         public ViewerWindowModel ViewModel => _viewModel;
 
@@ -199,11 +199,6 @@ namespace AssetsManager.Views
             {
                 _logService?.LogError(ex, "Error during ViewerWindow.CleanupResources");
             }
-        }
-
-        public void Dispose()
-        {
-            CleanupResources();
         }
     }
 }

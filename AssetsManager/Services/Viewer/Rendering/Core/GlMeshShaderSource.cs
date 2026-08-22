@@ -57,13 +57,17 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform sampler2D uEmissionTex;
 					uniform sampler2D uEmissionMask;
 					uniform sampler2D uIridescenceTex;
+					uniform sampler2D uIridescenceMask;
 					uniform int uHasLightmap;
 					uniform int uEffectKind;
 					uniform int uHasEffectTex;
 					uniform int uHasEmissionTex;
 					uniform int uHasEmissionMask;
 					uniform int uHasIridescenceTex;
-					uniform float uIridescenceStrength;
+					uniform vec4 uIridescenceControl;
+					uniform vec2 uIridescencePulseSpeedMin;
+					uniform vec2 uIridescenceAlphaMinMax;
+					uniform float uIridescenceDiffuseFadeMask;
 					uniform float uEffectTime;
 					uniform vec2 uEffectScrollSpeed;
 					uniform vec2 uEffectTiling;
@@ -242,23 +246,48 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 							{
 								vec3 iriNormal = normalize(vNormal);
 								vec3 iriViewDir = normalize(uCameraPosition - vWorldPosition);
-								float facing = max(dot(iriNormal, iriViewDir), 0.0);
-								vec2 matcapUv = clamp(
-									iriNormal.xy * 0.5 + 0.5,
-									vec2(0.002),
-									vec2(0.998));
-								vec3 iridescenceSample = texture(uIridescenceTex, matcapUv).rgb;
-								float rim = pow(1.0 - facing, 1.25);
-								float blend = clamp(
-									uIridescenceStrength * (0.4 + 0.6 * rim),
+								float facing = abs(dot(iriNormal, iriViewDir));
+								float edge = 1.0 - facing;
+								float angular = pow(
+									clamp(edge, 0.0, 1.0),
+									max(uIridescenceControl.z, 0.001));
+								float mask = texture(uIridescenceMask, vUv).r;
+								mask = clamp(mask, 0.0, 1.0);
+								float pulseSpeed = max(uIridescencePulseSpeedMin.x, 0.0);
+								float pulseMinimum = clamp(uIridescencePulseSpeedMin.y, 0.0, 1.0);
+								float pulse = pulseSpeed > 0.0001
+									? mix(
+										pulseMinimum,
+										1.0,
+										0.5 + 0.5 * sin(uEffectTime * pulseSpeed * 6.2831853))
+									: 1.0;
+								float lutHalfTexel = 0.5 /
+									float(textureSize(uIridescenceTex, 0).x);
+								float lutU = clamp(
+									angular * uIridescenceControl.y + uIridescenceControl.w,
+									lutHalfTexel,
+									1.0 - lutHalfTexel);
+								vec3 iridescenceSample = texture(
+									uIridescenceTex,
+									vec2(lutU, 0.5)).rgb;
+								float iridescenceAmount = clamp(
+									angular * max(uIridescenceControl.x, 0.0) * pulse * mask,
 									0.0,
 									1.0);
-								finalColor = mix(
-									finalColor,
-									finalColor * 0.45 +
-										iridescenceSample * (0.45 + 0.75 * rim),
-									blend);
+								finalColor = finalColor * (1.0 - 0.15 * iridescenceAmount) +
+									iridescenceSample * (0.25 * iridescenceAmount);
+
+								float fadeMask = clamp(
+									mask * max(uIridescenceDiffuseFadeMask, 0.0),
+									0.0,
+									1.0);
+								float fresnelAlpha = mix(
+									clamp(uIridescenceAlphaMinMax.x, 0.0, 1.0),
+									clamp(uIridescenceAlphaMinMax.y, 0.0, 1.0),
+									angular);
+								texColor.a *= mix(1.0, fresnelAlpha, fadeMask);
 							}
+							if (texColor.a <= 0.0001) discard;
 							fragColor = vec4(finalColor, texColor.a);
 				}";
     }

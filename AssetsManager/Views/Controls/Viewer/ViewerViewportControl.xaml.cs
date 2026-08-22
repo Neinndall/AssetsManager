@@ -191,22 +191,23 @@ namespace AssetsManager.Views.Controls.Viewer
             var lightColor1 = new Vector3(keyIntensity, keyIntensity, keyIntensity);
             var lightColor2 = new Vector3(fillIntensity, fillIntensity, fillIntensity);
 
-            // 4. Render loaded models
-            foreach (var model in _loadedModels)
-            {
-                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
-            }
-
-            // Render ground if visible
+            // Render ground before the editor grid so the grid remains a world-space guide.
             if (_groundModel != null && _viewModel.IsGroundVisible && !_viewModel.IsTransparentBg)
             {
                 _meshRenderer.Render(_groundModel, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
-            // Render 3D Ground Grid if visible
+            // Render the grid before transparent model passes. Transparent parts do not write
+            // depth, so drawing the grid afterward makes it appear over the model.
             if (_gridRenderer != null && _viewModel.IsGridVisible)
             {
                 _gridRenderer.Render(viewProj);
+            }
+
+            // Render loaded models after the ground and grid.
+            foreach (var model in _loadedModels)
+            {
+                _meshRenderer.Render(model, viewProj, eye, lightDir1, lightColor1, lightDir2, lightColor2, ambientColor);
             }
 
             // Render skybox if visible

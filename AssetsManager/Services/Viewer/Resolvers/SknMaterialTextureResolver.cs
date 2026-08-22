@@ -609,6 +609,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 "emissivetexture" or
                 "emissionrdistortiongtexture" or
                 "iridescenttex" or
+                "iridescencemask" or
+                "iridescentmask" or
                 "matcaptex";
         }
 

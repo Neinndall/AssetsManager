@@ -74,6 +74,49 @@ namespace AssetsManager.Tests.xUnit.Utils
         }
 
         [Fact]
+        public void HasTranslucentAlpha_DetectsPartialTextureAlpha()
+        {
+            BitmapSource bitmap = BitmapSource.Create(
+                3,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[]
+                {
+                    0, 0, 0, 0,
+                    0, 0, 0, 128,
+                    0, 0, 0, 255
+                },
+                12);
+            bitmap.Freeze();
+
+            Assert.True(TextureUtils.HasTranslucentAlpha(bitmap));
+        }
+
+        [Fact]
+        public void HasTranslucentAlpha_IgnoresOpaqueAndCutoutOnlyTextures()
+        {
+            BitmapSource bitmap = BitmapSource.Create(
+                2,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[]
+                {
+                    0, 0, 0, 0,
+                    0, 0, 0, 255
+                },
+                8);
+            bitmap.Freeze();
+
+            Assert.False(TextureUtils.HasTranslucentAlpha(bitmap));
+        }
+
+        [Fact]
         public void GetColorTextureCandidates_ExcludesPresentationAndMaterialMaps()
         {
             var candidates = TextureUtils.GetColorTextureCandidates(new[]

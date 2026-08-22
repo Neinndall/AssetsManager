@@ -150,6 +150,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             catch (Silk.NET.Core.Loader.SymbolLoadingException) when (gpuBound)
             {
+                // The OpenGL context owns these handles and may have released them already.
             }
             catch (Exception ex)
             {

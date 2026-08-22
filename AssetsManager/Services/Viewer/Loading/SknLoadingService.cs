@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -40,7 +40,7 @@ namespace AssetsManager.Services.Viewer.Loading
             _hashResolverService = hashResolverService;
         }
 
-        // Este mÃ©todo carga un modelo SKN y sus texturas desde una ruta de directorio de texturas personalizada (para chromas).
+        // Loads an SKN model and its textures from a custom texture directory (for chromas).
         public async Task<SceneModel> LoadModel(string filePath, string textureDirectoryPath, CancellationToken cancellationToken = default)
         {
             if (_hashResolverService != null)
@@ -75,7 +75,7 @@ namespace AssetsManager.Services.Viewer.Loading
             }, cancellationToken);
         }
 
-        // Este mÃ©todo carga un modelo SKN y sus texturas desde el mismo directorio del archivo SKN (comportamiento estÃ¡ndar).
+        // Loads an SKN model and its textures from the SKN file directory (standard behavior).
         public async Task<SceneModel> LoadModel(string filePath, CancellationToken cancellationToken = default)
         {
             if (_hashResolverService != null)
@@ -406,4 +406,3 @@ namespace AssetsManager.Services.Viewer.Loading
 
     }
 }
-

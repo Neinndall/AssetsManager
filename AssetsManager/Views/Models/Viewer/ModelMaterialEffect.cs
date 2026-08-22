@@ -3,6 +3,22 @@ using System.Numerics;
 
 namespace AssetsManager.Views.Models.Viewer
 {
+    public sealed record ModelIridescenceDefinition(
+        string LutTextureName,
+        string MaskTextureName,
+        Vector4 Control,
+        Vector2 PulseSpeedMin,
+        Vector2 FresnelAlphaMinMax,
+        float DiffuseFadeMaskValue,
+        bool UsesPulse,
+        bool UsesLocalizedAlpha)
+    {
+        public bool RequiresAlphaBlend =>
+            UsesLocalizedAlpha &&
+            DiffuseFadeMaskValue > 0.0001f &&
+            (FresnelAlphaMinMax.X < 0.999f || FresnelAlphaMinMax.Y < 0.999f);
+    }
+
     [Flags]
     public enum ModelMaterialEffectKind
     {
@@ -53,8 +69,10 @@ namespace AssetsManager.Views.Models.Viewer
         public Vector4 EmissionColor { get; init; } = Vector4.One;
         public float EmissionStrength { get; init; }
         public int EmissionChannel { get; init; } = -1;
-        public string IridescenceTextureName { get; init; }
-        public float IridescenceStrength { get; init; } = 0.85f;
+        public ModelIridescenceDefinition Iridescence { get; init; }
+
+        public bool RequiresAlphaBlend =>
+            Iridescence?.RequiresAlphaBlend == true;
 
         public static ModelMaterialEffectDefinition None { get; } = new(
             ModelMaterialEffectKind.None,
