@@ -150,7 +150,10 @@ namespace AssetsManager.Services.Formatting
             cancellationToken.ThrowIfCancellationRequested();
 
             // 1. Directory Traversal
-            if (node.Type == NodeType.WadFile || node.Type == NodeType.VirtualDirectory || node.Type == NodeType.RealDirectory)
+            if (node.Type == NodeType.WadFile ||
+                node.Type == NodeType.VirtualDirectory ||
+                node.Type == NodeType.RealDirectory ||
+                node.Type == NodeType.AudioEvent)
             {
                 string cleanName = PathUtils.GetLogName(node.Name);
                 string currentDestinationPath = Path.Combine(destinationPath, PathUtils.SanitizeName(cleanName));

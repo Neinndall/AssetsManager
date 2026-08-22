@@ -42,11 +42,13 @@ namespace AssetsManager.Views.Dialogs.Controls
 
         private void UpdateActionButtonsEnabled()
         {
-            bool allSelectedAreExportable = ResultsListBox?.SelectedItems.Count > 0 && ResultsListBox.SelectedItems
+            var selectedItems = ResultsListBox?.SelectedItems
                 .OfType<WadResultItemModel>()
-                .All(item => item.CanExport);
+                .ToList() ?? new List<WadResultItemModel>();
+            bool allSelectedAreExportable = selectedItems.Count > 0 && selectedItems.All(item => item.CanExport);
+            bool allSelectedAreSmartSaveable = allSelectedAreExportable && selectedItems.All(item => item.CanSmartSave);
             if (ExtractButton != null) ExtractButton.IsEnabled = allSelectedAreExportable;
-            if (SaveButton != null) SaveButton.IsEnabled = allSelectedAreExportable;
+            if (SaveButton != null) SaveButton.IsEnabled = allSelectedAreSmartSaveable;
         }
 
         public List<WadResultItemModel> GetAllItems() => _allItems;

@@ -1,9 +1,11 @@
+using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Formatting;
+using AssetsManager.Utils;
 using AssetsManager.Views.Converters;
 using AssetsManager.Views.Models.Wad;
 
@@ -71,6 +73,10 @@ namespace AssetsManager.Views.Models.Dialogs.Controls
             or ChunkDiffType.Modified
             or ChunkDiffType.Renamed
             or ChunkDiffType.Removed;
+
+        public bool CanSmartSave =>
+            !SupportedFileTypes.IsAudioBank(Diff.FileName) &&
+            !string.Equals(Path.GetExtension(Diff.FileName), ".wem", StringComparison.OrdinalIgnoreCase);
 
         public string StatusLabel
         {
