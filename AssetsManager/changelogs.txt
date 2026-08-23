@@ -71,6 +71,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / The OpenGL viewport now renders on demand while idle, eliminating continuous GPU work with no scene changes while preserving active animation, VFX, camera, and snapshot updates.
   - Viewer / Model animation playback now performs vertex skinning on the GPU, reducing per-frame CPU work and memory churn while retaining a safe fallback for incompatible meshes.
   - Viewer / Ignore out-of-range generic dissolve parameters so opaque champion submeshes are not discarded.
   - Core / Renamed the application identity metadata to VersionInfo and separated version data from view-specific build presentation.
