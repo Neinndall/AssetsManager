@@ -232,7 +232,7 @@
                                     </ToggleButton>
                                     <ToggleButton x:Name="LimitFpsToggleButton"
                                                   Style="{StaticResource TransparentIconToggleButton}"
-                                                  ToolTip="Limit Viewport to 60 FPS"
+                                                  ToolTip="Limit to 60 FPS"
                                                   IsChecked="{Binding LimitFps}"
                                                   Width="30" Height="30"
                                                   Margin="2,0,0,0">
