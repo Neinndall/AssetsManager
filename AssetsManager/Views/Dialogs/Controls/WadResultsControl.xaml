@@ -8,95 +8,6 @@
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
 
-    <UserControl.Resources>
-        <DataTemplate x:Key="WadResultItemTemplate">
-            <Border Width="160" Height="196" Margin="6" CornerRadius="10"
-                    Background="{StaticResource CardBackground}"
-                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
-                                <Setter Property="Background" Value="{StaticResource HoverColor}"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Border.ToolTip>
-                    <StackPanel MaxWidth="360">
-                        <TextBlock Text="{Binding DisplayPath}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding FileName}" FontSize="10" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                        <TextBlock Text="{Binding ErrorMessage}" FontSize="10" Foreground="{StaticResource AccentRed}" TextWrapping="Wrap" Margin="0,4,0,0"
-                                   Visibility="{Binding IsFailed, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    </StackPanel>
-                </Border.ToolTip>
-
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>   <!-- Thumbnail -->
-                        <RowDefinition Height="Auto"/> <!-- Label -->
-                    </Grid.RowDefinitions>
-
-                    <!-- Thumbnail Area -->
-                    <Border Grid.Row="0" CornerRadius="10,10,0,0" Background="{StaticResource SidebarBackground}" ClipToBounds="True">
-                        <Grid>
-                            <!-- Placeholder/Loading Icon -->
-                            <materialIcons:MaterialIcon Kind="FileOutline" Width="48" Height="48" Foreground="{StaticResource TextMuted}"
-                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                        Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
-
-                            <!-- Real Image Preview -->
-                            <Border CornerRadius="10,10,0,0" Visibility="{Binding ImagePreview, Converter={StaticResource NullToVisibilityConverter}}">
-                                <Border.Background>
-                                    <ImageBrush ImageSource="{Binding ImagePreview}" Stretch="UniformToFill"/>
-                                </Border.Background>
-                            </Border>
-
-                            <!-- Top Left Type Badge -->
-                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6"
-                                    Background="#CC000000" CornerRadius="3" Padding="4,1">
-                                <TextBlock Text="{Binding ExtensionDisplay}" FontSize="8" FontWeight="SemiBold" Foreground="White"/>
-                            </Border>
-
-                            <!-- Status Badge (bottom-left) -->
-                            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" Padding="7,2" CornerRadius="6"
-                                    Background="{Binding StatusBrush}">
-                                <TextBlock Text="{Binding StatusLabel}" FontSize="8" FontWeight="Black" Foreground="White" TextAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <!-- Label Area -->
-                    <Border Grid.Row="1" Padding="8,8,8,10">
-                        <StackPanel>
-                            <TextBlock Text="{Binding FileName}" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis"
-                                       TextWrapping="Wrap" Height="34" LineHeight="14"
-                                       TextAlignment="Center" HorizontalAlignment="Center"/>
-
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                <materialIcons:MaterialIcon Kind="CogOutline" Width="10" Height="10" Foreground="{StaticResource TextMuted}" Margin="0,0,3,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding ModeText}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                                <TextBlock Text=" · " FontSize="9" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding NewSizeString}" FontSize="9" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Selection Overlay -->
-                    <Border Grid.RowSpan="2" BorderThickness="1.5" CornerRadius="10"
-                            BorderBrush="{StaticResource AccentBrush}" IsHitTestVisible="False"
-                            Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                    <materialIcons:MaterialIcon Grid.RowSpan="2" Kind="CheckCircle" Foreground="{StaticResource AccentBrush}"
-                                                Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                Margin="0,8,8,0"
-                                                Visibility="{Binding IsMultiSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                </Grid>
-            </Border>
-        </DataTemplate>
-    </UserControl.Resources>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header & Filters -->
@@ -137,7 +48,7 @@
         <!-- 2. Main Grid -->
         <ListBox Grid.Row="1" x:Name="ResultsListBox"
                  Style="{StaticResource ModernFileGridListBox}"
-                 ItemTemplate="{StaticResource WadResultItemTemplate}"
+                 ItemTemplate="{StaticResource ResultCardTemplate}"
                  SelectionChanged="ResultsListBox_SelectionChanged">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource FileGridItemStyle}">

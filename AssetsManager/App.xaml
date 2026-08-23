@@ -5,32 +5,36 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- App Themes -->
+                <!-- App Themes & Control Styles -->
                 <ResourceDictionary Source="/Themes/Font.xaml"/>
                 <ResourceDictionary Source="/Themes/Colors.xaml"/>
-                <ResourceDictionary Source="/Themes/TextStyles.xaml"/>
-                <ResourceDictionary Source="/Themes/AvalonEditStyles.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernButton.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernRichTextBox.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernBorder.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernCheckBox.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernTextBox.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernSlider.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernComboBox.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernMenu.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernProgressBar.xaml"/>
-                <ResourceDictionary Source="/Themes/Animations.xaml"/> 
-                <ResourceDictionary Source="/Themes/CustomScrollbarStyles.xaml"/> 
-                <ResourceDictionary Source="/Themes/TreeViewStyles.xaml"/> 
-                <ResourceDictionary Source="/Themes/ModernListView.xaml"/>
-                <ResourceDictionary Source="/Themes/ModernListBox.xaml"/>
-                <ResourceDictionary Source="/Themes/ChromaFamilyTemplate.xaml"/>
-                <ResourceDictionary Source="/Themes/ChromaCardTemplate.xaml"/>
-                <ResourceDictionary Source="/Themes/GridView.xaml"/>
+                <ResourceDictionary Source="/Themes/Animations.xaml"/>
                 <ResourceDictionary Source="/Themes/Converters.xaml"/>
-                <ResourceDictionary Source="/Themes/ApiTemplates.xaml"/>
+                <ResourceDictionary Source="/Themes/TextStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ButtonStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/BorderStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/TextBoxStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/CheckBoxStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ComboBoxStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/SliderStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ProgressBarStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/MenuStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/RichTextBoxStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ScrollbarStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/TreeViewStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ListBoxStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/ListViewStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/FileGridStyles.xaml"/>
+                <ResourceDictionary Source="/Themes/AvalonEditStyles.xaml"/>
                 <ResourceDictionary Source="/Themes/HudWindowStyles.xaml"/>
-                <ResourceDictionary Source="/Themes/HashGuessingTemplate.xaml"/>
+
+                <!-- Component & Feature DataTemplates -->
+                <ResourceDictionary Source="/Themes/Templates/FileGridTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/Templates/ChromaFamilyTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/Templates/ChromaCardTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/Templates/ApiTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/Templates/HashGuessingTemplate.xaml"/>
+                <ResourceDictionary Source="/Themes/Templates/ResultCardTemplate.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
