@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,6 +27,7 @@ namespace AssetsManager.Services.News
         private readonly object _pendingSyncRoot = new();
         private readonly SemaphoreSlim _stateGate = new(1, 1);
         private readonly Dictionary<NewsCategory, CacheEntry> _cache = new();
+        private readonly ConcurrentDictionary<string, ArticleFullContent> _articleContentCache = new(StringComparer.OrdinalIgnoreCase);
 
         private NewsItemModel _pendingArticle;
 
@@ -342,6 +344,11 @@ namespace AssetsManager.Services.News
         {
             if (string.IsNullOrEmpty(articleUrl)) return null;
 
+            if (_articleContentCache.TryGetValue(articleUrl, out var cachedContent))
+            {
+                return cachedContent;
+            }
+
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, articleUrl);
@@ -357,13 +364,16 @@ namespace AssetsManager.Services.News
                 if (content != null)
                 {
                     _logService.LogDebug($"FetchArticleFullContentAsync: __NEXT_DATA__ content extracted (html={content.Html?.Length ?? 0}).");
+                    _articleContentCache[articleUrl] = content;
                     return content;
                 }
 
                 // Fallback: server-rendered HTML extraction (plain text).
                 string fallback = ExtractArticleBodyFromHtml(html);
                 _logService.LogDebug($"FetchArticleFullContentAsync: fallback text extraction (len={fallback?.Length ?? 0}).");
-                return new ArticleFullContent { PlainText = fallback };
+                var fallbackContent = new ArticleFullContent { PlainText = fallback };
+                _articleContentCache[articleUrl] = fallbackContent;
+                return fallbackContent;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

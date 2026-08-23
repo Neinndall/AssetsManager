@@ -90,7 +90,7 @@ namespace AssetsManager.Views.Controls.News
             {
                 VideoPanel.Visibility = Visibility.Collapsed;
                 PlainTextPanel.Visibility = Visibility.Collapsed;
-                ArticleDocumentViewer.Visibility = Visibility.Collapsed;
+                ArticleBlocksPanel.Visibility = Visibility.Collapsed;
                 LoadingOverlay.Visibility = Visibility.Visible;
                 return;
             }
@@ -100,8 +100,9 @@ namespace AssetsManager.Views.Controls.News
             {
                 VideoPanel.Visibility = Visibility.Visible;
                 PlainTextPanel.Visibility = Visibility.Collapsed;
-                ArticleDocumentViewer.Visibility = Visibility.Collapsed;
+                ArticleBlocksPanel.Visibility = Visibility.Collapsed;
                 UpdateVideoPanel(article);
+                ArticleScrollViewer.ScrollToTop();
                 return;
             }
 
@@ -111,26 +112,28 @@ namespace AssetsManager.Views.Controls.News
             if (!string.IsNullOrWhiteSpace(html))
             {
                 PlainTextPanel.Visibility = Visibility.Collapsed;
-                ArticleDocumentViewer.Visibility = Visibility.Visible;
+                ArticleBlocksPanel.Visibility = Visibility.Visible;
                 if (!string.Equals(_lastRenderedHtml, html, StringComparison.Ordinal))
                 {
                     _lastRenderedHtml = html;
                     try
                     {
-                        ArticleDocumentViewer.Document = ArticleHtmlToFlowDocument.Parse(html, _httpClient);
-                        FadeInContent(ArticleDocumentViewer);
+                        ArticleNativeRenderer.RenderToPanel(html, ArticleBlocksPanel, _httpClient);
+                        ArticleScrollViewer.ScrollToTop();
+                        FadeInContent(ArticleBlocksPanel);
                     }
                     catch (Exception)
                     {
-                        ArticleDocumentViewer.Visibility = Visibility.Collapsed;
+                        ArticleBlocksPanel.Visibility = Visibility.Collapsed;
                         PlainTextPanel.Visibility = Visibility.Visible;
                     }
                 }
             }
             else
             {
-                ArticleDocumentViewer.Visibility = Visibility.Collapsed;
+                ArticleBlocksPanel.Visibility = Visibility.Collapsed;
                 PlainTextPanel.Visibility = Visibility.Visible;
+                ArticleScrollViewer.ScrollToTop();
                 FadeInContent(PlainTextPanel);
             }
         }
@@ -236,6 +239,7 @@ namespace AssetsManager.Views.Controls.News
                 {
                     bitmap.BeginInit();
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.DecodePixelWidth = 1200;
                     bitmap.StreamSource = stream;
                     bitmap.EndInit();
                     bitmap.Freeze();
