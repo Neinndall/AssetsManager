@@ -1592,7 +1592,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 MeshPartsToggled?.Invoke(this, tb.IsChecked == true);
             }
         }
-
         private void GhostModeToggle_Click(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.Primitives.ToggleButton tb)
@@ -1617,24 +1616,5 @@ namespace AssetsManager.Views.Controls.Viewer
                 ResetCamera();
             }
         }
-
-        private static T FindVisualChild<T>(DependencyObject parent) where T : Visual
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild)
-                {
-                    return typedChild;
-                }
-                var result = FindVisualChild<T>(child);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-            return null;
-        }
-
     }
 }
