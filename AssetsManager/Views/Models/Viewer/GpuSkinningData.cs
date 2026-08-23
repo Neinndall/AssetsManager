@@ -111,7 +111,6 @@ namespace AssetsManager.Views.Models.Viewer
             }
             catch (Exception)
             {
-                // Malformed or incomplete skin data keeps the existing CPU fallback available.
                 return null;
             }
         }

@@ -56,9 +56,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal uint BoneWeightVbo;
             internal GpuSkinningData.PartData SkinningData;
             internal bool IsGpuSkinned;
-            internal Point3DCollection UploadedPositions;
             internal int VertexCount;
-            internal GlMeshVertexData VertexData;
         }
 
         private sealed class SharedTexture
@@ -98,7 +96,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             EnsureEmissionTextures(part, resources);
             EnsureIridescenceTextures(part, resources);
             EnsureLightmapTexture(part, resources);
-            resources = EnsureMeshBuffers(model, part, resources);
+            resources = EnsureMeshBuffers(part, resources);
             EnsureSkinningBuffers(model, resources, part);
             EnsureLightmapVertexBuffer(part, resources);
             EnsureVertexColorBuffer(part, resources);
@@ -119,7 +117,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _pendingReleases.Clear();
         }
 
-        private PartResources EnsureMeshBuffers(SceneModel model, ModelPart part, PartResources resources)
+        private PartResources EnsureMeshBuffers(ModelPart part, PartResources resources)
         {
             if (resources.Vao == 0 && part.Geometry?.Geometry is MeshGeometry3D mesh)
             {
@@ -131,11 +129,6 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 var vertexData = new GlMeshVertexData(vertexCount);
                 vertexData.Update(mesh, updateTextureCoordinates: true);
                 resources.VertexCount = vertexCount;
-                resources.VertexData = model?.GpuSkinningData?.TryGetPart(part, out _) == true ||
-                    part.SourceVertexIndices == null
-                    ? null
-                    : vertexData;
-                resources.UploadedPositions = positions;
 
                 uint[] indexData = new uint[indices.Count];
                 for (int i = 0; i < indices.Count; i++)
@@ -150,7 +143,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 _gl.BufferData(
                     BufferTargetARB.ArrayBuffer,
                     new ReadOnlySpan<float>(vertexData.Data),
-                    resources.VertexData != null ? BufferUsageARB.DynamicDraw : BufferUsageARB.StaticDraw);
+                    BufferUsageARB.StaticDraw);
 
                 _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, resources.Ebo);
                 _gl.BufferData(
@@ -165,33 +158,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
                 _gl.BindVertexArray(0);
                 resources.IndexCount = indices.Count;
-                return resources;
             }
 
-            if (resources.Vao == 0 ||
-                resources.VertexData == null ||
-                part.Geometry?.Geometry is not MeshGeometry3D animatedMesh ||
-                ReferenceEquals(resources.UploadedPositions, animatedMesh.Positions))
-            {
-                return resources;
-            }
-
-            Point3DCollection animatedPositions = animatedMesh.Positions;
-            if (animatedPositions == null) return resources;
-            if (animatedPositions.Count != resources.VertexData.VertexCount)
-            {
-                ReleasePart(part);
-                return Ensure(model, part);
-            }
-
-            resources.VertexData.Update(animatedMesh, updateTextureCoordinates: false);
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.Vbo);
-            _gl.BufferSubData(
-                BufferTargetARB.ArrayBuffer,
-                0,
-                new ReadOnlySpan<float>(resources.VertexData.Data));
-            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
-            resources.UploadedPositions = animatedPositions;
             return resources;
         }
 

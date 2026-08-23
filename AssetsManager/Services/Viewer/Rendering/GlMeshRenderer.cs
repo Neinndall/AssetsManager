@@ -103,7 +103,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 gl,
                 gles,
                 GlMeshShaderSource.Vertex,
-            GlMeshShaderSource.Fragment);
+                GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)

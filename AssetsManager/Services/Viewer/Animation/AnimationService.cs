@@ -1,15 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Media.Media3D;
 using LeagueToolkit.Core.Animation;
 using LeagueToolkit.Core.Mesh;
 using LeagueToolkit.Hashing;
-using LeagueToolkit.Core.Memory;
 using AssetsManager.Views.Models.Viewer;
-using AssetsManager.Services;
 using AssetsManager.Services.Core;
 using Quaternion = System.Numerics.Quaternion;
 
@@ -23,22 +18,17 @@ namespace AssetsManager.Services.Viewer.Animation
         // Persistent buffers to avoid per-frame allocations
         private Matrix4x4[] _boneTransforms;
         private Matrix4x4[] _finalBoneTransforms;
-        private Vector3[] _skinnedVertices;
         private uint[] _jointHashes;
         private GpuSkinningData _gpuSkinningData;
 
         // Cached model-specific data
         private string _lastModelName;
-        private IVertexBufferView _lastVerticesView;
         private RigResource _lastSkeleton;
         private IList<ModelPart> _lastModelParts;
-        private Vector3[] _cachedPositions;
-        private (byte x, byte y, byte z, byte w)[] _cachedBlendIndices;
-        private Vector4[] _cachedBlendWeights;
 
         private bool _isDisposed;
 
-        public AnimationService(LogService logService)
+        public AnimationService(LogService logService = null)
         {
             _logService = logService;
         }
@@ -48,19 +38,14 @@ namespace AssetsManager.Services.Viewer.Animation
 
         /// <summary>
         /// Releases cached buffers from the previous model so a new load does not
-        /// accumulate GPU/CPU memory across multiple model switches.
+        /// accumulate GPU memory across multiple model switches.
         /// Buffers are recreated lazily on the next Update call.
         /// </summary>
         public void ClearCache()
         {
             _lastModelName = null;
-            _lastVerticesView = null;
             _lastSkeleton = null;
             _lastModelParts = null;
-            _cachedPositions = null;
-            _cachedBlendIndices = null;
-            _cachedBlendWeights = null;
-            _skinnedVertices = null;
             _gpuSkinningData = null;
             _currentPose.Clear();
         }
@@ -89,41 +74,24 @@ namespace AssetsManager.Services.Viewer.Animation
             }
 
             if (_lastModelName != modelName ||
-                _lastVerticesView != skin.VerticesView ||
                 !ReferenceEquals(_lastSkeleton, skeleton) ||
                 !ReferenceEquals(_lastModelParts, modelParts))
             {
                 _lastModelName = modelName;
-                _lastVerticesView = skin.VerticesView;
                 _lastSkeleton = skeleton;
                 _lastModelParts = modelParts;
 
                 _gpuSkinningData = GpuSkinningData.TryCreate(skeleton, skin, modelParts);
-
-                if (_gpuSkinningData != null)
-                {
-                    _cachedPositions = null;
-                    _cachedBlendIndices = null;
-                    _cachedBlendWeights = null;
-                    _skinnedVertices = null;
-                    return;
-                }
-
-                var posAccessor = skin.VerticesView.GetAccessor(VertexElement.POSITION.Name);
-                _cachedPositions = posAccessor.AsVector3Array().ToArray();
-
-                var blendIdxAccessor = skin.VerticesView.GetAccessor(VertexElement.BLEND_INDEX.Name);
-                _cachedBlendIndices = blendIdxAccessor.AsXyzwU8Array().ToArray();
-
-                var blendWeightAccessor = skin.VerticesView.GetAccessor(VertexElement.BLEND_WEIGHT.Name);
-                _cachedBlendWeights = blendWeightAccessor.AsVector4Array().ToArray();
-
-                _skinnedVertices = new Vector3[_cachedPositions.Length];
             }
         }
 
-        public void Update(float totalSeconds, IAnimationAsset animation, RigResource skeleton, SkinnedMesh skin,
-            System.Collections.Generic.IList<ModelPart> modelParts, string modelName)
+        public void Update(
+            float totalSeconds,
+            IAnimationAsset animation,
+            RigResource skeleton,
+            SkinnedMesh skin,
+            IList<ModelPart> modelParts,
+            string modelName)
         {
             if (_isDisposed) return;
             if (animation == null || skeleton == null || skin == null)
@@ -162,86 +130,10 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
             }
 
-            // 3. Final Skinning Matrices
+            // 3. Final Skinning Matrices for GPU vertex shader
             for (int i = 0; i < skeleton.Joints.Count; i++)
             {
                 _finalBoneTransforms[i] = skeleton.Joints[i].InverseBindTransform * _boneTransforms[i];
-            }
-
-            if (_gpuSkinningData != null || _cachedPositions == null || _cachedPositions.Length == 0)
-                return;
-
-            try
-            {
-                var influencesCount = skeleton.Influences.Count;
-                var boneCount = _finalBoneTransforms.Length;
-
-                // 4. Parallel Linear Blend Skinning (LBS)
-                Parallel.For(0, _cachedPositions.Length, i =>
-                {
-                    var pos = _cachedPositions[i];
-                    var indices = _cachedBlendIndices[i];
-                    var weights = _cachedBlendWeights[i];
-
-                    var idx0 = indices.x < influencesCount ? skeleton.Influences[indices.x] : (short)0;
-                    var idx1 = indices.y < influencesCount ? skeleton.Influences[indices.y] : (short)0;
-                    var idx2 = indices.z < influencesCount ? skeleton.Influences[indices.z] : (short)0;
-                    var idx3 = indices.w < influencesCount ? skeleton.Influences[indices.w] : (short)0;
-
-                    var i0 = idx0 < boneCount ? idx0 : (short)0;
-                    var i1 = idx1 < boneCount ? idx1 : (short)0;
-                    var i2 = idx2 < boneCount ? idx2 : (short)0;
-                    var i3 = idx3 < boneCount ? idx3 : (short)0;
-
-                    Matrix4x4 skinningMatrix = _finalBoneTransforms[i0] * weights.X +
-                                               _finalBoneTransforms[i1] * weights.Y +
-                                               _finalBoneTransforms[i2] * weights.Z +
-                                               _finalBoneTransforms[i3] * weights.W;
-
-                    _skinnedVertices[i] = Vector3.Transform(pos, skinningMatrix);
-                });
-
-                // 5. Update Viewport (WPF) - Offload Point3DCollection creation and freezing to background threads
-                var collections = new Point3DCollection[modelParts.Count];
-
-                Parallel.For(0, modelParts.Count, i =>
-                {
-                    var part = modelParts[i];
-                    var range = skin.Ranges[i];
-                    var sourceVertexIndices = part.SourceVertexIndices;
-                    int vertexCount = sourceVertexIndices?.Length ?? range.VertexCount;
-
-                    // Instantiating on a background thread is allowed in WPF as long as we freeze the object
-                    // before passing it to the UI thread.
-                    var posCollection = new Point3DCollection(vertexCount);
-
-                    for (int j = 0; j < vertexCount; j++)
-                    {
-                        var vertexIndex = sourceVertexIndices != null ? sourceVertexIndices[j] : range.StartVertex + j;
-                        var skinnedPos = _skinnedVertices[vertexIndex];
-                        posCollection.Add(new Point3D(skinnedPos.X, skinnedPos.Y, skinnedPos.Z));
-                    }
-
-                    if (posCollection.CanFreeze)
-                    {
-                        posCollection.Freeze();
-                    }
-
-                    collections[i] = posCollection;
-                });
-
-                // Apply the frozen collections to the geometry on the UI thread (extremely fast pointer assignment)
-                for (int i = 0; i < modelParts.Count; i++)
-                {
-                    var part = modelParts[i];
-                    var geometry = (MeshGeometry3D)part.Geometry.Geometry;
-                    geometry.Positions = collections[i];
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.LogError(ex, "Error during skinning.");
-                return;
             }
         }
 
