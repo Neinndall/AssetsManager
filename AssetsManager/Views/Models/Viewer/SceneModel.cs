@@ -277,7 +277,6 @@ namespace AssetsManager.Views.Models.Viewer
         {
             SynchronizeParts();
             UpdateMasterVisibility();
-            OnPropertyChanged(nameof(Parts));
         }
 
         private void Part_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -303,8 +302,6 @@ namespace AssetsManager.Views.Models.Viewer
                     }
                 }
             }
-
-            OnPropertyChanged(nameof(Parts));
         }
 
         private void UpdateMasterVisibility()
