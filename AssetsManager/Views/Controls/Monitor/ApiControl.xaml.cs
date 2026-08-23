@@ -485,51 +485,7 @@ namespace AssetsManager.Views.Controls.Monitor
 
             try
             {
-                ViewModel?.MythicShopCategories.Clear();
-                var categories = new Dictionary<string, MythicShopCategory>();
-                var categoryOrder = new[] { "FEATURED", "BIWEEKLY", "WEEKLY", "DAILY" };
-
-                // Initialize categories to maintain order
-                foreach (var catName in categoryOrder)
-                {
-                    categories[catName] = new MythicShopCategory { CategoryName = catName };
-                }
-
-                foreach (var section in mythicShopResponse.Data)
-                {
-                    var sectionNameParts = section.Name.Split('_');
-                    if (sectionNameParts.Length > 2)
-                    {
-                        var categoryKey = sectionNameParts[2].ToUpper();
-                        if (categories.TryGetValue(categoryKey, out var categoryViewModel))
-                        {
-                            var itemsToAdd = new List<MythicShopModel>();
-                            foreach (var entry in section.CatalogEntries)
-                            {
-                                var purchaseUnit = entry.PurchaseUnits.FirstOrDefault();
-                                if (purchaseUnit == null || purchaseUnit.Fulfillment == null) continue;
-
-                                var payment = purchaseUnit.PaymentOptions.FirstOrDefault()?.Payments.FirstOrDefault();
-                                if (payment == null) continue;
-
-                                itemsToAdd.Add(new MythicShopModel
-                                {
-                                    Name = purchaseUnit.Fulfillment.Name,
-                                    Price = payment.Delta,
-                                    EndTime = FormatUtils.FormatTimeRemaining(entry.EndTime)
-                                });
-                            }
-                            categoryViewModel.Items.AddRange(itemsToAdd);
-                        }
-                    }
-                }
-
-                // Add to observable collection in the correct order using ReplaceRange
-                var finalCategories = categoryOrder
-                    .Where(categories.ContainsKey)
-                    .Where(catName => categories[catName].Items.Any())
-                    .Select(catName => categories[catName])
-                    .ToList();
+                var finalCategories = MythicShopParser.Parse(mythicShopResponse);
 
                 ViewModel?.MythicShopCategories.ReplaceRange(finalCategories);
 

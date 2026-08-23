@@ -312,6 +312,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Monitor / Mythic Shop now ignores unrelated Jade storefront sections and shows only Mythic Essence rotations with their correct prices.
   - Viewer / Ground logo opacity now affects the rendered logo correctly.
   - Viewer / Map Environment pan now stops cleanly at the ground collision boundary without lateral drift.
   - Viewer / Map Environment zoom now remains continuous at close range without crossing the terrain or losing nearby surfaces.

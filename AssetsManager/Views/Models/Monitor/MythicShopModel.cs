@@ -19,8 +19,26 @@ namespace AssetsManager.Views.Models.Monitor
         [JsonPropertyName("name")]
         public string Name { get; set; }
 
+        [JsonPropertyName("displayMetadata")]
+        public MythicShopDisplayMetadata DisplayMetadata { get; set; }
+
         [JsonPropertyName("catalogEntries")]
         public List<MythicShopCatalogEntry> CatalogEntries { get; set; }
+    }
+
+    public class MythicShopDisplayMetadata
+    {
+        [JsonPropertyName("shoppefront")]
+        public MythicShoppefrontMetadata Shoppefront { get; set; }
+    }
+
+    public class MythicShoppefrontMetadata
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+
+        [JsonPropertyName("categories")]
+        public List<string> Categories { get; set; }
     }
 
     public class MythicShopCatalogEntry
@@ -52,8 +70,17 @@ namespace AssetsManager.Views.Models.Monitor
 
     public class MythicShopPayment
     {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("currencyId")]
+        public string CurrencyId { get; set; }
+
         [JsonPropertyName("delta")]
         public int Delta { get; set; }
+
+        [JsonPropertyName("finalDelta")]
+        public int? FinalDelta { get; set; }
     }
 
     public class MythicShopFulfillment
