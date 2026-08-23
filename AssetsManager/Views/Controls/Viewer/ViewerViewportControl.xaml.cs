@@ -102,22 +102,6 @@ namespace AssetsManager.Views.Controls.Viewer
                 ? delta
                 : renderTime - _lastRenderedAt;
 
-            if (_viewModel.LimitFps)
-            {
-                TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
-                if (_nextLimitedFrame != TimeSpan.Zero && renderTime < _nextLimitedFrame)
-                    return;
-
-                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero ||
-                                    renderTime - _nextLimitedFrame > targetFrameTime * 4
-                    ? renderTime + targetFrameTime
-                    : _nextLimitedFrame + targetFrameTime;
-            }
-            else
-            {
-                _nextLimitedFrame = TimeSpan.Zero;
-            }
-
             _lastRenderedAt = renderTime;
             UpdateScene(frameDelta);
             RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
@@ -261,8 +245,10 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly Dictionary<SceneModel, AnimationService> _animationServices = new();
         private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
+        private bool _isCompositionTargetHooked;
         private int _framesSinceFpsUpdate;
         private TimeSpan _lastRenderedAt;
+        private TimeSpan _lastInvalidatedAt;
         private TimeSpan _nextLimitedFrame;
         private sealed record SnapshotRequest(string FilePath, int Width, int Height);
         private SnapshotRequest _pendingSnapshot;
@@ -325,7 +311,7 @@ namespace AssetsManager.Views.Controls.Viewer
             switch (e.PropertyName)
             {
                 case nameof(ViewerViewportModel.LimitFps):
-                    ResetRenderTiming();
+                    ApplyFpsLimitMode();
                     break;
                 case nameof(ViewerViewportModel.IsFpsVisible):
                     _fpsStopwatch.Restart();
@@ -343,6 +329,51 @@ namespace AssetsManager.Views.Controls.Viewer
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
                     break;
+            }
+        }
+
+        private void ApplyFpsLimitMode()
+        {
+            if (_isCleanedUp || OpenTkControl == null) return;
+
+            ResetRenderTiming();
+
+            if (_viewModel.LimitFps)
+            {
+                OpenTkControl.RenderContinuously = false;
+                if (!_isCompositionTargetHooked)
+                {
+                    CompositionTarget.Rendering += OnCompositionTargetRendering;
+                    _isCompositionTargetHooked = true;
+                }
+            }
+            else
+            {
+                if (_isCompositionTargetHooked)
+                {
+                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
+                    _isCompositionTargetHooked = false;
+                }
+                OpenTkControl.RenderContinuously = true;
+            }
+        }
+
+        private void OnCompositionTargetRendering(object sender, EventArgs e)
+        {
+            if (_isCleanedUp || OpenTkControl == null || !OpenTkControl.IsLoaded || !OpenTkControl.IsVisible)
+                return;
+
+            TimeSpan now = _renderStopwatch.Elapsed;
+            TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
+
+            if (_lastInvalidatedAt == TimeSpan.Zero || now >= _nextLimitedFrame)
+            {
+                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero || now - _nextLimitedFrame > targetFrameTime * 4
+                    ? now + targetFrameTime
+                    : _nextLimitedFrame + targetFrameTime;
+
+                _lastInvalidatedAt = now;
+                OpenTkControl.InvalidateVisual();
             }
         }
 
@@ -372,7 +403,7 @@ namespace AssetsManager.Views.Controls.Viewer
             };
             OpenTkControl.Start(settings);
 
-            ResetRenderTiming();
+            ApplyFpsLimitMode();
             _fpsStopwatch.Restart();
         }
 
@@ -548,6 +579,11 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 // 1. Desuscribir eventos
+                if (_isCompositionTargetHooked)
+                {
+                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
+                    _isCompositionTargetHooked = false;
+                }
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
                 AppSettings?.PropertyChanged -= OnAppSettingsPropertyChanged;
                 AppSettings?.ConfigurationSaved -= OnAppSettingsSaved;
@@ -955,6 +991,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ResetRenderTiming()
         {
             _lastRenderedAt = TimeSpan.Zero;
+            _lastInvalidatedAt = TimeSpan.Zero;
             _nextLimitedFrame = TimeSpan.Zero;
             _renderStopwatch.Restart();
         }
