@@ -1040,7 +1040,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         bool isActive = model == _activeSceneModel;
 
-                        // Optimize: skip Parallel Skinning (CPU/Memory intensive) if the model is static/paused
+                        // Avoid recomputing bone matrices if the model is static/paused
                         // and has already been rendered at this exact frame state.
                         int visiblePartsHash = model.Parts?.Sum(p => p.IsVisible ? 1 : 0) ?? 0;
                         var currentKey = new ModelUpdateKey

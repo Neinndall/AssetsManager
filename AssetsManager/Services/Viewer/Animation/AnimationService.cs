@@ -24,6 +24,7 @@ namespace AssetsManager.Services.Viewer.Animation
         // Cached model-specific data
         private string _lastModelName;
         private RigResource _lastSkeleton;
+        private SkinnedMesh _lastSkin;
         private IList<ModelPart> _lastModelParts;
 
         private bool _isDisposed;
@@ -45,6 +46,7 @@ namespace AssetsManager.Services.Viewer.Animation
         {
             _lastModelName = null;
             _lastSkeleton = null;
+            _lastSkin = null;
             _lastModelParts = null;
             _gpuSkinningData = null;
             _currentPose.Clear();
@@ -75,13 +77,24 @@ namespace AssetsManager.Services.Viewer.Animation
 
             if (_lastModelName != modelName ||
                 !ReferenceEquals(_lastSkeleton, skeleton) ||
+                !ReferenceEquals(_lastSkin, skin) ||
                 !ReferenceEquals(_lastModelParts, modelParts))
             {
                 _lastModelName = modelName;
                 _lastSkeleton = skeleton;
+                _lastSkin = skin;
                 _lastModelParts = modelParts;
 
-                _gpuSkinningData = GpuSkinningData.TryCreate(skeleton, skin, modelParts);
+                _gpuSkinningData = GpuSkinningData.TryCreate(
+                    skeleton,
+                    skin,
+                    modelParts,
+                    out string failureReason);
+                if (_gpuSkinningData == null)
+                {
+                    _logService?.LogWarning(
+                        $"GPU skinning unavailable for model '{modelName}': {failureReason ?? "Unsupported skin data."} The model will remain in bind pose.");
+                }
             }
         }
 
@@ -99,7 +112,7 @@ namespace AssetsManager.Services.Viewer.Animation
                 return;
             }
 
-            // 1. Ensure buffers are ready (only allocates when model changes)
+            // 1. Ensure buffers are ready (only allocates when model data changes)
             EnsureBuffers(skeleton, skin, modelParts, modelName);
 
             _currentPose.Clear();
