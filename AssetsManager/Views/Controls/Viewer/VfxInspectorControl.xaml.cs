@@ -4,12 +4,14 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Threading;
 using Vector = System.Windows.Vector;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.Core;
@@ -39,14 +41,21 @@ namespace AssetsManager.Views.Controls.Viewer
         private bool _isCleanedUp;
         private bool _isActive;
         private bool _isGlStarted;
+        private int _renderDispatchQueued;
+        private bool _resetPlaybackDelta;
         private VfxSystemDiagnosticItem _pendingSystem;
         private VfxSystemDiagnosticItem _inspectedSystem;
+        private RenderDemandSession _renderDemandSession;
+        private ProjectionCamera _cameraChangedSource;
 
         /// <summary>Injected by the host (ViewerWindow) following the peer-controls pattern.</summary>
         public LogService LogService { get; set; }
 
         /// <summary>Injected by the host and owned by ViewerWindow.</summary>
         public VfxLoadingService VfxLoadingService { get; set; }
+
+        /// <summary>Injected by the host and shared with the main Viewer viewport.</summary>
+        public RenderDemandService RenderDemandService { get; set; }
 
         // VFX Studio dedicated camera framing (elevated 3/4 perspective looking down at origin Y=0)
         private static readonly Point3D VfxCameraPosition = new(0, 320, 500);
@@ -77,6 +86,8 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Loaded += OnControlLoaded;
             Unloaded += OnControlUnloaded;
+            OpenTkControl.SizeChanged += OnOpenTkControlSizeChanged;
+            IsVisibleChanged += OnVfxIsVisibleChanged;
         }
 
         private void OnModelPropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -84,6 +95,14 @@ namespace AssetsManager.Views.Controls.Viewer
             if (e.PropertyName == nameof(VfxInspectorModel.SelectedSystem))
             {
                 RequestSystemInspection(_model.SelectedSystem);
+                return;
+            }
+
+            if (e.PropertyName == nameof(VfxInspectorModel.IsPlaying))
+            {
+                if (_model.IsPlaying)
+                    _resetPlaybackDelta = true;
+                RefreshRenderDemand();
             }
         }
 
@@ -112,6 +131,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 EnsureOpenGlStarted();
             }
+
+            RefreshRenderDemand();
         }
 
         /// <summary>
@@ -123,6 +144,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _pendingSystem = null;
             _model.IsPlaying = false;
             _vfxRenderer?.Pause();
+            _renderDemandSession?.Refresh();
         }
 
         private void EnsureOpenGlStarted()
@@ -131,14 +153,16 @@ namespace AssetsManager.Views.Controls.Viewer
 
             try
             {
+                EnsureRenderDemandSession();
                 var settings = new OpenTK.Wpf.GLWpfControlSettings
                 {
                     MajorVersion = 3,
                     MinorVersion = 3,
-                    RenderContinuously = true
+                    RenderContinuously = false
                 };
                 OpenTkControl.Start(settings);
                 _isGlStarted = true;
+                RefreshRenderDemand();
             }
             catch (Exception ex)
             {
@@ -162,7 +186,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             Deactivate();
             _isCleanedUp = true;
+            Interlocked.Exchange(ref _renderDispatchQueued, 0);
+            _renderDemandSession?.Dispose();
+            _renderDemandSession = null;
+            OpenTkControl.SizeChanged -= OnOpenTkControlSizeChanged;
+            IsVisibleChanged -= OnVfxIsVisibleChanged;
             _model.PropertyChanged -= OnModelPropertyChanged;
+            UnsubscribeFromCameraChanges();
 
             var cameraController = _cameraController;
             _cameraController = null;
@@ -234,6 +264,68 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private GridRenderer _gridRenderer;
 
+        private void EnsureRenderDemandSession()
+        {
+            if (_renderDemandSession != null || RenderDemandService == null)
+                return;
+
+            _renderDemandSession = RenderDemandService.Register(
+                () => !_isCleanedUp && _isActive && IsLoaded && IsVisible && OpenTkControl?.IsVisible == true &&
+                      OpenTkControl.ActualWidth > 0 && OpenTkControl.ActualHeight > 0 && _gl != null,
+                () => _model.IsPlaying,
+                RequestRender);
+        }
+
+        private void RefreshRenderDemand()
+        {
+            _renderDemandSession?.Refresh();
+            RequestRender();
+        }
+
+        private void RequestRender()
+        {
+            if (_isCleanedUp || !_isActive || !IsLoaded ||
+                Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished ||
+                Interlocked.Exchange(ref _renderDispatchQueued, 1) != 0)
+            {
+                return;
+            }
+
+            try
+            {
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.Render,
+                    new Action(() =>
+                    {
+                        Interlocked.Exchange(ref _renderDispatchQueued, 0);
+
+                        if (!_isCleanedUp && _isActive && IsLoaded && IsVisible &&
+                            OpenTkControl.IsVisible && _gl != null)
+                        {
+                            OpenTkControl.InvalidateVisual();
+                        }
+                    }));
+            }
+            catch (InvalidOperationException) when (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+            {
+                Interlocked.Exchange(ref _renderDispatchQueued, 0);
+            }
+        }
+
+        private void OnOpenTkControlSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _renderDemandSession?.Refresh();
+            if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+                RequestRender();
+        }
+
+        private void OnVfxIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            _renderDemandSession?.Refresh();
+            if (e.NewValue is true)
+                RequestRender();
+        }
+
         private void EnsureVfxRenderSession()
         {
             if (_vfxRenderer != null || _gl == null || !_isActive || _isCleanedUp) return;
@@ -259,6 +351,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _inspectedSystem = null;
             _pendingSystem = systemItem;
+            RefreshRenderDemand();
         }
 
         private void TryInspectPendingSystem()
@@ -303,6 +396,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _cameraController = new CustomCameraController(_dummyViewport, OpenTkControl);
                 }
+                SubscribeToCameraChanges();
 
                 _model.LogMessages.Add("[GL] OpenGL viewport, camera controller & 3D grid initialized successfully.");
                 _model.LogMessages.Add(
@@ -314,6 +408,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 _gl.GetInteger(Silk.NET.OpenGL.GLEnum.MaxVertexAttribs, out int vertexAttributes);
                 _model.LogMessages.Add(
                     $"[GL] Limits: fragment texture units={textureUnits}, vertex attributes={vertexAttributes}.");
+
+                RefreshRenderDemand();
 
             }
             catch (Exception ex)
@@ -327,7 +423,15 @@ namespace AssetsManager.Views.Controls.Viewer
             if (_gl == null || !_isActive || !IsVisible) return;
 
             float dt = (float)delta.TotalSeconds;
-            if (dt <= 0 || dt > 0.5f) dt = 1f / 60f;
+            if (_model.IsPlaying && _resetPlaybackDelta)
+            {
+                dt = 0;
+                _resetPlaybackDelta = false;
+            }
+            else if (dt <= 0 || dt > 0.5f)
+            {
+                dt = 1f / 60f;
+            }
 
             // Update background clear color matching main viewer (Dark Studio)
             switch (_model.BgMode)
@@ -394,7 +498,9 @@ namespace AssetsManager.Views.Controls.Viewer
                     _vfxRenderer.Play();
                 }
                 else if (_model.CurrentTime >= _model.TotalDuration)
+                {
                     _model.IsPlaying = false;
+                }
             }
             _vfxRenderer.Render(viewProj, view);
 
@@ -406,12 +512,34 @@ namespace AssetsManager.Views.Controls.Viewer
 
         #region Camera Control
 
+        private void OnCameraChanged(object sender, EventArgs e) => RequestRender();
+
+        private void SubscribeToCameraChanges()
+        {
+            if (_dummyViewport.Camera is not ProjectionCamera camera || ReferenceEquals(_cameraChangedSource, camera))
+                return;
+
+            UnsubscribeFromCameraChanges();
+            camera.Changed += OnCameraChanged;
+            _cameraChangedSource = camera;
+        }
+
+        private void UnsubscribeFromCameraChanges()
+        {
+            if (_cameraChangedSource == null)
+                return;
+
+            _cameraChangedSource.Changed -= OnCameraChanged;
+            _cameraChangedSource = null;
+        }
+
         public void ResetCamera()
         {
             _cameraController?.FlyTo(
                 VfxCameraPosition,
                 VfxCameraTarget - VfxCameraPosition,
                 VfxCameraUpDirection);
+            RequestRender();
         }
 
         #endregion
@@ -739,6 +867,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _vfxRenderer?.SetEmitterVisibility(item.SourceOrder, enabled);
                     _model.LogMessages.Add($"[EMITTER TOGGLE] {item.Name} set to {(enabled ? "ENABLED" : "DISABLED")}");
+                    RequestRender();
                 };
 
                 _model.Emitters.Add(emitterDiagnostic);
@@ -780,6 +909,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _model.StatusText = $"{systemItem.Name} · {playbackContext}.";
             _inspectedSystem = systemItem;
+            RefreshRenderDemand();
         }
 
         #region Timeline Deck Mechanics
@@ -976,6 +1106,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _model.CurrentTime = seekTime;
             _vfxRenderer?.Seek(seekTime);
+            RequestRender();
         }
 
         #endregion
@@ -1113,6 +1244,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (!_model.IsPlaying || _isUserSeeking)
             {
                 _vfxRenderer.Seek(e.NewValue);
+                RequestRender();
             }
         }
 
@@ -1137,6 +1269,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 {
                     _vfxRenderer.ActiveSystem.Speed = speed;
                 }
+                RequestRender();
             }
         }
 
@@ -1146,6 +1279,7 @@ namespace AssetsManager.Views.Controls.Viewer
             if (BgComboBox?.SelectedItem is ComboBoxItem item)
             {
                 _model.BgMode = item.Content?.ToString() ?? "Dark";
+                RequestRender();
             }
         }
 

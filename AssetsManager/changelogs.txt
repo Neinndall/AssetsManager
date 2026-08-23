@@ -72,6 +72,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Viewer / VFX Studio now stays demand-driven while idle and follows the shared optional 60 FPS cap during playback.
   - Viewer / Fixed model auto-rotation so the OpenGL viewport updates the model transform continuously while the toggle is active.
   - Viewer / Model animation playback now performs hardware-accelerated vertex skinning on the GPU, improving animation framerates and memory efficiency while reporting incompatible skin data.
   - Viewer / Ignore out-of-range generic dissolve parameters so opaque champion submeshes are not discarded.

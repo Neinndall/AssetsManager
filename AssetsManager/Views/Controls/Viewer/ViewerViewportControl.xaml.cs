@@ -51,6 +51,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public LogService LogService { get; set; }
         public AppSettings AppSettings { get; set; }
+        public RenderDemandService RenderDemandService { get; set; }
         public ViewerPanelControl Panel { get; set; }
         public IAnimationAsset CurrentlyPlayingAnimation => _activeSceneModel?.CurrentAnimation;
         public double CurrentAnimationTime => _activeSceneModel?.AnimationTime ?? 0;
@@ -84,6 +85,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 EnsureSceneRenderers();
                 EnsureVfxRenderer();
                 _vfxRenderer?.SetVfxSystem(_selectedVfxSystem);
+                _renderDemandSession?.Refresh();
                 RequestRender();
             }
             catch (Exception ex)
@@ -124,9 +126,9 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
+            UpdateContinuousFrameState();
             RecordRenderedFrame();
             ProcessPendingSnapshot();
-            UpdateFramePump();
         }
 
         private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
@@ -266,14 +268,14 @@ namespace AssetsManager.Views.Controls.Viewer
         private readonly Dictionary<SceneModel, AnimationService> _animationServices = new();
         private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
-        private static readonly TimeSpan TargetFrameInterval = TimeSpan.FromSeconds(1.0 / 60.0);
         private static readonly TimeSpan MaximumFrameDelta = TimeSpan.FromMilliseconds(100);
-        private bool _isFramePumpHooked;
+        private RenderDemandSession _renderDemandSession;
+        private bool _continuousFrameStateInitialized;
+        private bool _continuousFramesRequired;
         private bool _isUpdatingScene;
         private int _renderDispatchQueued;
         private int _framesSinceFpsUpdate;
         private TimeSpan _lastRenderedAt;
-        private TimeSpan _nextFrameDueAt;
         private sealed record SnapshotRequest(string FilePath, int Width, int Height);
         private SnapshotRequest _pendingSnapshot;
 
@@ -370,46 +372,17 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp || OpenTkControl == null) return;
 
+            if (RenderDemandService != null)
+                RenderDemandService.IsFrameCapEnabled = _viewModel.LimitFps;
+
             ResetRenderTiming();
-
-            // Demand rendering is the baseline for both capped and uncapped modes.
-            // The frame pump below is enabled only while the scene is changing.
             OpenTkControl.RenderContinuously = false;
-            _nextFrameDueAt = _viewModel.LimitFps
-                ? _renderStopwatch.Elapsed + TargetFrameInterval
-                : TimeSpan.Zero;
-            RequestRender();
-        }
-
-        private void OnCompositionTargetRendering(object sender, EventArgs e)
-        {
-            if (_isCleanedUp || !_isFramePumpHooked)
-                return;
-
-            if (!RequiresContinuousFrames())
-            {
-                UpdateFramePump();
-                return;
-            }
-
-            TimeSpan now = _renderStopwatch.Elapsed;
-            if (_viewModel.LimitFps)
-            {
-                if (now < _nextFrameDueAt)
-                    return;
-
-                TimeSpan lateness = now - _nextFrameDueAt;
-                _nextFrameDueAt = lateness > TargetFrameInterval
-                    ? now + TargetFrameInterval
-                    : _nextFrameDueAt + TargetFrameInterval;
-            }
-
             RequestRender();
         }
 
         private bool RequiresContinuousFrames()
         {
-            return (_viewModel.IsAutoRotateActive && _activeSceneModel != null) ||
+            return (_viewModel.IsAutoRotateActive && _activeSceneModel?.IsVisible == true) ||
                 _loadedModels.Any(model =>
                     model.IsVisible &&
                     model.CurrentAnimation != null &&
@@ -417,52 +390,39 @@ namespace AssetsManager.Views.Controls.Viewer
                 _vfxRenderer?.IsPlaying == true;
         }
 
-        private void UpdateFramePump()
+        private void EnsureRenderDemandSession()
         {
-            bool shouldRun = !_isCleanedUp && IsLoaded && IsVisible && RequiresContinuousFrames();
-
-            if (shouldRun == _isFramePumpHooked)
+            if (_renderDemandSession != null || RenderDemandService == null)
                 return;
 
-            _lastRenderedAt = TimeSpan.Zero;
-            _framesSinceFpsUpdate = 0;
-            _fpsStopwatch.Restart();
-
-            if (!shouldRun && _viewModel.IsFpsVisible)
-                _viewModel.DisplayFps = "0";
-
-            if (shouldRun)
-            {
-                TimeSpan now = _renderStopwatch.Elapsed;
-                _nextFrameDueAt = _viewModel.LimitFps
-                    ? now + TargetFrameInterval
-                    : now;
-                HookFramePump();
-            }
-            else
-            {
-                UnhookFramePump();
-            }
+            _renderDemandSession = RenderDemandService.Register(
+                () => !_isCleanedUp && IsLoaded && IsVisible && OpenTkControl?.IsVisible == true &&
+                      OpenTkControl.FrameBufferWidth > 0 && OpenTkControl.FrameBufferHeight > 0 && _gl != null,
+                RequiresContinuousFrames,
+                RequestRender);
         }
 
         private void RefreshPlayback()
         {
-            UpdateFramePump();
+            UpdateContinuousFrameState();
+            _renderDemandSession?.Refresh();
             RequestRender();
         }
 
-        private void HookFramePump()
+        private bool UpdateContinuousFrameState()
         {
-            if (_isFramePumpHooked) return;
-            CompositionTarget.Rendering += OnCompositionTargetRendering;
-            _isFramePumpHooked = true;
-        }
+            bool requiresContinuousFrames = RequiresContinuousFrames();
+            if (_continuousFrameStateInitialized && _continuousFramesRequired == requiresContinuousFrames)
+                return false;
 
-        private void UnhookFramePump()
-        {
-            if (!_isFramePumpHooked) return;
-            CompositionTarget.Rendering -= OnCompositionTargetRendering;
-            _isFramePumpHooked = false;
+            _continuousFrameStateInitialized = true;
+            _continuousFramesRequired = requiresContinuousFrames;
+            ResetRenderTiming();
+
+            if (!requiresContinuousFrames && _viewModel.IsFpsVisible)
+                _viewModel.DisplayFps = "0";
+
+            return true;
         }
 
         private void RequestRender()
@@ -471,15 +431,22 @@ namespace AssetsManager.Views.Controls.Viewer
                 Interlocked.Exchange(ref _renderDispatchQueued, 1) != 0)
                 return;
 
-            Dispatcher.BeginInvoke(
-                DispatcherPriority.Render,
-                new Action(() =>
-                {
-                    Interlocked.Exchange(ref _renderDispatchQueued, 0);
+            try
+            {
+                Dispatcher.BeginInvoke(
+                    DispatcherPriority.Render,
+                    new Action(() =>
+                    {
+                        Interlocked.Exchange(ref _renderDispatchQueued, 0);
 
-                    if (!_isCleanedUp && IsLoaded && IsVisible && OpenTkControl.IsVisible && _gl != null)
-                        OpenTkControl.InvalidateVisual();
-                }));
+                        if (!_isCleanedUp && IsLoaded && IsVisible && OpenTkControl.IsVisible && _gl != null)
+                            OpenTkControl.InvalidateVisual();
+                    }));
+            }
+            catch (InvalidOperationException) when (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+            {
+                Interlocked.Exchange(ref _renderDispatchQueued, 0);
+            }
         }
 
         private void OnCameraChanged(object sender, EventArgs e) => RequestRender();
@@ -507,22 +474,30 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (e.NewSize.Width <= 0 || e.NewSize.Height <= 0)
             {
-                _lastRenderedAt = TimeSpan.Zero;
+                ResetRenderTiming();
+                _renderDemandSession?.Refresh();
                 return;
             }
+            ResetRenderTiming();
+            _renderDemandSession?.Refresh();
             RequestRender();
         }
 
         private void OnViewportIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            ResetRenderTiming();
             if (e.NewValue is true)
                 RequestRender();
-            UpdateFramePump();
+            else if (_viewModel.IsFpsVisible)
+                _viewModel.DisplayFps = "0";
+            _renderDemandSession?.Refresh();
         }
 
         private async void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
+            _continuousFrameStateInitialized = false;
+            _continuousFramesRequired = false;
             _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
             _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
             OpenTkControl.SizeChanged -= OnOpenTkControlSizeChanged;
@@ -553,10 +528,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 RenderContinuously = false
             };
             OpenTkControl.Start(settings);
+            EnsureRenderDemandSession();
 
             ApplyFpsLimitMode();
             _fpsStopwatch.Restart();
-            UpdateFramePump();
         }
 
         private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e) =>
@@ -734,7 +709,8 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 // 1. Desuscribir eventos
-                UnhookFramePump();
+                _renderDemandSession?.Dispose();
+                _renderDemandSession = null;
                 OpenTkControl.SizeChanged -= OnOpenTkControlSizeChanged;
                 IsVisibleChanged -= OnViewportIsVisibleChanged;
                 UnsubscribeFromCameraChanges();
@@ -1088,7 +1064,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             double deltaTime = Math.Clamp(frameDelta.TotalSeconds, 0, 0.25);
 
-            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
+            if (_viewModel.IsAutoRotateActive && _activeSceneModel?.IsVisible == true)
             {
                 _activeSceneModel.RotationY = (_activeSceneModel.RotationY + 30.0 * deltaTime) % 360;
             }
@@ -1180,8 +1156,9 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ResetRenderTiming()
         {
             _lastRenderedAt = TimeSpan.Zero;
-            _nextFrameDueAt = TimeSpan.Zero;
+            _framesSinceFpsUpdate = 0;
             _renderStopwatch.Restart();
+            _fpsStopwatch.Restart();
         }
 
         private void RecordRenderedFrame()

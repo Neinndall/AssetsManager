@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using Microsoft.Win32;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Viewer.Loading;
+using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Utils;
 using AssetsManager.Views.Models.Viewer;
@@ -34,6 +35,7 @@ namespace AssetsManager.Views
             MapGeometryLoadingService mapGeometryLoadingService,
             ChromaLoadingService chromaLoadingService,
             VfxLoadingService vfxLoadingService,
+            RenderDemandService renderDemandService,
             CustomMessageBoxService customMessageBoxService)
         {
             InitializeComponent();
@@ -48,6 +50,7 @@ namespace AssetsManager.Views
             // Service injection (Peer-to-Peer Support)
             ViewportControl.LogService = _logService;
             ViewportControl.AppSettings = appSettings;
+            ViewportControl.RenderDemandService = renderDemandService;
 
             PanelControl.SknLoadingService = sknLoadingService;
             PanelControl.MapGeometryLoadingService = mapGeometryLoadingService;
@@ -61,6 +64,7 @@ namespace AssetsManager.Views
 
             VfxInspectorControl.LogService = _logService;
             VfxInspectorControl.VfxLoadingService = _vfxLoadingService;
+            VfxInspectorControl.RenderDemandService = renderDemandService;
 
             // Peer-to-Peer wiring between sub-controls
             PanelControl.Viewport = ViewportControl;
