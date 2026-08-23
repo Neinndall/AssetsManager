@@ -907,7 +907,13 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (folderBrowserDialog.ShowDialog() == true)
             {
-                HandleChromaGalleryRequest(folderBrowserDialog.FolderName);
+                string skinsPath = folderBrowserDialog.FolderName;
+                ProjectExplorer?.LoadProjectFolder(skinsPath);
+
+                if (ProjectExplorer != null && WindowViewModel != null)
+                    WindowViewModel.IsProjectExplorerVisible = true;
+
+                HandleChromaGalleryRequest(skinsPath);
             }
         }
 
