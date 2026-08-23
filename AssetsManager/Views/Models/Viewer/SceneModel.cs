@@ -58,8 +58,7 @@ namespace AssetsManager.Views.Models.Viewer
 
         /// <summary>
         /// The persistent Transform3DGroup that owns the user-defined Position/Rotation/Scale.
-        /// Exposed so the Viewport can safely inject the auto-rotation transform
-        /// without losing its reference when properties change.
+        /// Exposed for consumers that need to inspect the persistent WPF transform state.
         /// </summary>
         public Transform3DGroup UserTransformGroup => _userTransformGroup;
 

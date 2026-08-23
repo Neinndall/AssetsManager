@@ -310,8 +310,6 @@ namespace AssetsManager.Views.Controls.Viewer
         private sealed record SnapshotRequest(string FilePath, int Width, int Height);
         private SnapshotRequest _pendingSnapshot;
 
-        private readonly RotateTransform3D _autoRotation = new RotateTransform3D(new AxisAngleRotation3D(new Vector3D(0, 1, 0), 0));
-
         private SceneModel _activeSceneModel;
         private AnimationModel _activeAnimationModel;
         private readonly List<SceneModel> _loadedModels = new();
@@ -380,9 +378,6 @@ namespace AssetsManager.Views.Controls.Viewer
                     _framesSinceFpsUpdate = 0;
                     if (!_viewModel.IsFpsVisible)
                         _viewModel.DisplayFps = "0";
-                    break;
-                case nameof(ViewerViewportModel.IsAutoRotateActive):
-                    HandleAutoRotateChanged(_viewModel.IsAutoRotateActive);
                     break;
                 case nameof(ViewerViewportModel.FieldOfView):
                     UpdateFieldOfView();
@@ -807,7 +802,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
             _viewModel.IsAutoRotateActive = false;
             _viewModel.ResetStudioSettings();
-            ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
 
             // CRITICAL: Free cached vertex/skin buffers from the previous model so
             // the next load does not retain RAM of a model that is no longer in use.
@@ -852,14 +846,6 @@ namespace AssetsManager.Views.Controls.Viewer
             bool removingActiveModel = model == _activeSceneModel;
             if (removingActiveModel)
             {
-                if (_viewModel.IsAutoRotateActive)
-                {
-                    var transformGroup = model.RootVisual.Transform as Transform3DGroup;
-                    if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
-                    {
-                        transformGroup.Children.Remove(_autoRotation);
-                    }
-                }
                 _activeSceneModel = null;
             }
 
@@ -902,18 +888,6 @@ namespace AssetsManager.Views.Controls.Viewer
 
         public void SetActiveModel(SceneModel model)
         {
-            if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
-            {
-                var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
-                if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
-                {
-                    double accumulatedAngle = ((AxisAngleRotation3D)_autoRotation.Rotation).Angle;
-                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + accumulatedAngle) % 360;
-                    transformGroup.Children.Remove(_autoRotation);
-                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
-                }
-            }
-
             _activeSceneModel = model;
             RequestRender();
         }
@@ -982,28 +956,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
             if (_viewModel.IsAutoRotateActive && _activeSceneModel != null)
             {
-                var transform = _activeSceneModel.RootVisual.Transform;
-                Transform3DGroup transformGroup;
-
-                if (transform == null || transform == Transform3D.Identity)
-                {
-                    transformGroup = new Transform3DGroup();
-                    _activeSceneModel.RootVisual.Transform = transformGroup;
-                }
-                else
-                {
-                    transformGroup = transform as Transform3DGroup;
-                }
-
-                if (transformGroup != null)
-                {
-                    if (!transformGroup.Children.Contains(_autoRotation))
-                    {
-                        transformGroup.Children.Add(_autoRotation);
-                    }
-                    double rotationSpeed = 30.0 * deltaTime;
-                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = (((AxisAngleRotation3D)_autoRotation.Rotation).Angle + rotationSpeed) % 360;
-                }
+                _activeSceneModel.RotationY = (_activeSceneModel.RotationY + 30.0 * deltaTime) % 360;
             }
 
             if (_loadedModels.Count > 0)
@@ -1552,22 +1505,6 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 ResetCamera();
             }
-        }
-
-        private void HandleAutoRotateChanged(bool isAutoRotating)
-        {
-            if (!isAutoRotating && _activeSceneModel != null)
-            {
-                var transformGroup = _activeSceneModel.RootVisual.Transform as Transform3DGroup;
-                if (transformGroup != null && transformGroup.Children.Contains(_autoRotation))
-                {
-                    double accumulatedAngle = ((AxisAngleRotation3D)_autoRotation.Rotation).Angle;
-                    _activeSceneModel.RotationY = (_activeSceneModel.RotationY + accumulatedAngle) % 360;
-                    transformGroup.Children.Remove(_autoRotation);
-                    ((AxisAngleRotation3D)_autoRotation.Rotation).Angle = 0;
-                }
-            }
-
         }
 
         private static T FindVisualChild<T>(DependencyObject parent) where T : Visual
