@@ -901,9 +901,9 @@ namespace AssetsManager.Utils
                 BorderBrush = borderBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(3),
-                Height = 16,
+                Height = 15,
                 Padding = new Thickness(5, 0, 5, 0),
-                Margin = new Thickness(0, 0, 5, -1),
+                Margin = new Thickness(0, 0, 5, -2),
                 VerticalAlignment = VerticalAlignment.Center
             };
 
@@ -912,10 +912,11 @@ namespace AssetsManager.Utils
                 Text = upper,
                 FontSize = 9,
                 FontWeight = FontWeights.Bold,
-                FontFamily = new FontFamily("Segoe UI, sans-serif"),
+                FontFamily = new FontFamily("Segoe UI"),
                 Foreground = fgBrush,
                 VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, -1, 0, 0)
             };
 
             border.Child = tb;
