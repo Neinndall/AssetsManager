@@ -17,6 +17,7 @@ New Features
   - Viewer / Ignore un-tinted static white additive placeholders in iridescent material graphs so champion skin layers do not wash out the base diffuse texture.
   - Viewer / Champion skin iridescence now uses BIN-authored LUTs, masks, Fresnel alpha, and localized texture transparency without overbrightening the diffuse layer.
   - Viewer / Render the editor ground grid behind transparent champion layers so it blends as a world-space guide.
+  - Viewer / Keep the OpenGL viewport demand-driven while idle and run the frame pump only for animation, VFX, or auto-rotation activity.
   - Viewer / Project Browser can load multiple selected animation files from its context menu.
   - Viewer / Map Environment now applies map-authored sun, ambient lighting, and baked lightmaps to static geometry.
   - Viewer / Champion skin materials now resolve WadChunkLink texture paths.

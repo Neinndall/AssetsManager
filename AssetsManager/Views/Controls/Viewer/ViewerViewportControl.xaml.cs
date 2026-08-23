@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -83,6 +84,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 EnsureSceneRenderers();
                 EnsureVfxRenderer();
                 _vfxRenderer?.SetVfxSystem(_selectedVfxSystem);
+                RequestRender();
             }
             catch (Exception ex)
             {
@@ -92,21 +94,39 @@ namespace AssetsManager.Views.Controls.Viewer
 
         private void OpenTkControl_Render(TimeSpan delta)
         {
-            if (_gl == null) return;
+            if (_isCleanedUp || _gl == null) return;
+
             int framebufferWidth = OpenTkControl.FrameBufferWidth;
             int framebufferHeight = OpenTkControl.FrameBufferHeight;
-            if (framebufferWidth <= 0 || framebufferHeight <= 0) return;
+            if (framebufferWidth <= 0 || framebufferHeight <= 0)
+            {
+                _lastRenderedAt = TimeSpan.Zero;
+                return;
+            }
 
             TimeSpan renderTime = _renderStopwatch.Elapsed;
             TimeSpan frameDelta = _lastRenderedAt == TimeSpan.Zero
-                ? delta
+                ? TimeSpan.Zero
                 : renderTime - _lastRenderedAt;
+            frameDelta = TimeSpan.FromTicks(
+                Math.Clamp(frameDelta.Ticks, 0, MaximumFrameDelta.Ticks));
 
             _lastRenderedAt = renderTime;
-            UpdateScene(frameDelta);
+
+            _isUpdatingScene = true;
+            try
+            {
+                UpdateScene(frameDelta);
+            }
+            finally
+            {
+                _isUpdatingScene = false;
+            }
+
             RenderScene(framebufferWidth, framebufferHeight, frameDelta, updateVfx: true);
             RecordRenderedFrame();
             ProcessPendingSnapshot();
+            UpdateFramePump();
         }
 
         private void RenderScene(int framebufferWidth, int framebufferHeight, TimeSpan frameDelta, bool updateVfx)
@@ -242,14 +262,18 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private CustomCameraController _cameraController;
+        private ProjectionCamera _cameraChangedSource;
         private readonly Dictionary<SceneModel, AnimationService> _animationServices = new();
         private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
-        private bool _isCompositionTargetHooked;
+        private static readonly TimeSpan TargetFrameInterval = TimeSpan.FromSeconds(1.0 / 60.0);
+        private static readonly TimeSpan MaximumFrameDelta = TimeSpan.FromMilliseconds(100);
+        private bool _isFramePumpHooked;
+        private bool _isUpdatingScene;
+        private int _renderDispatchQueued;
         private int _framesSinceFpsUpdate;
         private TimeSpan _lastRenderedAt;
-        private TimeSpan _lastInvalidatedAt;
-        private TimeSpan _nextLimitedFrame;
+        private TimeSpan _nextFrameDueAt;
         private sealed record SnapshotRequest(string FilePath, int Width, int Height);
         private SnapshotRequest _pendingSnapshot;
 
@@ -312,23 +336,33 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 case nameof(ViewerViewportModel.LimitFps):
                     ApplyFpsLimitMode();
-                    break;
+                    return;
                 case nameof(ViewerViewportModel.IsFpsVisible):
                     _fpsStopwatch.Restart();
                     _framesSinceFpsUpdate = 0;
                     if (!_viewModel.IsFpsVisible)
                         _viewModel.DisplayFps = "0";
-                    break;
+                    return;
+                case nameof(ViewerViewportModel.IsAutoRotateActive):
+                    RefreshPlayback();
+                    return;
                 case nameof(ViewerViewportModel.FieldOfView):
                     UpdateFieldOfView();
-                    break;
+                    RequestRender();
+                    return;
                 case nameof(ViewerViewportModel.IsTransparentBg):
                 case nameof(ViewerViewportModel.IsGroundVisible):
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
-                    break;
+                    return;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
-                    break;
+                    return;
+                case nameof(ViewerViewportModel.IsGridVisible):
+                case nameof(ViewerViewportModel.AmbientIntensity):
+                case nameof(ViewerViewportModel.LightRotation):
+                case nameof(ViewerViewportModel.LightHeight):
+                    RequestRender();
+                    return;
             }
         }
 
@@ -338,48 +372,163 @@ namespace AssetsManager.Views.Controls.Viewer
 
             ResetRenderTiming();
 
-            if (_viewModel.LimitFps)
-            {
-                OpenTkControl.RenderContinuously = false;
-                if (!_isCompositionTargetHooked)
-                {
-                    CompositionTarget.Rendering += OnCompositionTargetRendering;
-                    _isCompositionTargetHooked = true;
-                }
-            }
-            else
-            {
-                if (_isCompositionTargetHooked)
-                {
-                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
-                    _isCompositionTargetHooked = false;
-                }
-                OpenTkControl.RenderContinuously = true;
-            }
+            // Demand rendering is the baseline for both capped and uncapped modes.
+            // The frame pump below is enabled only while the scene is changing.
+            OpenTkControl.RenderContinuously = false;
+            _nextFrameDueAt = _viewModel.LimitFps
+                ? _renderStopwatch.Elapsed + TargetFrameInterval
+                : TimeSpan.Zero;
+            RequestRender();
         }
 
         private void OnCompositionTargetRendering(object sender, EventArgs e)
         {
-            if (_isCleanedUp || OpenTkControl == null || !OpenTkControl.IsLoaded || !OpenTkControl.IsVisible)
+            if (_isCleanedUp || !_isFramePumpHooked)
                 return;
 
-            TimeSpan now = _renderStopwatch.Elapsed;
-            TimeSpan targetFrameTime = TimeSpan.FromSeconds(1.0 / 60.0);
-
-            if (_lastInvalidatedAt == TimeSpan.Zero || now >= _nextLimitedFrame)
+            if (!RequiresContinuousFrames())
             {
-                _nextLimitedFrame = _nextLimitedFrame == TimeSpan.Zero || now - _nextLimitedFrame > targetFrameTime * 4
-                    ? now + targetFrameTime
-                    : _nextLimitedFrame + targetFrameTime;
-
-                _lastInvalidatedAt = now;
-                OpenTkControl.InvalidateVisual();
+                UpdateFramePump();
+                return;
             }
+
+            TimeSpan now = _renderStopwatch.Elapsed;
+            if (_viewModel.LimitFps)
+            {
+                if (now < _nextFrameDueAt)
+                    return;
+
+                TimeSpan lateness = now - _nextFrameDueAt;
+                _nextFrameDueAt = lateness > TargetFrameInterval
+                    ? now + TargetFrameInterval
+                    : _nextFrameDueAt + TargetFrameInterval;
+            }
+
+            RequestRender();
+        }
+
+        private bool RequiresContinuousFrames()
+        {
+            return (_viewModel.IsAutoRotateActive && _activeSceneModel != null) ||
+                _loadedModels.Any(model =>
+                    model.IsVisible &&
+                    model.CurrentAnimation != null &&
+                    !model.IsAnimationPaused) ||
+                _vfxRenderer?.IsPlaying == true;
+        }
+
+        private void UpdateFramePump()
+        {
+            bool shouldRun = !_isCleanedUp && IsLoaded && IsVisible && RequiresContinuousFrames();
+
+            if (shouldRun == _isFramePumpHooked)
+                return;
+
+            _lastRenderedAt = TimeSpan.Zero;
+            _framesSinceFpsUpdate = 0;
+            _fpsStopwatch.Restart();
+
+            if (!shouldRun && _viewModel.IsFpsVisible)
+                _viewModel.DisplayFps = "0";
+
+            if (shouldRun)
+            {
+                TimeSpan now = _renderStopwatch.Elapsed;
+                _nextFrameDueAt = _viewModel.LimitFps
+                    ? now + TargetFrameInterval
+                    : now;
+                HookFramePump();
+            }
+            else
+            {
+                UnhookFramePump();
+            }
+        }
+
+        private void RefreshPlayback()
+        {
+            UpdateFramePump();
+            RequestRender();
+        }
+
+        private void HookFramePump()
+        {
+            if (_isFramePumpHooked) return;
+            CompositionTarget.Rendering += OnCompositionTargetRendering;
+            _isFramePumpHooked = true;
+        }
+
+        private void UnhookFramePump()
+        {
+            if (!_isFramePumpHooked) return;
+            CompositionTarget.Rendering -= OnCompositionTargetRendering;
+            _isFramePumpHooked = false;
+        }
+
+        private void RequestRender()
+        {
+            if (_isCleanedUp || !IsLoaded || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished ||
+                Interlocked.Exchange(ref _renderDispatchQueued, 1) != 0)
+                return;
+
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Render,
+                new Action(() =>
+                {
+                    Interlocked.Exchange(ref _renderDispatchQueued, 0);
+
+                    if (!_isCleanedUp && IsLoaded && IsVisible && OpenTkControl.IsVisible && _gl != null)
+                        OpenTkControl.InvalidateVisual();
+                }));
+        }
+
+        private void OnCameraChanged(object sender, EventArgs e) => RequestRender();
+
+        private void SubscribeToCameraChanges()
+        {
+            if (Viewport3D.Camera is not ProjectionCamera camera || ReferenceEquals(_cameraChangedSource, camera))
+                return;
+
+            UnsubscribeFromCameraChanges();
+            camera.Changed += OnCameraChanged;
+            _cameraChangedSource = camera;
+        }
+
+        private void UnsubscribeFromCameraChanges()
+        {
+            if (_cameraChangedSource == null)
+                return;
+
+            _cameraChangedSource.Changed -= OnCameraChanged;
+            _cameraChangedSource = null;
+        }
+
+        private void OnOpenTkControlSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.NewSize.Width <= 0 || e.NewSize.Height <= 0)
+            {
+                _lastRenderedAt = TimeSpan.Zero;
+                return;
+            }
+            RequestRender();
+        }
+
+        private void OnViewportIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.NewValue is true)
+                RequestRender();
+            UpdateFramePump();
         }
 
         private async void OnViewportLoaded(object sender, RoutedEventArgs e)
         {
             _isCleanedUp = false;
+            _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
+            _viewModel.PropertyChanged += OnViewportViewModelPropertyChanged;
+            OpenTkControl.SizeChanged -= OnOpenTkControlSizeChanged;
+            OpenTkControl.SizeChanged += OnOpenTkControlSizeChanged;
+            IsVisibleChanged -= OnViewportIsVisibleChanged;
+            IsVisibleChanged += OnViewportIsVisibleChanged;
             if (AppSettings != null)
             {
                 AppSettings.PropertyChanged -= OnAppSettingsPropertyChanged;
@@ -390,6 +539,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _animationServices.Clear();
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
+            SubscribeToCameraChanges();
 
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
@@ -399,12 +549,14 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 MajorVersion = 3,
                 MinorVersion = 3,
-                Profile = OpenTK.Windowing.Common.ContextProfile.Core
+                Profile = OpenTK.Windowing.Common.ContextProfile.Core,
+                RenderContinuously = false
             };
             OpenTkControl.Start(settings);
 
             ApplyFpsLimitMode();
             _fpsStopwatch.Restart();
+            UpdateFramePump();
         }
 
         private void OnAppSettingsPropertyChanged(object sender, PropertyChangedEventArgs e) =>
@@ -435,6 +587,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _groundVisual = null;
             _groundModel = null;
             SetupScene(false);
+            RequestRender();
         }
 
         private void OnViewportUnloaded(object sender, RoutedEventArgs e)
@@ -537,6 +690,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 _groundVisual = null;
                 _groundModel = null;
                 _skyModel = null;
+                RequestRender();
                 return;
             }
 
@@ -568,6 +722,7 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             if (_isCleanedUp) return;
             _isCleanedUp = true;
+            Interlocked.Exchange(ref _renderDispatchQueued, 0);
             try
             {
                 _pendingSnapshot = null;
@@ -579,11 +734,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 }
 
                 // 1. Desuscribir eventos
-                if (_isCompositionTargetHooked)
-                {
-                    CompositionTarget.Rendering -= OnCompositionTargetRendering;
-                    _isCompositionTargetHooked = false;
-                }
+                UnhookFramePump();
+                OpenTkControl.SizeChanged -= OnOpenTkControlSizeChanged;
+                IsVisibleChanged -= OnViewportIsVisibleChanged;
+                UnsubscribeFromCameraChanges();
                 _viewModel.PropertyChanged -= OnViewportViewModelPropertyChanged;
                 AppSettings?.PropertyChanged -= OnAppSettingsPropertyChanged;
                 AppSettings?.ConfigurationSaved -= OnAppSettingsSaved;
@@ -659,6 +813,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             Panel?.SetAnimationPlayingState(animationModel, true);
+            RefreshPlayback();
         }
 
         public void TogglePauseResume(AnimationModel animationToToggle)
@@ -683,6 +838,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             Panel?.SetAnimationPlayingState(_activeAnimationModel, !newPausedState);
+            RefreshPlayback();
         }
 
         public void SeekAnimation(TimeSpan time)
@@ -703,6 +859,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 _activeSceneModel.AnimationTime = time.TotalSeconds;
             }
+
+            RequestRender();
         }
 
         public void StopAnimation()
@@ -731,6 +889,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
 
             _activeAnimationModel = null;
+            RefreshPlayback();
         }
 
         public void RemoveAnimation(AnimationModel animationModel)
@@ -752,6 +911,8 @@ namespace AssetsManager.Views.Controls.Viewer
                     model.Animations.Remove(animData);
                 }
             }
+
+            RequestRender();
         }
 
         public void ResetScene()
@@ -782,6 +943,7 @@ namespace AssetsManager.Views.Controls.Viewer
             _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
+            RequestRender();
         }
 
         public void AddModel(SceneModel model)
@@ -831,6 +993,7 @@ namespace AssetsManager.Views.Controls.Viewer
             }
             model.Dispose();
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
+            RefreshPlayback();
         }
 
         private void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -847,12 +1010,20 @@ namespace AssetsManager.Views.Controls.Viewer
                     if (Viewport.Children.Contains(model.RootVisual))
                         Viewport.Children.Remove(model.RootVisual);
                 }
+
+                if (!_isUpdatingScene)
+                    RefreshPlayback();
+                return;
             }
+
+            if (!_isUpdatingScene)
+                RequestRender();
         }
 
         public void SetActiveModel(SceneModel model)
         {
             _activeSceneModel = model;
+            RefreshPlayback();
         }
 
         public void SetSelectedModels(IEnumerable<SceneModel> models, SceneModel activeModel)
@@ -860,6 +1031,7 @@ namespace AssetsManager.Views.Controls.Viewer
             var selected = models?.Where(model => model != null).ToList() ?? new List<SceneModel>();
             _modelInteractionController?.SetSelection(selected, activeModel);
             AutoArrangeModelsButton.IsEnabled = selected.Count > 1;
+            RequestRender();
         }
 
         private void OnModelSelectionRequested(
@@ -885,15 +1057,32 @@ namespace AssetsManager.Views.Controls.Viewer
             _selectedVfxSystem = vfxSystem;
             EnsureVfxRenderer();
             _vfxRenderer?.SetVfxSystem(vfxSystem);
+            RefreshPlayback();
         }
 
-        public void PlayVfx() => _vfxRenderer?.Play();
+        public void PlayVfx()
+        {
+            _vfxRenderer?.Play();
+            RefreshPlayback();
+        }
 
-        public void PauseVfx() => _vfxRenderer?.Pause();
+        public void PauseVfx()
+        {
+            _vfxRenderer?.Pause();
+            RefreshPlayback();
+        }
 
-        public void StopVfx() => _vfxRenderer?.Stop();
+        public void StopVfx()
+        {
+            _vfxRenderer?.Stop();
+            RefreshPlayback();
+        }
 
-        public void SeekVfx(TimeSpan time) => _vfxRenderer?.Seek(time.TotalSeconds);
+        public void SeekVfx(TimeSpan time)
+        {
+            _vfxRenderer?.Seek(time.TotalSeconds);
+            RequestRender();
+        }
 
         private void UpdateScene(TimeSpan frameDelta)
         {
@@ -991,8 +1180,7 @@ namespace AssetsManager.Views.Controls.Viewer
         private void ResetRenderTiming()
         {
             _lastRenderedAt = TimeSpan.Zero;
-            _lastInvalidatedAt = TimeSpan.Zero;
-            _nextLimitedFrame = TimeSpan.Zero;
+            _nextFrameDueAt = TimeSpan.Zero;
             _renderStopwatch.Restart();
         }
 
@@ -1235,6 +1423,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 Viewport.Children.Remove(_skyVisual);
             }
+
+            RequestRender();
         }
 
         public void SetGroundVisibility(bool isVisible)
@@ -1249,6 +1439,8 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 Viewport.Children.Remove(_groundVisual);
             }
+
+            RequestRender();
         }
 
         private void ProcessPendingSnapshot()
@@ -1331,6 +1523,7 @@ namespace AssetsManager.Views.Controls.Viewer
                     OpenTkControl.FrameBufferHeight);
                 ImageExportUtils.ValidateDimensions(width, height);
                 _pendingSnapshot = new SnapshotRequest(filePath, width, height);
+                RequestRender();
             }
         }
 
