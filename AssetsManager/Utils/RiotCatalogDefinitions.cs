@@ -14,9 +14,7 @@ namespace AssetsManager.Utils
         public const string EmotesJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-emotes.json";
         public const string WardsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/ward-skins.json";
         public const string IconsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/summoner-icons.json";
-        public const string PortraitsJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/portraits.json";
         public const string LootJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/loot.json";
-        public const string EventPassesJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/event-passes.json";
         public const string EventHubJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/event-hub.json";
         public const string NexusFinishersJsonPath = "plugins/rcp-be-lol-game-data/global/default/v1/nexusfinishers.json";
 
@@ -38,12 +36,10 @@ namespace AssetsManager.Utils
         public static readonly CatalogInfo EmoteCatalog = new CatalogInfo { Path = EmotesJsonPath, NameKey = "name", PathKey = "inventoryIcon" };
         public static readonly CatalogInfo WardCatalog = new CatalogInfo { Path = WardsJsonPath, NameKey = "name", PathKey = "wardImagePath" };
         public static readonly CatalogInfo IconCatalog = new CatalogInfo { Path = IconsJsonPath, NameKey = "title", PathKey = "imagePath" };
-        public static readonly CatalogInfo PortraitCatalog = new CatalogInfo { Path = PortraitsJsonPath, NameKey = "name", PathKey = "image" };
         public static readonly CatalogInfo LootCatalog = new CatalogInfo { Path = LootJsonPath, NameKey = "description", PathKey = "imagePath" };
-        public static readonly CatalogInfo EventPassCatalog = new CatalogInfo { Path = EventPassesJsonPath, NameKey = "name", PathKey = "image" };
         public static readonly CatalogInfo NexusFinisherCatalog = new CatalogInfo { Path = NexusFinishersJsonPath, NameKey = "translatedName", PathKey = "iconPath" };
 
-        private static readonly CatalogInfo[] AllCatalogs = { SkinCatalog, EmoteCatalog, WardCatalog, IconCatalog, PortraitCatalog, LootCatalog, EventPassCatalog, NexusFinisherCatalog };
+        private static readonly CatalogInfo[] AllCatalogs = { SkinCatalog, EmoteCatalog, WardCatalog, IconCatalog, LootCatalog, NexusFinisherCatalog };
 
         /// <summary>
         /// Returns all available catalogs for batch processing.

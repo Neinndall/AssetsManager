@@ -54,9 +54,7 @@ namespace AssetsManager.Services.Monitor
                     RiotCatalogDefinitions.EmoteCatalog,
                     RiotCatalogDefinitions.WardCatalog,
                     RiotCatalogDefinitions.IconCatalog,
-                    RiotCatalogDefinitions.PortraitCatalog,
                     RiotCatalogDefinitions.LootCatalog,
-                    RiotCatalogDefinitions.EventPassCatalog,
                     RiotCatalogDefinitions.NexusFinisherCatalog
                 };
                 var catalogNodes = await _wadContentProvider.FindNodesByVirtualPathsAsync(

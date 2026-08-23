@@ -75,6 +75,7 @@ Improvements
   - Viewer / Fixed model auto-rotation so the OpenGL viewport updates the model transform continuously while the toggle is active.
   - Viewer / Model animation playback now performs hardware-accelerated vertex skinning on the GPU, improving animation framerates and memory efficiency while reporting incompatible skin data.
   - Viewer / Ignore out-of-range generic dissolve parameters so opaque champion submeshes are not discarded.
+  - Monitor / Reduced Mythic asset metadata loading to the catalogs used by the shop, retaining Nexus Finisher support while removing portrait and event-pass catalogs.
   - Core / Renamed the application identity metadata to VersionInfo and separated version data from view-specific build presentation.
   - Background update checks now notify Experimental builds when a newer downloadable QA commit is available.
   - Background application update notifications now suppress repeats during the current session and expose direct Stable/Experimental actions in Notification Hub.
