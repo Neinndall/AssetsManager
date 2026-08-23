@@ -62,10 +62,6 @@ namespace AssetsManager.Services.Viewer.Vfx.Session
         }
 
         public VfxSystemModel ActiveSystem => _activeSystem;
-        public bool IsPlaying =>
-            _isPlaying &&
-            _activeSystem != null &&
-            _graphs.Count > 0;
 
         public void Initialize(GL gl)
         {

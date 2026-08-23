@@ -21,7 +21,6 @@ using AssetsManager.Services.Downloads;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Monitor;
 using AssetsManager.Services.Viewer.Loading;
-using AssetsManager.Services.Viewer.Rendering;
 using AssetsManager.Services.Viewer.Vfx.Loading;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Services.Explorer.Tree;
@@ -174,7 +173,6 @@ namespace AssetsManager
       services.AddSingleton<SknLoadingService>();
       services.AddSingleton<MapGeometryLoadingService>();
       services.AddSingleton<ChromaLoadingService>();
-      services.AddSingleton<RenderDemandService>();
       services.AddTransient<VfxLoadingService>();
 
       // Audio Services
