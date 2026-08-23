@@ -19,7 +19,7 @@ namespace AssetsManager.Utils
     /// Modern native WPF block renderer for Riot article HTML content.
     /// Converts rich article markup into responsive, hardware-accelerated WPF visual elements
     /// (HUD cards, stats lists with pixel-perfect hanging indent bullets, change tag pills,
-    /// headings with champion/item badges, images, tables, and formatted text) without FlowDocument overhead.
+    /// skin galleries, headings with champion/item badges, images, tables, and formatted text) without FlowDocument overhead.
     /// </summary>
     public static class ArticleNativeRenderer
     {
@@ -181,11 +181,18 @@ namespace AssetsManager.Utils
             }
 
             string tag = node.Tag.ToLowerInvariant();
+
+            // If this node solely wraps a full image (e.g. <p><a><img></a></p> or <a><img></a>)
+            if (TryExtractSoloImage(node, out var soloImgNode, out var wrappingHref))
+            {
+                return CreateImageBlock(soloImgNode, httpClient, wrappingHref);
+            }
+
             switch (tag)
             {
                 case "p":
                 {
-                    if (ContainsImage(node))
+                    if (ContainsNonIconImage(node))
                     {
                         return EmitContainerPanel(node, httpClient);
                     }
@@ -229,7 +236,7 @@ namespace AssetsManager.Utils
 
                 default:
                 {
-                    if (ContainsBlockChildren(node))
+                    if (ContainsBlockChildren(node) || ContainsNonIconImage(node))
                     {
                         return EmitContainerPanel(node, httpClient);
                     }
@@ -499,7 +506,7 @@ namespace AssetsManager.Utils
             return stack.Children.Count > 0 ? stack : null;
         }
 
-        private static UIElement CreateImageBlock(Node node, HttpClient httpClient)
+        private static UIElement CreateImageBlock(Node node, HttpClient httpClient, string targetUrl = null)
         {
             string src = GetSrc(node);
             if (IsAbilityIconUrl(src))
@@ -509,6 +516,11 @@ namespace AssetsManager.Utils
 
             string resolved = ResolveUrl(src);
             if (resolved == null) return null;
+
+            if (string.IsNullOrEmpty(targetUrl) && node.Attrs != null && node.Attrs.TryGetValue("href", out var rawHref))
+            {
+                targetUrl = ResolveUrl(rawHref);
+            }
 
             var image = new Image
             {
@@ -525,7 +537,7 @@ namespace AssetsManager.Utils
                 CornerRadius = new CornerRadius(10),
                 BorderBrush = BorderColor,
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(0, 12, 0, 12),
+                Margin = new Thickness(0, 10, 0, 10),
                 ClipToBounds = true,
                 Padding = new Thickness(2),
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -533,7 +545,20 @@ namespace AssetsManager.Utils
                 Child = image
             };
 
-            LoadImageAsync(image, resolved, httpClient, 900);
+            if (!string.IsNullOrEmpty(targetUrl))
+            {
+                border.Cursor = System.Windows.Input.Cursors.Hand;
+                border.MouseLeftButtonUp += (s, e) =>
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(targetUrl) { UseShellExecute = true });
+                    }
+                    catch { }
+                };
+            }
+
+            LoadImageAsync(image, resolved, httpClient, 1200);
             return border;
         }
 
@@ -718,8 +743,9 @@ namespace AssetsManager.Utils
 
         private static void FillInlines(List<Inline> inlines, Node node, HttpClient httpClient)
         {
-            foreach (var child in node.Children)
+            for (int i = 0; i < node.Children.Count; i++)
             {
+                var child = node.Children[i];
                 if (child.IsSkip) continue;
                 if (child.IsText)
                 {
@@ -738,7 +764,8 @@ namespace AssetsManager.Utils
                     {
                         if (TryCreateTagBadge(child, out var badge))
                         {
-                            inlines.Add(new InlineUIContainer(badge) { BaselineAlignment = BaselineAlignment.TextBottom });
+                            inlines.Add(new InlineUIContainer(badge) { BaselineAlignment = BaselineAlignment.Baseline });
+                            SkipLeadingWhitespace(node.Children, i + 1);
                             break;
                         }
                         var span = new Span();
@@ -753,7 +780,8 @@ namespace AssetsManager.Utils
                     {
                         if (TryCreateTagBadge(child, out var badge))
                         {
-                            inlines.Add(new InlineUIContainer(badge) { BaselineAlignment = BaselineAlignment.TextBottom });
+                            inlines.Add(new InlineUIContainer(badge) { BaselineAlignment = BaselineAlignment.Baseline });
+                            SkipLeadingWhitespace(node.Children, i + 1);
                             break;
                         }
                         var bold = new Bold();
@@ -834,6 +862,18 @@ namespace AssetsManager.Utils
             }
         }
 
+        private static void SkipLeadingWhitespace(List<Node> siblings, int nextIndex)
+        {
+            if (nextIndex < siblings.Count && siblings[nextIndex].IsText)
+            {
+                string t = siblings[nextIndex].Text;
+                if (!string.IsNullOrEmpty(t))
+                {
+                    siblings[nextIndex].Text = t.TrimStart(' ', '\t', '\r', '\n', '\u00A0');
+                }
+            }
+        }
+
         private static bool TryCreateTagBadge(Node node, out FrameworkElement badge)
         {
             badge = null;
@@ -901,8 +941,8 @@ namespace AssetsManager.Utils
                 BorderBrush = borderBrush,
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(3),
-                Height = 15,
-                Padding = new Thickness(5, 0, 5, 0),
+                Height = 13.5,
+                Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(0, 0, 5, -2),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -910,7 +950,7 @@ namespace AssetsManager.Utils
             var tb = new TextBlock
             {
                 Text = upper,
-                FontSize = 9,
+                FontSize = 8.5,
                 FontWeight = FontWeights.Bold,
                 FontFamily = new FontFamily("Segoe UI"),
                 Foreground = fgBrush,
@@ -1043,14 +1083,70 @@ namespace AssetsManager.Utils
             return false;
         }
 
-        private static bool ContainsImage(Node node)
+        private static bool ContainsNonIconImage(Node node)
         {
             if (node.IsText || node.IsSkip) return false;
-            if (string.Equals(node.Tag, "img", StringComparison.OrdinalIgnoreCase)) return true;
+            if (string.Equals(node.Tag, "img", StringComparison.OrdinalIgnoreCase))
+            {
+                return !IsAbilityIconUrl(GetSrc(node));
+            }
             foreach (var child in node.Children)
             {
-                if (ContainsImage(child)) return true;
+                if (ContainsNonIconImage(child)) return true;
             }
+            return false;
+        }
+
+        private static bool TryExtractSoloImage(Node node, out Node imgNode, out string targetUrl)
+        {
+            imgNode = null;
+            targetUrl = null;
+            if (node.IsText || node.IsSkip) return false;
+
+            if (string.Equals(node.Tag, "img", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!IsAbilityIconUrl(GetSrc(node)))
+                {
+                    imgNode = node;
+                    return true;
+                }
+                return false;
+            }
+
+            if (node.Children.Count == 0) return false;
+
+            // Check if this node only has whitespace text and exactly one non-icon image child
+            Node foundImg = null;
+            string foundHref = node.Attrs != null && node.Attrs.TryGetValue("href", out var h) ? h : null;
+
+            foreach (var child in node.Children)
+            {
+                if (child.IsSkip) continue;
+                if (child.IsText)
+                {
+                    if (!string.IsNullOrWhiteSpace(child.Text)) return false;
+                    continue;
+                }
+
+                if (TryExtractSoloImage(child, out var nestedImg, out var nestedHref))
+                {
+                    if (foundImg != null) return false; // Multiple images
+                    foundImg = nestedImg;
+                    if (!string.IsNullOrEmpty(nestedHref)) foundHref = nestedHref;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (foundImg != null)
+            {
+                imgNode = foundImg;
+                targetUrl = foundHref;
+                return true;
+            }
+
             return false;
         }
 
