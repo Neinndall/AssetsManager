@@ -15,7 +15,7 @@ using Quaternion = System.Numerics.Quaternion;
 
 namespace AssetsManager.Services.Viewer.Animation
 {
-    public class AnimationPlayer : IDisposable
+    public class AnimationService : IDisposable
     {
         private readonly Dictionary<uint, (Quaternion Rotation, Vector3 Translation, Vector3 Scale)> _currentPose = new();
         private readonly LogService _logService;
@@ -25,20 +25,26 @@ namespace AssetsManager.Services.Viewer.Animation
         private Matrix4x4[] _finalBoneTransforms;
         private Vector3[] _skinnedVertices;
         private uint[] _jointHashes;
+        private GpuSkinningData _gpuSkinningData;
 
         // Cached model-specific data
         private string _lastModelName;
         private IVertexBufferView _lastVerticesView;
+        private RigResource _lastSkeleton;
+        private IList<ModelPart> _lastModelParts;
         private Vector3[] _cachedPositions;
         private (byte x, byte y, byte z, byte w)[] _cachedBlendIndices;
         private Vector4[] _cachedBlendWeights;
 
         private bool _isDisposed;
 
-        public AnimationPlayer(LogService logService)
+        public AnimationService(LogService logService)
         {
             _logService = logService;
         }
+
+        internal Matrix4x4[] FinalBoneTransforms => _finalBoneTransforms;
+        internal GpuSkinningData SkinningData => _gpuSkinningData;
 
         /// <summary>
         /// Releases cached buffers from the previous model so a new load does not
@@ -49,19 +55,29 @@ namespace AssetsManager.Services.Viewer.Animation
         {
             _lastModelName = null;
             _lastVerticesView = null;
+            _lastSkeleton = null;
+            _lastModelParts = null;
             _cachedPositions = null;
             _cachedBlendIndices = null;
             _cachedBlendWeights = null;
             _skinnedVertices = null;
+            _gpuSkinningData = null;
             _currentPose.Clear();
         }
 
-        private void EnsureBuffers(RigResource skeleton, SkinnedMesh skin, string modelName)
+        private void EnsureBuffers(
+            RigResource skeleton,
+            SkinnedMesh skin,
+            IList<ModelPart> modelParts,
+            string modelName)
         {
-            if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationPlayer));
+            if (_isDisposed) throw new ObjectDisposedException(nameof(AnimationService));
 
             int jointCount = skeleton.Joints.Count;
-            if (_boneTransforms == null || _boneTransforms.Length != jointCount || _lastModelName != modelName)
+            if (_boneTransforms == null ||
+                _boneTransforms.Length != jointCount ||
+                _lastModelName != modelName ||
+                !ReferenceEquals(_lastSkeleton, skeleton))
             {
                 _boneTransforms = new Matrix4x4[jointCount];
                 _finalBoneTransforms = new Matrix4x4[jointCount];
@@ -72,10 +88,26 @@ namespace AssetsManager.Services.Viewer.Animation
                 }
             }
 
-            if (_lastModelName != modelName || _lastVerticesView != skin.VerticesView)
+            if (_lastModelName != modelName ||
+                _lastVerticesView != skin.VerticesView ||
+                !ReferenceEquals(_lastSkeleton, skeleton) ||
+                !ReferenceEquals(_lastModelParts, modelParts))
             {
                 _lastModelName = modelName;
                 _lastVerticesView = skin.VerticesView;
+                _lastSkeleton = skeleton;
+                _lastModelParts = modelParts;
+
+                _gpuSkinningData = GpuSkinningData.TryCreate(skeleton, skin, modelParts);
+
+                if (_gpuSkinningData != null)
+                {
+                    _cachedPositions = null;
+                    _cachedBlendIndices = null;
+                    _cachedBlendWeights = null;
+                    _skinnedVertices = null;
+                    return;
+                }
 
                 var posAccessor = skin.VerticesView.GetAccessor(VertexElement.POSITION.Name);
                 _cachedPositions = posAccessor.AsVector3Array().ToArray();
@@ -100,9 +132,10 @@ namespace AssetsManager.Services.Viewer.Animation
             }
 
             // 1. Ensure buffers are ready (only allocates when model changes)
-            EnsureBuffers(skeleton, skin, modelName);
+            EnsureBuffers(skeleton, skin, modelParts, modelName);
 
-            var currentTime = totalSeconds % animation.Duration;
+            _currentPose.Clear();
+            var currentTime = animation.Duration > 0f ? totalSeconds % animation.Duration : 0f;
             animation.Evaluate(currentTime, _currentPose);
 
             // 2. Calculate Bone Matrices (Hierarchical)
@@ -135,7 +168,8 @@ namespace AssetsManager.Services.Viewer.Animation
                 _finalBoneTransforms[i] = skeleton.Joints[i].InverseBindTransform * _boneTransforms[i];
             }
 
-            if (_cachedPositions.Length == 0) return;
+            if (_gpuSkinningData != null || _cachedPositions == null || _cachedPositions.Length == 0)
+                return;
 
             try
             {

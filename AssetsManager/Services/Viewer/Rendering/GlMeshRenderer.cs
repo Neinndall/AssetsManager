@@ -19,8 +19,10 @@ namespace AssetsManager.Services.Viewer.Rendering
         private GL _gl = null!;
         private GlMeshResourceCache _resources = null!;
         private uint _program;
+        private uint _boneBuffer;
         private int _uViewProj;
         private int _uWorld;
+        private int _uUseSkinning;
         private int _uTex;
         private int _uEffectTex;
         private int _uEffectMask;
@@ -101,9 +103,20 @@ namespace AssetsManager.Services.Viewer.Rendering
                 gl,
                 gles,
                 GlMeshShaderSource.Vertex,
-                GlMeshShaderSource.Fragment);
+            GlMeshShaderSource.Fragment);
             CacheUniformLocations(gl);
+            uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
+            if (boneBlock != uint.MaxValue)
+                gl.UniformBlockBinding(_program, boneBlock, 0);
             _resources = new GlMeshResourceCache(gl);
+            _boneBuffer = gl.GenBuffer();
+            gl.BindBuffer(BufferTargetARB.UniformBuffer, _boneBuffer);
+            gl.BufferData(
+                BufferTargetARB.UniformBuffer,
+                new ReadOnlySpan<float>(new float[GpuSkinningData.MaxBones * 16]),
+                BufferUsageARB.DynamicDraw);
+            gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, _boneBuffer);
+            gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
             _ready = true;
         }
 
@@ -134,6 +147,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.UniformMatrix4(_uViewProj, 1, false, in viewProj.M11);
             Matrix4x4 world = CreateWorldMatrix(model);
             _gl.UniformMatrix4(_uWorld, 1, false, in world.M11);
+            UploadBoneTransforms(model.SkinningMatrices);
             _gl.Uniform3(_uLightDir, NormalizeOrDefault(lightDir));
             _gl.Uniform3(_uLightColor, lightColor);
             _gl.Uniform3(_uLightDir2, NormalizeOrDefault(lightDir2));
@@ -176,6 +190,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         {
             _uViewProj = gl.GetUniformLocation(_program, "uViewProj");
             _uWorld = gl.GetUniformLocation(_program, "uWorld");
+            _uUseSkinning = gl.GetUniformLocation(_program, "uUseSkinning");
             _uTex = gl.GetUniformLocation(_program, "uTex");
             _uEffectTex = gl.GetUniformLocation(_program, "uEffectTex");
             _uEffectMask = gl.GetUniformLocation(_program, "uEffectMask");
@@ -256,10 +271,13 @@ namespace AssetsManager.Services.Viewer.Rendering
                     continue;
                 }
 
-                GlMeshResourceCache.PartResources resources = _resources.Ensure(part);
+                GlMeshResourceCache.PartResources resources = _resources.Ensure(model, part);
                 if (resources.Vao == 0) continue;
 
                 _gl.BindVertexArray(resources.Vao);
+                _gl.Uniform1(
+                    _uUseSkinning,
+                    resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
                 _gl.ActiveTexture(TextureUnit.Texture0);
                 _gl.BindTexture(
                     TextureTarget.Texture2D,
@@ -395,6 +413,21 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.BindTexture(TextureTarget.Texture2D, 0);
         }
 
+        private void UploadBoneTransforms(Matrix4x4[] boneTransforms)
+        {
+            if (_boneBuffer == 0 || boneTransforms == null || boneTransforms.Length == 0)
+                return;
+
+            int boneCount = Math.Min(boneTransforms.Length, GpuSkinningData.MaxBones);
+            _gl.BindBuffer(BufferTargetARB.UniformBuffer, _boneBuffer);
+            _gl.BufferSubData(
+                BufferTargetARB.UniformBuffer,
+                0,
+                new ReadOnlySpan<Matrix4x4>(boneTransforms, 0, boneCount));
+            _gl.BindBufferBase(BufferTargetARB.UniformBuffer, 0, _boneBuffer);
+            _gl.BindBuffer(BufferTargetARB.UniformBuffer, 0);
+        }
+
         private static Matrix4x4 CreateWorldMatrix(SceneModel model)
         {
             float pitch = (float)(model.RotationX * (Math.PI / 180.0));
@@ -427,6 +460,9 @@ namespace AssetsManager.Services.Viewer.Rendering
             if (!_ready) return;
 
             _resources.Dispose();
+            if (_boneBuffer != 0)
+                _gl.DeleteBuffer(_boneBuffer);
+            _boneBuffer = 0;
             if (_program != 0)
                 _gl.DeleteProgram(_program);
             _ready = false;

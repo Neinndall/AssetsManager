@@ -8,8 +8,11 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					layout(location=2) in vec2 aUv;
 					layout(location=3) in vec2 aLightmapUv;
 					layout(location=4) in vec4 aColor;
+					layout(location=5) in vec4 aBoneIndices;
+					layout(location=6) in vec4 aBoneWeights;
 					uniform mat4 uViewProj;
 					uniform mat4 uWorld;
+					uniform int uUseSkinning;
 					uniform int uHasVertexColor;
 					uniform int uEffectKind;
 					uniform float uEffectTime;
@@ -17,6 +20,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					uniform float uWaveSpeed;
 					uniform float uWaveFrequency;
 					uniform float uWaveIntensity;
+					const int MAX_BONES = 256;
+					layout(std140) uniform BoneTransforms {
+						mat4 uBoneTransforms[MAX_BONES];
+					};
 					out vec3 vNormal;
 					out vec3 vWorldPosition;
 					out vec2 vUv;
@@ -24,20 +31,32 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 					out vec4 vColor;
 					void main(){
 							vec3 animatedPosition = aPos;
+							vec3 animatedNormal = aNormal;
+							if (uUseSkinning != 0)
+							{
+								ivec4 boneIndices = ivec4(aBoneIndices + vec4(0.5));
+								mat4 skinMatrix =
+									uBoneTransforms[boneIndices.x] * aBoneWeights.x +
+									uBoneTransforms[boneIndices.y] * aBoneWeights.y +
+									uBoneTransforms[boneIndices.z] * aBoneWeights.z +
+									uBoneTransforms[boneIndices.w] * aBoneWeights.w;
+								animatedPosition = (skinMatrix * vec4(aPos, 1.0)).xyz;
+								animatedNormal = mat3(skinMatrix) * aNormal;
+							}
 							if ((uEffectKind & 32) != 0 && abs(uWaveIntensity) > 0.0001)
 							{
 								vec2 waveDirection = length(uWaveDirection.xy) > 0.0001
 									? normalize(uWaveDirection.xy)
 									: vec2(0.0, 1.0);
-								vec3 normal = length(aNormal) > 0.0001
-									? normalize(aNormal)
+								vec3 normal = length(animatedNormal) > 0.0001
+									? normalize(animatedNormal)
 									: vec3(0.0, 1.0, 0.0);
 								float phase = dot(aUv, waveDirection) * 6.2831853 * uWaveFrequency + uEffectTime * uWaveSpeed;
 								animatedPosition += normal * sin(phase) * uWaveIntensity;
 							}
 							vec4 worldPos = uWorld * vec4(animatedPosition, 1.0);
 							gl_Position = uViewProj * worldPos;
-							vNormal = normalize(mat3(uWorld) * aNormal);
+							vNormal = normalize(mat3(uWorld) * animatedNormal);
 							vWorldPosition = worldPos.xyz;
 							vUv = aUv;
 							vLightmapUv = aLightmapUv;

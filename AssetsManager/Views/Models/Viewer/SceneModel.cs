@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Numerics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -104,6 +105,8 @@ namespace AssetsManager.Views.Models.Viewer
         public IAnimationAsset CurrentAnimation { get; set; }
         public bool IsAnimationPaused { get; set; } = true;
         public double AnimationTime { get; set; }
+        internal GpuSkinningData GpuSkinningData { get; set; }
+        internal Matrix4x4[] SkinningMatrices { get; set; }
         private bool _isUpdatingVisibility;
 
         private bool _isVisible = true;
@@ -366,6 +369,8 @@ namespace AssetsManager.Views.Models.Viewer
             CurrentAnimation = null;
             SkinnedMesh = null;
             Skeleton = null;
+            GpuSkinningData = null;
+            SkinningMatrices = null;
             MapLightingProfile = null;
             RootVisual = null;
 

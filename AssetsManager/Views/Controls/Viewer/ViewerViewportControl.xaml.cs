@@ -258,7 +258,7 @@ namespace AssetsManager.Views.Controls.Viewer
         }
 
         private CustomCameraController _cameraController;
-        private readonly Dictionary<SceneModel, AnimationPlayer> _modelPlayers = new();
+        private readonly Dictionary<SceneModel, AnimationService> _animationServices = new();
         private readonly System.Diagnostics.Stopwatch _renderStopwatch = new();
         private readonly System.Diagnostics.Stopwatch _fpsStopwatch = new();
         private int _framesSinceFpsUpdate;
@@ -361,7 +361,7 @@ namespace AssetsManager.Views.Controls.Viewer
                 AppSettings.ConfigurationSaved -= OnAppSettingsSaved;
                 AppSettings.ConfigurationSaved += OnAppSettingsSaved;
             }
-            _modelPlayers.Clear();
+            _animationServices.Clear();
             InitializeModelInteraction();
             _cameraController = new CustomCameraController(Viewport3D, CameraInputSurface);
 
@@ -565,12 +565,12 @@ namespace AssetsManager.Views.Controls.Viewer
                 // Limpiar todo el viewport
                 Viewport.Children.Clear();
 
-                // 6. Liberar los AnimationPlayers y todos sus buffers cacheados
-                foreach (var player in _modelPlayers.Values)
+                // 6. Liberar los animation services y todos sus buffers cacheados
+                foreach (var animationService in _animationServices.Values)
                 {
-                    player.Dispose();
+                    animationService.Dispose();
                 }
-                _modelPlayers.Clear();
+                _animationServices.Clear();
 
                 // 7. Liberar el CameraController (dueño único)
                 _cameraController?.Dispose();
@@ -744,11 +744,11 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // CRITICAL: Free cached vertex/skin buffers from the previous model so
             // the next load does not retain RAM of a model that is no longer in use.
-            foreach (var player in _modelPlayers.Values)
+            foreach (var animationService in _animationServices.Values)
             {
-                player.Dispose();
+                animationService.Dispose();
             }
-            _modelPlayers.Clear();
+            _animationServices.Clear();
             _lastModelUpdates.Clear();
 
             _viewModel.UpdateSceneDisplay(_loadedModels.Count, _loadedModels.Count > 0 ? _loadedModels[0].Name : null);
@@ -798,10 +798,10 @@ namespace AssetsManager.Views.Controls.Viewer
             _loadedModels.Remove(model);
             _lastModelUpdates.Remove(model);
             _meshRenderer?.QueueRelease(model);
-            if (_modelPlayers.TryGetValue(model, out var player))
+            if (_animationServices.TryGetValue(model, out var animationService))
             {
-                player.Dispose();
-                _modelPlayers.Remove(model);
+                animationService.Dispose();
+                _animationServices.Remove(model);
             }
             if (Viewport.Children.Contains(model.RootVisual))
             {
@@ -938,7 +938,6 @@ namespace AssetsManager.Views.Controls.Viewer
                         }
                         else if (!model.IsAnimationPaused)
                         {
-                            double oldTime = model.AnimationTime;
                             model.AnimationTime += deltaTime * speed;
 
                             var duration = model.CurrentAnimation.Duration;
@@ -976,8 +975,8 @@ namespace AssetsManager.Views.Controls.Viewer
                         if (needsUpdate)
                         {
                             _lastModelUpdates[model] = currentKey;
-                            var player = GetPlayerForModel(model);
-                            player.Update(
+                            var animationService = GetAnimationServiceForModel(model);
+                            animationService.Update(
                                 (float)model.AnimationTime,
                                 model.CurrentAnimation,
                                 model.Skeleton,
@@ -985,6 +984,8 @@ namespace AssetsManager.Views.Controls.Viewer
                                 model.Parts,
                                 model.Name
                             );
+                            model.GpuSkinningData = animationService.SkinningData;
+                            model.SkinningMatrices = animationService.FinalBoneTransforms;
                         }
                     }
 
@@ -1021,14 +1022,14 @@ namespace AssetsManager.Views.Controls.Viewer
             _fpsStopwatch.Restart();
         }
 
-        private AnimationPlayer GetPlayerForModel(SceneModel model)
+        private AnimationService GetAnimationServiceForModel(SceneModel model)
         {
-            if (!_modelPlayers.TryGetValue(model, out var player))
+            if (!_animationServices.TryGetValue(model, out var animationService))
             {
-                player = new AnimationPlayer(LogService);
-                _modelPlayers[model] = player;
+                animationService = new AnimationService(LogService);
+                _animationServices[model] = animationService;
             }
-            return player;
+            return animationService;
         }
 
         public void ResetCamera(bool smooth = true)

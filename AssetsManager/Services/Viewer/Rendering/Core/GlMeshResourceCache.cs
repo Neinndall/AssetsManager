@@ -52,6 +52,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             internal BitmapSource LoadedLightmapBitmap;
             internal uint LightmapVbo;
             internal uint ColorVbo;
+            internal uint BoneIndexVbo;
+            internal uint BoneWeightVbo;
+            internal GpuSkinningData.PartData SkinningData;
+            internal bool IsGpuSkinned;
             internal Point3DCollection UploadedPositions;
             internal int VertexCount;
             internal GlMeshVertexData VertexData;
@@ -80,7 +84,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 
         internal uint WhiteTexture { get; }
 
-        internal PartResources Ensure(ModelPart part)
+        internal PartResources Ensure(SceneModel model, ModelPart part)
         {
             if (!_partResources.TryGetValue(part, out PartResources resources))
             {
@@ -94,7 +98,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             EnsureEmissionTextures(part, resources);
             EnsureIridescenceTextures(part, resources);
             EnsureLightmapTexture(part, resources);
-            resources = EnsureMeshBuffers(part, resources);
+            resources = EnsureMeshBuffers(model, part, resources);
+            EnsureSkinningBuffers(model, resources, part);
             EnsureLightmapVertexBuffer(part, resources);
             EnsureVertexColorBuffer(part, resources);
             return resources;
@@ -114,7 +119,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _pendingReleases.Clear();
         }
 
-        private PartResources EnsureMeshBuffers(ModelPart part, PartResources resources)
+        private PartResources EnsureMeshBuffers(SceneModel model, ModelPart part, PartResources resources)
         {
             if (resources.Vao == 0 && part.Geometry?.Geometry is MeshGeometry3D mesh)
             {
@@ -126,7 +131,10 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 var vertexData = new GlMeshVertexData(vertexCount);
                 vertexData.Update(mesh, updateTextureCoordinates: true);
                 resources.VertexCount = vertexCount;
-                resources.VertexData = part.SourceVertexIndices != null ? vertexData : null;
+                resources.VertexData = model?.GpuSkinningData?.TryGetPart(part, out _) == true ||
+                    part.SourceVertexIndices == null
+                    ? null
+                    : vertexData;
                 resources.UploadedPositions = positions;
 
                 uint[] indexData = new uint[indices.Count];
@@ -173,7 +181,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             if (animatedPositions.Count != resources.VertexData.VertexCount)
             {
                 ReleasePart(part);
-                return Ensure(part);
+                return Ensure(model, part);
             }
 
             resources.VertexData.Update(animatedMesh, updateTextureCoordinates: false);
@@ -185,6 +193,59 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
             resources.UploadedPositions = animatedPositions;
             return resources;
+        }
+
+        private void EnsureSkinningBuffers(SceneModel model, PartResources resources, ModelPart part)
+        {
+            if (resources.Vao == 0)
+                return;
+
+            GpuSkinningData.PartData skinningData = null;
+            model?.GpuSkinningData?.TryGetPart(part, out skinningData);
+
+            if (ReferenceEquals(resources.SkinningData, skinningData) &&
+                (skinningData == null || resources.IsGpuSkinned))
+            {
+                return;
+            }
+
+            ReleaseSkinningBuffers(resources);
+            resources.SkinningData = skinningData;
+            if (skinningData == null || skinningData.VertexCount != resources.VertexCount)
+                return;
+
+            resources.BoneIndexVbo = _gl.GenBuffer();
+            resources.BoneWeightVbo = _gl.GenBuffer();
+
+            _gl.BindVertexArray(resources.Vao);
+
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneIndexVbo);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<float>(skinningData.BoneIndices),
+                BufferUsageARB.StaticDraw);
+            ConfigureVertexAttribute(5, 4, 4 * sizeof(float), IntPtr.Zero);
+
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, resources.BoneWeightVbo);
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                new ReadOnlySpan<float>(skinningData.BoneWeights),
+                BufferUsageARB.StaticDraw);
+            ConfigureVertexAttribute(6, 4, 4 * sizeof(float), IntPtr.Zero);
+
+            _gl.BindVertexArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+            resources.IsGpuSkinned = true;
+        }
+
+        private void ReleaseSkinningBuffers(PartResources resources)
+        {
+            DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
+            DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
+            resources.BoneIndexVbo = 0;
+            resources.BoneWeightVbo = 0;
+            resources.SkinningData = null;
+            resources.IsGpuSkinned = false;
         }
 
         private void ConfigureVertexAttribute(uint location, int componentCount, uint stride, IntPtr offset)
@@ -465,6 +526,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
             DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
             DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
             DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
+            DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
+            DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
             _liveResources.Remove(resources);
             _partResources.Remove(part);
         }
@@ -615,6 +678,8 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
                 DeleteHandle(resources.Ebo, _gl.DeleteBuffer);
                 DeleteHandle(resources.LightmapVbo, _gl.DeleteBuffer);
                 DeleteHandle(resources.ColorVbo, _gl.DeleteBuffer);
+                DeleteHandle(resources.BoneIndexVbo, _gl.DeleteBuffer);
+                DeleteHandle(resources.BoneWeightVbo, _gl.DeleteBuffer);
             }
             _liveResources.Clear();
             _pendingReleases.Clear();
