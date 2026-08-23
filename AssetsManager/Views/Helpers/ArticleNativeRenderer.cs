@@ -13,7 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AssetsManager.Services.News;
 
-namespace AssetsManager.Utils
+namespace AssetsManager.Views.Helpers
 {
     /// <summary>
     /// Modern native WPF block renderer for Riot article HTML content.
