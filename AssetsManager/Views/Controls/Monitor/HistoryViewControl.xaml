@@ -6,13 +6,8 @@
              xmlns:local="clr-namespace:AssetsManager.Views.Controls.Monitor"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              mc:Ignorable="d"
              d:DesignHeight="800" d:DesignWidth="800">
-
-    <UserControl.Resources>
-        <converters:EqualityConverter x:Key="EqualityConverter"/>
-    </UserControl.Resources>
 
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>

@@ -4,7 +4,6 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
         xmlns:models="clr-namespace:AssetsManager.Views.Models.Home"
         xmlns:base="clr-namespace:AssetsManager.Views.Helpers"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
@@ -17,11 +16,6 @@
         HeaderTitle="Universal Converter"
         HeaderIcon="AutoFix"
         Style="{StaticResource HudWindowStyle}">
-
-    <Window.Resources>
-        <converters:ChunkDiffTypeToBrushConverter x:Key="StatusToBrushConverter"/>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-    </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>

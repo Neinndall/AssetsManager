@@ -22,6 +22,7 @@
     <converters:BooleanToMaterialIconConverter x:Key="BooleanToMaterialIconConverter"/>
     <converters:StringCaseConverter x:Key="StringCaseConverter"/>
     <converters:TimeAgoConverter x:Key="TimeAgoConverter"/>
+    <converters:AdaptiveImageStretchConverter x:Key="AdaptiveImageStretchConverter"/>
 
     <!-- 3. Specialized Parameterized Converters -->
     <converters:BoolToBrushConverter x:Key="BoolToBrushConverter" 

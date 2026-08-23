@@ -4,15 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-        xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
         xmlns:glWpfControl="clr-namespace:OpenTK.Wpf;assembly=GLWpfControl"
         mc:Ignorable="d" FontFamily="{StaticResource AppFontFamily}"
         Background="{StaticResource SidebarBackground}">
-
-    <UserControl.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
-    </UserControl.Resources>
 
     <Grid Background="{StaticResource SidebarBackground}">
         <Grid.RowDefinitions>
@@ -205,7 +199,7 @@
                     <!-- Active View Content Panels -->
                     <Grid Grid.Row="1">
                         <!-- TAB 1: 3D REAL-TIME VIEWPORT -->
-                        <Grid Visibility="{Binding IsChecked, ElementName=TabViewport, Converter={StaticResource BoolToVis}}">
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabViewport, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*"/>    <!-- OpenTK OpenGL Canvas -->
                                 <RowDefinition Height="Auto"/> <!-- Viewport Controls Bar -->
@@ -336,7 +330,7 @@
                                                                      <Ellipse Width="8" Height="8" Fill="#FFD700" Stroke="#18181B" StrokeThickness="1"
                                                                               HorizontalAlignment="Left" VerticalAlignment="Center"
                                                                               Margin="{Binding DelayMarkerMargin}"
-                                                                              Visibility="{Binding HasDelay, Converter={StaticResource BoolToVis}}"
+                                                                              Visibility="{Binding HasDelay, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                               ToolTip="{Binding DelayTime, StringFormat='Emission Trigger: {0:F2}s'}"/>
                                                                  </Grid>
                                                             </DataTemplate>
@@ -471,7 +465,7 @@
                         </Grid>
 
                         <!-- TAB 2: EMITTERS BREAKDOWN -->
-                        <Grid Visibility="{Binding IsChecked, ElementName=TabEmitters, Converter={StaticResource BoolToVis}}">
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabEmitters, Converter={StaticResource BoolToVisibilityConverter}}">
                             <ListView x:Name="EmittersListView" ItemsSource="{Binding Emitters}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
                                     <GridView AllowsColumnReorder="False">
@@ -601,7 +595,7 @@
                         </Grid>
 
                         <!-- TAB 3: TEXTURES -->
-                        <Grid Visibility="{Binding IsChecked, ElementName=TabTextures, Converter={StaticResource BoolToVis}}">
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabTextures, Converter={StaticResource BoolToVisibilityConverter}}">
                             <ListView x:Name="TexturesListView" ItemsSource="{Binding Textures}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
                                     <GridView AllowsColumnReorder="False">
@@ -704,7 +698,7 @@
                         </Grid>
 
                         <!-- TAB 4: MESHES (.scb / .sco / .skn) -->
-                        <Grid Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BoolToVis}}">
+                        <Grid Visibility="{Binding IsChecked, ElementName=TabMeshes, Converter={StaticResource BoolToVisibilityConverter}}">
                             <ListView x:Name="MeshesListView" ItemsSource="{Binding Meshes}" Style="{StaticResource ModernTableListView}" Loaded="TableListView_Loaded" SizeChanged="TableListView_SizeChanged" IsVisibleChanged="TableListView_IsVisibleChanged">
                                 <ListView.View>
                                     <GridView AllowsColumnReorder="False">

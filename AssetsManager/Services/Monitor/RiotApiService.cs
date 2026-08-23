@@ -110,6 +110,28 @@ namespace AssetsManager.Services.Monitor
                     string path = pathProp.GetString();
                     if (!string.IsNullOrEmpty(path)) map.TryAdd(name, path);
                 }
+
+                // If this skin entry contains nested chromas, index each chroma asset
+                if (element.TryGetProperty("chromas", out var chromasProp) && chromasProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var chroma in chromasProp.EnumerateArray())
+                    {
+                        string chromaName = chroma.TryGetProperty("name", out var cNameProp) ? cNameProp.GetString() : null;
+                        string chromaPath = chroma.TryGetProperty("chromaPath", out var cPathProp) ? cPathProp.GetString() : null;
+
+                        if (!string.IsNullOrEmpty(chromaName) && !string.IsNullOrEmpty(chromaPath))
+                        {
+                            map.TryAdd(chromaName, chromaPath);
+
+                            // Also index composite name permutations if the chroma name is short
+                            if (!chromaName.Contains(name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                map.TryAdd($"{name} ({chromaName})", chromaPath);
+                                map.TryAdd($"{name} - {chromaName}", chromaPath);
+                            }
+                        }
+                    }
+                }
             }
         }
 

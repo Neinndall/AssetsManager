@@ -4,14 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
-             xmlns:converters="clr-namespace:AssetsManager.Views.Converters"
              xmlns:controls="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="1000">
 
     <UserControl.Resources>
-        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
-
         <DataTemplate x:Key="WadResultItemTemplate">
             <Border Width="160" Height="196" Margin="6" CornerRadius="10"
                     Background="{StaticResource CardBackground}"
