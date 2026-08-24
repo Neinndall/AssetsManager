@@ -414,6 +414,22 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void IridescenceRequiresAlphaBlendForAuthoredFresnelMaskWithoutSwitches()
+        {
+            var iridescence = new ModelIridescenceDefinition(
+                "iridescent-lut",
+                "alpha-mask",
+                Vector4.One,
+                Vector2.Zero,
+                new Vector2(0.9f, 0.9f),
+                1f,
+                UsesPulse: false,
+                UsesLocalizedAlpha: false);
+
+            Assert.True(iridescence.RequiresAlphaBlend);
+        }
+
+        [Fact]
         public void Resolve_LeavesMissingIridescenceMaskForWhiteFallback()
         {
             var material = new SknMaterialDefinition(

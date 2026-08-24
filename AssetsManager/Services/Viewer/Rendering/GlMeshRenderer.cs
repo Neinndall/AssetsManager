@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -20,6 +21,7 @@ namespace AssetsManager.Services.Viewer.Rendering
         private GlMeshResourceCache _resources = null!;
         private uint _program;
         private uint _boneBuffer;
+        private readonly List<ModelPart> _alphaRenderQueue = new();
         private int _uViewProj;
         private int _uWorld;
         private int _uUseSkinning;
@@ -175,14 +177,14 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Enable(EnableCap.DepthTest);
             _gl.DepthMask(true);
             _gl.Disable(EnableCap.Blend);
-            RenderParts(model, renderDecals: false, alphaBlended: false);
-            RenderParts(model, renderDecals: true, alphaBlended: false);
+            RenderParts(model, false, false, cameraPosition, world);
+            RenderParts(model, true, false, cameraPosition, world);
 
             _gl.Enable(EnableCap.Blend);
             _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             _gl.DepthMask(false);
-            RenderParts(model, renderDecals: false, alphaBlended: true);
-            RenderParts(model, renderDecals: true, alphaBlended: true);
+            RenderParts(model, false, true, cameraPosition, world);
+            RenderParts(model, true, true, cameraPosition, world);
 
             _gl.Disable(EnableCap.PolygonOffsetFill);
             _gl.Disable(EnableCap.Blend);
@@ -255,7 +257,7 @@ namespace AssetsManager.Services.Viewer.Rendering
             _uHasVertexColor = gl.GetUniformLocation(_program, "uHasVertexColor");
         }
 
-        private void RenderParts(SceneModel model, bool renderDecals, bool alphaBlended)
+        private void RenderParts(SceneModel model, bool renderDecals, bool alphaBlended, Vector3 cameraPosition, Matrix4x4 world)
         {
             if (renderDecals)
             {
@@ -267,9 +269,23 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Disable(EnableCap.PolygonOffsetFill);
             }
 
+            IEnumerable<ModelPart> parts = model.Parts;
+            if (alphaBlended)
+            {
+                _alphaRenderQueue.Clear();
+                foreach (ModelPart part in model.Parts)
+                    if (part.IsVisible && part.IsDecal == renderDecals && part.IsAlphaBlended)
+                        _alphaRenderQueue.Add(part);
+
+                _alphaRenderQueue.Sort((left, right) =>
+                    GetRenderDistanceSquared(right, cameraPosition, world)
+                        .CompareTo(GetRenderDistanceSquared(left, cameraPosition, world)));
+                parts = _alphaRenderQueue;
+            }
+
             uint lastBoundTex0 = uint.MaxValue;
 
-            foreach (ModelPart part in model.Parts)
+            foreach (ModelPart part in parts)
             {
                 if (!part.IsVisible ||
                     part.IsDecal != renderDecals ||
@@ -313,14 +329,14 @@ namespace AssetsManager.Services.Viewer.Rendering
                     Vector2 iridescencePulseSpeedMin = iridescence?.UsesPulse == true
                         ? iridescence.PulseSpeedMin
                         : Vector2.Zero;
-                    Vector2 iridescenceAlphaMinMax = iridescence?.UsesLocalizedAlpha == true
+                    Vector2 iridescenceAlphaMinMax = iridescence?.RequiresAlphaBlend == true
                         ? iridescence.FresnelAlphaMinMax
                         : Vector2.One;
 
                     _gl.Uniform4(_uIridescenceControl, iridescenceControl.X, iridescenceControl.Y, iridescenceControl.Z, iridescenceControl.W);
                     _gl.Uniform2(_uIridescencePulseSpeedMin, iridescencePulseSpeedMin.X, iridescencePulseSpeedMin.Y);
                     _gl.Uniform2(_uIridescenceAlphaMinMax, iridescenceAlphaMinMax.X, iridescenceAlphaMinMax.Y);
-                    _gl.Uniform1(_uIridescenceDiffuseFadeMask, iridescence?.UsesLocalizedAlpha == true ? iridescence.DiffuseFadeMaskValue : 0f);
+                    _gl.Uniform1(_uIridescenceDiffuseFadeMask, iridescence?.RequiresAlphaBlend == true ? iridescence.DiffuseFadeMaskValue : 0f);
 
                     _gl.ActiveTexture(TextureUnit.Texture6);
                     _gl.BindTexture(TextureTarget.Texture2D, resources.IridescenceTexture != 0 ? resources.IridescenceTexture : _resources.WhiteTexture);
@@ -452,6 +468,23 @@ namespace AssetsManager.Services.Viewer.Rendering
                        (float)model.PositionX,
                        (float)model.PositionY,
                        (float)model.PositionZ);
+        }
+
+        private static float GetRenderDistanceSquared(
+            ModelPart part,
+            Vector3 cameraPosition,
+            Matrix4x4 world)
+        {
+            if (part.Geometry == null) return float.PositiveInfinity;
+
+            var bounds = part.Geometry.Bounds;
+            if (bounds.IsEmpty) return float.PositiveInfinity;
+
+            Vector3 center = new(
+                (float)(bounds.X + bounds.SizeX * 0.5),
+                (float)(bounds.Y + bounds.SizeY * 0.5),
+                (float)(bounds.Z + bounds.SizeZ * 0.5));
+            return Vector3.DistanceSquared(Vector3.Transform(center, world), cameraPosition);
         }
 
         private static Vector3 NormalizeOrDefault(Vector3 value) =>
