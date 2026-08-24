@@ -75,11 +75,11 @@ namespace AssetsManager.Views.Dialogs
             {
                 if (ViewModel.Items.Any(i => i.FilePath == file)) continue;
 
-                string ext = Path.GetExtension(file).ToLower();
+                string ext = Path.GetExtension(file).ToLowerInvariant();
                 ConverterFileType? type = null;
 
                 if (ext == ".tex" || ext == ".dds") type = ConverterFileType.Image;
-                else if (ext == ".wem" || ext == ".ogg" || ext == ".mp3" || ext == ".wav") type = ConverterFileType.Audio;
+                else if (SupportedFileTypes.Media.Contains(ext)) type = ConverterFileType.Audio;
 
                 if (type.HasValue)
                 {
@@ -116,6 +116,7 @@ namespace AssetsManager.Views.Dialogs
             if (tag == "Ogg") ViewModel.SelectedAudioFormat = AudioExportFormat.Ogg;
             else if (tag == "Wav") ViewModel.SelectedAudioFormat = AudioExportFormat.Wav;
             else if (tag == "Mp3") ViewModel.SelectedAudioFormat = AudioExportFormat.Mp3;
+            else if (tag == "Flac") ViewModel.SelectedAudioFormat = AudioExportFormat.Flac;
         }
 
         private async void Convert_Click(object sender, RoutedEventArgs e)
@@ -195,15 +196,10 @@ namespace AssetsManager.Views.Dialogs
 
             if (convertedData != null)
             {
-                string extension = ViewModel.SelectedAudioFormat switch
-                {
-                    AudioExportFormat.Wav => ".wav",
-                    AudioExportFormat.Mp3 => ".mp3",
-                    _ => ".ogg"
-                };
+                string extension = ViewModel.SelectedAudioFormat.GetExtension();
 
                 string outFileName = Path.GetFileNameWithoutExtension(item.FileName) + extension;
-                string outPath = Path.Combine(destinationPath, outFileName);
+                string outPath = PathUtils.GetUniqueFilePath(destinationPath, outFileName);
                 await File.WriteAllBytesAsync(outPath, convertedData);
                 item.Status = "Done";
             }

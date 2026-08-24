@@ -55,6 +55,8 @@
     <EmbeddedResource Include="Resources\AudioPlayer.html" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
     <EmbeddedResource Include="Resources\Vgmstream\**" />
+    <EmbeddedResource Include="Resources\Ffmpeg\ffmpeg.exe" />
+    <EmbeddedResource Include="Resources\Ffmpeg\*.dll" />
     <EmbeddedResource Include="Resources\Updater\**" />
   </ItemGroup>
 

@@ -36,7 +36,7 @@
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <materialIcons:MaterialIcon Kind="FileImportOutline" Width="60" Height="60" Foreground="{StaticResource TextMuted}" Margin="0,0,0,15" HorizontalAlignment="Center"/>
                             <TextBlock Text="Drag and drop your files here" Foreground="{StaticResource TextPrimary}" FontSize="16" FontWeight="Medium" HorizontalAlignment="Center"/>
-                            <TextBlock Text="Supports: .dds, .tex, .wem, .ogg, .wav, .mp3" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            <TextBlock Text="Supports: .dds, .tex, .wem, .ogg, .wav, .mp3, .flac" Foreground="{StaticResource TextMuted}" FontSize="12" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -120,6 +120,7 @@
                                 <RadioButton Content="OGG" IsChecked="True" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="55" Checked="AudioFormat_Checked" Tag="Ogg"/>
                                 <RadioButton Content="WAV" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="55" Checked="AudioFormat_Checked" Tag="Wav"/>
                                 <RadioButton Content="MP3" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="55" Checked="AudioFormat_Checked" Tag="Mp3"/>
+                                <RadioButton Content="FLAC" Style="{StaticResource SegmentedRadioButtonStyle}" MinWidth="55" Checked="AudioFormat_Checked" Tag="Flac"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

@@ -9,7 +9,7 @@ namespace AssetsManager.Utils
         public static readonly HashSet<string> Images = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".gif", ".ico", ".tga" };
         public static readonly HashSet<string> Textures = new(StringComparer.OrdinalIgnoreCase) { ".dds", ".tex" };
         public static readonly HashSet<string> VectorImages = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
-        public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3" };
+        public static readonly HashSet<string> Media = new(StringComparer.OrdinalIgnoreCase) { ".ogg", ".wem", ".webm", ".mp3", ".wav", ".flac" };
         public static readonly HashSet<string> AudioBank = new(StringComparer.OrdinalIgnoreCase) { ".wpk", ".bnk" };
         public static readonly HashSet<string> Viewer3D = new(StringComparer.OrdinalIgnoreCase) { ".skn", ".sco", ".scb", ".skl", ".anm", ".mapgeo" };
         public static readonly HashSet<string> Json = new(StringComparer.OrdinalIgnoreCase) { ".json" };

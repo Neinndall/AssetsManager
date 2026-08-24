@@ -306,13 +306,13 @@ namespace AssetsManager.Services.Explorer
             {
                 if (extension == ".wem")
                 {
-                    byte[] oggData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Ogg);
+                    byte[] wavData = await _audioConversionService.ConvertAudioToFormatAsync(data, ".wem", AudioExportFormat.Wav);
                     ThrowIfPreviewIsObsolete(previewRequest);
-                    if (oggData != null)
+                    if (wavData != null)
                     {
                         await SetPreviewerAsync(
                             Previewer.WebView,
-                            new MediaPreviewContent(oggData, ".ogg", node.Name),
+                            new MediaPreviewContent(wavData, ".wav", node.Name),
                             true,
                             previewRequest);
                     }

@@ -40,6 +40,8 @@ namespace AssetsManager.Views.Converters
             { ".ogg", MaterialIconKind.MusicNoteOutline },
             { ".wem", MaterialIconKind.MusicNoteOutline },
             { ".mp3", MaterialIconKind.MusicNoteOutline },
+            { ".wav", MaterialIconKind.MusicNoteOutline },
+            { ".flac", MaterialIconKind.MusicNoteOutline },
             { ".bin", MaterialIconKind.FileCodeOutline },
             { ".troybin", MaterialIconKind.StarFourPoints },
             { ".preload", MaterialIconKind.FormatListBulleted },

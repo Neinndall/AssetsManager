@@ -144,9 +144,6 @@ namespace AssetsManager.Services.Downloads
             if (SupportedFileTypes.IsAudioBank(diff.FileName))
                 return WadExportMode.Original;
 
-            if (SupportedFileTypes.IsAudio(diff.FileName) && _appSettings.AudioExportFormat == AudioExportFormat.Ogg)
-                return WadExportMode.Original;
-
             return WadExportMode.Smart;
         }
 

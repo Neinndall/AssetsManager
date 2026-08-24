@@ -256,14 +256,8 @@ namespace AssetsManager.Services.Explorer
         {
             string fileName = Path.GetFileName(tempFilePath);
             string fileUrl = $"https://preview.assets/{fileName}";
-            string mimeType = extension switch
-            {
-                ".ogg" => "audio/ogg",
-                ".webm" => "video/webm",
-                _ => "application/octet-stream"
-            };
 
-            if (!mimeType.StartsWith("video/", StringComparison.Ordinal))
+            if (!string.Equals(extension, ".webm", StringComparison.OrdinalIgnoreCase))
             {
                 return _audioPlayerTemplate.Replace("{{DISPLAY_NAME}}", WebUtility.HtmlEncode(displayName))
                                            .Replace("{{FILE_EXTENSION}}", extension.ToUpperInvariant().TrimStart('.'))
@@ -296,7 +290,7 @@ namespace AssetsManager.Services.Explorer
                     </head>
                     <body>
                         <video id='mediaElement' controls preload='auto' muted>
-                            <source src='{fileUrl}' type='{mimeType}'>
+                            <source src='{fileUrl}' type='video/webm'>
                         </video>
                         <script>
                             const mediaElement = document.getElementById('mediaElement');

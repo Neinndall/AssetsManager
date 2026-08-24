@@ -29,7 +29,8 @@ namespace AssetsManager.Views.Models.Shared
         {
             new FormatOption<AudioExportFormat> { Name = "OGG", Value = AudioExportFormat.Ogg },
             new FormatOption<AudioExportFormat> { Name = "WAV", Value = AudioExportFormat.Wav },
-            new FormatOption<AudioExportFormat> { Name = "MP3", Value = AudioExportFormat.Mp3 }
+            new FormatOption<AudioExportFormat> { Name = "MP3", Value = AudioExportFormat.Mp3 },
+            new FormatOption<AudioExportFormat> { Name = "FLAC", Value = AudioExportFormat.Flac }
         };
 
         public List<FormatOption<ImageExportFormat>> ImageFormatOptions { get; } = new List<FormatOption<ImageExportFormat>>

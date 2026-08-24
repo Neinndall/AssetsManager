@@ -402,6 +402,9 @@ namespace AssetsManager.Services.Formatting
                     break;
 
                 case ".ogg":
+                case ".mp3":
+                case ".wav":
+                case ".flac":
                     if (formats.AudioMode == WadExportMode.Smart)
                     {
                         await HandleStandardAudioFileAsync(node, destinationPath, formats.AudioTarget, cancellationToken, onFileSavedCallback);
@@ -503,12 +506,12 @@ namespace AssetsManager.Services.Formatting
 
             string currentExtension = Path.GetExtension(node.Name).ToLower();
 
-            if (targetFormat != AudioExportFormat.Ogg || currentExtension != ".ogg")
+            if (!string.Equals(targetFormat.GetExtension(), currentExtension, StringComparison.OrdinalIgnoreCase))
             {
-                byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(fileBytes, ".wem", targetFormat, cancellationToken);
+                byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(fileBytes, currentExtension, targetFormat, cancellationToken);
                 if (convertedData != null)
                 {
-                    string extension = targetFormat switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                    string extension = targetFormat.GetExtension();
                     string filePath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(node.Name, extension));
                     await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
                     onFileSavedCallback?.Invoke(filePath);
@@ -542,7 +545,7 @@ namespace AssetsManager.Services.Formatting
             byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
             if (convertedData != null)
             {
-                string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                string extension = format.GetExtension();
                 string filePath = PathUtils.GetUniqueFilePath(destinationPath, Path.ChangeExtension(node.Name, extension));
                 await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
                 onFileSavedCallback?.Invoke(filePath);
@@ -584,7 +587,7 @@ namespace AssetsManager.Services.Formatting
                     byte[] convertedData = await _audioConversionService.ConvertAudioToFormatAsync(wemData, ".wem", format, cancellationToken);
                     if (convertedData != null)
                     {
-                        string extension = format switch { AudioExportFormat.Wav => ".wav", AudioExportFormat.Mp3 => ".mp3", _ => ".ogg" };
+                        string extension = format.GetExtension();
                         string filePath = PathUtils.GetUniqueFilePath(eventPath, Path.ChangeExtension(soundNode.Name, extension));
                         await File.WriteAllBytesAsync(filePath, convertedData, cancellationToken);
                         onFileSavedCallback?.Invoke(filePath);
