@@ -29,9 +29,10 @@ namespace AssetsManager.Services.Formatting
         public AudioConversionService(LogService logService, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
-            _vgmstreamExePath = Path.Combine(directoriesCreator.AudioRuntimePath, "Vgmstream", "vgmstream-cli.exe");
-            _libsndfileDirectory = Path.Combine(directoriesCreator.AudioRuntimePath, "Libsndfile");
-            _tempConversionPath = Path.Combine(directoriesCreator.AudioRuntimePath, "WemPreview");
+            string audioRuntimePath = directoriesCreator.AudioRuntimePath;
+            _vgmstreamExePath = Path.Combine(audioRuntimePath, "Vgmstream", "vgmstream-cli.exe");
+            _libsndfileDirectory = Path.Combine(audioRuntimePath, "Libsndfile");
+            _tempConversionPath = Path.Combine(audioRuntimePath, "WemPreview");
         }
 
         public Task<byte[]> ConvertAudioToFormatAsync(
@@ -43,7 +44,7 @@ namespace AssetsManager.Services.Formatting
             return ConvertAudioToFormatInternalAsync(audioData, inputExtension, format, cancellationToken);
         }
 
-        private bool EnsureRuntimeReady()
+        private bool EnsureToolsExtracted()
         {
             lock (_runtimeLock)
             {
@@ -119,7 +120,7 @@ namespace AssetsManager.Services.Formatting
             AudioExportFormat format,
             CancellationToken cancellationToken)
         {
-            if (!await Task.Run(EnsureRuntimeReady, cancellationToken))
+            if (!await Task.Run(EnsureToolsExtracted, cancellationToken))
                 return null;
 
             string normalizedInputExtension = NormalizeExtension(inputExtension);
