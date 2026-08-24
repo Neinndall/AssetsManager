@@ -69,6 +69,7 @@ namespace AssetsManager.Views.Models.Viewer
         public float EmissionStrength { get; init; }
         public int EmissionChannel { get; init; } = -1;
         public ModelIridescenceDefinition Iridescence { get; init; }
+        public Vector4 MaterialTint { get; init; } = Vector4.One;
 
         public bool RequiresAlphaBlend =>
             Iridescence?.RequiresAlphaBlend == true;

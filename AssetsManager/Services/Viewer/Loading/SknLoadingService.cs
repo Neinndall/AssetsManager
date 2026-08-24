@@ -304,7 +304,8 @@ namespace AssetsManager.Services.Viewer.Loading
                         AllTextures = loadedTextures,
                         AvailableTextureNames = availableTextureNames,
                         SelectedTextureName = data.TexturePath,
-                        MaterialEffect = data.MaterialEffect
+                        MaterialEffect = data.MaterialEffect,
+                        ColorTint = data.MaterialEffect.MaterialTint
                     };
 
                     TextureUtils.UpdateMaterial(modelPart);

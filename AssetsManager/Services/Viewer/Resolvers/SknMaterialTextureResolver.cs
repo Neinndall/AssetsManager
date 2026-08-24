@@ -234,7 +234,8 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     submesh,
                     textureKeys,
                     metadata.OverrideTexturePaths.Keys);
-                if (effect.Kind != ModelMaterialEffectKind.None)
+                if (effect.Kind != ModelMaterialEffectKind.None ||
+                    effect.MaterialTint != Vector4.One)
                 {
                     effects[submesh] = effect;
                 }

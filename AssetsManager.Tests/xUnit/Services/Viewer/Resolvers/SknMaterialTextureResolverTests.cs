@@ -292,6 +292,34 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_PreservesMaterialTintWithoutEnablingAnEffect()
+        {
+            const string materialPath = "Characters/Aurora/Skins/Base/Materials/Tinted";
+            BinTree tree = CreateSkinTree(
+                "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_TX_CM.tex",
+                CreateOverride(
+                    "Base",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler(
+                            "Diffuse_Texture",
+                            "ASSETS/Characters/Aurora/Skins/Base/Aurora_Base_TX_CM.tex")
+                    },
+                    CreateParameter("TintColor", new Vector4(0.65f, 0.8f, 0.9f, 0.75f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "aurora_base_tx_cm" });
+
+            ModelMaterialEffectDefinition effect = resolution.ResolveEffect("base");
+            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
+            Assert.Equal(new Vector4(0.65f, 0.8f, 0.9f, 0.75f), effect.MaterialTint);
+        }
+
+        [Fact]
         public void Resolve_ScopesAdditiveScrollToItsSubmesh()
         {
             const string materialPath = "Characters/Aurora/Skins/Base/Materials/Aurora";

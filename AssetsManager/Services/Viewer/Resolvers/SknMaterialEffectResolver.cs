@@ -19,7 +19,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         {
             if (IsCompositeOnsenMaterial(material))
             {
-                return ModelMaterialEffectDefinition.None;
+                return ApplyMaterialTint(ModelMaterialEffectDefinition.None, material);
             }
 
             ModelMaterialEffectDefinition effect = ResolveOverlay(
@@ -32,8 +32,21 @@ namespace AssetsManager.Services.Viewer.Resolvers
             effect = ApplyFresnel(effect, material, textureKeys);
             effect = ApplyEmission(effect, material, textureKeys);
             effect = ApplyIridescence(effect, material, textureKeys);
-            return ApplySimpleWave(effect, material);
+            return ApplyMaterialTint(ApplySimpleWave(effect, material), material);
         }
+
+        private static ModelMaterialEffectDefinition ApplyMaterialTint(
+            ModelMaterialEffectDefinition effect,
+            SknMaterialDefinition material) =>
+            effect with
+            {
+                MaterialTint = ReadVector4(
+                    material.Parameters,
+                    Vector4.One,
+                    "TintColor",
+                    "MaterialTint",
+                    "ColorTint")
+            };
 
         private static ModelMaterialEffectDefinition ResolveOverlay(
             SknMaterialDefinition material,
