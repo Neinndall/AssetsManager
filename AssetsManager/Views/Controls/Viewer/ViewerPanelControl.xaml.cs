@@ -1069,14 +1069,6 @@ namespace AssetsManager.Views.Controls.Viewer
             }
         }
 
-        private void ToggleProjectExplorer_Click(object sender, RoutedEventArgs e)
-        {
-            if (WindowViewModel != null)
-            {
-                WindowViewModel.IsProjectExplorerVisible = !WindowViewModel.IsProjectExplorerVisible;
-            }
-        }
-
         public void LoadAnimationDirectly(string filePath)
             => LoadAnimationsDirectly(new[] { filePath });
 

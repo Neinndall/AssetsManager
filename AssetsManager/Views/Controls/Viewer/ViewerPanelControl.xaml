@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:materialIcons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+             xmlns:views="clr-namespace:AssetsManager.Views"
              xmlns:viewer="clr-namespace:AssetsManager.Views.Models.Viewer"
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d" 
@@ -51,7 +52,9 @@
 
                         <ToggleButton Grid.Column="1" 
                                       x:Name="ToggleProjectExplorerButton" 
-                                      Click="ToggleProjectExplorer_Click"
+                                      IsChecked="{Binding DataContext.IsProjectExplorerVisible,
+                                                  RelativeSource={RelativeSource AncestorType={x:Type views:ViewerWindow}},
+                                                  Mode=TwoWay}"
                                       Style="{StaticResource TransparentIconToggleButton}"
                                       Width="26" Height="26"
                                       Margin="0,0,4,0"
