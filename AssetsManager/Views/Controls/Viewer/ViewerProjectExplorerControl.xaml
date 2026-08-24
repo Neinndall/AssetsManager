@@ -24,7 +24,7 @@
             <!-- TOP BAR (Breadcrumbs & Search)              -->
             <!-- ============================================ -->
             <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1" Padding="6,3" Background="{StaticResource CardBackground}">
-                <Grid>
+                <Grid Height="26" VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/> <!-- Label & Open Button -->
                         <ColumnDefinition Width="*"/>    <!-- Breadcrumbs -->
@@ -34,7 +34,7 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Height="26" VerticalAlignment="Center" UseLayoutRounding="True" SnapsToDevicePixels="True">
                         <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="14" Height="14" Foreground="{StaticResource AccentBrush}" Margin="2,0,4,0" VerticalAlignment="Center"/>
                         <TextBlock Text="PROJECTS" FontSize="9.5" FontWeight="Black" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <Button Click="ChangeFolder_Click" Style="{StaticResource SmallTextButtonStyle}" Content="OPEN" FontSize="9" Padding="4,1" VerticalAlignment="Center"/>
+                        <Button Click="ChangeFolder_Click" Style="{StaticResource SmallTextButtonStyle}" Content="OPEN" FontSize="9.5" Padding="4,1" VerticalAlignment="Center"/>
                         <Border Width="1" Height="12" Background="{StaticResource BorderColor}" Margin="8,0" VerticalAlignment="Center"/>
                     </StackPanel>
 
@@ -42,11 +42,13 @@
                     <explorer:BreadcrumbControl Grid.Column="1"
                                                 x:Name="Breadcrumbs"
                                                 Margin="6,0"
-                                                FontSize="10"
+                                                FontSize="9.5"
+                                                Height="26"
                                                 VerticalAlignment="Center"
                                                 ItemClicked="Breadcrumbs_ItemClicked"/>
 
                     <shared:SearchBoxControl Grid.Column="2" x:Name="SearchBox" Height="26"
+                                              VerticalAlignment="Center"
                                              SearchTextChanged="SearchBox_SearchTextChanged"
                                              Tag="Search..."/>
                 </Grid>

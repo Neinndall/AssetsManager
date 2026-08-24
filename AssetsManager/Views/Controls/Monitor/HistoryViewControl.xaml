@@ -293,10 +293,10 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18"/>
+                                    <materialIcons:MaterialIcon Kind="Rename" Width="16" Height="16"/>
                                 </Button>
 
-                                <Button Click="btnViewDiff_Click" Width="34" Height="34" Margin="0,0,6,0">
+                                <Button Click="btnViewDiff_Click" Width="30" Height="30" Margin="0,0,6,0">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                             <Setter Property="ToolTip" Value="View Historical Data"/>
@@ -307,10 +307,10 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18"/>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="16" Height="16"/>
                                 </Button>
 
-                                <Button Click="btnOpenLocation_Click" Width="34" Height="34" Margin="0,0,6,0">
+                                <Button Click="btnOpenLocation_Click" Width="30" Height="30" Margin="0,0,6,0">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -325,13 +325,13 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
+                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16"/>
                                 </Button>
 
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>
 
                                 <Button Click="btnRemoveSelected_Click" Style="{StaticResource TransparentIconButton}" Width="30" Height="30" ToolTip="Remove from History">
-                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="18" Height="18" Foreground="{StaticResource AccentRed}"/>
+                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="{StaticResource AccentRed}"/>
                                 </Button>
                             </StackPanel>
                         </Grid>
