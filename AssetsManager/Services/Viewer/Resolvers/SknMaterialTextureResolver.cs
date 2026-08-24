@@ -174,11 +174,6 @@ namespace AssetsManager.Services.Viewer.Resolvers
                     }
 
                     var candidates = new List<string>(2);
-                    if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
-                    {
-                        candidates.Add(directTexturePath);
-                    }
-
                     if (entry.Properties.TryGetValue(Material, out BinTreeProperty linkProperty) &&
                         linkProperty is BinTreeObjectLink materialLink &&
                         materialDefinitions.TryGetValue(materialLink.Value, out SknMaterialDefinition materialDefinition))
@@ -193,6 +188,11 @@ namespace AssetsManager.Services.Viewer.Resolvers
                         {
                             overrideMaterials[normalizedSubmesh] = materialDefinition;
                         }
+                    }
+
+                    if (TryGetTexturePath(entry, Texture, wadChunkPathResolver, out string directTexturePath))
+                    {
+                        candidates.Add(directTexturePath);
                     }
 
                     if (candidates.Count > 0)
@@ -617,6 +617,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
         internal static bool IsNeutralTexturePath(string texturePath) =>
             NormalizeToken(PathUtils.TruncateAtDot(
                 Path.GetFileNameWithoutExtension(texturePath ?? string.Empty))) == "black";
+
 
         private static int RankColorSampler(string slotName)
         {

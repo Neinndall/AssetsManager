@@ -14,9 +14,8 @@ namespace AssetsManager.Views.Models.Viewer
         bool UsesLocalizedAlpha)
     {
         public bool RequiresAlphaBlend =>
-            UsesLocalizedAlpha &&
-            DiffuseFadeMaskValue > 0.0001f &&
-            (FresnelAlphaMinMax.X < 0.999f || FresnelAlphaMinMax.Y < 0.999f);
+            UsesLocalizedAlpha ||
+            (DiffuseFadeMaskValue > 0.0001f && FresnelAlphaMinMax.X >= 0.1f && (FresnelAlphaMinMax.X < 0.999f || FresnelAlphaMinMax.Y < 0.999f));
     }
 
     [Flags]

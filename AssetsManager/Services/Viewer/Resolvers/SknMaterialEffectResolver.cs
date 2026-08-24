@@ -538,7 +538,7 @@ namespace AssetsManager.Services.Viewer.Resolvers
             // authored shader. Aatrox's gradient/dissolve material, for example,
             // exposes that parameter but has no generic bloom color; treating it as
             // white emission is what washed out the wings and sword.
-            return intensity <= Epsilon || !HasSupportedEmissionSignal(material)
+            return intensity <= 0.01f || !HasSupportedEmissionSignal(material)
                 ? effect
                 : effect with
                 {
