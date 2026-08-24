@@ -305,7 +305,7 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
 
                 // --- Iridescence parameters ---
-        bool hasIridescence = resources.IridescenceTexture != 0;
+                bool hasIridescence = resources.IridescenceTexture != 0;
                 _gl.Uniform1(_uHasIridescenceTex, hasIridescence ? 1 : 0);
                 if (hasIridescence)
                 {
@@ -367,9 +367,10 @@ namespace AssetsManager.Services.Viewer.Rendering
                     {
                         _gl.ActiveTexture(TextureUnit.Texture2);
                         _gl.BindTexture(TextureTarget.Texture2D, resources.EffectTexture);
-                        _gl.ActiveTexture(TextureUnit.Texture3);
-                        _gl.BindTexture(TextureTarget.Texture2D, resources.EffectMaskTexture != 0 ? resources.EffectMaskTexture : _resources.WhiteTexture);
                     }
+
+                    _gl.ActiveTexture(TextureUnit.Texture3);
+                    _gl.BindTexture(TextureTarget.Texture2D, resources.EffectMaskTexture != 0 ? resources.EffectMaskTexture : _resources.WhiteTexture);
 
                     if (resources.EmissionTexture != 0)
                     {
