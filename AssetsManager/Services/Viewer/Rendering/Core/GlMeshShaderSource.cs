@@ -267,9 +267,9 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 								vec3 iriViewDir = normalize(uCameraPosition - vWorldPosition);
 								float facing = abs(dot(iriNormal, iriViewDir));
 								float edge = 1.0 - facing;
-								float angular = pow(
-									clamp(edge, 0.0, 1.0),
-									max(uIridescenceControl.z, 0.001));
+								float angular = uIridescenceControl.z > 0.0
+									? pow(clamp(edge, 0.0, 1.0), uIridescenceControl.z)
+									: 0.0;
 								float mask = texture(uIridescenceMask, vUv).r;
 								mask = clamp(mask, 0.0, 1.0);
 								float pulseSpeed = max(uIridescencePulseSpeedMin.x, 0.0);
@@ -294,7 +294,7 @@ namespace AssetsManager.Services.Viewer.Rendering.Core
 									0.0,
 									1.0);
 								finalColor = finalColor * (1.0 - 0.15 * iridescenceAmount) +
-									iridescenceSample * (0.85 * iridescenceAmount);
+									iridescenceSample * (0.25 * iridescenceAmount);
 
 								float fadeMask = clamp(
 									mask * max(uIridescenceDiffuseFadeMask, 0.0),
