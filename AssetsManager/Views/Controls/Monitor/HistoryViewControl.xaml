@@ -293,10 +293,10 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18" Foreground="{StaticResource TextSecondary}"/>
+                                    <materialIcons:MaterialIcon Kind="Rename" Width="18" Height="18"/>
                                 </Button>
 
-                                <Button Click="btnViewDiff_Click" Width="34" Height="34" Margin="0,0,6,0" Background="{StaticResource SidebarBackground}">
+                                <Button Click="btnViewDiff_Click" Width="34" Height="34" Margin="0,0,6,0">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
                                             <Setter Property="ToolTip" Value="View Historical Data"/>
@@ -307,7 +307,25 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18"/>
+                                </Button>
+
+                                <Button Click="btnOpenLocation_Click" Width="34" Height="34" Margin="0,0,6,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource TransparentIconButton}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Setter Property="ToolTip" Value="Open comparison location"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadArchive">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Type}" Value="WadFile">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18"/>
                                 </Button>
 
                                 <Separator Style="{StaticResource {x:Static ToolBar.SeparatorStyleKey}}" Margin="4,0,10,0" Background="{StaticResource BorderColor}"/>

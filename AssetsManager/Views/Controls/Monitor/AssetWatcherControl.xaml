@@ -228,9 +228,8 @@
                                         ToolTip="View Differences" 
                                         Style="{StaticResource TransparentIconButton}" 
                                         Width="34" Height="34" Margin="0,0,8,0" 
-                                        Background="{StaticResource SidebarBackground}"
                                         Visibility="{Binding HasChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18" Foreground="{StaticResource AccentBrush}"/>
+                                    <materialIcons:MaterialIcon Kind="FileCompare" Width="18" Height="18"/>
                                 </Button>
                                 <Button Click="Remove_Click" 
                                         Tag="{Binding}"

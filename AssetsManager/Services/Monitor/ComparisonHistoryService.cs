@@ -40,6 +40,13 @@ namespace AssetsManager.Services.Monitor
             _logService = logService;
         }
 
+        public string GetComparisonArchivePath(string referenceId)
+        {
+            return string.IsNullOrWhiteSpace(referenceId)
+                ? null
+                : Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
+        }
+
         /// <summary>
         /// Centralized entry point for archiving a comparison. Builds a stable
         /// identity key from (version + oldPath + newPath). If a previous entry
@@ -72,7 +79,7 @@ namespace AssetsManager.Services.Monitor
 
                 if (existingReferenceId != null)
                 {
-                    string archivePath = Path.Combine(_directoriesCreator.WadComparisonSavePath, existingReferenceId);
+                    string archivePath = GetComparisonArchivePath(existingReferenceId);
 
                     if (Directory.Exists(archivePath))
                     {
@@ -202,7 +209,11 @@ namespace AssetsManager.Services.Monitor
         {
             try
             {
-                string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, referenceId);
+                string historyDir = GetComparisonArchivePath(referenceId);
+                if (historyDir == null)
+                {
+                    return (null, null);
+                }
                 string indexFilePath = Path.Combine(historyDir, "wadcomparison.json");
 
                 if (!File.Exists(indexFilePath))
@@ -347,7 +358,7 @@ namespace AssetsManager.Services.Monitor
             {
                 if ((entry.Type == HistoryEntryType.WadArchive || entry.Type == HistoryEntryType.WadFile) && !string.IsNullOrEmpty(entry.ReferenceId))
                 {
-                    string historyDir = Path.Combine(_directoriesCreator.WadComparisonSavePath, entry.ReferenceId);
+                    string historyDir = GetComparisonArchivePath(entry.ReferenceId);
                     if (Directory.Exists(historyDir))
                     {
                         Directory.Delete(historyDir, true);

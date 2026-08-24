@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -166,6 +167,23 @@ namespace AssetsManager.Views.Controls.Monitor
             else
             {
                 CustomMessageBoxService.ShowWarning("Warning", "Please select a history entry to view.", Window.GetWindow(this));
+            }
+        }
+
+        private void btnOpenLocation_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not HistoryEntry entry) return;
+
+            string archivePath = ComparisonHistoryService.GetComparisonArchivePath(entry.ReferenceId);
+            if (string.IsNullOrEmpty(archivePath) || !Directory.Exists(archivePath)) return;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = archivePath, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError(ex, $"Failed to open comparison location: {archivePath}");
             }
         }
 
