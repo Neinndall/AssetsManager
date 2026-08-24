@@ -22,6 +22,7 @@
     <PackageReference Include="Silk.NET.OpenGL" Version="2.21.0" />
     <PackageReference Include="OpenTK.GLWpfControl" Version="4.3.6" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
+    <PackageReference Include="NAudio.SoundFile" Version="3.0.1" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Jsbeautifier" Version="0.0.1" />
@@ -55,8 +56,7 @@
     <EmbeddedResource Include="Resources\AudioPlayer.html" />
     <EmbeddedResource Include="Resources\JsonSyntaxHighlighting.xshd" />
     <EmbeddedResource Include="Resources\Vgmstream\**" />
-    <EmbeddedResource Include="Resources\Ffmpeg\ffmpeg.exe" />
-    <EmbeddedResource Include="Resources\Ffmpeg\*.dll" />
+    <EmbeddedResource Include="Resources\Libsndfile\**" />
     <EmbeddedResource Include="Resources\Updater\**" />
   </ItemGroup>
 

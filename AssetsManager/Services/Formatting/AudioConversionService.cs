@@ -5,11 +5,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsManager.Services.Core;
+using AssetsManager.Utils;
 using AssetsManager.Views.Models.Settings;
+using NAudio.SoundFile;
 
 namespace AssetsManager.Services.Formatting
 {
@@ -17,21 +20,18 @@ namespace AssetsManager.Services.Formatting
     {
         private readonly LogService _logService;
         private readonly string _vgmstreamExePath;
-        private readonly string _ffmpegExePath;
+        private readonly string _libsndfileDirectory;
         private readonly string _tempConversionPath;
-        private static bool _toolsExtracted;
-        private static readonly object _extractionLock = new();
+        private bool _runtimeReady;
+        private IntPtr _nativeLibraryHandle;
+        private readonly object _runtimeLock = new();
 
-        public AudioConversionService(LogService logService)
+        public AudioConversionService(LogService logService, DirectoriesCreator directoriesCreator)
         {
             _logService = logService;
-            string tempBasePath = Path.Combine(Path.GetTempPath(), "AssetsManager");
-            _vgmstreamExePath = Path.Combine(tempBasePath, "Vgmstream", "vgmstream-cli.exe");
-            _ffmpegExePath = Path.Combine(tempBasePath, "Ffmpeg", "ffmpeg.exe");
-            _tempConversionPath = Path.Combine(tempBasePath, "WemPreview");
-
-            EnsureToolsExtracted();
-            Directory.CreateDirectory(_tempConversionPath);
+            _vgmstreamExePath = Path.Combine(directoriesCreator.AudioRuntimePath, "Vgmstream", "vgmstream-cli.exe");
+            _libsndfileDirectory = Path.Combine(directoriesCreator.AudioRuntimePath, "Libsndfile");
+            _tempConversionPath = Path.Combine(directoriesCreator.AudioRuntimePath, "WemPreview");
         }
 
         public Task<byte[]> ConvertAudioToFormatAsync(
@@ -43,33 +43,41 @@ namespace AssetsManager.Services.Formatting
             return ConvertAudioToFormatInternalAsync(audioData, inputExtension, format, cancellationToken);
         }
 
-        private void EnsureToolsExtracted()
+        private bool EnsureRuntimeReady()
         {
-            lock (_extractionLock)
+            lock (_runtimeLock)
             {
-                if (_toolsExtracted && File.Exists(_vgmstreamExePath) && File.Exists(_ffmpegExePath))
-                    return;
+                string sndfilePath = Path.Combine(_libsndfileDirectory, "sndfile.dll");
+                if (_runtimeReady && File.Exists(_vgmstreamExePath) && File.Exists(sndfilePath))
+                    return true;
 
                 try
                 {
-                    var assembly = Assembly.GetExecutingAssembly();
-                    bool vgmstreamExtracted = ExtractResources(
+                    Assembly assembly = Assembly.GetExecutingAssembly();
+                    bool vgmstreamReady = ExtractResources(
                         assembly,
                         "Vgmstream",
                         Path.GetDirectoryName(_vgmstreamExePath));
-                    bool ffmpegExtracted = ExtractResources(
+                    bool libsndfileReady = ExtractResources(
                         assembly,
-                        "Ffmpeg",
-                        Path.GetDirectoryName(_ffmpegExePath));
+                        "Libsndfile",
+                        _libsndfileDirectory);
 
-                    _toolsExtracted = vgmstreamExtracted
-                        && ffmpegExtracted
-                        && File.Exists(_vgmstreamExePath)
-                        && File.Exists(_ffmpegExePath);
+                    if (!vgmstreamReady || !libsndfileReady || !File.Exists(_vgmstreamExePath) || !File.Exists(sndfilePath))
+                    {
+                        _logService.LogError(new FileNotFoundException(), "Audio conversion runtime is incomplete.");
+                        return false;
+                    }
+
+                    _nativeLibraryHandle = NativeLibrary.Load(sndfilePath);
+                    Directory.CreateDirectory(_tempConversionPath);
+                    _runtimeReady = true;
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    _logService.LogError(ex, "Failed to extract audio conversion tools.");
+                    _logService.LogError(ex, "Failed to prepare audio conversion runtime.");
+                    return false;
                 }
             }
         }
@@ -111,11 +119,8 @@ namespace AssetsManager.Services.Formatting
             AudioExportFormat format,
             CancellationToken cancellationToken)
         {
-            if (!_toolsExtracted)
-            {
-                _logService.LogError(new FileNotFoundException(), "Audio conversion tools are not available.");
+            if (!await Task.Run(EnsureRuntimeReady, cancellationToken))
                 return null;
-            }
 
             string normalizedInputExtension = NormalizeExtension(inputExtension);
             string inputPath = CreateTempPath(normalizedInputExtension);
@@ -145,10 +150,7 @@ namespace AssetsManager.Services.Formatting
                 if (format == AudioExportFormat.Wav && decodedByVgmstream)
                     return await ReadValidatedOutputAsync(sourcePath, format, cancellationToken);
 
-                bool encoded = await RunProcessAsync(
-                    _ffmpegExePath,
-                    BuildFfmpegArguments(sourcePath, outputPath, format),
-                    cancellationToken);
+                bool encoded = await EncodeWithLibsndfileAsync(sourcePath, outputPath, format, cancellationToken);
 
                 return encoded
                     ? await ReadValidatedOutputAsync(outputPath, format, cancellationToken)
@@ -171,6 +173,56 @@ namespace AssetsManager.Services.Formatting
                 TryDelete(outputPath);
             }
         }
+
+        private async Task<bool> EncodeWithLibsndfileAsync(
+            string sourcePath,
+            string outputPath,
+            AudioExportFormat format,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                SoundFileMajorFormat majorFormat = GetMajorFormat(format);
+                await Task.Run(() =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!SoundFileCapabilities.IsFormatSupported(majorFormat))
+                        throw new NotSupportedException($"libsndfile does not support {format.GetExtension()} output.");
+
+                    using var source = new SoundFileReader(sourcePath);
+                    SoundFileWriter.CreateSoundFile(
+                        outputPath,
+                        source,
+                        majorFormat,
+                        GetWriterOptions(format));
+                }, cancellationToken);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logService.LogError(ex, $"libsndfile failed to encode {format.GetExtension()} audio.");
+                return false;
+            }
+        }
+
+        private static SoundFileMajorFormat GetMajorFormat(AudioExportFormat format)
+            => format switch
+            {
+                AudioExportFormat.Ogg => SoundFileMajorFormat.OggVorbis,
+                AudioExportFormat.Wav => SoundFileMajorFormat.Wav,
+                AudioExportFormat.Mp3 => SoundFileMajorFormat.Mp3,
+                AudioExportFormat.Flac => SoundFileMajorFormat.Flac,
+                _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported audio export format.")
+            };
+
+        private static SoundFileWriterOptions GetWriterOptions(AudioExportFormat format)
+            => format == AudioExportFormat.Wav
+                ? new SoundFileWriterOptions { Subtype = SoundFileSubtype.Pcm16 }
+                : null;
 
         private async Task<bool> RunProcessAsync(
             string executablePath,
@@ -206,10 +258,17 @@ namespace AssetsManager.Services.Formatting
                 }
                 catch (Exception killException)
                 {
-                    _logService.LogWarning($"Failed to terminate audio tool process: {killException.Message}");
+                    _logService.LogWarning($"Failed to terminate vgmstream process: {killException.Message}");
                 }
 
-                try { await process.WaitForExitAsync(); } catch { }
+                try
+                {
+                    await process.WaitForExitAsync();
+                }
+                catch (Exception waitException)
+                {
+                    _logService.LogWarning($"Failed to wait for vgmstream process termination: {waitException.Message}");
+                }
                 throw;
             }
 
@@ -219,33 +278,8 @@ namespace AssetsManager.Services.Formatting
 
             _logService.LogError(
                 new InvalidOperationException(error),
-                $"Audio tool {Path.GetFileName(executablePath)} failed with exit code {process.ExitCode}.");
+                $"vgmstream failed with exit code {process.ExitCode}.");
             return false;
-        }
-
-        private static string[] BuildFfmpegArguments(string sourcePath, string outputPath, AudioExportFormat format)
-        {
-            var arguments = new List<string>
-            {
-                "-hide_banner",
-                "-loglevel", "error",
-                "-nostdin",
-                "-y",
-                "-i", sourcePath,
-                "-map", "0:a:0",
-                "-vn"
-            };
-
-            arguments.AddRange(format switch
-            {
-                AudioExportFormat.Mp3 => new[] { "-c:a", "libmp3lame", "-b:a", "192k" },
-                AudioExportFormat.Flac => new[] { "-c:a", "flac" },
-                AudioExportFormat.Wav => new[] { "-c:a", "pcm_s16le" },
-                AudioExportFormat.Ogg => new[] { "-c:a", "libvorbis", "-q:a", "5" },
-                _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported audio export format.")
-            });
-            arguments.Add(outputPath);
-            return arguments.ToArray();
         }
 
         private async Task<byte[]> ReadValidatedOutputAsync(
@@ -255,7 +289,7 @@ namespace AssetsManager.Services.Formatting
         {
             if (!File.Exists(outputPath))
             {
-                _logService.LogWarning($"Audio tool completed without creating {format.GetExtension()} output.");
+                _logService.LogWarning($"Audio conversion completed without creating {format.GetExtension()} output.");
                 return null;
             }
 

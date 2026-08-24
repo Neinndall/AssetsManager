@@ -26,6 +26,7 @@ namespace AssetsManager.Utils
         public string NotificationsPath { get; }
         public string NotificationsHistoryPath { get; }
         public string NewsSeenPath { get; }
+        public string AudioRuntimePath { get; }
 
         public DirectoriesCreator(string customAppFolderPath = null)
         {
@@ -37,6 +38,8 @@ namespace AssetsManager.Utils
                 string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 appFolderPath = Path.Combine(appDataPath, "AssetsManager");
             }
+
+            AudioRuntimePath = Path.Combine(appFolderPath, "audio_runtime");
 
             HashesPath = Path.Combine(appFolderPath, "hashes");
             HashLabPath = Path.Combine(appFolderPath, "hash_lab");
