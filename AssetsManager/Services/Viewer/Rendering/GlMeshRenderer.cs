@@ -108,6 +108,19 @@ namespace AssetsManager.Services.Viewer.Rendering
             uint boneBlock = gl.GetUniformBlockIndex(_program, "BoneTransforms");
             if (boneBlock != uint.MaxValue)
                 gl.UniformBlockBinding(_program, boneBlock, 0);
+
+            // Initialize static sampler uniform slot assignments once
+            gl.UseProgram(_program);
+            gl.Uniform1(_uTex, 0);
+            gl.Uniform1(_uLightmap, 1);
+            gl.Uniform1(_uEffectTex, 2);
+            gl.Uniform1(_uEffectMask, 3);
+            gl.Uniform1(_uEmissionTex, 4);
+            gl.Uniform1(_uEmissionMask, 5);
+            gl.Uniform1(_uIridescenceTex, 6);
+            gl.Uniform1(_uIridescenceMask, 7);
+            gl.UseProgram(0);
+
             _resources = new GlMeshResourceCache(gl);
             _boneBuffer = gl.GenBuffer();
             gl.BindBuffer(BufferTargetARB.UniformBuffer, _boneBuffer);
@@ -154,14 +167,6 @@ namespace AssetsManager.Services.Viewer.Rendering
             _gl.Uniform3(_uLightColor2, lightColor2);
             _gl.Uniform3(_uAmbient, ambientColor);
             _gl.Uniform3(_uCameraPosition, cameraPosition);
-            _gl.Uniform1(_uTex, 0);
-            _gl.Uniform1(_uLightmap, 1);
-            _gl.Uniform1(_uEffectTex, 2);
-            _gl.Uniform1(_uEffectMask, 3);
-            _gl.Uniform1(_uEmissionTex, 4);
-            _gl.Uniform1(_uEmissionMask, 5);
-            _gl.Uniform1(_uIridescenceTex, 6);
-            _gl.Uniform1(_uIridescenceMask, 7);
             _gl.Uniform1(
                 _uEffectTime,
                 (float)((Stopwatch.GetTimestamp() - _startTimestamp) / (double)Stopwatch.Frequency));
@@ -262,6 +267,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Disable(EnableCap.PolygonOffsetFill);
             }
 
+            uint lastBoundTex0 = uint.MaxValue;
+
             foreach (ModelPart part in model.Parts)
             {
                 if (!part.IsVisible ||
@@ -278,46 +285,51 @@ namespace AssetsManager.Services.Viewer.Rendering
                 _gl.Uniform1(
                     _uUseSkinning,
                     resources.IsGpuSkinned && model.SkinningMatrices != null ? 1 : 0);
-                _gl.ActiveTexture(TextureUnit.Texture0);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.Texture != 0 ? resources.Texture : _resources.WhiteTexture);
+
+                // Texture 0: Diffuse / Albedo (with redundant state cache)
+                uint targetTex0 = resources.Texture != 0 ? resources.Texture : _resources.WhiteTexture;
+                if (targetTex0 != lastBoundTex0)
+                {
+                    _gl.ActiveTexture(TextureUnit.Texture0);
+                    _gl.BindTexture(TextureTarget.Texture2D, targetTex0);
+                    lastBoundTex0 = targetTex0;
+                }
+
                 ModelMaterialEffectDefinition effect =
                     part.MaterialEffect ?? ModelMaterialEffectDefinition.None;
                 ModelIridescenceDefinition iridescence = effect.Iridescence;
+
                 _gl.Uniform4(_uColorTint, part.ColorTint.X, part.ColorTint.Y, part.ColorTint.Z, part.ColorTint.W);
                 _gl.Uniform1(_uAlphaCutoff, part.IsAlphaBlended ? 0f : part.AlphaCutoff);
                 _gl.Uniform1(_uUsesBakedDiffuse, part.UsesBakedDiffuse ? 1 : 0);
                 _gl.Uniform1(_uHasVertexColor, resources.ColorVbo != 0 ? 1 : 0);
 
+                // --- Iridescence parameters ---
+        bool hasIridescence = resources.IridescenceTexture != 0;
+                _gl.Uniform1(_uHasIridescenceTex, hasIridescence ? 1 : 0);
+                if (hasIridescence)
+                {
+                    Vector4 iridescenceControl = iridescence?.Control ?? new Vector4(1f, 1f, 1f, 0f);
+                    Vector2 iridescencePulseSpeedMin = iridescence?.UsesPulse == true
+                        ? iridescence.PulseSpeedMin
+                        : Vector2.Zero;
+                    Vector2 iridescenceAlphaMinMax = iridescence?.UsesLocalizedAlpha == true
+                        ? iridescence.FresnelAlphaMinMax
+                        : Vector2.One;
+
+                    _gl.Uniform4(_uIridescenceControl, iridescenceControl.X, iridescenceControl.Y, iridescenceControl.Z, iridescenceControl.W);
+                    _gl.Uniform2(_uIridescencePulseSpeedMin, iridescencePulseSpeedMin.X, iridescencePulseSpeedMin.Y);
+                    _gl.Uniform2(_uIridescenceAlphaMinMax, iridescenceAlphaMinMax.X, iridescenceAlphaMinMax.Y);
+                    _gl.Uniform1(_uIridescenceDiffuseFadeMask, iridescence?.UsesLocalizedAlpha == true ? iridescence.DiffuseFadeMaskValue : 0f);
+
+                    _gl.ActiveTexture(TextureUnit.Texture6);
+                    _gl.BindTexture(TextureTarget.Texture2D, resources.IridescenceTexture != 0 ? resources.IridescenceTexture : _resources.WhiteTexture);
+                    _gl.ActiveTexture(TextureUnit.Texture7);
+                    _gl.BindTexture(TextureTarget.Texture2D, resources.IridescenceMaskTexture != 0 ? resources.IridescenceMaskTexture : _resources.WhiteTexture);
+                }
+
+                // --- Material Effects parameters ---
                 _gl.Uniform1(_uEffectKind, (int)effect.Kind);
-                _gl.Uniform1(_uHasIridescenceTex, resources.IridescenceTexture != 0 ? 1 : 0);
-                Vector4 iridescenceControl = iridescence?.Control ?? new Vector4(1f, 1f, 1f, 0f);
-                Vector2 iridescencePulseSpeedMin = iridescence?.UsesPulse == true
-                    ? iridescence.PulseSpeedMin
-                    : Vector2.Zero;
-                Vector2 iridescenceAlphaMinMax = iridescence?.UsesLocalizedAlpha == true
-                    ? iridescence.FresnelAlphaMinMax
-                    : Vector2.One;
-                _gl.Uniform4(
-                    _uIridescenceControl,
-                    iridescenceControl.X,
-                    iridescenceControl.Y,
-                    iridescenceControl.Z,
-                    iridescenceControl.W);
-                _gl.Uniform2(
-                    _uIridescencePulseSpeedMin,
-                    iridescencePulseSpeedMin.X,
-                    iridescencePulseSpeedMin.Y);
-                _gl.Uniform2(
-                    _uIridescenceAlphaMinMax,
-                    iridescenceAlphaMinMax.X,
-                    iridescenceAlphaMinMax.Y);
-                _gl.Uniform1(
-                    _uIridescenceDiffuseFadeMask,
-                    iridescence?.UsesLocalizedAlpha == true
-                        ? iridescence.DiffuseFadeMaskValue
-                        : 0f);
                 if (effect.Kind != ModelMaterialEffectKind.None)
                 {
                     _gl.Uniform1(_uHasEffectTex, resources.EffectTexture != 0 ? 1 : 0);
@@ -350,40 +362,38 @@ namespace AssetsManager.Services.Viewer.Rendering
                     _gl.Uniform1(_uWaveIntensity, effect.WaveIntensity);
                     _gl.Uniform2(_uFresnelNoiseTiling, effect.FresnelNoiseTiling.X, effect.FresnelNoiseTiling.Y);
                     _gl.Uniform2(_uFresnelNoiseSpeed, effect.FresnelNoiseSpeed.X, effect.FresnelNoiseSpeed.Y);
+
+                    if (resources.EffectTexture != 0)
+                    {
+                        _gl.ActiveTexture(TextureUnit.Texture2);
+                        _gl.BindTexture(TextureTarget.Texture2D, resources.EffectTexture);
+                        _gl.ActiveTexture(TextureUnit.Texture3);
+                        _gl.BindTexture(TextureTarget.Texture2D, resources.EffectMaskTexture != 0 ? resources.EffectMaskTexture : _resources.WhiteTexture);
+                    }
+
+                    if (resources.EmissionTexture != 0)
+                    {
+                        _gl.ActiveTexture(TextureUnit.Texture4);
+                        _gl.BindTexture(TextureTarget.Texture2D, resources.EmissionTexture);
+                        _gl.ActiveTexture(TextureUnit.Texture5);
+                        _gl.BindTexture(TextureTarget.Texture2D, resources.EmissionMaskTexture != 0 ? resources.EmissionMaskTexture : _resources.WhiteTexture);
+                    }
+                }
+                else
+                {
+                    _gl.Uniform1(_uHasEffectTex, 0);
+                    _gl.Uniform1(_uHasEmissionTex, 0);
+                    _gl.Uniform1(_uHasEmissionMask, 0);
                 }
 
+                // --- Lightmap parameters ---
                 bool hasLightmap = resources.LightmapTexture != 0 && resources.LightmapVbo != 0;
                 _gl.Uniform1(_uHasLightmap, hasLightmap ? 1 : 0);
-                _gl.ActiveTexture(TextureUnit.Texture1);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    hasLightmap ? resources.LightmapTexture : 0);
-                _gl.ActiveTexture(TextureUnit.Texture2);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.EffectTexture);
-                _gl.ActiveTexture(TextureUnit.Texture3);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.EffectMaskTexture != 0 ? resources.EffectMaskTexture : _resources.WhiteTexture);
-                _gl.ActiveTexture(TextureUnit.Texture4);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.EmissionTexture);
-                _gl.Uniform1(_uEmissionMask, 5);
-                _gl.ActiveTexture(TextureUnit.Texture5);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.EmissionMaskTexture != 0 ? resources.EmissionMaskTexture : _resources.WhiteTexture);
-                _gl.ActiveTexture(TextureUnit.Texture6);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.IridescenceTexture != 0 ? resources.IridescenceTexture : _resources.WhiteTexture);
-                _gl.ActiveTexture(TextureUnit.Texture7);
-                _gl.BindTexture(
-                    TextureTarget.Texture2D,
-                    resources.IridescenceMaskTexture != 0 ? resources.IridescenceMaskTexture : _resources.WhiteTexture);
-                _gl.ActiveTexture(TextureUnit.Texture0);
+                if (hasLightmap)
+                {
+                    _gl.ActiveTexture(TextureUnit.Texture1);
+                    _gl.BindTexture(TextureTarget.Texture2D, resources.LightmapTexture);
+                }
 
                 _drawElements?.Invoke(
                     (uint)PrimitiveType.Triangles,
@@ -391,6 +401,8 @@ namespace AssetsManager.Services.Viewer.Rendering
                     (uint)DrawElementsType.UnsignedInt,
                     IntPtr.Zero);
             }
+
+            _gl.ActiveTexture(TextureUnit.Texture0);
         }
 
         private void UnbindSceneTextures()
