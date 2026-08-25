@@ -128,6 +128,87 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void ReadMetadata_ResolvesStaticMaterialFromDependencyTree()
+        {
+            const string defaultTexturePath =
+                "ASSETS/Characters/Pyke/Skins/Skin45/Pyke_Skin45_TX_CM.tex";
+            const string materialPath = "Characters/Pyke/Skins/Skin45/Materials/W_Blades";
+            const string materialTexturePath =
+                "ASSETS/Characters/Pyke/Skins/Skin45/Particles/Pyke_Skin45_Z_Material_Colors_03.tex";
+
+            BinTree primaryTree = CreateSkinTree(
+                defaultTexturePath,
+                CreateOverride(
+                    "W_Fins",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))));
+            BinTree dependencyTree = new(
+                new[]
+                {
+                    CreateMaterial(
+                        materialPath,
+                        CreateSampler("Diffuse_Texture", materialTexturePath))
+                },
+                Array.Empty<string>());
+
+            SknMaterialTextureMetadata metadata =
+                SknMaterialTextureResolver.ReadMetadata(new[] { primaryTree, dependencyTree });
+
+            Assert.Contains("wfins", metadata.OverrideMaterials.Keys);
+            Assert.Contains(
+                materialTexturePath,
+                metadata.ReferencedTexturePaths,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotSubstituteDefaultForMissingMaterialOverride()
+        {
+            const string defaultTexturePath =
+                "ASSETS/Characters/Pyke/Skins/Skin45/Pyke_Skin45_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                defaultTexturePath,
+                CreateOverride(
+                    "W_Fins",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower(
+                            "Characters/Pyke/Skins/Skin45/Materials/Missing"))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "pyke_skin45_tx_cm" });
+
+            Assert.Contains("wfins", resolution.MaterialOverrideKeys);
+            Assert.DoesNotContain("wfins", resolution.Overrides.Keys);
+        }
+
+        [Fact]
+        public void ReadMetadata_PreservesEveryDeclaredSamplerTexture()
+        {
+            const string diffusePath = "ASSETS/Characters/Test/Skins/Skin1/Test_Diffuse.tex";
+            const string maskPath = "ASSETS/Characters/Test/Skins/Skin1/Test_Mask.tex";
+            const string customLayerPath = "ASSETS/Characters/Test/Skins/Skin1/Test_CustomLayer.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(
+                        Fnv1a.HashLower("Material"),
+                        Fnv1a.HashLower("Characters/Test/Skins/Skin1/Materials/Body"))),
+                CreateMaterial(
+                    "Characters/Test/Skins/Skin1/Materials/Body",
+                    CreateSampler("Diffuse_Texture", diffusePath),
+                    CreateSampler("Mask_Texture_green", maskPath),
+                    CreateSampler("CustomLayer_Input", customLayerPath)));
+
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
+
+            Assert.Contains(diffusePath, metadata.ReferencedTexturePaths, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(maskPath, metadata.ReferencedTexturePaths, StringComparer.OrdinalIgnoreCase);
+            Assert.Contains(customLayerPath, metadata.ReferencedTexturePaths, StringComparer.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public void Resolve_UsesLinkedSkinMaterialAsDefaultBeforeLegacyTexture()
         {
             const string materialPath = "Characters/Aatrox/Skins/Skin33/Materials/Default_Head";
@@ -231,7 +312,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             "PetStyleTwoAphelios_Alune_Face",
             "PetStyleTwoAphelios_Skin2_Alune_Face_TX",
             "alunehead")]
-        public void Resolve_UsesLayerTex01ForCompanionMaterial(
+        public void Resolve_UsesLayerTex01AndPreservesCompanionAuxiliaryMaterial(
             string submesh,
             string materialName,
             string textureName,
@@ -260,7 +341,7 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
 
             Assert.Equal(textureName.ToLowerInvariant(), resolution.Overrides[expectedMaterialKey]);
             AssertContainsPath(texturePath, metadata.ReferencedTexturePaths);
-            AssertDoesNotContainPath(
+            AssertContainsPath(
                 "ASSETS/Characters/Shared/Overlay.tex",
                 metadata.ReferencedTexturePaths);
         }
@@ -702,6 +783,72 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void Resolve_RecognizesPanningMaterialSamplerWithoutAuthoredMask()
+        {
+            const string materialPath = "Characters/Pyke/Skins/Skin45/Materials/W_Blades";
+            const string diffusePath =
+                "ASSETS/Characters/Pyke/Skins/Skin45/Particles/Pyke_Skin45_Z_Material_Colors_03.tex";
+            const string panningPath =
+                "ASSETS/Characters/Pyke/Skins/Skin45/Particles/Pyke_Skin45_Z_Material_Flames_03.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "W_Fins",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParametersAndShader(
+                    materialPath,
+                    "Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom",
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Panning_Texture", panningPath)
+                    },
+                    CreateParameter("Panning_Scale", new Vector4(1f, 1f, 0f, 0f)),
+                    CreateParameter("Panning_Speed", new Vector4(0f, 0.7f, 0f, 0f))));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "pyke_skin45_z_material_colors_03", "pyke_skin45_z_material_flames_03" });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["wfins"];
+            Assert.Equal(ModelMaterialEffectKind.AdditiveScroll, effect.Kind);
+            Assert.Equal("pyke_skin45_z_material_flames_03", effect.TextureName);
+            Assert.Null(effect.MaskTextureName);
+            Assert.Equal(new Vector2(0f, 0.7f), effect.ScrollSpeed);
+            Assert.Equal(Vector2.One, effect.Tiling);
+            SknMaterialTextureMetadata metadata = SknMaterialTextureResolver.ReadMetadata(tree);
+            Assert.Equal(
+                Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom"),
+                metadata.OverrideMaterials["wfins"].ShaderHash);
+            AssertContainsPath(panningPath, metadata.ReferencedTexturePaths);
+        }
+
+        [Fact]
+        public void Resolve_DoesNotInferPanningBlendWithoutShaderIdentity()
+        {
+            var material = new SknMaterialDefinition(
+                new[]
+                {
+                    new SknMaterialSampler(
+                        "Panning_Texture",
+                        "ASSETS/Characters/Test/Skins/Skin1/Panning.tex")
+                },
+                new Dictionary<string, Vector4>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Panning_Speed"] = new(0f, 1f, 0f, 0f),
+                    ["Panning_Scale"] = Vector4.One
+                });
+
+            ModelMaterialEffectDefinition effect = SknMaterialEffectResolver.Resolve(
+                material,
+                "body",
+                new[] { "panning" },
+                new[] { "body" });
+
+            Assert.Equal(ModelMaterialEffectKind.None, effect.Kind);
+        }
+
+        [Fact]
         public void Resolve_RecognizesRealDissolveSamplerAliases()
         {
             const string materialPath = "Characters/MissFortune/Skins/Skin48/Materials/Body";
@@ -1021,25 +1168,27 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
-        public void IsReferencedSampler_RejectsSuffixedBlackTexture()
+        public void GetSelectableTextureCandidatesIncludesAuxiliaryTexturesWithoutPresentationMaps()
         {
-            Assert.False(SknMaterialTextureResolver.IsReferencedSampler(
-                new SknMaterialSampler(
-                    "Mask",
-                    "ASSETS/Characters/Brand/Skins/Skin53/black.SKINS_Brand_Skin53.tex")));
-        }
+            IReadOnlyList<string> candidates =
+                SknMaterialTextureResolver.GetSelectableTextureCandidates(
+                    new[]
+                    {
+                        "pyke_skin45_tx_cm",
+                        "pyke_skin45_empoweredform_tx_cm",
+                        "pyke_skin45_emote_trail_mult",
+                        "pyke_skin45_generic_noise",
+                        "pykeloadscreen_45",
+                        "pykeloadscreen_45_le"
+                    });
 
-        [Fact]
-        public void FindUnambiguousFallback_RejectsPresentationAndAmbiguousTextures()
-        {
-            Assert.Null(SknMaterialTextureResolver.FindUnambiguousFallback(
-                new[] { "belvethloadscreen_0" }));
-            Assert.Null(SknMaterialTextureResolver.FindUnambiguousFallback(
-                new[] { "belveth_skin29_tx_cm", "belveth_skin29_ult_tx_cm" }));
-            Assert.Equal(
-                "belveth_skin29_tx_cm",
-                SknMaterialTextureResolver.FindUnambiguousFallback(
-                    new[] { "belvethloadscreen_0", "belveth_skin29_tx_cm" }));
+            Assert.Equal(4, candidates.Count);
+            Assert.Contains("pyke_skin45_tx_cm", candidates);
+            Assert.Contains("pyke_skin45_empoweredform_tx_cm", candidates);
+            Assert.Contains("pyke_skin45_emote_trail_mult", candidates);
+            Assert.Contains("pyke_skin45_generic_noise", candidates);
+            Assert.DoesNotContain("pykeloadscreen_45", candidates);
+            Assert.DoesNotContain("pykeloadscreen_45_le", candidates);
         }
 
         [Fact]
@@ -1438,7 +1587,55 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                         Fnv1a.HashLower("paramValues"),
                         BinPropertyType.Embedded,
                         parameters)
-                });
+                 });
+
+        private static BinTreeObject CreateMaterialWithParametersAndShader(
+            string path,
+            string shaderPath,
+            BinTreeEmbedded[] samplers,
+            params BinTreeEmbedded[] parameters)
+        {
+            var properties = new List<BinTreeProperty>
+            {
+                new BinTreeUnorderedContainer(
+                    Fnv1a.HashLower("samplerValues"),
+                    BinPropertyType.Embedded,
+                    samplers),
+                new BinTreeUnorderedContainer(
+                    Fnv1a.HashLower("paramValues"),
+                    BinPropertyType.Embedded,
+                    parameters),
+                new BinTreeUnorderedContainer(
+                    Fnv1a.HashLower("techniques"),
+                    BinPropertyType.Embedded,
+                    new[]
+                    {
+                        new BinTreeEmbedded(
+                            0,
+                            Fnv1a.HashLower("StaticMaterialTechniqueDef"),
+                            new BinTreeProperty[]
+                            {
+                                new BinTreeUnorderedContainer(
+                                    Fnv1a.HashLower("passes"),
+                                    BinPropertyType.Embedded,
+                                    new[]
+                                    {
+                                        new BinTreeEmbedded(
+                                            0,
+                                            Fnv1a.HashLower("StaticMaterialPassDef"),
+                                            new BinTreeProperty[]
+                                            {
+                                                new BinTreeObjectLink(
+                                                    Fnv1a.HashLower("shader"),
+                                                    Fnv1a.HashLower(shaderPath))
+                                            })
+                                    })
+                            })
+                    })
+            };
+
+            return new BinTreeObject(path, "StaticMaterialDef", properties);
+        }
 
         private static BinTreeObject CreateMaterialWithSwitches(
             string path,
@@ -1525,11 +1722,14 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
                 Func<ulong, string> wadChunkPathResolver) =>
                 SknResolver.ReadMetadata(binTree, wadChunkPathResolver);
 
-            internal static bool IsReferencedSampler(SknMaterialSampler sampler) =>
-                SknResolver.IsReferencedSampler(sampler);
+            internal static SknMaterialTextureMetadata ReadMetadata(IEnumerable<BinTree> binTrees) =>
+                SknResolver.ReadMetadata(
+                    binTrees,
+                    SknMaterialTextureResolverTests.ResolveTestTexturePath);
 
-            internal static string FindUnambiguousFallback(IEnumerable<string> availableTextureKeys) =>
-                SknResolver.FindUnambiguousFallback(availableTextureKeys);
+            internal static IReadOnlyList<string> GetSelectableTextureCandidates(
+                IEnumerable<string> textureKeys) =>
+                SknResolver.GetSelectableTextureCandidates(textureKeys);
 
             internal static string TryResolveBinPath(string sknPath) =>
                 SknResolver.TryResolveBinPath(sknPath);

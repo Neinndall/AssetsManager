@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,50 +21,6 @@ namespace AssetsManager.Utils
 {
     public static class TextureUtils
     {
-        public static IReadOnlyList<string> GetColorTextureCandidates(IEnumerable<string> textureKeys)
-        {
-            var keys = textureKeys?.ToList() ?? new List<string>();
-            return keys
-                .Where(IsColorTextureCandidate)
-                .OrderByDescending(key => key.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                .ThenBy(key => key.Length)
-                .ToList();
-        }
-
-        private static bool IsColorTextureCandidate(string textureKey)
-        {
-            if (string.IsNullOrWhiteSpace(textureKey)) return false;
-
-            string key = textureKey.ToLowerInvariant();
-            string padded = "_" + key.Replace('-', '_').Replace(' ', '_').Replace('.', '_') + "_";
-
-            if (padded.Contains("_normal_") ||
-                padded.Contains("_norm_") ||
-                padded.Contains("_mask_") ||
-                padded.Contains("_masks_") ||
-                padded.Contains("_spec_") ||
-                padded.Contains("_specular_") ||
-                padded.Contains("_rough_") ||
-                padded.Contains("_roughness_") ||
-                padded.Contains("_metal_") ||
-                padded.Contains("_metallic_") ||
-                padded.Contains("_orm_") ||
-                padded.Contains("_ao_") ||
-                padded.Contains("_emissive_") ||
-                padded.Contains("_glow_"))
-            {
-                return false;
-            }
-
-            return padded.Contains("_tx_cm_") ||
-                   padded.Contains("_cm_") ||
-                   padded.Contains("_diffuse_") ||
-                   padded.Contains("_color_") ||
-                   padded.Contains("_albedo_") ||
-                   padded.Contains("_basecolor_") ||
-                   padded.Contains("_base_color_");
-        }
-
         public static BitmapSource ResolveTexture(Dictionary<string, BitmapSource> allTextures, string selectedTextureName)
         {
             if (allTextures == null || string.IsNullOrEmpty(selectedTextureName))

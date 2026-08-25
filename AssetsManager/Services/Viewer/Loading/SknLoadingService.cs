@@ -59,13 +59,21 @@ namespace AssetsManager.Services.Viewer.Loading
                     }
 
                     var loadedTextures = LoadTexturesFromDirectory(textureDirectoryPath, cancellationToken);
+                    string[] selectableTextureKeys = loadedTextures.Keys.ToArray();
                     // Chroma folders contain the replacement color maps, while the exact skin BIN
                     // may reference shared/parent-skin effect maps. Load those dependencies as well;
                     // the dictionary keeps the chroma files authoritative when names collide.
                     var materialTextures = LoadMaterialTextures(textureDirectoryPath, loadedTextures, true);
 
                     _logService.LogDebug($"Loaded model (with custom textures): {Path.GetFileNameWithoutExtension(filePath)}");
-                    return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath, cancellationToken);
+                    return await CreateSceneModel(
+                        skinnedMesh,
+                        loadedTextures,
+                        selectableTextureKeys,
+                        Path.GetFileNameWithoutExtension(filePath),
+                        materialTextures,
+                        filePath,
+                        cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -96,10 +104,18 @@ namespace AssetsManager.Services.Viewer.Loading
                     }
 
                     var loadedTextures = LoadTexturesFromDirectory(modelDirectory, cancellationToken);
+                    string[] selectableTextureKeys = loadedTextures.Keys.ToArray();
                     var materialTextures = LoadMaterialTextures(filePath, loadedTextures, true);
 
                     _logService.LogDebug($"Loaded model: {Path.GetFileNameWithoutExtension(filePath)}");
-                    return await CreateSceneModel(skinnedMesh, loadedTextures, Path.GetFileNameWithoutExtension(filePath), materialTextures, filePath, cancellationToken);
+                    return await CreateSceneModel(
+                        skinnedMesh,
+                        loadedTextures,
+                        selectableTextureKeys,
+                        Path.GetFileNameWithoutExtension(filePath),
+                        materialTextures,
+                        filePath,
+                        cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -115,6 +131,8 @@ namespace AssetsManager.Services.Viewer.Loading
             var textureFiles = Directory.GetFiles(directoryPath, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(path => path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ||
                                path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !SknMaterialTextureResolver.IsPresentationTexture(
+                    Path.GetFileNameWithoutExtension(path)))
                 .OrderBy(path => Path.GetExtension(path).Equals(".dds", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
 
@@ -176,14 +194,15 @@ namespace AssetsManager.Services.Viewer.Loading
         private async Task<SceneModel> CreateSceneModel(
             SkinnedMesh skinnedMesh,
             Dictionary<string, BitmapSource> loadedTextures,
+            IReadOnlyCollection<string> selectableTextureKeys,
             string modelName,
             SknMaterialTextureResolution materialTextures,
             string filePath,
             CancellationToken cancellationToken)
         {
-            var availableTextureNames = new ObservableRangeCollection<string>(TextureUtils.GetColorTextureCandidates(loadedTextures.Keys));
-            string defaultTextureKey = materialTextures?.DefaultTextureKey ??
-                SknMaterialTextureResolver.FindUnambiguousFallback(loadedTextures.Keys);
+            var availableTextureNames = new ObservableRangeCollection<string>(
+                SknMaterialTextureResolver.GetSelectableTextureCandidates(selectableTextureKeys));
+            string defaultTextureKey = materialTextures?.DefaultTextureKey;
 
             var dataList = new List<SubmeshData>();
             var vertexAccessor = skinnedMesh.VerticesView.GetAccessor(VertexElement.POSITION.Name);
@@ -247,6 +266,7 @@ namespace AssetsManager.Services.Viewer.Loading
                     materialName,
                     defaultTextureKey,
                     materialTextures?.Overrides,
+                    materialTextures?.MaterialOverrideKeys,
                     loadedTextures);
                 string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
                 ModelMaterialEffectDefinition materialEffect =
@@ -323,6 +343,7 @@ namespace AssetsManager.Services.Viewer.Loading
             string materialName,
             string defaultTextureKey,
             IReadOnlyDictionary<string, string> materialTextureOverrides,
+            IReadOnlySet<string> materialOverrideKeys,
             Dictionary<string, BitmapSource> loadedTextures)
         {
             string normalizedMaterialName = SknMaterialTextureResolver.NormalizeMaterialKey(materialName);
@@ -333,6 +354,15 @@ namespace AssetsManager.Services.Viewer.Loading
             {
                 _logService.LogDebug($"Found material-bin texture '{overrideTextureKey}' for submesh '{materialName}'.");
                 return overrideTextureKey;
+            }
+
+            if (!string.IsNullOrEmpty(normalizedMaterialName) &&
+                materialOverrideKeys?.Contains(normalizedMaterialName) == true)
+            {
+                _logService.LogDebug(
+                    $"Material-bin override for submesh '{materialName}' could not be resolved; " +
+                    "the skin default will not be substituted.");
+                return null;
             }
 
             if (defaultTextureKey != null)
@@ -357,13 +387,17 @@ namespace AssetsManager.Services.Viewer.Loading
 
             try
             {
-                using var stream = File.OpenRead(skinBinPath);
-                var binTree = new BinTree(stream);
+                IReadOnlyList<BinTree> binTrees = LoadMaterialBinTrees(skinBinPath);
+                if (binTrees.Count == 0)
+                {
+                    return null;
+                }
+
                 Func<ulong, string> wadChunkPathResolver = _hashResolverService == null
                     ? null
                     : _hashResolverService.ResolveHash;
                 SknMaterialTextureMetadata metadata =
-                    SknMaterialTextureResolver.ReadMetadata(binTree, wadChunkPathResolver);
+                    SknMaterialTextureResolver.ReadMetadata(binTrees, wadChunkPathResolver);
                 if (loadReferencedTextures)
                 {
                     foreach (string texturePath in metadata.ReferencedTexturePaths)
@@ -394,6 +428,53 @@ namespace AssetsManager.Services.Viewer.Loading
                 _logService.LogError(ex, $"Failed to read skin material bin: {skinBinPath}");
                 return null;
             }
+        }
+
+        private IReadOnlyList<BinTree> LoadMaterialBinTrees(string primaryBinPath)
+        {
+            var trees = new List<BinTree>();
+            var pendingPaths = new Queue<string>();
+            var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            pendingPaths.Enqueue(primaryBinPath);
+
+            while (pendingPaths.Count > 0)
+            {
+                string binPath = pendingPaths.Dequeue();
+                string fullPath = Path.GetFullPath(binPath);
+                if (!visitedPaths.Add(fullPath) || !File.Exists(fullPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    using var stream = File.OpenRead(fullPath);
+                    var tree = new BinTree(stream);
+                    trees.Add(tree);
+
+                    foreach (string dependency in tree.Dependencies)
+                    {
+                        string dependencyPath =
+                            SknMaterialTextureResolver.TryResolveDependencyBinPath(fullPath, dependency);
+                        if (dependencyPath != null)
+                        {
+                            pendingPaths.Enqueue(dependencyPath);
+                        }
+                        else
+                        {
+                            _logService.LogDebug(
+                                $"Could not resolve skin material BIN dependency '{dependency}' from '{fullPath}'.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logService.LogDebug(
+                        $"Could not read skin material BIN dependency '{fullPath}': {ex.Message}");
+                }
+            }
+
+            return trees;
         }
 
         private record SubmeshData(

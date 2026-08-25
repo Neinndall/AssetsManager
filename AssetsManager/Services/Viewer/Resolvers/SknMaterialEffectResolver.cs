@@ -4,12 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using AssetsManager.Views.Models.Viewer;
+using LeagueToolkit.Hashing;
 
 namespace AssetsManager.Services.Viewer.Resolvers
 {
     internal static class SknMaterialEffectResolver
     {
         private const float Epsilon = 0.0001f;
+        private static readonly uint ScrollingMaskedDiffuseBloomShader =
+            Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom");
 
         internal static ModelMaterialEffectDefinition Resolve(
             SknMaterialDefinition material,
@@ -54,6 +57,39 @@ namespace AssetsManager.Services.Viewer.Resolvers
             IReadOnlyList<string> textureKeys,
             IEnumerable<string> submeshes)
         {
+            string panningTexture = FindSamplerKey(
+                material,
+                textureKeys,
+                "Panning_Texture",
+                "PanningTex");
+            if (material.ShaderHash == ScrollingMaskedDiffuseBloomShader &&
+                panningTexture != null &&
+                HasAnyParameter(
+                    material.Parameters,
+                    "Panning_Speed",
+                    "PanningSpeed",
+                    "Panning_Scale",
+                    "PanningScale"))
+            {
+                return new ModelMaterialEffectDefinition(
+                    ModelMaterialEffectKind.AdditiveScroll,
+                    panningTexture,
+                    null,
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.Zero,
+                        "Panning_Speed",
+                        "PanningSpeed"),
+                    ReadVector2(
+                        material.Parameters,
+                        Vector2.One,
+                        "Panning_Scale",
+                        "PanningScale"),
+                    Vector4.One,
+                    1f,
+                    0f);
+            }
+
             string additiveTexture = FindSamplerKey(
                 material,
                 textureKeys,

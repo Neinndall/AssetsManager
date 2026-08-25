@@ -102,34 +102,6 @@ namespace AssetsManager.Tests.xUnit.Utils
         }
 
         [Fact]
-        public void GetColorTextureCandidates_ExcludesPresentationAndMaterialMaps()
-        {
-            var candidates = TextureUtils.GetColorTextureCandidates(new[]
-            {
-                "aatrox_base_sword_tx_cm",
-                "aatrox_base_tx_cm",
-                "aatrox_wings_tx_cm",
-                "aatrox_base_i_banner_color",
-                "aatroxloadscreen",
-                "aatrox_base_i_banner",
-                "aatrox_base_p_sword_mask",
-                "aatrox_base_r_wing_mask",
-                "aatrox_base_r_mat_gradient"
-            });
-
-            Assert.Equal(4, candidates.Count);
-            Assert.Contains("aatrox_base_sword_tx_cm", candidates);
-            Assert.Contains("aatrox_base_tx_cm", candidates);
-            Assert.Contains("aatrox_wings_tx_cm", candidates);
-            Assert.Contains("aatrox_base_i_banner_color", candidates);
-            Assert.DoesNotContain("aatroxloadscreen", candidates);
-            Assert.DoesNotContain("aatrox_base_i_banner", candidates);
-            Assert.DoesNotContain("aatrox_base_p_sword_mask", candidates);
-            Assert.DoesNotContain("aatrox_base_r_wing_mask", candidates);
-            Assert.DoesNotContain("aatrox_base_r_mat_gradient", candidates);
-        }
-
-        [Fact]
         public void LoadViewerTexture_SelectsExistingTexMipWithoutResizing()
         {
             using var stream = new MemoryStream();
