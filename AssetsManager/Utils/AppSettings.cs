@@ -20,7 +20,7 @@ namespace AssetsManager.Utils
         public bool SyncHashesWithCDTB { get; set; }
         public bool EnableExtraction { get; set; } 
         public bool OrganizeExtractedAssets { get; set; }
-        public ReportGenerationSettings ReportGeneration { get; set; }
+        public ReportGenerationSettings ReportGeneration { get; set; } = new();
         public StudioParametersSettings StudioParameters { get; set; } = new();
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
