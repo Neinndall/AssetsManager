@@ -201,7 +201,7 @@ namespace AssetsManager.Services.Viewer.Loading
             CancellationToken cancellationToken)
         {
             var availableTextureNames = new ObservableRangeCollection<string>(
-                SknMaterialTextureResolver.GetSelectableTextureCandidates(selectableTextureKeys));
+                SknMaterialTextureResolver.GetSelectableTextureCandidates(selectableTextureKeys, materialTextures));
             string defaultTextureKey = materialTextures?.DefaultTextureKey;
 
             var dataList = new List<SubmeshData>();

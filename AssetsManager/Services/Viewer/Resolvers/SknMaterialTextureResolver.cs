@@ -498,9 +498,13 @@ namespace AssetsManager.Services.Viewer.Resolvers
         }
 
         internal static IReadOnlyList<string> GetSelectableTextureCandidates(
-            IEnumerable<string> textureKeys) =>
+            IEnumerable<string> textureKeys,
+            SknMaterialTextureResolution materialTextures = null) =>
             (textureKeys ?? Enumerable.Empty<string>())
-                .Where(key => !IsPresentationTexture(key))
+                .Concat(materialTextures?.Overrides?.Values ?? Enumerable.Empty<string>())
+                .Append(materialTextures?.DefaultTextureKey)
+                .Where(key => !string.IsNullOrWhiteSpace(key) && !IsPresentationTexture(key))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
         internal static string NormalizeMaterialKey(string materialName)

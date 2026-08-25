@@ -1288,6 +1288,29 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
         }
 
         [Fact]
+        public void GetSelectableTextureCandidatesIncludesResolvedPrimaryMaterialTextures()
+        {
+            var resolution = new SknMaterialTextureResolution(
+                "pyke_skin01_tx_cm",
+                new Dictionary<string, string>
+                {
+                    ["pykeskin01scrollmat"] = "pyke_base_scroll_tx_cm"
+                },
+                new Dictionary<string, ModelMaterialEffectDefinition>(),
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                ModelMaterialEffectDefinition.None);
+
+            IReadOnlyList<string> candidates =
+                SknResolver.GetSelectableTextureCandidates(
+                    new[] { "pyke_skin01_tx_cm", "pykeloadscreen_1" },
+                    resolution);
+
+            Assert.Contains("pyke_skin01_tx_cm", candidates);
+            Assert.Contains("pyke_base_scroll_tx_cm", candidates);
+            Assert.DoesNotContain("pykeloadscreen_1", candidates);
+        }
+
+        [Fact]
         public void TryResolveBinPath_UsesExpectedHashNamedSkinBin()
         {
             string root = Path.Combine(Path.GetTempPath(), $"assetsmanager-skn-{Guid.NewGuid():N}");
