@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using AssetsManager.Views.Models.Monitor;
-using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Settings;
 using AssetsManager.Views.Models.Audio;
 
@@ -22,6 +21,7 @@ namespace AssetsManager.Utils
         public bool EnableExtraction { get; set; } 
         public bool OrganizeExtractedAssets { get; set; }
         public ReportGenerationSettings ReportGeneration { get; set; }
+        public StudioParametersSettings StudioParameters { get; set; } = new();
         public bool AssetWatcherUpdates { get; set; }
         public bool AssetTrackerTimer { get; set; }
         public bool SaveJsonHistory { get; set; }
@@ -81,11 +81,6 @@ namespace AssetsManager.Utils
         public AudioExportFormat AudioExportFormat { get; set; } = AudioExportFormat.Ogg;
         public ImageExportFormat ImageExportFormat { get; set; } = ImageExportFormat.Original;
         public DataExportFormat DataExportFormat { get; set; } = DataExportFormat.Original;
-
-        // Diagnostic: writes a per-file audit log after each comparison so the
-        // user can verify that the New/Modified/Removed/Renamed classification
-        // is correct (Checksum + size + compression per file).
-        public bool VerboseComparisonLog { get; set; } = true;
 
         // New structure for monitored assets (Local WADs/Plugins)
         private IList<MonitoredAsset> _monitoredAssets = new SafeList<MonitoredAsset>();
@@ -205,10 +200,29 @@ namespace AssetsManager.Utils
                 }
 
                 var json = File.ReadAllText(ConfigFilePath);
-                var settings = JsonConvert.DeserializeObject<AppSettings>(json) ?? GetDefaultSettings();
+                var jsonObject = JObject.Parse(json);
+                var settings = jsonObject.ToObject<AppSettings>() ?? GetDefaultSettings();
 
                 bool needsResave = false;
 
+                // Migrate the short-lived flat Studio settings introduced before they were grouped.
+                if (jsonObject["StudioParameters"] == null &&
+                    (jsonObject["StudioGroundVisible"] != null ||
+                     jsonObject["StudioGridVisible"] != null ||
+                     jsonObject["StudioSkyboxVisible"] != null ||
+                     jsonObject["StudioTransparentBackground"] != null))
+                {
+                    settings.StudioParameters = new StudioParametersSettings
+                    {
+                        GroundVisible = jsonObject.Value<bool?>("StudioGroundVisible") ?? false,
+                        GridVisible = jsonObject.Value<bool?>("StudioGridVisible") ?? true,
+                        SkyboxVisible = jsonObject.Value<bool?>("StudioSkyboxVisible") ?? false,
+                        TransparentBackground = jsonObject.Value<bool?>("StudioTransparentBackground") ?? false
+                    };
+                    needsResave = true;
+                }
+
+                settings.StudioParameters ??= GetDefaultSettings().StudioParameters;
                 settings.MonitoredAssets ??= new SafeList<MonitoredAsset>();
                 settings.DiffHistory ??= new SafeList<HistoryEntry>();
                 settings.AssetTrackerUserRemovedIds ??= new ConcurrentDictionary<string, List<long>>();
@@ -275,6 +289,13 @@ namespace AssetsManager.Utils
                 CustomGroundLogoPath = null,
                 GroundLogoScale = 1.0,
                 GroundLogoOpacity = 1.0,
+                StudioParameters = new StudioParametersSettings
+                {
+                    GroundVisible = false,
+                    GridVisible = true,
+                    SkyboxVisible = false,
+                    TransparentBackground = false
+                },
                 AudioExportFormat = AudioExportFormat.Ogg,
                 ImageExportFormat = ImageExportFormat.Original,
                 DataExportFormat = DataExportFormat.Original,
@@ -323,6 +344,7 @@ namespace AssetsManager.Utils
             CustomGroundLogoPath = defaultSettings.CustomGroundLogoPath;
             GroundLogoScale = defaultSettings.GroundLogoScale;
             GroundLogoOpacity = defaultSettings.GroundLogoOpacity;
+            StudioParameters = defaultSettings.StudioParameters;
             AudioExportFormat = defaultSettings.AudioExportFormat;
             ImageExportFormat = defaultSettings.ImageExportFormat;
             SaveJsonHistory = defaultSettings.SaveJsonHistory;
@@ -350,6 +372,23 @@ namespace AssetsManager.Utils
             SyncHashesWithCDTB = defaultSettings.SyncHashesWithCDTB;
             // HashesSizes is intentionally not reset to preserve local cache state.
         }
+    }
+
+    public class StudioParametersSettings
+    {
+        public bool GroundVisible { get; set; }
+        public bool GridVisible { get; set; } = true;
+        public bool SkyboxVisible { get; set; }
+        public bool TransparentBackground { get; set; }
+    }
+
+    public class ReportGenerationSettings
+    {
+        public bool Enabled { get; set; }
+        public bool FilterNew { get; set; }
+        public bool FilterModified { get; set; }
+        public bool FilterRenamed { get; set; }
+        public bool FilterRemoved { get; set; }
     }
 
     public class SafeList<T> : IList<T>

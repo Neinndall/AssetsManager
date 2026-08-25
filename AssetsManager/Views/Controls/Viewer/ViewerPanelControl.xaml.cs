@@ -679,6 +679,9 @@ namespace AssetsManager.Views.Controls.Viewer
             {
                 if (isInitialLoad)
                 {
+                    if (_viewModel.LoadedModels.Count == 0)
+                        Viewport?.ApplyStudioParameters();
+
                     Viewport?.SetupScene(false);
                     ViewModel.ShowMainContent(); // MVVM State Update
                 }

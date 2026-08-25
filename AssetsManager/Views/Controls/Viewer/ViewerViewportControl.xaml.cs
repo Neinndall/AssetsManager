@@ -326,6 +326,10 @@ namespace AssetsManager.Views.Controls.Viewer
                 case nameof(ViewerViewportModel.IsGroundVisible):
                     SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
                     break;
+                case nameof(ViewerViewportModel.IsGridVisible):
+                    if (_viewModel.IsGridVisible)
+                        EnsureSceneRenderers();
+                    break;
                 case nameof(ViewerViewportModel.ShowSkybox):
                     SetSkyboxVisibility(_viewModel.ShowSkybox);
                     break;
@@ -561,6 +565,17 @@ namespace AssetsManager.Views.Controls.Viewer
             // Ensure initial state is applied
             SetGroundVisibility(!_viewModel.IsTransparentBg && _viewModel.IsGroundVisible);
             SetSkyboxVisibility(_viewModel.ShowSkybox);
+        }
+
+        public void ApplyStudioParameters()
+        {
+            StudioParametersSettings studioParameters = AppSettings?.StudioParameters;
+            if (studioParameters == null) return;
+
+            _viewModel.IsGroundVisible = studioParameters.GroundVisible;
+            _viewModel.IsGridVisible = studioParameters.GridVisible;
+            _viewModel.IsTransparentBg = studioParameters.TransparentBackground;
+            _viewModel.ShowSkybox = studioParameters.SkyboxVisible && !studioParameters.TransparentBackground;
         }
 
 
