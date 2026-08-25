@@ -27,7 +27,19 @@ namespace AssetsManager.Views.Models.Viewer
             Geometry = geometry;
         }
 
-        public string Name { get; set; }
+        private string _name;
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                _name = value;
+                if (value?.IndexOf("VFX", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    IsVisible = false;
+                }
+            }
+        }
 
         private bool _isVisible = true;
         public bool IsVisible

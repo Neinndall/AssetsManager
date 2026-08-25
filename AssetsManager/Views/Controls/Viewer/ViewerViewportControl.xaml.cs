@@ -489,10 +489,7 @@ namespace AssetsManager.Views.Controls.Viewer
 
                         var part = new ModelPart(
                             name + "_" + sceneModel.Parts.Count,
-                            new GeometryModel3D(transformedMesh, geomModel.Material))
-                        {
-                            IsVisible = true
-                        };
+                            new GeometryModel3D(transformedMesh, geomModel.Material));
 
                         if (geomModel.Material is DiffuseMaterial diffuse && diffuse.Brush is ImageBrush imgBrush && imgBrush.ImageSource is BitmapSource bitmap)
                         {

@@ -27,6 +27,20 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer
         }
 
         [Fact]
+        public void ModelPart_HidesVfxNamedPartsByDefault()
+        {
+            var geometry = CreateGeometry();
+            var part = new ModelPart("Pyke_VFX_Dagger", geometry);
+
+            Assert.False(part.IsVisible);
+            Assert.Null(part.Visual.Content);
+
+            part.IsVisible = true;
+
+            Assert.Same(geometry, part.Visual.Content);
+        }
+
+        [Fact]
         public void SceneModel_AddAndRemovePartOwnsVisualTreeConsistently()
         {
             var scene = new SceneModel();
