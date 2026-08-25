@@ -112,6 +112,71 @@ public sealed class ManifestDownloaderTests
     }
 
     [Fact]
+    public async Task VerificationOnlyReportsCorruptionWithoutDownloadingOrWriting()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        byte[] first = "first manifest chunk"u8.ToArray();
+        byte[] second = "second manifest chunk"u8.ToArray();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest(first, second);
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = bridge.CreateDirectory("client");
+        string target = Path.Combine(output, "Data", "test.wad.client");
+
+        Assert.Equal(1, await downloader.DownloadManifestAsync(manifest, output));
+        int requestsAfterDownload = handler.RequestCount;
+
+        await using (var stream = new FileStream(target, FileMode.Open, FileAccess.Write, FileShare.Read))
+        {
+            stream.Position = first.Length;
+            stream.WriteByte(0xFF);
+        }
+
+        Assert.Equal(1, await downloader.VerifyManifestAsync(manifest, output));
+        Assert.Equal(requestsAfterDownload, handler.RequestCount);
+        Assert.Equal(0xFF, (await File.ReadAllBytesAsync(target))[first.Length]);
+    }
+
+    [Fact]
+    public async Task VerificationOnlyDoesNotCreateTheTargetDirectory()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest("payload"u8.ToArray());
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = Path.Combine(bridge.RootPath, "missing-client");
+
+        Assert.Equal(1, await downloader.VerifyManifestAsync(manifest, output));
+        Assert.False(Directory.Exists(output));
+        Assert.Equal(0, handler.RequestCount);
+
+        Assert.Equal(1, await downloader.DownloadManifestAsync(manifest, output));
+        Assert.True(Directory.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifiesChunksWhenTheReusableBufferGrows()
+    {
+        using var bridge = new AssetsManagerTestBridge();
+        byte[] first = new byte[] { 0x11 };
+        byte[] second = Enumerable.Repeat((byte)0x5A, 4097).ToArray();
+        (RmanManifest manifest, byte[] bundle) = CreateManifest(first, second);
+        var handler = new RangeBundleHandler(bundle);
+        using var httpClient = new HttpClient(handler);
+        using var downloader = new ManifestDownloader(httpClient, bridge.LogService, bridge.Directories, new HashService());
+        string output = bridge.CreateDirectory("client");
+
+        Assert.Equal(1, await downloader.DownloadManifestAsync(manifest, output));
+        int requestsAfterDownload = handler.RequestCount;
+
+        Assert.Equal(0, await downloader.DownloadManifestAsync(manifest, output));
+        Assert.Equal(requestsAfterDownload, handler.RequestCount);
+        Assert.Equal(first.Concat(second), await File.ReadAllBytesAsync(Path.Combine(output, "Data", "test.wad.client")));
+    }
+
+    [Fact]
     public async Task RefusesDownloadedContentThatDoesNotMatchTheManifestHash()
     {
         using var bridge = new AssetsManagerTestBridge();
@@ -267,4 +332,5 @@ public sealed class ManifestDownloaderTests
             throw new InvalidOperationException("The request should have been cancelled.");
         }
     }
+
 }

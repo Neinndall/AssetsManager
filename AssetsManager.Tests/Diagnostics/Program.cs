@@ -13,6 +13,7 @@ using AssetsManager.Services.Core;
 using AssetsManager.Views.Models.Hashes;
 using AssetsManager.Tests.Diagnostics.Viewer;
 using AssetsManager.Tests.Diagnostics.Hashes;
+using AssetsManager.Tests.Diagnostics.Monitor;
 using LeagueToolkit.Core.Meta;
 using LeagueToolkit.Core.Meta.Properties;
 using LeagueToolkit.Hashing;
@@ -25,6 +26,11 @@ namespace AssetsManager.Tests.Diagnostics
 
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && string.Equals(args[0], "manifest-verify", StringComparison.OrdinalIgnoreCase))
+            {
+                await ManifestVerificationDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "game-baseline", StringComparison.OrdinalIgnoreCase))
             {
                 await GameBaselineDiagnostic.Run(args.Skip(1).ToArray());

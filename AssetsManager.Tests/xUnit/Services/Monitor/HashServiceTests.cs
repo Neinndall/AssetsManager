@@ -12,7 +12,8 @@ public sealed class HashServiceTests
     [InlineData(HashType.Sha512, 0xBA7A6193A135AFDDul)]
     [InlineData(HashType.Sha256, 0xEACF018FBF1678BAul)]
     [InlineData(HashType.Hkdf, 0x3D4EDA0AB8CF0D24ul)]
-    public void ComputesRmanChunkIdWithoutAllocatingDigestArrays(HashType hashType, ulong expected)
+    [InlineData(HashType.Blake3, 0x33514638ACB33764ul)]
+    public void ComputesRmanChunkIdForSupportedHashTypes(HashType hashType, ulong expected)
     {
         var service = new HashService();
 

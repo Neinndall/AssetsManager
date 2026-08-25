@@ -39,8 +39,9 @@ public sealed class HashService
 
     private static ulong HashBlake3(ReadOnlySpan<byte> data)
     {
-        var hash = Blake3.Hasher.Hash(data);
-        return BinaryPrimitives.ReadUInt64LittleEndian(hash.AsSpan());
+        Span<byte> hash = stackalloc byte[sizeof(ulong)];
+        Blake3.Hasher.Hash(data, hash);
+        return BinaryPrimitives.ReadUInt64LittleEndian(hash);
     }
 
     private static ulong HashHkdf(ReadOnlySpan<byte> data)

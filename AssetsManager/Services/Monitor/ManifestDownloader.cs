@@ -81,14 +81,31 @@ public sealed class ManifestDownloader : IDisposable
         string filter = null,
         List<string> langs = null,
         CancellationToken cancellationToken = default)
+        => RunManifestAsync(manifest, outputPath, filter, langs, verificationOnly: false, cancellationToken);
+
+    public Task<int> VerifyManifestAsync(
+        RmanManifest manifest,
+        string outputPath,
+        string filter = null,
+        List<string> langs = null,
+        CancellationToken cancellationToken = default)
+        => RunManifestAsync(manifest, outputPath, filter, langs, verificationOnly: true, cancellationToken);
+
+    private Task<int> RunManifestAsync(
+        RmanManifest manifest,
+        string outputPath,
+        string filter,
+        List<string> langs,
+        bool verificationOnly,
+        CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(manifest);
 
-        // Run the complete RMAN pipeline on the thread pool so filtering, lookup construction,
+        // Run the RMAN pipeline on the thread pool so filtering, lookup construction,
         // range planning, hashing, and patch bookkeeping never execute on the WPF dispatcher.
         return Task.Run(
-            () => DownloadManifestCoreAsync(manifest, outputPath, filter, langs, cancellationToken),
+            () => DownloadManifestCoreAsync(manifest, outputPath, filter, langs, verificationOnly, cancellationToken),
             cancellationToken);
     }
 
@@ -97,6 +114,7 @@ public sealed class ManifestDownloader : IDisposable
         string outputPath,
         string filter,
         List<string> langs,
+        bool verificationOnly,
         CancellationToken cancellationToken)
     {
 
@@ -129,7 +147,8 @@ public sealed class ManifestDownloader : IDisposable
             return true;
         }).ToList();
 
-        _directoriesCreator.CreateDirectory(outputRoot);
+        if (!verificationOnly)
+            _directoriesCreator.CreateDirectory(outputRoot);
 
         // Phase 2: Scan local files with bounded disk concurrency and verify every physical chunk.
         var filesToPatch = new ConcurrentBag<FilePatchTask>();
@@ -167,45 +186,59 @@ public sealed class ManifestDownloader : IDisposable
 
                         if (fileExists)
                         {
-                            await using var stream = new FileStream(
-                                physicalPath,
-                                FileMode.Open,
-                                FileAccess.Read,
-                                FileShare.ReadWrite,
-                                256 * 1024,
-                                FileOptions.SequentialScan | FileOptions.Asynchronous);
-
-                            foreach (ulong chunkId in file.ChunkIds)
+                            byte[] verificationBuffer = null;
+                            try
                             {
-                                token.ThrowIfCancellationRequested();
-                                RmanChunk chunk = GetRequiredChunk(manifest, chunkId, file.Name);
-                                int chunkSize = GetBufferSize(chunk.UncompressedSize, "uncompressed");
-                                bool needsUpdate = true;
+                                await using var stream = new FileStream(
+                                    physicalPath,
+                                    FileMode.Open,
+                                    FileAccess.Read,
+                                    FileShare.ReadWrite,
+                                    256 * 1024,
+                                    FileOptions.SequentialScan | FileOptions.Asynchronous);
 
-                                if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
+                                foreach (ulong chunkId in file.ChunkIds)
                                 {
-                                    byte[] localData = ArrayPool<byte>.Shared.Rent(chunkSize);
-                                    try
+                                    token.ThrowIfCancellationRequested();
+                                    RmanChunk chunk = GetRequiredChunk(manifest, chunkId, file.Name);
+                                    int chunkSize = GetBufferSize(chunk.UncompressedSize, "uncompressed");
+                                    bool needsUpdate = true;
+
+                                    if (currentFileLength >= currentFileOffset + chunk.UncompressedSize)
                                     {
+                                        if (verificationBuffer == null || verificationBuffer.Length < chunkSize)
+                                        {
+                                            byte[] previousBuffer = verificationBuffer;
+                                            verificationBuffer = ArrayPool<byte>.Shared.Rent(chunkSize);
+                                            if (previousBuffer != null)
+                                                ArrayPool<byte>.Shared.Return(previousBuffer);
+                                        }
+
                                         int totalRead = await ReadExactlyOrToEndAsync(
                                             stream,
-                                            localData.AsMemory(0, chunkSize),
+                                            verificationBuffer.AsMemory(0, chunkSize),
                                             token);
-                                        needsUpdate = totalRead != chunkSize
-                                            || !_hashService.VerifyChunk(localData.AsSpan(0, totalRead), chunk.ChunkId, file.HashType);
+                                        if (totalRead == chunkSize)
+                                        {
+                                            needsUpdate = !_hashService.VerifyChunk(
+                                                verificationBuffer.AsSpan(0, totalRead),
+                                                chunk.ChunkId,
+                                                file.HashType);
+                                        }
                                     }
-                                    finally
+
+                                    if (needsUpdate)
                                     {
-                                        ArrayPool<byte>.Shared.Return(localData);
+                                        chunks.Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset });
                                     }
-                                }
 
-                                if (needsUpdate)
-                                {
-                                    chunks.Add(new ChunkDownloadTask { Chunk = chunk, FileOffset = currentFileOffset });
+                                    currentFileOffset += chunk.UncompressedSize;
                                 }
-
-                                currentFileOffset += chunk.UncompressedSize;
+                            }
+                            finally
+                            {
+                                if (verificationBuffer != null)
+                                    ArrayPool<byte>.Shared.Return(verificationBuffer);
                             }
                         }
                         else
@@ -270,6 +303,7 @@ public sealed class ManifestDownloader : IDisposable
         _logService.Log($"  • Chunks to download: {totalChunksToDownloadCount:N0}");
         _logService.Log($"  • Estimated download: {verifyMB:F2} MB (compressed)");
 
+        if (verificationOnly) return filesToPatch.Count;
         if (!filesToPatch.Any()) return 0;
 
         // Preserve the completed verification frame before the update phase replaces it.
