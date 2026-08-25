@@ -45,6 +45,7 @@ New Features
   - Hash Guessing Lab / GAME Custom now includes character `.tex` substitutions and deterministic basename word addition.
   - Viewer / Added configurable ground logo opacity in General settings.
   - Viewer / Added a configurable ground logo size in General settings.
+  - Viewer / Authored black material masks no longer become an unmasked white Fresnel overlay on champion models.
   - Viewer / Added a transparent ground logo overlay that preserves the original image resolution.
   - Added independent BIN and RST hash discovery with typed local inventories, same-file BIN evidence, contextual RST strategies, and automatic persistence.
   - BIN differences now show only semantic object and property changes with resolved paths.

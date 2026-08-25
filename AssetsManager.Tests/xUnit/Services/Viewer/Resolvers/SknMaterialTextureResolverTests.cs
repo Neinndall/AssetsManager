@@ -559,6 +559,102 @@ namespace AssetsManager.Tests.xUnit.Services.Viewer.Resolvers
             Assert.Null(effect.Iridescence.MaskTextureName);
         }
 
+        [Theory]
+        [InlineData("black", false)]
+        [InlineData("white", true)]
+        public void Resolve_HonorsAuthoredFresnelMaskSemantics(string maskName, bool expectFresnel)
+        {
+            const string materialPath = "Characters/Test/Skins/Base/Materials/Fresnel";
+            const string diffusePath = "ASSETS/Characters/Test/Skins/Base/Test_TX_CM.tex";
+            string maskPath = $"ASSETS/Shared/Materials/{maskName}.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Mask_Texture", maskPath)
+                    },
+                    CreateParameter("FresnelIntensity", Vector4.One)));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm", maskName });
+
+            if (!expectFresnel)
+            {
+                Assert.DoesNotContain("body", resolution.Effects);
+                return;
+            }
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.Equal(maskName, effect.MaskTextureName);
+        }
+
+        [Fact]
+        public void Resolve_UsesWhiteFresnelWhenMaskIsAbsent()
+        {
+            const string materialPath = "Characters/Test/Skins/Base/Materials/Fresnel";
+            const string diffusePath = "ASSETS/Characters/Test/Skins/Base/Test_TX_CM.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[] { CreateSampler("Diffuse_Texture", diffusePath) },
+                    CreateParameter("FresnelIntensity", Vector4.One)));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm" });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.Null(effect.MaskTextureName);
+        }
+
+        [Fact]
+        public void Resolve_PreservesExistingEffectMaskWhenFresnelMaskIsBlack()
+        {
+            const string materialPath = "Characters/Test/Skins/Base/Materials/Fresnel";
+            const string diffusePath = "ASSETS/Characters/Test/Skins/Base/Test_TX_CM.tex";
+            const string scrollPath = "ASSETS/Characters/Test/Skins/Base/Test_Scroll.tex";
+            const string scrollMaskPath = "ASSETS/Characters/Test/Skins/Base/Test_Scroll_Mask.tex";
+            BinTree tree = CreateSkinTree(
+                diffusePath,
+                CreateOverride(
+                    "Body",
+                    new BinTreeObjectLink(Fnv1a.HashLower("Material"), Fnv1a.HashLower(materialPath))),
+                CreateMaterialWithParameters(
+                    materialPath,
+                    new[]
+                    {
+                        CreateSampler("Diffuse_Texture", diffusePath),
+                        CreateSampler("Mask_Texture", "ASSETS/Shared/Materials/black.tex"),
+                        CreateSampler("AdditiveScrollTex", scrollPath),
+                        CreateSampler("AdditiveScroll_Mask", scrollMaskPath)
+                    },
+                    CreateParameter("ScrollSpeed", new Vector4(0.2f, -0.1f, 0f, 0f)),
+                    CreateParameter("ScrollTexTile", Vector4.One),
+                    CreateParameter("FresnelIntensity", Vector4.One)));
+
+            SknMaterialTextureResolution resolution = SknMaterialTextureResolver.Resolve(
+                tree,
+                new[] { "test_tx_cm", "test_scroll", "test_scroll_mask" });
+
+            ModelMaterialEffectDefinition effect = resolution.Effects["body"];
+            Assert.True((effect.Kind & ModelMaterialEffectKind.AdditiveScroll) != 0);
+            Assert.True((effect.Kind & ModelMaterialEffectKind.Fresnel) != 0);
+            Assert.Equal("test_scroll_mask", effect.MaskTextureName);
+        }
+
         [Fact]
         public void Resolve_CombinesFresnelAndBloomWithMaterialMask()
         {

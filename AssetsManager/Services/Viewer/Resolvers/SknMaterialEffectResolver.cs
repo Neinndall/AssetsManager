@@ -13,6 +13,24 @@ namespace AssetsManager.Services.Viewer.Resolvers
         private const float Epsilon = 0.0001f;
         private static readonly uint ScrollingMaskedDiffuseBloomShader =
             Fnv1a.HashLower("Shaders/SkinnedMesh/ScrollingMaskedDiffuseBloom");
+        private static readonly string[] MaterialMaskSamplerNames =
+        {
+            "Mask",
+            "Mask_Texture_red",
+            "Mask_Texture_green",
+            "Mask_Texture_blue",
+            "Mask_Texture",
+            "MaskTex",
+            "FresnelMask",
+            "BloomMask",
+            "BloomMask_Texture",
+            "Outline_Bloom_Mask",
+            "Pattern_Mask",
+            "Flow_Mask",
+            "Scroll_Tex_Mask",
+            "Scroll_Texture_Mask",
+            "Scroll_Mask"
+        };
 
         internal static ModelMaterialEffectDefinition Resolve(
             SknMaterialDefinition material,
@@ -395,10 +413,18 @@ namespace AssetsManager.Services.Viewer.Resolvers
                 return effect;
             }
 
+            string maskTexture = FindMaterialMask(material, textureKeys);
+            if (effect.MaskTextureName == null &&
+                maskTexture == null &&
+                HasAuthoredBlackMaterialMask(material))
+            {
+                return effect;
+            }
+
             effect = effect with
             {
                 Kind = effect.Kind | ModelMaterialEffectKind.Fresnel,
-                MaskTextureName = effect.MaskTextureName ?? FindMaterialMask(material, textureKeys),
+                MaskTextureName = effect.MaskTextureName ?? maskTexture,
                 FresnelColor = ReadVector4(
                     material.Parameters,
                     Vector4.One,
@@ -699,21 +725,14 @@ namespace AssetsManager.Services.Viewer.Resolvers
             FindSamplerKey(
                 material,
                 textureKeys,
-                "Mask",
-                "Mask_Texture_red",
-                "Mask_Texture_green",
-                "Mask_Texture_blue",
-                "Mask_Texture",
-                "MaskTex",
-                "FresnelMask",
-                "BloomMask",
-                "BloomMask_Texture",
-                "Outline_Bloom_Mask",
-                "Pattern_Mask",
-                "Flow_Mask",
-                "Scroll_Tex_Mask",
-                "Scroll_Texture_Mask",
-                "Scroll_Mask");
+                MaterialMaskSamplerNames);
+
+        private static bool HasAuthoredBlackMaterialMask(SknMaterialDefinition material) =>
+            material.Samplers.Any(sampler =>
+                MaterialMaskSamplerNames.Any(name =>
+                    SknMaterialTextureResolver.NormalizeToken(name) ==
+                    SknMaterialTextureResolver.NormalizeToken(sampler.TextureName)) &&
+                SknMaterialTextureResolver.IsNeutralTexturePath(sampler.TexturePath));
 
         private static bool IsEffectMaskApplicable(
             IReadOnlyList<SknMaterialSampler> samplers,
