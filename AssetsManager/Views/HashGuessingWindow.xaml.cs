@@ -796,16 +796,17 @@ namespace AssetsManager.Views
 
                     if (value.TotalWads > 0)
                     {
-                        statusMsg = $"Hash Lab: {value.CurrentWad} ({value.ProcessedWads}/{value.TotalWads}) · {foundMatches:N0} found";
+                        string fileName = string.IsNullOrEmpty(value.CurrentWad) ? "WAD" : value.CurrentWad;
+                        statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName} · {foundMatches:N0} found";
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, null);
                     }
                     else
                     {
                         string stageName = string.IsNullOrEmpty(value.CurrentWad) ? (_viewModel.SelectedMethod?.Name ?? "In-memory") : value.CurrentWad;
                         statusMsg = $"Hash Lab: {stageName} · {foundMatches:N0} found";
                         customProgressText = $"{totalChecked:N0} checked";
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{stageName} · {foundMatches:N0} found", customProgressText);
                     }
-
-                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, customProgressText);
                 });
                 var matchProgress = new Progress<HashGuessMatch>(match =>
                 {
@@ -970,9 +971,18 @@ namespace AssetsManager.Views
                     string timeText = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
 
-                    string statusMsg = $"Hash Lab: {domainName} {action} · {p.FoundMatches:N0} found";
-                    string customProgressText = p.TotalWads > 0 ? null : $"{p.CheckedCandidates:N0} checked";
-                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, customProgressText);
+                    if (p.TotalWads > 0)
+                    {
+                        string stage = string.IsNullOrEmpty(p.CurrentStage) ? "WAD" : p.CurrentStage;
+                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage} · {p.FoundMatches:N0} found";
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
+                    }
+                    else
+                    {
+                        string statusMsg = $"Hash Lab: {domainName} {action} · {p.FoundMatches:N0} found";
+                        string customProgressText = p.CheckedCandidates > 0 ? $"{p.CheckedCandidates:N0} checked" : null;
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, 0, $"{domainName} {action} · {p.FoundMatches:N0} found", customProgressText);
+                    }
                 });
 
                 if (action == InternalHashAction.Inventory)
@@ -1070,7 +1080,18 @@ namespace AssetsManager.Views
 
             try
             {
-                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, null, effectiveToken);
+                var progress = new Progress<HashGuessProgress>(p =>
+                {
+                    if (p.TotalWads > 0)
+                    {
+                        _viewModel.IsProgressIndeterminate = false;
+                        _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
+                        _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
+                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {p.CurrentWad}";
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
+                    }
+                });
+                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, progress, effectiveToken);
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.ProgressValue = 100;
