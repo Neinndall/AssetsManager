@@ -379,19 +379,20 @@ namespace AssetsManager.Services.Core
 
         // --- Hash Guessing Lab ---
 
-        public void OnHashGuessingStarted(string operationName, int totalItems = 0)
+        public void OnHashGuessingStarted(string operationName, string initialStatus = null, int totalItems = 0)
         {
             _owner?.Dispatcher.Invoke(() =>
             {
+                string status = !string.IsNullOrEmpty(initialStatus) ? initialStatus : $"Preparing {operationName}...";
                 if (_progressDetailsWindow != null && _totalFiles == 0 && totalItems > 0)
                 {
                     _totalFiles = totalItems;
-                    UpdateStatusBar($"Hash Lab: {operationName}...", 0, totalItems);
+                    UpdateStatusBar(status, 0, totalItems);
                     _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
                     return;
                 }
 
-                StartOperation($"Hash Lab: {operationName}", "Scanning", "TagSearchOutline", totalItems, $"Hash Lab: {operationName}...");
+                StartOperation($"Hash Lab: {operationName}", "Scanning", "TagSearchOutline", totalItems, status);
             });
         }
 

@@ -757,7 +757,8 @@ namespace AssetsManager.Views
             }
 
             UpdateStatus();
-            _progressUIManager?.OnHashGuessingStarted(_viewModel.SelectedMethod?.Name ?? mode.ToString());
+            string initialStatus = (mode is HashGuessMode.GrepGame or HashGuessMode.GrepLcu) ? "Preparing WADs..." : "Preparing Candidates...";
+            _progressUIManager?.OnHashGuessingStarted(_viewModel.SelectedMethod?.Name ?? mode.ToString(), initialStatus);
 
             try
             {
@@ -901,7 +902,7 @@ namespace AssetsManager.Views
             var displayedMatchHashes = new HashSet<ulong>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-            _progressUIManager?.OnHashGuessingStarted($"{domainName} {action}");
+            _progressUIManager?.OnHashGuessingStarted($"{domainName} {action}", "Preparing Hashes...");
 
             try
             {
@@ -1026,7 +1027,7 @@ namespace AssetsManager.Views
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = true;
             _viewModel.StatusText = $"Scanning {domain} WADs for unknown chunks...";
-            _progressUIManager?.OnHashGuessingStarted($"Scanning {domain} Unknowns");
+            _progressUIManager?.OnHashGuessingStarted($"Scanning {domain} Unknowns", "Preparing WADs...");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
