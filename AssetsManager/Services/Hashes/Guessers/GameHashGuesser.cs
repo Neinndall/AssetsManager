@@ -1808,13 +1808,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 sourceChunkHash);
         }
 
-        private static readonly string[] CanonicalTextureSamplers =
-        {
-            "_tx_cm", "_tx_mask", "_tx_em", "_tx_normal", "_tx_spec", "_tx_ao",
-            "_tx_dist", "_tx_alpha", "_tx_noise", "_tx_cube", "_tx_env", "_tx_flow",
-            "_base_tx_cm", "_base_tx_mask", "_base_tx_em", "_base_tx_normal"
-        };
-
         private void GuessMaterialAndMeshBinPaths(
             HashGuessEngine engine,
             ArraySegment<byte> data,
@@ -1920,7 +1913,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
 
-                    foreach (string sampler in CanonicalTextureSamplers)
+                    var samplers = GetKnownTextureSamplers(cancellationToken);
+                    foreach (string sampler in samplers)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (chunkLinks.Count == 0) break;
@@ -2082,6 +2076,38 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 return templates.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private static readonly string[] DefaultTextureSamplers =
+        {
+            "_tx_cm", "_base_tx_cm", "_tx_gm", "_tx_mask", "_tx_rm",
+            "_tx_outline", "_base_tx_gm", "_tx_em", "_tx_coin", "_base_tx_rm", "_tx_noise"
+        };
+
+        private IReadOnlyList<string> GetKnownTextureSamplers(CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate("canonical-texture-samplers", knownPaths =>
+            {
+                var samplers = new HashSet<string>(DefaultTextureSamplers, StringComparer.OrdinalIgnoreCase);
+                var regex = new Regex(@"(_(?:base_)?tx_[a-zA-Z0-9]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    if ((i & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    string path = knownPaths[i];
+                    if (!path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
+                        !path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var match = regex.Match(path);
+                    if (match.Success)
+                    {
+                        samplers.Add(match.Value.ToLowerInvariant());
+                    }
+                }
+
+                return samplers.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
             });
         }
 
