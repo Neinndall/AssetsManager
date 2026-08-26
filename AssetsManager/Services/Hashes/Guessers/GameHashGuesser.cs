@@ -2027,6 +2027,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 int maxSkin = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 350;
+                for (int i = 0; i <= 9; i++) skins.Add($"skin{i:D2}");
                 for (int i = 0; i <= maxSkin; i++) skins.Add($"skin{i}");
 
                 return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
