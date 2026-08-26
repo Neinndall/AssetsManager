@@ -77,6 +77,14 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex DottedBinPathRegex = new(
             @"^(?<prefix>.+)\.[0-9a-f]{8}\.bin$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly string[] DottedBinTargetPrefixes =
+        {
+            "loadouts/companions",
+            "loadouts/summoneremotesvfx",
+            "loadouts/summoneremotes",
+            "loadouts/tftdamageskins",
+            "loadouts/tftzoomskins"
+        };
         private const int AnimationNumberLimit = 360;
         private const int CustomBinSampleSize = 30_000;
         private const int CustomCharacterDdsSampleSize = 25_000;
@@ -1805,6 +1813,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     .Select(path => DottedBinPathRegex.Match(PathUtils.NormalizePath(path)))
                     .Where(match => match.Success)
                     .Select(match => match.Groups["prefix"].Value)
+                    .Concat(DottedBinTargetPrefixes)
+                    .Where(prefix => DottedBinTargetPrefixes.Any(target => prefix.EndsWith(target, StringComparison.OrdinalIgnoreCase)))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(prefix => prefix, StringComparer.OrdinalIgnoreCase)
                     .ToList());
