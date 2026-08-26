@@ -986,6 +986,27 @@ namespace AssetsManager.Views.Controls.Viewer
 
         // ===== Control Deck navigation handlers =====
 
+        private void Close3DModels_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                TaskCancellationManager?.CancelCurrentOperation(false);
+
+                _viewModel.IsChromaGalleryVisible = false;
+                Viewport?.ResetScene();
+                ResetScene();
+
+                _viewModel.IsMapMode = false;
+                WindowViewModel?.IsProjectExplorerVisible = false;
+                ProjectExplorer?.ClearImagePreview();
+                _viewModel.ShowSelectionScreen();
+            }
+            catch (Exception ex)
+            {
+                LogService?.LogError(ex, "Failed to close the 3D model workspace");
+            }
+        }
+
         private void ExpandAllToggle_Click(object sender, RoutedEventArgs e)
         {
             if (sender is ToggleButton toggle)

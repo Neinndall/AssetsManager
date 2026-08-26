@@ -275,6 +275,14 @@ namespace AssetsManager.Views.Models.Viewer
             IsMainContentVisible = true;
         }
 
+        /// <summary>
+        /// Returns the Viewer to its initial selection screen.
+        /// </summary>
+        public void ShowSelectionScreen()
+        {
+            IsMainContentVisible = false;
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

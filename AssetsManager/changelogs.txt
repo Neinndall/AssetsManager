@@ -33,6 +33,7 @@ New Features
   - VFX Studio / Added CPU skinning for authored `.skn + .skl + .anm` particle meshes and indexed skeleton/animation resources from extracted WAD trees.
   - VFX Studio / Enabled full camera interaction parity (Orbit, Pan, Shift turbo zoom, Ctrl precision zoom, cursor indicators) matching 3D Model Viewport.
   - Viewer / Added selectable VFX playback with play, pause, stop, and speed controls.
+  - Viewer / Added a Close 3D Models action that returns to the model selection screen and releases the active 3D workspace.
   - Hash Guessing Lab / Added interactive sub-algorithm checkboxes and Select/Deselect All tools per attack suite, allowing granular single-attack execution alongside instant single-click actions.
   - Hash Guessing Lab now shows every GAME and LCU match as soon as it is discovered.
   - Hash Guessing Lab / Added a dedicated 'Search Unknown Hashes' action to scan local WAD files and build the unknown hash dictionary independently.
