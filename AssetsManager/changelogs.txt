@@ -499,3 +499,4 @@ Bug Fixes
   - Monitor / Version Manager: Fixed target installation dropdown not updating when switching tabs after creating or cloning a backup.
   - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
   - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
+  - Hash Lab: GAME and LCU attacks now stop promptly when Cancel is pressed, including WAD path scanning.

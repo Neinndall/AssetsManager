@@ -189,19 +189,97 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void WadGrepDoesNotRunNumberedShaderAttack()
+        public void WadGrepDoesNotRunWideNumberedShaderAttack()
         {
+            const string lowVariantStart = "assets/shaders/generated/shaders/test.ps_2_0.dx11_0";
+            const string lowVariantEnd = "assets/shaders/generated/shaders/test.ps_2_0.dx11_31";
             const string numberedShader = "assets/shaders/generated/shaders/test.ps_2_0.dx11_100";
+            const string embeddedPath = "Shaders/test";
             var game = new GameHashGuesser();
             var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>
             {
+                XxHash64Ext.Hash(lowVariantStart),
+                XxHash64Ext.Hash(lowVariantEnd),
                 XxHash64Ext.Hash(numberedShader)
             });
+            byte[] pathBytes = Encoding.ASCII.GetBytes(embeddedPath);
+            byte[] data = new byte[pathBytes.Length + sizeof(ushort)];
+            data[0] = (byte)pathBytes.Length;
+            data[1] = (byte)(pathBytes.Length >> 8);
+            pathBytes.CopyTo(data, sizeof(ushort));
 
-            game.GrepFile(engine, data: Encoding.ASCII.GetBytes("SHADERS/test"));
+            game.GrepWad(engine, data, "data/test.bin", "test.wad.client", 1);
 
-            Assert.Empty(engine.Matches);
+            Assert.Contains(engine.Matches.Values, match => match.Path == lowVariantStart);
+            Assert.Contains(engine.Matches.Values, match => match.Path == lowVariantEnd);
+            Assert.DoesNotContain(engine.Matches.Values, match => match.Path == numberedShader);
             Assert.Equal(1, engine.RemainingUnknownCount);
+            Assert.Equal(4_176, engine.CheckedCandidates);
+        }
+
+        [Fact]
+        public void WadGrepHonorsCancellationBeforeParsing()
+        {
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            var game = new GameHashGuesser();
+            var engine = new HashGuessEngine(HashGuessDomain.Game, new HashSet<ulong>());
+
+            Assert.Throws<OperationCanceledException>(() => game.GrepWad(
+                engine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("Shaders/test")),
+                "data/test.bin",
+                "test.wad.client",
+                1,
+                cancellation.Token));
+        }
+
+        [Fact]
+        public void GameWadGrepHonorsCancellationBetweenEmbeddedPathCandidates()
+        {
+            const string expected = "characters/test/test.bin";
+            using var cancellation = new CancellationTokenSource();
+            var game = new GameHashGuesser();
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                new HashSet<ulong>
+                {
+                    XxHash64Ext.Hash(expected),
+                    XxHash64Ext.Hash("assets/characters/test/test.bin")
+                },
+                _ => cancellation.Cancel());
+            byte[] pathBytes = Encoding.ASCII.GetBytes("Characters/Test/Test.bin");
+            byte[] data = new byte[pathBytes.Length + sizeof(ushort)];
+            data[0] = (byte)pathBytes.Length;
+            data[1] = (byte)(pathBytes.Length >> 8);
+            pathBytes.CopyTo(data, sizeof(ushort));
+
+            Assert.Throws<OperationCanceledException>(() => game.GrepWad(
+                engine,
+                data,
+                "data/test.bin",
+                "test.wad.client",
+                1,
+                cancellation.Token));
+
+            Assert.Single(engine.Matches);
+            Assert.Equal(expected, engine.Matches.Values.Single().Path);
+        }
+
+        [Fact]
+        public void StandaloneShaderGuessKeepsHundredStepPermutationCoverage()
+        {
+            const string shaderBase = "assets/shaders/generated/shaders/test.ps";
+            string[] expected = { shaderBase + ".dx11_100", shaderBase + ".dx11_20000" };
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { shaderBase }));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                expected.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            game.GuessShaderVariants(engine, CancellationToken.None);
+
+            Assert.Equal(0, engine.RemainingUnknownCount);
+            Assert.All(expected, path => Assert.Contains(engine.Matches.Values, match => match.Path == path));
         }
 
         [Fact]
@@ -344,6 +422,37 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(
                 new[] { fileName, sourceMap, template }.OrderBy(path => path),
                 engine.Matches.Values.Select(match => match.Path).OrderBy(path => path));
+        }
+
+        [Fact]
+        public void LcuGrepHonorsCancellationInsideRelativeBasenameExpansion()
+        {
+            const string expected = "plugins/rcp-fe-test/global/default/aaa/icon.png";
+            using var cancellation = new CancellationTokenSource();
+            var guesser = new LcuHashGuesser(new[]
+            {
+                "plugins/rcp-fe-test/global/default/aaa/existing.json",
+                "plugins/rcp-fe-test/global/default/zzz/existing.json"
+            }, null);
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Lcu,
+                new HashSet<ulong>
+                {
+                    XxHash64Ext.Hash(expected),
+                    XxHash64Ext.Hash("plugins/rcp-fe-test/global/default/never/icon.png")
+                },
+                _ => cancellation.Cancel());
+
+            Assert.Throws<OperationCanceledException>(() => guesser.GrepWad(
+                engine,
+                Encoding.UTF8.GetBytes("\"icon.png\""),
+                "init.js",
+                "test.wad",
+                8,
+                cancellation.Token));
+
+            Assert.Single(engine.Matches);
+            Assert.Equal(expected, engine.Matches.Values.Single().Path);
         }
 
         [Fact]

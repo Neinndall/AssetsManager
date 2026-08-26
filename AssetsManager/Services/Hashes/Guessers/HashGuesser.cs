@@ -173,15 +173,36 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal abstract bool ShouldSkip(string extension);
         internal abstract IReadOnlyList<string> BuildWordlist();
-        internal abstract void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash);
+        internal void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash) =>
+            GrepWad(engine, data, sourcePath, sourceWadPath, sourceChunkHash, CancellationToken.None);
+
+        internal abstract void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken);
 
         protected virtual void CheckCandidate(
             HashGuessEngine engine,
             HashGuessCandidate candidate,
             string sourceWadPath,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
-            CheckIter(engine, ExpandCandidate(candidate), candidate.Strategy, sourceWadPath, sourceChunkHash);
+            CheckIter(
+                engine,
+                ExpandCandidate(candidate),
+                candidate.Strategy,
+                sourceWadPath,
+                cancellationToken,
+                sourceChunkHash);
         }
 
         internal virtual IEnumerable<HashGuessCandidate> GenerateNumberCandidates(
@@ -351,10 +372,22 @@ namespace AssetsManager.Services.Hashes.Guessers
             string source = "Generated",
             ulong sourceChunkHash = 0)
         {
+            return CheckIter(engine, paths, strategy, source, CancellationToken.None, sourceChunkHash);
+        }
+
+        internal int CheckIter(
+            HashGuessEngine engine,
+            IEnumerable<string> paths,
+            HashGuessStrategy strategy,
+            string source,
+            CancellationToken cancellationToken,
+            ulong sourceChunkHash = 0)
+        {
             ArgumentNullException.ThrowIfNull(paths);
             int checkedCount = 0;
             foreach (string path in paths)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 engine.Check(path, strategy, source, sourceChunkHash);
                 checkedCount++;
                 if (engine.RemainingUnknownCount == 0) break;
@@ -376,7 +409,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             foreach (HashGuessCandidate candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                CheckCandidate(engine, candidate, source, sourceChunkHash);
+                CheckCandidate(engine, candidate, source, sourceChunkHash, cancellationToken);
                 checkedCount++;
                 if (progressInterval > 0 && checkedCount % progressInterval == 0)
                     progress?.Invoke(checkedCount);

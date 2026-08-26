@@ -157,7 +157,7 @@ namespace AssetsManager.Services.Hashes
                                     if (guesser.ShouldSkip(chunkExt)) continue;
                                     if (chunkExt.Length > 0) resolvedChunkPath += "." + chunkExt;
                                 }
-                                guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash);
+                                guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash, cancellationToken);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {

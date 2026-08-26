@@ -856,11 +856,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                 source: "Generated numeric variant",
                 progress: progress);
 
-        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash)
+        internal override void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (data.Count == 0 || !TryDecodeWadText(data, out string text)) return;
             void CheckLcuCandidates(IEnumerable<HashGuessCandidate> candidates) =>
-                CheckIter(engine, candidates, sourceWadPath, CancellationToken.None, sourceChunkHash: sourceChunkHash);
+                CheckIter(engine, candidates, sourceWadPath, cancellationToken, sourceChunkHash: sourceChunkHash);
 
             if (Path.GetExtension(sourcePath).Equals(".json", StringComparison.OrdinalIgnoreCase))
             {
@@ -1087,21 +1094,27 @@ namespace AssetsManager.Services.Hashes.Guessers
             HashGuessEngine engine,
             HashGuessCandidate candidate,
             string sourceWadPath,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
             if (candidate.Strategy != HashGuessStrategy.LcuRelativeBasename)
             {
-                base.CheckCandidate(engine, candidate, sourceWadPath, sourceChunkHash);
+                base.CheckCandidate(engine, candidate, sourceWadPath, sourceChunkHash, cancellationToken);
                 return;
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (string directory in GetKnownDirectories())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 engine.CheckCombined(
                     directory,
                     candidate.Path,
                     candidate.Strategy,
                     sourceWadPath,
                     sourceChunkHash);
+                if (engine.RemainingUnknownCount == 0) break;
+            }
         }
 
         private IReadOnlyList<string> GetKnownDirectories()

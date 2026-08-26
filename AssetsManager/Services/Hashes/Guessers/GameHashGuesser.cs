@@ -27,6 +27,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly Regex LocaleRegex = new($"({string.Join("|", Locales)})", RegexOptions.Compiled);
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
+        private static readonly int[] EmbeddedShaderIndices = Enumerable.Range(0, 32).ToArray();
         private static readonly Regex ShaderPathRegex = new(
             @".*\.[pv]s(?:_[23]_0|(?=$|[.-]))",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1476,44 +1477,57 @@ namespace AssetsManager.Services.Hashes.Guessers
             return words.ToList();
         }
 
-        internal override void GrepWad(HashGuessEngine engine, ArraySegment<byte> data, string sourcePath, string sourceWadPath, ulong sourceChunkHash)
+        internal override void GrepWad(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (data.Count == 0) return;
 
             void CheckGame(string path, HashGuessStrategy strategy = HashGuessStrategy.BinLengthPath)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(path))
                     Check(engine, path, strategy, sourceWadPath, sourceChunkHash);
             }
 
             void CheckGameIter(IEnumerable<string> paths, HashGuessStrategy strategy = HashGuessStrategy.BinLengthPath) =>
-                CheckIter(engine, paths, strategy, sourceWadPath, sourceChunkHash);
+                CheckIter(engine, paths, strategy, sourceWadPath, cancellationToken, sourceChunkHash);
 
             void CheckGameCandidates(IEnumerable<HashGuessCandidate> candidates) =>
-                CheckIter(engine, candidates, sourceWadPath, CancellationToken.None, sourceChunkHash: sourceChunkHash);
+                CheckIter(engine, candidates, sourceWadPath, cancellationToken, sourceChunkHash: sourceChunkHash);
 
             if (sourcePath.Equals("data/all_lua_files.manifest", StringComparison.OrdinalIgnoreCase))
             {
-                CheckGameCandidates(ExtractLuaManifestCandidates(data));
+                CheckGameCandidates(ExtractLuaManifestCandidates(data, cancellationToken));
                 return;
             }
 
             if (ImageAutoAtlas.IsAtlas(data.AsSpan()))
             {
-                GuessImageAutoAtlasPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+                GuessImageAutoAtlasPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
             }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (engine.RemainingUnknownCount == 0) return;
 
             string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
             bool isBin = extension is "bin" or "inibin";
             if (isBin)
             {
-                foreach (int offset in FindBinPathOffsets(data))
+                var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (int offset in FindBinPathOffsets(data, cancellationToken))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (offset < 2) continue;
                     int length = ByteAt(data, offset - 2) | (ByteAt(data, offset - 1) << 8);
                     if (length <= 0 || offset + length > data.Count) continue;
                     if (!TryDecodeAscii(data, offset, length, out string path)) continue;
                     path = NormalizePath(path);
+                    if (!seenPaths.Add(path)) continue;
 
                     if (path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
                     {
@@ -1538,23 +1552,25 @@ namespace AssetsManager.Services.Hashes.Guessers
                             ? new[] { path }
                             : new[] { $"assets/{path}", $"data/{path}", $"assets/shaders/generated/{path}" };
 
-                        var shaderIndices = Enumerable.Range(0, 32)
-                            .Concat(Enumerable.Range(1, 200).Select(index => index * 100));
-
                         foreach (string candidateBase in candidateBases)
                         {
                             CheckGameIter(
                                 ShaderExtensions.Select(extensionName =>
                                     $"{candidateBase}{extensionName}"));
+                            if (engine.RemainingUnknownCount == 0) break;
+
                             CheckGameIter(
                                 ShaderExtensions.SelectMany(extensionName =>
                                     ShaderVariants.Select(variant =>
                                         $"{candidateBase}{extensionName}{variant}")));
+                            if (engine.RemainingUnknownCount == 0) break;
+
                             CheckGameIter(
                                 ShaderExtensions.SelectMany(extensionName =>
                                     ShaderVariants.SelectMany(variant =>
-                                        shaderIndices.Select(index =>
+                                        EmbeddedShaderIndices.Select(index =>
                                             $"{candidateBase}{extensionName}{variant}_{index}"))));
+                            if (engine.RemainingUnknownCount == 0) break;
                         }
                     }
                     else if (path.StartsWith("maps/mapgeometry/", StringComparison.OrdinalIgnoreCase))
@@ -1585,9 +1601,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
 
-                GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash);
+                GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash);
+                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                 return;
             }
 
@@ -1648,14 +1664,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                 return;
             }
 
-            CheckGameCandidates(GrepFileCandidates(data));
+            CheckGameCandidates(GrepFileCandidates(data, cancellationToken));
         }
 
         private void GuessDottedBinPaths(
             HashGuessEngine engine,
             ArraySegment<byte> data,
             string sourceWadPath,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
             IReadOnlyList<string> prefixes = Corpus.GetOrCreate(
                 "dotted-bin-prefixes",
@@ -1702,6 +1719,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 for (uint index = 0; index < objectCount; index++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     long objectOffset = stream.Position;
                     uint objectSize = reader.ReadUInt32();
                     uint objectPathHash = reader.ReadUInt32();
@@ -1709,12 +1727,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (objectSize < 6 || nextObjectOffset < stream.Position || nextObjectOffset > stream.Length)
                         return;
                     foreach (string prefix in prefixes)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
                         Check(
                             engine,
                             $"{prefix}.{objectPathHash:x8}.bin",
                             HashGuessStrategy.BinEntry,
                             sourceWadPath,
                             sourceChunkHash);
+                        if (engine.RemainingUnknownCount == 0) return;
+                    }
                     stream.Position = nextObjectOffset;
                 }
             }
@@ -1729,8 +1751,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             ArraySegment<byte> data,
             string sourcePath,
             string sourceWadPath,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
             if (!context.Success || data.Array is null || data.Count == 0) return;
 
@@ -1739,8 +1763,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
                 var tree = new BinTree(stream);
+                cancellationToken.ThrowIfCancellationRequested();
                 foreach (AnimationFileLink link in EnumerateAnimationFileLinks(tree))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     links.Add(link);
+                }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -1749,12 +1777,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             foreach (AnimationFileLink link in links)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrWhiteSpace(link.Path))
                     Check(engine, link.Path, HashGuessStrategy.AnimationBinLink, sourceWadPath, sourceChunkHash);
+            }
 
             var unresolved = links
                 .Where(link => link.PathHash != 0 && engine.UnknownHashes.Contains(link.PathHash))
                 .ToList();
+            cancellationToken.ThrowIfCancellationRequested();
             if (unresolved.Count == 0) return;
 
             CheckIter(
@@ -1766,6 +1798,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     engine.UnknownHashes),
                 HashGuessStrategy.AnimationBinLink,
                 sourceWadPath,
+                cancellationToken,
                 sourceChunkHash);
         }
 
@@ -1800,8 +1833,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             ArraySegment<byte> data,
             string sourcePath,
             string sourceWadPath,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (data.Array is null || data.Count == 0) return;
             if (!ImageAutoAtlas.IsAtlas(data.AsSpan()) || !ImageAutoAtlas.TryRead(data.Array[data.Offset..(data.Offset + data.Count)], out ImageAutoAtlas atlas))
                 return;
@@ -1812,6 +1847,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             bool hasUnresolvedSprites = false;
             foreach (var sprite in atlas.Sprites)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (engine.UnknownHashes.Contains(sprite.SpriteHash) || !knownDict.ContainsKey(sprite.SpriteHash))
                 {
                     engine.EnsureUnknown(sprite.SpriteHash);
@@ -1834,6 +1870,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 var texDirIndex = GetTextureHashToDirectoryIndex();
                 foreach (ulong texHash in atlas.TextureHashes)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (texDirIndex.TryGetValue(texHash, out string dir))
                         candidateDirs.Add(dir);
                 }
@@ -1842,20 +1879,26 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateDirs.Count == 0)
             {
                 foreach (string dir in GetAllKnownAtlasDirectories())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     candidateDirs.Add(dir);
+                }
             }
 
             IReadOnlyList<string> candidatePatterns = GetAutoAtlasCandidatePatterns();
             foreach (string baseDir in candidateDirs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 foreach (string pattern in candidatePatterns)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     Check(engine, $"{baseDir}/{pattern}", HashGuessStrategy.AtlasReference, sourceWadPath, sourceChunkHash);
 
                     // If all sprites in this atlas are resolved, stop immediately
                     bool stillHasUnresolved = false;
                     foreach (var sprite in atlas.Sprites)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (engine.UnknownHashes.Contains(sprite.SpriteHash))
                         {
                             stillHasUnresolved = true;
@@ -1868,6 +1911,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 bool anyRemaining = false;
                 foreach (var sprite in atlas.Sprites)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (engine.UnknownHashes.Contains(sprite.SpriteHash))
                     {
                         anyRemaining = true;
@@ -2286,7 +2330,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (!string.IsNullOrWhiteSpace(path)) data = File.ReadAllBytes(path);
             else if (data == null) throw new ArgumentException("Either path or data must be provided.");
             int checkedCandidates = 0;
-            foreach (HashGuessCandidate candidate in GrepFileCandidates(data))
+            foreach (HashGuessCandidate candidate in GrepFileCandidates(data, CancellationToken.None))
             {
                 Check(engine, candidate.Path, candidate.Strategy, string.IsNullOrWhiteSpace(path) ? source : path);
                 checkedCandidates++;
@@ -2295,7 +2339,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        private static IEnumerable<HashGuessCandidate> ExtractLuaManifestCandidates(ArraySegment<byte> data)
+        private static IEnumerable<HashGuessCandidate> ExtractLuaManifestCandidates(
+            ArraySegment<byte> data,
+            CancellationToken cancellationToken)
         {
             using var stream = new MemoryStream(data.Array, data.Offset, data.Count, false);
             using var reader = new BinaryReader(stream, new UTF8Encoding(false, true), true);
@@ -2305,10 +2351,12 @@ namespace AssetsManager.Services.Hashes.Guessers
             uint characterCount = ReadManifestCount(reader);
             for (uint characterIndex = 0; characterIndex < characterCount; characterIndex++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string character = ReadManifestString(reader).ToLowerInvariant();
                 uint childCount = ReadManifestCount(reader);
                 for (uint childIndex = 0; childIndex < childCount; childIndex++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     string name = ReadManifestString(reader).ToLowerInvariant();
                     foreach (string prefix in LuaCharacterPrefixes)
                     foreach (string extension in LuaExtensions)
@@ -2322,6 +2370,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             var sharedNames = new List<string>((int)Math.Min(sharedCount, 100_000));
             for (uint sharedIndex = 0; sharedIndex < sharedCount; sharedIndex++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 sharedNames.Add(ReadManifestString(reader).ToLowerInvariant());
             }
 
@@ -2333,6 +2382,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             var hashMap = new Dictionary<ulong, uint>((int)Math.Min(hashCount, 100_000));
             for (uint i = 0; i < hashCount; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 ulong entry = reader.ReadUInt64();
                 uint dirIndex = (uint)(entry & 0x1F);
                 ulong xxh3Truncated = entry >> 5;
@@ -2341,6 +2391,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             foreach (string name in sharedNames)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 byte[] nameBytes = Encoding.UTF8.GetBytes(name);
                 ulong nameHashTruncated = XxHash3.HashToUInt64(nameBytes) >> 5;
                 if (hashMap.TryGetValue(nameHashTruncated, out uint dirIndex) && dirIndex < (uint)SharedScriptDirectories.Length)
@@ -2396,11 +2447,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             return new UTF8Encoding(false, true).GetString(bytes);
         }
 
-        private static IEnumerable<HashGuessCandidate> GrepFileCandidates(ArraySegment<byte> data)
+        private static IEnumerable<HashGuessCandidate> GrepFileCandidates(
+            ArraySegment<byte> data,
+            CancellationToken cancellationToken)
         {
             var paths = new HashSet<string>(StringComparer.Ordinal);
-            foreach ((int offset, int length) in FindGeneralPathRanges(data))
+            foreach ((int offset, int length) in FindGeneralPathRanges(data, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string path = PathUtils.NormalizeGrepPath(Encoding.ASCII.GetString(data.Array, data.Offset + offset, length));
                 if (path.Length > 0) paths.Add(path);
                 if (offset < 2) continue;
@@ -2415,15 +2469,24 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var emitted = new HashSet<string>(StringComparer.Ordinal);
             foreach (string path in paths)
-            foreach (HashGuessCandidate candidate in ExpandGrepFilePath(path, HashGuessStrategy.EmbeddedPathGrep))
-                if (emitted.Add(candidate.Path)) yield return candidate;
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (HashGuessCandidate candidate in ExpandGrepFilePath(path, HashGuessStrategy.EmbeddedPathGrep))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (emitted.Add(candidate.Path)) yield return candidate;
+                }
+            }
         }
 
-        private static IEnumerable<(int Offset, int Length)> FindGeneralPathRanges(ArraySegment<byte> data)
+        private static IEnumerable<(int Offset, int Length)> FindGeneralPathRanges(
+            ArraySegment<byte> data,
+            CancellationToken cancellationToken)
         {
             int limit = data.Count;
             for (int offset = 0; offset < limit; offset++)
             {
+                if ((offset & 0xFFF) == 0) cancellationToken.ThrowIfCancellationRequested();
                 byte[][] prefixes = GetPrefixes(ByteAt(data, offset));
                 if (prefixes == null) continue;
                 foreach (byte[] prefix in prefixes)
@@ -2435,7 +2498,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                     if (prefixIndex != prefix.Length) continue;
 
                     int end = offset + prefix.Length;
-                    while (end < limit && IsGeneralPathByte(ByteAt(data, end))) end++;
+                    while (end < limit && IsGeneralPathByte(ByteAt(data, end)))
+                    {
+                        if ((end & 0xFFF) == 0) cancellationToken.ThrowIfCancellationRequested();
+                        end++;
+                    }
                     if (end == offset + prefix.Length) continue;
                     yield return (offset, end - offset);
 
@@ -2466,10 +2533,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             yield return new HashGuessCandidate(path, strategy);
         }
 
-        private static IEnumerable<int> FindBinPathOffsets(ArraySegment<byte> data)
+        private static IEnumerable<int> FindBinPathOffsets(
+            ArraySegment<byte> data,
+            CancellationToken cancellationToken)
         {
             for (int offset = 0; offset < data.Count; offset++)
             {
+                if ((offset & 0xFFF) == 0) cancellationToken.ThrowIfCancellationRequested();
                 byte[][] needles = GetWadBinPrefixes(ByteAt(data, offset));
                 if (needles == null) continue;
                 foreach (byte[] needle in needles)
