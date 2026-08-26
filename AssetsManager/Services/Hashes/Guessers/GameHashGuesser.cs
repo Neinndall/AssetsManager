@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Hashing;
 using System.Linq;
@@ -856,10 +857,127 @@ namespace AssetsManager.Services.Hashes.Guessers
                             $"data/characters/{character}/tiers/tier{tier}.bin"));
                 }
 
+                checkedCount += CheckCharacterPaths(EnumerateCharacterAssetPaths(character, skinLimit));
+
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
 
             return checkedCount;
+        }
+
+        private static readonly string[] CharacterTextureSamplers = new[]
+        {
+            "_tx_cm", "_recall_tx_cm", "_weapon_tx_cm", "_body_tx_cm",
+            "_tx_mask", "_tx_rm", "_tx_em", "_tx_gm",
+            "_tx_outline", "_tx_coin", "_tx_noise", "_fx_mask", "_base_tx_cm"
+        };
+
+        private static readonly string[] CharacterTexturePrefixes = new[] { "", "2x_", "4x_", "tft_", "sd_" };
+        private static readonly string[] CharacterTextureExtensions = new[] { ".tex", ".dds", ".project_jade.tex" };
+        private static readonly string[] CharacterSubProps = new[] { "weapon", "cannon", "gun", "dragon", "bomb", "pet", "wings", "cape", "tail" };
+
+        private static readonly string[] CharacterAnimationActions = new[]
+        {
+            "idle", "idle1", "idle2", "idle3", "idle4",
+            "run", "run_fast", "walk",
+            "attack1", "attack2", "attack3", "attack4", "crit",
+            "spell", "spell1", "spell2", "spell3", "spell4",
+            "spell1_cast", "spell2_cast", "spell3_cast", "spell4_cast",
+            "death", "death2", "recall", "recall_windup",
+            "dance", "taunt", "laugh", "joke",
+            "channel", "channel_windup", "celebration", "spawn", "homeguard", "respawn"
+        };
+
+        private static IEnumerable<string> EnumerateCharacterAssetPaths(string character, int skinLimit)
+        {
+            yield return $"assets/characters/{character}/hud/{character}_square.tex";
+            yield return $"assets/characters/{character}/hud/{character}_circle.tex";
+            yield return $"assets/characters/{character}/hud/{character}_square.dds";
+            yield return $"assets/characters/{character}/hud/{character}_circle.dds";
+
+            foreach (string prefix in CharacterTexturePrefixes)
+            {
+                foreach (string sampler in CharacterTextureSamplers)
+                {
+                    foreach (string ext in CharacterTextureExtensions)
+                    {
+                        yield return $"assets/characters/{character}/skins/base/{prefix}{character}_base{sampler}{ext}";
+                        yield return $"assets/characters/{character}/skins/base/{prefix}{character}{sampler}{ext}";
+                    }
+                }
+            }
+
+            foreach (string action in CharacterAnimationActions)
+            {
+                yield return $"assets/characters/{character}/skins/base/animations/{character}_{action}.anm";
+                yield return $"assets/characters/{character}/skins/base/animations/{action}.anm";
+            }
+
+            var skinNumbers = Enumerable.Range(0, Math.Min(skinLimit, 120))
+                .Select(s => s.ToString(CultureInfo.InvariantCulture))
+                .Concat(Enumerable.Range(1, 9).Select(s => s.ToString("D2", CultureInfo.InvariantCulture)))
+                .Distinct(StringComparer.Ordinal);
+
+            foreach (string skin in skinNumbers)
+            {
+                string skinTag = $"skin{skin}";
+
+                yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}.skn";
+                yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}.skl";
+                yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skn";
+                yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skl";
+
+                foreach (string prop in CharacterSubProps)
+                {
+                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_{prop}.skn";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_{prop}.skl";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{prop}.skn";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{prop}.skl";
+                }
+
+                foreach (string prefix in CharacterTexturePrefixes)
+                {
+                    foreach (string sampler in CharacterTextureSamplers)
+                    {
+                        foreach (string ext in CharacterTextureExtensions)
+                        {
+                            yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{skinTag}{sampler}{ext}";
+                            yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}{sampler}{ext}";
+
+                            foreach (string prop in CharacterSubProps)
+                            {
+                                yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{skinTag}_{prop}{sampler}{ext}";
+                                yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{prop}{sampler}{ext}";
+                            }
+                        }
+                    }
+                }
+
+                foreach (string action in CharacterAnimationActions)
+                {
+                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{skinTag}_{action}.anm";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{action}.anm";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{action}.anm";
+                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/recall.skins_{character}_{skinTag}.anm";
+                }
+
+                yield return $"assets/characters/{character}/hud/{character}_circle_{skin}.dds";
+                yield return $"assets/characters/{character}/hud/{character}_circle_{skin}.tex";
+                yield return $"assets/characters/{character}/hud/{character}_square_{skin}.dds";
+                yield return $"assets/characters/{character}/hud/{character}_square_{skin}.tex";
+                yield return $"assets/characters/{character}/hud/icons2d/{character}_{skinTag}.dds";
+                yield return $"assets/characters/{character}/hud/icons2d/{character}_{skinTag}.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/{character}_{skinTag}_glow.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/{character}_{skinTag}_glow.dds";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/color-hold.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/color-hold.dds";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/common_color-hold.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/common_color-hold.dds";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/aura_self.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/aura_self.dds";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/alphaslice_mesh.tex";
+                yield return $"assets/characters/{character}/skins/{skinTag}/particles/alphaslice_mesh.dds";
+            }
         }
 
         internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget)
@@ -1944,19 +2062,24 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         if (chunkLinks.Count == 0) break;
-                        CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.tex");
-                        CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.dds");
-                        CheckLinkCandidate($"{skinDir}/2x_{baseName}{sampler}.tex");
-                        CheckLinkCandidate($"{skinDir}/2x_{baseName}{sampler}.dds");
-                        CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.tex");
-                        CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.dds");
-
-                        if (baseCharBaseName != null)
+                        foreach (string prefix in CharacterTexturePrefixes)
                         {
-                            CheckLinkCandidate($"{skinDir}/{baseCharBaseName}{sampler}.tex");
-                            CheckLinkCandidate($"{skinDir}/{baseCharBaseName}{sampler}.dds");
-                            CheckLinkCandidate($"{skinDir}/2x_{baseCharBaseName}{sampler}.tex");
-                            CheckLinkCandidate($"{skinDir}/2x_{baseCharBaseName}{sampler}.dds");
+                            CheckLinkCandidate($"{skinDir}/{prefix}{baseName}{sampler}.tex");
+                            CheckLinkCandidate($"{skinDir}/{prefix}{baseName}{sampler}.dds");
+                            CheckLinkCandidate($"{dataSkinDir}/{prefix}{baseName}{sampler}.tex");
+                            CheckLinkCandidate($"{dataSkinDir}/{prefix}{baseName}{sampler}.dds");
+
+                            if (baseCharBaseName != null)
+                            {
+                                CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.tex");
+                                CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.dds");
+                            }
+
+                            foreach (string prop in CharacterSubProps)
+                            {
+                                CheckLinkCandidate($"{skinDir}/{prefix}{baseName}_{prop}{sampler}.tex");
+                                CheckLinkCandidate($"{skinDir}/{prefix}{baseName}_{prop}{sampler}.dds");
+                            }
                         }
                     }
 
@@ -1966,6 +2089,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckLinkCandidate($"{skinDir}/{baseName}.skl");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skn");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skl");
+
+                    foreach (string prop in CharacterSubProps)
+                    {
+                        CheckLinkCandidate($"{skinDir}/{baseName}_{prop}.skn");
+                        CheckLinkCandidate($"{skinDir}/{baseName}_{prop}.skl");
+                        CheckLinkCandidate($"{dataSkinDir}/{baseName}_{prop}.skn");
+                        CheckLinkCandidate($"{dataSkinDir}/{baseName}_{prop}.skl");
+                    }
 
                     if (baseCharBaseName != null)
                     {

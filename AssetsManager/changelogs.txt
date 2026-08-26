@@ -7,7 +7,7 @@ This hotfix separates the BIN diffing and WAD comparison work from the previous 
 
 New Features
   - Hash Guessing Lab / Added background execution and global status bar progress reporting, allowing uninterrupted scans across app navigation with live status and percentage feedback.
-  - Hash Guessing Lab / Expanded Game Grep and Basic Suite pattern resolution with high-resolution 2x_ texture prefixes, Jade champion aliases, and complete 350-skin ranges.
+  - Hash Guessing Lab / Expanded Game Basic Suite and GrepWad with universal champion asset discovery spanning HD texture prefixes (2x_, 4x_, tft_, sd_), sub-props, 3D meshes, and core animations.
   - Hash Guessing Lab / Calibrated combinatorial candidate budgets to 100M per algorithm, reducing extended and custom suite runtimes by over 80%.
   - Universal Converter now exports WEM and standard audio to OGG, WAV, MP3, or FLAC through vgmstream and FFmpeg.
   - Wad Comparison / Redesigned the Overview dashboard into a modern, symmetrical Patch Intelligence Dashboard featuring Net Payload & Hash KPIs, 6 Game System & Content Domains, Asset Type Distribution with percentage progress bars, Critical Size Impact file tracking, and Top Altered WAD Packages.
