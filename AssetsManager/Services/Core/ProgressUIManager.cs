@@ -181,9 +181,9 @@ namespace AssetsManager.Services.Core
                 {
                     _statusBarViewModel.ProgressPercentage = customProgressText;
                 }
-                else if (!string.IsNullOrEmpty(message) && message != "Ready")
+                else if (completed >= 0 && !string.IsNullOrEmpty(message) && message != "Ready")
                 {
-                    _statusBarViewModel.ProgressPercentage = "Scanning";
+                    _statusBarViewModel.ProgressPercentage = "0%";
                 }
                 else
                 {
