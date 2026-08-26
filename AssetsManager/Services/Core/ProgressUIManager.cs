@@ -111,7 +111,7 @@ namespace AssetsManager.Services.Core
             UpdateStatusBar(cleanStatus, current, total, customProgressText);
             _owner.Dispatcher.Invoke(() =>
             {
-                _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
+                _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage, customProgressText);
             });
         }
 
