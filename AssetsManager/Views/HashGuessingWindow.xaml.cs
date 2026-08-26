@@ -780,11 +780,21 @@ namespace AssetsManager.Views
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
 
-                    string detail = string.IsNullOrEmpty(value.CurrentWad) ? $"{totalChecked:N0} checked" : value.CurrentWad;
-                    string statusMsg = string.IsNullOrEmpty(value.CurrentWad)
-                        ? $"Hash Lab: {totalChecked:N0} checked ({foundMatches:N0} found)"
-                        : $"Hash Lab: {value.CurrentWad} ({value.ProcessedWads}/{value.TotalWads}) · {foundMatches:N0} found";
-                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, detail);
+                    string statusMsg;
+                    string customProgressText = null;
+
+                    if (value.TotalWads > 0)
+                    {
+                        statusMsg = $"Hash Lab: {value.CurrentWad} ({value.ProcessedWads}/{value.TotalWads}) · {foundMatches:N0} found";
+                    }
+                    else
+                    {
+                        string stageName = string.IsNullOrEmpty(value.CurrentWad) ? (_viewModel.SelectedMethod?.Name ?? "In-memory") : value.CurrentWad;
+                        statusMsg = $"Hash Lab: {stageName} · {foundMatches:N0} found";
+                        customProgressText = $"{totalChecked:N0} checked";
+                    }
+
+                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, customProgressText);
                 });
                 var matchProgress = new Progress<HashGuessMatch>(match =>
                 {
@@ -940,9 +950,9 @@ namespace AssetsManager.Views
                     string timeText = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
 
-                    string detail = string.IsNullOrEmpty(p.CurrentStage) ? $"{p.CheckedCandidates:N0} checked" : p.CurrentStage;
-                    string statusMsg = $"Hash Lab: {detail} ({p.FoundMatches:N0} found)";
-                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, detail);
+                    string statusMsg = $"Hash Lab: {domainName} {action} · {p.FoundMatches:N0} found";
+                    string customProgressText = p.TotalWads > 0 ? null : $"{p.CheckedCandidates:N0} checked";
+                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, customProgressText);
                 });
 
                 if (action == InternalHashAction.Inventory)

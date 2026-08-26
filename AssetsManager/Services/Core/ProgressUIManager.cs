@@ -99,7 +99,7 @@ namespace AssetsManager.Services.Core
         /// <summary>
         /// Centralizes logic to update both StatusBar and ProgressWindow.
         /// </summary>
-        private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null)
+        private void UpdateOperation(string statusMessage, int current, int total, string currentFileDetail, bool success = true, string errorMessage = null, string customProgressText = null)
         {
             // Clean statusMessage for StatusBar (remove anything after '|')
             string cleanStatus = statusMessage;
@@ -108,7 +108,7 @@ namespace AssetsManager.Services.Core
                 cleanStatus = cleanStatus.Split('|')[0].Trim();
             }
 
-            UpdateStatusBar(cleanStatus, current, total);
+            UpdateStatusBar(cleanStatus, current, total, customProgressText);
             _owner.Dispatcher.Invoke(() =>
             {
                 _progressDetailsWindow?.UpdateProgress(current, total, currentFileDetail, success, errorMessage);
@@ -155,7 +155,7 @@ namespace AssetsManager.Services.Core
             }
         }
 
-        private void UpdateStatusBar(string message, int completed = -1, int total = -1)
+        private void UpdateStatusBar(string message, int completed = -1, int total = -1, string customProgressText = null)
         {
             _owner.Dispatcher.Invoke(() =>
             {
@@ -177,9 +177,13 @@ namespace AssetsManager.Services.Core
                     double percentage = (double)completed / total * 100;
                     _statusBarViewModel.ProgressPercentage = $"{(int)percentage}%";
                 }
+                else if (!string.IsNullOrWhiteSpace(customProgressText))
+                {
+                    _statusBarViewModel.ProgressPercentage = customProgressText;
+                }
                 else if (!string.IsNullOrEmpty(message) && message != "Ready")
                 {
-                    _statusBarViewModel.ProgressPercentage = string.Empty; // Show spinner, no number
+                    _statusBarViewModel.ProgressPercentage = "Scanning";
                 }
                 else
                 {
@@ -396,10 +400,10 @@ namespace AssetsManager.Services.Core
             });
         }
 
-        public void OnHashGuessingProgressChanged(string statusMessage, int current, int total, string currentItemDetail)
+        public void OnHashGuessingProgressChanged(string statusMessage, int current, int total, string currentItemDetail, string customProgressText = null)
         {
             string detail = string.IsNullOrEmpty(currentItemDetail) ? "Scanning..." : currentItemDetail;
-            UpdateOperation(statusMessage, current, total, detail);
+            UpdateOperation(statusMessage, current, total, detail, success: true, errorMessage: null, customProgressText: customProgressText);
         }
 
         public async Task OnHashGuessingCompletedAsync()
