@@ -80,6 +80,8 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Hash Guessing Lab / Standardized WAD Grep progress feedback to match the application-wide 'Scanning X of Y WADs' format with synchronized percentage and time tracking.
+  - Hash Guessing Lab / Optimized dotted BIN scanning in WAD Grep to target canonical Riot loadouts directly with zero memory overhead.
   - Monitor / Version verification now reuses local scan buffers and limits Blake3 output to the required chunk-ID prefix; an explicit diagnostic reports scan metrics when requested.
   - Viewer / Fixed model auto-rotation so the OpenGL viewport updates the model transform continuously while the toggle is active.
   - Viewer / Model animation playback now performs hardware-accelerated vertex skinning on the GPU, improving animation framerates and memory efficiency while reporting incompatible skin data.
@@ -323,6 +325,9 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Hash Guessing Lab / Wired task cancellation into the centralized progress manager, displaying 'Cancelling Task...' with the orange status glow before returning cleanly to Ready.
+  - Status Bar / Synchronized live percentage calculations across all progress views using uniform rounding.
+  - Themes / Added smooth sweeping glow animation to indeterminate progress bars.
   - Monitor / Mythic Shop now ignores unrelated Jade storefront sections and shows only Mythic Essence rotations with their correct prices.
   - Viewer / Ground logo opacity now affects the rendered logo correctly.
   - Viewer / Map Environment pan now stops cleanly at the ground collision boundary without lateral drift.
