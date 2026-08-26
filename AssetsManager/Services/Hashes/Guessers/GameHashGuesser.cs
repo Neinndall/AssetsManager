@@ -789,10 +789,21 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
-            IReadOnlyList<string> characterList = (characters ?? GetCharacters())
+            IReadOnlyList<string> rawCharacters = (characters ?? GetCharacters())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToList();
+
+            var characterList = new List<string>(rawCharacters);
+            foreach (string ch in rawCharacters)
+            {
+                if (!ch.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) &&
+                    !ch.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                {
+                    characterList.Add($"jade_{ch}");
+                }
+            }
+
             int checkedCount = 0;
 
             int CheckCharacterPaths(IEnumerable<string> paths)
@@ -825,13 +836,19 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"characters/{character}"
                 });
 
-                int skinLimit = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 200;
+                int skinLimit = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 350;
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, skinLimit).Select(skin =>
                         $"data/characters/{character}/skins/skin{skin}.bin"));
                 checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(1, 9).Select(skin =>
+                        $"data/characters/{character}/skins/skin{skin:D2}.bin"));
+                checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, skinLimit).Select(skin =>
                         $"data/characters/{character}/animations/skin{skin}.bin"));
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(1, 9).Select(skin =>
+                        $"data/characters/{character}/animations/skin{skin:D2}.bin"));
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                 {
                     checkedCount += CheckCharacterPaths(
@@ -2027,7 +2044,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 int maxSkin = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 350;
-                for (int i = 0; i <= 9; i++) skins.Add($"skin{i:D2}");
+                for (int i = 1; i <= 9; i++) skins.Add($"skin{i:D2}");
                 for (int i = 0; i <= maxSkin; i++) skins.Add($"skin{i}");
 
                 return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
