@@ -58,6 +58,7 @@ namespace AssetsManager.Views
         private readonly NewsService _newsService;
         private readonly ComparisonHistoryService _comparisonHistoryService;
         private ComparatorWindow _comparatorWindow;
+        private HashGuessingWindow _hashGuessingWindow;
         private bool _isUpdatePromptOpen;
 
         // New fields to manage the state of the extraction after comparison
@@ -507,7 +508,11 @@ namespace AssetsManager.Views
         }
         private void LoadViewerWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<ViewerWindow>();
         private void LoadMonitorWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<MonitorWindow>();
-        private void LoadHashGuessingWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<HashGuessingWindow>();
+        private void LoadHashGuessingWindow()
+        {
+            _hashGuessingWindow ??= _serviceProvider.GetRequiredService<HashGuessingWindow>();
+            MainContentArea.Content = _hashGuessingWindow;
+        }
         private void LoadNewsWindow() => MainContentArea.Content = _serviceProvider.GetRequiredService<NewsWindow>();
 
         private void btnHelp_Click(object sender, RoutedEventArgs e)

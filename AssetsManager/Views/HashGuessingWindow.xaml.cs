@@ -25,6 +25,7 @@ namespace AssetsManager.Views
         private readonly AppSettings _appSettings;
         private readonly CustomMessageBoxService _messageBoxService;
         private readonly LogService _logService;
+        private readonly ProgressUIManager _progressUIManager;
         private readonly HashGuessLabModel _viewModel = new();
         private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
@@ -35,7 +36,8 @@ namespace AssetsManager.Views
             BinRstHashGuessingService binRstHashGuessingService,
             AppSettings appSettings,
             CustomMessageBoxService messageBoxService,
-            LogService logService)
+            LogService logService,
+            ProgressUIManager progressUIManager)
         {
             InitializeComponent();
             _hashGuessingService = hashGuessingService;
@@ -43,6 +45,7 @@ namespace AssetsManager.Views
             _appSettings = appSettings;
             _messageBoxService = messageBoxService;
             _logService = logService;
+            _progressUIManager = progressUIManager;
             DataContext = _viewModel;
             InitializeMethods();
             Unloaded += OnUnloaded;
@@ -686,9 +689,7 @@ namespace AssetsManager.Views
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
+            // Do not cancel background task on view unload
         }
 
         private async Task RunAsync(HashGuessMode mode)
@@ -756,6 +757,7 @@ namespace AssetsManager.Views
             }
 
             UpdateStatus();
+            _progressUIManager?.OnHashGuessingStarted(_viewModel.SelectedMethod?.Name ?? mode.ToString());
 
             try
             {
@@ -776,6 +778,10 @@ namespace AssetsManager.Views
                     currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
+
+                    string detail = string.IsNullOrEmpty(value.CurrentWad) ? $"{totalChecked:N0} checked" : value.CurrentWad;
+                    string statusMsg = $"Hash Lab: {detail} ({foundMatches:N0} found)";
+                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, detail);
                 });
                 var matchProgress = new Progress<HashGuessMatch>(match =>
                 {
@@ -860,6 +866,10 @@ namespace AssetsManager.Views
             {
                 _viewModel.IsRunning = false;
                 _cancellationTokenSource = null;
+                if (_progressUIManager != null)
+                {
+                    await _progressUIManager.OnHashGuessingCompletedAsync();
+                }
             }
         }
 
@@ -890,6 +900,8 @@ namespace AssetsManager.Views
             _viewModel.Matches.Clear();
             var displayedMatchHashes = new HashSet<ulong>();
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+            _progressUIManager?.OnHashGuessingStarted($"{domainName} {action}");
 
             try
             {
@@ -924,6 +936,10 @@ namespace AssetsManager.Views
 
                     string timeText = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.StatusText = $"{p.CurrentStage} · {p.FoundMatches:N0} found · Time: {timeText}";
+
+                    string detail = string.IsNullOrEmpty(p.CurrentStage) ? $"{p.CheckedCandidates:N0} checked" : p.CurrentStage;
+                    string statusMsg = $"Hash Lab: {detail} ({p.FoundMatches:N0} found)";
+                    _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, detail);
                 });
 
                 if (action == InternalHashAction.Inventory)
@@ -976,6 +992,10 @@ namespace AssetsManager.Views
             {
                 _viewModel.IsRunning = false;
                 _cancellationTokenSource = null;
+                if (_progressUIManager != null)
+                {
+                    await _progressUIManager.OnHashGuessingCompletedAsync();
+                }
             }
         }
 
@@ -1006,6 +1026,7 @@ namespace AssetsManager.Views
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = true;
             _viewModel.StatusText = $"Scanning {domain} WADs for unknown chunks...";
+            _progressUIManager?.OnHashGuessingStarted($"Scanning {domain} Unknowns");
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -1040,6 +1061,10 @@ namespace AssetsManager.Views
             {
                 _viewModel.IsRunning = false;
                 _cancellationTokenSource = null;
+                if (_progressUIManager != null)
+                {
+                    await _progressUIManager.OnHashGuessingCompletedAsync();
+                }
             }
         }
 
