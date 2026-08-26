@@ -1879,7 +1879,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var skinsToTest = !string.IsNullOrEmpty(skin)
                 ? new[] { skin.ToLowerInvariant() }
-                : new[] { "base", "skin0", "skin01" };
+                : GetChampionSkinNames(character, cancellationToken);
 
             var samplers = GetKnownTextureSamplers(cancellationToken);
 
@@ -1918,19 +1918,27 @@ namespace AssetsManager.Services.Hashes.Guessers
                     void TestResolvedTemplate(string res)
                     {
                         CheckLinkCandidate($"{skinDir}/{res}");
+                        CheckLinkCandidate($"{skinDir}/2x_{res}");
                         CheckLinkCandidate($"{dataSkinDir}/{res}");
+                        CheckLinkCandidate($"{dataSkinDir}/2x_{res}");
 
                         if (res.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
                         {
                             CheckLinkCandidate($"{skinDir}/{res[..^4]}.dds");
+                            CheckLinkCandidate($"{skinDir}/2x_{res[..^4]}.dds");
                             CheckLinkCandidate($"{dataSkinDir}/{res[..^4]}.dds");
+                            CheckLinkCandidate($"{dataSkinDir}/2x_{res[..^4]}.dds");
                         }
                         else if (res.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
                         {
                             CheckLinkCandidate($"{skinDir}/{res[..^4]}.tex");
+                            CheckLinkCandidate($"{skinDir}/2x_{res[..^4]}.tex");
                             CheckLinkCandidate($"{dataSkinDir}/{res[..^4]}.tex");
+                            CheckLinkCandidate($"{dataSkinDir}/2x_{res[..^4]}.tex");
                         }
                     }
+
+                    string baseCharBaseName = baseChar != null ? $"{baseChar}_{skinName}" : null;
 
                     foreach (string sampler in samplers)
                     {
@@ -1938,8 +1946,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                         if (chunkLinks.Count == 0) break;
                         CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.tex");
                         CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.dds");
+                        CheckLinkCandidate($"{skinDir}/2x_{baseName}{sampler}.tex");
+                        CheckLinkCandidate($"{skinDir}/2x_{baseName}{sampler}.dds");
                         CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.tex");
                         CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.dds");
+
+                        if (baseCharBaseName != null)
+                        {
+                            CheckLinkCandidate($"{skinDir}/{baseCharBaseName}{sampler}.tex");
+                            CheckLinkCandidate($"{skinDir}/{baseCharBaseName}{sampler}.dds");
+                            CheckLinkCandidate($"{skinDir}/2x_{baseCharBaseName}{sampler}.tex");
+                            CheckLinkCandidate($"{skinDir}/2x_{baseCharBaseName}{sampler}.dds");
+                        }
                     }
 
                     CheckLinkCandidate($"{skinDir}/{baseName}.tex");
@@ -1948,6 +1966,14 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckLinkCandidate($"{skinDir}/{baseName}.skl");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skn");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skl");
+
+                    if (baseCharBaseName != null)
+                    {
+                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.tex");
+                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.dds");
+                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skn");
+                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skl");
+                    }
                 }
             }
 
