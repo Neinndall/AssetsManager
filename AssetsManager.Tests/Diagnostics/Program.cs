@@ -36,6 +36,11 @@ namespace AssetsManager.Tests.Diagnostics
                 await GameBaselineDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "fiora-grep-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                FioraGrepProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "game-unknowns-audit", StringComparison.OrdinalIgnoreCase))
             {
                 GameUnknownsAuditDiagnostic.Run(args.Skip(1).ToArray());

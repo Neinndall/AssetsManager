@@ -1795,20 +1795,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                     context.Groups["character"].Value,
                     context.Groups["skin"].Value,
                     unresolved,
-                    engine.UnknownHashes),
+                    engine.UnknownHashes,
+                    cancellationToken),
                 HashGuessStrategy.AnimationBinLink,
                 sourceWadPath,
                 cancellationToken,
                 sourceChunkHash);
         }
 
-        private IReadOnlyDictionary<uint, List<string>> GetAnimationNameIndex()
+        private IReadOnlyDictionary<uint, List<string>> GetAnimationNameIndex(CancellationToken cancellationToken)
         {
             return Corpus.GetOrCreate("animation-name-index", knownPaths =>
             {
                 var index = new Dictionary<uint, List<string>>();
-                foreach (string path in knownPaths)
+                for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
                 {
+                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    string path = knownPaths[pathIndex];
                     if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
                     string name = GetBasename(path);
                     if (name.Length <= 4) continue;
@@ -2016,8 +2019,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             string character,
             string skin,
             IReadOnlyList<AnimationFileLink> links,
-            IReadOnlyCollection<ulong> unknownHashes)
+            IReadOnlyCollection<ulong> unknownHashes,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var remaining = links
                 .Where(link => link.PathHash != 0 && unknownHashes.Contains(link.PathHash))
                 .Select(link => link.PathHash)
@@ -2025,10 +2030,11 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (remaining.Count == 0) yield break;
 
             var attemptedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var (prefixes, suffixes) = GetDynamicAnimationAffixes();
+            var (prefixes, suffixes) = GetDynamicAnimationAffixes(cancellationToken);
 
-            foreach (string name in EnumerateAnimationNameCandidates(character, links, remaining))
+            foreach (string name in EnumerateAnimationNameCandidates(character, links, remaining, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!attemptedNames.Add(name)) continue;
                 foreach (string path in MatchAnimationVariants(name, character, skin, remaining, prefixes, suffixes))
                     yield return path;
@@ -2037,10 +2043,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             if (remaining.Count == 0) yield break;
 
-            IReadOnlyList<string> contextualNames = GetAnimationNames(character, contextual: true);
-            IReadOnlyList<string> sourceNames = contextualNames.Count > 0
-                ? contextualNames
-                : GetAnimationNames(character, contextual: false);
+            IReadOnlyList<string> sourceNames = GetAnimationNames(character, cancellationToken);
 
             foreach (HashGuessCandidate candidate in GenerateNumberCandidates(
                          sourceNames.Where(name => name.Any(char.IsDigit)).Select(name => $"animations/{name}"),
@@ -2050,6 +2053,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                          inferDigits: false,
                          includeCommonPadding: false))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string name = GetBasename(candidate.Path);
                 if (!attemptedNames.Add(name)) continue;
                 foreach (string path in MatchAnimationVariants(name, character, skin, remaining, DefaultPrefixModifiers, DefaultSuffixModifiers))
@@ -2061,85 +2065,52 @@ namespace AssetsManager.Services.Hashes.Guessers
         private IEnumerable<string> EnumerateAnimationNameCandidates(
             string character,
             IReadOnlyList<AnimationFileLink> links,
-            IReadOnlySet<ulong> targetHashes)
+            IReadOnlySet<ulong> targetHashes,
+            CancellationToken cancellationToken)
         {
-            IReadOnlyDictionary<uint, List<string>> namesByHash = GetAnimationNameIndex();
-            foreach (AnimationFileLink link in links)
+            var namedLinks = links
+                .Where(link => targetHashes.Contains(link.PathHash) && link.NameHash != 0)
+                .ToList();
+            if (namedLinks.Count == 0) yield break;
+
+            foreach (AnimationFileLink link in namedLinks)
             {
-                if (!targetHashes.Contains(link.PathHash) || link.NameHash == 0) continue;
+                cancellationToken.ThrowIfCancellationRequested();
                 string resolved = _resolveBinHash?.Invoke(link.NameHash);
                 if (IsAnimationStem(resolved)) yield return resolved;
+            }
+            if (targetHashes.Count == 0) yield break;
 
-                if (!namesByHash.TryGetValue(link.NameHash, out List<string> names)) continue;
+            var nameHashes = namedLinks
+                .Where(link => targetHashes.Contains(link.PathHash))
+                .Select(link => link.NameHash)
+                .ToHashSet();
+            if (nameHashes.Count == 0) yield break;
+
+            IReadOnlyDictionary<uint, List<string>> namesByHash = GetAnimationNameIndex(cancellationToken);
+            foreach (AnimationFileLink link in namedLinks)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!targetHashes.Contains(link.PathHash) || !namesByHash.TryGetValue(link.NameHash, out List<string> names)) continue;
                 foreach (string name in names)
                     yield return name;
             }
+            if (targetHashes.Count == 0) yield break;
 
-            IReadOnlyList<string> contextualNames = GetAnimationNames(character, contextual: true);
-            IReadOnlyList<string> sourceNames = contextualNames.Count > 0
-                ? contextualNames
-                : GetAnimationNames(character, contextual: false);
+            IReadOnlyList<string> sourceNames = GetAnimationNames(character, cancellationToken);
             HashSet<string> prefixes = GetReusableAnimationPrefixes(sourceNames);
-            HashSet<uint> nameHashes = links
-                .Where(link => targetHashes.Contains(link.PathHash) && link.NameHash != 0)
-                .Select(link => link.NameHash)
-                .ToHashSet();
 
             foreach (string name in sourceNames)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string stem = name.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
                 if (nameHashes.Contains(Fnv1a.HashLower(stem))) yield return stem;
                 foreach (string prefix in prefixes)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     string prefixed = prefix + "_" + stem;
                     if (nameHashes.Contains(Fnv1a.HashLower(prefixed))) yield return prefixed;
                 }
-            }
-
-            if (nameHashes.Count > 0)
-            {
-                IReadOnlyList<string> words = Corpus.GetOrCreate(
-                    "animation-words",
-                    paths => HashGuessEngine.BuildBasenameWordlist(
-                        paths.Where(path => path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))));
-
-                var characterWords = prefixes.SelectMany(p => p.Split('_', StringSplitOptions.RemoveEmptyEntries))
-                    .Concat(sourceNames.SelectMany(n => n.Split(new[] { '_', '.' }, StringSplitOptions.RemoveEmptyEntries)))
-                    .Where(w => w.Length >= 2)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                foreach (string prefix in prefixes)
-                {
-                    uint prefixHash = Fnv1aIncremental.Append(Fnv1aIncremental.Hash(prefix), [(byte)'_']);
-                    foreach (string word in characterWords)
-                    {
-                        byte[] wordBytes = Encoding.UTF8.GetBytes(word.ToLowerInvariant());
-                        uint stemHash = Fnv1aIncremental.Append(prefixHash, wordBytes);
-                        if (nameHashes.Contains(stemHash)) yield return prefix + "_" + word;
-
-                        uint stem2BaseHash = Fnv1aIncremental.Append(stemHash, [(byte)'_']);
-                        foreach (string word2 in characterWords)
-                        {
-                            byte[] word2Bytes = Encoding.UTF8.GetBytes(word2.ToLowerInvariant());
-                            if (nameHashes.Contains(Fnv1aIncremental.Append(stem2BaseHash, word2Bytes)))
-                                yield return prefix + "_" + word + "_" + word2;
-                        }
-
-                        foreach (string word2 in words)
-                        {
-                            byte[] word2Bytes = Encoding.UTF8.GetBytes(word2.ToLowerInvariant());
-                            if (nameHashes.Contains(Fnv1aIncremental.Append(stem2BaseHash, word2Bytes)))
-                                yield return prefix + "_" + word + "_" + word2;
-                        }
-                    }
-                }
-            }
-
-            if (contextualNames.Count == 0)
-            {
-                foreach (string name in GetAnimationNames(character, contextual: false).Take(1000))
-                    yield return name;
             }
         }
 
@@ -2162,22 +2133,26 @@ namespace AssetsManager.Services.Hashes.Guessers
             !value.Contains('\\') &&
             !value.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
 
-        private IReadOnlyList<string> GetAnimationNames(string character, bool contextual)
+        private IReadOnlyList<string> GetAnimationNames(string character, CancellationToken cancellationToken)
         {
-            string key = contextual ? $"animation-names/{character.ToLowerInvariant()}" : "animation-names/all";
             return Corpus.GetOrCreate(
-                key,
-                paths => BuildAnimationNames(paths, contextual ? character : null));
+                $"animation-names/{character.ToLowerInvariant()}",
+                paths => BuildAnimationNames(paths, character, cancellationToken));
         }
 
-        private static IReadOnlyList<string> BuildAnimationNames(IReadOnlyList<string> knownPaths, string character)
+        private static IReadOnlyList<string> BuildAnimationNames(
+            IReadOnlyList<string> knownPaths,
+            string character,
+            CancellationToken cancellationToken)
         {
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string path in knownPaths)
+            for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
             {
+                if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                string path = knownPaths[pathIndex];
                 if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
                 Match context = KnownAnimationPathRegex.Match(PathUtils.NormalizePath(path));
-                if (!context.Success || (character != null && !context.Groups["character"].Value.Equals(character, StringComparison.OrdinalIgnoreCase)))
+                if (!context.Success || !context.Groups["character"].Value.Equals(character, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 string name = GetBasename(path);
@@ -2187,15 +2162,17 @@ namespace AssetsManager.Services.Hashes.Guessers
             return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private (IReadOnlyList<string> Prefixes, IReadOnlyList<string> Suffixes) GetDynamicAnimationAffixes()
+        private (IReadOnlyList<string> Prefixes, IReadOnlyList<string> Suffixes) GetDynamicAnimationAffixes(CancellationToken cancellationToken)
         {
             return Corpus.GetOrCreate("dynamic-animation-affixes", knownPaths =>
             {
                 var prefixes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 var suffixes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (string path in knownPaths)
+                for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
                 {
+                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    string path = knownPaths[pathIndex];
                     if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
                     string stem = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
                     int first = stem.IndexOf('_');

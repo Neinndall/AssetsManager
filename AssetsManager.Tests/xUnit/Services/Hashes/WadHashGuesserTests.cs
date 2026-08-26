@@ -267,6 +267,30 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void GameAnimationBinGrepHonorsCancellationDuringNameResolution()
+        {
+            const string expected = "assets/characters/seraphine/skins/skin69/animations/spell1.anm";
+            using var cancellation = new CancellationTokenSource();
+            var game = new GameHashGuesser(
+                new HashFile(HashGuessDomain.Game, Array.Empty<string>()),
+                null,
+                _ =>
+                {
+                    cancellation.Cancel();
+                    return null;
+                });
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
+
+            Assert.Throws<OperationCanceledException>(() => game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin("spell1", XxHash64Ext.Hash(expected))),
+                "data/characters/seraphine/animations/skin69.bin",
+                "Seraphine.wad.client",
+                1,
+                cancellation.Token));
+        }
+
+        [Fact]
         public void StandaloneShaderGuessKeepsHundredStepPermutationCoverage()
         {
             const string shaderBase = "assets/shaders/generated/shaders/test.ps";
