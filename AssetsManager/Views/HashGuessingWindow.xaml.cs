@@ -26,6 +26,7 @@ namespace AssetsManager.Views
         private readonly CustomMessageBoxService _messageBoxService;
         private readonly LogService _logService;
         private readonly ProgressUIManager _progressUIManager;
+        private readonly TaskCancellationManager _taskCancellationManager;
         private readonly HashGuessLabModel _viewModel = new();
         private readonly List<HashMethodItemModel> _allMethods = new();
         private CancellationTokenSource _cancellationTokenSource;
@@ -37,7 +38,8 @@ namespace AssetsManager.Views
             AppSettings appSettings,
             CustomMessageBoxService messageBoxService,
             LogService logService,
-            ProgressUIManager progressUIManager)
+            ProgressUIManager progressUIManager,
+            TaskCancellationManager taskCancellationManager)
         {
             InitializeComponent();
             _hashGuessingService = hashGuessingService;
@@ -46,6 +48,7 @@ namespace AssetsManager.Views
             _messageBoxService = messageBoxService;
             _logService = logService;
             _progressUIManager = progressUIManager;
+            _taskCancellationManager = taskCancellationManager;
             DataContext = _viewModel;
             InitializeMethods();
             Unloaded += OnUnloaded;
@@ -685,7 +688,11 @@ namespace AssetsManager.Views
             }
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e) => _cancellationTokenSource?.Cancel();
+        private void Cancel_Click(object sender, RoutedEventArgs e)
+        {
+            _taskCancellationManager?.CancelCurrentOperation();
+            _cancellationTokenSource?.Cancel();
+        }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
@@ -720,6 +727,11 @@ namespace AssetsManager.Views
 
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
+            using var linkedCts = _taskCancellationManager != null
+                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
+                : null;
+            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
             _viewModel.ProgressText = "Scanning";
@@ -807,21 +819,21 @@ namespace AssetsManager.Views
                 });
                 var result = mode switch
                 {
-                    HashGuessMode.GamePrefixes => await _hashGuessingService.RunGamePrefixGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GameShaders => await _hashGuessingService.RunGameShaderGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress, selectedSubMethods),
-                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, runCancellation.Token, matchProgress),
-                    HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, runCancellation.Token, matchProgress),
+                    HashGuessMode.GamePrefixes => await _hashGuessingService.RunGamePrefixGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.GameShaders => await _hashGuessingService.RunGameShaderGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.GameBasic => await _hashGuessingService.RunGameBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.GameExtended => await _hashGuessingService.RunGameExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.BannerGuess => await _hashGuessingService.RunGameBannerGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.GameCustom => await _hashGuessingService.RunGameCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuScoped => await _hashGuessingService.RunLcuScopedPluginGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.LcuModifiers => await _hashGuessingService.RunLcuUniversalModifierGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.LcuMedia => await _hashGuessingService.RunLcuMediaGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.LcuBasic => await _hashGuessingService.RunLcuBasicGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuExtended => await _hashGuessingService.RunLcuExtendedGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuCustom => await _hashGuessingService.RunLcuCustomGuessingAsync(rootPath, progress, effectiveToken, matchProgress, selectedSubMethods),
+                    HashGuessMode.LcuV1Paths => await _hashGuessingService.RunLcuV1PathGuessingAsync(rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.GrepGame => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Game, rootPath, progress, effectiveToken, matchProgress),
+                    HashGuessMode.GrepLcu => await _hashGuessingService.RunEmbeddedPathGrepAsync(HashGuessDomain.Lcu, rootPath, progress, effectiveToken, matchProgress),
                     _ => throw new ArgumentOutOfRangeException(nameof(mode))
                 };
                 stopwatch.Stop();
@@ -884,6 +896,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -909,6 +922,11 @@ namespace AssetsManager.Views
 
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
+            using var linkedCts = _taskCancellationManager != null
+                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
+                : null;
+            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
             _viewModel.ProgressText = "Running";
@@ -962,7 +980,7 @@ namespace AssetsManager.Views
 
                 if (action == InternalHashAction.Inventory)
                 {
-                    var inv = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token);
+                    var inv = await _binRstHashGuessingService.BuildInventoryAsync(rootPath, includeBin, includeRst, progress, effectiveToken);
                     stopwatch.Stop();
                     string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                     _viewModel.ProgressValue = 100;
@@ -974,8 +992,8 @@ namespace AssetsManager.Views
                 {
                     InternalHashRunResult result = action switch
                     {
-                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token, selectedSubMethods: selectedSubMethods),
-                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, runCancellation.Token, selectedSubMethods: selectedSubMethods),
+                        InternalHashAction.Content => await _binRstHashGuessingService.RunContentGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
+                        InternalHashAction.Structural => await _binRstHashGuessingService.RunStructuralGuessingAsync(rootPath, includeBin, includeRst, progress, effectiveToken, selectedSubMethods: selectedSubMethods),
                         _ => throw new ArgumentOutOfRangeException(nameof(action))
                     };
 
@@ -1011,6 +1029,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -1040,6 +1059,11 @@ namespace AssetsManager.Views
 
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
+            using var linkedCts = _taskCancellationManager != null
+                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
+                : null;
+            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
             _viewModel.ProgressText = "Scanning";
@@ -1051,7 +1075,7 @@ namespace AssetsManager.Views
 
             try
             {
-                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, null, runCancellation.Token);
+                var summary = await _hashGuessingService.ScanUnknownHashesAsync(domain, rootPath, null, effectiveToken);
                 stopwatch.Stop();
                 string elapsedTime = FormatElapsedTime(stopwatch.Elapsed);
                 _viewModel.ProgressValue = 100;
@@ -1081,6 +1105,7 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
+                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
