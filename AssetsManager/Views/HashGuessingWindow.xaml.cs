@@ -781,7 +781,9 @@ namespace AssetsManager.Views
                     totalWads = value.TotalWads;
 
                     string detail = string.IsNullOrEmpty(value.CurrentWad) ? $"{totalChecked:N0} checked" : value.CurrentWad;
-                    string statusMsg = $"Hash Lab: {detail} ({foundMatches:N0} found)";
+                    string statusMsg = string.IsNullOrEmpty(value.CurrentWad)
+                        ? $"Hash Lab: {totalChecked:N0} checked ({foundMatches:N0} found)"
+                        : $"Hash Lab: {value.CurrentWad} ({value.ProcessedWads}/{value.TotalWads}) · {foundMatches:N0} found";
                     _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, detail);
                 });
                 var matchProgress = new Progress<HashGuessMatch>(match =>
