@@ -82,18 +82,18 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomCharacterTexSampleSize = 20_000;
         private const int CustomWordAdditionSampleSize = 20_000;
         private const int CustomFocusedPathSampleSize = 20_000;
-        private const int CustomBinCandidateBudget = 250_000_000;
-        private const int CustomDataBinCandidateBudget = 250_000_000;
-        private const int CustomCharacterDdsCandidateBudget = 250_000_000;
-        private const int CustomCharacterTexCandidateBudget = 250_000_000;
-        private const int CustomSwordlistCandidateBudget = 250_000_000;
-        private const int CustomWordlistCandidateBudget = 250_000_000;
-        private const int CustomWordAdditionCandidateBudget = 250_000_000;
-        private const int CustomShaderCandidateBudget = 250_000_000;
-        private const int SkinGroupCandidateBudget = 200_000_000;
-        private const int SuffixSubstitutionCandidateBudget = 200_000_000;
-        private const int CharacterSubstitutionCandidateBudget = 200_000_000;
-        private const int SkinNumberSubstitutionCandidateBudget = 200_000_000;
+        private const int CustomBinCandidateBudget = 100_000_000;
+        private const int CustomDataBinCandidateBudget = 100_000_000;
+        private const int CustomCharacterDdsCandidateBudget = 100_000_000;
+        private const int CustomCharacterTexCandidateBudget = 100_000_000;
+        private const int CustomSwordlistCandidateBudget = 100_000_000;
+        private const int CustomWordlistCandidateBudget = 100_000_000;
+        private const int CustomWordAdditionCandidateBudget = 100_000_000;
+        private const int CustomShaderCandidateBudget = 100_000_000;
+        private const int SkinGroupCandidateBudget = 100_000_000;
+        private const int SuffixSubstitutionCandidateBudget = 100_000_000;
+        private const int CharacterSubstitutionCandidateBudget = 100_000_000;
+        private const int SkinNumberSubstitutionCandidateBudget = 100_000_000;
         private const int EsportsBannerSingleCandidateBudget = 2_000_000;
         private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
@@ -1249,7 +1249,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-chromas"))
                 checkedCandidates += await GuessSkinGroupsBinUsingChromas(engine, rootDirectory, cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-suffixes"))
-                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
+                checkedCandidates += CheckCandidates(engine, SubstituteSuffixes(SuffixSubstitutionCandidateBudget), "GAME suffix substitution", cancellationToken, progress, checkedCandidates);
             if (engine.RemainingUnknownCount > 0 && ShouldRun("game-ext-skinnumbers"))
                 checkedCandidates += CheckCandidates(
                     engine,
