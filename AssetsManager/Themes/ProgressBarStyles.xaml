@@ -21,22 +21,51 @@
                                 Background="{TemplateBinding Background}"/>
 
                         <!-- 2. Contenedor del indicador -->
-                        <!-- Usamos ClipToBounds para asegurar que el inicio no se salga de la curva del carril -->
                         <Border CornerRadius="4" ClipToBounds="True">
                             <Grid x:Name="PART_Track" Background="Transparent">
-                                <!-- El indicador ahora es un Border con CornerRadius -->
-                                <!-- Esto hace que la "punta" que avanza sea redonda -->
+                                <!-- El indicador determinado -->
                                 <Border x:Name="PART_Indicator"
                                         Background="{TemplateBinding Foreground}"
                                         CornerRadius="4"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Stretch"/>
+
+                                <!-- El indicador indeterminado animado -->
+                                <Border x:Name="IndeterminateIndicator"
+                                        Background="{TemplateBinding Foreground}"
+                                        CornerRadius="4"
+                                        Width="160"
+                                        Opacity="0.85"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Stretch"
+                                        Visibility="Collapsed">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="IndeterminateTranslate" X="-160"/>
+                                    </Border.RenderTransform>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsIndeterminate" Value="true">
                             <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="IndeterminateIndicator" Property="Visibility" Value="Visible"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard x:Name="StartIndeterminateAnim">
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetName="IndeterminateIndicator"
+                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                         From="-160" To="600" Duration="0:0:1.4">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseInOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <StopStoryboard BeginStoryboardName="StartIndeterminateAnim"/>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
