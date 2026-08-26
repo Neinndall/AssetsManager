@@ -74,9 +74,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex AnimationSkinTokenRegex = new("skin\\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex DottedBinPathRegex = new(
-            @"^(?<prefix>.+)\.[0-9a-f]{8}\.bin$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly string[] DottedBinTargetPrefixes =
         {
             "loadouts/companions",
@@ -1807,18 +1804,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             ulong sourceChunkHash,
             CancellationToken cancellationToken)
         {
-            IReadOnlyList<string> prefixes = Corpus.GetOrCreate(
-                "dotted-bin-prefixes",
-                paths => paths
-                    .Select(path => DottedBinPathRegex.Match(PathUtils.NormalizePath(path)))
-                    .Where(match => match.Success)
-                    .Select(match => match.Groups["prefix"].Value)
-                    .Concat(DottedBinTargetPrefixes)
-                    .Where(prefix => DottedBinTargetPrefixes.Any(target => prefix.EndsWith(target, StringComparison.OrdinalIgnoreCase)))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(prefix => prefix, StringComparer.OrdinalIgnoreCase)
-                    .ToList());
-            if (prefixes.Count == 0 || data.Array is null || data.Count < 16) return;
+            if (data.Array is null || data.Count < 16) return;
 
             try
             {
@@ -1861,7 +1847,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     long nextObjectOffset = objectOffset + sizeof(uint) + objectSize;
                     if (objectSize < 6 || nextObjectOffset < stream.Position || nextObjectOffset > stream.Length)
                         return;
-                    foreach (string prefix in prefixes)
+                    foreach (string prefix in DottedBinTargetPrefixes)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         Check(
