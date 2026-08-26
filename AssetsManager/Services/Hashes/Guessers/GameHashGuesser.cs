@@ -1551,7 +1551,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                                              path.StartsWith("data/", StringComparison.OrdinalIgnoreCase)
                             ? new[] { path }
                             : new[] { $"assets/{path}", $"data/{path}", $"assets/shaders/generated/{path}" };
-
                         foreach (string candidateBase in candidateBases)
                         {
                             CheckGameIter(
@@ -1603,7 +1602,10 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                {
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                    GuessMaterialAndMeshBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                }
                 return;
             }
 
@@ -1801,6 +1803,193 @@ namespace AssetsManager.Services.Hashes.Guessers
                 sourceWadPath,
                 cancellationToken,
                 sourceChunkHash);
+        }
+
+        private static readonly string[] CanonicalTextureSamplers =
+        {
+            "_tx_cm", "_tx_mask", "_tx_em", "_tx_normal", "_tx_spec", "_tx_ao",
+            "_tx_dist", "_tx_alpha", "_tx_noise", "_tx_cube", "_tx_env", "_tx_flow",
+            "_base_tx_cm", "_base_tx_mask", "_base_tx_em", "_base_tx_normal"
+        };
+
+        private void GuessMaterialAndMeshBinPaths(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
+            string character = context.Success ? context.Groups["character"].Value : null;
+            string skin = context.Success ? context.Groups["skin"].Value : null;
+
+            if (string.IsNullOrEmpty(character) && !string.IsNullOrEmpty(sourceWadPath))
+            {
+                string wadName = Path.GetFileNameWithoutExtension(sourceWadPath);
+                if (wadName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
+                    wadName = Path.GetFileNameWithoutExtension(wadName);
+                if (!wadName.Equals("global", StringComparison.OrdinalIgnoreCase) &&
+                    !wadName.StartsWith("map", StringComparison.OrdinalIgnoreCase))
+                {
+                    character = wadName.ToLowerInvariant();
+                }
+            }
+
+            if (string.IsNullOrEmpty(character) || data.Array is null || data.Count == 0) return;
+
+            var chunkLinks = new HashSet<ulong>();
+            try
+            {
+                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
+                var tree = new BinTree(stream);
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (ulong link in EnumerateChunkLinks(tree))
+                {
+                    if (engine.UnknownHashes.Contains(link))
+                        chunkLinks.Add(link);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logService?.LogDebug($"GAME material/mesh BIN link scan skipped '{sourcePath}': {exception.Message}");
+                return;
+            }
+
+            if (chunkLinks.Count == 0) return;
+
+            var skinsToTest = !string.IsNullOrEmpty(skin)
+                ? new[] { skin.ToLowerInvariant() }
+                : new[] { "base", "skin01", "skin02", "skin03", "skin04", "skin05", "skin06", "skin07", "skin08", "skin09", "skin10" };
+
+            var templates = GetChampionSkinAssetTemplates(character, cancellationToken);
+
+            foreach (string skinName in skinsToTest)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (chunkLinks.Count == 0 || engine.RemainingUnknownCount == 0) break;
+
+                string baseName = $"{character}_{skinName}";
+                string skinDir = $"assets/characters/{character}/skins/{skinName}";
+                string dataSkinDir = $"data/characters/{character}/skins/{skinName}";
+
+                foreach (string template in templates)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (chunkLinks.Count == 0) break;
+                    string resolved = template.Replace("{skin}", skinName, StringComparison.OrdinalIgnoreCase);
+                    CheckLinkCandidate($"{skinDir}/{resolved}");
+                    CheckLinkCandidate($"{dataSkinDir}/{resolved}");
+
+                    if (resolved.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckLinkCandidate($"{skinDir}/{resolved[..^4]}.dds");
+                        CheckLinkCandidate($"{dataSkinDir}/{resolved[..^4]}.dds");
+                    }
+                    else if (resolved.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CheckLinkCandidate($"{skinDir}/{resolved[..^4]}.tex");
+                        CheckLinkCandidate($"{dataSkinDir}/{resolved[..^4]}.tex");
+                    }
+                }
+
+                foreach (string sampler in CanonicalTextureSamplers)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (chunkLinks.Count == 0) break;
+                    CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.tex");
+                    CheckLinkCandidate($"{skinDir}/{baseName}{sampler}.dds");
+                    CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.tex");
+                    CheckLinkCandidate($"{dataSkinDir}/{baseName}{sampler}.dds");
+                }
+
+                CheckLinkCandidate($"{skinDir}/{baseName}.tex");
+                CheckLinkCandidate($"{skinDir}/{baseName}.dds");
+                CheckLinkCandidate($"{skinDir}/{baseName}.skn");
+                CheckLinkCandidate($"{skinDir}/{baseName}.skl");
+                CheckLinkCandidate($"{dataSkinDir}/{baseName}.skn");
+                CheckLinkCandidate($"{dataSkinDir}/{baseName}.skl");
+            }
+
+            void CheckLinkCandidate(string candidatePath)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ulong hash = XxHash64Ext.Hash(candidatePath);
+                if (chunkLinks.Remove(hash))
+                {
+                    Check(engine, candidatePath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                }
+            }
+        }
+
+        private IReadOnlyList<string> GetChampionSkinAssetTemplates(string character, CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate($"champion-skin-templates/{character.ToLowerInvariant()}", knownPaths =>
+            {
+                var templates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string charPrefix = $"assets/characters/{character}/skins/";
+                string dataCharPrefix = $"data/characters/{character}/skins/";
+
+                for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
+                {
+                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    string path = knownPaths[pathIndex];
+                    string rel = null;
+                    if (path.StartsWith(charPrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[charPrefix.Length..];
+                    else if (path.StartsWith(dataCharPrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[dataCharPrefix.Length..];
+
+                    if (string.IsNullOrEmpty(rel)) continue;
+                    int slash = rel.IndexOf('/');
+                    if (slash < 0) continue;
+                    string skinToken = rel[..slash];
+                    string subPath = rel[(slash + 1)..];
+
+                    if (subPath.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
+                        subPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string templated = subPath.Replace(skinToken, "{skin}", StringComparison.OrdinalIgnoreCase);
+                    if (templated.Length > 0 && templated.Length < 260)
+                        templates.Add(templated);
+                }
+
+                return templates.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private static IEnumerable<ulong> EnumerateChunkLinks(BinTree tree)
+        {
+            var roots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
+                .Concat(tree.DataOverrides.Select(ovr => ovr.Property));
+            foreach (BinTreeProperty root in roots)
+            {
+                foreach (BinTreeProperty prop in EnumerateAllProperties(root))
+                {
+                    if (prop is BinTreeWadChunkLink link && link.Value != 0)
+                        yield return link.Value;
+                }
+            }
+        }
+
+        private static IEnumerable<BinTreeProperty> EnumerateAllProperties(BinTreeProperty property)
+        {
+            if (property == null) yield break;
+            yield return property;
+
+            IEnumerable<BinTreeProperty> children = property switch
+            {
+                BinTreeStruct structure => structure.Properties.Values,
+                BinTreeOptional optional when optional.Value != null => new[] { optional.Value },
+                BinTreeContainer container => container.Elements,
+                BinTreeMap map => map.SelectMany(pair => new[] { pair.Key, pair.Value }),
+                _ => Array.Empty<BinTreeProperty>()
+            };
+            foreach (BinTreeProperty child in children)
+            foreach (BinTreeProperty descendant in EnumerateAllProperties(child))
+                yield return descendant;
         }
 
         private IReadOnlyDictionary<uint, List<string>> GetAnimationNameIndex(CancellationToken cancellationToken)
