@@ -91,7 +91,7 @@ namespace AssetsManager.Services.Core
                 _progressDetailsWindow.ViewModel.OperationVerb = verb;
 
                 _progressDetailsWindow.Closed += (s, e) => _progressDetailsWindow = null;
-                _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null);
+                _progressDetailsWindow.UpdateProgress(0, totalItems, "Initializing...", true, null, totalItems > 0 ? null : "Initializing...");
                 // _progressDetailsWindow.Show(); // Ventana en segundo plano por defecto, el usuario la abre si quiere
             });
         }
