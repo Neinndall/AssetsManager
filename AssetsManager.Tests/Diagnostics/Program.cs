@@ -46,6 +46,26 @@ namespace AssetsManager.Tests.Diagnostics
                 GameUnknownsAuditDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-texture-probe", StringComparison.OrdinalIgnoreCase))
+            {
+                GameTextureProbeDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-link-inspect", StringComparison.OrdinalIgnoreCase))
+            {
+                GameChunkLinkInspectorDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "quick-hash-check", StringComparison.OrdinalIgnoreCase))
+            {
+                QuickHashCheck.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "full-coverage", StringComparison.OrdinalIgnoreCase))
+            {
+                FullUnknownsCoverageDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "game-crack-lab", StringComparison.OrdinalIgnoreCase))
             {
                 GameCrackLabDiagnostic.Run(args.Skip(1).ToArray());

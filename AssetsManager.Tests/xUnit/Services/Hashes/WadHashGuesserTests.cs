@@ -2697,5 +2697,60 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             AssertResolved(engine, expected);
         }
 
+        private static byte[] CreateChunkLinkBin(ulong linkHash)
+        {
+            var mat = new BinTreeStruct(
+                0,
+                Fnv1a.HashLower("StaticMaterialDef"),
+                new BinTreeProperty[]
+                {
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), linkHash)
+                });
+            var tree = new BinTree(
+                new[] { new BinTreeObject(1, Fnv1a.HashLower("SkinCharacterDataProperties"), new BinTreeProperty[] { mat }) },
+                Array.Empty<string>());
+            using var stream = new MemoryStream();
+            tree.Write(stream);
+            return stream.ToArray();
+        }
+
+        [Fact]
+        public void GameSpecialSkinBinPathsResolvesJadeAndSkin300Series()
+        {
+            const string jadeBin = "data/characters/jade_xinzhao/skins/skin303.bin";
+            var game = new GameHashGuesser();
+            var engine = CreateEngine(HashGuessDomain.Game, jadeBin);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
+                "data/test.bin",
+                "XinZhao.wad.client",
+                1);
+
+            AssertResolved(engine, jadeBin);
+        }
+
+        [Fact]
+        public void GameMaterialAndMeshBinLinksResolvesJadeInheritedSkinTextures()
+        {
+            const string expectedTex = "assets/characters/jade_fiora/skins/skin301/fiora_skin301_tx_cm.tex";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/fiora/skins/skin01/fiora_skin01_tx_cm.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedTex);
+
+            byte[] binData = CreateChunkLinkBin(XxHash64Ext.Hash(expectedTex));
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(binData),
+                "data/characters/jade_fiora/skins/skin301.bin",
+                "Fiora.wad.client",
+                1);
+
+            AssertResolved(engine, expectedTex);
+        }
     }
 }
