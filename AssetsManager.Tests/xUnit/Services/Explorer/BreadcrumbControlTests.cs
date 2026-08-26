@@ -64,7 +64,7 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
                 "ViewerProjectExplorerControl.xaml"));
 
             Assert.Matches(
-                @"<explorer:BreadcrumbControl[^>]*FontSize=""10""",
+                @"<explorer:BreadcrumbControl[^>]*FontSize=""9\.5""",
                 xaml.ReplaceLineEndings(" "));
         }
     }

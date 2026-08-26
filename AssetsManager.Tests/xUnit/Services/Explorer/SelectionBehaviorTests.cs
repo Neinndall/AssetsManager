@@ -56,7 +56,7 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
         {
             string repositoryRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
             string treeStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "TreeViewStyles.xaml"));
-            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "GridView.xaml"));
+            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "FileGridStyles.xaml"));
             string resultsTree = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Views", "Dialogs", "Controls", "WadResultsTreeControl.xaml"));
 
             Assert.DoesNotContain("Property=\"IsSelected\" Value=\"{Binding IsSelected", treeStyle);
@@ -92,7 +92,7 @@ namespace AssetsManager.Tests.xUnit.Services.Explorer
                 "Controls",
                 "Viewer",
                 "ViewerProjectExplorerControl.xaml"));
-            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "GridView.xaml"));
+            string gridStyle = File.ReadAllText(Path.Combine(repositoryRoot, "AssetsManager", "Themes", "FileGridStyles.xaml"));
 
             Assert.Matches(
                 @"<ListBox[^>]*x:Name=""FilesListBox""[^>]*Style=""\{StaticResource ModernFileGridListBox\}""",
