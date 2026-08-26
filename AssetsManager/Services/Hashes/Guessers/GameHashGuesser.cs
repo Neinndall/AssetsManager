@@ -872,9 +872,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             "_tx_outline", "_tx_coin", "_tx_noise", "_fx_mask", "_base_tx_cm"
         };
 
-        private static readonly string[] CharacterTexturePrefixes = new[] { "", "2x_", "4x_", "tft_", "sd_" };
+        private static readonly string[] CharacterTexturePrefixes = new[] { "", "2x_", "4x_" };
         private static readonly string[] CharacterTextureExtensions = new[] { ".tex", ".dds", ".project_jade.tex" };
-        private static readonly string[] CharacterSubProps = new[] { "weapon", "cannon", "gun", "dragon", "bomb", "pet", "wings", "cape", "tail" };
 
         private static readonly string[] CharacterAnimationActions = new[]
         {
@@ -927,14 +926,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skn";
                 yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skl";
 
-                foreach (string prop in CharacterSubProps)
-                {
-                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_{prop}.skn";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_{prop}.skl";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{prop}.skn";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{prop}.skl";
-                }
-
                 foreach (string prefix in CharacterTexturePrefixes)
                 {
                     foreach (string sampler in CharacterTextureSamplers)
@@ -943,12 +934,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         {
                             yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{skinTag}{sampler}{ext}";
                             yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}{sampler}{ext}";
-
-                            foreach (string prop in CharacterSubProps)
-                            {
-                                yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{skinTag}_{prop}{sampler}{ext}";
-                                yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{prop}{sampler}{ext}";
-                            }
                         }
                     }
                 }
@@ -2074,12 +2059,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                                 CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.tex");
                                 CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.dds");
                             }
-
-                            foreach (string prop in CharacterSubProps)
-                            {
-                                CheckLinkCandidate($"{skinDir}/{prefix}{baseName}_{prop}{sampler}.tex");
-                                CheckLinkCandidate($"{skinDir}/{prefix}{baseName}_{prop}{sampler}.dds");
-                            }
                         }
                     }
 
@@ -2089,14 +2068,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckLinkCandidate($"{skinDir}/{baseName}.skl");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skn");
                     CheckLinkCandidate($"{dataSkinDir}/{baseName}.skl");
-
-                    foreach (string prop in CharacterSubProps)
-                    {
-                        CheckLinkCandidate($"{skinDir}/{baseName}_{prop}.skn");
-                        CheckLinkCandidate($"{skinDir}/{baseName}_{prop}.skl");
-                        CheckLinkCandidate($"{dataSkinDir}/{baseName}_{prop}.skn");
-                        CheckLinkCandidate($"{dataSkinDir}/{baseName}_{prop}.skl");
-                    }
 
                     if (baseCharBaseName != null)
                     {
