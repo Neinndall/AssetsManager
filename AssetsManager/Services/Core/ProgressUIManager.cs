@@ -175,7 +175,7 @@ namespace AssetsManager.Services.Core
                 if (completed >= 0 && total > 0)
                 {
                     double percentage = (double)completed / total * 100;
-                    _statusBarViewModel.ProgressPercentage = $"{(int)percentage}%";
+                    _statusBarViewModel.ProgressPercentage = $"{(int)Math.Round(percentage)}%";
                 }
                 else if (!string.IsNullOrWhiteSpace(customProgressText))
                 {
