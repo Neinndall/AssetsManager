@@ -725,12 +725,11 @@ namespace AssetsManager.Views
                 return;
             }
 
+            var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
-            using var linkedCts = _taskCancellationManager != null
-                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
-                : null;
-            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
+            var effectiveToken = linkedCts.Token;
 
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
@@ -896,7 +895,6 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
-                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -920,12 +918,11 @@ namespace AssetsManager.Views
             bool includeRst = domainIndex == 3;
             string domainName = includeBin ? "BIN" : "RST";
 
+            var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
-            using var linkedCts = _taskCancellationManager != null
-                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
-                : null;
-            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
+            var effectiveToken = linkedCts.Token;
 
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
@@ -1029,7 +1026,6 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
-                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
@@ -1057,12 +1053,11 @@ namespace AssetsManager.Views
                 return;
             }
 
+            var taskToken = _taskCancellationManager != null ? _taskCancellationManager.PrepareNewOperation() : CancellationToken.None;
             var runCancellation = new CancellationTokenSource();
             _cancellationTokenSource = runCancellation;
-            using var linkedCts = _taskCancellationManager != null
-                ? CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, _taskCancellationManager.Token)
-                : null;
-            var effectiveToken = linkedCts?.Token ?? runCancellation.Token;
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(runCancellation.Token, taskToken);
+            var effectiveToken = linkedCts.Token;
 
             _viewModel.IsRunning = true;
             _viewModel.ProgressValue = 0;
@@ -1105,7 +1100,6 @@ namespace AssetsManager.Views
                 _viewModel.IsRunning = false;
                 _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
-                _taskCancellationManager?.CompleteCurrentOperation();
                 if (_progressUIManager != null)
                 {
                     await _progressUIManager.OnHashGuessingCompletedAsync();
