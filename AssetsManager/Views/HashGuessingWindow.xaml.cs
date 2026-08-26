@@ -846,6 +846,7 @@ namespace AssetsManager.Views
                 stopwatch.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
                 _viewModel.StatusText = "Operation was canceled by user.";
             }
             catch (InvalidOperationException ex)
@@ -853,6 +854,7 @@ namespace AssetsManager.Views
                 stopwatch.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
                 _logService.LogWarning(ex.Message);
                 _viewModel.StatusText = "Pre-validation failed. Run WAD Path Grep first.";
                 _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
@@ -862,6 +864,7 @@ namespace AssetsManager.Views
                 stopwatch.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
                 _logService.LogWarning(ex.Message);
                 _viewModel.StatusText = "Selected directory does not exist.";
                 _messageBoxService.ShowWarning("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
@@ -871,6 +874,7 @@ namespace AssetsManager.Views
                 stopwatch.Stop();
                 _viewModel.ProgressText = "";
                 _viewModel.ProgressValue = 0;
+                _viewModel.IsProgressIndeterminate = false;
                 _logService.LogError(ex, "Unexpected error during hash guessing.");
                 _viewModel.StatusText = "Error during hash guessing execution.";
                 _messageBoxService.ShowError("Hash Guessing Lab", ex.Message, Window.GetWindow(this));
@@ -878,6 +882,7 @@ namespace AssetsManager.Views
             finally
             {
                 _viewModel.IsRunning = false;
+                _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
                 if (_progressUIManager != null)
                 {
@@ -1004,6 +1009,7 @@ namespace AssetsManager.Views
             finally
             {
                 _viewModel.IsRunning = false;
+                _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
                 if (_progressUIManager != null)
                 {
@@ -1073,6 +1079,7 @@ namespace AssetsManager.Views
             finally
             {
                 _viewModel.IsRunning = false;
+                _viewModel.IsProgressIndeterminate = false;
                 _cancellationTokenSource = null;
                 if (_progressUIManager != null)
                 {
