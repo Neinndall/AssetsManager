@@ -1862,7 +1862,9 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             var skinsToTest = !string.IsNullOrEmpty(skin)
                 ? new[] { skin.ToLowerInvariant() }
-                : GetChampionSkinNames(character, cancellationToken);
+                : new[] { "base", "skin0", "skin01" };
+
+            var samplers = GetKnownTextureSamplers(cancellationToken);
 
             foreach (string charName in charactersToTest)
             {
@@ -1913,7 +1915,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         }
                     }
 
-                    var samplers = GetKnownTextureSamplers(cancellationToken);
                     foreach (string sampler in samplers)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
