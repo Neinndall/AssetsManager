@@ -860,6 +860,20 @@ namespace AssetsManager.Services.Hashes.Guessers
                     checkedCount += CheckCharacterPaths(
                         Enumerable.Range(0, 10).Select(tier =>
                             $"data/characters/{character}/tiers/tier{tier}.bin"));
+
+                    var themes = GetDynamicPetThemeNames(cancellationToken);
+                    checkedCount += CheckCharacterPaths(themes.SelectMany(theme => new[]
+                    {
+                        $"data/characters/{character}/themes/{theme}/root.bin",
+                        $"data/characters/{character}/themes/{theme}/tier1.bin",
+                        $"data/characters/{character}/themes/{theme}/tier2.bin",
+                        $"data/characters/{character}/themes/{theme}/tier3.bin",
+                        $"data/characters/{character}/themes/{theme}/tier0.bin",
+                        $"assets/characters/{character}/themes/{theme}/root.bin",
+                        $"assets/characters/{character}/themes/{theme}/tier1.bin",
+                        $"assets/characters/{character}/themes/{theme}/tier2.bin",
+                        $"assets/characters/{character}/themes/{theme}/tier3.bin"
+                    }));
                 }
 
                 checkedCount += CheckCharacterPaths(EnumerateCharacterAssetPaths(character, skinLimit));
@@ -2357,6 +2371,43 @@ namespace AssetsManager.Services.Hashes.Guessers
 
             progress?.Invoke(checkedCount);
             return checkedCount;
+        }
+
+        private IReadOnlyList<string> GetDynamicPetThemeNames(CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate("dynamic-pet-theme-names", knownPaths =>
+            {
+                var themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var petThemeRegex = new Regex(@"^(?:assets|data)/characters/pet[^/]+/themes/([^/]+)/", RegexOptions.IgnoreCase);
+                var skinThemeRegex = new Regex(@"^(?:assets|data)/characters/[^/]+/skins/(?:skin\d+|base)/[a-zA-Z0-9]+_([a-zA-Z0-9]+)_tx_cm\.", RegexOptions.IgnoreCase);
+
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string path = knownPaths[i];
+                    if (path.Contains("/themes/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Match match = petThemeRegex.Match(path);
+                        if (match.Success)
+                        {
+                            string t = match.Groups[1].Value.ToLowerInvariant();
+                            if (t.Length <= 40 && !t.Contains('.'))
+                                themes.Add(t);
+                        }
+                    }
+                    else if (path.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Match match = skinThemeRegex.Match(path);
+                        if (match.Success)
+                        {
+                            string t = match.Groups[1].Value.ToLowerInvariant();
+                            if (t.Length <= 24 && !t.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !t.Equals("base", StringComparison.OrdinalIgnoreCase))
+                                themes.Add(t);
+                        }
+                    }
+                }
+
+                return themes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+            });
         }
 
         private void GuessSpecialSkinBinPaths(
