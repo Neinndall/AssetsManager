@@ -2590,6 +2590,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.dds");
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.tex");
 
+                    var commonSubmeshTokens = new[] { "weapon", "weapons", "props", "body", "wings", "mask", "hair", "eyes", "sword", "recall", "head", "glass", "flower", "ult", "main" };
+                    foreach (string sub in commonSubmeshTokens)
+                    {
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{sub}_tx_cm.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{sub}_tx_cm.dds");
+                    }
+
                     foreach (string theme in dynamicPetThemes)
                     {
                         CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.tex");
