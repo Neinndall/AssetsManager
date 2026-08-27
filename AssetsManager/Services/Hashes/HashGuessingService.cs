@@ -60,7 +60,7 @@ namespace AssetsManager.Services.Hashes
 
             HashGuesser guesser = CreateWadGuesser(domain);
             string[] wadPaths = guesser.FindWads(rootDirectory);
-            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken);
+            var inventory = await BuildUnknownInventoryAsync(domain, wadPaths, cancellationToken, null, progress);
             await _persistence.CommitPathRunAsync(
                 domain,
                 Array.Empty<HashGuessMatch>(),
@@ -1013,7 +1013,7 @@ namespace AssetsManager.Services.Hashes
                     (wadPath, exception) => _logService.LogError(exception, $"Hash Lab could not build inventory from WAD '{wadPath}'."),
                     (processedWads, totalWads, currentWad) => progress?.Report(new HashGuessProgress
                     {
-                        CurrentWad = $"Scanning {currentWad} ({processedWads}/{totalWads})",
+                        CurrentWad = currentWad,
                         ProcessedWads = processedWads,
                         TotalWads = totalWads,
                         RemainingUnknowns = pending.Count
