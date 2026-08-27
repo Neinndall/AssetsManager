@@ -2377,7 +2377,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             return Corpus.GetOrCreate("dynamic-pet-theme-names", knownPaths =>
             {
-                var themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base" };
                 var petThemeRegex = new Regex(@"^(?:assets|data)/characters/pet[^/]+/themes/([^/]+)/", RegexOptions.IgnoreCase);
                 var skinThemeRegex = new Regex(@"^(?:assets|data)/characters/[^/]+/skins/(?:skin\d+|base)/[a-zA-Z0-9]+_([a-zA-Z0-9]+)_tx_cm\.", RegexOptions.IgnoreCase);
                 var companionRegex = new Regex(@"(?:tooltip|loot|chibi|portal|icon|icon_square)[_-](?:pet|chibi)?[a-zA-Z0-9]+_([a-zA-Z0-9]+)[_-]", RegexOptions.IgnoreCase);
