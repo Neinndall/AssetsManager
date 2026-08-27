@@ -119,13 +119,6 @@ namespace AssetsManager.Services.Hashes
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string wadPath = wadPaths[wadIndex];
-                    string wadName = Path.GetFileName(wadPath);
-
-                    progress?.Report(engine.CreateProgress(
-                        wadName,
-                        processedChunks,
-                        wadIndex,
-                        wadPaths.Length));
 
                     try
                     {
@@ -135,10 +128,10 @@ namespace AssetsManager.Services.Hashes
                             cancellationToken.ThrowIfCancellationRequested();
                             processedChunks++;
 
-                            if ((processedChunks & 0x3F) == 0)
+                            if (processedChunks % 100 == 0)
                             {
                                 progress?.Report(engine.CreateProgress(
-                                    wadName,
+                                    Path.GetFileName(wadPath),
                                     processedChunks,
                                     wadIndex,
                                     wadPaths.Length));

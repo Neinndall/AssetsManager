@@ -2549,10 +2549,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            var dynamicPetThemes = champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase)
-                ? GetDynamicPetThemeNames(cancellationToken)
-                : Array.Empty<string>();
-            var animStems = GetDynamicAnimationStems(cancellationToken);
             foreach (string alias in aliases)
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
@@ -2566,56 +2562,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"gameplay.{consonantStem}comps.bin");
                 }
 
-                for (int s = 0; s <= 60; s++)
+                for (int s = 0; s <= 350; s++)
                 {
                     CheckSpecialBin($"gameplay.{alias}skin{s}viewcontroller.bin");
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
-
                 foreach (string skin in dynamicSkins)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skn");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skl");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.tex");
-
-                    var commonSubmeshTokens = new[] { "weapon", "weapons", "props", "body", "wings", "mask", "hair", "eyes", "sword", "recall", "head", "glass", "flower", "ult", "main" };
-                    foreach (string sub in commonSubmeshTokens)
-                    {
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{sub}_tx_cm.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{sub}_tx_cm.dds");
-                    }
-
-                    if (dynamicPetThemes.Count > 0)
-                    {
-                        foreach (string theme in dynamicPetThemes)
-                        {
-                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.tex");
-                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.dds");
-                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.tex");
-                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.dds");
-                        }
-                    }
-
-                    foreach (string stem in animStems)
-                    {
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{stem}.anm");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{stem}.anm");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{skin}_{stem}.anm");
-                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{stem}.anm");
-                    }
                 }
             }
 
