@@ -113,12 +113,19 @@ namespace AssetsManager.Services.Hashes
                 int processedChunks = 0;
                 var inferredExtensions = new Dictionary<ulong, string>();
 
-                progress?.Report(engine.CreateProgress("Catalog ready, starting scan...", 0, 0, wadPaths.Length));
+                progress?.Report(engine.CreateProgress("Preparing WAD scan...", 0, 0, wadPaths.Length));
 
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     string wadPath = wadPaths[wadIndex];
+                    string wadName = Path.GetFileName(wadPath);
+
+                    progress?.Report(engine.CreateProgress(
+                        wadName,
+                        processedChunks,
+                        wadIndex,
+                        wadPaths.Length));
 
                     try
                     {
@@ -128,10 +135,10 @@ namespace AssetsManager.Services.Hashes
                             cancellationToken.ThrowIfCancellationRequested();
                             processedChunks++;
 
-                            if (processedChunks % 100 == 0)
+                            if ((processedChunks & 0x3F) == 0)
                             {
                                 progress?.Report(engine.CreateProgress(
-                                    Path.GetFileName(wadPath),
+                                    wadName,
                                     processedChunks,
                                     wadIndex,
                                     wadPaths.Length));

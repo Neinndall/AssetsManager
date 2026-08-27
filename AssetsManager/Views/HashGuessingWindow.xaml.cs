@@ -776,7 +776,11 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
+                    currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
+                    totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
+                    totalWads = value.TotalWads;
                     UpdateLiveProgress(value.RemainingUnknowns, value.FoundMatches);
+
                     _viewModel.IsProgressIndeterminate = value.TotalWads == 0;
                     if (value.TotalWads > 0)
                     {
@@ -788,9 +792,6 @@ namespace AssetsManager.Views
                         long checkedCount = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                         _viewModel.ProgressText = $"{checkedCount:N0} checked";
                     }
-                    currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
-                    totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
-                    totalWads = value.TotalWads;
 
                     string statusMsg;
                     string customProgressText = null;
