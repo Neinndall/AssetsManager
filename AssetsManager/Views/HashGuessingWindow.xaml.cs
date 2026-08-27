@@ -750,7 +750,14 @@ namespace AssetsManager.Views
             void UpdateStatus()
             {
                 string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                _viewModel.StatusText = $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
+                if (totalWads > 0 && totalChecked == 0 && foundMatches == 0)
+                {
+                    _viewModel.StatusText = $"{currentStage} · Time: {timeText}";
+                }
+                else
+                {
+                    _viewModel.StatusText = $"{currentStage} · {foundMatches:N0} found · Time: {timeText}";
+                }
             }
 
             void UpdateLiveProgress(int? remaining = null, int? matches = null)
@@ -805,7 +812,7 @@ namespace AssetsManager.Views
                     else if (value.TotalWads > 0)
                     {
                         string stage = string.IsNullOrEmpty(value.CurrentWad) ? "Building unknown hash inventory..." : value.CurrentWad;
-                        statusMsg = $"{stage} · {foundMatches:N0} found";
+                        statusMsg = stage;
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, value.TotalWads, statusMsg, null);
                     }
                     else
