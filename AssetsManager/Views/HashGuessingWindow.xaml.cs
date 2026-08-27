@@ -1123,8 +1123,8 @@ namespace AssetsManager.Views
                         _viewModel.ProgressValue = p.ProcessedWads * 100d / p.TotalWads;
                         _viewModel.ProgressText = $"{_viewModel.ProgressValue:F0}%";
                         string timeText = FormatElapsedTime(stopwatch.Elapsed);
-                        _viewModel.StatusText = $"{p.CurrentWad} · Time: {timeText}";
                         string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {p.CurrentWad}";
+                        _viewModel.StatusText = $"{statusMsg} · Time: {timeText}";
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                     }
                 });
