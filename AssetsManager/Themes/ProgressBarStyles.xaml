@@ -32,16 +32,22 @@
 
                                 <!-- El indicador indeterminado animado -->
                                 <Border x:Name="IndeterminateIndicator"
-                                        Background="{TemplateBinding Foreground}"
                                         CornerRadius="4"
-                                        Width="160"
-                                        Opacity="0.85"
-                                        HorizontalAlignment="Left"
+                                        HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"
                                         Visibility="Collapsed">
-                                    <Border.RenderTransform>
-                                        <TranslateTransform x:Name="IndeterminateTranslate" X="-160"/>
-                                    </Border.RenderTransform>
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <LinearGradientBrush.RelativeTransform>
+                                                <TranslateTransform X="-1.0"/>
+                                            </LinearGradientBrush.RelativeTransform>
+                                            <GradientStop Color="#0000C8FF" Offset="0.0"/>
+                                            <GradientStop Color="#6000C8FF" Offset="0.25"/>
+                                            <GradientStop Color="#FF00C8FF" Offset="0.5"/>
+                                            <GradientStop Color="#6000C8FF" Offset="0.75"/>
+                                            <GradientStop Color="#0000C8FF" Offset="1.0"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
                                 </Border>
                             </Grid>
                         </Border>
@@ -54,8 +60,8 @@
                                 <BeginStoryboard x:Name="StartIndeterminateAnim">
                                     <Storyboard RepeatBehavior="Forever">
                                         <DoubleAnimation Storyboard.TargetName="IndeterminateIndicator"
-                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                         From="-160" To="600" Duration="0:0:1.4">
+                                                         Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.RelativeTransform).(TranslateTransform.X)"
+                                                         From="-1.0" To="1.0" Duration="0:0:1.4">
                                             <DoubleAnimation.EasingFunction>
                                                 <QuadraticEase EasingMode="EaseInOut"/>
                                             </DoubleAnimation.EasingFunction>
