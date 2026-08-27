@@ -2603,6 +2603,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_fast.anm");
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_crit.anm");
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/recall.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_idle.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_idle.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_run.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_run.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_run_fast.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_run_fast.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_to_run.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_to_run_fast.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_to_idle.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_fast_to_idle.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/winddown_to_idle.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/signature_move_to_idle.anm");
                 }
             }
 
