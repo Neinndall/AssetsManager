@@ -812,7 +812,7 @@ namespace AssetsManager.Views
                         }
                         else
                         {
-                            statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName}";
+                            statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName} · {foundMatches:N0} found";
                         }
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, null);
                     }
@@ -990,7 +990,7 @@ namespace AssetsManager.Views
                     if (p.TotalWads > 0)
                     {
                         string stage = string.IsNullOrEmpty(p.CurrentStage) ? "WAD" : p.CurrentStage;
-                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage}";
+                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage} · {p.FoundMatches:N0} found";
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                     }
                     else
