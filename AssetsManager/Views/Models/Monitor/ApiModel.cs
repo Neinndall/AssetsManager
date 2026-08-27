@@ -9,6 +9,7 @@ using AssetsManager.Utils;
 using AssetsManager.Utils.Framework; // Added for ObservableRangeCollection
 using AssetsManager.Views.Models.Shared;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Views.Models.Monitor
 {

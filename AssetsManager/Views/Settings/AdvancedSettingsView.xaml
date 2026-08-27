@@ -126,13 +126,29 @@
             </Border>
 
             <StackPanel Margin="28,0,0,0">
+                <!-- 1. Client Environment Target -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Target Client Environment" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Client used for API connection and asset extraction" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <ComboBox Grid.Column="1" Width="90" Height="28" 
+                              Style="{StaticResource ModernComboBox}"
+                              DisplayMemberPath="Name"
+                              SelectedValuePath="Value"
+                              ItemsSource="{Binding ApiClientTargetOptions}"
+                              SelectedValue="{Binding Settings.ApiSettings.ClientTarget, Mode=TwoWay}"/>
+                </Grid>
+
+                <!-- 2. Offline Cache Persistence -->
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Prioritize PBE for API Authentication" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
-                        <TextBlock Text="Forces LCU API to use PBE credentials over Live client" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
+                        <TextBlock Text="Offline Cache Persistence" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock Text="Display cached store and pass data when client is offline" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0"/>
                     </StackPanel>
-                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.ApiSettings.UsePbeForApi, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
+                    <CheckBox Grid.Column="1" IsChecked="{Binding Settings.ApiSettings.OfflineCachePersistence, Mode=TwoWay}" Style="{StaticResource ModernToggleSwitch}"/>
                 </Grid>
             </StackPanel>
         </StackPanel>

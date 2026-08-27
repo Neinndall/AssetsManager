@@ -13,6 +13,7 @@ using AssetsManager.Utils;
 using AssetsManager.Services.Core;
 using AssetsManager.Services.Explorer;
 using AssetsManager.Views.Models.Monitor;
+using AssetsManager.Views.Models.Settings;
 
 namespace AssetsManager.Services.Monitor
 {
@@ -31,6 +32,23 @@ namespace AssetsManager.Services.Monitor
 
         private Task _metadataLoadTask;
 
+        public string GetEffectiveGameDirectory()
+        {
+            return _appSettings.ApiSettings.ClientTarget == ApiClientTarget.PBE
+                ? _appSettings.LolPbeDirectory
+                : _appSettings.LolLiveDirectory;
+        }
+
+        public string GetEffectiveClientType()
+        {
+            return _appSettings.ApiSettings.ClientTarget == ApiClientTarget.PBE ? "PBE" : "LIVE";
+        }
+
+        public void InvalidateMetadata()
+        {
+            _metadataLoadTask = null;
+        }
+
         private string GetIconWadPath(string iconUrl)
         {
             return PathUtils.NormalizeRiotIconPath(iconUrl);
@@ -43,7 +61,7 @@ namespace AssetsManager.Services.Monitor
             {
                 _assetPathMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string lolDirectory = GetEffectiveGameDirectory();
                 if (string.IsNullOrEmpty(lolDirectory)) return;
 
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
@@ -158,7 +176,9 @@ namespace AssetsManager.Services.Monitor
             {
                 if (File.Exists(destinationPath)) return destinationPath;
 
-                string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+                string lolDirectory = GetEffectiveGameDirectory();
+                if (string.IsNullOrEmpty(lolDirectory)) return null;
+
                 string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
                 
                 var node = await _wadContentProvider.FindNodeByVirtualPathAsync(virtualPath, pluginPath);
@@ -216,11 +236,8 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<bool> ReadLockfileAsync(bool logErrorOnFailure = true)
         {
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi
-                ? _appSettings.LolPbeDirectory
-                : _appSettings.LolLiveDirectory;
-
-            string clientType = _appSettings.ApiSettings.UsePbeForApi ? "PBE" : "Live";
+            string lolDirectory = GetEffectiveGameDirectory();
+            string clientType = GetEffectiveClientType();
 
             if (string.IsNullOrEmpty(lolDirectory) || !Directory.Exists(lolDirectory))
             {
@@ -505,7 +522,7 @@ namespace AssetsManager.Services.Monitor
 
         public async Task<(string Id, string Name)> GetActivePassGroupIdAsync()
         {
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return (null, null);
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
@@ -545,7 +562,7 @@ namespace AssetsManager.Services.Monitor
         {
             if (string.IsNullOrEmpty(trackConfigId)) return null;
 
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return null;
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");
@@ -587,7 +604,7 @@ namespace AssetsManager.Services.Monitor
         {
             if (iconUrls == null || !iconUrls.Any()) return;
 
-            string lolDirectory = _appSettings.ApiSettings.UsePbeForApi ? _appSettings.LolPbeDirectory : _appSettings.LolLiveDirectory;
+            string lolDirectory = GetEffectiveGameDirectory();
             if (string.IsNullOrEmpty(lolDirectory)) return;
 
             string pluginPath = Path.Combine(lolDirectory, "Plugins", "rcp-be-lol-game-data");

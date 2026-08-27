@@ -47,6 +47,12 @@ namespace AssetsManager.Views.Models.Settings
         LIVE
     }
 
+    public enum ApiClientTarget
+    {
+        PBE,
+        LIVE
+    }
+
     public enum PreferredDirectory
     {
         All,

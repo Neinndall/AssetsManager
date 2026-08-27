@@ -81,6 +81,10 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private Task EnsureCachedDataLoadedAsync()
         {
+            if (AppSettings?.ApiSettings?.OfflineCachePersistence == false)
+            {
+                return Task.CompletedTask;
+            }
             return _cachedDataLoadTask ??= LoadCachedDataOnceAsync();
         }
 
@@ -149,7 +153,31 @@ namespace AssetsManager.Views.Controls.Monitor
 
         private async void OnConfigurationSaved(object sender, EventArgs e)
         {
-            await Dispatcher.InvokeAsync(UpdateAuthenticationStatus);
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                UpdateAuthenticationStatus();
+
+                if (RiotApiService != null)
+                {
+                    RiotApiService.InvalidateMetadata();
+                    bool isCurrentlyConnected = await RiotApiService.ReadLockfileAsync(false);
+                    UpdateConnectionStatus(isCurrentlyConnected);
+                }
+
+                if (ViewModel?.SalesCatalog != null && ViewModel.SalesCatalog.Any())
+                {
+                    _ = ExtractSkinImagesInBackgroundAsync(ViewModel.SalesCatalog, "sales");
+                }
+
+                if (ViewModel?.MythicShopCategories != null && ViewModel.MythicShopCategories.Any())
+                {
+                    var allMythic = ViewModel.MythicShopCategories.SelectMany(c => c.Items).ToList();
+                    if (allMythic.Any())
+                    {
+                        _ = ExtractSkinImagesInBackgroundAsync(allMythic, "mythic");
+                    }
+                }
+            });
         }
 
         private async Task LoadSalesCacheAsync()

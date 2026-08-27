@@ -132,7 +132,7 @@ namespace AssetsManager.Utils
             set => _audioPlaylists = WrapList(value);
         }
 
-        public ApiSettings ApiSettings { get; set; }
+        public ApiSettings ApiSettings { get; set; } = new ApiSettings();
 
         public event PropertyChangedEventHandler PropertyChanged;
         public event EventHandler ConfigurationSaved;
@@ -315,7 +315,8 @@ namespace AssetsManager.Utils
                 {
                     Connection = new ConnectionInfo(),
                     Token = new TokenInfo(),
-                    UsePbeForApi = false
+                    ClientTarget = ApiClientTarget.PBE,
+                    OfflineCachePersistence = true
                 },
             };
         }

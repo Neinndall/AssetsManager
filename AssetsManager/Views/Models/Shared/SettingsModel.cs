@@ -52,6 +52,12 @@ namespace AssetsManager.Views.Models.Shared
             new FormatOption<PreferredClient> { Name = "LIVE", Value = PreferredClient.LIVE }
         };
 
+        public List<FormatOption<ApiClientTarget>> ApiClientTargetOptions { get; } = new List<FormatOption<ApiClientTarget>>
+        {
+            new FormatOption<ApiClientTarget> { Name = "PBE", Value = ApiClientTarget.PBE },
+            new FormatOption<ApiClientTarget> { Name = "LIVE", Value = ApiClientTarget.LIVE }
+        };
+
         public List<FormatOption<PreferredDirectory>> PreferredDirectoryOptions { get; } = new List<FormatOption<PreferredDirectory>>
         {
             new FormatOption<PreferredDirectory> { Name = "All", Value = PreferredDirectory.All },
