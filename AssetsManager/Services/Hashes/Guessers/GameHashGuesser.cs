@@ -2380,6 +2380,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 var themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var petThemeRegex = new Regex(@"^(?:assets|data)/characters/pet[^/]+/themes/([^/]+)/", RegexOptions.IgnoreCase);
                 var skinThemeRegex = new Regex(@"^(?:assets|data)/characters/[^/]+/skins/(?:skin\d+|base)/[a-zA-Z0-9]+_([a-zA-Z0-9]+)_tx_cm\.", RegexOptions.IgnoreCase);
+                var companionRegex = new Regex(@"(?:tooltip|loot|chibi|portal|icon|icon_square)[_-](?:pet|chibi)?[a-zA-Z0-9]+_([a-zA-Z0-9]+)[_-]", RegexOptions.IgnoreCase);
 
                 for (int i = 0; i < knownPaths.Count; i++)
                 {
@@ -2401,6 +2402,18 @@ namespace AssetsManager.Services.Hashes.Guessers
                         {
                             string t = match.Groups[1].Value.ToLowerInvariant();
                             if (t.Length <= 24 && !t.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !t.Equals("base", StringComparison.OrdinalIgnoreCase))
+                                themes.Add(t);
+                        }
+                    }
+                    else if (path.Contains("companions", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("rotationalshop", StringComparison.OrdinalIgnoreCase) ||
+                             path.Contains("/hud/icon", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Match match = companionRegex.Match(path);
+                        if (match.Success)
+                        {
+                            string t = match.Groups[1].Value.ToLowerInvariant();
+                            if (t.Length is >= 3 and <= 24 && !t.All(char.IsDigit) && !t.StartsWith("tier", StringComparison.OrdinalIgnoreCase))
                                 themes.Add(t);
                         }
                     }
