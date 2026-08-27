@@ -783,7 +783,22 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
-                    currentStage = string.IsNullOrEmpty(value.CurrentWad) ? currentStage : value.CurrentWad;
+                    if (value.TotalWads > 0 && !string.IsNullOrEmpty(value.CurrentWad))
+                    {
+                        if (value.CurrentWad.Equals("Building unknown hash inventory...", StringComparison.OrdinalIgnoreCase))
+                        {
+                            currentStage = "Building unknown hash inventory...";
+                        }
+                        else
+                        {
+                            currentStage = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {value.CurrentWad}";
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(value.CurrentWad))
+                    {
+                        currentStage = value.CurrentWad;
+                    }
+
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
                     UpdateLiveProgress(value.RemainingUnknowns, value.FoundMatches);
@@ -803,17 +818,22 @@ namespace AssetsManager.Views
                     string statusMsg;
                     string customProgressText = null;
 
-                    if (value.ProcessedWads > 0 && value.TotalWads > 0)
+                    if (value.TotalWads > 0)
                     {
                         string fileName = string.IsNullOrEmpty(value.CurrentWad) ? "WAD" : value.CurrentWad;
-                        statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName} · {foundMatches:N0} found";
+                        if (fileName.Equals("Building unknown hash inventory...", StringComparison.OrdinalIgnoreCase))
+                        {
+                            statusMsg = "Building unknown hash inventory...";
+                        }
+                        else
+                        {
+                            statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName}";
+                            if (foundMatches > 0)
+                            {
+                                statusMsg += $" · {foundMatches:N0} found";
+                            }
+                        }
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, null);
-                    }
-                    else if (value.TotalWads > 0)
-                    {
-                        string stage = string.IsNullOrEmpty(value.CurrentWad) ? "Building unknown hash inventory..." : value.CurrentWad;
-                        statusMsg = stage;
-                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, value.TotalWads, statusMsg, null);
                     }
                     else
                     {
