@@ -909,6 +909,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
                     : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
                     : (character.StartsWith("cherry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("strawberry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("crepe_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("ruby_", StringComparison.OrdinalIgnoreCase)) ? character[(character.IndexOf('_') + 1)..]
+                    : character.Equals("oriannaball", StringComparison.OrdinalIgnoreCase) ? "orianna"
+                    : character.Equals("tibbers", StringComparison.OrdinalIgnoreCase) ? "annie"
+                    : character.Equals("heimergarrison", StringComparison.OrdinalIgnoreCase) ? "heimerdinger"
+                    : character.Equals("quinnvalor", StringComparison.OrdinalIgnoreCase) ? "quinn"
+                    : character.Equals("yorickghoul", StringComparison.OrdinalIgnoreCase) ? "yorick"
+                    : character.Equals("kalistaspawn", StringComparison.OrdinalIgnoreCase) ? "kalista"
+                    : character.Equals("malzaharvoidling", StringComparison.OrdinalIgnoreCase) ? "malzahar"
                     : null;
 
                 string charPrefix = $"assets/characters/{character}/";
@@ -961,6 +968,13 @@ namespace AssetsManager.Services.Hashes.Guessers
             string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
                 : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
                 : (character.StartsWith("cherry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("strawberry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("crepe_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("ruby_", StringComparison.OrdinalIgnoreCase)) ? character[(character.IndexOf('_') + 1)..]
+                : character.Equals("oriannaball", StringComparison.OrdinalIgnoreCase) ? "orianna"
+                : character.Equals("tibbers", StringComparison.OrdinalIgnoreCase) ? "annie"
+                : character.Equals("heimergarrison", StringComparison.OrdinalIgnoreCase) ? "heimerdinger"
+                : character.Equals("quinnvalor", StringComparison.OrdinalIgnoreCase) ? "quinn"
+                : character.Equals("yorickghoul", StringComparison.OrdinalIgnoreCase) ? "yorick"
+                : character.Equals("kalistaspawn", StringComparison.OrdinalIgnoreCase) ? "kalista"
+                : character.Equals("malzaharvoidling", StringComparison.OrdinalIgnoreCase) ? "malzahar"
                 : null;
 
             yield return $"assets/characters/{character}/hud/{character}_square.tex";
@@ -1839,6 +1853,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 {
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                     GuessMaterialAndMeshBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                    GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                 }
                 return;
             }
@@ -2207,6 +2222,126 @@ namespace AssetsManager.Services.Hashes.Guessers
                     Check(engine, candidatePath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
                 }
             }
+        }
+
+        private IReadOnlyList<string> GetDynamicLoadoutRegaliaPaths(CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate("dynamic-loadout-regalia-paths", knownPaths =>
+            {
+                var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var queueTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "ranked_5s_", "ranked_solo_5s_", "ranked_flex_5s_", "ranked_3s_", "ranked_tft_", "arena_" };
+                var tierTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var typeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_banner", "_crest", "_border", "_wings", "_flag", "_pedestal", "_badge" };
+                var sizeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_512x512", "_256x256", "_1024x1024", "_128x128" };
+                var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".tex", ".dds", ".png" };
+
+                var regex = new Regex(@"^(?<dir>(?:assets|data)/loadouts/regalia/[^/]+/)(?<file>[^.]+)(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
+
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string p = knownPaths[i];
+                    if (!p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase)) continue;
+                    Match match = regex.Match(p);
+                    if (!match.Success) continue;
+
+                    directories.Add(match.Groups["dir"].Value.ToLowerInvariant());
+                    extensions.Add(match.Groups["ext"].Value.ToLowerInvariant());
+
+                    string file = match.Groups["file"].Value.ToLowerInvariant();
+                    string[] parts = file.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string part in parts)
+                    {
+                        if (part.Contains('x') && part.All(c => char.IsDigit(c) || c == 'x'))
+                            sizeTokens.Add($"_{part}");
+                        else if (part is "iron" or "bronze" or "silver" or "gold" or "platinum" or "emerald" or "diamond" or "master" or "grandmaster" or "challenger" or "unranked")
+                            tierTokens.Add(part);
+                    }
+                }
+
+                foreach (string dir in directories)
+                foreach (string queue in queueTokens)
+                foreach (string tier in tierTokens)
+                foreach (string type in typeTokens)
+                foreach (string size in sizeTokens)
+                foreach (string ext in extensions)
+                {
+                    string candidate = $"{dir}{queue}{tier}{type}{size}{ext}".ToLowerInvariant().Replace("__", "_");
+                    candidates.Add(candidate);
+                }
+
+                return candidates.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private void GuessRegaliaBinChunkLinks(
+            HashGuessEngine engine,
+            ArraySegment<byte> data,
+            string sourcePath,
+            string sourceWadPath,
+            ulong sourceChunkHash,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (data.Array is null || data.Count == 0) return;
+
+            var unresolved = new HashSet<ulong>();
+            try
+            {
+                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
+                var tree = new BinTree(stream);
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (ulong link in EnumerateChunkLinks(tree))
+                {
+                    if (engine.UnknownHashes.Contains(link))
+                        unresolved.Add(link);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                return;
+            }
+
+            if (unresolved.Count == 0) return;
+
+            var candidates = GetDynamicLoadoutRegaliaPaths(cancellationToken);
+            foreach (string candidate in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (unresolved.Count == 0 || engine.RemainingUnknownCount == 0) return;
+
+                ulong hash = XxHash64Ext.Hash(candidate);
+                if (unresolved.Remove(hash))
+                {
+                    Check(engine, candidate, HashGuessStrategy.BannerVariant, sourceWadPath, sourceChunkHash);
+                }
+            }
+        }
+
+        internal int GuessRegaliaAssets(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            Action<int> progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(engine);
+            if (engine.RemainingUnknownCount == 0) return 0;
+
+            var candidates = GetDynamicLoadoutRegaliaPaths(cancellationToken);
+            int checkedCount = 0;
+            foreach (string path in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Check(engine, path, HashGuessStrategy.BannerVariant, "Regalia matrix");
+                checkedCount++;
+                if ((checkedCount & 0xFFF) == 0)
+                {
+                    progress?.Invoke(checkedCount);
+                }
+                if (engine.RemainingUnknownCount == 0) break;
+            }
+
+            progress?.Invoke(checkedCount);
+            return checkedCount;
         }
 
         private void GuessSpecialSkinBinPaths(

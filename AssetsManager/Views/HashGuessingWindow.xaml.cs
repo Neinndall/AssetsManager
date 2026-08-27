@@ -122,6 +122,7 @@ namespace AssetsManager.Views
             };
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-crossdomain", Name = "GuessFromLcuHashes", Description = "Try client hash paths mapped to game structures", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-characters", Name = "GuessCharacterFiles", Description = "Champion and skin assets (characters/{champ}/skins/...)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-regalia", Name = "GuessRegaliaAssets", Description = "Ranked banners, crests, borders, wings and loadout assets", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-shaders", Name = "GuessShaderVariants", Description = "Permutations across HLSL families and platform variants", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-locales", Name = "SubstituteLang", Description = "28 region and language translations", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-extensions", Name = "SubstituteExtensions", Description = "Cross-extension permutations (.dds, .tex, .bin, .anm)", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });

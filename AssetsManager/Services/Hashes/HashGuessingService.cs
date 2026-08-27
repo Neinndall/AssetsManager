@@ -346,6 +346,16 @@ namespace AssetsManager.Services.Hashes
                         progress: count => progress?.Report(engine.CreateProgress("GAME Basic: character files", progressOffset + count)));
                 }
 
+                if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-regalia"))
+                {
+                    progress?.Report(engine.CreateProgress("GAME Basic: regalia and loadout assets", checkedCandidates));
+                    int progressOffset = checkedCandidates;
+                    checkedCandidates += _gameGuesser.GuessRegaliaAssets(
+                        engine,
+                        cancellationToken,
+                        progress: count => progress?.Report(engine.CreateProgress("GAME Basic: regalia and loadout assets", progressOffset + count)));
+                }
+
                 if (engine.RemainingUnknownCount > 0 && ShouldRun("game-basic-shaders"))
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: shader variants", checkedCandidates));
