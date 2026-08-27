@@ -2526,41 +2526,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             });
         }
 
-        private IReadOnlyList<string> GetDynamicTextureStems(CancellationToken cancellationToken)
-        {
-            return Corpus.GetOrCreate("dynamic-texture-stems", knownPaths =>
-            {
-                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < knownPaths.Count; i++)
-                {
-                    string path = knownPaths[i];
-                    if (path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
-                        path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string fn = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
-                        if (fn.Length <= 50) stems.Add(fn);
-                        string[] parts = fn.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string p in parts)
-                        {
-                            if (p.Length is >= 3 and <= 30 && !p.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !p.All(char.IsDigit))
-                                stems.Add(p);
-                        }
-                        if (fn.Contains('_'))
-                        {
-                            string lastPart = fn.Substring(fn.IndexOf('_') + 1);
-                            if (lastPart.Length <= 40) stems.Add(lastPart);
-                            if (lastPart.Contains('_'))
-                            {
-                                string afterSecond = lastPart.Substring(lastPart.IndexOf('_') + 1);
-                                if (afterSecond.Length <= 35) stems.Add(afterSecond);
-                            }
-                        }
-                    }
-                }
-                return stems.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
-            });
-        }
-
         private void GuessSpecialSkinBinPaths(
             HashGuessEngine engine,
             string sourcePath,
@@ -2584,6 +2549,9 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
+            var dynamicPetThemes = GetDynamicPetThemeNames(cancellationToken);
+            var animStems = GetDynamicAnimationStems(cancellationToken);
+
             foreach (string alias in aliases)
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
@@ -2603,8 +2571,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
-                var animStems = GetDynamicAnimationStems(cancellationToken);
-                var texStems = GetDynamicTextureStems(cancellationToken);
 
                 foreach (string skin in dynamicSkins)
                 {
@@ -2615,6 +2581,22 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.dds");
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.tex");
                     CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skn");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skl");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.tex");
+
+                    foreach (string theme in dynamicPetThemes)
+                    {
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.dds");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.dds");
+                    }
 
                     foreach (string stem in animStems)
                     {
@@ -2624,18 +2606,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{stem}.anm");
                         CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{stem}.anm");
                         CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{skin}_{stem}.anm");
-                    }
-
-                    foreach (string stem in texStems)
-                    {
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{stem}_tx_cm.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{stem}_tx_cm.dds");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{stem}.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{stem}.dds");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{skin}_{stem}.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{skin}_{stem}.dds");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{stem}.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{stem}.dds");
                     }
                 }
             }
