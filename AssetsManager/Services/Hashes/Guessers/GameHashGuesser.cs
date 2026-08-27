@@ -958,6 +958,10 @@ namespace AssetsManager.Services.Hashes.Guessers
         private IEnumerable<string> EnumerateCharacterAssetPaths(string character, int skinLimit)
         {
             var actions = GetCharacterAnimationActions(character);
+            string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
+                : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
+                : (character.StartsWith("cherry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("strawberry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("crepe_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("ruby_", StringComparison.OrdinalIgnoreCase)) ? character[(character.IndexOf('_') + 1)..]
+                : null;
 
             yield return $"assets/characters/{character}/hud/{character}_square.tex";
             yield return $"assets/characters/{character}/hud/{character}_circle.tex";
@@ -980,6 +984,10 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 yield return $"assets/characters/{character}/skins/base/animations/{character}_{action}.anm";
                 yield return $"assets/characters/{character}/skins/base/animations/{action}.anm";
+                if (baseChar != null)
+                {
+                    yield return $"assets/characters/{character}/skins/base/animations/{baseChar}_{action}.anm";
+                }
             }
 
             foreach (string ext in CharacterTextureExtensions)
@@ -1042,6 +1050,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                     yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{action}.anm";
                     yield return $"assets/characters/{character}/skins/{skinTag}/animations/{action}.anm";
                     yield return $"assets/characters/{character}/skins/{skinTag}/animations/recall.skins_{character}_{skinTag}.anm";
+                    if (baseChar != null)
+                    {
+                        yield return $"assets/characters/{character}/skins/{skinTag}/animations/{baseChar}_{action}.anm";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/animations/{baseChar}_{skinTag}_{action}.anm";
+                    }
                 }
 
                 yield return $"assets/characters/{character}/hud/{character}_circle_{skin}.dds";
