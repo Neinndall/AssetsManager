@@ -164,6 +164,11 @@ namespace AssetsManager.Views.Controls.Monitor
                     UpdateConnectionStatus(isCurrentlyConnected);
                 }
 
+                if (AppSettings?.ApiSettings?.OfflineCachePersistence != false)
+                {
+                    await EnsureCachedDataLoadedAsync();
+                }
+
                 if (ViewModel?.SalesCatalog != null && ViewModel.SalesCatalog.Any())
                 {
                     _ = ExtractSkinImagesInBackgroundAsync(ViewModel.SalesCatalog, "sales");

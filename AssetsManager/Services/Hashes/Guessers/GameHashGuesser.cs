@@ -879,21 +879,86 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         private static readonly string[] CharacterTexturePrefixes = new[] { "", "2x_", "4x_" };
         private static readonly string[] CharacterTextureExtensions = new[] { ".tex", ".dds", ".project_jade.tex" };
+        private static readonly string[] LoadscreenSuffixes = new[] { "", "_le" };
 
-        private static readonly string[] CharacterAnimationActions = new[]
+        private static readonly string[] DefaultUniversalAnimationActions = new[]
         {
-            "idle", "idle1", "idle2", "idle3", "idle4",
-            "run", "run_fast", "walk",
+            "idle", "idle1", "idle2", "idle3", "idle4", "idle_in",
+            "run", "run_fast", "run_base", "walk",
             "attack1", "attack2", "attack3", "attack4", "crit",
             "spell", "spell1", "spell2", "spell3", "spell4",
+            "spell1a", "spell2a", "spell3a", "spell4a",
+            "spell1b", "spell2b", "spell3b", "spell4b",
+            "spell1c", "spell2c", "spell3c", "spell4c",
             "spell1_cast", "spell2_cast", "spell3_cast", "spell4_cast",
+            "spell1_windup", "spell2_windup", "spell3_windup", "spell4_windup",
+            "spell1_loop", "spell2_loop", "spell3_loop", "spell4_loop",
+            "spell1_winddown", "spell2_winddown", "spell3_winddown", "spell4_winddown",
             "death", "death2", "recall", "recall_windup",
             "dance", "taunt", "laugh", "joke",
-            "channel", "channel_windup", "celebration", "spawn", "homeguard", "respawn"
+            "channel", "channel_windup", "channel_loop", "channel_winddown",
+            "celebration", "spawn", "homeguard", "respawn"
         };
 
-        private static IEnumerable<string> EnumerateCharacterAssetPaths(string character, int skinLimit)
+        private IReadOnlyList<string> GetCharacterAnimationActions(string character)
         {
+            return Corpus.GetOrCreate($"champion-animation-actions/{character.ToLowerInvariant()}", knownPaths =>
+            {
+                var actions = new HashSet<string>(DefaultUniversalAnimationActions, StringComparer.OrdinalIgnoreCase);
+
+                string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
+                    : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
+                    : (character.StartsWith("cherry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("strawberry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("crepe_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("ruby_", StringComparison.OrdinalIgnoreCase)) ? character[(character.IndexOf('_') + 1)..]
+                    : null;
+
+                string charPrefix = $"assets/characters/{character}/";
+                string dataCharPrefix = $"data/characters/{character}/";
+                string basePrefix = baseChar != null ? $"assets/characters/{baseChar}/" : null;
+                string dataBasePrefix = baseChar != null ? $"data/characters/{baseChar}/" : null;
+
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string path = knownPaths[i];
+                    if (!path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string rel = null;
+                    if (path.StartsWith(charPrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[charPrefix.Length..];
+                    else if (path.StartsWith(dataCharPrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[dataCharPrefix.Length..];
+                    else if (basePrefix != null && path.StartsWith(basePrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[basePrefix.Length..];
+                    else if (dataBasePrefix != null && path.StartsWith(dataBasePrefix, StringComparison.OrdinalIgnoreCase))
+                        rel = path[dataBasePrefix.Length..];
+
+                    if (string.IsNullOrEmpty(rel)) continue;
+
+                    string basename = GetBasename(path);
+                    string stem = basename.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ? basename[..^4] : basename;
+                    if (stem.Length == 0 || stem.Length > 50) continue;
+
+                    actions.Add(stem);
+
+                    if (stem.StartsWith(character + "_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string sub = stem[(character.Length + 1)..];
+                        if (sub.Length > 0) actions.Add(sub);
+                    }
+                    if (baseChar != null && stem.StartsWith(baseChar + "_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string sub = stem[(baseChar.Length + 1)..];
+                        if (sub.Length > 0) actions.Add(sub);
+                    }
+                }
+
+                return actions.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private IEnumerable<string> EnumerateCharacterAssetPaths(string character, int skinLimit)
+        {
+            var actions = GetCharacterAnimationActions(character);
+
             yield return $"assets/characters/{character}/hud/{character}_square.tex";
             yield return $"assets/characters/{character}/hud/{character}_circle.tex";
             yield return $"assets/characters/{character}/hud/{character}_square.dds";
@@ -911,15 +976,28 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
-            foreach (string action in CharacterAnimationActions)
+            foreach (string action in actions)
             {
                 yield return $"assets/characters/{character}/skins/base/animations/{character}_{action}.anm";
                 yield return $"assets/characters/{character}/skins/base/animations/{action}.anm";
             }
 
+            foreach (string ext in CharacterTextureExtensions)
+            {
+                foreach (string suffix in LoadscreenSuffixes)
+                {
+                    yield return $"assets/characters/{character}/skins/base/{character}_loadscreen{suffix}{ext}";
+                    yield return $"assets/characters/{character}/skins/base/{character}loadscreen{suffix}{ext}";
+                    yield return $"assets/characters/{character}/skins/base/{character}_loadscreen_0{suffix}{ext}";
+                    yield return $"assets/characters/{character}/skins/base/{character}loadscreen_0{suffix}{ext}";
+                }
+            }
+
             var skinNumbers = Enumerable.Range(0, Math.Min(skinLimit, 120))
                 .Select(s => s.ToString(CultureInfo.InvariantCulture))
                 .Concat(Enumerable.Range(1, 9).Select(s => s.ToString("D2", CultureInfo.InvariantCulture)))
+                .Concat(Enumerable.Range(300, 51).Select(s => s.ToString(CultureInfo.InvariantCulture)))
+                .Concat(Enumerable.Range(500, 51).Select(s => s.ToString(CultureInfo.InvariantCulture)))
                 .Distinct(StringComparer.Ordinal);
 
             foreach (string skin in skinNumbers)
@@ -943,7 +1021,22 @@ namespace AssetsManager.Services.Hashes.Guessers
                     }
                 }
 
-                foreach (string action in CharacterAnimationActions)
+                foreach (string ext in CharacterTextureExtensions)
+                {
+                    foreach (string suffix in LoadscreenSuffixes)
+                    {
+                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}_loadscreen_{skin}{suffix}{ext}";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}loadscreen_{skin}{suffix}{ext}";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_loadscreen{suffix}{ext}";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}{skinTag}_loadscreen{suffix}{ext}";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/loadscreen_{skin}{suffix}{ext}";
+                        yield return $"assets/characters/{character}/skins/{skinTag}/loadscreen_{skinTag}{suffix}{ext}";
+                        yield return $"assets/characters/{character}/hud/{character}_loadscreen_{skin}{suffix}{ext}";
+                        yield return $"assets/characters/{character}/hud/{character}loadscreen_{skin}{suffix}{ext}";
+                    }
+                }
+
+                foreach (string action in actions)
                 {
                     yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{skinTag}_{action}.anm";
                     yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{action}.anm";
@@ -2071,6 +2164,23 @@ namespace AssetsManager.Services.Hashes.Guessers
                         CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.dds");
                         CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skn");
                         CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skl");
+                    }
+
+                    var actions = GetCharacterAnimationActions(charName);
+                    foreach (string action in actions)
+                    {
+                        CheckLinkCandidate($"{skinDir}/animations/{baseName}_{action}.anm");
+                        CheckLinkCandidate($"{skinDir}/animations/{charName}_{action}.anm");
+                        CheckLinkCandidate($"{skinDir}/animations/{action}.anm");
+                        CheckLinkCandidate($"{dataSkinDir}/animations/{baseName}_{action}.anm");
+                        CheckLinkCandidate($"{dataSkinDir}/animations/{charName}_{action}.anm");
+                        CheckLinkCandidate($"{dataSkinDir}/animations/{action}.anm");
+
+                        if (baseCharBaseName != null)
+                        {
+                            CheckLinkCandidate($"{skinDir}/animations/{baseCharBaseName}_{action}.anm");
+                            CheckLinkCandidate($"{skinDir}/animations/{baseChar}_{action}.anm");
+                        }
                     }
                 }
             }

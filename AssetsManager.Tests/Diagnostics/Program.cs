@@ -36,6 +36,30 @@ namespace AssetsManager.Tests.Diagnostics
                 await GameBaselineDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "anm-audit", StringComparison.OrdinalIgnoreCase))
+            {
+                string path = @"C:\Users\danielpriego\AppData\Local\AssetsManager\hashes\hashes.game.txt";
+                if (!File.Exists(path)) path = @"C:\Users\danielpriego\Downloads\hashes.game.txt";
+                var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var regex = new System.Text.RegularExpressions.Regex(@"/animations/(?:[^/_]+_)*(?:skin\d+_)?([^/]+)\.anm$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                var examples = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string line in File.ReadLines(path))
+                {
+                    var match = regex.Match(line);
+                    if (match.Success)
+                    {
+                        string stem = match.Groups[1].Value.ToLowerInvariant();
+                        counts[stem] = counts.GetValueOrDefault(stem) + 1;
+                        if (!examples.ContainsKey(stem)) examples[stem] = line;
+                    }
+                }
+                Console.WriteLine("=== Top Animation Stems in hashes.game.txt ===");
+                foreach (var pair in counts.OrderByDescending(p => p.Value).Take(40))
+                {
+                    Console.WriteLine($"Stem: '{pair.Key}' (Count: {pair.Value}) -> Example: {examples[pair.Key]}");
+                }
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "fiora-grep-probe", StringComparison.OrdinalIgnoreCase))
             {
                 FioraGrepProbeDiagnostic.Run(args.Skip(1).ToArray());
