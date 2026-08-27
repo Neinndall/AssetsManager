@@ -23,6 +23,7 @@ using System.Threading.Tasks;
 using AssetsManager.Views.Helpers;
 using AssetsManager.Views.Controls.Shared;
 using System.Linq;
+using System.Threading;
 
 namespace AssetsManager.Views.Controls.Viewer
 {
