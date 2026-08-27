@@ -769,7 +769,7 @@ namespace AssetsManager.Views
             }
 
             UpdateStatus();
-            string initialStatus = (mode is HashGuessMode.GrepGame or HashGuessMode.GrepLcu) ? "Preparing WADs..." : "Preparing Candidates...";
+            string initialStatus = (mode is HashGuessMode.GrepGame or HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Preparing Candidates...";
             _progressUIManager?.OnHashGuessingStarted(_viewModel.SelectedMethod?.Name ?? mode.ToString(), initialStatus);
 
             try
@@ -796,11 +796,17 @@ namespace AssetsManager.Views
                     string statusMsg;
                     string customProgressText = null;
 
-                    if (value.TotalWads > 0)
+                    if (value.ProcessedWads > 0 && value.TotalWads > 0)
                     {
                         string fileName = string.IsNullOrEmpty(value.CurrentWad) ? "WAD" : value.CurrentWad;
                         statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName} · {foundMatches:N0} found";
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, null);
+                    }
+                    else if (value.TotalWads > 0)
+                    {
+                        string stage = string.IsNullOrEmpty(value.CurrentWad) ? "Building unknown hash inventory..." : value.CurrentWad;
+                        statusMsg = $"{stage} · {foundMatches:N0} found";
+                        _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, 0, value.TotalWads, statusMsg, null);
                     }
                     else
                     {
