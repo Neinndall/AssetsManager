@@ -2373,6 +2373,16 @@ namespace AssetsManager.Services.Hashes.Guessers
             cancellationToken.ThrowIfCancellationRequested();
             if (data.Array is null || data.Count == 0) return;
 
+            if (!sourcePath.Contains("regalia", StringComparison.OrdinalIgnoreCase) &&
+                !sourcePath.Contains("loadouts", StringComparison.OrdinalIgnoreCase) &&
+                !sourcePath.Contains("troves", StringComparison.OrdinalIgnoreCase) &&
+                !sourcePath.Contains("companions", StringComparison.OrdinalIgnoreCase) &&
+                !sourceWadPath.Contains("global", StringComparison.OrdinalIgnoreCase) &&
+                !sourceWadPath.Contains("companion", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             var unresolved = new HashSet<ulong>();
             try
             {
