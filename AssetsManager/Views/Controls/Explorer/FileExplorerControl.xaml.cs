@@ -643,8 +643,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         LogService.LogInteractiveSuccess($"Successfully extracted {selectedNodes.Count} selected items", destinationPath, "Extracted Assets");
                     }
-
-                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {
@@ -742,8 +740,6 @@ namespace AssetsManager.Views.Controls.Explorer
                     {
                         LogService.LogInteractiveSuccess($"Successfully saved {selectedNodes.Count} selected items", destinationPath, "Saved Assets");
                     }
-
-                    TaskCancellationManager.CompleteCurrentOperation();
                 }
                 catch (OperationCanceledException)
                 {

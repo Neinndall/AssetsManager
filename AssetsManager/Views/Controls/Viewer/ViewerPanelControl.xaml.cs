@@ -47,6 +47,7 @@ namespace AssetsManager.Views.Controls.Viewer
         public ObservableRangeCollection<AnimationModel> AnimationModels => _viewModel.AnimationModels;
 
         private AnimationModel _currentlyPlayingAnimation;
+        private CancellationTokenSource _modelLoadingCts;
         private bool _isCleanedUp;
         private bool _isSynchronizingModelSelection;
         private SceneModel _modelSelectionAnchor;
@@ -403,6 +404,10 @@ namespace AssetsManager.Views.Controls.Viewer
                     model.MeshTextureChanged -= HandleMeshTextureChanged;
                 }
 
+                _modelLoadingCts?.Cancel();
+                _modelLoadingCts?.Dispose();
+                _modelLoadingCts = null;
+
                 ResetScene();
             }
             catch (Exception ex)
@@ -646,9 +651,10 @@ namespace AssetsManager.Views.Controls.Viewer
 
             // Start a new cancellable operation. If another load is already in flight
             // (rapid clicks, double-load) it will be cancelled and its result dropped.
-            var cancellationToken = TaskCancellationManager != null
-                ? TaskCancellationManager.PrepareNewOperation()
-                : System.Threading.CancellationToken.None;
+            _modelLoadingCts?.Cancel();
+            _modelLoadingCts?.Dispose();
+            _modelLoadingCts = new CancellationTokenSource();
+            var cancellationToken = _modelLoadingCts.Token;
 
             SceneModel newModel = null;
 
@@ -768,9 +774,10 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             ViewModel.IsMapMode = true;
 
-            var cancellationToken = TaskCancellationManager != null
-                ? TaskCancellationManager.PrepareNewOperation()
-                : System.Threading.CancellationToken.None;
+            _modelLoadingCts?.Cancel();
+            _modelLoadingCts?.Dispose();
+            _modelLoadingCts = new CancellationTokenSource();
+            var cancellationToken = _modelLoadingCts.Token;
 
             SceneModel newModel;
             try
@@ -990,7 +997,9 @@ namespace AssetsManager.Views.Controls.Viewer
         {
             try
             {
-                TaskCancellationManager?.CancelCurrentOperation(false);
+                _modelLoadingCts?.Cancel();
+                _modelLoadingCts?.Dispose();
+                _modelLoadingCts = null;
 
                 _viewModel.IsChromaGalleryVisible = false;
                 Viewport?.ResetScene();
