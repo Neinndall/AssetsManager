@@ -833,10 +833,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"data/characters/{character}/skins/base/{character}.skn",
                     $"data/characters/{character}/skins/base/{character}_tx_cm.dds",
                     $"data/characters/{character}/tiers/root.bin",
+                    $"data/characters/{character}/animations/shared.bin",
+                    $"data/characters/{character}/animations/root.bin",
+                    $"data/characters/{character}/themes/root.bin",
                     $"data/characters/{character}/{character}.bin",
                     $"data/characters/{character}/{character}.ddf",
                     $"data/characters/{character}/hud/{character}_circle.dds",
                     $"data/characters/{character}/hud/{character}_square.dds",
+                    $"assets/characters/{character}/animations/shared.bin",
+                    $"assets/characters/{character}/animations/root.bin",
                     $"assets/characters/{character}/hud/{character}_circle.dds",
                     $"assets/characters/{character}/hud/{character}_square.dds",
                     $"characters/{character}"
@@ -2286,6 +2291,60 @@ namespace AssetsManager.Services.Hashes.Guessers
                         candidates.Add($"{dir}{file}.dds");
                         candidates.Add($"{dir}{file}.png");
                     }
+                    else if (p.Contains("loadouts/companions", StringComparison.OrdinalIgnoreCase) || p.Contains(".cutscene.bin", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string clean = p;
+                        if (clean.StartsWith("plugins/rcp-be-lol-game-data/global/default/", StringComparison.OrdinalIgnoreCase))
+                            clean = clean[44..];
+                        if (clean.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+                            clean = clean[7..];
+                        if (clean.StartsWith("data/", StringComparison.OrdinalIgnoreCase))
+                            clean = clean[5..];
+
+                        candidates.Add(clean);
+                        candidates.Add($"data/{clean}");
+                        candidates.Add($"assets/{clean}");
+                    }
+                }
+
+                var cutscenePets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var petThemeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base", "tier1" };
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string p = knownPaths[i];
+                    if (p.StartsWith("data/characters/pet", StringComparison.OrdinalIgnoreCase) ||
+                        p.StartsWith("assets/characters/pet", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int slash1 = p.IndexOf('/', 16);
+                        if (slash1 > 0)
+                        {
+                            string pet = p[16..slash1];
+                            string cleanPet = pet.StartsWith("pet", StringComparison.OrdinalIgnoreCase) ? pet[3..] : pet;
+                            cutscenePets.Add(cleanPet);
+                            cutscenePets.Add(pet);
+                        }
+                    }
+                    if (p.Contains("/themes/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int themeIdx = p.IndexOf("/themes/", StringComparison.OrdinalIgnoreCase);
+                        int nextSlash = p.IndexOf('/', themeIdx + 8);
+                        if (nextSlash > 0)
+                        {
+                            petThemeTokens.Add(p.Substring(themeIdx + 8, nextSlash - (themeIdx + 8)).ToLowerInvariant());
+                        }
+                    }
+                }
+
+                foreach (string pet in cutscenePets)
+                foreach (string theme in petThemeTokens)
+                {
+                    for (int tier = 1; tier <= 3; tier++)
+                    {
+                        candidates.Add($"loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
+                        candidates.Add($"loadouts/companions/{pet}_{theme}_tier{tier}.cutscene.bin");
+                        candidates.Add($"data/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
+                        candidates.Add($"assets/loadouts/companions/{pet}_{theme}_{theme}_tier{tier}.cutscene.bin");
+                    }
                 }
 
                 foreach (string dir in directories)
@@ -2450,6 +2509,19 @@ namespace AssetsManager.Services.Hashes.Guessers
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
                 CheckSpecialBin($"data/characters/{alias}/skins/root.bin");
+                CheckSpecialBin($"gameplay.hol{alias}ncvc.bin");
+                CheckSpecialBin($"gameplay.{alias}comps.bin");
+
+                string consonantStem = new string(alias.Where(c => !"aeiou_".Contains(c)).ToArray());
+                if (!string.IsNullOrEmpty(consonantStem) && !consonantStem.Equals(alias, StringComparison.OrdinalIgnoreCase))
+                {
+                    CheckSpecialBin($"gameplay.{consonantStem}comps.bin");
+                }
+
+                for (int s = 0; s <= 350; s++)
+                {
+                    CheckSpecialBin($"gameplay.{alias}skin{s}viewcontroller.bin");
+                }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
                 foreach (string skin in dynamicSkins)
