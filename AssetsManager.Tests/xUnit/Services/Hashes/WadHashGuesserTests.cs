@@ -2529,9 +2529,9 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             }
         }
 
-        private static HashGuessEngine CreateEngine(HashGuessDomain domain, string expected)
+        private static HashGuessEngine CreateEngine(HashGuessDomain domain, params string[] expected)
         {
-            return new HashGuessEngine(domain, new HashSet<ulong> { XxHash64Ext.Hash(expected) });
+            return new HashGuessEngine(domain, expected.Select(s => XxHash64Ext.Hash(s)).ToHashSet());
         }
 
         private static void WriteManifestString(BinaryWriter writer, string value)
@@ -2751,6 +2751,29 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 1);
 
             AssertResolved(engine, expectedTex);
+        }
+
+        [Fact]
+        public void GameGrepWadResolvesTristanaHallOfLegendsSkin80Assets()
+        {
+            const string expectedAnim = "assets/characters/tristana/skins/skin80/animations/signature_move.anm";
+            const string expectedBin = "data/characters/tristana/skins/skin80.bin";
+            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
+            {
+                "assets/characters/tristana/skins/skin01/tristana_skin01_tx_cm.tex"
+            }));
+            var engine = CreateEngine(HashGuessDomain.Game, expectedAnim, expectedBin);
+
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
+                "data/test.bin",
+                "Tristana.wad.client",
+                1);
+
+            Assert.Contains(engine.Matches.Values, m => m.Path == expectedAnim);
+            Assert.Contains(engine.Matches.Values, m => m.Path == expectedBin);
+            Assert.Equal(0, engine.RemainingUnknownCount);
         }
     }
 }

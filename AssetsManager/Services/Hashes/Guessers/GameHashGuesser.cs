@@ -2573,6 +2573,27 @@ namespace AssetsManager.Services.Hashes.Guessers
                     cancellationToken.ThrowIfCancellationRequested();
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skn");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skl");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.tex");
+
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/signature_move.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/winddown.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_homeguard.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_variant1.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_variant2.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_fast.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_crit.anm");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/recall.anm");
                 }
             }
 
@@ -2651,7 +2672,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
-            int limit = Math.Max(maxAttested + 5, 25);
+            int limit = Math.Max(maxAttested + 15, 85);
             if (character.Equals("sightward", StringComparison.OrdinalIgnoreCase)) limit = 500;
             for (int i = 0; i <= limit; i++)
             {
@@ -2659,10 +2680,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (i <= 9) skins.Add($"skin{i:D2}");
             }
 
-            if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
-            {
-                for (int i = 300; i <= 350; i++) skins.Add($"skin{i}");
-            }
+            for (int i = 300; i <= 350; i++) skins.Add($"skin{i}");
 
             return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
         }
