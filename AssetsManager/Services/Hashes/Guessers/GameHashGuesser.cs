@@ -1867,13 +1867,13 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
-                GuessSpecialSkinBinPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                 if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
                 {
                     GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                     GuessMaterialAndMeshBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                     GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                 }
+                GuessSpecialSkinBinPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
                 return;
             }
 
@@ -2482,6 +2482,75 @@ namespace AssetsManager.Services.Hashes.Guessers
             });
         }
 
+        private IReadOnlyList<string> GetDynamicAnimationStems(CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate("dynamic-animation-stems", knownPaths =>
+            {
+                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string path = knownPaths[i];
+                    if (path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string fn = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+                        if (fn.Length <= 40) stems.Add(fn);
+                        string[] parts = fn.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string p in parts)
+                        {
+                            if (p.Length is >= 3 and <= 30 && !p.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !p.All(char.IsDigit))
+                                stems.Add(p);
+                        }
+                        if (fn.Contains('_'))
+                        {
+                            string lastPart = fn.Substring(fn.IndexOf('_') + 1);
+                            if (lastPart.Length <= 35) stems.Add(lastPart);
+                            if (lastPart.Contains('_'))
+                            {
+                                string afterSecond = lastPart.Substring(lastPart.IndexOf('_') + 1);
+                                if (afterSecond.Length <= 30) stems.Add(afterSecond);
+                            }
+                        }
+                    }
+                }
+                return stems.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
+        private IReadOnlyList<string> GetDynamicTextureStems(CancellationToken cancellationToken)
+        {
+            return Corpus.GetOrCreate("dynamic-texture-stems", knownPaths =>
+            {
+                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < knownPaths.Count; i++)
+                {
+                    string path = knownPaths[i];
+                    if (path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                        path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string fn = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+                        if (fn.Length <= 50) stems.Add(fn);
+                        string[] parts = fn.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string p in parts)
+                        {
+                            if (p.Length is >= 3 and <= 30 && !p.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !p.All(char.IsDigit))
+                                stems.Add(p);
+                        }
+                        if (fn.Contains('_'))
+                        {
+                            string lastPart = fn.Substring(fn.IndexOf('_') + 1);
+                            if (lastPart.Length <= 40) stems.Add(lastPart);
+                            if (lastPart.Contains('_'))
+                            {
+                                string afterSecond = lastPart.Substring(lastPart.IndexOf('_') + 1);
+                                if (afterSecond.Length <= 35) stems.Add(afterSecond);
+                            }
+                        }
+                    }
+                }
+                return stems.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+            });
+        }
+
         private void GuessSpecialSkinBinPaths(
             HashGuessEngine engine,
             string sourcePath,
@@ -2524,11 +2593,40 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 var dynamicSkins = GetChampionSkinNames(alias, cancellationToken);
+                var animStems = GetDynamicAnimationStems(cancellationToken);
+                var texStems = GetDynamicTextureStems(cancellationToken);
+
                 foreach (string skin in dynamicSkins)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.dds");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.tex");
+                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.dds");
+
+                    foreach (string stem in animStems)
+                    {
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{stem}.anm");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{stem}.anm");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{skin}_{stem}.anm");
+                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{stem}.anm");
+                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{stem}.anm");
+                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{skin}_{stem}.anm");
+                    }
+
+                    foreach (string stem in texStems)
+                    {
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{stem}_tx_cm.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{stem}_tx_cm.dds");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{stem}.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{stem}.dds");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{skin}_{stem}.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{skin}_{stem}.dds");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{stem}.tex");
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/particles/{alias}_{stem}.dds");
+                    }
                 }
             }
 
