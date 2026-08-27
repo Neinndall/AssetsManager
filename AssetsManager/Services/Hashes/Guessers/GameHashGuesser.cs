@@ -1034,12 +1034,21 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
             }
 
-            var skinNumbers = Enumerable.Range(0, Math.Min(skinLimit, 120))
-                .Select(s => s.ToString(CultureInfo.InvariantCulture))
-                .Concat(Enumerable.Range(1, 9).Select(s => s.ToString("D2", CultureInfo.InvariantCulture)))
-                .Concat(Enumerable.Range(300, 51).Select(s => s.ToString(CultureInfo.InvariantCulture)))
-                .Concat(Enumerable.Range(500, 51).Select(s => s.ToString(CultureInfo.InvariantCulture)))
-                .Distinct(StringComparer.Ordinal);
+            var dynamicSkins = GetChampionSkinNames(character, CancellationToken.None);
+            var skinNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string ds in dynamicSkins)
+            {
+                if (ds.StartsWith("skin", StringComparison.OrdinalIgnoreCase))
+                {
+                    skinNumbers.Add(ds[4..]);
+                }
+                else if (!ds.Equals("base", StringComparison.OrdinalIgnoreCase))
+                {
+                    skinNumbers.Add(ds);
+                }
+            }
+            skinNumbers.Add("0");
+            skinNumbers.Add("00");
 
             foreach (string skin in skinNumbers)
             {
