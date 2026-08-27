@@ -2236,26 +2236,41 @@ namespace AssetsManager.Services.Hashes.Guessers
                 var sizeTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "", "_512x512", "_256x256", "_1024x1024", "_128x128" };
                 var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".tex", ".dds", ".png" };
 
-                var regex = new Regex(@"^(?<dir>(?:assets|data)/loadouts/regalia/[^/]+/)(?<file>[^.]+)(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
+                var regaliaRegex = new Regex(@"^(?<dir>(?:assets|data)/loadouts/regalia/[^/]+/)(?<file>[^.]+)(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
+                var trovesRegex = new Regex(@"^(?:plugins/rcp-be-lol-game-data/global/default/)?(?<dir>(?:assets|data)/ux/tft/troves_bannercontent/[^/]+/)(?<file>[^.]+)(?:\.[^./]+)?(?<ext>\.[^.]+)$", RegexOptions.IgnoreCase);
 
                 for (int i = 0; i < knownPaths.Count; i++)
                 {
                     string p = knownPaths[i];
-                    if (!p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase)) continue;
-                    Match match = regex.Match(p);
-                    if (!match.Success) continue;
-
-                    directories.Add(match.Groups["dir"].Value.ToLowerInvariant());
-                    extensions.Add(match.Groups["ext"].Value.ToLowerInvariant());
-
-                    string file = match.Groups["file"].Value.ToLowerInvariant();
-                    string[] parts = file.Split('_', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string part in parts)
+                    if (p.Contains("loadouts/regalia", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (part.Contains('x') && part.All(c => char.IsDigit(c) || c == 'x'))
-                            sizeTokens.Add($"_{part}");
-                        else if (part is "iron" or "bronze" or "silver" or "gold" or "platinum" or "emerald" or "diamond" or "master" or "grandmaster" or "challenger" or "unranked")
-                            tierTokens.Add(part);
+                        Match match = regaliaRegex.Match(p);
+                        if (!match.Success) continue;
+
+                        directories.Add(match.Groups["dir"].Value.ToLowerInvariant());
+                        extensions.Add(match.Groups["ext"].Value.ToLowerInvariant());
+
+                        string file = match.Groups["file"].Value.ToLowerInvariant();
+                        string[] parts = file.Split('_', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string part in parts)
+                        {
+                            if (part.Contains('x') && part.All(c => char.IsDigit(c) || c == 'x'))
+                                sizeTokens.Add($"_{part}");
+                            else if (part is "iron" or "bronze" or "silver" or "gold" or "platinum" or "emerald" or "diamond" or "master" or "grandmaster" or "challenger" or "unranked")
+                                tierTokens.Add(part);
+                        }
+                    }
+                    else if (p.Contains("troves_bannercontent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Match match = trovesRegex.Match(p);
+                        if (!match.Success) continue;
+
+                        string dir = match.Groups["dir"].Value.ToLowerInvariant();
+                        string file = match.Groups["file"].Value.ToLowerInvariant();
+
+                        candidates.Add($"{dir}{file}.tex");
+                        candidates.Add($"{dir}{file}.dds");
+                        candidates.Add($"{dir}{file}.png");
                     }
                 }
 
