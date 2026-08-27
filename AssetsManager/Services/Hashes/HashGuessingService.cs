@@ -113,7 +113,7 @@ namespace AssetsManager.Services.Hashes
                 int processedChunks = 0;
                 var inferredExtensions = new Dictionary<ulong, string>();
 
-                progress?.Report(engine.CreateProgress("Preparing WAD scan...", 0, 0, wadPaths.Length));
+                progress?.Report(engine.CreateProgress("Building unknown hash inventory...", 0, 0, wadPaths.Length));
 
                 for (int wadIndex = 0; wadIndex < wadPaths.Length; wadIndex++)
                 {
