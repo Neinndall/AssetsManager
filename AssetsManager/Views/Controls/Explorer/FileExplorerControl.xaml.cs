@@ -98,6 +98,7 @@ namespace AssetsManager.Views.Controls.Explorer
         private readonly FileExplorerModel _viewModel;
         
         private readonly DispatcherTimer _searchTimer;
+        private CancellationTokenSource _treeBuildCts;
         private string _currentRootPath;
         private string _backupJsonPath;
         private bool _isExternalInitRequested = false;
@@ -171,8 +172,10 @@ namespace AssetsManager.Views.Controls.Explorer
 
         public void CleanupResources()
         {
-            // 1. CRITICAL: Cancel any active tree build or extraction
-            TaskCancellationManager.CancelCurrentOperation();
+            // 1. Cancel active local tree build without affecting global background tasks
+            _treeBuildCts?.Cancel();
+            _treeBuildCts?.Dispose();
+            _treeBuildCts = null;
 
             // 2. Stop search timer (Unloaded also does this, but we ensure it here too)
             if (_searchTimer != null)
@@ -453,7 +456,10 @@ namespace AssetsManager.Views.Controls.Explorer
             Action<ObservableRangeCollection<FileSystemNodeModel>> onSuccess = null)
         {
             _viewModel.IsBackupMode = isBackupMode;
-            var cancellationToken = TaskCancellationManager.PrepareNewOperation();
+            _treeBuildCts?.Cancel();
+            _treeBuildCts?.Dispose();
+            _treeBuildCts = new CancellationTokenSource();
+            var cancellationToken = _treeBuildCts.Token;
 
             _viewModel.SetLoadingState(loadingState);
 
@@ -472,14 +478,10 @@ namespace AssetsManager.Views.Controls.Explorer
                     LogService.LogWarning("No items found in the selected location.");
                     _viewModel.IsEmptyState = true;
                 }
-
-                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (OperationCanceledException)
             {
                 LogService.LogWarning("The tree build was cancelled.");
-                await Task.Delay(1500);
-                TaskCancellationManager.CompleteCurrentOperation();
             }
             catch (Exception ex)
             {

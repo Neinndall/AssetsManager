@@ -214,7 +214,6 @@ namespace AssetsManager.Views
 
             try
             {
-                _taskCancellationManager?.CancelCurrentOperation(false);
                 _viewModel.IsVfxStudioVisible = false;
 
                 // Release the VFX consumer before disposing the service it uses.
