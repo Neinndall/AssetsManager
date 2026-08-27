@@ -783,22 +783,7 @@ namespace AssetsManager.Views
             {
                 var progress = new Progress<HashGuessProgress>(value =>
                 {
-                    if (value.TotalWads > 0 && !string.IsNullOrEmpty(value.CurrentWad))
-                    {
-                        if (value.CurrentWad.Equals("Building unknown hash inventory...", StringComparison.OrdinalIgnoreCase))
-                        {
-                            currentStage = "Building unknown hash inventory...";
-                        }
-                        else
-                        {
-                            currentStage = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {value.CurrentWad}";
-                        }
-                    }
-                    else if (!string.IsNullOrEmpty(value.CurrentWad))
-                    {
-                        currentStage = value.CurrentWad;
-                    }
-
+                    currentStage = !string.IsNullOrEmpty(value.CurrentWad) ? value.CurrentWad : currentStage;
                     totalChecked = value.CheckedCandidates > 0 ? value.CheckedCandidates : value.ProcessedChunks;
                     totalWads = value.TotalWads;
                     UpdateLiveProgress(value.RemainingUnknowns, value.FoundMatches);
@@ -828,10 +813,6 @@ namespace AssetsManager.Views
                         else
                         {
                             statusMsg = $"Scanning {value.ProcessedWads} of {value.TotalWads} WADs: {fileName}";
-                            if (foundMatches > 0)
-                            {
-                                statusMsg += $" · {foundMatches:N0} found";
-                            }
                         }
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, value.ProcessedWads, value.TotalWads, statusMsg, null);
                     }
@@ -1009,7 +990,7 @@ namespace AssetsManager.Views
                     if (p.TotalWads > 0)
                     {
                         string stage = string.IsNullOrEmpty(p.CurrentStage) ? "WAD" : p.CurrentStage;
-                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage} · {p.FoundMatches:N0} found";
+                        string statusMsg = $"Scanning {p.ProcessedWads} of {p.TotalWads} WADs: {stage}";
                         _progressUIManager?.OnHashGuessingProgressChanged(statusMsg, p.ProcessedWads, p.TotalWads, statusMsg, null);
                     }
                     else
