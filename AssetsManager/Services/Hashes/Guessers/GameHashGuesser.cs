@@ -2549,9 +2549,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                 ? new[] { champ }
                 : new[] { champ, $"jade_{champ}" };
 
-            var dynamicPetThemes = GetDynamicPetThemeNames(cancellationToken);
+            var dynamicPetThemes = champ.StartsWith("pet", StringComparison.OrdinalIgnoreCase)
+                ? GetDynamicPetThemeNames(cancellationToken)
+                : Array.Empty<string>();
             var animStems = GetDynamicAnimationStems(cancellationToken);
-
             foreach (string alias in aliases)
             {
                 CheckSpecialBin($"data/characters/{alias}/{alias}.bin");
@@ -2565,7 +2566,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     CheckSpecialBin($"gameplay.{consonantStem}comps.bin");
                 }
 
-                for (int s = 0; s <= 350; s++)
+                for (int s = 0; s <= 60; s++)
                 {
                     CheckSpecialBin($"gameplay.{alias}skin{s}viewcontroller.bin");
                 }
@@ -2597,12 +2598,15 @@ namespace AssetsManager.Services.Hashes.Guessers
                         CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{sub}_tx_cm.dds");
                     }
 
-                    foreach (string theme in dynamicPetThemes)
+                    if (dynamicPetThemes.Count > 0)
                     {
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.dds");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.tex");
-                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.dds");
+                        foreach (string theme in dynamicPetThemes)
+                        {
+                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.tex");
+                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_{theme}_tx_cm.dds");
+                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.tex");
+                            CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{theme}_tx_cm.dds");
+                        }
                     }
 
                     foreach (string stem in animStems)
@@ -2611,8 +2615,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                         CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{stem}.anm");
                         CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{alias}_{skin}_{stem}.anm");
                         CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{stem}.anm");
-                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{stem}.anm");
-                        CheckSpecialBin($"assets/characters/{alias}/animations/{skin}/{alias}_{skin}_{stem}.anm");
                     }
                 }
             }
@@ -2627,46 +2629,85 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        private IReadOnlyList<string> GetChampionSkinNames(string character, CancellationToken cancellationToken)
+        private IReadOnlyDictionary<string, IReadOnlyList<string>> GetChampionSkinMap(CancellationToken cancellationToken)
         {
-            return Corpus.GetOrCreate($"champion-skin-names/{character.ToLowerInvariant()}", knownPaths =>
+            return Corpus.GetOrCreate("all-champion-skin-maps", knownPaths =>
             {
-                var skins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base" };
-                string charPrefix = $"assets/characters/{character}/skins/";
-                string dataCharPrefix = $"data/characters/{character}/skins/";
-
-                string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..] : null;
-                string basePrefix = baseChar != null ? $"assets/characters/{baseChar}/skins/" : null;
-                string dataBasePrefix = baseChar != null ? $"data/characters/{baseChar}/skins/" : null;
+                var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
                 for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
                 {
-                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
+                    if ((pathIndex & 0x3fff) == 0) cancellationToken.ThrowIfCancellationRequested();
                     string path = knownPaths[pathIndex];
-                    string rel = null;
-                    if (path.StartsWith(charPrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[charPrefix.Length..];
-                    else if (path.StartsWith(dataCharPrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[dataCharPrefix.Length..];
-                    else if (basePrefix != null && path.StartsWith(basePrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[basePrefix.Length..];
-                    else if (dataBasePrefix != null && path.StartsWith(dataBasePrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[dataBasePrefix.Length..];
+                    if (!path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) &&
+                        !path.StartsWith("data/characters/", StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                    if (string.IsNullOrEmpty(rel)) continue;
+                    int skinsIdx = path.IndexOf("/skins/", StringComparison.OrdinalIgnoreCase);
+                    if (skinsIdx <= 0) continue;
+
+                    string champ = path.Substring(path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) ? 18 : 16, skinsIdx - (path.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase) ? 18 : 16)).ToLowerInvariant();
+                    string rel = path.Substring(skinsIdx + 7);
                     int slash = rel.IndexOf('/');
-                    if (slash > 0)
+                    string skin = slash > 0 ? rel[..slash] : rel;
+                    if (skin.Length is >= 3 and <= 35 && !skin.Contains('.'))
                     {
-                        skins.Add(rel[..slash]);
+                        if (!map.TryGetValue(champ, out var set))
+                        {
+                            set = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base" };
+                            map[champ] = set;
+                        }
+                        set.Add(skin);
                     }
                 }
 
-                int maxSkin = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 350;
-                for (int i = 1; i <= 9; i++) skins.Add($"skin{i:D2}");
-                for (int i = 0; i <= maxSkin; i++) skins.Add($"skin{i}");
-
-                return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+                return (IReadOnlyDictionary<string, IReadOnlyList<string>>)map.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => (IReadOnlyList<string>)kvp.Value.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList(),
+                    StringComparer.OrdinalIgnoreCase);
             });
+        }
+
+        private IReadOnlyList<string> GetChampionSkinNames(string character, CancellationToken cancellationToken)
+        {
+            var map = GetChampionSkinMap(cancellationToken);
+            string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..] : character;
+            
+            var skins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base" };
+            if (map.TryGetValue(character, out var directSkins))
+            {
+                for (int i = 0; i < directSkins.Count; i++) skins.Add(directSkins[i]);
+            }
+            if (baseChar != character && map.TryGetValue(baseChar, out var baseSkins))
+            {
+                for (int i = 0; i < baseSkins.Count; i++) skins.Add(baseSkins[i]);
+            }
+
+            // Add attested skin numbers + padding
+            int maxAttested = 0;
+            foreach (var s in skins)
+            {
+                if (s.StartsWith("skin", StringComparison.OrdinalIgnoreCase) &&
+                    int.TryParse(s[4..], out int num))
+                {
+                    if (num > maxAttested) maxAttested = num;
+                }
+            }
+
+            int limit = Math.Max(maxAttested + 5, 25);
+            if (character.Equals("sightward", StringComparison.OrdinalIgnoreCase)) limit = 500;
+            for (int i = 0; i <= limit; i++)
+            {
+                skins.Add($"skin{i}");
+                if (i <= 9) skins.Add($"skin{i:D2}");
+            }
+
+            if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+            {
+                for (int i = 300; i <= 350; i++) skins.Add($"skin{i}");
+            }
+
+            return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         private IReadOnlyList<string> GetChampionSkinAssetTemplates(string character, CancellationToken cancellationToken)
