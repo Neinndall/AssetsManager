@@ -502,7 +502,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                             extension = cachedExtension;
                             extensionCacheHits++;
                         }
-                        if (guesser.ShouldSkip(extension))
+                        if (IsSkippedExtension(extension))
                         {
                             skippedChunks++;
                             continue;
@@ -516,7 +516,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                             {
                                 extension = HashGuessingService.InferChunkExtension(data, detectJson: false);
                                 inferredExtensions[hash] = extension;
-                                if (guesser.ShouldSkip(extension))
+                                if (IsSkippedExtension(extension))
                                 {
                                     skippedChunks++;
                                     continue;
@@ -692,6 +692,10 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 yield return nested;
         }
 
+        private static bool IsSkippedExtension(string extension) => extension is
+            "dds" or "jpg" or "png" or "tga" or "ttf" or "otf" or "ogg" or "webm" or
+            "anm" or "skl" or "skn" or "scb" or "sco" or "troybin" or "bnk" or "wpk" or "tex";
+
         private static bool IsBinExtension(string extension) => extension is "bin" or "inibin" or "preload";
 
         private static void PrintPassResult(PassResult result)
@@ -787,7 +791,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
             long managedBefore = GC.GetTotalMemory(true);
             long allocatedBefore = GC.GetTotalAllocatedBytes(precise: false);
             var stopwatch = Stopwatch.StartNew();
-            guesser.GuessCharacterFiles(engine, CancellationToken.None, characters, budget);
+            guesser.GuessCharactersFiles(engine, CancellationToken.None, characters, budget);
             stopwatch.Stop();
             long allocatedAfter = GC.GetTotalAllocatedBytes(precise: false);
             long managedAfter = GC.GetTotalMemory(true);
@@ -826,7 +830,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 lcuGuesser,
                 CancellationToken.None,
                 candidateBudget: budget));
-            RunStage(stages, engine, "characters / WAD context", () => gameGuesser.GuessCharacterFiles(
+            RunStage(stages, engine, "characters / WAD context", () => gameGuesser.GuessCharactersFiles(
                 engine,
                 CancellationToken.None,
                 contextCharacters,

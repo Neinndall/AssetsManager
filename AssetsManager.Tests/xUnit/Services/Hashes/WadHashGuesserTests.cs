@@ -1289,13 +1289,13 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             const string expectedCharacter = "data/characters/ahri/skins/base/ahri.skn";
             var characterEngine = CreateEngine(HashGuessDomain.Game, expectedCharacter);
-            int checkedCharacters = game.GuessCharacterFiles(characterEngine, CancellationToken.None);
+            int checkedCharacters = game.GuessCharactersFiles(characterEngine, CancellationToken.None);
             AssertResolved(characterEngine, expectedCharacter);
             Assert.True(checkedCharacters > 0);
 
             const string expectedCharacterTexture = "assets/characters/ahri/hud/ahri_square.dds";
             var textureEngine = CreateEngine(HashGuessDomain.Game, expectedCharacterTexture);
-            game.GuessCharacterFiles(textureEngine, CancellationToken.None);
+            game.GuessCharactersFiles(textureEngine, CancellationToken.None);
             AssertResolved(textureEngine, expectedCharacterTexture);
             const string expectedCrossDomain = "plugins/rcp-be-lol-game-data/global/default/assets/characters/ahri/hud/ahri_square.png";
             var crossDomainEngine = CreateEngine(HashGuessDomain.Lcu, expectedCrossDomain);
@@ -1434,7 +1434,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             var engine = CreateEngine(HashGuessDomain.Game, expected);
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[] { knownPath }));
 
-            game.SubstituteBasenameWordsCore(
+            game._SubstituteBasenameWords(
                 engine,
                 new[] { knownPath },
                 new[] { "red", "blue", "new" },
@@ -1509,7 +1509,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             }
 
             var insertionEngine = CreateEngine(HashGuessDomain.Game, inserted);
-            game.AddBasenameWordCore(
+            game._AddBasenameWord(
                 insertionEngine,
                 new[] { "assets/ui/icon.png" },
                 new[] { "new" },
@@ -1893,7 +1893,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             AssertResolved(prefixEngine, "assets/ui/2x_icon.png");
 
             var characterEngine = CreateEngine(HashGuessDomain.Game, "data/characters/lux/skins/base/lux.skn");
-            game.GuessCharacterFiles(characterEngine, CancellationToken.None, new[] { "lux" });
+            game.GuessCharactersFiles(characterEngine, CancellationToken.None, new[] { "lux" });
             AssertResolved(characterEngine, "data/characters/lux/skins/base/lux.skn");
 
             string[] shaderTargets =
@@ -1988,7 +1988,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 HashGuessDomain.Game,
                 targets.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
 
-            int checkedCandidates = game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "lux" });
+            int checkedCandidates = game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "lux" });
 
             Assert.True(checkedCandidates > 0);
             Assert.Equal(0, engine.RemainingUnknownCount);
@@ -2009,7 +2009,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 HashGuessDomain.Game,
                 targets.Select(path => XxHash64Ext.Hash(path)).ToHashSet());
 
-            game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "pet_tft" });
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "pet_tft" });
 
             Assert.Equal(0, engine.RemainingUnknownCount);
             Assert.All(targets, expected =>
@@ -2044,7 +2044,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 HashGuessDomain.Game,
                 expected.Concat(rejected).Select(path => XxHash64Ext.Hash(path)).ToHashSet());
 
-            game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "petdoughcat" });
+            game.GuessCharactersFiles(engine, CancellationToken.None, new[] { "petdoughcat" });
 
             Assert.All(expected, path =>
                 Assert.Contains(engine.Matches.Values, match => match.Path == path));
@@ -2458,17 +2458,17 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameCustomWordAdditionUsesDeterministicGameLists()
+        public void GameWordAdditionUsesDeterministicGameLists()
         {
             var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
             {
-                "assets/characters/ahri/ahri.bin",
-                "assets/characters/lux/lux.bin"
+                "data/spells/ahri.bin",
+                "data/spells/lux.bin"
             }));
-            const string expected = "assets/characters/ahri/ahri_lux.bin";
+            const string expected = "data/spells/ahri_lux.bin";
             var engine = CreateEngine(HashGuessDomain.Game, expected);
 
-            int checkedCandidates = game.AddCustomBasenameWord(engine, CancellationToken.None);
+            int checkedCandidates = game.AddBasenameWord(engine, CancellationToken.None);
 
             AssertResolved(engine, expected);
             Assert.True(checkedCandidates > 0);
@@ -2662,12 +2662,12 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             const string skinPath = "data/characters/ahri/skins/skin5.bin";
             var skinEngine = CreateEngine(HashGuessDomain.Game, skinPath);
-            game.GuessCharacterFiles(skinEngine, CancellationToken.None);
+            game.GuessCharactersFiles(skinEngine, CancellationToken.None);
             AssertResolved(skinEngine, skinPath);
 
             const string petTierPath = "data/characters/petdssquid/tiers/tier2.bin";
             var petEngine = CreateEngine(HashGuessDomain.Game, petTierPath);
-            game.GuessCharacterFiles(petEngine, CancellationToken.None);
+            game.GuessCharactersFiles(petEngine, CancellationToken.None);
             AssertResolved(petEngine, petTierPath);
         }
 

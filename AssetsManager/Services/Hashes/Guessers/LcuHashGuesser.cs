@@ -34,11 +34,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
         private static readonly string[] Regions = { "br", "cn", "eun", "eune", "euw", "garena2", "garena3", "id", "jp", "kr", "la", "la1", "la2", "lan", "las", "me1", "na", "oc", "oc1", "oce", "pbe", "ph", "ph2", "ru", "sg", "sg2", "tencent", "th", "th2", "tr", "tw", "tw2", "vn", "vn2", "global" };
 
-        private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
-        {
-            "png", "jpg", "ttf", "webm", "ogg", "dds", "tga"
-        };
-
         private readonly object _directorySync = new();
         private IReadOnlyList<string> _knownDirectories;
         private long _knownDirectoryRevision = -1;
@@ -54,7 +49,6 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal LcuHashGuesser(IEnumerable<string> knownPaths, LogService logService)
             : this(new HashFile(HashGuessDomain.Lcu, knownPaths), logService) { }
 
-        internal override bool ShouldSkip(string extension) => SkippedExtensions.Contains(extension);
         internal IReadOnlyList<string> WordlistPaths => Corpus.GetOrCreate(
             "wordlist-paths",
             paths => paths.Where(path => !WordlistExcludedPathRegex.IsMatch(path)).ToList());
@@ -412,7 +406,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
             if (!string.IsNullOrEmpty(fileExtension))
                 paths = paths.Where(path => path.EndsWith(fileExtension, StringComparison.Ordinal));
-            return SubstituteBasenameWordsCore(
+            return _SubstituteBasenameWords(
                 engine, paths, words ?? BuildWordlist(), oldWordCount, newWordCount,
                 cancellationToken, candidateBudget, "LCU basename word substitution", progress);
         }
@@ -710,7 +704,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     var pluginWords = HashGuessEngine.BuildWordlist(pluginPaths.Select(Path.GetFileName));
                     if (pluginWords.Count > 0)
                     {
-                        int subCount1 = SubstituteBasenameWordsCore(
+                        int subCount1 = _SubstituteBasenameWords(
                             engine,
                             pluginPaths.Take(1000),
                             pluginWords.Take(200),
@@ -831,7 +825,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             Action<int> progress = null) =>
-            AddBasenameWordCore(
+            _AddBasenameWord(
                 engine,
                 KnownPaths,
                 BuildWordlist(),
@@ -846,7 +840,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             int maximum = 10_000,
             int? digits = null,
             Action<int> progress = null) =>
-            base.SubstituteNumbersCore(
+            base._SubstituteNumbers(
                 engine,
                 KnownPaths.Where(path => !NumberExcludedPathRegex.IsMatch(path)),
                 maximum,
@@ -865,6 +859,14 @@ namespace AssetsManager.Services.Hashes.Guessers
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            string extension = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
+            if (extension is "png" or "jpg" or "jpeg" or "webp" or "gif" or "svg" or "ico" or
+                "ttf" or "otf" or "woff" or "woff2" or "eot" or
+                "ogg" or "mp3" or "wav" or "webm" or "mp4" or "dds" or "tga")
+            {
+                return;
+            }
+
             if (data.Count == 0 || !TryDecodeWadText(data, out string text)) return;
             void CheckLcuCandidates(IEnumerable<HashGuessCandidate> candidates) =>
                 CheckIter(engine, candidates, sourceWadPath, cancellationToken, sourceChunkHash: sourceChunkHash);

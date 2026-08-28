@@ -329,14 +329,14 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
         {
             var paths = GetGameDataPaths(lcuGuesser);
             var words = HashGuessEngine.BuildBasenameWordlist(paths).Take(wordCap).ToList();
-            return RunInstance(lcuGuesser, "SubstituteBasenameWordsCore", engine, paths, words, budget, oldWordCount: 1, newWordCount: 2);
+            return RunInstance(lcuGuesser, "_SubstituteBasenameWords", engine, paths, words, budget, oldWordCount: 1, newWordCount: 2);
         }
 
         private static int RunGameDataAddition(object lcuGuesser, HashGuessEngine engine, int wordCap, int budget)
         {
             var paths = GetGameDataPaths(lcuGuesser);
             var words = HashGuessEngine.BuildBasenameWordlist(paths).Take(wordCap).ToList();
-            return RunInstance(lcuGuesser, "AddBasenameWordCore", engine, paths, words, budget);
+            return RunInstance(lcuGuesser, "_AddBasenameWord", engine, paths, words, budget);
         }
 
         private static int RunGeneralWordAddition(object lcuGuesser, HashGuessEngine engine, int budget)
@@ -365,7 +365,7 @@ namespace AssetsManager.Tests.Diagnostics.Hashes
                 .GetType("AssetsManager.Services.Hashes.Guessers.HashGuesser", throwOnError: true)
                 .GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
             object[] args;
-            if (methodName == "AddBasenameWordCore")
+            if (methodName == "_AddBasenameWord")
             {
                 args = new object[] { engine, paths, words, CancellationToken.None, budget, "Focused game-data word addition", null };
             }

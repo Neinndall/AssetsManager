@@ -144,7 +144,6 @@ namespace AssetsManager.Services.Hashes
                             string chunkExt = Path.GetExtension(resolvedChunkPath).TrimStart('.').ToLowerInvariant();
                             if (chunkExt.Length == 0 && inferredExtensions.TryGetValue(chunk.PathHash, out string cachedExtension))
                                 chunkExt = cachedExtension;
-                            if (guesser.ShouldSkip(chunkExt)) continue;
 
                             try
                             {
@@ -154,7 +153,6 @@ namespace AssetsManager.Services.Hashes
                                 {
                                     chunkExt = InferChunkExtension(data, domain == HashGuessDomain.Lcu);
                                     inferredExtensions[chunk.PathHash] = chunkExt;
-                                    if (guesser.ShouldSkip(chunkExt)) continue;
                                     if (chunkExt.Length > 0) resolvedChunkPath += "." + chunkExt;
                                 }
                                 guesser.GrepWad(engine, data, resolvedChunkPath, wadPath, chunk.PathHash, cancellationToken);
@@ -340,7 +338,7 @@ namespace AssetsManager.Services.Hashes
                 {
                     progress?.Report(engine.CreateProgress("GAME Basic: character files", checkedCandidates));
                     int progressOffset = checkedCandidates;
-                    checkedCandidates += _gameGuesser.GuessCharacterFiles(
+                    checkedCandidates += _gameGuesser.GuessCharactersFiles(
                         engine,
                         cancellationToken,
                         progress: count => progress?.Report(engine.CreateProgress("GAME Basic: character files", progressOffset + count)));

@@ -90,6 +90,11 @@ namespace AssetsManager.Utils
             return data.StartsWith(ENCRYPTED_RIOT_TEX_SIGNATURE);
         }
 
+        public static bool IsPropertyBin(ReadOnlySpan<byte> data)
+        {
+            return data.StartsWith(BIN_PROP_SIGNATURE) || data.StartsWith(BIN_PTCH_SIGNATURE);
+        }
+
         private static bool IsRiotBinaryAtlas(Span<byte> data)
         {
             // Riot UIAutoAtlas layout (little-endian):

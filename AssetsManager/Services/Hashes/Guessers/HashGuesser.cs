@@ -171,7 +171,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
         }
 
-        internal abstract bool ShouldSkip(string extension);
         internal abstract IReadOnlyList<string> BuildWordlist();
         internal void GrepWad(
             HashGuessEngine engine,
@@ -213,7 +212,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             bool includeCommonPadding = true) =>
             GenerateNumberCandidates(KnownPaths, numberLimit, candidateBudget, digits, inferDigits, includeCommonPadding);
 
-        protected int SubstituteNumbersCore(
+        protected int _SubstituteNumbers(
             HashGuessEngine engine,
             IEnumerable<string> paths,
             int numberLimit,
@@ -516,10 +515,10 @@ namespace AssetsManager.Services.Hashes.Guessers
         }
 
         internal int RunFocusedWordlistSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
-            => SubstituteBasenameWordsCore(engine, paths, words, 1, 1, cancellationToken, candidateBudget, "Focused Wordlist");
+            => _SubstituteBasenameWords(engine, paths, words, 1, 1, cancellationToken, candidateBudget, "Focused Wordlist");
 
         internal int RunFocusedWordlistDoubleSubstitution(HashGuessEngine engine, IEnumerable<string> paths, IEnumerable<string> words, CancellationToken cancellationToken, int candidateBudget = 500_000)
-            => SubstituteBasenameWordsCore(engine, paths, words.Take(150), 2, 2, cancellationToken, candidateBudget, "Double Wordlist");
+            => _SubstituteBasenameWords(engine, paths, words.Take(150), 2, 2, cancellationToken, candidateBudget, "Double Wordlist");
 
         internal static IReadOnlyList<(string Prefix, string Suffix)> BuildBasenameWordFormats(IEnumerable<string> paths, int oldWordCount, int newWordCount)
         {
@@ -544,7 +543,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .ToList();
         }
 
-        protected internal int SubstituteBasenameWordsCore(
+        protected internal int _SubstituteBasenameWords(
             HashGuessEngine engine,
             IEnumerable<string> paths,
             IEnumerable<string> words,
@@ -601,7 +600,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return formats.OrderBy(format => format, StringComparer.Ordinal).ToList();
         }
 
-        protected internal int AddBasenameWordCore(
+        protected internal int _AddBasenameWord(
             HashGuessEngine engine,
             IEnumerable<string> paths,
             IEnumerable<string> words,

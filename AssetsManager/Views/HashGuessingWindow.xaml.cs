@@ -121,7 +121,7 @@ namespace AssetsManager.Views
                 EstimatedTime = "~10s"
             };
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-crossdomain", Name = "GuessFromLcuHashes", Description = "Try client hash paths mapped to game structures", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
-            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-characters", Name = "GuessCharacterFiles", Description = "Champion and skin assets (characters/{champ}/skins/...)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
+            gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-characters", Name = "GuessCharactersFiles", Description = "Champion and skin assets (characters/{champ}/skins/...)", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-regalia", Name = "GuessRegaliaAssets", Description = "Ranked banners, crests, borders, wings and loadout assets", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-shaders", Name = "GuessShaderVariants", Description = "Permutations across HLSL families and platform variants", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
             gameBasic.SubMethods.Add(new HashMethodSubItemModel { Id = "game-basic-locales", Name = "SubstituteLang", Description = "28 region and language translations", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
@@ -147,6 +147,7 @@ namespace AssetsManager.Views
             gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-suffixes", Name = "SubstituteSuffixes", Description = "Common asset suffixes substitution across paths", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
             gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-skinnumbers", Name = "SubstituteSkinNumbers", Description = "Combinations of skin numbers across champion templates", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
             gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-characters", Name = "SubstituteCharacter", Description = "Champion name substitutions across known game assets", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
+            gameExtended.SubMethods.Add(new HashMethodSubItemModel { Id = "game-ext-wordaddition", Name = "AddBasenameWord", Description = "Basename dictionary word insertion across game paths", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
             _allMethods.Add(gameExtended);
 
             var gameCustom = new HashMethodItemModel
@@ -165,7 +166,6 @@ namespace AssetsManager.Views
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-databin", Name = "SubstituteDataBinBasenameWords", Description = "data/*.bin basename word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-dds", Name = "SubstituteCharacterDdsBasenameWords", Description = "Character .dds texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-tex", Name = "SubstituteCharacterTexBasenameWords", Description = "Character .tex texture word substitution", BadgeText = "🚀 FAST", BadgeBrush = accentBrush });
-            gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-wordaddition", Name = "AddCustomBasenameWord", Description = "Basename word insertion attack across game paths", BadgeText = "🚀 FAST", BadgeBrush = accentPurple });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-swordlist", Name = "SubstituteSwordlistBasenameWords", Description = "Full corpus basename words substitution matrix", BadgeText = "🚀 FAST", BadgeBrush = accentTeal });
             gameCustom.SubMethods.Add(new HashMethodSubItemModel { Id = "game-custom-shaders", Name = "SubstituteShaderVocabWords", Description = "Custom shader vocabulary and compound names", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
             _allMethods.Add(gameCustom);
