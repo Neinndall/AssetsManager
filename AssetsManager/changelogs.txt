@@ -6,6 +6,7 @@ MAJOR UPDATE
 This hotfix separates the BIN diffing and WAD comparison work from the previous release line. It focuses on semantic BIN output, faster WAD comparisons, and the optional-value crash fix.
 
 New Features
+  - Hash Guessing Lab / Added read-only champion texture and in-memory GAME diagnostics with WAD-local family/content/visual evidence, plus bounded typed BIN-reference candidates and per-run WAD context caching.
   - Hash Guessing Lab / Added background execution and global status bar progress reporting, allowing uninterrupted scans across app navigation with live status and percentage feedback.
   - Hash Guessing Lab / Expanded Game Basic Suite and GrepWad with universal champion asset discovery spanning HD texture prefixes (2x_, 4x_, tft_, sd_), sub-props, 3D meshes, and core animations.
   - Hash Guessing Lab / Calibrated combinatorial candidate budgets to 100M per algorithm, reducing extended and custom suite runtimes by over 80%.

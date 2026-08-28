@@ -606,107 +606,59 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(0x1234UL, match.SourceChunkHash);
         }
 
-        [Fact]
-        public void GameMaterialAndMeshBinLinksResolveTexAndSknPaths()
+        [Theory]
+        [InlineData("bin")]
+        [InlineData("inibin")]
+        public void GameAnimationBinLinksRecoverAnimationOnAnotherKnownSkin(string extension)
         {
-            const string expectedTex = "assets/characters/fiora/skins/skin01/fiora_skin01_tx_cm.tex";
-            const string expectedSkn = "assets/characters/fiora/skins/skin01/fiora_skin01.skn";
-            ulong targetTexHash = XxHash64Ext.Hash(expectedTex);
-            ulong targetSknHash = XxHash64Ext.Hash(expectedSkn);
+            const string expected = "assets/characters/fiora/skins/skin30/animations/idle.anm";
+            var game = new GameHashGuesser();
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
 
-            var samplerStruct = new BinTreeStruct(
-                Fnv1a.HashLower("samplerValues"),
-                Fnv1a.HashLower("SamplerValue"),
+            game.GrepWad(
+                engine,
+                new ArraySegment<byte>(CreateAnimationBin("idle", XxHash64Ext.Hash(expected))),
+                $"data/characters/fiora/skins/root.{extension}",
+                "Fiora.wad.client",
+                0x999aUL);
+
+            AssertResolved(engine, expected);
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
+            Assert.Equal("Fiora.wad.client", match.SourceWadPath);
+            Assert.Equal(0x999aUL, match.SourceChunkHash);
+        }
+
+        [Fact]
+        public void GameAnimationBinLinksFindClipPathOutsideClipDataMap()
+        {
+            const string expected = "assets/characters/fiora/skins/skin30/animations/idle.anm";
+            var clip = new BinTreeStruct(
+                Fnv1a.HashLower("AnimationClip"),
+                Fnv1a.HashLower("AnimationClip"),
                 new BinTreeProperty[]
                 {
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), targetTexHash)
-                });
-            var meshStruct = new BinTreeStruct(
-                Fnv1a.HashLower("skinMeshProperties"),
-                Fnv1a.HashLower("SkinMeshDataProperties"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("simpleSkin"), targetSknHash)
+                    new BinTreeWadChunkLink(Fnv1a.HashLower("mAnimationFilePath"), XxHash64Ext.Hash(expected))
                 });
             var tree = new BinTree(
-                new[]
-                {
-                    new BinTreeObject(0x11223344, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[] { samplerStruct }),
-                    new BinTreeObject(0x55667788, Fnv1a.HashLower("SkinCharacterDataProperties"), new BinTreeProperty[] { meshStruct })
-                },
+                new[] { new BinTreeObject(1, Fnv1a.HashLower("AnimationClip"), new BinTreeProperty[] { clip }) },
                 Array.Empty<string>());
             using var stream = new MemoryStream();
             tree.Write(stream);
 
             var game = new GameHashGuesser();
-            var engine = new HashGuessEngine(
-                HashGuessDomain.Game,
-                new HashSet<ulong> { targetTexHash, targetSknHash });
-
+            var engine = CreateEngine(HashGuessDomain.Game, expected);
             game.GrepWad(
                 engine,
                 new ArraySegment<byte>(stream.ToArray()),
-                "data/characters/fiora/skins/skin01.bin",
+                "data/characters/fiora/skins/root.inibin",
                 "Fiora.wad.client",
-                0x9999UL);
+                0x999bUL);
 
-            Assert.Equal(0, engine.RemainingUnknownCount);
-            Assert.Contains(engine.Matches.Values, m => m.Path == expectedTex && m.Strategy == HashGuessStrategy.BinEntry);
-            Assert.Contains(engine.Matches.Values, m => m.Path == expectedSkn && m.Strategy == HashGuessStrategy.BinEntry);
-        }
-
-        [Fact]
-        public void GameMaterialAndMeshBinLinksResolveHistoricalSubmeshesAndParticles()
-        {
-            const string expectedSwordTex = "assets/characters/fiora/skins/skin30/fiora_skin30_sword_tx_cm.tex";
-            const string expectedParticleTex = "assets/characters/fiora/skins/skin30/particles/fiora_skin30_q_dash.dds";
-            ulong targetSwordHash = XxHash64Ext.Hash(expectedSwordTex);
-            ulong targetParticleHash = XxHash64Ext.Hash(expectedParticleTex);
-
-            var swordSampler = new BinTreeStruct(
-                Fnv1a.HashLower("samplerValues"),
-                Fnv1a.HashLower("SamplerValue"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), targetSwordHash)
-                });
-            var particleSampler = new BinTreeStruct(
-                Fnv1a.HashLower("samplerValues"),
-                Fnv1a.HashLower("SamplerValue"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), targetParticleHash)
-                });
-            var tree = new BinTree(
-                new[]
-                {
-                    new BinTreeObject(0x11223344, Fnv1a.HashLower("StaticMaterialDef"), new BinTreeProperty[] { swordSampler }),
-                    new BinTreeObject(0x55667788, Fnv1a.HashLower("VfxSystemDefinitionData"), new BinTreeProperty[] { particleSampler })
-                },
-                Array.Empty<string>());
-            using var stream = new MemoryStream();
-            tree.Write(stream);
-
-            // GameHashGuesser knows Fiora's historical templates from skin01
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/fiora/skins/skin01/fiora_skin01_sword_tx_cm.tex",
-                "assets/characters/fiora/skins/skin01/particles/fiora_skin01_q_dash.tex"
-            }));
-            var engine = new HashGuessEngine(
-                HashGuessDomain.Game,
-                new HashSet<ulong> { targetSwordHash, targetParticleHash });
-
-            game.GrepWad(
-                engine,
-                new ArraySegment<byte>(stream.ToArray()),
-                "data/characters/fiora/skins/skin30.bin",
-                "Fiora.wad.client",
-                0x8888UL);
-
-            Assert.Equal(0, engine.RemainingUnknownCount);
-            Assert.Contains(engine.Matches.Values, m => m.Path == expectedSwordTex && m.Strategy == HashGuessStrategy.BinEntry);
-            Assert.Contains(engine.Matches.Values, m => m.Path == expectedParticleTex && m.Strategy == HashGuessStrategy.BinEntry);
+            AssertResolved(engine, expected);
+            HashGuessMatch match = Assert.Single(engine.Matches).Value;
+            Assert.Equal(HashGuessStrategy.BinEntry, match.Strategy);
+            Assert.Equal(0x999bUL, match.SourceChunkHash);
         }
 
         [Fact]
@@ -2018,8 +1970,19 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
                 "data/characters/lux/skins/root.bin",
                 "data/characters/lux/skins/skin0.bin",
                 "data/characters/lux/skins/skin199.bin",
+                "data/characters/lux/skins/skin399.bin",
                 "data/characters/lux/animations/skin0.bin",
-                "data/characters/lux/animations/skin199.bin"
+                "data/characters/lux/animations/skin199.bin",
+                "data/characters/lux/animations/skin399.bin",
+                "assets/characters/lux/hud/lux_circle_classic.tex",
+                "assets/characters/lux/hud/lux_circle.tex",
+                "assets/characters/lux/hud/icons2d/lux_p1_passive.dds",
+                "assets/characters/lux/hud/lux_square.tex",
+                "assets/characters/lux/hud/lux_circle_399.tex",
+                "assets/characters/lux/skins/base/lux_base_tx_cm.tex",
+                "assets/characters/lux/skins/base/luxloadscreen.tex",
+                "assets/characters/lux/skins/skin399/luxloadscreen_399_le.tex",
+                "assets/characters/lux/skins/skin399/lux_skin399_tx_cm.tex"
             };
             var engine = new HashGuessEngine(
                 HashGuessDomain.Game,
@@ -2051,6 +2014,42 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(0, engine.RemainingUnknownCount);
             Assert.All(targets, expected =>
                 Assert.Contains(engine.Matches.Values, match => match.Path == expected));
+        }
+
+        [Fact]
+        public void GamePetThemeCandidatesStayScopedToObservedDataFormats()
+        {
+            const string observedDoughcatTheme =
+                "assets/characters/petdoughcat/themes/sushi/petdoughcat_sushi_tx_cm.tex";
+            const string observedOtherPetTheme =
+                "assets/characters/petstyletwoleblanc/themes/coven/petstyletwoleblanc_coven_tx_cm.tex";
+            string[] expected =
+            {
+                "data/characters/petdoughcat/themes/sushi/root.bin",
+                "data/characters/petdoughcat/themes/sushi/tier1.bin",
+                "data/characters/petdoughcat/themes/sushi/tier2.bin",
+                "data/characters/petdoughcat/themes/sushi/tier3.bin"
+            };
+            string[] rejected =
+            {
+                "data/characters/petdoughcat/themes/sushi/tier0.bin",
+                "assets/characters/petdoughcat/themes/sushi/root.bin",
+                "assets/characters/petdoughcat/themes/sushi/tier1.bin",
+                "data/characters/petdoughcat/themes/coven/root.bin"
+            };
+            var game = new GameHashGuesser(new HashFile(
+                HashGuessDomain.Game,
+                new[] { observedDoughcatTheme, observedOtherPetTheme }));
+            var engine = new HashGuessEngine(
+                HashGuessDomain.Game,
+                expected.Concat(rejected).Select(path => XxHash64Ext.Hash(path)).ToHashSet());
+
+            game.GuessCharacterFiles(engine, CancellationToken.None, new[] { "petdoughcat" });
+
+            Assert.All(expected, path =>
+                Assert.Contains(engine.Matches.Values, match => match.Path == path));
+            Assert.All(rejected, path =>
+                Assert.Contains(XxHash64Ext.Hash(path), engine.UnknownHashes));
         }
 
         [Theory]
@@ -2697,23 +2696,6 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             AssertResolved(engine, expected);
         }
 
-        private static byte[] CreateChunkLinkBin(ulong linkHash)
-        {
-            var mat = new BinTreeStruct(
-                0,
-                Fnv1a.HashLower("StaticMaterialDef"),
-                new BinTreeProperty[]
-                {
-                    new BinTreeWadChunkLink(Fnv1a.HashLower("texturePath"), linkHash)
-                });
-            var tree = new BinTree(
-                new[] { new BinTreeObject(1, Fnv1a.HashLower("SkinCharacterDataProperties"), new BinTreeProperty[] { mat }) },
-                Array.Empty<string>());
-            using var stream = new MemoryStream();
-            tree.Write(stream);
-            return stream.ToArray();
-        }
-
         [Fact]
         public void GameSpecialSkinBinPathsResolvesJadeAndSkin300Series()
         {
@@ -2732,25 +2714,31 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
-        public void GameMaterialAndMeshBinLinksResolvesJadeInheritedSkinTextures()
+        public void GameSpecialSkinBinPathCacheIsScopedToEachEngineRun()
         {
-            const string expectedTex = "assets/characters/jade_fiora/skins/skin301/fiora_skin301_tx_cm.tex";
-            var game = new GameHashGuesser(new HashFile(HashGuessDomain.Game, new[]
-            {
-                "assets/characters/fiora/skins/skin01/fiora_skin01_tx_cm.tex"
-            }));
-            var engine = CreateEngine(HashGuessDomain.Game, expectedTex);
-
-            byte[] binData = CreateChunkLinkBin(XxHash64Ext.Hash(expectedTex));
+            var game = new GameHashGuesser();
+            const string firstExpected = "gameplay.ahricomps.bin";
+            var firstEngine = CreateEngine(HashGuessDomain.Game, firstExpected);
 
             game.GrepWad(
-                engine,
-                new ArraySegment<byte>(binData),
-                "data/characters/jade_fiora/skins/skin301.bin",
-                "Fiora.wad.client",
+                firstEngine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
+                "data/test.bin",
+                "Ahri.wad.client",
                 1);
+            AssertResolved(firstEngine, firstExpected);
 
-            AssertResolved(engine, expectedTex);
+            const string secondExpected = "data/characters/ahri/skins/root.bin";
+            var secondEngine = CreateEngine(HashGuessDomain.Game, secondExpected);
+
+            game.GrepWad(
+                secondEngine,
+                new ArraySegment<byte>(Encoding.ASCII.GetBytes("PROP")),
+                "data/test.bin",
+                "Ahri.wad.client",
+                2);
+
+            AssertResolved(secondEngine, secondExpected);
         }
 
         [Fact]

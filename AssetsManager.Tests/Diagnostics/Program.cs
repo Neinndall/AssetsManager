@@ -95,6 +95,16 @@ namespace AssetsManager.Tests.Diagnostics
                 GameCrackLabDiagnostic.Run(args.Skip(1).ToArray());
                 return;
             }
+            if (args.Length > 0 && string.Equals(args[0], "game-memory-lab", StringComparison.OrdinalIgnoreCase))
+            {
+                GameInMemoryResolutionDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
+            if (args.Length > 0 && string.Equals(args[0], "game-champion-texture-lab", StringComparison.OrdinalIgnoreCase))
+            {
+                GameChampionTextureLabDiagnostic.Run(args.Skip(1).ToArray());
+                return;
+            }
             if (args.Length > 0 && string.Equals(args[0], "lcu-unknowns-audit", StringComparison.OrdinalIgnoreCase))
             {
                 string pbe = args.Length > 1 ? args[1] : PbeDirectory;

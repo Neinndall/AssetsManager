@@ -88,7 +88,7 @@ namespace AssetsManager.Views
                 Id = "game-grep",
                 DomainIndex = 0,
                 Name = "Game GrepWad",
-                Description = "Extract valid game asset paths embedded directly in local WAD files.",
+                Description = "Extract embedded paths and typed BIN/WAD-link references from local GAME WAD files.",
                 Category = "Inspection",
                 IconKind = MaterialIconKind.FileSearchOutline,
                 BadgeText = "⚡ FAST (~5s)",
@@ -737,7 +737,11 @@ namespace AssetsManager.Views
             _viewModel.ProgressText = "Scanning";
             _viewModel.IsProgressIndeterminate = mode != HashGuessMode.GrepGame && mode != HashGuessMode.GrepLcu;
             
-            string currentStage = (mode == HashGuessMode.GrepGame || mode == HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Building structural candidates...";
+            string currentStage = mode == HashGuessMode.GrepGame
+                ? "Extracting GAME paths and typed BIN references..."
+                : mode == HashGuessMode.GrepLcu
+                    ? "Building unknown hash inventory..."
+                    : "Building structural candidates...";
             long totalChecked = 0;
             int totalWads = 0;
             int foundMatches = 0;
@@ -776,7 +780,11 @@ namespace AssetsManager.Views
             }
 
             UpdateStatus();
-            string initialStatus = (mode is HashGuessMode.GrepGame or HashGuessMode.GrepLcu) ? "Building unknown hash inventory..." : "Preparing Candidates...";
+            string initialStatus = mode == HashGuessMode.GrepGame
+                ? "Extracting GAME paths and typed BIN references..."
+                : mode == HashGuessMode.GrepLcu
+                    ? "Building unknown hash inventory..."
+                    : "Preparing Candidates...";
             _progressUIManager?.OnHashGuessingStarted(_viewModel.SelectedMethod?.Name ?? mode.ToString(), initialStatus);
 
             try

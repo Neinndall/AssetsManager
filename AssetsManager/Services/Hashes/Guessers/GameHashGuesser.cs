@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Hashing;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -30,10 +31,8 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly string[] ShaderExtensions = { ".ps_2_0", ".ps_3_0", ".vs_2_0", ".vs_3_0", ".ps", ".vs" };
         private static readonly string[] ShaderVariants = { ".dx11", ".dx9", ".dx9sm3", ".glsl", ".metal", "-dx11", "-metal" };
         private static readonly int[] EmbeddedShaderIndices = Enumerable.Range(0, 32).ToArray();
-        private static readonly Regex ShaderPathRegex = new(
-            @".*\.[pv]s(?:_[23]_0|(?=$|[.-]))",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private readonly ConcurrentDictionary<string, byte> _scannedWadCharacters = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Regex ShaderPathRegex = new(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private readonly ConditionalWeakTable<HashGuessEngine, ConcurrentDictionary<string, byte>> _scannedWadCharacters = new();
         private static readonly string[] LuaExtensions = { "luabin64", "preload" };
         private static readonly string[] LuaCharacterPrefixes = { "", "spells/", "scripts/", "npcscripts", "npcscripts/" };
         private static readonly string[] LuaCommonPaths =
@@ -68,7 +67,7 @@ namespace AssetsManager.Services.Hashes.Guessers
         private static readonly byte[][] WadBinPrefixesP = ToAsciiPrefixes("Patching/");
         private static readonly byte[][] WadBinPrefixesS = ToAsciiPrefixes("Shaders/");
         private static readonly Regex AnimationBinPathRegex = new(
-            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.bin$",
+            @"^(?:assets|data)/characters/(?<character>[^/]+)/(?:animations/(?<skin>[^/]+)|skins/(?<skin>[^/]+)(?:/animations)?(?:/[^/]+)?)\.(?:bin|inibin)$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
         private static readonly Regex KnownAnimationPathRegex = new(
             @"^(?:assets|data)/characters/(?<character>[^/]+)/skins/(?<skin>[^/]+)/animations/[^/]+\.anm$",
@@ -105,6 +104,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
         private const int EsportsBannerInsertionCandidateBudget = 750_000;
         private const int EsportsBannerDoubleWordLimit = 96;
+        private const int AnimationBinFallbackCandidateBudget = 100_000;
+        private const int PropMagic = 0x504F5250;
+        private const int PtchMagic = 0x48435450;
         private static readonly uint AnimationFilePathNameHash = Fnv1a.HashLower("mAnimationFilePath");
         private static readonly uint ClipDataMapNameHash = Fnv1a.HashLower("mClipDataMap");
         private static readonly HashSet<string> SkippedExtensions = new(StringComparer.Ordinal)
@@ -811,13 +813,15 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             int checkedCount = 0;
+            var emittedCharacterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             int CheckCharacterPaths(IEnumerable<string> paths)
             {
                 int remaining = candidateBudget == int.MaxValue ? int.MaxValue : candidateBudget - checkedCount;
                 if (remaining <= 0 || engine.RemainingUnknownCount == 0) return 0;
                 IEnumerable<HashGuessCandidate> candidatesToCheck = paths.Select(
-                    path => new HashGuessCandidate(path, HashGuessStrategy.CharacterTemplate));
+                    path => new HashGuessCandidate(path, HashGuessStrategy.CharacterTemplate))
+                    .Where(candidate => !string.IsNullOrWhiteSpace(candidate.Path) && emittedCharacterPaths.Add(candidate.Path));
                 if (remaining != int.MaxValue) candidatesToCheck = candidatesToCheck.Take(remaining);
                 int checkedPaths = CheckIter(engine, candidatesToCheck, "GAME character files", cancellationToken);
                 progress?.Invoke(checkedCount + checkedPaths);
@@ -835,7 +839,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"data/characters/{character}/tiers/root.bin",
                     $"data/characters/{character}/animations/shared.bin",
                     $"data/characters/{character}/animations/root.bin",
-                    $"data/characters/{character}/themes/root.bin",
                     $"data/characters/{character}/{character}.bin",
                     $"data/characters/{character}/{character}.ddf",
                     $"data/characters/{character}/hud/{character}_circle.dds",
@@ -843,11 +846,17 @@ namespace AssetsManager.Services.Hashes.Guessers
                     $"assets/characters/{character}/animations/shared.bin",
                     $"assets/characters/{character}/animations/root.bin",
                     $"assets/characters/{character}/hud/{character}_circle.dds",
+                    $"assets/characters/{character}/hud/{character}_circle.tex",
+                    $"assets/characters/{character}/hud/{character}_circle_classic.tex",
                     $"assets/characters/{character}/hud/{character}_square.dds",
+                    $"assets/characters/{character}/hud/{character}_square.tex",
+                    $"assets/characters/{character}/hud/{character}_square_301.tex",
+                    $"assets/characters/{character}/skins/base/{character}_base_tx_cm.tex",
+                    $"assets/characters/{character}/skins/base/{character}loadscreen.tex",
                     $"characters/{character}"
                 });
 
-                int skinLimit = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 350;
+                int skinLimit = character.Equals("sightward", StringComparison.OrdinalIgnoreCase) ? 500 : 400;
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(0, skinLimit).Select(skin =>
                         $"data/characters/{character}/skins/skin{skin}.bin"));
@@ -860,28 +869,44 @@ namespace AssetsManager.Services.Hashes.Guessers
                 checkedCount += CheckCharacterPaths(
                     Enumerable.Range(1, 9).Select(skin =>
                         $"data/characters/{character}/animations/skin{skin:D2}.bin"));
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"assets/characters/{character}/hud/{character}_circle_{skin}.tex"));
+                checkedCount += CheckCharacterPaths(
+                    from ability in new[] { "", "p", "q", "w", "e", "r" }
+                    from number in new[] { "", "1", "2", "3", "4" }
+                    from suffix in new[] { "", "_passive" }
+                    select $"assets/characters/{character}/hud/icons2d/{character}_{ability}{number}{suffix}.dds");
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}.tex"));
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}loadscreen_{skin}_le.tex"));
+                checkedCount += CheckCharacterPaths(
+                    Enumerable.Range(0, skinLimit).Select(skin =>
+                        $"assets/characters/{character}/skins/skin{skin:D2}/{character}_skin{skin:D2}_tx_cm.tex"));
                 if (character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
                 {
                     checkedCount += CheckCharacterPaths(
                         Enumerable.Range(0, 10).Select(tier =>
                             $"data/characters/{character}/tiers/tier{tier}.bin"));
 
-                    var themes = GetDynamicPetThemeNames(cancellationToken);
-                    checkedCount += CheckCharacterPaths(themes.SelectMany(theme => new[]
-                    {
-                        $"data/characters/{character}/themes/{theme}/root.bin",
-                        $"data/characters/{character}/themes/{theme}/tier1.bin",
-                        $"data/characters/{character}/themes/{theme}/tier2.bin",
-                        $"data/characters/{character}/themes/{theme}/tier3.bin",
-                        $"data/characters/{character}/themes/{theme}/tier0.bin",
-                        $"assets/characters/{character}/themes/{theme}/root.bin",
-                        $"assets/characters/{character}/themes/{theme}/tier1.bin",
-                        $"assets/characters/{character}/themes/{theme}/tier2.bin",
-                        $"assets/characters/{character}/themes/{theme}/tier3.bin"
-                    }));
+                    IReadOnlyDictionary<string, IReadOnlyList<string>> themesByPet =
+                        GetDynamicPetThemeNames(cancellationToken);
+                    IReadOnlyList<string> themes = themesByPet.TryGetValue(
+                        character,
+                        out IReadOnlyList<string> observedThemes)
+                        ? observedThemes
+                        : new[] { "base" };
+                    checkedCount += CheckCharacterPaths(
+                        themes.SelectMany(theme =>
+                            new[]
+                            {
+                                $"data/characters/{character}/themes/{theme}/root.bin"
+                            }.Concat(Enumerable.Range(1, 3).Select(tier =>
+                                $"data/characters/{character}/themes/{theme}/tier{tier}.bin"))));
                 }
-
-                checkedCount += CheckCharacterPaths(EnumerateCharacterAssetPaths(character, skinLimit));
 
                 if (checkedCount >= candidateBudget || engine.RemainingUnknownCount == 0) break;
             }
@@ -889,18 +914,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        private static readonly string[] CharacterTextureSamplers = new[]
-        {
-            "_tx_cm", "_recall_tx_cm", "_weapon_tx_cm", "_body_tx_cm",
-            "_tx_mask", "_tx_rm", "_tx_em", "_tx_gm",
-            "_tx_outline", "_tx_coin", "_tx_noise", "_fx_mask", "_base_tx_cm"
-        };
-
-        private static readonly string[] CharacterTexturePrefixes = new[] { "", "2x_", "4x_" };
-        private static readonly string[] CharacterTextureExtensions = new[] { ".tex", ".dds", ".project_jade.tex" };
-        private static readonly string[] LoadscreenSuffixes = new[] { "", "_le" };
-
-        private static readonly string[] DefaultUniversalAnimationActions = new[]
+        private static readonly string[] DefaultAnimationActions = new[]
         {
             "idle", "idle1", "idle2", "idle3", "idle4", "idle_in",
             "run", "run_fast", "run_base", "walk",
@@ -916,14 +930,19 @@ namespace AssetsManager.Services.Hashes.Guessers
             "death", "death2", "recall", "recall_windup",
             "dance", "taunt", "laugh", "joke",
             "channel", "channel_windup", "channel_loop", "channel_winddown",
-            "celebration", "spawn", "homeguard", "respawn"
+            "celebration", "spawn", "homeguard", "respawn",
+            "signature_move", "winddown", "run_homeguard", "idle_variant1", "idle_variant2",
+            "attack_fast", "attack_crit",
+            "attack1_to_idle", "attack2_to_idle", "attack1_to_run", "attack2_to_run",
+            "attack1_to_run_fast", "attack2_to_run_fast", "idle_to_run", "idle_to_run_fast",
+            "run_to_idle", "run_fast_to_idle", "winddown_to_idle", "signature_move_to_idle"
         };
 
         private IReadOnlyList<string> GetCharacterAnimationActions(string character)
         {
             return Corpus.GetOrCreate($"champion-animation-actions/{character.ToLowerInvariant()}", knownPaths =>
             {
-                var actions = new HashSet<string>(DefaultUniversalAnimationActions, StringComparer.OrdinalIgnoreCase);
+                var actions = new HashSet<string>(DefaultAnimationActions, StringComparer.OrdinalIgnoreCase);
 
                 string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
                     : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
@@ -979,143 +998,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 
                 return actions.OrderBy(a => a, StringComparer.OrdinalIgnoreCase).ToList();
             });
-        }
-
-        private IEnumerable<string> EnumerateCharacterAssetPaths(string character, int skinLimit)
-        {
-            var actions = GetCharacterAnimationActions(character);
-            string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..]
-                : (character.StartsWith("tft_", StringComparison.OrdinalIgnoreCase) || (character.StartsWith("tft", StringComparison.OrdinalIgnoreCase) && character.Length > 5 && character.Contains('_'))) ? character[(character.IndexOf('_') + 1)..]
-                : (character.StartsWith("cherry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("strawberry_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("crepe_", StringComparison.OrdinalIgnoreCase) || character.StartsWith("ruby_", StringComparison.OrdinalIgnoreCase)) ? character[(character.IndexOf('_') + 1)..]
-                : character.Equals("oriannaball", StringComparison.OrdinalIgnoreCase) ? "orianna"
-                : character.Equals("tibbers", StringComparison.OrdinalIgnoreCase) ? "annie"
-                : character.Equals("heimergarrison", StringComparison.OrdinalIgnoreCase) ? "heimerdinger"
-                : character.Equals("quinnvalor", StringComparison.OrdinalIgnoreCase) ? "quinn"
-                : character.Equals("yorickghoul", StringComparison.OrdinalIgnoreCase) ? "yorick"
-                : character.Equals("kalistaspawn", StringComparison.OrdinalIgnoreCase) ? "kalista"
-                : character.Equals("malzaharvoidling", StringComparison.OrdinalIgnoreCase) ? "malzahar"
-                : null;
-
-            yield return $"assets/characters/{character}/hud/{character}_square.tex";
-            yield return $"assets/characters/{character}/hud/{character}_circle.tex";
-            yield return $"assets/characters/{character}/hud/{character}_square.dds";
-            yield return $"assets/characters/{character}/hud/{character}_circle.dds";
-
-            foreach (string prefix in CharacterTexturePrefixes)
-            {
-                foreach (string sampler in CharacterTextureSamplers)
-                {
-                    foreach (string ext in CharacterTextureExtensions)
-                    {
-                        yield return $"assets/characters/{character}/skins/base/{prefix}{character}_base{sampler}{ext}";
-                        yield return $"assets/characters/{character}/skins/base/{prefix}{character}{sampler}{ext}";
-                    }
-                }
-            }
-
-            foreach (string action in actions)
-            {
-                yield return $"assets/characters/{character}/skins/base/animations/{character}_{action}.anm";
-                yield return $"assets/characters/{character}/skins/base/animations/{action}.anm";
-                if (baseChar != null)
-                {
-                    yield return $"assets/characters/{character}/skins/base/animations/{baseChar}_{action}.anm";
-                }
-            }
-
-            foreach (string ext in CharacterTextureExtensions)
-            {
-                foreach (string suffix in LoadscreenSuffixes)
-                {
-                    yield return $"assets/characters/{character}/skins/base/{character}_loadscreen{suffix}{ext}";
-                    yield return $"assets/characters/{character}/skins/base/{character}loadscreen{suffix}{ext}";
-                    yield return $"assets/characters/{character}/skins/base/{character}_loadscreen_0{suffix}{ext}";
-                    yield return $"assets/characters/{character}/skins/base/{character}loadscreen_0{suffix}{ext}";
-                }
-            }
-
-            var dynamicSkins = GetChampionSkinNames(character, CancellationToken.None);
-            var skinNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string ds in dynamicSkins)
-            {
-                if (ds.StartsWith("skin", StringComparison.OrdinalIgnoreCase))
-                {
-                    skinNumbers.Add(ds[4..]);
-                }
-                else if (!ds.Equals("base", StringComparison.OrdinalIgnoreCase))
-                {
-                    skinNumbers.Add(ds);
-                }
-            }
-            skinNumbers.Add("0");
-            skinNumbers.Add("00");
-
-            foreach (string skin in skinNumbers)
-            {
-                string skinTag = $"skin{skin}";
-
-                yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}.skn";
-                yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}.skl";
-                yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skn";
-                yield return $"assets/characters/{character}/skins/{skinTag}/{character}.skl";
-
-                foreach (string prefix in CharacterTexturePrefixes)
-                {
-                    foreach (string sampler in CharacterTextureSamplers)
-                    {
-                        foreach (string ext in CharacterTextureExtensions)
-                        {
-                            yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}_{skinTag}{sampler}{ext}";
-                            yield return $"assets/characters/{character}/skins/{skinTag}/{prefix}{character}{sampler}{ext}";
-                        }
-                    }
-                }
-
-                foreach (string ext in CharacterTextureExtensions)
-                {
-                    foreach (string suffix in LoadscreenSuffixes)
-                    {
-                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}_loadscreen_{skin}{suffix}{ext}";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}loadscreen_{skin}{suffix}{ext}";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}_{skinTag}_loadscreen{suffix}{ext}";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/{character}{skinTag}_loadscreen{suffix}{ext}";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/loadscreen_{skin}{suffix}{ext}";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/loadscreen_{skinTag}{suffix}{ext}";
-                        yield return $"assets/characters/{character}/hud/{character}_loadscreen_{skin}{suffix}{ext}";
-                        yield return $"assets/characters/{character}/hud/{character}loadscreen_{skin}{suffix}{ext}";
-                    }
-                }
-
-                foreach (string action in actions)
-                {
-                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{skinTag}_{action}.anm";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{character}_{action}.anm";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/{action}.anm";
-                    yield return $"assets/characters/{character}/skins/{skinTag}/animations/recall.skins_{character}_{skinTag}.anm";
-                    if (baseChar != null)
-                    {
-                        yield return $"assets/characters/{character}/skins/{skinTag}/animations/{baseChar}_{action}.anm";
-                        yield return $"assets/characters/{character}/skins/{skinTag}/animations/{baseChar}_{skinTag}_{action}.anm";
-                    }
-                }
-
-                yield return $"assets/characters/{character}/hud/{character}_circle_{skin}.dds";
-                yield return $"assets/characters/{character}/hud/{character}_circle_{skin}.tex";
-                yield return $"assets/characters/{character}/hud/{character}_square_{skin}.dds";
-                yield return $"assets/characters/{character}/hud/{character}_square_{skin}.tex";
-                yield return $"assets/characters/{character}/hud/icons2d/{character}_{skinTag}.dds";
-                yield return $"assets/characters/{character}/hud/icons2d/{character}_{skinTag}.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/{character}_{skinTag}_glow.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/{character}_{skinTag}_glow.dds";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/color-hold.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/color-hold.dds";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/common_color-hold.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/common_color-hold.dds";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/aura_self.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/aura_self.dds";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/alphaslice_mesh.tex";
-                yield return $"assets/characters/{character}/skins/{skinTag}/particles/alphaslice_mesh.dds";
-            }
         }
 
         internal IEnumerable<HashGuessCandidate> GenerateCharacterSubstitutionCandidates(int candidateBudget)
@@ -1617,7 +1499,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logService?.LogWarning("Hash Lab skipped skins.json chroma groups: " + exception.Message);
+                _logService.LogWarning("Hash Lab skipped skins.json chroma groups: " + exception.Message);
                 return 0;
             }
         }
@@ -1747,7 +1629,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                _logService?.LogError(exception, $"Hash Lab could not enumerate JSON word sources under '{rootDirectory}'.");
+                _logService.LogError(exception, $"Hash Lab could not enumerate JSON word sources under '{rootDirectory}'.");
             }
             return words.ToList();
         }
@@ -1876,13 +1758,16 @@ namespace AssetsManager.Services.Hashes.Guessers
                 }
 
                 GuessDottedBinPaths(engine, data, sourceWadPath, sourceChunkHash, cancellationToken);
-                if (sourcePath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+                if (data.Array is not null && data.Count >= sizeof(int))
                 {
-                    GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
-                    GuessMaterialAndMeshBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
-                    GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                    int magic = BitConverter.ToInt32(data.Array, data.Offset);
+                    if (magic is PropMagic or PtchMagic)
+                    {
+                        GuessAnimationBinPaths(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                        GuessRegaliaBinChunkLinks(engine, data, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                    }
                 }
-                GuessSpecialSkinBinPaths(engine, sourcePath, sourceWadPath, sourceChunkHash, cancellationToken);
+                GuessSpecialSkinBinPaths(engine, sourceWadPath, sourceChunkHash, cancellationToken);
                 return;
             }
 
@@ -2028,6 +1913,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
             if (!context.Success || data.Array is null || data.Count == 0) return;
 
+            string character = context.Groups["character"].Value.ToLowerInvariant();
+            string sourceSkin = context.Groups["skin"].Value.ToLowerInvariant();
+
             var links = new HashSet<AnimationFileLink>();
             try
             {
@@ -2062,8 +1950,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             CheckIter(
                 engine,
                 EnumerateAnimationPaths(
-                    context.Groups["character"].Value,
-                    context.Groups["skin"].Value,
+                    character,
+                    sourceSkin,
                     unresolved,
                     engine.UnknownHashes,
                     cancellationToken),
@@ -2071,183 +1959,68 @@ namespace AssetsManager.Services.Hashes.Guessers
                 sourceWadPath,
                 cancellationToken,
                 sourceChunkHash);
-        }
+            var remainingHashes = unresolved
+                .Where(link => engine.UnknownHashes.Contains(link.PathHash))
+                .Select(link => link.PathHash)
+                .ToHashSet();
+            if (remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
 
-        private void GuessMaterialAndMeshBinPaths(
-            HashGuessEngine engine,
-            ArraySegment<byte> data,
-            string sourcePath,
-            string sourceWadPath,
-            ulong sourceChunkHash,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Match context = AnimationBinPathRegex.Match(PathUtils.NormalizePath(sourcePath));
-            string character = context.Success ? context.Groups["character"].Value : null;
-            string skin = context.Success ? context.Groups["skin"].Value : null;
+            var characters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AddAnimationCharacter(character);
+            if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                AddAnimationCharacter(character[5..]);
+            else if (!character.StartsWith("pet", StringComparison.OrdinalIgnoreCase))
+                AddAnimationCharacter($"jade_{character}");
 
-            if (string.IsNullOrEmpty(character) && !string.IsNullOrEmpty(sourceWadPath))
-            {
-                string wadName = Path.GetFileNameWithoutExtension(sourceWadPath);
-                if (wadName.EndsWith(".wad", StringComparison.OrdinalIgnoreCase))
-                    wadName = Path.GetFileNameWithoutExtension(wadName);
-                if (!wadName.Equals("global", StringComparison.OrdinalIgnoreCase) &&
-                    !wadName.StartsWith("map", StringComparison.OrdinalIgnoreCase))
-                {
-                    character = wadName.ToLowerInvariant();
-                }
-            }
-
-            if (string.IsNullOrEmpty(character) || data.Array is null || data.Count == 0) return;
-
-            var chunkLinks = new HashSet<ulong>();
-            try
-            {
-                using var stream = new MemoryStream(data.Array, data.Offset, data.Count, writable: false);
-                var tree = new BinTree(stream);
-                cancellationToken.ThrowIfCancellationRequested();
-                foreach (ulong link in EnumerateChunkLinks(tree))
-                {
-                    if (engine.UnknownHashes.Contains(link))
-                        chunkLinks.Add(link);
-                }
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                _logService?.LogDebug($"GAME material/mesh BIN link scan skipped '{sourcePath}': {exception.Message}");
-                return;
-            }
-
-            if (chunkLinks.Count == 0) return;
-
-            var charactersToTest = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
-                                   character.StartsWith("pet", StringComparison.OrdinalIgnoreCase)
-                ? new[] { character }
-                : new[] { character, $"jade_{character}" };
-
-            var skinsToTest = !string.IsNullOrEmpty(skin)
-                ? new[] { skin.ToLowerInvariant() }
-                : GetChampionSkinNames(character, cancellationToken);
-
-            var samplers = GetKnownTextureSamplers(cancellationToken);
-
-            foreach (string charName in charactersToTest)
-            {
-                var templates = GetChampionSkinAssetTemplates(charName, cancellationToken);
-
-                foreach (string skinName in skinsToTest)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (chunkLinks.Count == 0 || engine.RemainingUnknownCount == 0) break;
-
-                    string baseName = $"{charName}_{skinName}";
-                    string skinDir = $"assets/characters/{charName}/skins/{skinName}";
-                    string dataSkinDir = $"data/characters/{charName}/skins/{skinName}";
-
-                    string baseChar = charName.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? charName[5..] : null;
-
-                    foreach (string template in templates)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (chunkLinks.Count == 0) break;
-                        string resolved = template
-                            .Replace("{skin}", skinName, StringComparison.OrdinalIgnoreCase)
-                            .Replace("{character}", charName, StringComparison.OrdinalIgnoreCase);
-
-                        TestResolvedTemplate(resolved);
-                        if (baseChar != null && template.Contains("{character}", StringComparison.OrdinalIgnoreCase))
-                        {
-                            TestResolvedTemplate(template
-                                .Replace("{skin}", skinName, StringComparison.OrdinalIgnoreCase)
-                                .Replace("{character}", baseChar, StringComparison.OrdinalIgnoreCase));
-                        }
-                    }
-
-                    void TestResolvedTemplate(string res)
-                    {
-                        CheckLinkCandidate($"{skinDir}/{res}");
-                        CheckLinkCandidate($"{skinDir}/2x_{res}");
-                        CheckLinkCandidate($"{dataSkinDir}/{res}");
-                        CheckLinkCandidate($"{dataSkinDir}/2x_{res}");
-
-                        if (res.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
-                        {
-                            CheckLinkCandidate($"{skinDir}/{res[..^4]}.dds");
-                            CheckLinkCandidate($"{skinDir}/2x_{res[..^4]}.dds");
-                            CheckLinkCandidate($"{dataSkinDir}/{res[..^4]}.dds");
-                            CheckLinkCandidate($"{dataSkinDir}/2x_{res[..^4]}.dds");
-                        }
-                        else if (res.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                        {
-                            CheckLinkCandidate($"{skinDir}/{res[..^4]}.tex");
-                            CheckLinkCandidate($"{skinDir}/2x_{res[..^4]}.tex");
-                            CheckLinkCandidate($"{dataSkinDir}/{res[..^4]}.tex");
-                            CheckLinkCandidate($"{dataSkinDir}/2x_{res[..^4]}.tex");
-                        }
-                    }
-
-                    string baseCharBaseName = baseChar != null ? $"{baseChar}_{skinName}" : null;
-
-                    foreach (string sampler in samplers)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        if (chunkLinks.Count == 0) break;
-                        foreach (string prefix in CharacterTexturePrefixes)
-                        {
-                            CheckLinkCandidate($"{skinDir}/{prefix}{baseName}{sampler}.tex");
-                            CheckLinkCandidate($"{skinDir}/{prefix}{baseName}{sampler}.dds");
-                            CheckLinkCandidate($"{dataSkinDir}/{prefix}{baseName}{sampler}.tex");
-                            CheckLinkCandidate($"{dataSkinDir}/{prefix}{baseName}{sampler}.dds");
-
-                            if (baseCharBaseName != null)
-                            {
-                                CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.tex");
-                                CheckLinkCandidate($"{skinDir}/{prefix}{baseCharBaseName}{sampler}.dds");
-                            }
-                        }
-                    }
-
-                    CheckLinkCandidate($"{skinDir}/{baseName}.tex");
-                    CheckLinkCandidate($"{skinDir}/{baseName}.dds");
-                    CheckLinkCandidate($"{skinDir}/{baseName}.skn");
-                    CheckLinkCandidate($"{skinDir}/{baseName}.skl");
-                    CheckLinkCandidate($"{dataSkinDir}/{baseName}.skn");
-                    CheckLinkCandidate($"{dataSkinDir}/{baseName}.skl");
-
-                    if (baseCharBaseName != null)
-                    {
-                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.tex");
-                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.dds");
-                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skn");
-                        CheckLinkCandidate($"{skinDir}/{baseCharBaseName}.skl");
-                    }
-
-                    var actions = GetCharacterAnimationActions(charName);
-                    foreach (string action in actions)
-                    {
-                        CheckLinkCandidate($"{skinDir}/animations/{baseName}_{action}.anm");
-                        CheckLinkCandidate($"{skinDir}/animations/{charName}_{action}.anm");
-                        CheckLinkCandidate($"{skinDir}/animations/{action}.anm");
-                        CheckLinkCandidate($"{dataSkinDir}/animations/{baseName}_{action}.anm");
-                        CheckLinkCandidate($"{dataSkinDir}/animations/{charName}_{action}.anm");
-                        CheckLinkCandidate($"{dataSkinDir}/animations/{action}.anm");
-
-                        if (baseCharBaseName != null)
-                        {
-                            CheckLinkCandidate($"{skinDir}/animations/{baseCharBaseName}_{action}.anm");
-                            CheckLinkCandidate($"{skinDir}/animations/{baseChar}_{action}.anm");
-                        }
-                    }
-                }
-            }
-
-            void CheckLinkCandidate(string candidatePath)
+            var emittedCandidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            int checkedCandidates = 0;
+            foreach (string animationCharacter in characters)
+            foreach (string skin in EnumerateAnimationSkins(animationCharacter))
+            foreach (string action in GetCharacterAnimationActions(animationCharacter))
+            foreach (string candidate in EnumerateAnimationCandidates(animationCharacter, skin, action))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                ulong hash = XxHash64Ext.Hash(candidatePath);
-                if (chunkLinks.Remove(hash))
+                if (!emittedCandidates.Add(candidate)) continue;
+                if (checkedCandidates++ >= AnimationBinFallbackCandidateBudget ||
+                    remainingHashes.Count == 0 || engine.RemainingUnknownCount == 0) return;
+
+                ulong hash = XxHash64Ext.Hash(candidate);
+                if (remainingHashes.Remove(hash) && engine.UnknownHashes.Contains(hash))
+                    Check(engine, candidate, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+            }
+
+            void AddAnimationCharacter(string value)
+            {
+                if (!string.IsNullOrWhiteSpace(value)) characters.Add(value.ToLowerInvariant());
+            }
+
+            IEnumerable<string> EnumerateAnimationSkins(string animationCharacter)
+            {
+                if (!string.IsNullOrEmpty(sourceSkin) &&
+                    !sourceSkin.Equals("root", StringComparison.OrdinalIgnoreCase) &&
+                    !sourceSkin.Equals("shared", StringComparison.OrdinalIgnoreCase))
                 {
-                    Check(engine, candidatePath, HashGuessStrategy.BinEntry, sourceWadPath, sourceChunkHash);
+                    yield return sourceSkin;
+                }
+
+                foreach (string candidate in GetChampionSkinNames(animationCharacter, cancellationToken))
+                    if (!candidate.Equals(sourceSkin, StringComparison.OrdinalIgnoreCase)) yield return candidate;
+            }
+
+            static IEnumerable<string> EnumerateAnimationCandidates(
+                string animationCharacter,
+                string skin,
+                string action)
+            {
+                foreach (string candidate in EnumerateAnimationNameVariants(animationCharacter, skin, action))
+                    yield return candidate;
+
+                if (!action.Equals("recall", StringComparison.OrdinalIgnoreCase)) yield break;
+                foreach (string root in AnimationRootPrefixes)
+                {
+                    yield return $"{root}/characters/{animationCharacter}/skins/{skin}/animations/recall.skins_{animationCharacter}_{skin}.anm";
+                    if (animationCharacter.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                        yield return $"{root}/characters/{animationCharacter}/skins/{skin}/animations/recall.skins_{animationCharacter[5..]}_{skin}.anm";
                 }
             }
         }
@@ -2406,6 +2179,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                _logService?.LogDebug($"GAME regalia BIN link scan skipped '{sourcePath}': {exception.Message}");
                 return;
             }
 
@@ -2451,93 +2225,49 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCount;
         }
 
-        private IReadOnlyList<string> GetDynamicPetThemeNames(CancellationToken cancellationToken)
+        private IReadOnlyDictionary<string, IReadOnlyList<string>> GetDynamicPetThemeNames(
+            CancellationToken cancellationToken)
         {
-            return Corpus.GetOrCreate("dynamic-pet-theme-names", knownPaths =>
+            return Corpus.GetOrCreate("dynamic-pet-themes-by-character", knownPaths =>
             {
-                var themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "base" };
-                var petThemeRegex = new Regex(@"^(?:assets|data)/characters/pet[^/]+/themes/([^/]+)/", RegexOptions.IgnoreCase);
-                var skinThemeRegex = new Regex(@"^(?:assets|data)/characters/[^/]+/skins/(?:skin\d+|base)/[a-zA-Z0-9]+_([a-zA-Z0-9]+)_tx_cm\.", RegexOptions.IgnoreCase);
-                var companionRegex = new Regex(@"(?:tooltip|loot|chibi|portal|icon|icon_square)[_-](?:pet|chibi)?[a-zA-Z0-9]+_([a-zA-Z0-9]+)[_-]", RegexOptions.IgnoreCase);
+                var themesByPet = new Dictionary<string, HashSet<string>>(
+                    StringComparer.OrdinalIgnoreCase);
+                var petThemeRegex = new Regex(
+                    @"^(?:assets|data)/characters/(?<pet>pet[^/]+)/themes/(?<theme>[^/]+)/",
+                    RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
                 for (int i = 0; i < knownPaths.Count; i++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     string path = knownPaths[i];
-                    if (path.Contains("/themes/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Match match = petThemeRegex.Match(path);
-                        if (match.Success)
-                        {
-                            string t = match.Groups[1].Value.ToLowerInvariant();
-                            if (t.Length <= 40 && !t.Contains('.'))
-                                themes.Add(t);
-                        }
-                    }
-                    else if (path.Contains("_tx_cm", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Match match = skinThemeRegex.Match(path);
-                        if (match.Success)
-                        {
-                            string t = match.Groups[1].Value.ToLowerInvariant();
-                            if (t.Length <= 24 && !t.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !t.Equals("base", StringComparison.OrdinalIgnoreCase))
-                                themes.Add(t);
-                        }
-                    }
-                    else if (path.Contains("companions", StringComparison.OrdinalIgnoreCase) ||
-                             path.Contains("rotationalshop", StringComparison.OrdinalIgnoreCase) ||
-                             path.Contains("/hud/icon", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Match match = companionRegex.Match(path);
-                        if (match.Success)
-                        {
-                            string t = match.Groups[1].Value.ToLowerInvariant();
-                            if (t.Length is >= 3 and <= 24 && !t.All(char.IsDigit) && !t.StartsWith("tier", StringComparison.OrdinalIgnoreCase))
-                                themes.Add(t);
-                        }
-                    }
+                    Match match = petThemeRegex.Match(path);
+                    if (!match.Success) continue;
+
+                    string pet = match.Groups["pet"].Value.ToLowerInvariant();
+                    string theme = match.Groups["theme"].Value.ToLowerInvariant();
+                    if (theme.Length > 40 || theme.Contains('.')) continue;
+
+                    if (!themesByPet.TryGetValue(pet, out HashSet<string> themes))
+                        themesByPet[pet] = themes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    themes.Add(theme);
                 }
 
-                return themes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
-            });
-        }
-
-        private IReadOnlyList<string> GetDynamicAnimationStems(CancellationToken cancellationToken)
-        {
-            return Corpus.GetOrCreate("dynamic-animation-stems", knownPaths =>
-            {
-                var stems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < knownPaths.Count; i++)
+                var result = new Dictionary<string, IReadOnlyList<string>>(
+                    StringComparer.OrdinalIgnoreCase);
+                foreach ((string pet, HashSet<string> themes) in themesByPet)
                 {
-                    string path = knownPaths[i];
-                    if (path.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string fn = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
-                        if (fn.Length <= 40) stems.Add(fn);
-                        string[] parts = fn.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (string p in parts)
-                        {
-                            if (p.Length is >= 3 and <= 30 && !p.StartsWith("skin", StringComparison.OrdinalIgnoreCase) && !p.All(char.IsDigit))
-                                stems.Add(p);
-                        }
-                        if (fn.Contains('_'))
-                        {
-                            string lastPart = fn.Substring(fn.IndexOf('_') + 1);
-                            if (lastPart.Length <= 35) stems.Add(lastPart);
-                            if (lastPart.Contains('_'))
-                            {
-                                string afterSecond = lastPart.Substring(lastPart.IndexOf('_') + 1);
-                                if (afterSecond.Length <= 30) stems.Add(afterSecond);
-                            }
-                        }
-                    }
+                    themes.Add("base");
+                    result[pet] = themes
+                        .OrderBy(theme => theme, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
                 }
-                return stems.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+
+                return result;
             });
         }
 
         private void GuessSpecialSkinBinPaths(
             HashGuessEngine engine,
-            string sourcePath,
             string sourceWadPath,
             ulong sourceChunkHash,
             CancellationToken cancellationToken)
@@ -2550,7 +2280,10 @@ namespace AssetsManager.Services.Hashes.Guessers
                 wadName.StartsWith("map", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (!_scannedWadCharacters.TryAdd(wadName, 0)) return;
+            ConcurrentDictionary<string, byte> scannedWadCharacters = _scannedWadCharacters.GetValue(
+                engine,
+                _ => new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
+            if (!scannedWadCharacters.TryAdd(wadName, 0)) return;
 
             string champ = wadName.ToLowerInvariant();
             string[] aliases = champ.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ||
@@ -2582,39 +2315,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     cancellationToken.ThrowIfCancellationRequested();
                     CheckSpecialBin($"data/characters/{alias}/skins/{skin}.bin");
                     CheckSpecialBin($"data/characters/{alias}/animations/{skin}.bin");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_cm.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cm_tx.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_tx_d.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}_cubemap.tex");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skn");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.skl");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.dds");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/{alias}_{skin}.tex");
-
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/signature_move.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/winddown.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_homeguard.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_variant1.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_variant2.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_fast.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack_crit.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/recall.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_idle.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_idle.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_run.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_run.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack1_to_run_fast.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/attack2_to_run_fast.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_to_run.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/idle_to_run_fast.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_to_idle.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/run_fast_to_idle.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/winddown_to_idle.anm");
-                    CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/signature_move_to_idle.anm");
+                    foreach (string action in DefaultAnimationActions)
+                        CheckSpecialBin($"assets/characters/{alias}/skins/{skin}/animations/{action}.anm");
                 }
             }
 
@@ -2704,85 +2406,6 @@ namespace AssetsManager.Services.Hashes.Guessers
             for (int i = 300; i <= 350; i++) skins.Add($"skin{i}");
 
             return skins.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        private IReadOnlyList<string> GetChampionSkinAssetTemplates(string character, CancellationToken cancellationToken)
-        {
-            return Corpus.GetOrCreate($"champion-skin-templates/{character.ToLowerInvariant()}", knownPaths =>
-            {
-                var templates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                string charPrefix = $"assets/characters/{character}/skins/";
-                string dataCharPrefix = $"data/characters/{character}/skins/";
-
-                string baseChar = character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase) ? character[5..] : null;
-                string basePrefix = baseChar != null ? $"assets/characters/{baseChar}/skins/" : null;
-                string dataBasePrefix = baseChar != null ? $"data/characters/{baseChar}/skins/" : null;
-
-                for (int pathIndex = 0; pathIndex < knownPaths.Count; pathIndex++)
-                {
-                    if ((pathIndex & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
-                    string path = knownPaths[pathIndex];
-                    string rel = null;
-                    if (path.StartsWith(charPrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[charPrefix.Length..];
-                    else if (path.StartsWith(dataCharPrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[dataCharPrefix.Length..];
-                    else if (basePrefix != null && path.StartsWith(basePrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[basePrefix.Length..];
-                    else if (dataBasePrefix != null && path.StartsWith(dataBasePrefix, StringComparison.OrdinalIgnoreCase))
-                        rel = path[dataBasePrefix.Length..];
-
-                    if (string.IsNullOrEmpty(rel)) continue;
-                    int slash = rel.IndexOf('/');
-                    if (slash < 0) continue;
-                    string skinToken = rel[..slash];
-                    string subPath = rel[(slash + 1)..];
-
-                    if (subPath.EndsWith(".anm", StringComparison.OrdinalIgnoreCase) ||
-                        subPath.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    string templated = subPath.Replace(skinToken, "{skin}", StringComparison.OrdinalIgnoreCase);
-                    if (baseChar != null)
-                        templated = templated.Replace(baseChar, "{character}", StringComparison.OrdinalIgnoreCase);
-                    if (templated.Length > 0 && templated.Length < 260)
-                        templates.Add(templated);
-                }
-
-                return templates.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
-            });
-        }
-
-        private static readonly string[] DefaultTextureSamplers =
-        {
-            "_tx_cm", "_base_tx_cm", "_tx_gm", "_tx_mask", "_tx_rm",
-            "_tx_outline", "_base_tx_gm", "_tx_em", "_tx_coin", "_base_tx_rm", "_tx_noise"
-        };
-
-        private IReadOnlyList<string> GetKnownTextureSamplers(CancellationToken cancellationToken)
-        {
-            return Corpus.GetOrCreate("canonical-texture-samplers", knownPaths =>
-            {
-                var samplers = new HashSet<string>(DefaultTextureSamplers, StringComparer.OrdinalIgnoreCase);
-                var regex = new Regex(@"(_(?:base_)?tx_[a-zA-Z0-9]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-                for (int i = 0; i < knownPaths.Count; i++)
-                {
-                    if ((i & 0x3ff) == 0) cancellationToken.ThrowIfCancellationRequested();
-                    string path = knownPaths[i];
-                    if (!path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) &&
-                        !path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var match = regex.Match(path);
-                    if (match.Success)
-                    {
-                        samplers.Add(match.Value.ToLowerInvariant());
-                    }
-                }
-
-                return samplers.OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
-            });
         }
 
         private static IEnumerable<ulong> EnumerateChunkLinks(BinTree tree)
@@ -3255,6 +2878,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                     yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{s}.anm";
                     yield return $"{root}/characters/{character}/skins/{sk}/animations/{character}_{sk}_{s}.anm";
                     yield return $"{root}/characters/{character}/skins/{sk}/animations/{sk}_{s}.anm";
+                    if (character.StartsWith("jade_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string baseCharacter = character[5..];
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{s}.anm";
+                        yield return $"{root}/characters/{character}/skins/{sk}/animations/{baseCharacter}_{sk}_{s}.anm";
+                    }
                 }
             }
         }
@@ -3274,6 +2903,9 @@ namespace AssetsManager.Services.Hashes.Guessers
         {
             var roots = tree.Objects.Values.SelectMany(obj => obj.Properties.Values)
                 .Concat(tree.DataOverrides.Select(ovr => ovr.Property));
+            var namedPathHashes = new HashSet<ulong>();
+            var namedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (BinTreeMap map in roots
                          .SelectMany(root => FindProperties(root, ClipDataMapNameHash))
                          .OfType<BinTreeMap>())
@@ -3282,11 +2914,32 @@ namespace AssetsManager.Services.Hashes.Guessers
                 uint nameHash = pair.Key is BinTreeHash hash ? hash.Value : 0;
                 foreach (BinTreeProperty path in FindProperties(pair.Value, AnimationFilePathNameHash).Take(1))
                 {
-                    if (path is BinTreeWadChunkLink link)
+                    if (path is BinTreeWadChunkLink link && link.Value != 0)
+                    {
+                        namedPathHashes.Add(link.Value);
                         yield return new AnimationFileLink(nameHash, link.Value, null);
+                    }
                     else if (path is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value))
-                        yield return new AnimationFileLink(nameHash, 0, PathUtils.NormalizePath(text.Value));
+                    {
+                        string normalized = PathUtils.NormalizePath(text.Value);
+                        namedPaths.Add(normalized);
+                        yield return new AnimationFileLink(nameHash, 0, normalized);
+                    }
                 }
+            }
+
+            // Some current hash-only BINs store AnimationClip records outside
+            // mClipDataMap. Keep the same property evidence, but do not turn
+            // every arbitrary WadChunkLink into an animation candidate.
+            foreach (BinTreeProperty root in roots)
+            foreach (BinTreeProperty path in FindProperties(root, AnimationFilePathNameHash))
+            {
+                if (path is BinTreeWadChunkLink link && link.Value != 0 &&
+                    !namedPathHashes.Contains(link.Value))
+                    yield return new AnimationFileLink(0, link.Value, null);
+                else if (path is BinTreeString text && !string.IsNullOrWhiteSpace(text.Value) &&
+                         !namedPaths.Contains(PathUtils.NormalizePath(text.Value)))
+                    yield return new AnimationFileLink(0, 0, PathUtils.NormalizePath(text.Value));
             }
         }
 
