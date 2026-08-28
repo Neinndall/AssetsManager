@@ -47,13 +47,13 @@ namespace AssetsManager.Services.Hashes
             }
 
             ulong hash = XxHash64Ext.Hash(normalizedPath);
-            if (!_unknownHashes.Remove(hash))
+            if (!_unknownHashes.Contains(hash))
             {
                 DiscardedCandidates++;
                 return false;
             }
 
-            AddMatch(hash, normalizedPath, strategy, source, sourceChunkHash);
+            _AddKnown(hash, normalizedPath, strategy, source, sourceChunkHash);
             return true;
         }
 
@@ -84,13 +84,13 @@ namespace AssetsManager.Services.Hashes
             {
                 int written = Encoding.UTF8.GetBytes(normalizedPath, utf8);
                 ulong hash = XxHash64.HashToUInt64(utf8[..written]);
-                if (!_unknownHashes.Remove(hash))
+                if (!_unknownHashes.Contains(hash))
                 {
                     DiscardedCandidates++;
                     return false;
                 }
 
-                AddMatch(hash, normalizedPath, strategy, source, sourceChunkHash);
+                _AddKnown(hash, normalizedPath, strategy, source, sourceChunkHash);
                 return true;
             }
             finally
@@ -99,13 +99,14 @@ namespace AssetsManager.Services.Hashes
             }
         }
 
-        private void AddMatch(
+        internal void _AddKnown(
             ulong hash,
             string path,
             HashGuessStrategy strategy,
             string source,
-            ulong sourceChunkHash)
+            ulong sourceChunkHash = 0)
         {
+            _unknownHashes.Remove(hash);
             var match = new HashGuessMatch
             {
                 Hash = hash,

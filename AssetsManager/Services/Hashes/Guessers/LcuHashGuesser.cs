@@ -17,23 +17,6 @@ namespace AssetsManager.Services.Hashes.Guessers
 {
     internal sealed class LcuHashGuesser : HashGuesser
     {
-        private static readonly Regex PluginPathRegex = new(@"plugins/[0-9a-z_./@-]+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex FrontendPathRegex = new(@"\bfe/([^/]+)/([a-zA-Z0-9/_.@-]+)", RegexOptions.Compiled);
-        private static readonly Regex DataPathRegex = new(@"/DATA/([a-zA-Z0-9/_.@-]+)", RegexOptions.Compiled);
-        private static readonly Regex AssetPathRegex = new(@"\blol-game-data/assets/([a-zA-Z0-9/_.@-]+)", RegexOptions.Compiled);
-        private static readonly Regex RelativePathRegex = new(@"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)", RegexOptions.Compiled);
-        private static readonly Regex FileNameRegex = new("[\\\"']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\\.(?:js|json|webm|html|[a-z]{3}))\\b", RegexOptions.Compiled);
-        private static readonly Regex CssUrlRegex = new("url\\(\\s*[\\\"']?([^\\\"')?#]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex HtmlAssetRegex = new("(?:src|href|poster|data-src)\\s*=\\s*[\\\"']([^\\\"'?#]+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex TemplateRegex = new("<template id=\\\"[^\\\"]*-template-([^\\\"]+)\\\"", RegexOptions.Compiled);
-        private static readonly Regex SourceMapRegex = new("sourceMappingURL=(.*?\\.js)\\.map", RegexOptions.Compiled);
-        private static readonly Regex SplashNameRegex = new(@"-splash-([^.]+)", RegexOptions.Compiled);
-        private static readonly Regex RegionLangRegex = new(@"^plugins/([^/]+)/[^/]+/[^/]+/", RegexOptions.Compiled);
-        private static readonly Regex NumberExcludedPathRegex = new(@"(?:^(?:plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champion-|plugins/rcp-be-lol-game-data/global/default/(?:data|assets)/characters/|plugins/rcp-be-lol-game-data/global/default/data/items/icons2d/\d+_|plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champions/-1\.json)|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex WordlistExcludedPathRegex = new(@"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly string[] Locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
-        private static readonly string[] Regions = { "br", "cn", "eun", "eune", "euw", "garena2", "garena3", "id", "jp", "kr", "la", "la1", "la2", "lan", "las", "me1", "na", "oc", "oc1", "oce", "pbe", "ph", "ph2", "ru", "sg", "sg2", "tencent", "th", "th2", "tr", "tw", "tw2", "vn", "vn2", "global" };
-
         private readonly object _directorySync = new();
         private IReadOnlyList<string> _knownDirectories;
         private long _knownDirectoryRevision = -1;
@@ -51,7 +34,11 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IReadOnlyList<string> WordlistPaths => Corpus.GetOrCreate(
             "wordlist-paths",
-            paths => paths.Where(path => !WordlistExcludedPathRegex.IsMatch(path)).ToList());
+            paths =>
+            {
+                var regex = new Regex(@"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase);
+                return paths.Where(path => !regex.IsMatch(path)).ToList();
+            });
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", _ => HashGuessEngine.BuildWordlist(WordlistPaths));
 
@@ -102,7 +89,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             && (path.Contains(".webm", StringComparison.Ordinal)
                 || path.Contains(".ogg", StringComparison.Ordinal));
 
-        protected override bool IncludeNumberPath(string path) => !NumberExcludedPathRegex.IsMatch(path);
+        protected override bool IncludeNumberPath(string path) =>
+            !Regex.IsMatch(path, @"(?:^(?:plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champion-|plugins/rcp-be-lol-game-data/global/default/(?:data|assets)/characters/|plugins/rcp-be-lol-game-data/global/default/data/items/icons2d/\d+_|plugins/rcp-be-lol-game-data/[^/]+/[^/]+/v1/champions/-1\.json)|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase);
 
         internal int SubstitutePlugin(
             HashGuessEngine engine,
@@ -194,31 +182,33 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (engine.RemainingUnknownCount == 0 || checkedCount >= candidateBudget) return checkedCount;
             }
 
+            string[] locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
+            string[] regions = { "br", "cn", "eun", "eune", "euw", "garena2", "garena3", "id", "jp", "kr", "la", "la1", "la2", "lan", "las", "me1", "na", "oc", "oc1", "oce", "pbe", "ph", "ph2", "ru", "sg", "sg2", "tencent", "th", "th2", "tr", "tw", "tw2", "vn", "vn2" };
+
             IEnumerable<string> sanitizerPaths = Enumerable.Range(0, 5).SelectMany(index =>
                 new[] { "filter", "unfilter", "whitelist" }.SelectMany(action =>
                     new[] { $"{index}.{action}.csv" }
-                        .Concat(Locales.Select(locale =>
+                        .Concat(locales.Select(locale =>
                         {
                             string[] parts = locale.Split('_');
                             return $"{index}.{action}.language.{parts[0]}.csv";
                         }))
-                        .Concat(Locales.Select(locale =>
+                        .Concat(locales.Select(locale =>
                         {
                             string[] parts = locale.Split('_');
                             return $"{index}.{action}.country.{parts[1]}.csv";
                         }))
-                        .Concat(Regions
-                            .Where(region => !region.Equals("global", StringComparison.OrdinalIgnoreCase))
+                        .Concat(regions
                             .Select(region => $"{index}.{action}.region.{region}.csv"))
-                        .Concat(Locales.Select(locale => $"{index}.{action}.locale.{locale}.csv"))));
+                        .Concat(locales.Select(locale => $"{index}.{action}.locale.{locale}.csv"))));
 
             IEnumerable<string> sanitizerNames = new[]
             {
                 "allowedchars", "breakingchars", "projectedchars", "projectedchars1337",
                 "punctuationchars", "variantaliases"
             }.SelectMany(name =>
-                Locales.Select(locale => $"{name}.locale.{locale}.txt")
-                    .Concat(Locales.Select(locale => $"{name}.language.{locale.Split('_')[0]}.txt")));
+                locales.Select(locale => $"{name}.locale.{locale}.txt")
+                    .Concat(locales.Select(locale => $"{name}.language.{locale.Split('_')[0]}.txt")));
 
             CheckPatternIter(
                 sanitizerPaths
@@ -354,13 +344,17 @@ namespace AssetsManager.Services.Hashes.Guessers
             if (candidateBudget < 0) throw new ArgumentOutOfRangeException(nameof(candidateBudget));
             if (candidateBudget == 0) return 0;
 
+            string[] locales = { "ar_ae", "ar_eg", "cs_cz", "de_de", "el_gr", "en_au", "en_gb", "en_ph", "en_pl", "en_sg", "en_us", "es_ar", "es_es", "es_mx", "fr_fr", "hu_hu", "id_id", "it_it", "ja_jp", "ko_kr", "ms_my", "pl_pl", "pt_br", "ro_ro", "ru_ru", "th_th", "tr_tr", "vi_vn", "vn_vn", "zh_cn", "zh_my", "zh_tw" };
+            string[] regions = { "br", "cn", "eun", "eune", "euw", "garena2", "garena3", "id", "jp", "kr", "la", "la1", "la2", "lan", "las", "me1", "na", "oc", "oc1", "oce", "pbe", "ph", "ph2", "ru", "sg", "sg2", "tencent", "th", "th2", "tr", "tw", "tw2", "vn", "vn2", "global" };
+
             IReadOnlyList<string> known = KnownPaths.ToList();
-            IReadOnlyList<string> languages = Locales.Append("default").ToList();
-            var regionLanguages = Regions
+            IReadOnlyList<string> languages = locales.Append("default").ToList();
+            var regionLanguages = regions
                 .SelectMany(region => languages, (region, language) => (Region: region, Language: language))
                 .ToList();
 
             const string source = "Generated region or locale variant";
+            var regionLangRegex = new Regex(@"^plugins/([^/]+)/[^/]+/[^/]+/");
             int checkedCount = 0;
             foreach (var regionLanguage in ProgressIterator(
                          regionLanguages,
@@ -374,7 +368,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 string replacement = $"plugins/$1/{regionLanguage.Region}/{regionLanguage.Language}/";
                 IEnumerable<HashGuessCandidate> candidates = known.Select(path =>
                     new HashGuessCandidate(
-                        RegionLangRegex.Replace(path, replacement),
+                        regionLangRegex.Replace(path, replacement),
                         HashGuessStrategy.LanguageVariant));
                 if (remaining != int.MaxValue) candidates = candidates.Take(remaining);
 
@@ -837,12 +831,12 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int SubstituteNumbers(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            int maximum = 10_000,
+            int maximum = 10000,
             int? digits = null,
             Action<int> progress = null) =>
             base._SubstituteNumbers(
                 engine,
-                KnownPaths.Where(path => !NumberExcludedPathRegex.IsMatch(path)),
+                KnownPaths.Where(IncludeNumberPath),
                 maximum,
                 digits,
                 inferDigits: false,
@@ -879,32 +873,43 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (stopAfterStructuredJson) return;
             }
 
+            var pluginPathRegex = new Regex(@"plugins/[0-9a-z_./@-]+", RegexOptions.IgnoreCase);
+            var frontendPathRegex = new Regex(@"\bfe/([^/]+)/([a-zA-Z0-9/_.@-]+)");
+            var dataPathRegex = new Regex(@"/DATA/([a-zA-Z0-9/_.@-]+)");
+            var assetPathRegex = new Regex(@"\blol-game-data/assets/([a-zA-Z0-9/_.@-]+)");
+            var cssUrlRegex = new Regex(@"url\(\s*[""']?([^""')?#]+)", RegexOptions.IgnoreCase);
+            var htmlAssetRegex = new Regex(@"(?:src|href|poster|data-src)\s*=\s*[""']([^""'?#]+)", RegexOptions.IgnoreCase);
+            var relativePathRegex = new Regex(@"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)");
+            var fileNameRegex = new Regex(@"[""']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\.(?:js|json|webm|html|[a-z]{3}))\b");
+            var templateRegex = new Regex(@"<template id=""[^""]*-template-([^""]+)""");
+            var sourceMapRegex = new Regex(@"sourceMappingURL=(.*?\.js)\.map");
+
             CheckLcuCandidates(
-                PluginPathRegex.Matches(text).Cast<Match>().Select(match =>
+                pluginPathRegex.Matches(text).Cast<Match>().Select(match =>
                     new HashGuessCandidate(NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                FrontendPathRegex.Matches(text).Cast<Match>().Select(match =>
+                frontendPathRegex.Matches(text).Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-fe-{match.Groups[1].Value}/global/default/{match.Groups[2].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                DataPathRegex.Matches(text).Cast<Match>().Select(match =>
+                dataPathRegex.Matches(text).Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-be-lol-game-data/global/default/data/{match.Groups[1].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                AssetPathRegex.Matches(text).Cast<Match>().Select(match =>
+                assetPathRegex.Matches(text).Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
 
-            foreach (Match match in CssUrlRegex.Matches(text))
+            foreach (Match match in cssUrlRegex.Matches(text))
             {
                 string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
             }
-            foreach (Match match in HtmlAssetRegex.Matches(text))
+            foreach (Match match in htmlAssetRegex.Matches(text))
             {
                 string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
                 if (contextualPath.Length > 0)
@@ -912,7 +917,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match match in RelativePathRegex.Matches(text))
+            foreach (Match match in relativePathRegex.Matches(text))
             {
                 string relativePath = match.Groups[1].Value;
                 relativePaths.Add(relativePath);
@@ -920,12 +925,11 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
             }
-            foreach (Match match in FileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
-            foreach (Match match in TemplateRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value + "/template.html");
-            foreach (Match match in SourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+            foreach (Match match in fileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+            foreach (Match match in templateRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value + "/template.html");
+            foreach (Match match in sourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
 
-            CheckLcuCandidates(
-                relativePaths.Select(path => new HashGuessCandidate(NormalizePath(path), HashGuessStrategy.LcuRelativeBasename)));
+            CheckBasenames(engine, relativePaths.Select(p => p.ToLowerInvariant()), cancellationToken, sourceWadPath);
         }
 
         internal int GuessFromGameHashes(
@@ -1206,8 +1210,9 @@ namespace AssetsManager.Services.Hashes.Guessers
             var filePaths = filesProperty.EnumerateObject()
                 .Select(property => property.Value.GetString()?.ToLowerInvariant() ?? string.Empty)
                 .ToList();
+            var splashNameRegex = new Regex(@"-splash-([^.]+)");
             var splashNames = filePaths
-                .SelectMany(path => SplashNameRegex.Matches(path).Select(match => match.Groups[1].Value.ToLowerInvariant()))
+                .SelectMany(path => splashNameRegex.Matches(path).Select(match => match.Groups[1].Value.ToLowerInvariant()))
                 .ToHashSet(StringComparer.Ordinal);
 
             foreach (string splashName in splashNames)

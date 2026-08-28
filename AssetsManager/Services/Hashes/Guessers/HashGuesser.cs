@@ -358,10 +358,29 @@ namespace AssetsManager.Services.Hashes.Guessers
             ulong sourceChunkHash = 0) =>
             engine.Check(path, strategy, source, sourceChunkHash);
 
-        internal bool IsKnown(HashGuessEngine engine, string path, HashGuessStrategy strategy, string source = "Generated")
+        protected void _AddKnown(
+            HashGuessEngine engine,
+            ulong hash,
+            string path,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant,
+            string source = "Generated",
+            ulong sourceChunkHash = 0) =>
+            engine._AddKnown(hash, path, strategy, source, sourceChunkHash);
+
+        internal bool IsKnown(
+            HashGuessEngine engine,
+            string path,
+            HashGuessStrategy strategy = HashGuessStrategy.WordlistVariant,
+            string source = "Generated")
         {
             ulong hash = XxHash64Ext.Hash(PathUtils.NormalizePath(path));
-            return engine.Check(path, strategy, source) || HashFile.Load().ContainsKey(hash);
+            if (engine.UnknownHashes.Contains(hash))
+            {
+                _AddKnown(engine, hash, path, strategy, source);
+                return true;
+            }
+
+            return HashFile.Load().ContainsKey(hash);
         }
 
         internal int CheckIter(
@@ -459,6 +478,29 @@ namespace AssetsManager.Services.Hashes.Guessers
                 .Where(parts => parts.Length > 1)
                 .Select(parts => parts[1]);
             return CheckIter(engine, candidates, strategy, "XDBG hashes");
+        }
+
+        internal int CheckBasenames(
+            HashGuessEngine engine,
+            IEnumerable<string> names,
+            CancellationToken cancellationToken = default,
+            string source = "Basenames")
+        {
+            ArgumentNullException.ThrowIfNull(names);
+            IReadOnlyList<string> dirs = DirectoryList();
+            int checkedCount = 0;
+            foreach (string name in ProgressIterator(names.OrderBy(n => n, StringComparer.Ordinal).ToList(), value => value, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (engine.RemainingUnknownCount == 0) break;
+                checkedCount += CheckIter(
+                    engine,
+                    dirs.Select(dir => string.IsNullOrEmpty(dir) ? name : $"{dir}/{name}"),
+                    HashGuessStrategy.PluginVariant,
+                    source,
+                    cancellationToken);
+            }
+            return checkedCount;
         }
 
         internal int SubstituteBasenames(
