@@ -328,6 +328,7 @@ Changes
   - Comparator / Renamed internal ComparisonViewMode.Advanced enum value to ComparisonViewMode.Hierarchy for consistency with the UI.
 
 Bug Fixes
+  - Diff Viewer / Fixed severe 10-minute freeze and horizontal line blowout when viewing minified JavaScript files (e.g. rcp-fe-lol-navigation.js). Replaced quadratic Jsbeautifier and broken fallback with a high-performance linear JavaScript tokenizer/beautifier featuring regex-literal aware string tokenization, bounded line wrapping, and clamped indentation.
   - Hash Guessing Lab / Wired task cancellation into the centralized progress manager, displaying 'Cancelling Task...' with the orange status glow before returning cleanly to Ready.
   - Status Bar / Synchronized live percentage calculations across all progress views using uniform rounding.
   - Themes / Added smooth sweeping glow animation to indeterminate progress bars.

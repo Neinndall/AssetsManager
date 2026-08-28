@@ -36,37 +36,42 @@ namespace AssetsManager.Services.Formatting
                     return dataFormatted;
                 }
 
-                // PASO 2: Intentar formatear de manera profesional con Jsbeautifier (C# Port de js-beautify)
-                try
+                // Para archivos grandes (bundles o scripts minificados > 150KB), Jsbeautifier
+                // escala de forma cuadrática/exponencial (bloqueos de minutos) y se desincroniza
+                // en expresiones regulares modernas o arrays anidados de templates.
+                // QuickFormat procesa archivos de cualquier tamaño en milisegundos sin bloqueos.
+                if (jsContent.Length <= 150_000)
                 {
-                    var options = new BeautifierOptions
+                    // PASO 2: Intentar formatear con Jsbeautifier para archivos pequeños/medianos
+                    try
                     {
-                        IndentSize = 4,
-                        IndentChar = ' ',
-                        KeepArrayIndentation = true,
-                        KeepFunctionIndentation = false,
-                        BraceStyle = BraceStyle.Collapse
-                    };
+                        var options = new BeautifierOptions
+                        {
+                            IndentSize = 4,
+                            IndentChar = ' ',
+                            KeepArrayIndentation = false,
+                            KeepFunctionIndentation = false,
+                            BraceStyle = BraceStyle.Collapse
+                        };
 
-                    var beautifier = new Beautifier(options);
-                    string formatted = beautifier.Beautify(jsContent);
-                    if (!string.IsNullOrWhiteSpace(formatted))
-                    {
-                        return formatted;
+                        var beautifier = new Beautifier(options);
+                        string formatted = beautifier.Beautify(jsContent);
+                        if (!string.IsNullOrWhiteSpace(formatted) && !HasExcessiveLineLength(formatted, 1000))
+                        {
+                            return formatted;
+                        }
+                        else
+                        {
+                            _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier output was empty or exceeded safe line limits. Falling back to QuickFormat.");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier returned empty output. Falling back to QuickFormat.");
+                        _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier failed: {ex.Message}. Falling back to QuickFormat.");
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logService.LogWarning($"[JS BEAUTIFIER] Jsbeautifier failed: {ex.Message}. Falling back to QuickFormat.");
                 }
 
                 // PASO 3: Formateador lineal de alto rendimiento (Failsafe)
-                // Imprescindible para archivos minificados masivos. Si devolvemos una 
-                // única línea gigante, AvalonEdit la trunca y el comparador Diff colapsa.
                 return QuickFormat(jsContent);
             }
             catch
@@ -106,30 +111,145 @@ namespace AssetsManager.Services.Formatting
             return false;
         }
 
+        private static bool HasExcessiveLineLength(string text, int maxAllowedLength)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            int currentLen = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\n' || c == '\r')
+                {
+                    currentLen = 0;
+                }
+                else
+                {
+                    currentLen++;
+                    if (currentLen > maxAllowedLength)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private string QuickFormat(string code)
         {
-            var sb = new StringBuilder(code.Length + 1024);
+            if (string.IsNullOrEmpty(code)) return string.Empty;
+
+            var sb = new StringBuilder(code.Length + 16384);
             int indent = 0;
-            bool inString = false;
-            char stringChar = '\0';
             int currentLineLength = 0;
+            const string indentStr = INDENT;
+            const int preferredMaxLineLength = 100;
+            const int hardMaxLineLength = 400;
+            const int maxIndentLevel = 8;
+
+            void AppendIndent()
+            {
+                int effectiveIndent = Math.Clamp(indent, 0, maxIndentLevel);
+                for (int k = 0; k < effectiveIndent; k++)
+                {
+                    sb.Append(indentStr);
+                    currentLineLength += indentStr.Length;
+                }
+            }
+
+            void AppendNewline()
+            {
+                if (sb.Length > 0 && sb[sb.Length - 1] != '\n')
+                {
+                    sb.Append('\n');
+                    currentLineLength = 0;
+                    AppendIndent();
+                }
+            }
+
+            char GetLastSignificantChar()
+            {
+                for (int k = sb.Length - 1; k >= 0; k--)
+                {
+                    char sc = sb[k];
+                    if (!char.IsWhiteSpace(sc)) return sc;
+                }
+                return '\0';
+            }
+
+            string GetLastWord()
+            {
+                int end = sb.Length - 1;
+                while (end >= 0 && char.IsWhiteSpace(sb[end])) end--;
+                if (end < 0) return string.Empty;
+                int start = end;
+                while (start >= 0 && (char.IsLetterOrDigit(sb[start]) || sb[start] == '$' || sb[start] == '_')) start--;
+                return sb.ToString(start + 1, end - start);
+            }
+
+            bool CanBeRegexPrefix(char lastChar, string lastWord)
+            {
+                if (lastChar == '\0') return true;
+                if (lastChar == '=' || lastChar == '(' || lastChar == '[' || lastChar == ',' ||
+                    lastChar == ':' || lastChar == '?' || lastChar == ';' || lastChar == '!' ||
+                    lastChar == '&' || lastChar == '|' || lastChar == '{' || lastChar == '}' ||
+                    lastChar == '~' || lastChar == '^' || lastChar == '*' || lastChar == '+' ||
+                    lastChar == '-' || lastChar == '%' || lastChar == '<' || lastChar == '>' ||
+                    lastChar == '\n')
+                {
+                    return true;
+                }
+                if (!string.IsNullOrEmpty(lastWord))
+                {
+                    return lastWord == "return" || lastWord == "case" || lastWord == "throw" ||
+                           lastWord == "delete" || lastWord == "typeof" || lastWord == "void" ||
+                           lastWord == "else" || lastWord == "do" || lastWord == "in" ||
+                           lastWord == "instanceof" || lastWord == "of" || lastWord == "yield" ||
+                           lastWord == "await";
+                }
+                return false;
+            }
 
             for (int i = 0; i < code.Length; i++)
             {
                 char c = code[i];
 
-                // Failsafe: Evitar que CUALQUIER línea supere los 5000 caracteres.
-                // Si el lexer se desincroniza (ej. comillas dentro de regex complejas),
-                // esto garantiza que AvalonEdit jamás crasheará por OOM al intentar
-                // renderizar una línea infinita.
-                if (currentLineLength > 5000)
+                // 1. Strings: ", ', `
+                if (c == '"' || c == '\'' || c == '`')
                 {
-                    sb.Append('\n');
-                    currentLineLength = 0;
-                    inString = false; // Resetear estado por si se quedó atascado
+                    char quote = c;
+                    sb.Append(quote);
+                    currentLineLength++;
+                    i++;
+                    while (i < code.Length)
+                    {
+                        char sc = code[i];
+                        sb.Append(sc);
+                        currentLineLength++;
+                        if (sc == '\n') currentLineLength = 0;
+
+                        if (sc == '\\')
+                        {
+                            if (i + 1 < code.Length)
+                            {
+                                i++;
+                                sb.Append(code[i]);
+                                currentLineLength++;
+                            }
+                        }
+                        else if (sc == quote)
+                        {
+                            break;
+                        }
+                        else if (currentLineLength > hardMaxLineLength && (sc == ' ' || sc == ','))
+                        {
+                            AppendNewline();
+                        }
+                        i++;
+                    }
+                    continue;
                 }
 
-                // 1. Skip single line comments
+                // 2. Comments: // and /*
                 if (c == '/' && i + 1 < code.Length && code[i + 1] == '/')
                 {
                     while (i < code.Length && code[i] != '\n' && code[i] != '\r')
@@ -138,15 +258,15 @@ namespace AssetsManager.Services.Formatting
                         currentLineLength++;
                         i++;
                     }
-                    if (i < code.Length) 
+                    if (i < code.Length)
                     {
                         sb.Append(code[i]);
                         currentLineLength = 0;
+                        AppendIndent();
                     }
                     continue;
                 }
 
-                // 2. Skip multi-line comments
                 if (c == '/' && i + 1 < code.Length && code[i + 1] == '*')
                 {
                     sb.Append("/*");
@@ -160,60 +280,53 @@ namespace AssetsManager.Services.Formatting
                         i++;
                     }
                     if (i < code.Length) { sb.Append(code[i]); currentLineLength++; }
-                    if (i + 1 < code.Length) { sb.Append(code[i + 1]); currentLineLength++; }
-                    i++;
+                    if (i + 1 < code.Length) { sb.Append(code[i + 1]); currentLineLength++; i++; }
                     continue;
                 }
 
-                // 3. Skip regular expression literals (e.g. /regex/)
-                if (c == '/' && !inString)
+                // 3. Regular Expression Literal /.../
+                if (c == '/')
                 {
-                    char lastChar = '\0';
-                    for (int j = sb.Length - 1; j >= 0; j--)
+                    char lastChar = GetLastSignificantChar();
+                    string lastWord = GetLastWord();
+                    if (CanBeRegexPrefix(lastChar, lastWord))
                     {
-                        if (!char.IsWhiteSpace(sb[j]))
-                        {
-                            lastChar = sb[j];
-                            break;
-                        }
-                    }
-
-                    bool isRegex = lastChar == '\0' || lastChar == '=' || lastChar == '(' || lastChar == '[' || 
-                                   lastChar == ',' || lastChar == ':' || lastChar == '?' || lastChar == '&' || 
-                                   lastChar == '|' || lastChar == '!' || lastChar == '{' || lastChar == '}' || 
-                                   lastChar == ';' || lastChar == '\n' || lastChar == 'n'; // 'n' for return
-
-                    if (isRegex)
-                    {
-                        sb.Append(c);
+                        sb.Append('/');
                         currentLineLength++;
                         i++;
-                        bool inRegexCharClass = false;
+                        bool inCharClass = false;
                         while (i < code.Length)
                         {
                             char rc = code[i];
                             sb.Append(rc);
-                            if (rc == '\n') currentLineLength = 0; else currentLineLength++;
-                            
+                            currentLineLength++;
+
                             if (rc == '\\')
                             {
                                 if (i + 1 < code.Length)
                                 {
-                                    sb.Append(code[i + 1]);
-                                    currentLineLength++;
                                     i++;
+                                    sb.Append(code[i]);
+                                    currentLineLength++;
                                 }
                             }
                             else if (rc == '[')
                             {
-                                inRegexCharClass = true;
+                                inCharClass = true;
                             }
-                            else if (rc == ']')
+                            else if (rc == ']' && inCharClass)
                             {
-                                inRegexCharClass = false;
+                                inCharClass = false;
                             }
-                            else if (rc == '/' && !inRegexCharClass)
+                            else if (rc == '/' && !inCharClass)
                             {
+                                // Append flags if any
+                                while (i + 1 < code.Length && char.IsLetter(code[i + 1]))
+                                {
+                                    i++;
+                                    sb.Append(code[i]);
+                                    currentLineLength++;
+                                }
                                 break;
                             }
                             i++;
@@ -222,95 +335,76 @@ namespace AssetsManager.Services.Formatting
                     }
                 }
 
-                // 4. Basic string literal handling
-                if (c == '"' || c == '\'' || c == '`')
-                {
-                    int backslashCount = 0;
-                    int tempIndex = i - 1;
-                    while (tempIndex >= 0 && code[tempIndex] == '\\')
-                    {
-                        backslashCount++;
-                        tempIndex--;
-                    }
-
-                    if (backslashCount % 2 == 0) // No está escapada
-                    {
-                        if (!inString) { inString = true; stringChar = c; }
-                        else if (c == stringChar) inString = false;
-                    }
-                    
-                    sb.Append(c);
-                    currentLineLength++;
-                    continue;
-                }
-
-                if (inString) 
-                { 
-                    sb.Append(c); 
-                    if (c == '\n') currentLineLength = 0; else currentLineLength++;
-                    continue; 
-                }
-
+                // 4. Structural tokens
                 switch (c)
                 {
                     case '{':
-                        sb.Append(c);
-                        sb.Append('\n');
-                        currentLineLength = 0;
-                        indent++;
-                        AppendIndent(sb, indent, ref currentLineLength);
+                        sb.Append('{');
+                        if (indent < maxIndentLevel) indent++;
+                        AppendNewline();
                         break;
+
                     case '}':
-                        indent = Math.Max(0, indent - 1);
-                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n') 
-                        {
-                            sb.Append('\n');
-                            currentLineLength = 0;
-                        }
-                        AppendIndent(sb, indent, ref currentLineLength);
-                        sb.Append(c);
+                        if (indent > 0) indent--;
+                        AppendNewline();
+                        sb.Append('}');
                         currentLineLength++;
                         break;
+
+                    case '[':
+                        sb.Append('[');
+                        currentLineLength++;
+                        break;
+
+                    case ']':
+                        sb.Append(']');
+                        currentLineLength++;
+                        break;
+
                     case ';':
-                        sb.Append(c);
-                        sb.Append('\n');
-                        currentLineLength = 0;
-                        AppendIndent(sb, indent, ref currentLineLength);
+                        sb.Append(';');
+                        AppendNewline();
                         break;
+
                     case ',':
-                        sb.Append(c);
-                        sb.Append(' ');
-                        currentLineLength += 2;
-                        break;
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // Ignore original whitespace when outside strings
-                        break;
-                    case ' ':
-                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n' && sb[sb.Length - 1] != ' ')
+                        sb.Append(',');
+                        if (currentLineLength > preferredMaxLineLength)
                         {
-                            sb.Append(c);
+                            AppendNewline();
+                        }
+                        else
+                        {
+                            sb.Append(' ');
                             currentLineLength++;
                         }
                         break;
+
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // Collapse whitespace
+                        break;
+
+                    case ' ':
+                        if (sb.Length > 0 && sb[sb.Length - 1] != '\n' && sb[sb.Length - 1] != ' ')
+                        {
+                            sb.Append(' ');
+                            currentLineLength++;
+                        }
+                        break;
+
                     default:
                         sb.Append(c);
                         currentLineLength++;
+                        if (currentLineLength > hardMaxLineLength && (c == '&' || c == '|' || c == '+' || c == '-' || c == '(' || c == ')'))
+                        {
+                            AppendNewline();
+                        }
                         break;
                 }
             }
 
             return sb.ToString().Trim();
-        }
-
-        private void AppendIndent(StringBuilder sb, int count, ref int currentLineLength)
-        {
-            for (int i = 0; i < count; i++) 
-            {
-                sb.Append(INDENT);
-                currentLineLength += INDENT.Length;
-            }
         }
     }
 }
