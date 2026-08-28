@@ -34,11 +34,7 @@ namespace AssetsManager.Services.Hashes.Guessers
 
         internal IReadOnlyList<string> WordlistPaths => Corpus.GetOrCreate(
             "wordlist-paths",
-            paths =>
-            {
-                var regex = new Regex(@"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase);
-                return paths.Where(path => !regex.IsMatch(path)).ToList();
-            });
+            paths => paths.Where(path => !Regex.IsMatch(path, @"(?:^plugins/rcp-be-lol-game-data/global/default/data/characters/|/[0-9a-f]{32}\.)", RegexOptions.IgnoreCase)).ToList());
         internal override IReadOnlyList<string> BuildWordlist() =>
             Corpus.GetOrCreate("wordlist", _ => HashGuessEngine.BuildWordlist(WordlistPaths));
 
@@ -873,43 +869,32 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (stopAfterStructuredJson) return;
             }
 
-            var pluginPathRegex = new Regex(@"plugins/[0-9a-z_./@-]+", RegexOptions.IgnoreCase);
-            var frontendPathRegex = new Regex(@"\bfe/([^/]+)/([a-zA-Z0-9/_.@-]+)");
-            var dataPathRegex = new Regex(@"/DATA/([a-zA-Z0-9/_.@-]+)");
-            var assetPathRegex = new Regex(@"\blol-game-data/assets/([a-zA-Z0-9/_.@-]+)");
-            var cssUrlRegex = new Regex(@"url\(\s*[""']?([^""')?#]+)", RegexOptions.IgnoreCase);
-            var htmlAssetRegex = new Regex(@"(?:src|href|poster|data-src)\s*=\s*[""']([^""'?#]+)", RegexOptions.IgnoreCase);
-            var relativePathRegex = new Regex(@"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)");
-            var fileNameRegex = new Regex(@"[""']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\.(?:js|json|webm|html|[a-z]{3}))\b");
-            var templateRegex = new Regex(@"<template id=""[^""]*-template-([^""]+)""");
-            var sourceMapRegex = new Regex(@"sourceMappingURL=(.*?\.js)\.map");
-
             CheckLcuCandidates(
-                pluginPathRegex.Matches(text).Cast<Match>().Select(match =>
+                Regex.Matches(text, @"plugins/[0-9a-z_./@-]+", RegexOptions.IgnoreCase).Cast<Match>().Select(match =>
                     new HashGuessCandidate(NormalizePath(match.Value), HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                frontendPathRegex.Matches(text).Cast<Match>().Select(match =>
+                Regex.Matches(text, @"\bfe/([^/]+)/([a-zA-Z0-9/_.@-]+)").Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-fe-{match.Groups[1].Value}/global/default/{match.Groups[2].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                dataPathRegex.Matches(text).Cast<Match>().Select(match =>
+                Regex.Matches(text, @"/DATA/([a-zA-Z0-9/_.@-]+)").Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-be-lol-game-data/global/default/data/{match.Groups[1].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
             CheckLcuCandidates(
-                assetPathRegex.Matches(text).Cast<Match>().Select(match =>
+                Regex.Matches(text, @"\blol-game-data/assets/([a-zA-Z0-9/_.@-]+)").Cast<Match>().Select(match =>
                     new HashGuessCandidate(
                         $"plugins/rcp-be-lol-game-data/global/default/{match.Groups[1].Value}".ToLowerInvariant(),
                         HashGuessStrategy.LcuEmbeddedPath)));
 
-            foreach (Match match in cssUrlRegex.Matches(text))
+            foreach (Match match in Regex.Matches(text, @"url\(\s*[""']?([^""')?#]+)", RegexOptions.IgnoreCase))
             {
                 string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
             }
-            foreach (Match match in htmlAssetRegex.Matches(text))
+            foreach (Match match in Regex.Matches(text, @"(?:src|href|poster|data-src)\s*=\s*[""']([^""'?#]+)", RegexOptions.IgnoreCase))
             {
                 string contextualPath = ResolveRelativePath(sourcePath, match.Groups[1].Value);
                 if (contextualPath.Length > 0)
@@ -917,7 +902,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             }
 
             var relativePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match match in relativePathRegex.Matches(text))
+            foreach (Match match in Regex.Matches(text, @"[^a-zA-Z0-9/_.\\-]((?:\.|\.\.)/[a-zA-Z0-9/_.-]+)"))
             {
                 string relativePath = match.Groups[1].Value;
                 relativePaths.Add(relativePath);
@@ -925,9 +910,12 @@ namespace AssetsManager.Services.Hashes.Guessers
                 if (contextualPath.Length > 0)
                     CheckLcuCandidates(new[] { new HashGuessCandidate(contextualPath, HashGuessStrategy.LcuEmbeddedPath) });
             }
-            foreach (Match match in fileNameRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
-            foreach (Match match in templateRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value + "/template.html");
-            foreach (Match match in sourceMapRegex.Matches(text)) relativePaths.Add(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(text, @"[""']([a-zA-Z0-9][a-zA-Z0-9/_.@-]*\.(?:js|json|webm|html|[a-z]{3}))\b"))
+                relativePaths.Add(match.Groups[1].Value);
+            foreach (Match match in Regex.Matches(text, @"<template id=""[^""]*-template-([^""]+)"""))
+                relativePaths.Add(match.Groups[1].Value + "/template.html");
+            foreach (Match match in Regex.Matches(text, @"sourceMappingURL=(.*?\.js)\.map"))
+                relativePaths.Add(match.Groups[1].Value);
 
             CheckBasenames(engine, relativePaths.Select(p => p.ToLowerInvariant()), cancellationToken, sourceWadPath);
         }
@@ -1210,9 +1198,8 @@ namespace AssetsManager.Services.Hashes.Guessers
             var filePaths = filesProperty.EnumerateObject()
                 .Select(property => property.Value.GetString()?.ToLowerInvariant() ?? string.Empty)
                 .ToList();
-            var splashNameRegex = new Regex(@"-splash-([^.]+)");
             var splashNames = filePaths
-                .SelectMany(path => splashNameRegex.Matches(path).Select(match => match.Groups[1].Value.ToLowerInvariant()))
+                .SelectMany(path => Regex.Matches(path, @"-splash-([^.]+)").Select(match => match.Groups[1].Value.ToLowerInvariant()))
                 .ToHashSet(StringComparer.Ordinal);
 
             foreach (string splashName in splashNames)
