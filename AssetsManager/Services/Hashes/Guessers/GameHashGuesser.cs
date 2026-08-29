@@ -410,7 +410,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progress?.Report(engine.CreateProgress(
                     "GAME Custom: shader vocabulary attack", checkedCandidates));
                 int progressOffset = checkedCandidates;
-                checkedCandidates += GuessCustomShaders(
+                checkedCandidates += SubstituteShaderVocabWords(
                     engine,
                     cancellationToken,
                     candidateBudget: CustomShaderCandidateBudget,
@@ -421,7 +421,7 @@ namespace AssetsManager.Services.Hashes.Guessers
             return checkedCandidates;
         }
 
-        internal int GuessCustomShaders(
+        internal int SubstituteShaderVocabWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
             int candidateBudget = int.MaxValue,
