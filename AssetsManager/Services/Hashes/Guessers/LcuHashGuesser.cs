@@ -820,7 +820,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                 KnownPaths,
                 BuildWordlist(),
                 cancellationToken,
-                candidateBudget: 250_000_000,
+                candidateBudget: 150_000_000,
                 source: "LCU basename word addition",
                 progress: progress);
 
