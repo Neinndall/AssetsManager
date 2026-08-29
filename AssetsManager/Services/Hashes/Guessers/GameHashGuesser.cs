@@ -458,13 +458,6 @@ namespace AssetsManager.Services.Hashes.Guessers
                 progress: progress);
         }
 
-        internal int GuessCustomShaders(
-            HashGuessEngine engine,
-            CancellationToken cancellationToken,
-            int candidateBudget = CustomShaderCandidateBudget,
-            Action<int> progress = null) =>
-            SubstituteShaderVocabWords(engine, cancellationToken, candidateBudget, progress);
-
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
             var paths = Corpus.GetOrCreate("word-addition-paths", values => values.Where(path =>
