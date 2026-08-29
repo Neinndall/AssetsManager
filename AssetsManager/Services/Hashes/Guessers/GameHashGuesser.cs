@@ -38,12 +38,12 @@ namespace AssetsManager.Services.Hashes.Guessers
         private const int CustomCharacterTexCandidateBudget = 100_000_000;
         private const int CustomSwordlistCandidateBudget = 100_000_000;
         private const int CustomWordlistCandidateBudget = 100_000_000;
-        private const int CustomWordAdditionCandidateBudget = 100_000_000;
+        private const int CustomWordAdditionCandidateBudget = 150_000_000;
         private const int CustomShaderCandidateBudget = 100_000_000;
-        private const int SkinGroupCandidateBudget = 100_000_000;
-        private const int SuffixSubstitutionCandidateBudget = 100_000_000;
-        private const int CharacterSubstitutionCandidateBudget = 100_000_000;
-        private const int SkinNumberSubstitutionCandidateBudget = 100_000_000;
+        private const int SkinGroupCandidateBudget = 150_000_000;
+        private const int SuffixSubstitutionCandidateBudget = 150_000_000;
+        private const int CharacterSubstitutionCandidateBudget = 150_000_000;
+        private const int SkinNumberSubstitutionCandidateBudget = 150_000_000;
         private const int EsportsBannerSingleCandidateBudget = 2_000_000;
         private const int EsportsBannerCompoundCandidateBudget = 10_000_000;
         private const int EsportsBannerDoubleCandidateBudget = 2_000_000;
