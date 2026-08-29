@@ -424,150 +424,46 @@ namespace AssetsManager.Services.Hashes.Guessers
         internal int SubstituteShaderVocabWords(
             HashGuessEngine engine,
             CancellationToken cancellationToken,
-            int candidateBudget = int.MaxValue,
+            int candidateBudget = CustomShaderCandidateBudget,
             Action<int> progress = null)
         {
             if (engine.RemainingUnknownCount == 0 || candidateBudget <= 0) return 0;
 
-            IReadOnlyList<string> shaderDirs = Corpus.GetOrCreate("custom-shader-directories", paths =>
-            {
-                var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string path in paths)
-                {
-                    if (path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) ||
-                        path.StartsWith("data/shaders/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        int lastSlash = path.LastIndexOf('/');
-                        if (lastSlash > 0)
-                        {
-                            dirs.Add(path[..(lastSlash + 1)]);
-                        }
-                    }
-                }
+            var shaderPattern = new Regex(@".*\.[pv]s(?:_[23]_0|(?=$|[.-]))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            IReadOnlyList<string> shaderPaths = Corpus.GetOrCreate(
+                "custom-shader-paths",
+                paths => paths
+                    .Where(path => path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) || shaderPattern.IsMatch(path))
+                    .ToList());
 
-                dirs.Add("assets/shaders/");
-                dirs.Add("assets/shaders/hlsl/");
-                dirs.Add("assets/shaders/hlsl/environment/");
-                dirs.Add("assets/shaders/hlsl/enveffectors/");
-                dirs.Add("assets/shaders/hlsl/filters/");
-                dirs.Add("assets/shaders/hlsl/hud/");
-                dirs.Add("assets/shaders/hlsl/ssao/");
-                dirs.Add("assets/shaders/hlsl/gamma/");
-                dirs.Add("assets/shaders/hlsl/skinnedmesh/");
-                dirs.Add("assets/shaders/hlsl/particlesystem/");
-                dirs.Add("assets/shaders/hlsl/ui/");
-                dirs.Add("assets/shaders/generated/");
-                dirs.Add("assets/shaders/generated/shaders/");
-                dirs.Add("data/shaders/");
-                dirs.Add("data/shaders/hlsl/");
-                return dirs.OrderBy(d => d, StringComparer.Ordinal).ToList();
-            });
+            IReadOnlyList<string> shaderNames = Corpus.GetOrCreate(
+                "custom-shader-names",
+                _ => shaderPaths.Select(GetBasename).ToList());
 
-            IReadOnlyList<string> vocabulary = Corpus.GetOrCreate("custom-shader-vocabulary", _ =>
-            {
-                var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<string> shaderWordlist = Corpus.GetOrCreate(
+                "custom-shader-wordlist",
+                _ => HashGuessEngine.BuildWordlist(shaderNames));
 
-                foreach (string path in KnownPaths)
-                {
-                    if (path.StartsWith("assets/shaders/", StringComparison.OrdinalIgnoreCase) ||
-                        path.StartsWith("data/shaders/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string basename = GetBasename(path);
-                        foreach (string token in basename.Split(new[] { '_', '-', '.' }, StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            if (token.Length >= 2 && token.Length <= 24 && token.All(char.IsLetterOrDigit))
-                            {
-                                words.Add(token.ToLowerInvariant());
-                            }
-                        }
-                    }
-                }
+            if (shaderPaths.Count == 0 || shaderWordlist.Count == 0) return 0;
 
-                string[] graphicsSeed =
-                {
-                    "ssao", "hbao", "gtao", "sdf", "fxaa", "smaa", "taa", "pbr", "dof", "hdr", "lut",
-                    "bloom", "fog", "fow", "env", "effectors", "effector", "simple", "blur", "gauss",
-                    "edge", "aware", "composite", "compositor", "decal", "distortion", "outline",
-                    "minimap", "hud", "terrain", "water", "clouds", "sky", "particle", "trail",
-                    "copy", "blit", "resolve", "downsample", "upsample", "tonemap", "vignette",
-                    "depth", "shadow", "mask", "stencil", "normal", "albedo", "specular", "roughness",
-                    "metallic", "cubemap", "gamma", "noise", "radial", "gradient", "post", "light",
-                    "shared", "uber", "unlit", "lit", "alpha", "blend", "filter", "sample"
-                };
-
-                foreach (string seed in graphicsSeed)
-                {
-                    words.Add(seed.ToLowerInvariant());
-                }
-
-                return words.OrderBy(w => w, StringComparer.Ordinal).ToList();
-            });
-
-            IReadOnlyList<string> compoundNames = Corpus.GetOrCreate("custom-shader-compound-names", _ =>
-            {
-                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (string word in vocabulary)
-                {
-                    names.Add(word);
-                    names.Add($"ps_{word}");
-                    names.Add($"vs_{word}");
-                }
-
-                foreach (string w1 in vocabulary)
-                {
-                    foreach (string w2 in vocabulary)
-                    {
-                        if (w1.Length + w2.Length > 24) continue;
-                        names.Add($"{w1}{w2}");
-                        names.Add($"{w1}_{w2}");
-                        names.Add($"ps_{w1}_{w2}");
-                        names.Add($"vs_{w1}_{w2}");
-                    }
-                }
-
-                return names.OrderBy(n => n, StringComparer.Ordinal).ToList();
-            });
-
-            IEnumerable<HashGuessCandidate> GenerateCandidates()
-            {
-                foreach (string dir in shaderDirs)
-                {
-                    foreach (string name in compoundNames)
-                    {
-                        string basePath = $"{dir}{name}";
-
-                        foreach (string ext in ShaderExtensions)
-                        {
-                            yield return new HashGuessCandidate($"{basePath}{ext}", HashGuessStrategy.ShaderVariant);
-
-                            foreach (string variant in ShaderVariants)
-                            {
-                                yield return new HashGuessCandidate($"{basePath}{ext}{variant}", HashGuessStrategy.ShaderVariant);
-
-                                for (int index = 0; index <= 15; index++)
-                                {
-                                    yield return new HashGuessCandidate($"{basePath}{ext}{variant}_{index}", HashGuessStrategy.ShaderVariant);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            IEnumerable<HashGuessCandidate> candidates = GenerateCandidates();
-            if (candidateBudget != int.MaxValue)
-            {
-                candidates = candidates.Take(candidateBudget);
-            }
-
-            return CheckIter(
+            return _SubstituteBasenameWords(
                 engine,
-                candidates,
-                "GAME Custom: shader vocabulary attack",
+                shaderPaths,
+                shaderWordlist,
+                oldWordCount: 1,
+                newWordCount: 1,
                 cancellationToken,
-                progress);
+                candidateBudget: candidateBudget,
+                source: "GAME Custom: shader vocabulary attack",
+                progress: progress);
         }
+
+        internal int GuessCustomShaders(
+            HashGuessEngine engine,
+            CancellationToken cancellationToken,
+            int candidateBudget = CustomShaderCandidateBudget,
+            Action<int> progress = null) =>
+            SubstituteShaderVocabWords(engine, cancellationToken, candidateBudget, progress);
 
         internal int AddBasenameWord(HashGuessEngine engine, CancellationToken cancellationToken, int candidateBudget = int.MaxValue)
         {
