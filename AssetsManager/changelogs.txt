@@ -512,3 +512,4 @@ Bug Fixes
   - VFX Studio: Fixed billboard particle emitters with opaque RGB masks rendering rectangular background quad artifacts in Alpha and Additive blend modes.
   - Hash Lab: Fixed shader variant guessing to generate low consecutive permutation indices and broaden HLSL path prefixes in Wad Path Grep.
   - Hash Lab: GAME and LCU attacks now stop promptly when Cancel is pressed, including WAD path scanning.
+  - Monitor / API Center: Fixed background placeholder icons remaining visible behind transparent reward and store card artwork.

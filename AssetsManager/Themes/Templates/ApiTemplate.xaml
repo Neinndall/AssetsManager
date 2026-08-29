@@ -25,7 +25,8 @@
                             BorderThickness="1">
                         <Grid>
                             <!-- Watermark / Placeholder -->
-                            <materialIcons:MaterialIcon Kind="TagOutline" Width="36" Height="36" Foreground="{StaticResource AccentGreen}" Opacity="0.08" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="TagOutline" Width="36" Height="36" Foreground="{StaticResource AccentGreen}" Opacity="0.08" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                        Visibility="{Binding ImagePath, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
 
                             <!-- Hero Artwork / Skin / Chroma Image with Rounded Corners -->
                             <Border CornerRadius="9">
@@ -106,7 +107,8 @@
                             BorderThickness="1">
                         <Grid>
                             <!-- Watermark / Placeholder -->
-                            <materialIcons:MaterialIcon Kind="DiamondStone" Width="36" Height="36" Foreground="{StaticResource AccentPurple}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="DiamondStone" Width="36" Height="36" Foreground="{StaticResource AccentPurple}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                        Visibility="{Binding ImagePath, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
 
                             <!-- Hero Artwork / Chroma Image with Rounded Corners -->
                             <Border CornerRadius="9">
@@ -182,7 +184,8 @@
                             ClipToBounds="True">
                         <Grid>
                             <!-- Watermark Placeholder Icon -->
-                            <materialIcons:MaterialIcon Kind="TicketPercentOutline" Width="32" Height="32" Foreground="{StaticResource AccentTeal}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <materialIcons:MaterialIcon Kind="TicketPercentOutline" Width="32" Height="32" Foreground="{StaticResource AccentTeal}" Opacity="0.1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                        Visibility="{Binding IconUrl, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
                             
                             <!-- Actual Reward Icon -->
                             <Image Source="{Binding IconUrl}" Stretch="Uniform" Margin="4" HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>

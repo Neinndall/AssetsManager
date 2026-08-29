@@ -685,6 +685,7 @@ namespace AssetsManager.Views.Controls.Monitor
             var rewardGroupsMap = rewardsResponse.Data.ToDictionary(g => g.Id, g => g);
             var passRewards = new List<PassRewardModel>();
             var processedKeys = new HashSet<string>();
+            var rewardUrlMap = new List<(PassRewardModel Model, string Url)>();
 
             foreach (var milestone in progression.Milestones)
             {
@@ -713,18 +714,35 @@ namespace AssetsManager.Views.Controls.Monitor
                             details = reward.Localizations.Details;
                         }
 
-                        passRewards.Add(new PassRewardModel
+                        string rawUrl = reward.Media.IconUrl;
+                        string initialIconPath = null;
+                        if (DirectoriesCreator != null && !string.IsNullOrEmpty(rawUrl))
+                        {
+                            string cached = Path.Combine(DirectoriesCreator.ApiCacheRewardsPath, Path.GetFileName(rawUrl));
+                            if (File.Exists(cached))
+                            {
+                                initialIconPath = cached;
+                            }
+                        }
+
+                        var model = new PassRewardModel
                         {
                             Level = translatedLevel,
                             Title = TransformTitle(title, reward.Quantity),
                             Details = details,
-                            IconUrl = reward.Media.IconUrl,
+                            IconUrl = initialIconPath,
                             Quantity = reward.Quantity,
                             // Priority logic: _Free takes precedence over _Pass. 
                             // If neither is present (Mini-Events), it defaults to FREE.
                             IsFree = milestone.Name.Contains("_Free", StringComparison.OrdinalIgnoreCase) || 
                                      !milestone.Name.Contains("_Pass", StringComparison.OrdinalIgnoreCase)
-                        });
+                        };
+
+                        passRewards.Add(model);
+                        if (!string.IsNullOrEmpty(rawUrl))
+                        {
+                            rewardUrlMap.Add((model, rawUrl));
+                        }
 
                         processedKeys.Add(key);
                         break; // Following GeneratorRewards logic: process only the first reward
@@ -735,7 +753,11 @@ namespace AssetsManager.Views.Controls.Monitor
             ViewModel.PassRewards.ReplaceRange(passRewards);
 
             // Batch extract icons efficiently
-            var urlsToExtract = passRewards.Select(r => r.IconUrl).ToList();
+            var urlsToExtract = rewardUrlMap
+                .Where(x => x.Model.IconUrl == null)
+                .Select(x => x.Url)
+                .Distinct()
+                .ToList();
             
             _ = Task.Run(async () => 
             {
@@ -744,7 +766,7 @@ namespace AssetsManager.Views.Controls.Monitor
                     await RiotApiService.ExtractRewardIconsBatchAsync(urlsToExtract, async (originalUrl, localPath) => 
                     {
                         // Find all models using this URL (there might be duplicates across levels)
-                        var targets = passRewards.Where(r => r.IconUrl == originalUrl).ToList();
+                        var targets = rewardUrlMap.Where(x => x.Url == originalUrl).Select(x => x.Model).ToList();
                         
                         await Dispatcher.InvokeAsync(() => 
                         {
