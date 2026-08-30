@@ -344,12 +344,12 @@ namespace AssetsManager.Services.Core
                 return new List<GitHubCommit>();
             }
         }
-    }
 
-    public class GitHubCacheEntry
-    {
-        public string ETag { get; set; }
-        public string JsonPayload { get; set; }
-        public DateTime LastUpdated { get; set; }
+        private class GitHubCacheEntry
+        {
+            public string ETag { get; set; }
+            public string JsonPayload { get; set; }
+            public DateTime LastUpdated { get; set; }
+        }
     }
 }
