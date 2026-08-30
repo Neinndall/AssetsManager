@@ -296,6 +296,8 @@ namespace AssetsManager.Services.Core
                     var commits = await _gitHubApiService.GetEnrichedCommitsAsync("qa", "qa-testing", 100);
                     cancellationToken.ThrowIfCancellationRequested();
 
+                    if (commits == null || commits.Count == 0) return;
+
                     string installedSha = VersionInfo.QaCommitSha;
                     if (string.IsNullOrEmpty(installedSha)) return;
 

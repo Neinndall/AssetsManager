@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -275,6 +276,23 @@ namespace AssetsManager.Services.Updater
                 {
                     latestVersionRaw = _lastLatestVersionRaw;
                 }
+                else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    string webTag = await ResolveLatestVersionViaWebRedirectAsync();
+                    if (!string.IsNullOrEmpty(webTag))
+                    {
+                        latestVersionRaw = webTag;
+                        _lastLatestVersionRaw = latestVersionRaw;
+                    }
+                    else if (!string.IsNullOrEmpty(_lastLatestVersionRaw))
+                    {
+                        latestVersionRaw = _lastLatestVersionRaw;
+                    }
+                    else
+                    {
+                        return (false, null);
+                    }
+                }
                 else
                 {
                     response.EnsureSuccessStatusCode();
@@ -308,10 +326,42 @@ namespace AssetsManager.Services.Updater
             }
             catch (Exception ex)
             {
-                _logService.LogError(ex, "Error checking for new version in IsNewVersionAvailableAsync.");
+                _logService.LogWarning($"Could not check for new version: {ex.Message}");
             }
 
             return (false, null);
+        }
+
+        private async Task<string> ResolveLatestVersionViaWebRedirectAsync()
+        {
+            try
+            {
+                using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+                using var client = new HttpClient(handler);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("AssetsManager");
+
+                using var response = await client.GetAsync("https://github.com/Neinndall/AssetsManager/releases/latest");
+                if (response.StatusCode == System.Net.HttpStatusCode.Redirect ||
+                    response.StatusCode == System.Net.HttpStatusCode.MovedPermanently ||
+                    response.StatusCode == System.Net.HttpStatusCode.Found ||
+                    response.StatusCode == System.Net.HttpStatusCode.SeeOther)
+                {
+                    var location = response.Headers.Location?.ToString();
+                    if (!string.IsNullOrEmpty(location))
+                    {
+                        string tag = location.Split('/').LastOrDefault();
+                        if (!string.IsNullOrEmpty(tag))
+                        {
+                            return tag;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.LogDebug($"[UpdateManager] Web redirect version check failed: {ex.Message}");
+            }
+            return null;
         }
     }
 }

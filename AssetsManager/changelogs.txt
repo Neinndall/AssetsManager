@@ -15,6 +15,7 @@ New Features
   - Wad Comparison / Optimized comparison metrics aggregation (CalculateInsights) into a single-pass O(N) pipeline for instant recalculations with zero UI latency.
   - History Explorer / 'Sync History' now synchronizes bidirectionally with disk, importing new folders and removing deleted ones.
   - Monitor Backups / Optimized snapshot directory measurement with direct Win32 enumeration for fast single-threaded backup loading.
+  - GitHub API / Added persistent disk caching, ETag validation, web redirect fallback, and rate-limit backoff to eliminate 403 quota exhaustion on VPNs and shared IPs.
   - VFX Studio now applies authored stencil masks so clipped particles and meshes render without visible mask geometry.
   - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
   - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
