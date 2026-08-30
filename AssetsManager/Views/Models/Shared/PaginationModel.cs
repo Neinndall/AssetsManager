@@ -37,7 +37,6 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _currentPage, value))
                 {
-                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
@@ -51,7 +50,6 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _pageSize, value))
                 {
-                    _pageInfo = null;
                     UpdatePaging();
                 }
             }
@@ -65,7 +63,6 @@ namespace AssetsManager.Views.Models.Shared
             {
                 if (SetProperty(ref _totalPages, value))
                 {
-                    _pageInfo = null;
                     OnPropertyChanged(nameof(CanGoToNextPage));
                     OnPropertyChanged(nameof(CanGoToPreviousPage));
                     OnPropertyChanged(nameof(CanGoToFirstPage));
@@ -79,10 +76,9 @@ namespace AssetsManager.Views.Models.Shared
         public bool CanGoToNextPage => CurrentPage < TotalPages;
         public bool CanGoToFirstPage => CurrentPage > 1;
         public bool CanGoToLastPage => CurrentPage < TotalPages;
-        private string _pageInfo;
-        public string PageInfo => _pageInfo ??= $"{CurrentPage} / {TotalPages}";
+        public string PageInfo => $"{CurrentPage} / {TotalPages}";
 
-        public void SetFullList(IEnumerable<T> fullList, bool preservePage = false)
+        public void SetFullList(IEnumerable<T> fullList, bool preservePage = true)
         {
             int savedPage = preservePage ? CurrentPage : 1;
             _fullList = fullList?.ToList() ?? new List<T>();

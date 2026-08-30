@@ -81,6 +81,7 @@ New Features
   - Monitor / Version Manager: Fetch Versions now flags newly discovered manifests with an inline NEW tag (icon + text) next to the publish date.
 
 Improvements
+  - Monitor / Watcher: Preserved active pagination page and synchronized PageInfo display when validating or updating monitored assets.
   - Api Center / Added in-place image replacement with Drag & Drop support and inline title editing for Pass Rewards cards.
   - Monitor / Api Center: Added dedicated Target Client Environment (PBE / LIVE) in Advanced Settings, completely decoupling API service connection and catalog extraction from general explorer preferences.
   - Monitor / Api Center: Added Offline Cache Persistence toggle in Advanced Settings to automatically load and render cached sales, mythic shop, and event rewards without requiring an active League client session.
