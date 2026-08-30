@@ -238,15 +238,38 @@ namespace AssetsManager.Services.Monitor
             }
         }
 
-        public async Task<int> SyncOrphanedArchivesAsync()
+        public async Task<(int RecoveredCount, int RemovedCount)> SyncOrphanedArchivesAsync()
         {
             int recoveredCount = 0;
+            int removedCount = 0;
             
             try
             {
-                if (!Directory.Exists(_directoriesCreator.WadComparisonSavePath))
+                var archiveDirs = Directory.Exists(_directoriesCreator.WadComparisonSavePath)
+                    ? Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath)
+                    : Array.Empty<string>();
+                var physicalFolderNames = new HashSet<string>(
+                    archiveDirs.Select(Path.GetFileName),
+                    StringComparer.OrdinalIgnoreCase
+                );
+
+                bool changesMade = false;
+
+                // 1. Remove history entries whose physical folder on disk was deleted
+                var deletedEntries = _appSettings.DiffHistory
+                    .Where(h => (h.Type == HistoryEntryType.WadArchive || h.Type == HistoryEntryType.WadFile) &&
+                                !string.IsNullOrEmpty(h.ReferenceId) &&
+                                !physicalFolderNames.Contains(h.ReferenceId))
+                    .ToList();
+
+                if (deletedEntries.Count > 0)
                 {
-                    return 0;
+                    foreach (var entry in deletedEntries)
+                    {
+                        _appSettings.DiffHistory.Remove(entry);
+                    }
+                    removedCount = deletedEntries.Count;
+                    changesMade = true;
                 }
 
                 var existingReferenceIds = new HashSet<string>(
@@ -256,10 +279,7 @@ namespace AssetsManager.Services.Monitor
                     StringComparer.OrdinalIgnoreCase
                 );
 
-                var archiveDirs = Directory.GetDirectories(_directoriesCreator.WadComparisonSavePath);
-
-                bool changesMade = false;
-
+                // 2. Import missing folders from disk
                 foreach (var dir in archiveDirs)
                 {
                     string folderName = Path.GetFileName(dir);
@@ -349,7 +369,7 @@ namespace AssetsManager.Services.Monitor
                 _logService.LogError(ex, "Failed to synchronize orphaned archives.");
             }
 
-            return recoveredCount;
+            return (recoveredCount, removedCount);
         }
 
         public void DeleteComparison(HistoryEntry entry)

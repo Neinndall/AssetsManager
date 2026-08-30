@@ -96,15 +96,20 @@ namespace AssetsManager.Views.Controls.Monitor
         {
             try
             {
-                int recoveredCount = await ComparisonHistoryService.SyncOrphanedArchivesAsync();
+                var (recoveredCount, removedCount) = await ComparisonHistoryService.SyncOrphanedArchivesAsync();
                 
-                if (recoveredCount > 0)
+                RefreshHistory();
+
+                if (recoveredCount > 0 || removedCount > 0)
                 {
-                    LogService.LogSuccess($"Successfully synchronized {recoveredCount} orphaned history entry(s).");
+                    var details = new List<string>();
+                    if (recoveredCount > 0) details.Add($"{recoveredCount} imported");
+                    if (removedCount > 0) details.Add($"{removedCount} removed");
+                    LogService.LogSuccess($"History synchronized with disk: {string.Join(", ", details)}.");
                 }
                 else
                 {
-                    LogService.Log("No orphaned history entries found to synchronize.");
+                    LogService.Log("History is already synchronized with local comparisons folder.");
                 }
             }
             catch (Exception ex)
