@@ -198,6 +198,8 @@ namespace AssetsManager.Services.Monitor
                 var basePaths = configuredPaths
                     .Where(path => !string.IsNullOrWhiteSpace(path));
 
+                var candidateEntries = new List<(string Dir, string Version, bool IsPbe, bool IsMain)>();
+
                 foreach (string basePath in basePaths)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -212,25 +214,7 @@ namespace AssetsManager.Services.Monitor
                             string version = _versionService.GetGameVersionAsync(dir).GetAwaiter().GetResult();
                             if (version == null) continue;
                             var (isPbe, isMain) = GetPathIdentification(dir);
-                            DirectoryMetrics metrics = includeStorageMetrics
-                                ? MeasureDirectory(dir, cancellationToken)
-                                : default;
-                            backups.Add(new BackupModel
-                            {
-                                Name = Path.GetFileName(dir),
-                                DisplayName = GetBackupDisplayName(null, dir),
-                                Version = version,
-                                IsPbe = isPbe,
-                                Path = dir,
-                                IsMainClient = isMain,
-                                CreationDate = Directory.GetCreationTime(dir),
-                                Size = metrics.TotalBytes,
-                                SizeDisplay = includeStorageMetrics
-                                    ? FormatUtils.FormatSize(metrics.TotalBytes)
-                                    : null,
-                                IsSelected = false,
-                                IsCurrentSessionBackup = IsCurrentSessionBackup(dir)
-                            });
+                            candidateEntries.Add((dir, version, isPbe, isMain));
                         }
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
@@ -238,6 +222,50 @@ namespace AssetsManager.Services.Monitor
                         _logService.LogError(ex, $"Error scanning directory for backups: {parentDir}");
                     }
                 }
+
+                var metricsMap = new System.Collections.Concurrent.ConcurrentDictionary<string, DirectoryMetrics>(StringComparer.OrdinalIgnoreCase);
+
+                if (includeStorageMetrics)
+                {
+                    var snapshotsToMeasure = candidateEntries
+                        .Where(e => !e.IsMain)
+                        .Select(e => e.Dir)
+                        .ToList();
+
+                    if (snapshotsToMeasure.Count > 0)
+                    {
+                        Parallel.ForEach(snapshotsToMeasure, new ParallelOptions
+                        {
+                            CancellationToken = cancellationToken,
+                            MaxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount / 2)
+                        }, dir =>
+                        {
+                            metricsMap[dir] = MeasureDirectory(dir, cancellationToken);
+                        });
+                    }
+                }
+
+                foreach (var (dir, version, isPbe, isMain) in candidateEntries)
+                {
+                    DirectoryMetrics metrics = metricsMap.TryGetValue(dir, out var m) ? m : default;
+                    backups.Add(new BackupModel
+                    {
+                        Name = Path.GetFileName(dir),
+                        DisplayName = GetBackupDisplayName(null, dir),
+                        Version = version,
+                        IsPbe = isPbe,
+                        Path = dir,
+                        IsMainClient = isMain,
+                        CreationDate = Directory.GetCreationTime(dir),
+                        Size = metrics.TotalBytes,
+                        SizeDisplay = includeStorageMetrics && !isMain
+                            ? FormatUtils.FormatSize(metrics.TotalBytes)
+                            : null,
+                        IsSelected = false,
+                        IsCurrentSessionBackup = IsCurrentSessionBackup(dir)
+                    });
+                }
+
                 return FilterByClient(backups, client)
                     .OrderByDescending(backup => backup.CreationDate)
                     .ToList();
@@ -362,15 +390,29 @@ namespace AssetsManager.Services.Monitor
 
         private static DirectoryMetrics MeasureDirectory(string path, CancellationToken cancellationToken)
         {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                return default;
+            }
+
             int fileCount = 0;
             long totalBytes = 0;
-            foreach (string filePath in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+
+            var enumerationOptions = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            var dirInfo = new DirectoryInfo(path);
+            foreach (var file in dirInfo.EnumerateFiles("*", enumerationOptions))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var info = new FileInfo(filePath);
                 fileCount++;
-                totalBytes += info.Length;
+                totalBytes += file.Length;
             }
+
             return new DirectoryMetrics(fileCount, totalBytes);
         }
 
