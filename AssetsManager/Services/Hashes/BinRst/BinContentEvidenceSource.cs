@@ -777,7 +777,48 @@ namespace AssetsManager.Services.Hashes
             {
                 if (item.ClassHash is uint classHash)
                 {
-                    if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
+                    if (NamedEntryTypes.Contains(classHash))
+                        MatchEntryDirect(entryHash, item, "name");
+                    else if (classHash == Fnv1a.HashLower("ContextualActionData"))
+                        MatchEntryDirect(entryHash, item, "mObjectPath");
+                    else if (classHash == Fnv1a.HashLower("CustomShaderDef"))
+                        MatchEntryDirect(entryHash, item, "objectPath");
+                    else if (classHash == Fnv1a.HashLower("RewardGroup"))
+                        MatchEntryDirect(entryHash, item, "internalName");
+                    else if (classHash == Fnv1a.HashLower("Sequence"))
+                        MatchEntryDirect(entryHash, item, "path");
+                    else if (classHash == 0x8d31b69b)
+                    {
+                        if (TryGetString(item.Properties, "QuestName", out string qName))
+                            MatchObservedEntry(entryHash, $"Maps/ModeSpecificData/ModesQuests/{qName}");
+                    }
+                    else if (classHash == Fnv1a.HashLower("TftShopData"))
+                    {
+                        if (TryGetString(item.Properties, "mName", out string shopName))
+                        {
+                            for (int set = 1; set < 30; set++)
+                                if (MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Sets/TFTSet{set}/Shop/{shopName}"))
+                                    break;
+                            MatchObservedEntry(entryHash, $"Maps/Shipping/Map22/Shop/{shopName}");
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("MapPlaceableContainer"))
+                    {
+                        if (item.Properties.TryGetValue(Fnv1a.HashLower("items"), out BinTreeProperty itemsProp) &&
+                            itemsProp is BinTreeMap itemsMap)
+                        {
+                            foreach (var pair in itemsMap)
+                            {
+                                if (pair.Value is BinTreeStruct placeableStruct &&
+                                    placeableStruct.ClassHash == Fnv1a.HashLower("GdsMapObject") &&
+                                    TryGetStringByHash(placeableStruct.Properties, 0xad304db5, out string gdsPath))
+                                {
+                                    MatchAnyEntry(gdsPath);
+                                }
+                            }
+                        }
+                    }
+                    else if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
                         MatchCharacterRecord(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("GameFontDescription"))
                         MatchEntryPattern(entryHash, item, "name", value => $"UX/Fonts/Descriptions/{value}");
@@ -800,7 +841,13 @@ namespace AssetsManager.Services.Hashes
                     else if (classHash == Fnv1a.HashLower("TftMapSkin"))
                     {
                         if (TryGetString(item.Properties, "mapContainer", out string mapContainer))
-                            MatchObservedEntry(entryHash, $"Loadouts/TFTMapSkins/{mapContainer[(mapContainer.LastIndexOf('/') + 1)..]}");
+                        {
+                            int lastSlash = mapContainer.LastIndexOf('/');
+                            string containerName = lastSlash >= 0 ? mapContainer[(lastSlash + 1)..] : mapContainer;
+                            MatchObservedEntry(entryHash, $"Loadouts/TFTMapSkins/{containerName}");
+                        }
+                        if (TryGetString(item.Properties, "GroupLink", out string groupLink))
+                            MatchAnyEntry(groupLink);
                         MatchAnyEntryString(item, "speciesLink");
                     }
                     else if (classHash == Fnv1a.HashLower("SpellObject"))
@@ -860,11 +907,17 @@ namespace AssetsManager.Services.Hashes
                     else if (SkinCharacterDataPropertiesTypes.Contains(classHash))
                         MatchSkinCharacterData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") || classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
+                    {
+                        MatchEntryDirect(entryHash, item, "particlePath");
                         MatchVfxData(entryHash, item);
+                    }
                     else if (classHash == Fnv1a.HashLower("ResourceResolver") || classHash == Fnv1a.HashLower("GlobalResourceResolver"))
                         MatchHashLinkMap(item, "resourceMap");
                     else if (classHash == Fnv1a.HashLower("MapContainer"))
+                    {
+                        MatchEntryDirect(entryHash, item, "mapPath");
                         MatchHashLinkMap(item, "chunks");
+                    }
                 }
             }
 
@@ -1339,6 +1392,11 @@ namespace AssetsManager.Services.Hashes
             {
                 if (item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property)) VisitStrings(property, MatchAnyEntry);
             }
+            void MatchEntryDirect(uint entryHash, BinTreeObject item, string field)
+            {
+                if (TryGetString(item.Properties, field, out string val) && !string.IsNullOrWhiteSpace(val))
+                    MatchObservedEntry(entryHash, val);
+            }
             bool MatchObservedEntry(uint hash, string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath, hash);
             void MatchAnyEntry(string value) => matcher.CheckContextualCandidate(InternalHashKind.BinEntries, value, path, wadPath);
 
@@ -1362,9 +1420,12 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value)
+            static bool TryGetString(Dictionary<uint, BinTreeProperty> properties, string field, out string value) =>
+                TryGetStringByHash(properties, Fnv1a.HashLower(field), out value);
+
+            static bool TryGetStringByHash(Dictionary<uint, BinTreeProperty> properties, uint fieldHash, out string value)
             {
-                if (properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty property) && property is BinTreeString text)
+                if (properties.TryGetValue(fieldHash, out BinTreeProperty property) && property is BinTreeString text)
                 {
                     value = text.Value;
                     return true;
