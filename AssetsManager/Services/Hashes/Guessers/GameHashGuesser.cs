@@ -760,7 +760,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                     int dotIdx = stem.IndexOf('.');
                     if (dotIdx > 0) stem = stem[..dotIdx];
 
-                    if (stem.Length < 2 || stem.Length > 45) continue;
+                    if (stem.Length < 2 || stem.Length > 80) continue;
                     if (stem.All(char.IsDigit) || (stem.Length == 16 && stem.All(c => char.IsAsciiHexDigitLower(c)))) continue;
 
                     bool isValid = true;
@@ -780,7 +780,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         if (afterSkin > 0 && afterSkin < stem.Length - 1)
                         {
                             string sub = stem[(afterSkin + 1)..];
-                            if (sub.Length >= 2 && sub.Length <= 45 && !sub.All(char.IsDigit))
+                            if (sub.Length >= 2 && sub.Length <= 80 && !sub.All(char.IsDigit))
                                 AddCount(sub);
                         }
                     }
@@ -790,7 +790,7 @@ namespace AssetsManager.Services.Hashes.Guessers
                         if (firstUnderscore > 0 && firstUnderscore < stem.Length - 1)
                         {
                             string sub = stem[(firstUnderscore + 1)..];
-                            if (sub.Length >= 2 && sub.Length <= 45 && !sub.All(char.IsDigit))
+                            if (sub.Length >= 2 && sub.Length <= 80 && !sub.All(char.IsDigit))
                                 AddCount(sub);
                         }
                     }
@@ -800,8 +800,8 @@ namespace AssetsManager.Services.Hashes.Guessers
                     {
                         string part1 = stem[..toIdx];
                         string part2 = stem[(toIdx + 4)..];
-                        if (part1.Length >= 2 && part1.Length <= 45) AddCount(part1);
-                        if (part2.Length >= 2 && part2.Length <= 45) AddCount(part2);
+                        if (part1.Length >= 2 && part1.Length <= 80) AddCount(part1);
+                        if (part2.Length >= 2 && part2.Length <= 80) AddCount(part2);
                     }
                 }
 
