@@ -778,7 +778,7 @@ namespace AssetsManager.Services.Hashes
                 if (item.ClassHash is uint classHash)
                 {
                     if (classHash == Fnv1a.HashLower("CharacterRecord") || classHash == Fnv1a.HashLower("TFTCharacterRecord"))
-                        MatchEntryPattern(entryHash, item, "mCharacterName", value => $"Characters/{value}/CharacterRecords/Root");
+                        MatchCharacterRecord(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("GameFontDescription"))
                         MatchEntryPattern(entryHash, item, "name", value => $"UX/Fonts/Descriptions/{value}");
                     else if (classHash == Fnv1a.HashLower("TFTRoundData"))
@@ -875,6 +875,83 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
+            void MatchCharacterRecord(uint entryHash, BinTreeObject item)
+            {
+                if (!TryGetString(item.Properties, "mCharacterName", out string cname) || string.IsNullOrWhiteSpace(cname))
+                    return;
+
+                string prefix = $"Characters/{cname}";
+
+                MatchObservedEntry(entryHash, $"{prefix}/CharacterRecords/Root");
+                MatchObservedEntry(entryHash, prefix);
+
+                MatchAnyEntry(prefix);
+                MatchAnyEntry($"{prefix}/CharacterRecords/Root");
+                MatchAnyEntry($"{prefix}/CharacterRecords/SLIME");
+                MatchAnyEntry($"{prefix}/CharacterRecords/URF");
+                MatchAnyEntry($"{prefix}/Skins/Meta");
+                MatchAnyEntry($"{prefix}/Skins/Root");
+
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("basicAttack"), out BinTreeProperty basicProp) &&
+                    basicProp is BinTreeStruct basicStruct &&
+                    TryGetString(basicStruct.Properties, "mAttackName", out string basicName))
+                {
+                    MatchAnyEntry($"{prefix}/Spells/{basicName}");
+                }
+
+                CheckAttackList("extraAttacks");
+                CheckAttackList("critAttacks");
+
+                void CheckAttackList(string field)
+                {
+                    if (item.Properties.TryGetValue(Fnv1a.HashLower(field), out BinTreeProperty listProp) &&
+                        listProp is BinTreeContainer container)
+                    {
+                        foreach (BinTreeProperty elem in container.Elements)
+                        {
+                            if (elem is BinTreeStruct attackStruct &&
+                                TryGetString(attackStruct.Properties, "mAttackName", out string attackName))
+                            {
+                                MatchAnyEntry($"{prefix}/Spells/{attackName}");
+                            }
+                        }
+                    }
+                }
+
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("spellNames"), out BinTreeProperty spellNamesProp) &&
+                    spellNamesProp is BinTreeContainer spellContainer)
+                {
+                    foreach (BinTreeProperty elem in spellContainer.Elements)
+                    {
+                        if (elem is BinTreeString spellNameStr && !string.IsNullOrWhiteSpace(spellNameStr.Value))
+                        {
+                            string spellName = spellNameStr.Value;
+                            MatchAnyEntry($"{prefix}/Spells/{spellName}");
+                            int slash = spellName.IndexOf('/');
+                            if (slash > 0)
+                            {
+                                string parent = spellName[..slash];
+                                MatchAnyEntry($"{prefix}/Spells/{parent}");
+                            }
+                        }
+                    }
+                }
+
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("extraSpells"), out BinTreeProperty extraSpellsProp) &&
+                    extraSpellsProp is BinTreeContainer extraContainer)
+                {
+                    foreach (BinTreeProperty elem in extraContainer.Elements)
+                    {
+                        if (elem is BinTreeString extraSpellStr &&
+                            !string.IsNullOrWhiteSpace(extraSpellStr.Value) &&
+                            !extraSpellStr.Value.Equals("BaseSpell", StringComparison.OrdinalIgnoreCase))
+                        {
+                            MatchAnyEntry($"{prefix}/Spells/{extraSpellStr.Value}");
+                        }
+                    }
+                }
+            }
+
             void MatchAnimationGraphData(uint entryHash, BinTreeObject item)
             {
                 if (!string.IsNullOrEmpty(path))
@@ -889,10 +966,45 @@ namespace AssetsManager.Services.Hashes
                         {
                             string champName = sub[..slash];
                             MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Base");
-                            for (int skin = 0; skin < 50; skin++)
+                            for (int skin = 0; skin < 200; skin++)
                             {
                                 MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Skin{skin}");
                                 MatchObservedEntry(entryHash, $"Characters/{champName}/Animations/Skin{skin:00}");
+                            }
+                        }
+                    }
+                }
+
+                if (item.Properties.TryGetValue(Fnv1a.HashLower("mClipDataMap"), out BinTreeProperty clipMapProp) &&
+                    clipMapProp is BinTreeMap clipMap)
+                {
+                    foreach (var pair in clipMap)
+                    {
+                        if (pair.Key is BinTreeHash clipHash &&
+                            pair.Value is BinTreeStruct clipStruct &&
+                            clipStruct.Properties.TryGetValue(Fnv1a.HashLower("mAnimationResourceData"), out BinTreeProperty resProp) &&
+                            resProp is BinTreeStruct resStruct &&
+                            TryGetString(resStruct.Properties, "mAnimationFilePath", out string animFilePath))
+                        {
+                            string animStem = animFilePath;
+                            if (animStem.EndsWith(".anm", StringComparison.OrdinalIgnoreCase))
+                                animStem = animStem[..^4];
+
+                            int firstSlash = animStem.IndexOf('/');
+                            if (firstSlash >= 0)
+                                animStem = animStem[(firstSlash + 1)..];
+
+                            matcher.CheckContextualCandidate(InternalHashKind.BinHashes, animStem, path, wadPath, clipHash.Value);
+
+                            int lastIdx = 0;
+                            while ((lastIdx = animStem.IndexOf('_', lastIdx)) >= 0)
+                            {
+                                lastIdx++;
+                                if (lastIdx < animStem.Length)
+                                {
+                                    string part = animStem[lastIdx..];
+                                    matcher.CheckContextualCandidate(InternalHashKind.BinHashes, part, path, wadPath, clipHash.Value);
+                                }
                             }
                         }
                     }

@@ -773,6 +773,45 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
         }
 
         [Fact]
+        public void CharacterRecordResolvesSpellsAndGameModes()
+        {
+            const string cname = "Aatrox";
+            const string rootPath = "Characters/Aatrox/CharacterRecords/Root";
+            const string slimePath = "Characters/Aatrox/CharacterRecords/SLIME";
+            const string spellPath = "Characters/Aatrox/Spells/AatroxBasicAttack";
+
+            uint rootHash = Fnv1a.HashLower(rootPath);
+            uint slimeHash = Fnv1a.HashLower(slimePath);
+            uint spellHash = Fnv1a.HashLower(spellPath);
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(rootHash);
+            targets[InternalHashKind.BinEntries].Add(slimeHash);
+            targets[InternalHashKind.BinEntries].Add(spellHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var basicAttackStruct = new BinTreeStruct(Fnv1a.HashLower("basicAttack"), Fnv1a.HashLower("AttackSlotData"), new BinTreeProperty[]
+            {
+                new BinTreeString(Fnv1a.HashLower("mAttackName"), "AatroxBasicAttack")
+            });
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(rootHash, Fnv1a.HashLower("CharacterRecord"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("mCharacterName"), cname),
+                    basicAttackStruct
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, m => m.Value == rootPath);
+            Assert.Contains(matcher.Matches, m => m.Value == slimePath);
+            Assert.Contains(matcher.Matches, m => m.Value == spellPath);
+        }
+
+        [Fact]
         public void OwningEntryStringPrefixResolvesOnlyItsOwnEntryHash()
         {
             const string entry = "characters/test/skins/skin01";

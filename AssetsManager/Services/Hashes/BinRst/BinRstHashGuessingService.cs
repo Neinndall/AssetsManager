@@ -488,24 +488,6 @@ namespace AssetsManager.Services.Hashes
                         {
                             CheckCandidates(GenerateStructuralCandidates(wordlist, NumericBudget, cancellationToken), InternalHashGuessStrategy.NumericVariant, "Structural Templates", preserveCasing: true);
                         }
-
-                        // 4. Markov / Bigram pass
-                        if (matcher.Remaining > 0 && ShouldRun("bin-schema-bigram-chain"))
-                        {
-                            CheckCandidates(GenerateBigramCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.BigramVariant, "Structural Bigram Pass", preserveCasing: true);
-                        }
-
-                        // 5. Word Reduction pass
-                        if (matcher.Remaining > 0 && ShouldRun("bin-schema-word-reduction"))
-                        {
-                            CheckCandidates(GenerateReductionCandidates(wordlist), InternalHashGuessStrategy.ReductionVariant, "Structural Reduction Pass", preserveCasing: true);
-                        }
-
-                        // 6. Word Substitution pass
-                        if (matcher.Remaining > 0 && ShouldRun("bin-schema-word-swap"))
-                        {
-                            CheckCandidates(GenerateSwapCandidates(wordlist, BigramBudget, cancellationToken), InternalHashGuessStrategy.ReductionVariant, "Structural Word Swap Pass", preserveCasing: true);
-                        }
                     }
 
                     void CheckCandidates(IEnumerable<string> candidates, InternalHashGuessStrategy strategy, string source, bool preserveCasing = false)
