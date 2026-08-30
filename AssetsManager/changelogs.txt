@@ -13,7 +13,7 @@ New Features
   - Universal Converter now exports WEM and standard audio to OGG, WAV, MP3, or FLAC through vgmstream and FFmpeg.
   - Wad Comparison / Redesigned the Overview dashboard into a modern, symmetrical Patch Intelligence Dashboard featuring Net Payload & Hash KPIs, 6 Game System & Content Domains, Asset Type Distribution with percentage progress bars, Critical Size Impact file tracking, and Top Altered WAD Packages.
   - Wad Comparison / Optimized comparison metrics aggregation (CalculateInsights) into a single-pass O(N) pipeline for instant recalculations with zero UI latency.
-  - History Explorer / Enhanced 'Sync History' into a true bidirectional storage synchronizer, importing missing folders and automatically purging orphaned entries for comparisons deleted manually from disk.
+  - History Explorer / 'Sync History' now synchronizes bidirectionally with disk, importing new folders and removing deleted ones.
   - VFX Studio now applies authored stencil masks so clipped particles and meshes render without visible mask geometry.
   - VFX Studio now reconstructs animation ParticleEventData sequences, resolves their ResourceMap effects, plays resolved events with authored start/kill timing, and separates optional preview loops from emitter lifetimes.
   - VFX AttachedMesh emitters now resolve only their authored owner submeshes with the champion skin scale; unresolved owner context renders no proxy model.
