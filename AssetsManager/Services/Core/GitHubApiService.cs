@@ -173,23 +173,16 @@ namespace AssetsManager.Services.Core
             _rateLimitResetTime = DateTimeOffset.UtcNow.AddMinutes(15);
         }
 
-        /// <summary>
-        /// Fetches the recent commit history from a specific branch with persistent caching and rate-limit mitigation.
-        /// </summary>
-        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 100)
+        private async Task<T> SendCachedGetAsync<T>(string url, string cacheKey, string descriptor)
         {
-            string cacheKey = $"commits_{branch}_{count}";
-
             if (IsRateLimited)
             {
-                if (TryGetCachedData<List<GitHubCommit>>(cacheKey, out var rateLimitedFallback))
+                if (TryGetCachedData<T>(cacheKey, out var rateLimitedFallback))
                 {
                     return rateLimitedFallback;
                 }
-                return new List<GitHubCommit>();
+                return default;
             }
-
-            string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={branch}&per_page={count}";
 
             try
             {
@@ -203,7 +196,7 @@ namespace AssetsManager.Services.Core
 
                 if (response.StatusCode == HttpStatusCode.NotModified)
                 {
-                    if (TryGetCachedData<List<GitHubCommit>>(cacheKey, out var cachedData))
+                    if (TryGetCachedData<T>(cacheKey, out var cachedData))
                     {
                         return cachedData;
                     }
@@ -212,38 +205,49 @@ namespace AssetsManager.Services.Core
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                 {
                     HandleRateLimit(response);
-                    if (TryGetCachedData<List<GitHubCommit>>(cacheKey, out var cachedFallback))
+                    if (TryGetCachedData<T>(cacheKey, out var cachedFallback))
                     {
-                        _logService.Log($"GitHub API rate limit in effect for this IP. Serving cached commits (resets at {_rateLimitResetTime:HH:mm:ss}).");
+                        _logService.Log($"GitHub API rate limit in effect for this IP. Serving cached {descriptor} (resets at {_rateLimitResetTime:HH:mm:ss}).");
                         return cachedFallback;
                     }
                     _logService.LogWarning($"GitHub API rate limit in effect for this IP (resets at {_rateLimitResetTime:HH:mm:ss}).");
-                    return new List<GitHubCommit>();
+                    return default;
+                }
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return default;
                 }
 
                 response.EnsureSuccessStatusCode();
 
                 string responseEtag = response.Headers.ETag?.Tag;
-                var commits = await response.Content.ReadFromJsonAsync<List<GitHubCommit>>();
-                var result = commits ?? new List<GitHubCommit>();
-
-                SetCachedData(cacheKey, responseEtag, result);
-                return result;
-            }
-            catch (HttpRequestException httpEx) when (httpEx.StatusCode == HttpStatusCode.NotFound)
-            {
-                _logService.LogWarning($"Could not load commits from branch '{branch}'. The branch may have been renamed or removed.");
-                return new List<GitHubCommit>();
+                var data = await response.Content.ReadFromJsonAsync<T>();
+                if (data != null)
+                {
+                    SetCachedData(cacheKey, responseEtag, data);
+                }
+                return data;
             }
             catch (Exception ex)
             {
-                if (TryGetCachedData<List<GitHubCommit>>(cacheKey, out var cachedFallback))
+                if (TryGetCachedData<T>(cacheKey, out var cachedFallback))
                 {
                     return cachedFallback;
                 }
-                _logService.LogWarning($"Could not load commits from branch '{branch}': {ex.Message}");
-                return new List<GitHubCommit>();
+                _logService.LogWarning($"Could not load {descriptor}: {ex.Message}");
+                return default;
             }
+        }
+
+        /// <summary>
+        /// Fetches the recent commit history from a specific branch with persistent caching and rate-limit mitigation.
+        /// </summary>
+        public async Task<List<GitHubCommit>> GetCommitsAsync(string branch = "qa", int count = 100)
+        {
+            string cacheKey = $"commits_{branch}_{count}";
+            string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/commits?sha={branch}&per_page={count}";
+            return await SendCachedGetAsync<List<GitHubCommit>>(url, cacheKey, $"commits from branch '{branch}'") ?? new List<GitHubCommit>();
         }
 
         /// <summary>
@@ -252,66 +256,8 @@ namespace AssetsManager.Services.Core
         public async Task<GitHubRelease> GetReleaseAsync(string tag)
         {
             string cacheKey = $"release_{tag}";
-
-            if (IsRateLimited)
-            {
-                if (TryGetCachedData<GitHubRelease>(cacheKey, out var rateLimitedFallback))
-                {
-                    return rateLimitedFallback;
-                }
-                return null;
-            }
-
             string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{tag}";
-
-            try
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, url);
-                if (TryGetEtag(cacheKey, out var etag))
-                {
-                    request.Headers.TryAddWithoutValidation("If-None-Match", etag);
-                }
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.StatusCode == HttpStatusCode.NotModified)
-                {
-                    if (TryGetCachedData<GitHubRelease>(cacheKey, out var cachedData))
-                    {
-                        return cachedData;
-                    }
-                }
-
-                if (response.StatusCode == HttpStatusCode.Forbidden)
-                {
-                    HandleRateLimit(response);
-                    if (TryGetCachedData<GitHubRelease>(cacheKey, out var cachedFallback))
-                    {
-                        return cachedFallback;
-                    }
-                    return null;
-                }
-
-                response.EnsureSuccessStatusCode();
-
-                string responseEtag = response.Headers.ETag?.Tag;
-                var release = await response.Content.ReadFromJsonAsync<GitHubRelease>();
-                SetCachedData(cacheKey, responseEtag, release);
-                return release;
-            }
-            catch (HttpRequestException httpEx) when (httpEx.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-            catch (Exception ex)
-            {
-                if (TryGetCachedData<GitHubRelease>(cacheKey, out var cachedFallback))
-                {
-                    return cachedFallback;
-                }
-                _logService.LogWarning($"Failed to fetch release '{tag}': {ex.Message}");
-                return null;
-            }
+            return await SendCachedGetAsync<GitHubRelease>(url, cacheKey, $"release '{tag}'");
         }
 
         /// <summary>
@@ -320,69 +266,9 @@ namespace AssetsManager.Services.Core
         public async Task<List<GitHubAsset>> GetAllAssetsAsync()
         {
             string cacheKey = "all_assets";
-
-            if (IsRateLimited)
-            {
-                if (TryGetCachedData<List<GitHubAsset>>(cacheKey, out var rateLimitedFallback))
-                {
-                    return rateLimitedFallback;
-                }
-                return new List<GitHubAsset>();
-            }
-
             string releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases?per_page=30";
-
-            try
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, releasesUrl);
-                if (TryGetEtag(cacheKey, out var etag))
-                {
-                    request.Headers.TryAddWithoutValidation("If-None-Match", etag);
-                }
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (response.StatusCode == HttpStatusCode.NotModified)
-                {
-                    if (TryGetCachedData<List<GitHubAsset>>(cacheKey, out var cachedData))
-                    {
-                        return cachedData;
-                    }
-                }
-
-                if (response.StatusCode == HttpStatusCode.Forbidden)
-                {
-                    HandleRateLimit(response);
-                    if (TryGetCachedData<List<GitHubAsset>>(cacheKey, out var cachedFallback))
-                    {
-                        return cachedFallback;
-                    }
-                    return new List<GitHubAsset>();
-                }
-
-                response.EnsureSuccessStatusCode();
-
-                string responseEtag = response.Headers.ETag?.Tag;
-                var releases = await response.Content.ReadFromJsonAsync<List<GitHubRelease>>();
-                var allAssets = releases?.SelectMany(r => r.Assets).ToList() ?? new List<GitHubAsset>();
-
-                SetCachedData(cacheKey, responseEtag, allAssets);
-                return allAssets;
-            }
-            catch (HttpRequestException httpEx) when (httpEx.StatusCode == HttpStatusCode.NotFound)
-            {
-                _logService.LogWarning("Releases not found on GitHub. The repository may be private or unavailable.");
-                return new List<GitHubAsset>();
-            }
-            catch (Exception ex)
-            {
-                if (TryGetCachedData<List<GitHubAsset>>(cacheKey, out var cachedFallback))
-                {
-                    return cachedFallback;
-                }
-                _logService.LogWarning($"Failed to fetch all releases: {ex.Message}");
-                return new List<GitHubAsset>();
-            }
+            var releases = await SendCachedGetAsync<List<GitHubRelease>>(releasesUrl, cacheKey, "releases") ?? new List<GitHubRelease>();
+            return releases.SelectMany(r => r.Assets).ToList();
         }
 
         /// <summary>
