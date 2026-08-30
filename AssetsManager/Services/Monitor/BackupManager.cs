@@ -223,25 +223,14 @@ namespace AssetsManager.Services.Monitor
                     }
                 }
 
-                var metricsMap = new System.Collections.Concurrent.ConcurrentDictionary<string, DirectoryMetrics>(StringComparer.OrdinalIgnoreCase);
+                var metricsMap = new Dictionary<string, DirectoryMetrics>(StringComparer.OrdinalIgnoreCase);
 
                 if (includeStorageMetrics)
                 {
-                    var snapshotsToMeasure = candidateEntries
-                        .Where(e => !e.IsMain)
-                        .Select(e => e.Dir)
-                        .ToList();
-
-                    if (snapshotsToMeasure.Count > 0)
+                    foreach (var (dir, _, _, _) in candidateEntries)
                     {
-                        Parallel.ForEach(snapshotsToMeasure, new ParallelOptions
-                        {
-                            CancellationToken = cancellationToken,
-                            MaxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount / 2)
-                        }, dir =>
-                        {
-                            metricsMap[dir] = MeasureDirectory(dir, cancellationToken);
-                        });
+                        cancellationToken.ThrowIfCancellationRequested();
+                        metricsMap[dir] = MeasureDirectory(dir, cancellationToken);
                     }
                 }
 
@@ -258,7 +247,7 @@ namespace AssetsManager.Services.Monitor
                         IsMainClient = isMain,
                         CreationDate = Directory.GetCreationTime(dir),
                         Size = metrics.TotalBytes,
-                        SizeDisplay = includeStorageMetrics && !isMain
+                        SizeDisplay = includeStorageMetrics
                             ? FormatUtils.FormatSize(metrics.TotalBytes)
                             : null,
                         IsSelected = false,
