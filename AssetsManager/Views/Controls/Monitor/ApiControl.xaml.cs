@@ -422,7 +422,7 @@ namespace AssetsManager.Views.Controls.Monitor
                 SnapsToDevicePixels = true,
                 UseLayoutRounding = true,
                 Orientation = Orientation.Vertical,
-                Width = 1200 // Fixed width for consistent high-quality output
+                Width = Math.Max(1200, columns * 180) // Dynamic width ensuring comfortable card proportions across all column counts
             };
 
             // 2. Logic for both flat lists and categorized lists (Mythic)

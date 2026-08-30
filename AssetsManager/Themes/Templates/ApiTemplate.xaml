@@ -303,7 +303,8 @@
                                      Foreground="{StaticResource TextPrimary}"
                                      TextAlignment="Center"
                                      TextWrapping="Wrap"
-                                     MaxHeight="48"
+                                     MinHeight="36"
+                                     MaxHeight="64"
                                      AcceptsReturn="False"
                                      Style="{StaticResource InlineEditableTitleTextBox}"/>
 
