@@ -252,4 +252,44 @@
         </Setter>
     </Style>
 
+    <!-- Inline Editable Title TextBox for Cards / Pass Rewards -->
+    <Style x:Key="InlineEditableTitleTextBox" TargetType="TextBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Padding" Value="4,2"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="SelectionOpacity" Value="0.4"/>
+        <Setter Property="Validation.ErrorTemplate" Value="{x:Null}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="ToolTip" Value="Click to edit title (Press Enter to confirm)"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Grid>
+                        <Border x:Name="bgBorder" Background="{TemplateBinding Background}" CornerRadius="6"/>
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="2,1" VerticalAlignment="Center" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled"/>
+                        <Border x:Name="borderOverlay" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" IsHitTestVisible="False"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bgBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                            <Setter TargetName="borderOverlay" Property="BorderBrush" Value="{StaticResource BorderColor}"/>
+                            <Setter Property="Cursor" Value="IBeam"/>
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="bgBorder" Property="Background" Value="{StaticResource SidebarBackground}"/>
+                            <Setter TargetName="borderOverlay" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            <Setter Property="Cursor" Value="IBeam"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

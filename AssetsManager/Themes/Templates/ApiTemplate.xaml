@@ -191,7 +191,7 @@
                             <Image Source="{Binding IconUrl}" Stretch="Uniform" Margin="4" HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
 
                             <!-- Tier Badge INSIDE Image Area (Top-Right) -->
-                            <StackPanel VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4">
+                            <StackPanel VerticalAlignment="Top" HorizontalAlignment="Right" Margin="4" IsHitTestVisible="False">
                                 <!-- FREE Badge -->
                                 <Border Background="{StaticResource AccentGreen}" CornerRadius="6" Padding="5,2" Visibility="{Binding IsFree, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <TextBlock Text="FREE" FontSize="9" FontWeight="Black" Foreground="White"/>
@@ -201,13 +201,112 @@
                                     <TextBlock Text="PASS" FontSize="9" FontWeight="Black" Foreground="White"/>
                                 </Border>
                             </StackPanel>
+
+                            <!-- Change / Revert Overlay (Hover Only) -->
+                            <Border x:Name="HoverOverlay"
+                                    Background="#B80E1117"
+                                    CornerRadius="9">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Change Button (Left) -->
+                                    <Button Tag="ChangeImage"
+                                            ToolTip="Change image (.png, .jpg)"
+                                            Cursor="Hand"
+                                            FocusVisualStyle="{x:Null}"
+                                            Margin="0,0,6,0">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="8,6" MinWidth="48">
+                                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <materialIcons:MaterialIcon Kind="CameraPlusOutline" Width="16" Height="16" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,3"/>
+                                                                    <TextBlock Text="Change" FontSize="9" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                    <!-- Revert Button (Right) -->
+                                    <Button Tag="RevertImage"
+                                            ToolTip="Revert to original image and title"
+                                            Cursor="Hand"
+                                            FocusVisualStyle="{x:Null}">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Background" Value="#33FFFFFF"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="8,6" MinWidth="48">
+                                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <materialIcons:MaterialIcon Kind="Restore" Width="16" Height="16" Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,3"/>
+                                                                    <TextBlock Text="Revert" FontSize="9" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource AccentOrange}"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Opacity" Value="0"/>
+                                        <Setter Property="IsHitTestVisible" Value="False"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                                                <Setter Property="IsHitTestVisible" Value="True"/>
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
                         </Grid>
                     </Border>
 
                     <!-- Content Area -->
                     <Border Padding="12,8,12,10">
                         <StackPanel>
-                            <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource TextPrimary}" TextAlignment="Center" MaxHeight="32" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                            <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                     FontWeight="Bold" FontSize="12"
+                                     Foreground="{StaticResource TextPrimary}"
+                                     TextAlignment="Center"
+                                     TextWrapping="Wrap"
+                                     MaxHeight="48"
+                                     AcceptsReturn="False"
+                                     Style="{StaticResource InlineEditableTitleTextBox}"/>
+
                             <TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource TextMuted}" TextAlignment="Center" Margin="0,3,0,0" TextWrapping="Wrap" MaxHeight="28" TextTrimming="CharacterEllipsis"/>
                             
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">

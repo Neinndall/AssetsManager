@@ -11,6 +11,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging; // Added for RenderTargetBitmap
+using System.Windows.Input;
 using Microsoft.Win32;
 using AssetsManager.Utils;
 using AssetsManager.Services.Monitor;
@@ -729,8 +730,10 @@ namespace AssetsManager.Views.Controls.Monitor
                         {
                             Level = translatedLevel,
                             Title = TransformTitle(title, reward.Quantity),
+                            OriginalTitle = TransformTitle(title, reward.Quantity),
                             Details = details,
                             IconUrl = initialIconPath,
+                            OriginalIconUrl = initialIconPath,
                             Quantity = reward.Quantity,
                             // Priority logic: _Free takes precedence over _Pass. 
                             // If neither is present (Mini-Events), it defaults to FREE.
@@ -773,6 +776,10 @@ namespace AssetsManager.Views.Controls.Monitor
                             foreach (var target in targets)
                             {
                                 target.IconUrl = localPath;
+                                if (string.IsNullOrEmpty(target.OriginalIconUrl))
+                                {
+                                    target.OriginalIconUrl = localPath;
+                                }
                             }
                         });
                     });
@@ -838,5 +845,106 @@ namespace AssetsManager.Views.Controls.Monitor
             }
             return title;
         }
+
+        #region Pass Rewards In-Place Editing Event Handlers
+
+        private void PassRewards_ButtonClick(object sender, RoutedEventArgs e)
+        {
+            if (e.OriginalSource is FrameworkElement fe)
+            {
+                var model = FindRewardModel(fe);
+                if (model == null) return;
+
+                if (fe.Tag as string == "ChangeImage")
+                {
+                    PromptChangeRewardImage(model);
+                    e.Handled = true;
+                }
+                else if (fe.Tag as string == "RevertImage")
+                {
+                    if (!string.IsNullOrEmpty(model.OriginalTitle))
+                    {
+                        model.Title = model.OriginalTitle;
+                    }
+                    if (!string.IsNullOrEmpty(model.OriginalIconUrl))
+                    {
+                        model.IconUrl = model.OriginalIconUrl;
+                    }
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void RewardImage_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+
+        private void RewardImage_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.OriginalSource is DependencyObject dep)
+            {
+                var model = FindRewardModel(dep);
+                if (model != null && e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
+                {
+                    string filePath = files[0];
+                    string ext = Path.GetExtension(filePath).ToLowerInvariant();
+                    string[] validExtensions = { ".png", ".jpg" };
+
+                    if (validExtensions.Contains(ext))
+                    {
+                        model.IconUrl = filePath;
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+
+        private void RewardTitle_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void PromptChangeRewardImage(PassRewardModel model)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = $"Select Reward Image for {model.Level}",
+                Filter = "Image Files (*.png;*.jpg)|*.png;*.jpg|All Files (*.*)|*.*",
+                InitialDirectory = DirectoriesCreator?.AssetsDownloadedPath ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures)
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                model.IconUrl = dialog.FileName;
+            }
+        }
+
+        private PassRewardModel FindRewardModel(DependencyObject dep)
+        {
+            while (dep != null)
+            {
+                if (dep is FrameworkElement fe && fe.DataContext is PassRewardModel model)
+                {
+                    return model;
+                }
+                dep = VisualTreeHelper.GetParent(dep);
+            }
+            return null;
+        }
+
+        #endregion
     }
 }

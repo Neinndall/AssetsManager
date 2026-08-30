@@ -8,7 +8,7 @@
              xmlns:shared="clr-namespace:AssetsManager.Views.Controls.Shared"
              mc:Ignorable="d"
              d:DesignHeight="800" d:DesignWidth="1000">
-    
+
     <Grid Margin="0,10,0,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- 1. Control Row (Card + Buttons) -->
@@ -302,7 +302,14 @@
                 </ItemsControl>
             </TabItem>
             <TabItem>
-                <ItemsControl x:Name="PassRewardsItemsControl" ItemsSource="{Binding PassRewards}" ItemTemplate="{StaticResource PassRewardTemplate}">
+                <ItemsControl x:Name="PassRewardsItemsControl" 
+                              ItemsSource="{Binding PassRewards}" 
+                              ItemTemplate="{StaticResource PassRewardTemplate}"
+                              Button.Click="PassRewards_ButtonClick"
+                              AllowDrop="True"
+                              PreviewDragOver="RewardImage_PreviewDragOver"
+                              Drop="RewardImage_Drop"
+                              PreviewKeyDown="RewardTitle_KeyDown">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="5"/>
