@@ -692,6 +692,46 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(hash, targets[InternalHashKind.BinEntries]);
         }
 
+        [Theory]
+        [InlineData("VfxSystemDefinitionData")]
+        [InlineData("SpellObject")]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        [InlineData("AnimationGraphData")]
+        public async Task ObjectPathFromEntryPathResolvesMatchingHashForSupportedTypes(string className)
+        {
+            using var bridge = new AssetsManagerTestBridge();
+            bridge.Directories.CreateHashesDirectories();
+            using var resolver = new HashResolverService(bridge.Directories, bridge.LogService);
+
+            const string entryPath = "Characters/Aatrox/Spells/AatroxQ";
+            uint entryHash = Fnv1a.HashLower(entryPath);
+            uint objectPathHash = entryHash;
+
+            File.WriteAllText(
+                Path.Combine(bridge.Directories.HashesPath, "hashes.binentries.txt"),
+                $"{entryHash:x8} {entryPath}{Environment.NewLine}");
+            await resolver.LoadAllHashesAsync();
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinHashes].Add(objectPathHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(entryHash, Fnv1a.HashLower(className), new BinTreeProperty[]
+                {
+                    new BinTreeHash(Fnv1a.HashLower("objectPath"), objectPathHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "test.bin", resolver: resolver);
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(entryPath, match.Value);
+            Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+        }
+
         [Fact]
         public void OwningEntryStringPrefixResolvesOnlyItsOwnEntryHash()
         {

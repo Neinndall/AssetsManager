@@ -49,6 +49,15 @@ namespace AssetsManager.Services.Hashes
             Fnv1a.HashLower("UiSceneViewPaneData")
         };
 
+        private static readonly HashSet<uint> ObjectPathTypes = new()
+        {
+            Fnv1a.HashLower("VfxSystemDefinitionData"),
+            Fnv1a.HashLower("SpellObject"),
+            Fnv1a.HashLower("SkinCharacterDataProperties"),
+            Fnv1a.HashLower("TftSkinCharacterDataProperties"),
+            Fnv1a.HashLower("AnimationGraphData")
+        };
+
         private static readonly Dictionary<string, string> SharedBufferLeaves = new()
         {
             ["CharacterPerDrawVertexCB"] = "CharacterPerDrawVS",
@@ -650,6 +659,28 @@ namespace AssetsManager.Services.Hashes
             return false;
         }
 
+        private static bool TryGetObjectPathHash(
+            Dictionary<uint, BinTreeProperty> properties,
+            out uint hashValue)
+        {
+            if (properties.TryGetValue(Fnv1a.HashLower("objectPath"), out BinTreeProperty property))
+            {
+                if (property is BinTreeHash hash && hash.Value != 0)
+                {
+                    hashValue = hash.Value;
+                    return true;
+                }
+                if (property is BinTreeObjectLink link && link.Value != 0)
+                {
+                    hashValue = (uint)link.Value;
+                    return true;
+                }
+            }
+
+            hashValue = 0;
+            return false;
+        }
+
         private static bool TryGetString(
             Dictionary<uint, BinTreeProperty> properties,
             string field,
@@ -709,11 +740,30 @@ namespace AssetsManager.Services.Hashes
             {
                 BinTreeObject item = pair.Value;
                 MatchEntry(pair.Key, pair.Value);
+                if (resolver != null && ObjectPathTypes.Contains(item.ClassHash))
+                    MatchObjectPathFromEntry(pair.Key, item);
+
                 foreach (BinTreeProperty property in item.Properties.Values)
                     Visit(property);
             }
             foreach (var item in tree.DataOverrides)
                 Visit(item.Property);
+
+            void MatchObjectPathFromEntry(uint entryHash, BinTreeObject item)
+            {
+                if (!TryGetObjectPathHash(item.Properties, out uint objectPathHash))
+                    return;
+
+                string entryPath = resolver.ResolveBinHashGeneral(entryHash);
+                if (string.IsNullOrWhiteSpace(entryPath) ||
+                    string.Equals(entryPath, entryHash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                matcher.CheckContextualCandidate(InternalHashKind.BinHashes, entryPath, path, wadPath, objectPathHash);
+                matcher.CheckContextualCandidate(InternalHashKind.BinEntries, entryPath, path, wadPath, objectPathHash);
+            }
 
             void MatchEntry(uint entryHash, BinTreeObject item)
             {
