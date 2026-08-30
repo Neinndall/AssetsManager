@@ -58,6 +58,14 @@ namespace AssetsManager.Services.Hashes
             Fnv1a.HashLower("AnimationGraphData")
         };
 
+        private static readonly HashSet<uint> SkinCharacterDataPropertiesTypes = new()
+        {
+            Fnv1a.HashLower("SkinCharacterDataProperties"),
+            Fnv1a.HashLower("TftSkinCharacterDataProperties"),
+            Fnv1a.HashLower("CharacterSkinData"),
+            Fnv1a.HashLower("SkinData")
+        };
+
         private static readonly Dictionary<string, string> SharedBufferLeaves = new()
         {
             ["CharacterPerDrawVertexCB"] = "CharacterPerDrawVS",
@@ -818,8 +826,8 @@ namespace AssetsManager.Services.Hashes
                         MatchAtomicClipData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("AnimationGraphData") || classHash == Fnv1a.HashLower("AnimationGraphDataContainer"))
                         MatchAnimationGraphData(entryHash, item);
-                    else if (classHash == Fnv1a.HashLower("CharacterSkinData") || classHash == Fnv1a.HashLower("SkinData"))
-                        MatchSkinData(entryHash, item);
+                    else if (SkinCharacterDataPropertiesTypes.Contains(classHash))
+                        MatchSkinCharacterData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("VfxSystemDefinitionData") || classHash == Fnv1a.HashLower("VfxEmitterDefinitionData"))
                         MatchVfxData(entryHash, item);
                     else if (classHash == Fnv1a.HashLower("ResourceResolver") || classHash == Fnv1a.HashLower("GlobalResourceResolver"))
@@ -891,9 +899,59 @@ namespace AssetsManager.Services.Hashes
                 }
             }
 
-            void MatchSkinData(uint entryHash, BinTreeObject item)
+            void MatchSkinCharacterData(uint entryHash, BinTreeObject item)
             {
-                if (!string.IsNullOrEmpty(path))
+                string skinPath = null;
+
+                if (resolver != null)
+                {
+                    string resolved = resolver.ResolveBinHashGeneral(entryHash);
+                    if (!string.IsNullOrWhiteSpace(resolved) &&
+                        !string.Equals(resolved, entryHash.ToString("x8"), StringComparison.OrdinalIgnoreCase))
+                    {
+                        skinPath = resolved;
+                    }
+                }
+
+                if (skinPath == null && TryGetString(item.Properties, "championSkinName", out string champSkinName))
+                {
+                    int skinIdx = champSkinName.IndexOf("Skin", StringComparison.OrdinalIgnoreCase);
+                    if (skinIdx > 0 && skinIdx < champSkinName.Length - 4)
+                    {
+                        string champ = champSkinName[..skinIdx];
+                        string skinNum = champSkinName[(skinIdx + 4)..].TrimStart('0');
+                        if (string.IsNullOrEmpty(skinNum)) skinNum = "0";
+                        string candidate = $"Characters/{champ}/Skins/Skin{skinNum}";
+                        if (MatchObservedEntry(entryHash, candidate))
+                            skinPath = candidate;
+                    }
+                }
+
+                if (skinPath == null && TryGetString(item.Properties, "iconSquare", out string iconSquare))
+                {
+                    string normIcon = InternalHashEvidenceMatcher.NormalizeCandidate(iconSquare);
+                    if (normIcon.StartsWith("assets/characters/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string sub = normIcon["assets/characters/".Length..];
+                        int slash = sub.IndexOf('/');
+                        if (slash > 0)
+                        {
+                            string champ = sub[..slash];
+                            MatchObservedEntry(entryHash, $"Characters/{champ}/Skins/Base");
+                            for (int i = 0; i < 200; i++)
+                            {
+                                string candidate = $"Characters/{champ}/Skins/Skin{i}";
+                                if (MatchObservedEntry(entryHash, candidate))
+                                {
+                                    skinPath = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (skinPath == null && !string.IsNullOrEmpty(path))
                 {
                     string normalizedPath = InternalHashEvidenceMatcher.NormalizeCandidate(path);
                     int charIdx = normalizedPath.IndexOf("characters/", StringComparison.OrdinalIgnoreCase);
@@ -905,11 +963,37 @@ namespace AssetsManager.Services.Hashes
                         {
                             string champName = sub[..slash];
                             MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Base");
-                            for (int skin = 0; skin < 50; skin++)
+                            for (int skin = 0; skin < 200; skin++)
                             {
-                                MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Skin{skin}");
+                                string candidate = $"Characters/{champName}/Skins/Skin{skin}";
+                                if (MatchObservedEntry(entryHash, candidate))
+                                {
+                                    skinPath = candidate;
+                                    break;
+                                }
                                 MatchObservedEntry(entryHash, $"Characters/{champName}/Skins/Skin{skin:00}");
                             }
+                        }
+                    }
+                }
+
+                if (skinPath != null)
+                {
+                    if (TryGetObjectLink(item.Properties, "mResourceResolver", out BinTreeObjectLink resResolverLink) && resResolverLink.Value != 0)
+                    {
+                        MatchObservedEntry((uint)resResolverLink.Value, $"{skinPath}/Resources");
+                    }
+
+                    if (item.Properties.TryGetValue(Fnv1a.HashLower("skinAnimationProperties"), out BinTreeProperty animProp) &&
+                        animProp is BinTreeStruct animStruct &&
+                        TryGetObjectLink(animStruct.Properties, "animationGraphData", out BinTreeObjectLink animGraphLink) &&
+                        animGraphLink.Value != 0)
+                    {
+                        string[] parts = skinPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 4 && parts[0].Equals("Characters", StringComparison.OrdinalIgnoreCase) &&
+                            parts[2].Equals("Skins", StringComparison.OrdinalIgnoreCase))
+                        {
+                            MatchObservedEntry((uint)animGraphLink.Value, $"Characters/{parts[1]}/Animations/{parts[3]}");
                         }
                     }
                 }

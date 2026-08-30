@@ -732,6 +732,46 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Equal(InternalHashKind.BinHashes, match.Kind);
         }
 
+        [Theory]
+        [InlineData("SkinCharacterDataProperties")]
+        [InlineData("TftSkinCharacterDataProperties")]
+        public void SkinCharacterDataPropertiesResolvesLinksForLoLAndTFT(string className)
+        {
+            const string skinPath = "Characters/Aatrox/Skins/Skin1";
+            uint skinEntryHash = Fnv1a.HashLower(skinPath);
+            const string expectedResourcePath = "Characters/Aatrox/Skins/Skin1/Resources";
+            uint resourceHash = Fnv1a.HashLower(expectedResourcePath);
+            const string expectedAnimPath = "Characters/Aatrox/Animations/Skin1";
+            uint animHash = Fnv1a.HashLower(expectedAnimPath);
+
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(skinEntryHash);
+            targets[InternalHashKind.BinEntries].Add(resourceHash);
+            targets[InternalHashKind.BinEntries].Add(animHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+
+            var animStruct = new BinTreeStruct(Fnv1a.HashLower("skinAnimationProperties"), Fnv1a.HashLower("SkinAnimationProperties"), new BinTreeProperty[]
+            {
+                new BinTreeObjectLink(Fnv1a.HashLower("animationGraphData"), animHash)
+            });
+
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(skinEntryHash, Fnv1a.HashLower(className), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("championSkinName"), "AatroxSkin01"),
+                    new BinTreeObjectLink(Fnv1a.HashLower("mResourceResolver"), resourceHash),
+                    animStruct
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, m => m.Value == skinPath);
+            Assert.Contains(matcher.Matches, m => m.Value == expectedResourcePath);
+            Assert.Contains(matcher.Matches, m => m.Value == expectedAnimPath);
+        }
+
         [Fact]
         public void OwningEntryStringPrefixResolvesOnlyItsOwnEntryHash()
         {
