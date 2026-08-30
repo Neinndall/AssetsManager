@@ -46,7 +46,8 @@ namespace AssetsManager.Services.Hashes
             Fnv1a.HashLower("UiElementScissorRegionData"),
             Fnv1a.HashLower("UiElementSpineAnimationData"),
             Fnv1a.HashLower("UiElementTextData"),
-            Fnv1a.HashLower("UiSceneViewPaneData")
+            Fnv1a.HashLower("UiSceneViewPaneData"),
+            Fnv1a.HashLower("UiComponent")
         };
 
         private static readonly HashSet<uint> ObjectPathTypes = new()
@@ -61,9 +62,7 @@ namespace AssetsManager.Services.Hashes
         private static readonly HashSet<uint> SkinCharacterDataPropertiesTypes = new()
         {
             Fnv1a.HashLower("SkinCharacterDataProperties"),
-            Fnv1a.HashLower("TftSkinCharacterDataProperties"),
-            Fnv1a.HashLower("CharacterSkinData"),
-            Fnv1a.HashLower("SkinData")
+            Fnv1a.HashLower("TftSkinCharacterDataProperties")
         };
 
         private static readonly Dictionary<string, string> SharedBufferLeaves = new()
@@ -770,7 +769,6 @@ namespace AssetsManager.Services.Hashes
                 }
 
                 matcher.CheckContextualCandidate(InternalHashKind.BinHashes, entryPath, path, wadPath, objectPathHash);
-                matcher.CheckContextualCandidate(InternalHashKind.BinEntries, entryPath, path, wadPath, objectPathHash);
             }
 
             void MatchEntry(uint entryHash, BinTreeObject item)

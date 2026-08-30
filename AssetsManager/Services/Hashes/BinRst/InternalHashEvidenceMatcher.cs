@@ -76,7 +76,7 @@ namespace AssetsManager.Services.Hashes
                 Check32(InternalHashKind.BinTypes, fnv, candidate, strategy, source, sourceWad, sourceBin, HasLocalEvidence(fnv, localTargets, InternalHashKind.BinTypes));
             }
 
-            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath or InternalHashGuessStrategy.ReductionVariant or InternalHashGuessStrategy.BigramVariant)
+            if (content || strategy is InternalHashGuessStrategy.CrossDictionary or InternalHashGuessStrategy.CrossVersion or InternalHashGuessStrategy.NumericVariant or InternalHashGuessStrategy.GamePath)
             {
                 bool hasXxh3 = includeTruncatedRst && _targets[InternalHashKind.RstXxh3].Count > 0;
                 bool hasXxh64 = _targets[InternalHashKind.RstXxh64].Count > 0;

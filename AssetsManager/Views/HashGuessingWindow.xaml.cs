@@ -304,9 +304,6 @@ namespace AssetsManager.Views
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-reverse-suffix", Name = "SuffixFoldingEngine", Description = "Reverse-fold 45+ class/field suffixes in state space (O(Words))", BadgeText = "🚀 FAST", BadgeBrush = accentGreen });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-family-lattice", Name = "BaseClassFamilyLattice", Description = "Inherit sibling suffixes & vocabulary from base classes", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-crossdomain", Name = "CrossDomainDictionary", Description = "Known types as fields, known fields as types, 3D bones", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
-            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-bigram-chain", Name = "MarkovBigramChains", Description = "Attested 2..4 word transitions from meta dictionary", BadgeText = "⚡ FAST", BadgeBrush = accentPurple });
-            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-word-reduction", Name = "WordReductionPass", Description = "Delete 1 inner word from known schema names", BadgeText = "⚡ FAST", BadgeBrush = accentOrange });
-            binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-word-swap", Name = "WordSubstitutionPass", Description = "Substitute corpus words into attested name positions", BadgeText = "⚡ FAST", BadgeBrush = accentTeal });
             binSchema.SubMethods.Add(new HashMethodSubItemModel { Id = "bin-schema-path-templates", Name = "StructuralTemplates", Description = "Path and field numeric and character substitutions", BadgeText = "⚡ FAST", BadgeBrush = accentBrush });
             _allMethods.Add(binSchema);
 

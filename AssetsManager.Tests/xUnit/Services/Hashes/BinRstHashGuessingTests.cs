@@ -715,6 +715,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
 
             var targets = CreateTargets();
             targets[InternalHashKind.BinHashes].Add(objectPathHash);
+            targets[InternalHashKind.BinEntries].Add(objectPathHash);
             var matcher = new InternalHashEvidenceMatcher(targets);
 
             var tree = new BinTree(new[]
@@ -730,6 +731,7 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             InternalHashGuessMatch match = Assert.Single(matcher.Matches);
             Assert.Equal(entryPath, match.Value);
             Assert.Equal(InternalHashKind.BinHashes, match.Kind);
+            Assert.Contains(objectPathHash, targets[InternalHashKind.BinEntries]);
         }
 
         [Theory]
@@ -809,6 +811,57 @@ namespace AssetsManager.Tests.xUnit.Services.Hashes
             Assert.Contains(matcher.Matches, m => m.Value == rootPath);
             Assert.Contains(matcher.Matches, m => m.Value == slimePath);
             Assert.Contains(matcher.Matches, m => m.Value == spellPath);
+        }
+
+        [Theory]
+        [InlineData("ContextualActionData", "mObjectPath")]
+        [InlineData("CustomShaderDef", "objectPath")]
+        [InlineData("RewardGroup", "internalName")]
+        [InlineData("Sequence", "path")]
+        [InlineData("MapContainer", "mapPath")]
+        [InlineData("VfxSystemDefinitionData", "particlePath")]
+        [InlineData("UiComponent", "name")]
+        public void DirectEntryAttributesResolveTheirOwningEntry(string className, string fieldName)
+        {
+            const string entryPath = "Maps/Shipping/Map11/TestEntry";
+            uint entryHash = Fnv1a.HashLower(entryPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(entryHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = CreateEntryTree(entryHash, className, fieldName, entryPath);
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "test.bin");
+
+            InternalHashGuessMatch match = Assert.Single(matcher.Matches);
+            Assert.Equal(entryPath, match.Value);
+            Assert.Equal(InternalHashKind.BinEntries, match.Kind);
+        }
+
+        [Fact]
+        public void AugmentDataResolvesEntryAndRootSpell()
+        {
+            const string augmentName = "TestAugment";
+            const string augmentPath = "Maps/ModeSpecificData/Augments/TestAugment";
+            const string spellPath = "Maps/ModeSpecificData/Augments/TestAugment/Augment_TestAugment";
+            uint augmentHash = Fnv1a.HashLower(augmentPath);
+            uint spellHash = Fnv1a.HashLower(spellPath);
+            var targets = CreateTargets();
+            targets[InternalHashKind.BinEntries].Add(augmentHash);
+            targets[InternalHashKind.BinEntries].Add(spellHash);
+            var matcher = new InternalHashEvidenceMatcher(targets);
+            var tree = new BinTree(new[]
+            {
+                new BinTreeObject(augmentHash, Fnv1a.HashLower("AugmentData"), new BinTreeProperty[]
+                {
+                    new BinTreeString(Fnv1a.HashLower("AugmentNameId"), augmentName),
+                    new BinTreeObjectLink(Fnv1a.HashLower("RootSpell"), spellHash)
+                })
+            }, Array.Empty<string>());
+
+            BinContentEvidenceSource.MatchBinContextualEvidence(tree, matcher, "test.bin");
+
+            Assert.Contains(matcher.Matches, match => match.Value == augmentPath);
+            Assert.Contains(matcher.Matches, match => match.Value == spellPath);
         }
 
         [Fact]

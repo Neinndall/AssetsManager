@@ -20,9 +20,7 @@ namespace AssetsManager.Views.Models.Hashes
         GamePath,
         CrossDictionary,
         CrossVersion,
-        NumericVariant,
-        ReductionVariant,
-        BigramVariant
+        NumericVariant
     }
 
     public enum InternalHashConfidence
